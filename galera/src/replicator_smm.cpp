@@ -1310,7 +1310,26 @@ void galera::ReplicatorSMM::resume() throw ()
 
 void galera::ReplicatorSMM::desync() throw (gu::Exception)
 {
-    gcs_.desync();
+    wsrep_seqno_t const seqno_l(gcs_.desync());
+
+    if (seqno_l >= 0)
+    {
+        if (local_monitor_.would_block(seqno_l))
+        {
+            gu_throw_error (-EDEADLK) << "Ran out of resources waiting to "
+                                      << "desync the node."
+                                      << "Application restart required";
+        }
+
+        LocalOrder lo(seqno_l);
+        local_monitor_.enter(lo);
+        state_.shift_to(S_DONOR);
+        local_monitor_.leave(lo);
+    }
+    else
+    {
+        gu_throw_error (-seqno_l) << "Node desync failed";
+    }
 }
 
 void galera::ReplicatorSMM::resync() throw (gu::Exception)

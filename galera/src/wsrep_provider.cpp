@@ -761,7 +761,7 @@ wsrep_status_t galera_desync (wsrep_t* gh)
     catch (gu::Exception& e)
     {
         log_error << e.what();
-        return WSREP_NODE_FAIL;
+        return WSREP_TRX_FAIL;
     }
 }
 
