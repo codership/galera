@@ -223,7 +223,12 @@ PC::~PC()
 {
     if (!closed)
     {
-        close();
+        try
+        {
+            close();
+        }
+        catch (...)
+        { }
         sleep(1); // half-hearted attempt to avoid race with client threads
     }
 
