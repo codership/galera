@@ -182,6 +182,7 @@ public:
         mutex(),
         refcnt(0),
         terminated(false),
+        error(0),
         recv_buf(),
         current_view(),
         prof("gcs_gcomm")
@@ -237,7 +238,7 @@ public:
         log_info << "gcomm: connected";
     }
 
-    void close()
+    void close(bool join = true)
     {
         if (tp == 0)
         {
@@ -246,11 +247,13 @@ public:
         }
         log_info << "gcomm: terminating thread";
         terminate();
-        log_info << "gcomm: joining thread";
-        pthread_join(thd, 0);
+        if (join == true)
+        {
+            log_info << "gcomm: joining thread";
+            pthread_join(thd, 0);
+        }
         log_info << "gcomm: closing backend";
         tp->close();
-
         gcomm::disconnect(tp, this);
         delete tp;
         tp = 0;
@@ -295,7 +298,7 @@ public:
     bool        get_use_prod_cons() const { return use_prod_cons; }
     Protonet&   get_pnet()                { return *net; }
     gu::Config& get_conf()                { return conf; }
-
+    int         get_error() const         { return error; }
     class Ref
     {
     public:
@@ -353,6 +356,7 @@ private:
     Mutex mutex;
     size_t refcnt;
     bool terminated;
+    bool error;
     RecvBuf recv_buf;
     View current_view;
     Profile prof;
@@ -361,11 +365,15 @@ private:
 
 void GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
 {
-    if (um.has_view() == true)
+    if (um.get_errno() != 0)
+    {
+        error = um.get_errno();
+        recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
+    }
+    else if (um.has_view() == true)
     {
         current_view = um.get_view();
-        recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(),
-                                       dg, um));
+        recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
         if (current_view.is_empty())
         {
             log_debug << "handle_up: self leave";
@@ -447,7 +455,44 @@ void GCommConn::run()
             }
         }
 
-        net->event_loop(Sec);
+        try
+        {
+            net->event_loop(Sec);
+        }
+        catch (gu::Exception& e)
+        {
+            log_error << "exception from gcomm, backend must be restarted:"
+                      << e.what();
+            gcomm::Critical<Protonet> crit(get_pnet());
+            handle_up(0, Datagram(),
+                      ProtoUpMeta(UUID::nil(),
+                                  ViewId(V_NON_PRIM),
+                                  0,
+                                  0xff,
+                                  O_DROP,
+                                  -1,
+                                  e.get_errno()));
+            close(false);
+            pthread_detach(thd);
+            break;
+        }
+        catch (...)
+        {
+            log_error
+                << "unknow exception from gcomm, backend must be restarted";
+            gcomm::Critical<Protonet> crit(get_pnet());
+            handle_up(0, Datagram(),
+                      ProtoUpMeta(UUID::nil(),
+                                  ViewId(V_NON_PRIM),
+                                  0,
+                                  0xff,
+                                  O_DROP,
+                                  -1,
+                                  gu::Exception::E_UNSPEC));
+            close(false);
+            pthread_detach(thd);
+            break;
+        }
     }
 }
 
@@ -496,9 +541,14 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
                 new Buffer(reinterpret_cast<const byte_t*>(buf),
                            reinterpret_cast<const byte_t*>(buf) + len)));
         gcomm::Critical<Protonet> crit(conn.get_pnet());
+        if (gu_unlikely(conn.get_error() != 0))
+        {
+            return -ENOTCONN;
+        }
         int err = conn.send_down(
             dg,
-            ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ? O_LOCAL_CAUSAL : O_SAFE));
+            ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ?
+                          O_LOCAL_CAUSAL : O_SAFE));
         return (err == 0 ? len : -err);
     }
 }
@@ -572,6 +622,23 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             {
                 msg->type = GCS_MSG_ERROR;
             }
+        }
+        else if (um.get_errno() != 0)
+        {
+            gcs_comp_msg_t* cm(gcs_comp_msg_leave());
+            const ssize_t cm_size(gcs_comp_msg_size(cm));
+            msg->size = cm_size;
+            if (gu_likely(cm_size <= msg->buf_len))
+            {
+                memcpy(msg->buf, cm, cm_size);
+                recv_buf.pop_front();
+                msg->type = GCS_MSG_COMPONENT;
+            }
+            else
+            {
+                msg->type = GCS_MSG_ERROR;
+            }
+            gcs_comp_msg_delete(cm);
         }
         else
         {
@@ -665,7 +732,7 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     }
 
     GCommConn& conn(*ref.get());
-
+    gcomm::Critical<Protonet> crit(conn.get_pnet());
     try
     {
         conn.close();
