@@ -8,6 +8,7 @@
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
 #include <list>
+#include <vector>
 
 namespace galera
 {
@@ -57,7 +58,8 @@ namespace galera
             :
             delete_(false),
             trans_map_(trans_map),
-            state_(initial_state)
+            state_(initial_state),
+            state_hist_()
         { }
 
         ~FSM()
@@ -98,6 +100,7 @@ namespace galera
                 (*ai)();
             }
 
+            state_hist_.push_back(state_);
             state_ = state;
 
             for (ai = i->second.post_action_.begin();
@@ -184,6 +187,7 @@ namespace galera
         bool delete_;
         TransMap* const trans_map_;
         State state_;
+        std::vector<State> state_hist_;
     };
 
 }
