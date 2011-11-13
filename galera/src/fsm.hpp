@@ -51,7 +51,8 @@ namespace galera
             :
             delete_(true),
             trans_map_(new TransMap),
-            state_(initial_state)
+            state_(initial_state),
+            state_hist_()
         { }
 
         FSM(TransMap* const trans_map, State const initial_state)
