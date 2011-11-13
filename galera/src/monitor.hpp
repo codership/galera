@@ -206,7 +206,8 @@ namespace galera
                 lock.wait(cond_);
             }
 
-            if (process_[idx].state_ == Process::S_WAITING)
+            if (process_[idx].state_ == Process::S_IDLE    ||
+                process_[idx].state_ == Process::S_WAITING )
             {
                 process_[idx].state_ = Process::S_CANCELED;
                 process_[idx].cond_.signal();
@@ -215,7 +216,10 @@ namespace galera
             }
             else
             {
-                log_debug << "cancel, applier state " << process_[idx].state_;
+                log_debug << "interrupting " << obj.seqno()
+                          << " state " << process_[idx].state_
+                          << " le " << last_entered_
+                          << " ll " << last_left_;
             }
         }
 
