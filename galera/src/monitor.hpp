@@ -206,7 +206,8 @@ namespace galera
                 lock.wait(cond_);
             }
 
-            if (process_[idx].state_ == Process::S_IDLE    ||
+            if ((process_[idx].state_ == Process::S_IDLE &&
+                 obj.seqno()          >  last_left_ ) ||
                 process_[idx].state_ == Process::S_WAITING )
             {
                 process_[idx].state_ = Process::S_CANCELED;
