@@ -40,6 +40,7 @@ namespace galera
             Receiver(gu::Config& conf, const char* addr);
             ~Receiver();
             std::string prepare(wsrep_seqno_t, wsrep_seqno_t, int);
+            void ready();
             int recv(TrxHandle** trx);
             void finished();
             void run();
@@ -71,6 +72,7 @@ namespace galera
             };
             std::stack<Consumer*> consumers_;
             bool running_;
+            bool ready_;
             int error_code_;
             wsrep_seqno_t current_seqno_;
             wsrep_seqno_t last_seqno_;

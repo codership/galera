@@ -502,6 +502,7 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     cond_(),
     consumers_(),
     running_(false),
+    ready_(false),
     error_code_(0),
     current_seqno_(-1),
     last_seqno_(-1),
@@ -612,6 +613,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
                                wsrep_seqno_t last_seqno,
                                int           version)
 {
+    ready_ = false;
     version_ = version;
     recv_addr_ = IST_determine_recv_addr(conf_);
     gu::URI     const uri(recv_addr_);
@@ -714,7 +716,7 @@ void galera::ist::Receiver::run()
                 ++current_seqno_;
             }
             gu::Lock lock(mutex_);
-            while (consumers_.empty())
+            while (ready_ == false || consumers_.empty())
             {
                 lock.wait(cond_);
             }
@@ -773,6 +775,13 @@ err:
     }
 }
 
+
+void galera::ist::Receiver::ready()
+{
+    gu::Lock lock(mutex_);
+    ready_ = true;
+    cond_.signal();
+}
 
 int galera::ist::Receiver::recv(TrxHandle** trx)
 {
@@ -998,7 +1007,8 @@ extern "C"
 void* run_async_sender(void* arg)
 {
     galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
-    log_info << "async IST sender starting to serve " << as->peer();
+    log_info << "async IST sender starting to serve " << as->peer()
+             << " sending " << as->first() << "-" << as->last();
     wsrep_seqno_t join_seqno;
     try
     {
