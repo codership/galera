@@ -563,11 +563,8 @@ IST_determine_recv_addr (const gu::Config& conf)
                                << '\'' << "not found.";
     }
 
-    try /* check if explicit scheme is present */
-    {
-        gu::URI tmp(recv_addr);
-    }
-    catch (gu::Exception&)
+    /* check if explicit scheme is present */
+    if (recv_addr.find("://") == std::string::npos)
     {
         bool ssl(false);
 
