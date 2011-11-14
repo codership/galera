@@ -103,6 +103,7 @@ public:
 
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_APPLYING);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_REPLAY_AM); // trx replay
 
         add(TrxHandle::S_APPLYING, TrxHandle::S_MUST_ABORT);
