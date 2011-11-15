@@ -65,6 +65,7 @@ public:
   {
     switch (m)
     {
+/* Not supported in libssl 1.0.0
     case context_base::sslv2:
       impl = ::SSL_CTX_new(::SSLv2_method());
       break;
@@ -74,6 +75,7 @@ public:
     case context_base::sslv2_server:
       impl = ::SSL_CTX_new(::SSLv2_server_method());
       break;
+*/
     case context_base::sslv3:
       impl = ::SSL_CTX_new(::SSLv3_method());
       break;

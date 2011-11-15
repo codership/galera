@@ -176,11 +176,10 @@ test_make_msg (char* msg, const long mlen)
 {
     static gcs_seqno_t count = 1;
     long len = 0;
-    gcs_seqno_t tmp;
 
     if (!throughput) {
         pthread_mutex_lock   (&make_msg_lock);
-        tmp = count++;
+        count++;
         pthread_mutex_unlock (&make_msg_lock);
 
         len = snprintf (msg, mlen, "%10d %9llu %s",

@@ -42,12 +42,11 @@ libgcs_env.StaticLibrary('gcs', libgcs_sources)
 # and program should be linked statically
 gcs_test_env = libgcs_env.Clone()
 
-gcs_test_env.Append(LIBS = File('#/gcs/src/libgcs.a'))
-gcs_test_env.Append(LIBS = File('#/gcache/src/libgcache.a'))
-gcs_test_env.Append(LIBS = File('#/gcomm/src/libgcomm.a'))
-gcs_test_env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
-gcs_test_env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
-gcs_test_env.Append(LIBS = ['pthread'])
+gcs_test_env.Prepend(LIBS = File('#/galerautils/src/libgalerautils.a'))
+gcs_test_env.Prepend(LIBS = File('#/galerautils/src/libgalerautils++.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcomm/src/libgcomm.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcache/src/libgcache.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcs/src/libgcs.a'))
 
 gcs_test_env.Program(target = 'gcs_test',
                      source = 'gcs_test.c',
