@@ -11,10 +11,10 @@ if not conf.CheckLibWithHeader(libs=['boost_program_options'],
     print 'Error: boost_program_options not found'
     Exit (1)
 
-env.Append(LIBS=File('#/gcs/src/libgcs4garb.a'))
-env.Append(LIBS=File('#/gcomm/src/libgcomm.a'))
-env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
-env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
+env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
 
 bpo_static = '/usr/lib/libboost_program_options.a'
 

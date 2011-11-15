@@ -19,15 +19,15 @@
 #include "gcomm/map.hpp"
 #include "gcomm/util.hpp"
 
-
 #include <vector>
 #include <deque>
 #include <functional>
 
+extern gu::Config check_trace_conf;
+
+
 namespace gcomm
 {
-
-
     class TraceMsg
     {
     public:
@@ -171,11 +171,11 @@ namespace gcomm
         UUID uuid;
         std::deque<gu::Datagram*> out;
         bool queue;
-        static std::auto_ptr<Protonet> dummy_net;
     public:
         DummyTransport(const UUID& uuid_ = UUID::nil(), bool queue_ = true,
                        const gu::URI& uri = gu::URI("dummy:")) :
-            Transport(*dummy_net, uri),
+            Transport(*std::auto_ptr<Protonet>(Protonet::create(check_trace_conf)),
+                      uri),
             uuid(uuid_),
             out(),
             queue(queue_)
