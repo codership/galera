@@ -14,8 +14,7 @@ using namespace std;
 using namespace gu;
 using namespace gcomm;
 
-static gu::Config check_trace_conf;
-
+gu::Config check_trace_conf;
 
 ostream& gcomm::operator<<(ostream& os, const TraceMsg& msg)
 {
@@ -344,5 +343,3 @@ void gcomm::check_trace(const vector<DummyNode*>& nvec)
     for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
 }
 
-
-auto_ptr<Protonet> DummyTransport::dummy_net(Protonet::create(check_trace_conf));

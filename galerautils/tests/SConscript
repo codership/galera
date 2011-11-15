@@ -3,8 +3,8 @@ Import('check_env')
 
 env = check_env.Clone()
 
-env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
-env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 
 gu_tests = env.Program(target = 'gu_tests',
                        source = Split('''
