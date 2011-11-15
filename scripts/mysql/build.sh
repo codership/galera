@@ -329,16 +329,12 @@ then
         MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
         MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
 
-        COMMENT="\"wsrep patch: $RELEASE.r$WSREP_REV\""
-
         export wsrep_configs="$LAYOUT \
-                              --exec-prefix=/usr \
                               --libexecdir=/usr/sbin \
                               --localstatedir=/var/lib/mysql/ \
                               --with-extra-charsets=all \
                               --with-ssl \
-                              --with-unix-socket-path=$MYSQL_SOCKET_PATH \
-                              --with-comment=$COMMENT"
+                              --with-unix-socket-path=$MYSQL_SOCKET_PATH"
 
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
