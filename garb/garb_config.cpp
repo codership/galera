@@ -108,6 +108,7 @@ Config::Config (int argc, char* argv[]) throw (gu::Exception)
     options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_master_slave=yes";
 
     // this block must be the very last.
+    gu_conf_self_tstamp_on();
     if (vm.count("log"))
     {
         set_logfile (log_);
@@ -115,6 +116,7 @@ Config::Config (int argc, char* argv[]) throw (gu::Exception)
     else if (daemon_) /* if no log file given AND daemon operation requested -
                        * log to syslog */
     {
+        gu_conf_self_tstamp_off();
         set_syslog();
     }
 }

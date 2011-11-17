@@ -19,7 +19,6 @@ namespace garb
         }
 
         gu_conf_set_log_file (log_file);
-        gu_conf_self_tstamp_on ();
     }
 
     static void log_to_syslog (int level, const char* msg) throw()
