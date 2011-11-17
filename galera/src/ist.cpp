@@ -16,6 +16,11 @@
 
 namespace
 {
+    static std::string const CONF_SSL_KEY       ("socket.ssl_key");
+    static std::string const CONF_SSL_CERT      ("socket.ssl_cert");
+    static std::string const CONF_SSL_CA        ("socket.ssl_ca");
+    static std::string const CONF_SSL_PSWD_FILE ("socket.ssl_password_file");
+
     static inline std::string unescape_addr(const std::string& addr)
     {
         std::string ret(addr);
@@ -31,7 +36,7 @@ namespace
         SSLPasswordCallback(const gu::Config& conf) : conf_(conf) { }
         std::string get_password() const
         {
-            std::string   file(conf_.get("socket.ssl_password_file"));
+            std::string   file(conf_.get(CONF_SSL_PSWD_FILE));
             std::ifstream ifs(file.c_str(), std::ios_base::in);
             if (ifs.good() == false)
             {
@@ -55,15 +60,13 @@ namespace
         SSLPasswordCallback cb(conf);
         ctx.set_password_callback(
             boost::bind(&SSLPasswordCallback::get_password, &cb));
-        ctx.use_private_key_file(conf.get("socket.ssl_key"),
+        ctx.use_private_key_file(conf.get(CONF_SSL_KEY),
                                  asio::ssl::context::pem);
-        ctx.use_certificate_file(conf.get("socket.ssl_cert"),
+        ctx.use_certificate_file(conf.get(CONF_SSL_CERT),
                                  asio::ssl::context::pem);
-        ctx.load_verify_file(conf.get("socekt.ssl_ca",
-                                      conf.get("socket.ssl_cert")));
-
+        ctx.load_verify_file(conf.get(CONF_SSL_CA,
+                                      conf.get(CONF_SSL_CERT)));
     }
-
 }
 
 //
@@ -571,7 +574,7 @@ IST_determine_recv_addr (const gu::Config& conf)
 
         try
         {
-            std::string ssl_key = conf.get("socket.ssl_key");
+            std::string ssl_key = conf.get(CONF_SSL_KEY);
             if (ssl_key.length() != 0) ssl = true;
         }
         catch (gu::NotFound&) {}
