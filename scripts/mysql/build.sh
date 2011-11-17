@@ -447,13 +447,16 @@ if [ $TAR == "yes" ]; then
     install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 
     # Copy required Galera libraries
+    GALERA_BINS=$GALERA_DIST_DIR/bin
     GALERA_LIBS=$GALERA_DIST_DIR/lib
     install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
+    install -m 755 -d $GALERA_BINS
     install -m 755 -d $GALERA_LIBS
 
     if [ "$SCONS" == "yes" ]
     then
         SCONS_VD=$GALERA_SRC
+        cp -P $SCONS_VD/garb/garbd        $GALERA_BINS
         cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
     else
         echo "Autotools compilation not supported any more."
@@ -468,8 +471,8 @@ if [ $TAR == "yes" ]; then
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
     then
-        for d in $GALERA_LIBS $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib \
-                 $MYSQL_DIST_DIR/sbin
+        for d in $GALERA_BINS $GALERA_LIBS \
+                 $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib $MYSQL_DIST_DIR/sbin
         do
             for f in $d/*
             do
