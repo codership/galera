@@ -103,6 +103,7 @@ namespace galera
         private:
             Sender(const Sender&);
             void operator=(const Sender&);
+            const gu::Config&                        conf_;
             asio::io_service                         io_service_;
             asio::ip::tcp::socket                    socket_;
             asio::ssl::context                       ssl_ctx_;

@@ -16,6 +16,9 @@
 
 namespace
 {
+    static std::string const CONF_KEEP_KEYS     ("ist.keep_keys");
+    static bool        const CONF_KEEP_KEYS_DEFAULT (true);
+
     static std::string const CONF_SSL_KEY       ("socket.ssl_key");
     static std::string const CONF_SSL_CERT      ("socket.ssl_cert");
     static std::string const CONF_SSL_CA        ("socket.ssl_ca");
@@ -100,22 +103,28 @@ namespace galera
                     T_CTRL = 3,
                     T_TRX = 4
                 } Type;
-                Message(int version = -1, Type type = T_NONE,
-                        int16_t ctrl = 0, uint64_t len = 0)
+                Message(int       version = -1,
+                        Type      type    = T_NONE,
+                        uint8_t   flags   = 0,
+                        int8_t    ctrl    = 0,
+                        uint64_t  len     = 0)
                     :
                     version_(version),
                     type_   (type   ),
+                    flags_  (flags  ),
                     ctrl_   (ctrl   ),
                     len_    (len    )
                 { }
-                int  version() const { return version_; }
-                Type    type() const { return type_   ; }
-                int16_t ctrl() const { return ctrl_   ; }
-                uint64_t len() const { return len_    ; }
+                int  version()  const { return version_; }
+                Type    type()  const { return type_   ; }
+                uint8_t flags() const { return flags_  ; }
+                int8_t  ctrl()  const { return ctrl_   ; }
+                uint64_t len()  const { return len_    ; }
 
                 static inline size_t serial_size(const Message& msg)
                 {
-                    // header: version 1 byte, type 1 byte, ctrl field 2 bytes
+                    // header: version 1 byte, type 1 byte, flags 1 byte,
+                    //         ctrl field 1 byte
                     return 4 + sizeof(msg.len_);
                 }
 
@@ -127,6 +136,7 @@ namespace galera
                                                buf, buflen, offset);
                     offset = galera::serialize(static_cast<uint8_t>(msg.type_),
                                                buf, buflen, offset);
+                    offset = galera::serialize(msg.flags_, buf, buflen, offset);
                     offset = galera::serialize(msg.ctrl_, buf, buflen, offset);
                     offset = galera::serialize(msg.len(), buf, buflen, offset);
                     return offset;
@@ -142,6 +152,7 @@ namespace galera
                     msg.version_ = u8;
                     offset = galera::unserialize(buf, buflen, offset, u8);
                     msg.type_ = static_cast<Proto::Message::Type>(u8);
+                    offset = galera::unserialize(buf, buflen, offset, msg.flags_);
                     offset = galera::unserialize(buf, buflen, offset, msg.ctrl_);
                     offset = galera::unserialize(buf, buflen, offset, msg.len_);
                     return offset;
@@ -151,7 +162,8 @@ namespace galera
 
                 int      version_;
                 Type     type_;
-                int16_t  ctrl_;
+                uint8_t  flags_;
+                int8_t   ctrl_;
                 uint64_t len_;
             };
             class Handshake : public Message
@@ -159,7 +171,7 @@ namespace galera
             public:
                 Handshake(int version = -1)
                     :
-                    Message(version, Message::T_HANDSHAKE, 0, 0)
+                    Message(version, Message::T_HANDSHAKE, 0, 0, 0)
                 { }
             };
             class HandshakeResponse : public Message
@@ -167,7 +179,7 @@ namespace galera
             public:
                 HandshakeResponse(int version = -1)
                     :
-                    Message(version, Message::T_HANDSHAKE_RESPONSE, 0, 0)
+                    Message(version, Message::T_HANDSHAKE_RESPONSE, 0, 0, 0)
                 { }
             };
             class Ctrl : public Message
@@ -179,9 +191,9 @@ namespace galera
                     C_OK = 0,
                     C_EOF = 1
                 };
-                Ctrl(int version = -1, int16_t code = 0)
+                Ctrl(int version = -1, int8_t code = 0)
                     :
-                    Message(version, Message::T_CTRL, code, 0)
+                    Message(version, Message::T_CTRL, 0, code, 0)
                 { }
             };
             class Trx : public Message
@@ -189,11 +201,31 @@ namespace galera
             public:
                 Trx(int version = -1, uint64_t len = 0)
                     :
-                    Message(version, Message::T_TRX, 0, len)
+                    Message(version, Message::T_TRX, 0, 0, len)
                 { }
             };
 
-            Proto(int version) : version_(version) { }
+            Proto(int version, bool keep_keys)
+                :
+                version_(version),
+                keep_keys_(keep_keys),
+                raw_sent_(0),
+                real_sent_(0)
+            { }
+
+            ~Proto()
+            {
+                if (raw_sent_ > 0)
+                {
+                    log_info << "ist proto finished, raw sent: "
+                             << raw_sent_
+                             << " real sent: "
+                             << real_sent_
+                             << " frac: "
+                             << (raw_sent_ == 0 ? 0. :
+                                 static_cast<double>(real_sent_)/raw_sent_);
+                }
+            }
 
             template <class ST>
             void send_handshake(ST& socket)
@@ -303,7 +335,7 @@ namespace galera
             }
 
             template <class ST>
-            void send_ctrl(ST& socket, int16_t code)
+            void send_ctrl(ST& socket, int8_t code)
             {
                 Ctrl ctrl(version_, code);
                 gu::Buffer buf(serial_size(ctrl));
@@ -316,7 +348,7 @@ namespace galera
             }
 
             template <class ST>
-            int16_t recv_ctrl(ST& socket)
+            int8_t recv_ctrl(ST& socket)
             {
                 Message msg;
                 gu::Buffer buf(serial_size(msg));
@@ -345,26 +377,90 @@ namespace galera
             void send_trx(ST&        socket,
                           const gcache::GCache::Buffer& buffer)
             {
-                const size_t trx_meta_size(galera::serial_size(buffer.seqno_g())
-                                           + galera::serial_size(buffer.seqno_d()));
+                const size_t trx_meta_size(
+                    galera::serial_size(buffer.seqno_g())
+                    + galera::serial_size(buffer.seqno_d()));
                 const bool rolled_back(buffer.seqno_d() == -1);
-                const size_t trx_size(rolled_back == true ? 0 : buffer.size());
-                Trx trx(version_, trx_size + trx_meta_size);
-                gu::Buffer buf(serial_size(trx) + trx_meta_size);
-                size_t offset(serialize(trx, &buf[0], buf.size(), 0));
-                offset = galera::serialize(buffer.seqno_g(), &buf[0], buf.size(), offset);
-                offset = galera::serialize(buffer.seqno_d(), &buf[0], buf.size(), offset);
+
                 assert(offset = buf.size());
                 size_t n;
                 if (rolled_back == true)
                 {
+                    Trx trx_msg(version_, trx_meta_size);
+                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
+                    size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
+                    offset = galera::serialize(buffer.seqno_g(),
+                                               &buf[0], buf.size(), offset);
+                    offset = galera::serialize(buffer.seqno_d(),
+                                               &buf[0], buf.size(), offset);
                     n = asio::write(socket, asio::buffer(&buf[0], buf.size()));
                 }
-                else
+                else if (keep_keys_ == true)
                 {
+                    Trx trx_msg(version_, trx_meta_size + buffer.size());
+                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
+                    size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
+                    offset = galera::serialize(buffer.seqno_g(),
+                                               &buf[0], buf.size(), offset);
+                    offset = galera::serialize(buffer.seqno_d(),
+                                               &buf[0], buf.size(), offset);
                     boost::array<asio::const_buffer, 2> cbs;
                     cbs[0] = asio::const_buffer(&buf[0], buf.size());
                     cbs[1] = asio::const_buffer(buffer.ptr(), buffer.size());
+                    n = asio::write(socket, cbs);
+                }
+                else
+                {
+                    class AutoRelease
+                    {
+                    public:
+                        AutoRelease(TrxHandle* trx) : trx_(trx) { }
+                        ~AutoRelease() { trx_->unref(); }
+                        TrxHandle* trx() { return trx_; }
+                    private:
+                        TrxHandle* trx_;
+                    };
+                    // reconstruct trx without keys
+                    AutoRelease ar(new TrxHandle);
+                    galera::TrxHandle* trx(ar.trx());
+                    const gu::byte_t* const ptr(
+                        reinterpret_cast<const gu::byte_t*>(buffer.ptr()));
+                    size_t offset(galera::unserialize(ptr,
+                                                      buffer.size(), 0, *trx));
+                    while (offset < static_cast<size_t>(buffer.size()))
+                    {
+                        // skip over keys
+                        uint32_t len;
+                        offset = galera::unserialize(
+                            ptr, buffer.size(), offset, len);
+                        offset += len;
+                        offset = galera::unserialize(
+                            ptr, buffer.size(), offset, len);
+                        if (offset + len > static_cast<size_t>(buffer.size()))
+                        {
+                            gu_throw_error(ERANGE)
+                                << (offset + len) << " > " << buffer.size();
+                        }
+                        trx->append_data(ptr + offset, len);
+                        offset += len;
+                    }
+                    trx->flush(0);
+
+                    Trx trx_msg(version_, trx_meta_size
+                                + trx->write_set_collection().size());
+                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
+                    offset = serialize(trx_msg, &buf[0], buf.size(), 0);
+                    offset = galera::serialize(buffer.seqno_g(),
+                                               &buf[0], buf.size(), offset);
+                    offset = galera::serialize(buffer.seqno_d(),
+                                               &buf[0], buf.size(), offset);
+                    boost::array<asio::const_buffer, 2> cbs;
+                    cbs[0] = asio::const_buffer(&buf[0], buf.size());
+                    cbs[1] = asio::const_buffer(
+                        &trx->write_set_collection()[0],
+                        trx->write_set_collection().size());
+                    raw_sent_ += buffer.size();
+                    real_sent_ += trx->write_set_collection().size();
                     n = asio::write(socket, cbs);
                 }
                 log_debug << "sent " << n << " bytes";
@@ -450,7 +546,10 @@ namespace galera
             }
 
         private:
-            int version_;
+            int  version_;
+            bool keep_keys_;
+            uint64_t raw_sent_;
+            uint64_t real_sent_;
         };
 
 
@@ -683,7 +782,7 @@ void galera::ist::Receiver::run()
     int ec(0);
     try
     {
-        Proto p(version_);
+        Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         if (use_ssl_ == true)
         {
             p.send_handshake(ssl_stream);
@@ -848,7 +947,8 @@ void galera::ist::Receiver::interrupt()
                 ssl_stream(io_service_, ssl_ctx_);
             ssl_stream.lowest_layer().connect(*i);
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p(version_);
+            Proto p(version_,
+                    conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(ssl_stream);
             p.send_ctrl(ssl_stream, Proto::Ctrl::C_EOF);
             p.recv_ctrl(ssl_stream);
@@ -857,7 +957,8 @@ void galera::ist::Receiver::interrupt()
         {
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
-            Proto p(version_);
+            Proto p(version_,
+                    conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(socket);
             p.send_ctrl(socket, Proto::Ctrl::C_EOF);
             p.recv_ctrl(socket);
@@ -870,11 +971,12 @@ void galera::ist::Receiver::interrupt()
 }
 
 
-galera::ist::Sender::Sender(const gu::Config& conf,
+galera::ist::Sender::Sender(const gu::Config&  conf,
                             gcache::GCache&    gcache,
                             const std::string& peer,
-                            int version)
+                            int                version)
     :
+    conf_(conf),
     io_service_(),
     socket_(io_service_),
     ssl_ctx_(io_service_, asio::ssl::context::sslv23),
@@ -923,7 +1025,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 {
     try
     {
-        Proto p(version_);
+        Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
         if (use_ssl_ == true)
         {
@@ -1010,7 +1112,7 @@ extern "C"
 void* run_async_sender(void* arg)
 {
     galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
-    log_info << "async IST sender starting to serve " << as->peer()
+    log_info << "async IST sender starting to serve " << as->peer().c_str()
              << " sending " << as->first() << "-" << as->last();
     wsrep_seqno_t join_seqno;
     try
@@ -1020,13 +1122,13 @@ void* run_async_sender(void* arg)
     }
     catch (gu::Exception& e)
     {
-        log_error << "async IST sender failed to serve " << as->peer()
+        log_error << "async IST sender failed to serve " << as->peer().c_str()
                   << ": " << e.what();
         join_seqno = -e.get_errno();
     }
     catch (...)
     {
-        log_error << "async IST sender, failed to serve " << as->peer();
+        log_error << "async IST sender, failed to serve " << as->peer().c_str();
         throw;
     }
 
