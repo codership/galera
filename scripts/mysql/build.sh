@@ -259,11 +259,11 @@ fi
 ##           Build MySQL            ##
 ##                                  ##
 ######################################
-# Obtain MySQL version and revision of Galera patch
+# Obtain MySQL version and revision number
 cd $MYSQL_SRC
-WSREP_REV=$(bzr revno)
+WSREP_REV=$(bzr revno) || \
+WSREP_REV="XXXX"
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-
 
 if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
