@@ -13,6 +13,7 @@
 #include "trx_handle.hpp"
 #include <boost/bind.hpp>
 #include <fstream>
+#include <algorithm>
 
 namespace
 {
@@ -1023,6 +1024,11 @@ galera::ist::Sender::~Sender()
 
 void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 {
+    if (first > last)
+    {
+        gu_throw_error(EINVAL) << "sender send first greater than last: "
+                               << first << " > " << last ;
+    }
     try
     {
         Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
@@ -1045,8 +1051,9 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 << "ist send failed, peer reported error: " << ctrl;
         }
 
-        std::vector<gcache::GCache::Buffer> buf_vec(1);
-
+        std::vector<gcache::GCache::Buffer> buf_vec(
+            std::min(static_cast<size_t>(last - first),
+                     static_cast<size_t>(1024)));
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
