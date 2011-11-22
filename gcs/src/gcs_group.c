@@ -60,6 +60,8 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
 
     group->quorum = GCS_QUORUM_NON_PRIMARY;
 
+    group->last_applied_proto_ver = -1;
+
     return 0;
 }
 
@@ -164,8 +166,15 @@ group_redo_last_applied (gcs_group_t* group)
     gu_seqno_t last_applied = GU_LONG_LONG_MAX;
 
     for (n = 0; n < group->num; n++) {
-        gcs_node_t*      node  = &group->nodes[n];
-        gcs_seqno_t      seqno = gcs_node_get_last_applied (node);
+        const gcs_node_t* const node  = &group->nodes[n];
+        gcs_seqno_t const seqno = node->last_applied;
+        bool count = node->count_last_applied;
+
+        if (gu_unlikely (0 == group->last_applied_proto_ver)) {
+            /* @note: this may be removed after quorum v1 is phased out */
+            count = (GCS_NODE_STATE_SYNCED == node->status ||
+                     GCS_NODE_STATE_DONOR  == node->status);
+        }
 
 //        gu_debug ("last_applied[%ld]: %lld", n, seqno);
 
@@ -176,8 +185,7 @@ group_redo_last_applied (gcs_group_t* group)
          *       GCS_BLOCKING_DONOR should never be defined unless in some
          *       very custom builds. Commenting it out for safety sake. */
 //#ifndef GCS_BLOCKING_DONOR
-        if ((GCS_NODE_STATE_SYNCED == node->status ||
-             GCS_NODE_STATE_DONOR  == node->status)
+        if (count
 //#else
 //        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
 //#endif
@@ -261,6 +269,19 @@ group_post_state_exchange (gcs_group_t* group)
               GU_UUID_ARGS(&group->state_uuid));
 
     gcs_state_msg_get_quorum (states, group->num, quorum);
+
+    if (quorum->version >= 0) {
+        if (quorum->version < 2) {
+            group->last_applied_proto_ver = 0;
+        }
+        else {
+            group->last_applied_proto_ver = 1;            
+        }
+    }
+    else {
+        gu_fatal ("Negative quorum version: %d", quorum->version);
+        abort();
+    }
 
     // Update each node state based on quorum outcome:
     // is it up to date, does it need SST and stuff
@@ -610,9 +631,17 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             peer_id    = sender->joiner;
             from_donor = true;
             st_dir     = "to";
-            /* #454 - we don't switch to JOINED here, 
-             *        instead going straignt to SYNCED */
-            // sender->status = GCS_NODE_STATE_JOINED;
+
+            assert (group->last_applied_proto_ver >= 0);
+
+            if (0 == group->last_applied_proto_ver) {
+                /* #454 - we don't switch to JOINED here, 
+                 *        instead going straignt to SYNCED */
+            }
+            else {
+                assert (sender->flags & GCS_STATE_FDONOR);
+                sender->status = GCS_NODE_STATE_JOINED;
+            }
         }
         else {
             peer_id = sender->donor;
@@ -691,9 +720,11 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     if (GCS_NODE_STATE_JOINED == sender->status ||
         /* #454 - at this layer we jump directly from DONOR to SYNCED */
-        GCS_NODE_STATE_DONOR  == sender->status) {
+        (0 == group->last_applied_proto_ver &&
+         GCS_NODE_STATE_DONOR == sender->status)) {
 
         sender->status = GCS_NODE_STATE_SYNCED;
+        sender->count_last_applied = true;
 
         group_redo_last_applied (group);//from now on this node must be counted
 
@@ -704,7 +735,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
     else {
         if (GCS_NODE_STATE_SYNCED != sender->status) {
-            gu_warn ("SYNC message sender from non-joined %ld (%s). Ignored.",
+            gu_warn ("SYNC message sender from non-JOINED %ld (%s). Ignored.",
                      msg->sender_idx, sender->name);
         }
         else {
@@ -997,7 +1028,8 @@ group_get_node_state (gcs_group_t* group, long node_idx)
 
     uint8_t flags = 0;
 
-    if (0 == node_idx) flags |= GCS_STATE_FREP;
+    if (0 == node_idx)            flags |= GCS_STATE_FREP;
+    if (node->count_last_applied) flags |= GCS_STATE_FCLA;
 
     return gcs_state_msg_create (
         &group->state_uuid,

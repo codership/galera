@@ -306,15 +306,15 @@ core_test_init ()
     fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
              ret, strerror(-ret));
 
-    // this will configure backend to have desired fragment size
-    ret = core_test_set_payload_size (FRAG_SIZE);
-    fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
-             ret, strerror(-ret));
-
     // receive first configuration message
     fail_if (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act.data, true, 0, 1));
     free ((void*)act.data);
+
+    // this will configure backend to have desired fragment size
+    ret = core_test_set_payload_size (FRAG_SIZE);
+    fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
+             ret, strerror(-ret));
 
     // try to send an action to check that everything's alright
     ret = gcs_core_send (Core, act1, sizeof(act1), GCS_ACT_TORDERED);

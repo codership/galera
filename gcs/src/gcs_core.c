@@ -21,8 +21,8 @@
 #include "gcs_group.h"
 #include "gcs_gcache.h"
 
-const size_t CORE_FIFO_LEN = (1 << 8); // 256 elements (no need to have more)
-const size_t CORE_INIT_BUF_SIZE = 4096;
+const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)
+const size_t CORE_INIT_BUF_SIZE = (1 << 16); // 65K - IP packet size
 
 typedef enum core_state
 {
@@ -60,7 +60,7 @@ struct gcs_core
     gcs_recv_msg_t  recv_msg;
 
     /* local action FIFO */
-    gcs_fifo_lite_t*     fifo;
+    gcs_fifo_lite_t* fifo;
 
     /* group context */
     gcs_group_t     group;
@@ -90,6 +90,8 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
+static int const GCS_PROTO_MAX = 0;
+
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
                  gcache_t*    const cache,
@@ -113,19 +115,27 @@ gcs_core_create (gu_config_t* const conf,
 
             core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
 
-            core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
-                                               sizeof (core_act_t));
-            if (core->fifo) {
-                gu_mutex_init  (&core->send_lock, NULL);
-                core->proto_ver = 0; // will be bumped in gcs_group_act_conf()
-                gcs_group_init (&core->group, cache, node_name, inc_addr,
-                                GCS_ACT_PROTO_MAX, repl_proto_ver,
-                                appl_proto_ver);
-                core->state = CORE_CLOSED;
+            core->send_buf = GU_CALLOC(CORE_INIT_BUF_SIZE, char);
+            if (core->send_buf) {
+
+                core->send_buf_len = CORE_INIT_BUF_SIZE;
+
+                core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
+                                                   sizeof (core_act_t));
+                if (core->fifo) {
+                    gu_mutex_init  (&core->send_lock, NULL);
+                    core->proto_ver = -1; // shall be bumped in gcs_group_act_conf()
+                    gcs_group_init (&core->group, cache, node_name, inc_addr,
+                                    GCS_PROTO_MAX, repl_proto_ver,
+                                    appl_proto_ver);
+                    core->state = CORE_CLOSED;
 #ifdef GCS_CORE_TESTING
-                gu_lock_step_init (&core->ls);
+                    gu_lock_step_init (&core->ls);
 #endif
-                return core; // success
+                    return core; // success
+                }
+
+                gu_free (core->send_buf);
             }
 
             gu_free (core->recv_msg.buf);
@@ -641,12 +651,16 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        ret = gcs_group_act_conf (group, act, &core->proto_ver);
+        int gcs_proto_ver;
+        ret = gcs_group_act_conf (group, act, &gcs_proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
             assert (0);
             ret = -ENOTRECOVERABLE;
+        }
+        else {
+            if (0 == gcs_proto_ver) { core->proto_ver = 0; } 
         }
         assert (ret == act->buf_len);
         break;

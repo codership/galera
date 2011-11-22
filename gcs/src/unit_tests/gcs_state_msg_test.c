@@ -8,6 +8,8 @@
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_state_msg.h"
 
+static int const QUORUM_VERSION = 2;
+
 START_TEST (gcs_state_msg_test_basic)
 {
     ssize_t send_len, ret;
@@ -138,7 +140,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                         sizeof(st)/sizeof(gcs_state_msg_t*),
                                         &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (false != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
     fail_if (GCS_SEQNO_ILL != quorum.act_id);
@@ -161,7 +163,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group1_uuid));
     fail_if (act1_seqno  != quorum.act_id);
@@ -184,7 +186,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (false != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
     fail_if (GCS_SEQNO_ILL != quorum.act_id);
@@ -207,7 +209,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
     fail_if (act2_seqno - 1 != quorum.act_id);
@@ -230,7 +232,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
     fail_if (act2_seqno != quorum.act_id);
@@ -297,7 +299,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                         sizeof(st)/sizeof(gcs_state_msg_t*),
                                         &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (false != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
     fail_if (GCS_SEQNO_ILL != quorum.act_id);
@@ -320,7 +322,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
     fail_if (act2_seqno - 1 != quorum.act_id);
@@ -343,7 +345,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
     fail_if (act2_seqno != quorum.act_id);
@@ -366,7 +368,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (false != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
     fail_if (GCS_SEQNO_ILL != quorum.act_id);
@@ -389,7 +391,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (1 != quorum.version);
+    fail_if (QUORUM_VERSION != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
     fail_if (act2_seqno != quorum.act_id);
