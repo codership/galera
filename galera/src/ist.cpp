@@ -1052,7 +1052,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
         }
 
         std::vector<gcache::GCache::Buffer> buf_vec(
-            std::min(static_cast<size_t>(last - first),
+            std::min(static_cast<size_t>(last - first + 1),
                      static_cast<size_t>(1024)));
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
