@@ -553,10 +553,31 @@ gcs_become_open (gcs_conn_t* conn)
     gcs_shift_state (conn, GCS_CONN_OPEN);
 }
 
+static long
+gcs_set_pkt_size (gcs_conn_t *conn, long pkt_size)
+{
+    long ret = gcs_core_set_pkt_size (conn->core, pkt_size);
+
+    if (ret >= 0) {
+        conn->params.max_packet_size = ret;
+        gu_config_set_int64 (conn->config, GCS_PARAMS_MAX_PKT_SIZE,
+                             conn->params.max_packet_size);
+    }
+
+    return ret;
+}
+
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
     gcs_shift_state (conn, GCS_CONN_PRIMARY);
+
+    /* at this point we have established protocol version,
+     * so can set packet size */
+    long ret;
+    if (0 < (ret = gcs_set_pkt_size (conn, conn->params.max_packet_size))) {
+        gu_warn ("Failed to set packet size: %ld (%s)", ret, strerror(-ret));
+    }
 }
 
 static void
@@ -1151,20 +1172,6 @@ static void *gcs_recv_thread (void *arg)
     return NULL;
 }
 
-static long
-gcs_set_pkt_size (gcs_conn_t *conn, long pkt_size)
-{
-    long ret = gcs_core_set_pkt_size (conn->core, pkt_size);
-
-    if (ret >= 0) {
-        conn->params.max_packet_size = ret;
-        gu_config_set_int64 (conn->config, GCS_PARAMS_MAX_PKT_SIZE,
-                             conn->params.max_packet_size);
-    }
-
-    return ret;
-}
-
 /* Opens connection to group */
 long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 {
@@ -1185,29 +1192,18 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 
         if (!(ret = gcs_core_open (conn->core, channel, url))) {
 
-            if (0 < (ret = gcs_set_pkt_size
-                     (conn, conn->params.max_packet_size))) {
-
-                if (!(ret = gu_thread_create (&conn->recv_thread,
-                                              NULL,
-                                              gcs_recv_thread,
-                                              conn))) {
-                    gcs_fifo_lite_open(conn->repl_q);
-                    gu_fifo_open(conn->recv_q);
-                    gcs_shift_state (conn, GCS_CONN_OPEN);
-                    gu_info ("Opened channel '%s'", channel);
-                    goto out;
-                }
-                else {
-                    gu_error ("Failed to create main receive thread: %ld (%s)",
-                              ret, strerror(-ret));
-                }
+            if (!(ret = gu_thread_create (&conn->recv_thread, NULL,
+                                          gcs_recv_thread, conn))) {
+                gcs_fifo_lite_open(conn->repl_q);
+                gu_fifo_open(conn->recv_q);
+                gcs_shift_state (conn, GCS_CONN_OPEN);
+                gu_info ("Opened channel '%s'", channel);
+                goto out;
             }
             else {
-                gu_error ("Failed to set packet size: %ld (%s)",
+                gu_error ("Failed to create main receive thread: %ld (%s)",
                           ret, strerror(-ret));
             }
-
             gcs_core_close (conn->core);
         }
         else {

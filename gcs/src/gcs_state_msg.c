@@ -11,7 +11,7 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_MSG_VER 1
+#define GCS_STATE_MSG_VER 2
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.h"
@@ -279,6 +279,13 @@ gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
     *appl_proto_ver = state->appl_proto_ver;
 }
 
+/* Get state message flags */
+uint8_t
+gcs_state_msg_flags (const gcs_state_msg_t* state)
+{
+    return state->flags;
+}
+
 /* Returns the node which is most representative of a group */
 static const gcs_state_msg_t*
 state_nodes_compare (const gcs_state_msg_t* left, const gcs_state_msg_t* right)
@@ -424,7 +431,7 @@ state_match_candidate (const gcs_state_msg_t* const s,
     }
 }
 
-/* try to find representative reperge candidate */
+/* try to find representative remerge candidate */
 static const struct candidate*
 state_rep_candidate (const struct candidate const c[],
                      int                    const c_num)

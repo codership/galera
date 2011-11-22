@@ -155,6 +155,28 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             // node joins completely different group, clear all status
             node->status = GCS_NODE_STATE_PRIM;
         }
+
+        switch (node->status)
+        {
+        case GCS_NODE_STATE_DONOR:
+        case GCS_NODE_STATE_SYNCED:
+            node->count_last_applied = true;
+            break;
+        case GCS_NODE_STATE_JOINED:
+            node->count_last_applied =(gcs_state_msg_flags (node->state_msg) &
+                                       GCS_STATE_FCLA);
+            break;
+        case GCS_NODE_STATE_JOINER:
+        case GCS_NODE_STATE_PRIM:
+            node->count_last_applied = false;
+            break;
+        case GCS_NODE_STATE_NON_PRIM:
+        case GCS_NODE_STATE_MAX:
+            gu_fatal ("Internal logic error: state %d in "
+                      "primary configuration. Aborting.", node->status);
+            abort();
+            break;
+        }
     }
     else {
         /* Probably don't want to change anything here, quorum was a failure

@@ -24,24 +24,25 @@
 
 struct gcs_node
 {
-    gcs_seqno_t        last_applied; // last applied action on that node
-//    long             queue_len;    // action queue length on that node
-    gcs_node_state_t   status;       // node status
-    int                gcs_proto_ver;// supported protocol versions
-    int                repl_proto_ver;//
-    int                appl_proto_ver;
-    gcs_defrag_t       app;          // defragmenter for application actions
-    gcs_defrag_t       oob;        // defragmenter for out-of-band service acts.
+    gcs_seqno_t      last_applied; // last applied action on that node
+    bool             count_last_applied; // should it be counted
+//    long           queue_len;    // action queue length on that node
+    gcs_node_state_t status;       // node status
+    int              gcs_proto_ver;// supported protocol versions
+    int              repl_proto_ver;//
+    int              appl_proto_ver;
+    gcs_defrag_t     app;          // defragmenter for application actions
+    gcs_defrag_t     oob;        // defragmenter for out-of-band service acts.
 
     // globally unique id from a component message
-    const char         id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    const char       id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 
     // to track snapshot status
-    char               joiner[GCS_COMP_MEMB_ID_MAX_LEN + 1];
-    char               donor [GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    char             joiner[GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    char             donor [GCS_COMP_MEMB_ID_MAX_LEN + 1];
 
-    const char*        name;         // human-given name
-    const char*        inc_addr;     // incoming address - for load balancer
+    const char*      name;         // human-given name
+    const char*      inc_addr;     // incoming address - for load balancer
     const gcs_state_msg_t* state_msg;// state message
 };
 typedef struct gcs_node gcs_node_t;

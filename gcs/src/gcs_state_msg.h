@@ -20,6 +20,7 @@
 
 /* State flags */
 #define GCS_STATE_FREP 0x01  // group representative
+#define GCS_STATE_FCLA 0x02  // count last applied (for JOINED node)
 
 #ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg

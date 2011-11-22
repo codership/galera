@@ -60,6 +60,7 @@ typedef struct gcs_group
     int         const appl_proto_ver;
 
     gcs_state_quorum_t quorum;
+    int last_applied_proto_ver;
 }
 gcs_group_t;
 
