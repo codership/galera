@@ -238,7 +238,7 @@ public:
         log_info << "gcomm: connected";
     }
 
-    void close(bool join = true)
+    void close()
     {
         if (tp == 0)
         {
@@ -247,11 +247,8 @@ public:
         }
         log_info << "gcomm: terminating thread";
         terminate();
-        if (join == true)
-        {
-            log_info << "gcomm: joining thread";
-            pthread_join(thd, 0);
-        }
+        log_info << "gcomm: joining thread";
+        pthread_join(thd, 0);
         log_info << "gcomm: closing backend";
         tp->close();
         gcomm::disconnect(tp, this);
@@ -472,8 +469,6 @@ void GCommConn::run()
                                   O_DROP,
                                   -1,
                                   e.get_errno()));
-            close(false);
-            pthread_detach(thd);
             break;
         }
         catch (...)
@@ -489,8 +484,6 @@ void GCommConn::run()
                                   O_DROP,
                                   -1,
                                   gu::Exception::E_UNSPEC));
-            close(false);
-            pthread_detach(thd);
             break;
         }
     }
@@ -732,7 +725,6 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     }
 
     GCommConn& conn(*ref.get());
-    gcomm::Critical<Protonet> crit(conn.get_pnet());
     try
     {
         conn.close();
