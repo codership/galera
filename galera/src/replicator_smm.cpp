@@ -839,8 +839,7 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 {
     if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
-        /* @todo: figure out how this can happen? */
-//        trx->set_state(TrxHandle::S_ABORTING);
+        trx->set_state(TrxHandle::S_ABORTING);
     }
 
     assert(trx->state() == TrxHandle::S_ABORTING ||
