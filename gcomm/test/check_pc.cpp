@@ -1316,7 +1316,8 @@ START_TEST(test_trac_191)
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
     Proto p(conf, uuid4);
     DummyTransport tp(uuid4, true);
-    gcomm::connect(&tp, &p);
+    // gcomm::connect(&tp, &p);
+    PCUser pu(conf, uuid4, &tp, &p);
 
     p.shift_to(Proto::S_NON_PRIM);
     View t0(ViewId(V_TRANS, uuid4, 0));
