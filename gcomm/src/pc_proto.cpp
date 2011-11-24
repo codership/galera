@@ -744,12 +744,13 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
         }
         else
         {
-            const bool was_prim(get_prim());
+            // #571 Deliver NON-PRIM views in all cases.
+            // const bool was_prim(get_prim());
             shift_to(S_NON_PRIM);
-            if (was_prim == true)
-            {
-                deliver_view();
-            }
+            // if (was_prim == true)
+            // {
+            deliver_view();
+            // }
         }
     }
 }
