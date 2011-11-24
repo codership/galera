@@ -143,11 +143,26 @@ void PC::connect()
                  evs->get_state() == evs::Proto::S_INSTALL ||
                  evs->get_state() == evs::Proto::S_OPERATIONAL);
 
-    do
+
+    // #596 Time out if PRIM view cannot be reached before connect
+    //      timeout expires.
+    while (pc->get_state() != pc::Proto::S_PRIM)
     {
         get_pnet().event_loop(Sec/2);
+        if (try_until < Date::now())
+        {
+            pc->close();
+            evs->close();
+            gmcast->close();
+            get_pnet().erase(&pstack_);
+            pstack_.pop_proto(this);
+            pstack_.pop_proto(pc);
+            pstack_.pop_proto(evs);
+            pstack_.pop_proto(gmcast);
+            gu_throw_error(ETIMEDOUT) << "failed to reach primary view";
+        }
+
     }
-    while (pc->get_state() != pc::Proto::S_PRIM);
 }
 
 
