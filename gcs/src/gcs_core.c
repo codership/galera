@@ -919,6 +919,13 @@ core_msg_to_action (gcs_core_t*          core,
         }
     }
     else {
+        if (GCS_MSG_JOIN == msg->type && group->my_idx == msg->sender_idx) {
+            // workaround for #594
+            gu_fatal ("JOIN message unrecoverably lost in configuration change."
+                      " Restart required.");
+            return -ENOTRECOVERABLE;
+        }
+
         gu_warn ("%s message from member %ld in non-primary configuration. "
                  "Ignored.", gcs_msg_type_string[msg->type], msg->sender_idx);
     }
