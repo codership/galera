@@ -27,11 +27,11 @@ typedef struct gcs_state_msg
 {
     gu_uuid_t        state_uuid;    // UUID of the current state exchange
     gu_uuid_t        group_uuid;    // UUID of the group
-    gu_uuid_t        prim_uuid;     // UUID of the last PC
-    long             prim_joined;   // number of joined nodes in the last PC
-    gcs_seqno_t      prim_seqno;    // last primary configuration seqno
-    gcs_seqno_t      act_seqno;     // last action seqno (received up to)
-    gcs_node_state_t prim_state;    // state of the node in the last PC
+    gu_uuid_t        prim_uuid;     // last PC state UUID
+    gcs_seqno_t      prim_seqno;    // last PC state seqno
+    gcs_seqno_t      received;      // last action seqno (received up to)
+    long             prim_joined;   // number of joined nodes in its last PC
+    gcs_node_state_t prim_state;    // state of the node in its last PC
     gcs_node_state_t current_state; // current state of the node
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
@@ -72,9 +72,9 @@ extern gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       const gu_uuid_t* group_uuid,
                       const gu_uuid_t* prim_uuid,
-                      long             prim_joined,
                       gcs_seqno_t      prim_seqno,
-                      gcs_seqno_t      act_seqno,
+                      gcs_seqno_t      received,
+                      long             prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
                       const char*      name,
@@ -111,9 +111,9 @@ gcs_state_msg_group_uuid (const gcs_state_msg_t* state);
 //extern const gu_uuid_t*
 //gcs_state_prim_uuid (const gcs_state_msg_t* state);
 
-/* Get action seqno */
+/* Get last received action seqno */
 extern gcs_seqno_t
-gcs_state_msg_act_id (const gcs_state_msg_t* state);
+gcs_state_msg_received (const gcs_state_msg_t* state);
 
 /* Get current node state */
 extern gcs_node_state_t

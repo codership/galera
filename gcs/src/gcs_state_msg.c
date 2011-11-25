@@ -21,9 +21,9 @@ gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       const gu_uuid_t* group_uuid,
                       const gu_uuid_t* prim_uuid,
-                      long             prim_joined,
                       gcs_seqno_t      prim_seqno,
-                      gcs_seqno_t      act_seqno,
+                      gcs_seqno_t      received,
+                      long             prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
                       const char*      name,
@@ -54,7 +54,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->prim_uuid     = *prim_uuid;
         ret->prim_joined   = prim_joined;
         ret->prim_seqno    = prim_seqno;
-        ret->act_seqno     = act_seqno;
+        ret->received      = received;
         ret->prim_state    = prim_state;
         ret->current_state = current_state;
         ret->version       = GCS_STATE_MSG_VER;
@@ -97,7 +97,7 @@ gcs_state_msg_len (gcs_state_msg_t* state)
         sizeof (gu_uuid_t)   +   // state_uuid
         sizeof (gu_uuid_t)   +   // group_uuid
         sizeof (gu_uuid_t)   +   // conf_uuid
-        sizeof (int64_t)     +   // act_seqno
+        sizeof (int64_t)     +   // received
         sizeof (int64_t)     +   // prim_seqno
         strlen (state->name) + 1 +
         strlen (state->inc_addr) + 1 +
@@ -116,8 +116,8 @@ gcs_state_msg_len (gcs_state_msg_t* state)
     _const gu_uuid_t* state_uuid     = (gu_uuid_t*)(prim_joined + 1);   \
     _const gu_uuid_t* group_uuid     = state_uuid     + 1;              \
     _const gu_uuid_t* prim_uuid      = group_uuid     + 1;              \
-    _const int64_t*   act_seqno      = (int64_t*)(prim_uuid + 1);       \
-    _const int64_t*   prim_seqno     = act_seqno      + 1;              \
+    _const int64_t*   received       = (int64_t*)(prim_uuid + 1);       \
+    _const int64_t*   prim_seqno     = received       + 1;              \
     _const char*      name           = (char*)(prim_seqno + 1);
 
 /* Serialize gcs_state_msg_t into buf */
@@ -138,7 +138,7 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *state_uuid     = state->state_uuid;
     *group_uuid     = state->group_uuid;
     *prim_uuid      = state->prim_uuid;
-    *act_seqno      = gu_le64(state->act_seqno);
+    *received       = gu_le64(state->received);
     *prim_seqno     = gu_le64(state->prim_seqno);
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
@@ -164,9 +164,9 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
         state_uuid,
         group_uuid,
         prim_uuid,
-        gu_le16(*prim_joined),
         gu_le64(*prim_seqno),
-        gu_le64(*act_seqno),
+        gu_le64(*received),
+        gu_le16(*prim_joined),
         *prim_state,
         *curr_state,
         name,
@@ -194,9 +194,9 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tState        : %s"
                      "\n\tPrim state   : %s"
                      "\n\tPrim UUID    : "GU_UUID_FORMAT
-                     "\n\tPrim JOINED  : %ld"
                      "\n\tPrim seqno   : %lld"
-                     "\n\tGlobal seqno : %lld"
+                     "\n\tLast seqno   : %lld"
+                     "\n\tPrim JOINED  : %ld"
                      "\n\tState UUID   : "GU_UUID_FORMAT
                      "\n\tGroup UUID   : "GU_UUID_FORMAT
                      "\n\tName         : '%s'"
@@ -208,9 +208,9 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      gcs_node_state_to_str(state->current_state),
                      gcs_node_state_to_str(state->prim_state),
                      GU_UUID_ARGS(&state->prim_uuid),
-                     state->prim_joined,
                      (long long)state->prim_seqno,
-                     (long long)state->act_seqno,
+                     (long long)state->received,
+                     state->prim_joined,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
                      state->name,
@@ -234,9 +234,9 @@ gcs_state_msg_group_uuid (const gcs_state_msg_t* state)
 
 /* Get action seqno */
 gcs_seqno_t
-gcs_state_msg_act_id (const gcs_state_msg_t* state)
+gcs_state_msg_received (const gcs_state_msg_t* state)
 {
-    return state->act_seqno;
+    return state->received;
 }
 
 /* Get current node state */
@@ -294,11 +294,11 @@ state_nodes_compare (const gcs_state_msg_t* left, const gcs_state_msg_t* right)
     assert (left->prim_seqno  != GCS_SEQNO_ILL);
     assert (right->prim_seqno != GCS_SEQNO_ILL);
 
-    if (left->act_seqno < right->act_seqno) {
+    if (left->received < right->received) {
         assert (left->prim_seqno <= right->prim_seqno);
         return right;
     }
-    else if (left->act_seqno > right->act_seqno) {
+    else if (left->received > right->received) {
         assert (left->prim_seqno >= right->prim_seqno);
         return left;
     }
@@ -398,7 +398,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
         }
     }
 
-    quorum->act_id     = rep->act_seqno;
+    quorum->act_id     = rep->received;
     quorum->conf_id    = rep->prim_seqno;
     quorum->group_uuid = rep->group_uuid;
     quorum->primary    = true;
@@ -427,7 +427,7 @@ state_match_candidate (const gcs_state_msg_t* const s,
         return (0 == gu_uuid_compare(&s->prim_uuid, &c->prim_uuid));
     default:
         return ((0 == gu_uuid_compare(&s->group_uuid, &c->state_uuid)) &&
-                (s->act_seqno == c->state_seqno));
+                (s->received == c->state_seqno));
     }
 }
 
@@ -514,7 +514,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
                 // we don't have this candidate in the list yet
                 candidates[j].prim_uuid   = states[i]->prim_uuid;
                 candidates[j].state_uuid  = states[i]->group_uuid;
-                candidates[j].state_seqno = states[i]->act_seqno;
+                candidates[j].state_seqno = states[i]->received;
                 candidates[j].prim_joined = states[i]->prim_joined;
                 candidates[j].rep         = states[i];
                 candidates[j].found       = 1;
@@ -539,8 +539,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
             rep = NULL;
         }
         else {
-            gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: "
-                     "%ld of %ld.",
+            gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: %d of %d.",
                      rc->found == rc->prim_joined ? "Full" : "Partial",
                      GU_UUID_ARGS(&rc->prim_uuid),
                      rc->found, rc->prim_joined);
@@ -549,7 +548,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
             assert (NULL != rep);
             assert (gcs_node_is_joined(rep->prim_state));
 
-            quorum->act_id     = rep->act_seqno;
+            quorum->act_id     = rep->received;
             quorum->conf_id    = rep->prim_seqno;
             quorum->group_uuid = rep->group_uuid;
             quorum->primary    = true;

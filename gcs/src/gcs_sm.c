@@ -43,6 +43,10 @@ gcs_sm_create (long len, long n)
     if (sm) {
         sm_init_stats (&sm->stats);
         gu_mutex_init (&sm->lock, NULL);
+#ifdef GCS_SM_GRAB_RELEASE
+        gu_cond_init  (&sm->cond, NULL);
+        sm->cond_wait   = 0;
+#endif /* GCS_SM_GRAB_RELEASE */
         sm->wait_q_len  = len;
         sm->wait_q_mask = sm->wait_q_len - 1;
         sm->wait_q_head = 1;
