@@ -49,6 +49,11 @@ extern "C" {
 #define WSREP_CAP_DISTRIBUTED_LOCKS     ( 1ULL << 10 )
 #define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 11 )
 
+/*!
+ *  Write set replication flags
+ */
+#define WSREP_FLAG_PA_SAFE              ( 1ULL << 0 )
+
 /* Empty backend spec */
 #define WSREP_NONE "none"
 
@@ -482,6 +487,7 @@ struct wsrep_ {
    * @param conn_id    connection ID
    * @param app_data   application specific applying data
    * @param data_len   the size of the applying data
+   * @param flags      fine tuning the replication WSREP_FLAG_*
    * @param seqno      seqno part of the global transaction ID
    *
    * @retval WSREP_OK         cluster-wide commit succeeded
@@ -494,6 +500,7 @@ struct wsrep_ {
                                  wsrep_trx_handle_t* trx_handle,
                                  const void*         app_data,
                                  size_t              data_len,
+                                 uint64_t            flags,
                                  wsrep_seqno_t*      seqno);
 
   /*!
