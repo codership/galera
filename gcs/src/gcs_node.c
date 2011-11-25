@@ -128,7 +128,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
 
         if (!gu_uuid_compare (node_group_uuid, quorum_group_uuid)) {
             // node was a part of this group
-            gcs_seqno_t node_act_id = gcs_state_msg_act_id (node->state_msg);
+            gcs_seqno_t node_act_id = gcs_state_msg_received (node->state_msg);
 
              if (node_act_id == quorum->act_id) {
                 const gcs_node_state_t last_prim_state =

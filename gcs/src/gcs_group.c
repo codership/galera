@@ -637,16 +637,27 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                  *        instead going straignt to SYNCED */
             }
             else {
-                assert (sender->flags & GCS_STATE_FDONOR);
+                assert(gcs_state_msg_flags(sender->state_msg) & GCS_STATE_FCLA);
                 sender->status = GCS_NODE_STATE_JOINED;
             }
         }
         else {
             peer_id = sender->donor;
             st_dir  = "from";
-            if (seqno >= 0) {
+
+            if (group->quorum.version < 2) {
+                // #591 remove after quorum v1 is phased out
                 sender->status = GCS_NODE_STATE_JOINED;
                 group->prim_num++;
+            }
+            else {
+                if (seqno >= 0) {
+                    sender->status = GCS_NODE_STATE_JOINED;
+                    group->prim_num++;
+                }
+                else {
+                    sender->status = GCS_NODE_STATE_PRIM;
+                }
             }
         }
 
@@ -677,6 +688,13 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 // one recv thread there is no (generic) way to wake it up.
                 gu_fatal ("Will never receive state. Need to abort.");
                 // return to core to shutdown the backend before aborting
+                return -ENOTRECOVERABLE;
+            }
+
+            if (group->quorum.version < 2 && !from_donor && // #591
+                sender_idx == group->my_idx) {
+                // remove after quorum v1 is phased out
+                gu_fatal ("Faield to receive state. Need to abort.");
                 return -ENOTRECOVERABLE;
             }
         }
@@ -1048,9 +1066,9 @@ group_get_node_state (gcs_group_t* group, long node_idx)
         &group->state_uuid,
         &group->group_uuid,
         &group->prim_uuid,
-        group->prim_num,
         group->prim_seqno,
         group->act_id,
+        group->prim_num,
         group->prim_state,
         node->status,
         node->name,

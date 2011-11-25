@@ -26,9 +26,9 @@ START_TEST (gcs_state_msg_test_basic)
     send_state = gcs_state_msg_create (&state_uuid,
                                        &group_uuid,
                                        &prim_uuid,
-                                       5,                  // prim_joined
                                        457,                // prim_seqno
-                                       3465,               // act_seqno
+                                       3465,               // last received seq.
+                                       5,                  // prim_joined
                                        GCS_NODE_STATE_JOINED,   // prim_state
                                        GCS_NODE_STATE_NON_PRIM, // current_state
                                        "My Name",          // name
@@ -61,9 +61,9 @@ START_TEST (gcs_state_msg_test_basic)
     fail_if (send_state->appl_proto_ver != recv_state->appl_proto_ver);
     fail_if (recv_state->appl_proto_ver != 1, "appl_proto_ver: %d",
              recv_state->appl_proto_ver);
-    fail_if (send_state->act_seqno      != recv_state->act_seqno,
-             "act_seqno: sent %lld, recv %lld",
-             send_state->act_seqno, recv_state->act_seqno);
+    fail_if (send_state->received       != recv_state->received,
+             "Last received seqno: sent %lld, recv %lld",
+             send_state->received, recv_state->received);
     fail_if (send_state->prim_seqno    != recv_state->prim_seqno);
     fail_if (send_state->current_state != recv_state->current_state);
     fail_if (send_state->prim_state    != recv_state->prim_state);
@@ -115,21 +115,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
 
     /* First just nodes from different groups and configurations, none JOINED */
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno - 1, act2_seqno - 1,
+                                  prim2_seqno - 1, act2_seqno - 1, 5,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node0", "",
                                   0, 1, 1, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno, act2_seqno,
+                                  prim2_seqno, act2_seqno, 5,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node2", "",
                                   0, 1, 1, 1);
@@ -152,7 +152,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     /* now make node1 inherit PC */
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_DONOR,
                                   "node1", "",
                                   0, 1, 0, 0);
@@ -175,7 +175,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     /* now make node0 inherit PC (should yield conflicting uuids) */
     gcs_state_msg_destroy (st[0]);
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno - 1, act2_seqno - 1,
+                                  prim2_seqno - 1, act2_seqno - 1, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node0", "",
                                   0, 1, 1, 0);
@@ -198,7 +198,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     /* now make node1 non-joined again: group2 should win */
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0);
@@ -221,7 +221,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     /* now make node2 joined: it should become a representative */
     gcs_state_msg_destroy (st[2]);
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno, act2_seqno,
+                                  prim2_seqno, act2_seqno, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node2", "",
                                   0, 1, 1, 0);
@@ -274,21 +274,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
 
     /* First just nodes from different groups and configurations, none JOINED */
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim0_uuid,
-                                  5, prim2_seqno - 1, act2_seqno - 1,
+                                  prim2_seqno - 1, act2_seqno - 1, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
                                   0, 1, 1, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno, act2_seqno,
+                                  prim2_seqno, act2_seqno, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
                                   0, 1, 1, 1);
@@ -311,7 +311,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     /* Now make node0 to be joined at least once */
     gcs_state_msg_destroy (st[0]);
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim0_uuid,
-                                  5, prim2_seqno - 1, act2_seqno - 1,
+                                  prim2_seqno - 1, act2_seqno - 1, 5,
                                   GCS_NODE_STATE_DONOR, GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
                                   0, 1, 1, 0);
@@ -334,7 +334,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     /* Now make node2 to be joined too */
     gcs_state_msg_destroy (st[2]);
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
-                                  5, prim2_seqno, act2_seqno,
+                                  prim2_seqno, act2_seqno, 5,
                                   GCS_NODE_STATE_JOINED,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
                                   0, 1, 1, 1);
@@ -357,7 +357,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     /* now make node1 joined too: conflict */
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0);
@@ -380,7 +380,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     /* now make node1 current joiner: should be ignored */
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
-                                  3, prim1_seqno, act1_seqno,
+                                  prim1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_JOINER,
                                   "node1", "",
                                   0, 1, 0, 0);

@@ -526,7 +526,7 @@ gcs_shift_state (gcs_conn_t*      conn,
         { false, false, true,  true,  false, false, false, false }, // JOINED
         { true,  true,  false, false, false, false, false, false }, // DONOR
         { false, false, false, false, true,  false, false, false }, // JOINER
-        { true,  true,  true,  true,  false, true,  false, false }, // PRIMARY
+        { true,  true,  true,  true,  true,  true,  false, false }, // PRIMARY
         { true,  true,  true,  true,  true,  false, true,  false }, // OPEN
         { true,  true,  true,  true,  true,  true,  false, false }, // CLOSED
         { false, false, false, false, false, false, true,  false }  // DESTROYED
@@ -571,14 +571,48 @@ gcs_set_pkt_size (gcs_conn_t *conn, long pkt_size)
     return ret;
 }
 
+static long
+_release_flow_control (gcs_conn_t* conn)
+{
+    int err = 0;
+
+    if (gu_unlikely(err = gu_mutex_lock (&conn->fc_lock))) {
+        gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
+        abort();
+    }
+
+    if (conn->stop_sent) {
+        assert (1 == conn->stop_sent);
+        conn->stop_sent--;
+        err = gcs_fc_cont_end (conn);
+    }
+    else {
+        gu_mutex_unlock (&conn->fc_lock);
+    }
+
+    return err;
+}
+
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
-    gcs_shift_state (conn, GCS_CONN_PRIMARY);
+    if (!gcs_shift_state (conn, GCS_CONN_PRIMARY)) {
+        gu_fatal ("Protocol violation, can't continue");
+        gcs_close (conn);
+        abort();
+    }
+
+    long ret;
+
+    if ((ret = _release_flow_control (conn))) {
+        gu_fatal ("Failed to release flow control: %ld (%s)",
+                  ret, strerror(ret));
+        gcs_close (conn);
+        abort();
+    }
 
     /* at this point we have established protocol version,
      * so can set packet size */
-    long ret;
     if (0 < (ret = gcs_set_pkt_size (conn, conn->params.max_packet_size))) {
         gu_warn ("Failed to set packet size: %ld (%s)", ret, strerror(-ret));
     }
@@ -604,28 +638,6 @@ gcs_become_joiner (gcs_conn_t* conn)
 
     gcs_fc_reset (&conn->stfc, conn->recv_q_size);
     gcs_fc_debug (&conn->stfc, conn->params.fc_debug);
-}
-
-static long
-_release_flow_control (gcs_conn_t* conn)
-{
-    int err = 0;
-
-    if (gu_unlikely(err = gu_mutex_lock (&conn->fc_lock))) {
-        gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
-        abort();
-    }
-
-    if (conn->stop_sent) {
-        assert (1 == conn->stop_sent);
-        conn->stop_sent--;
-        err = gcs_fc_cont_end (conn);
-    }
-    else {
-        gu_mutex_unlock (&conn->fc_lock);
-    }
-
-    return err;
 }
 
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
@@ -930,7 +942,10 @@ gcs_handle_actions (gcs_conn_t*          conn,
         break;
     case GCS_ACT_JOIN:
         ret = gcs_handle_state_change (conn, &rcvd->act);
-        gcs_become_joined (conn);
+        if (gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf) >= 0)
+            gcs_become_joined (conn);
+        else
+            gcs_become_primary (conn);
         break;
     case GCS_ACT_SYNC:
         ret = gcs_handle_state_change (conn, &rcvd->act);
@@ -1516,11 +1531,12 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
                                  const char  *donor,
                                  gcs_seqno_t *local)
 {
-    gcs_seqno_t global;
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
     size_t rst_size  = size + donor_len;
     void*  rst       = gu_malloc (rst_size);
+
+    *local = GCS_SEQNO_ILL;
 
     if (rst) {
         /* RST format: |donor name|\0|app request|
@@ -1530,19 +1546,19 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         memcpy (rst, donor, donor_len);
         memcpy (rst + donor_len, req, size);
 
+        gcs_seqno_t global;
+
         ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, false,
                        &global, local);
 
         if (ret > 0) {
             assert (ret == (ssize_t)rst_size);
             assert (global >= 0);
-            ret = global; // index of donor or error code is in the global seqno
+            ret = global; /* index of donor or error code is in the global
+                           * seqno */
         }
 
         gu_free (rst);
-    }
-    else {
-        *local = GCS_SEQNO_ILL;
     }
 
     return ret;

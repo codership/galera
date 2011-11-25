@@ -41,6 +41,10 @@ typedef struct gcs_sm
 {
     gcs_sm_stats_t stats;
     gu_mutex_t    lock;
+#ifdef GCS_SM_GRAB_RELEASE
+    gu_cond_t     cond;
+    long          cond_wait;
+#endif /* GCS_SM_GRAB_RELEASE */
     unsigned long wait_q_len;
     unsigned long wait_q_mask;
     unsigned long wait_q_head;
@@ -113,6 +117,25 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
     assert (sm->users >= 0);
 }
 
+/* wake up whoever might be waiting there */
+static inline void
+_gcs_sm_wake_up_waiters (gcs_sm_t* sm)
+{
+#ifdef GCS_SM_GRAB_RELEASE
+    if (gu_unlikely(sm->cond_wait)) {
+        assert (sm->cond_wait > 0);
+        sm->cond_wait--;
+        gu_cond_signal (&sm->cond);
+    } else
+#endif /* GCS_SM_GRAB_RELEASE */
+    if (!sm->pause) {
+        _gcs_sm_wake_up_next(sm);
+    }
+    else {
+        /* gcs_sm_continue() will do the rest */
+    }
+}
+
 static inline void
 _gcs_sm_leave_common (gcs_sm_t* sm)
 {
@@ -124,12 +147,7 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
     assert (NULL  == sm->wait_q[sm->wait_q_head].cond);
     GCS_SM_INCREMENT(sm->wait_q_head);
 
-    if (!sm->pause) {
-        _gcs_sm_wake_up_next(sm);
-    }
-    else {
-        /* gcs_sm_continue() will do the rest */
-    }
+    _gcs_sm_wake_up_waiters (sm);
 }
 
 static inline bool
@@ -352,5 +370,47 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
  */
 extern void
 gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for);
+
+#ifdef GCS_SM_GRAB_RELEASE
+/*! Grabs sm object for out-of-order access
+ * @return 0 or negative error code */
+static inline long
+gcs_sm_grab (gcs_sm_t* sm)
+{
+    long ret;
+
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    while (!(ret = sm->ret) && sm->entered >= GCS_SM_CC) {
+        sm->cond_wait++;
+        gu_cond_wait (&sm->cond, &sm->lock);
+    }
+
+    if (ret) {
+        assert (ret < 0);
+        _gcs_sm_wake_up_waiters (sm);
+    }
+    else {
+        assert (sm->entered < GCS_SM_CC);
+        sm->entered++;
+    }
+
+    gu_mutex_unlock (&sm->lock);
+
+    return ret;
+}
+
+/*! Releases sm object after gcs_sm_grab() */
+static inline void
+gcs_sm_release (gcs_sm_t* sm)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    sm->entered--;
+    _gcs_sm_wake_up_waiters (sm);
+
+    gu_mutex_unlock (&sm->lock);
+}
+#endif /* GCS_SM_GRAB_RELEASE */
 
 #endif /* _gcs_sm_h_ */
