@@ -346,6 +346,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  const void*         rbr_data,
                                  size_t              rbr_data_len,
+                                 uint64_t            flags __attribute__((unused)) ,
                                  wsrep_seqno_t*      global_seqno)
 {
     assert(gh != 0);
