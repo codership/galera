@@ -35,17 +35,23 @@ namespace galera
             F_MAC_HEADER  = 1 << 3,
             F_MAC_PAYLOAD = 1 << 4,
             F_ANNOTATION  = 1 << 5,
-            F_ISOLATION   = 1 << 6
+            F_ISOLATION   = 1 << 6,
+            F_PA_UNSAFE   = 1 << 7
         };
 
-        static inline bool has_mac(int flags)
+        bool has_mac() const
         {
-            return ((flags & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
+            return ((write_set_flags_ & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
         }
 
-        static inline bool has_annotation(int flags)
+        bool has_annotation() const
         {
-            return ((flags & F_ANNOTATION) != 0);
+            return ((write_set_flags_ & F_ANNOTATION) != 0);
+        }
+
+        bool pa_safe() const
+        {
+            return ((write_set_flags_ & F_PA_UNSAFE) == 0);
         }
 
         typedef enum
