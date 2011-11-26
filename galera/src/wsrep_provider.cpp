@@ -349,7 +349,10 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         trx->set_conn_id(conn_id);
         trx->append_data(rbr_data, rbr_data_len);
-        trx->set_flags(TrxHandle::F_COMMIT);
+        trx->set_flags(
+            TrxHandle::F_COMMIT |
+            ((flags & WSREP_FLAG_PA_SAFE) ? 0 : TrxHandle::F_PA_UNSAFE)
+            );
 
         retval = repl->replicate(trx);
 
