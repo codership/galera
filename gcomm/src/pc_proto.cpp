@@ -8,7 +8,7 @@
 #include "gcomm/util.hpp"
 
 #include "gu_logger.hpp"
-
+#include "gu_macros.h"
 #include <set>
 
 using namespace std;
@@ -972,9 +972,13 @@ void gcomm::pc::Proto::handle_up(const void* cid,
 
 int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    if (get_state() != S_PRIM)
+    if (gu_unlikely(get_state() != S_PRIM))
     {
         return EAGAIN;
+    }
+    if (gu_unlikely(dg.get_len() > mtu()))
+    {
+        return EMSGSIZE;
     }
 
     uint32_t    seq(dm.get_order() == O_SAFE ? last_sent_seq_ + 1 : last_sent_seq_);

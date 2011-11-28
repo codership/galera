@@ -163,6 +163,8 @@ void PC::connect()
         }
 
     }
+
+    pc->set_mtu(get_mtu());
 }
 
 
