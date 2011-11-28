@@ -1657,6 +1657,48 @@ START_TEST(test_set_param)
 }
 END_TEST
 
+
+START_TEST(test_trac_599)
+{
+    class D : public gcomm::Toplay
+    {
+    public:
+        D(gu::Config& conf) : gcomm::Toplay(conf) { }
+        void handle_up(const void* id, const gu::Datagram& dg,
+                       const gcomm::ProtoUpMeta& um)
+        {
+
+        }
+    };
+
+
+    gu::Config conf;
+    D d(conf);
+    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    std::auto_ptr<gcomm::Transport> tp(
+        gcomm::Transport::create(*pnet,
+                                 "pc://?gmcast.group=test"));
+    gcomm::connect(tp.get(), &d);
+    gu::Buffer buf(10);
+    gu::Datagram dg(buf);
+    int err;
+    err = tp->send_down(dg, gcomm::ProtoDownMeta());
+    fail_unless(err == ENOTCONN, "%d", err);
+    tp->connect();
+    buf.resize(tp->get_mtu());
+    gu::Datagram dg2(buf);
+    err = tp->send_down(dg2, gcomm::ProtoDownMeta());
+    fail_unless(err == 0, "%d", err);
+    buf.resize(buf.size() + 1);
+    gu::Datagram dg3(buf);
+    err = tp->send_down(dg3, gcomm::ProtoDownMeta());
+    fail_unless(err == EMSGSIZE, "%d", err);
+    pnet->event_loop(gu::datetime::Sec);
+    tp->close();
+}
+END_TEST
+
+
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
@@ -1736,6 +1778,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_set_param");
     tcase_add_test(tc, test_set_param);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_trac_599");
+    tcase_add_test(tc, test_trac_599);
     suite_add_tcase(s, tc);
 
 
