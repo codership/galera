@@ -168,6 +168,7 @@ namespace galera
         wsrep_seqno_t initial_position_;
         wsrep_seqno_t position_;
         wsrep_seqno_t safe_to_discard_seqno_;
+        wsrep_seqno_t last_pa_unsafe_;
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
 
