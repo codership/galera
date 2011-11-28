@@ -560,6 +560,8 @@ gcs_become_open (gcs_conn_t* conn)
 static long
 gcs_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
+    if (conn->state != GCS_CONN_CLOSED) return -EPERM; // #600 workaround
+
     long ret = gcs_core_set_pkt_size (conn->core, pkt_size);
 
     if (ret >= 0) {
@@ -609,12 +611,6 @@ gcs_become_primary (gcs_conn_t* conn)
                   ret, strerror(ret));
         gcs_close (conn);
         abort();
-    }
-
-    /* at this point we have established protocol version,
-     * so can set packet size */
-    if (0 < (ret = gcs_set_pkt_size (conn, conn->params.max_packet_size))) {
-        gu_warn ("Failed to set packet size: %ld (%s)", ret, strerror(-ret));
     }
 }
 
@@ -765,6 +761,19 @@ gcs_handle_flow_control (gcs_conn_t*                conn,
     return;
 }
 
+static void
+_reset_pkt_size(gcs_conn_t* conn)
+{
+    if (conn->state != GCS_CONN_CLOSED) return; // #600 workaround
+
+    long ret;
+
+    if (0 > (ret = gcs_core_set_pkt_size (conn->core,
+                                          conn->params.max_packet_size))) {
+        gu_warn ("Failed to set packet size: %ld (%s)", ret, strerror(-ret));
+    }
+}
+
 /*! Handles configuration action */
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
@@ -839,6 +848,10 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     /* </sanity_checks> */
 
     conn->global_seqno = conf->seqno;
+
+    /* at this point we have established protocol version,
+     * so can set packet size */
+// Ticket #600: commented out as unsafe under load    _reset_pkt_size(conn);
 
     const gcs_conn_state_t old_state = conn->state;
     switch (conf->my_state) {
@@ -1211,6 +1224,8 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
     if (GCS_CONN_CLOSED == conn->state) {
 
         if (!(ret = gcs_core_open (conn->core, channel, url))) {
+
+            _reset_pkt_size(conn);
 
             if (!(ret = gu_thread_create (&conn->recv_thread, NULL,
                                           gcs_recv_thread, conn))) {

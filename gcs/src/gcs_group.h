@@ -137,17 +137,19 @@ gcs_group_handle_state_request (gcs_group_t*         group,
  * @return negative - error code, 0 - continue, positive - complete action
  */
 static inline ssize_t
-gcs_group_handle_act_msg (gcs_group_t*          group,
-                          const gcs_act_frag_t* frg,
-                          const gcs_recv_msg_t* msg,
-                          struct gcs_act_rcvd*  rcvd)
+gcs_group_handle_act_msg (gcs_group_t*          const group,
+                          const gcs_act_frag_t* const frg,
+                          const gcs_recv_msg_t* const msg,
+                          struct gcs_act_rcvd*  const rcvd)
 {
-    long    sender_idx = msg->sender_idx;
-    bool    local      = (sender_idx == group->my_idx);
+    long const sender_idx = msg->sender_idx;
+    bool const local      = (sender_idx == group->my_idx);
     ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
     assert (sender_idx < group->num);
+    assert (frg->act_id > 0);
+    assert (frg->act_size > 0);
 
     // clear reset flag if set by own first fragment after reset flag was set
     group->frag_reset = (group->frag_reset && (!local || (0 != frg->frag_no)));
