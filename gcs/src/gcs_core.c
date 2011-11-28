@@ -129,6 +129,7 @@ gcs_core_create (gu_config_t* const conf,
                                     GCS_PROTO_MAX, repl_proto_ver,
                                     appl_proto_ver);
                     core->state = CORE_CLOSED;
+                    core->send_act_no = 1; // 0 == no actions sent
 #ifdef GCS_CORE_TESTING
                     gu_lock_step_init (&core->ls);
 #endif
@@ -299,6 +300,9 @@ gcs_core_send (gcs_core_t*      const conn,
     const size_t   hdr_size       = gcs_act_proto_hdr_size (proto_ver);
 
     core_act_t*    local_act;
+
+    assert (action != NULL);
+    assert (act_size > 0);
 
     /*
      * Action header will be replicated with every message.
@@ -1132,7 +1136,7 @@ long gcs_core_destroy (gcs_core_t* core)
 }
 
 long
-gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
+gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
 {
     long     hdr_size, msg_size;
     uint8_t* new_send_buf = NULL;
@@ -1154,8 +1158,12 @@ gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
         msg_size = hdr_size + 1;
     }
 
-    gu_info ("Changing maximum message size %u -> %u, result: %u",
-             core->send_buf_len, pkt_size, msg_size);
+    gu_info ("Changing maximum packet size to %ld, resulting msg size: %ld",
+              pkt_size, msg_size);
+
+    ret = msg_size - hdr_size; // message payload
+
+    if (core->send_buf_len == (size_t)msg_size) return ret;
 
     if (gu_mutex_lock (&core->send_lock)) abort();
     {
@@ -1165,7 +1173,6 @@ gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
                 core->send_buf     = new_send_buf;
                 core->send_buf_len = msg_size;
                 memset (core->send_buf, 0, hdr_size); // to pacify valgrind
-                ret = msg_size - hdr_size; // message payload
                 gu_debug ("Message payload (action fragment size): %ld", ret);
             }
             else {
