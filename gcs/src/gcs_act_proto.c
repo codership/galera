@@ -32,11 +32,13 @@ static const size_t PROTO_AT_OFFSET       = 16;
 static const size_t PROTO_DATA_OFFSET     = 20;
 
 static const gcs_seqno_t PROTO_ACT_ID_MAX = 0x00FFFFFFFFFFFFLL;
-static const size_t    PROTO_ACT_SIZE_MAX = 0xFFFFFFFF;
-static const ulong     PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
-static const ulong     PROTO_AT_MAX       = 0xFF;
+static const size_t      PROTO_ACT_SIZE_MAX = 0xFFFFFFFF;
+static const ulong       PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
+static const ulong       PROTO_AT_MAX       = 0xFF;
 
-static const int       PROTO_VERSION = GCS_ACT_PROTO_MAX;
+static const int    PROTO_VERSION = GCS_ACT_PROTO_MAX;
+
+#define PROTO_MAX_HDR_SIZE PROTO_DATA_OFFSET // for now
 
 /*! Writes header data into actual header of the message.
  *  Remainig fragment buf and length is in frag->frag and frag->frag_len
@@ -109,9 +111,10 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
 long
 gcs_act_proto_hdr_size (long version)
 {
-    if (GCS_ACT_PROTO_MAX < version || version < 0) {
-        return -EPROTONOSUPPORT;
-    }
+    if (gu_unlikely(GCS_ACT_PROTO_MAX < version)) return -EPROTONOSUPPORT;
+
+    if (gu_unlikely(version < 0)) return PROTO_MAX_HDR_SIZE; // safe
+
     return PROTO_DATA_OFFSET;
 }
 

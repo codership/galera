@@ -148,11 +148,21 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             }
             else {
                 // gap in sequence numbers, needs a snapshot, demote status
+                if (node->status > GCS_NODE_STATE_PRIM) {
+                    gu_info ("'%s' demoted %s->PRIMARY due to gap in history: "
+                             "%lld - %lld",
+                             node->name, gcs_node_state_to_str(node->status),
+                             node_act_id, quorum->act_id);
+                }
                 node->status = GCS_NODE_STATE_PRIM;
             }
         }
         else {
             // node joins completely different group, clear all status
+            if (node->status > GCS_NODE_STATE_PRIM) {
+                gu_info ("'%s' has a different history, demoted %s->PRIMARY",
+                         node->name, gcs_node_state_to_str(node->status));
+            }
             node->status = GCS_NODE_STATE_PRIM;
         }
 

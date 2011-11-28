@@ -125,7 +125,7 @@ gcs_core_recv (gcs_core_t*          conn,
  * In case of failure returns negative error code, in case of success -
  * resulting message payload size (size of action fragment) */
 extern long
-gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size);
+gcs_core_set_pkt_size (gcs_core_t* conn, long pkt_size);
 
 /* sends this node's last applied value to group */
 extern long
