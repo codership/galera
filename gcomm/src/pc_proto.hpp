@@ -81,7 +81,8 @@ public:
         state_msgs_    (),
         current_view_  (V_NONE),
         pc_view_       (V_NON_PRIM),
-        views_         ()
+        views_         (),
+        mtu_           (std::numeric_limits<int32_t>::max())
     {
         log_info << "PC version " << version_;
         conf.set(Conf::PcVersion,      gu::to_string(version_));
@@ -158,7 +159,8 @@ public:
     void handle_view (const View&);
 
     bool set_param(const std::string& key, const std::string& val);
-
+    void set_mtu(size_t mtu) { mtu_ = mtu; }
+    size_t mtu() const { return mtu_; }
 private:
 
     Proto (const Proto&);
@@ -194,6 +196,7 @@ private:
     View              current_view_;  // EVS view
     View              pc_view_;       // PC view
     std::list<View>   views_;         // List of seen views
+    size_t            mtu_;           // Maximum transmission unit
 };
 
 
