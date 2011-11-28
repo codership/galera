@@ -37,15 +37,12 @@ mem_head_t;
 #define HEAD(tail) ((mem_head_t*)(tail) - 1)
 
 void* gu_malloc_dbg  (size_t size,
-		      const char* file, unsigned int line)
+                      const char* file, unsigned int line)
 {
-    mem_head_t* ret = NULL;
-    size_t      total_size;
-
     if (size) {
-	total_size = size + sizeof(mem_head_t);
-	ret = (mem_head_t*) malloc (total_size);
-	if (ret) {
+        size_t const total_size = size + sizeof(mem_head_t);
+        mem_head_t* const ret = (mem_head_t*) malloc (total_size);
+        if (ret) {
 	    gu_mem_total  += total_size;
 	    gu_mem_allocs++;
 	    ret->signature = MEM_SIGNATURE;
@@ -60,14 +57,13 @@ void* gu_malloc_dbg  (size_t size,
 }
 
 void* gu_calloc_dbg  (size_t nmemb, size_t size,
-		      const char* file, unsigned int line)
+                      const char* file, unsigned int line)
 {
     if (size != 0 && nmemb != 0) {
-	mem_head_t* ret      = NULL;
-	size_t      total_size = size*nmemb + sizeof(mem_head_t);
-
-	ret = (mem_head_t*) calloc (total_size, 1);
-	if (ret) {
+        size_t const total_size = size*nmemb + sizeof(mem_head_t);
+        mem_head_t* const ret = (mem_head_t*) calloc (total_size, 1);
+        if (ret) {
+            size_t const total_size = size*nmemb + sizeof(mem_head_t);
 	    gu_mem_total  += total_size;
 	    gu_mem_allocs++;
 	    ret->signature = MEM_SIGNATURE;
@@ -82,21 +78,21 @@ void* gu_calloc_dbg  (size_t nmemb, size_t size,
 }
 
 void* gu_realloc_dbg (void* ptr, size_t size,
-		      const char* file, unsigned int line)
+                      const char* file, unsigned int line)
 {
     if (ptr) {
-	if (size > 0) {
-	    mem_head_t* ret        = HEAD(ptr);
-	    size_t      total_size = size + sizeof(mem_head_t);
-	    
-	    if (MEM_SIGNATURE != ret->signature) {
-		gu_error ("Attempt to realloc uninitialized pointer at "
-			  "file: %s, line: %d", file, line);
-		assert (0);
-	    }
-	    
-	    ret = (mem_head_t*) realloc (ret, total_size);
-	    if (ret) {
+        if (size > 0) {
+            mem_head_t* const old = HEAD(ptr);
+
+            if (MEM_SIGNATURE != old->signature) {
+                gu_error ("Attempt to realloc uninitialized pointer at "
+                          "file: %s, line: %d", file, line);
+                assert (0);
+            }
+
+            size_t const total_size = size + sizeof(mem_head_t);
+            mem_head_t* const ret = (mem_head_t*) realloc (old, total_size);
+            if (ret) {
 		gu_mem_reallocs++;
 		gu_mem_total  -= ret->allocated; // old size
 		ret->allocated = total_size;
