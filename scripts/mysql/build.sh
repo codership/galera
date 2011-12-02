@@ -249,9 +249,10 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
     cd $GALERA_SRC
-    GALERA_REV=$(bzr revno)
-    export GALERA_VER=${RELEASE:-$GALERA_REV}
     scripts/build.sh # options are passed via environment variables
+    GALERA_REV=$(bzr revno 2>/dev/null)     || \
+    GALERA_REV=$(svnversion | sed s/\:/,/g) || \
+    GALERA_REV=$(echo "xxxx")
 fi
 
 ######################################
@@ -303,7 +304,6 @@ fi
 echo  "Building mysqld"
 
 export WSREP_REV
-export GALERA_REV
 export MAKE="make -j$JOBS"
 
 if [ "$SKIP_BUILD" == "no" ]

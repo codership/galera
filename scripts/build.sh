@@ -273,7 +273,10 @@ pushd "$build_base"
 #GALERA_REV="$(svnversion | sed s/\:/,/g)"
 #if [ "$GALERA_REV" == "exported" ]
 #then
-    GALERA_REV=$(bzr revno)
+    GALERA_REV=$(bzr revno 2>/dev/null)     || \
+    GALERA_REV=$(svnversion | sed s/\:/,/g) || \
+    GALERA_REV=$(echo "xxxx")
+    export GALERA_REV
 #fi
 popd
 
