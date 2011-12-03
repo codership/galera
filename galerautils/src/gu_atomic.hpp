@@ -33,9 +33,19 @@ namespace gu
             return *this;
         }
 
+        I fetch_and_zero()
+        {
+            return __sync_fetch_and_and(&i_, 0);
+        }
+
         I fetch_and_add(const I i)
         {
             return __sync_fetch_and_add(&i_, i);
+        }
+
+        I add_and_fetch(const I i)
+        {
+            return __sync_add_and_fetch(&i_, i);
         }
 
         I sub_and_fetch(const I i)

@@ -163,6 +163,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);
 
+    long key_count(0);
     gu::Lock lock(mutex_);
 
     while (offset < wscoll.size())
@@ -262,6 +263,8 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
                 }
             }
         }
+
+        key_count += rk.size();
     }
 
     if (store_keys == true)
@@ -277,6 +280,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
             i->first->ref(trx, i->second);
         }
 
+        key_count_ += key_count;
     }
 
     return TEST_OK;
@@ -383,6 +387,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
     size_t offset(serial_size(*trx));
     const MappedBuffer& wscoll(trx->write_set_collection());
     KeyList key_list;
+    long key_count(0);
     gu::Lock lock(mutex_);
 
     // Scan over write sets
@@ -406,6 +411,8 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
                 goto cert_fail;
             }
         }
+
+        key_count += rk.size();
     }
 
     trx->set_last_depends_seqno(std::max(trx->last_depends_seqno(),
@@ -432,6 +439,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
         }
 
         if (!trx->pa_safe()) last_pa_unsafe_ = trx->global_seqno();
+        key_count_ += key_count;
     }
     cert_debug << "END CERTIFICATION (success): " << *trx;
     return TEST_OK;
@@ -533,11 +541,12 @@ galera::Certification::Certification(const gu::Config& conf)
     deps_dist_             (0),
 
     /* The defaults below are deliberately not reflected in conf: people
-     * should not know about these dangerous setting uless they read RTFM. */
-    max_length_       (conf.get<long>("cert.max_length",
-                                      max_length_default)),
-    max_length_check_ (conf.get<unsigned long>("cert.max_length_check",
-                                               max_length_check_default))
+     * should not know about these dangerous setting unless they read RTFM. */
+    max_length_           (conf.get<long>("cert.max_length",
+                                          max_length_default)),
+    max_length_check_     (conf.get<unsigned long>("cert.max_length_check",
+                                                   max_length_check_default)),
+    key_count_            (0)
 { }
 
 
