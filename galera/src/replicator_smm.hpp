@@ -149,8 +149,7 @@ namespace galera
 
         inline void report_last_committed()
         {
-            size_t i(report_counter_.fetch_and_add(1));
-            if (gu_unlikely(i % report_interval_ == 0))
+            if (gu_unlikely(cert_.index_purge_required()))
                 service_thd_.report_last_committed(apply_monitor_.last_left());
         }
 
@@ -402,10 +401,6 @@ namespace galera
         gu::Atomic<long long> local_cert_failures_;
         gu::Atomic<long long> local_bf_aborts_;
         gu::Atomic<long long> local_replays_;
-
-        // reporting last committed
-        size_t             report_interval_;
-        gu::Atomic<size_t> report_counter_;
 
         mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
     };
