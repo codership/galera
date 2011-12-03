@@ -216,8 +216,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_cert_failures_(),
     local_bf_aborts_    (),
     local_replays_      (),
-    report_interval_    (128),
-    report_counter_     (),
     wsrep_stats_        ()
 {
     strncpy (const_cast<char*>(state_uuid_str_), 

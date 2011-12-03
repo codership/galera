@@ -105,6 +105,14 @@ namespace galera
             return cert_index_.size();
         }
 
+        bool index_purge_required()
+        {
+            register long const count(key_count_.fetch_and_zero());
+
+            return ((count > Certification::purge_interval_) ||
+                    (key_count_ += count /* restore count */, false));
+        }
+
     private:
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v0(TrxHandle*, bool);
@@ -182,6 +190,9 @@ namespace galera
 
         unsigned long const max_length_check_; /* Mask how often to check */
         static unsigned long  const max_length_check_default;
+
+        static long const purge_interval_ = (1UL<<10);
+        gu::Atomic<long> key_count_;
     };
 }
 
