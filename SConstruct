@@ -91,7 +91,7 @@ else:
 boost = int(ARGUMENTS.get('boost', 1))
 ssl   = int(ARGUMENTS.get('ssl', 1))
 
-GALERA_VER = ARGUMENTS.get('version', '0.8.dev')
+GALERA_VER = ARGUMENTS.get('version', '0.8.4')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')

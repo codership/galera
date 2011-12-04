@@ -167,7 +167,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
                              config_.get(Param::commit_order))),
-    data_dir_           (),
+    data_dir_           (args->data_dir ? args->data_dir : ""),
     state_file_         ("grastate.dat"),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
@@ -1446,13 +1446,12 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
             /* Check that we're not running out of space in monitor. */
             if (local_monitor_.would_block(seqno_l))
             {
-                long const seconds = sst_retry_sec_ * local_monitor_.size();
-                double const hours = (seconds/360) * 0.1;
+                long const seconds = sst_retry_sec_ * tries;
                 log_error << "We ran out of resources, seemingly because "
                           << "we've been unsuccessfully requesting state "
-                          << "transfer for over " << seconds << " seconds (>"
-                          << hours << " hours). Please check that there is at "
-                          << "least one fully synced member in the group. "
+                          << "transfer for over " << seconds << " seconds. "
+                          << "Please check that there is "
+                          << "at least one fully synced member in the group. "
                           << "Application must be restarted.";
                 ret = -EDEADLK;
             }
