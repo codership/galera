@@ -921,8 +921,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
     // WARNING: Here we have application block on this call which
     //          may prevent application from resolving the issue.
     //          (Not that we expect that application can resolve it.)
-    ssize_t err;
-    while (-EAGAIN == (err = gcs_.join(seqno))) usleep (100000);
+    ssize_t err = gcs_.join(seqno);
 
     if (err == 0) return WSREP_OK;
 
