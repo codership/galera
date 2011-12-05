@@ -231,7 +231,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     // the following is possible only when bootstrapping new cluster
     // (trivial wsrep_cluster_address)
     state_.add_transition(Transition(S_CONNECTED, S_JOINED));
-    // the following is possible on PC remerge
+    // the following are possible on PC remerge
+    state_.add_transition(Transition(S_CONNECTED, S_DONOR));
     state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
@@ -1138,6 +1139,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 switch (next_state)
                 {
+                case S_JOINING:
+                    state_.shift_to(S_JOINING);
+                    break;
+                case S_DONOR:
+                    state_.shift_to(S_DONOR);
+                    break;
                 case S_JOINED:
                     state_.shift_to(S_JOINED);
                     break;
