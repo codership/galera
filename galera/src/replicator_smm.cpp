@@ -1120,7 +1120,10 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
                     state_.shift_to(S_JOINING);
                     break;
                 case S_DONOR:
-                    state_.shift_to(S_DONOR);
+                    if (state_() == S_CONNECTED)
+                    {
+                        state_.shift_to(S_DONOR);
+                    }
                     break;
                 case S_JOINED:
                     state_.shift_to(S_JOINED);
