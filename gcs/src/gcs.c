@@ -146,6 +146,9 @@ struct gcs_conn
     long         stats_fc_received;   //
     gcs_fc_t     stfc; // state transfer FC object
 
+    /* #603, #606 join control */
+    gcs_seqno_t volatile join_seqno;
+
     /* sync control */
     bool         sync_sent;
 
@@ -697,7 +700,8 @@ gcs_become_joined (gcs_conn_t* conn)
 
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
-        conn->fc_offset = conn->queue_len;
+        conn->fc_offset  = conn->queue_len;
+        conn->join_seqno = 0;
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
         if ((ret = gcs_send_sync (conn))) {
@@ -767,6 +771,27 @@ _reset_pkt_size(gcs_conn_t* conn)
     if (0 > (ret = gcs_core_set_pkt_size (conn->core,
                                           conn->params.max_packet_size))) {
         gu_warn ("Failed to set packet size: %ld (%s)", ret, strerror(-ret));
+    }
+}
+
+static long
+_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+{
+    long err;
+
+    while (-EAGAIN == (err = gcs_core_send_join (conn->core, seqno)))
+        usleep (10000);
+
+    switch (err)
+    {
+    case -ENOTCONN:
+        gu_warn ("Sending JOIN failed: %d (%s). "
+                 "Will retry in new primary component.", err, strerror(-err));
+    case 0:
+        return 0;
+    default:
+        gu_error ("Sending JOIN failed: %d (%s).", err, strerror(-err));
+        return err;
     }
 }
 
@@ -870,8 +895,10 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
                  conn->global_seqno);
     }
 
-    /* One of the cases when the node can become SYNCED */
-    if (GCS_CONN_JOINED == conn->state) {
+    switch (conn->state) {
+    case GCS_CONN_JOINED:
+        /* One of the cases when the node can become SYNCED */
+    {
         bool send_sync = false;
 
         gu_fifo_lock(conn->recv_q);
@@ -883,6 +910,18 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         if (send_sync && (ret = gcs_send_sync_end (conn))) {
             gu_warn ("CC: sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
+    }
+    break;
+    case GCS_CONN_JOINER:
+    case GCS_CONN_DONOR:
+        /* #603, #606 - duplicate JOIN msg in case we lost it */
+        assert (conf->conf_id >= 0);
+
+        if (conn->join_seqno > 0) _join (conn, conn->join_seqno);
+
+        break;
+    default:
+        break;
     }
 }
 
@@ -1743,7 +1782,9 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 long
 gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
-    return gcs_core_send_join (conn->core, seqno);
+    conn->join_seqno = seqno;
+
+    return _join (conn, seqno);
 }
 
 void
