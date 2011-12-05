@@ -55,6 +55,13 @@ copy_config()
     fi
 }
 
+install_node()
+{
+    local dist=$1
+
+    node_job untar_cmd "$@"
+}
+
 install()
 {
     local dist=$1

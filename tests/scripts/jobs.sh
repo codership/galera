@@ -48,6 +48,9 @@ virtual_job()
 # This function tries to add a bit of polymorphism by treating untar cmd
 # specially. The speciality comes from that it not only excutes command,
 # but also transfers data
+#
+# Usage: node_job cmd opt1 opt2 ... optN node
+#
 node_job()
 {
     local cmd=$1
