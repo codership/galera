@@ -1,0 +1,12 @@
+The test
+ - installs demo package pointed to by OLD,
+ - starts sqlgen load,
+ - checks consistency,
+ - upgrades the nodes one by one to distribution pointed to by NEW,
+ - checks consistency
+
+Usage:
+
+OLD=<old>.tgz NEW=<new>.tgz ./run.sh
+
+Usage with vsbes backend:
