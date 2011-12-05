@@ -150,17 +150,7 @@ namespace galera
 
         void join (gcs_seqno_t seqno) throw (gu::Exception)
         {
-            long err;
-
-            // WARNING: Here we have application block on this call which
-            //          may prevent application from resolving the issue.
-            //          (Not that we expect that application can resolve it.)
-            while (-EAGAIN == (err = gcs_join(conn_, seqno)))
-            {
-                log_warn << "Retrying sending JOIN message (seqno: "
-                         << seqno << ')';
-                usleep (100000); // 0.1s
-            }
+            long const err(gcs_join(conn_, seqno));
 
             if (err < 0)
             {

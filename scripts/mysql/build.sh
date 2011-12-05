@@ -441,7 +441,8 @@ if [ $TAR == "yes" ]; then
         install -m 644 -D my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
-    cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
+    cat $MYSQL_SRC/support-files/wsrep.cnf | \
+        sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
     tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
     install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
