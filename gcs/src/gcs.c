@@ -147,6 +147,7 @@ struct gcs_conn
     gcs_fc_t     stfc; // state transfer FC object
 
     /* #603, #606 join control */
+    bool        volatile need_to_join;
     gcs_seqno_t volatile join_seqno;
 
     /* sync control */
@@ -704,8 +705,8 @@ gcs_become_joined (gcs_conn_t* conn)
 
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
-        conn->fc_offset  = conn->queue_len;
-        conn->join_seqno = 0;
+        conn->fc_offset    = conn->queue_len;
+        conn->need_to_join = false;
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
         if ((ret = gcs_send_sync (conn))) {
@@ -921,7 +922,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         /* #603, #606 - duplicate JOIN msg in case we lost it */
         assert (conf->conf_id >= 0);
 
-        if (conn->join_seqno > 0) _join (conn, conn->join_seqno);
+        if (conn->need_to_join) _join (conn, conn->join_seqno);
 
         break;
     default:
@@ -1750,7 +1751,8 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 long
 gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
-    conn->join_seqno = seqno;
+    conn->join_seqno   = seqno;
+    conn->need_to_join = true;
 
     return _join (conn, seqno);
 }
