@@ -370,6 +370,11 @@ galera::Certification::TestResult
 galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
 {
     cert_debug << "BEGIN CERTIFICATION: " << *trx;
+    size_t offset(serial_size(*trx));
+    const MappedBuffer& wscoll(trx->write_set_collection());
+    KeyList key_list;
+    long key_count(0);
+    gu::Lock lock(mutex_);
 
     if ((trx->flags() & (TrxHandle::F_ISOLATION | TrxHandle::F_PA_UNSAFE))
         || trx_map_.empty())
@@ -381,12 +386,6 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
         trx->set_depends_seqno(
             trx_map_.begin()->second->global_seqno() - 1);
     }
-
-    size_t offset(serial_size(*trx));
-    const MappedBuffer& wscoll(trx->write_set_collection());
-    KeyList key_list;
-    long key_count(0);
-    gu::Lock lock(mutex_);
 
     // Scan over write sets
     while (offset < wscoll.size())
