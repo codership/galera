@@ -103,6 +103,7 @@ mysql_install_db --wsrep-on=0 --user=mysql --datadir=${mysql_data} --basedir=/us
 # This is a fix/workaround for AppArmor profile provided with mysql-server deb
 [ ! -d /etc/apparmor.d/disable ] || \
 ( cd /etc/apparmor.d/disable && ln -sf ../usr.sbin.mysqld ./ )
+[ ! -x /etc/init.d/apparmor ] || /etc/init.d/apparmor restart
 EOF_POSTINSTALL
 
 %preremove <<EOF_PREREMOVE
@@ -114,6 +115,7 @@ fi
 update-rc.d -f mysql remove >/dev/null || exit $
 [ ! -L $BINS_DST/my_print_defaults ] || rm -rf $BINS_DST/my_print_defaults
 [ ! -L /etc/apparmor.d/disable/usr.sbin.mysqld ] || rm -rf /etc/apparmor.d/disable/usr.sbin.mysqld
+[ ! -x /etc/init.d/apparmor ] || /etc/init.d/apparmor restart
 EOF_PREREMOVE
 
 #
