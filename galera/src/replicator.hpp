@@ -93,7 +93,7 @@ namespace galera
                                        wsrep_seqno_t seqno_l,
                                        wsrep_seqno_t donor_seq)
             throw (gu::Exception) = 0;
-        virtual void process_join(wsrep_seqno_t seqno_l)
+        virtual void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l)
             throw (gu::Exception) = 0;
         virtual void process_sync(wsrep_seqno_t seqno_l) = 0;
 

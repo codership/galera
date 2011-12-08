@@ -962,6 +962,9 @@ gcs_handle_state_change (gcs_conn_t*           conn,
         return 1;
     }
     else {
+        gu_fatal ("Could not allocate state change action (%zd bytes)",
+                  act->buf_len);
+        abort();
         return -ENOMEM;
     }
 }
@@ -991,10 +994,11 @@ gcs_handle_actions (gcs_conn_t*          conn,
         break;
     case GCS_ACT_JOIN:
         ret = gcs_handle_state_change (conn, &rcvd->act);
-        if (gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf) >= 0)
-            gcs_become_joined (conn);
-        else
+        if (gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf) < 0 &&
+            GCS_CONN_JOINER == conn->state)
             gcs_become_primary (conn);
+        else
+            gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
         ret = gcs_handle_state_change (conn, &rcvd->act);

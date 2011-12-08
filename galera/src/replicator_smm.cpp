@@ -1204,7 +1204,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 }
 
 
-void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_l)
+void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_j,
+                                         wsrep_seqno_t seqno_l)
     throw (gu::Exception)
 {
     LocalOrder lo(seqno_l);
@@ -1217,7 +1218,18 @@ void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_l)
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 
-    state_.shift_to(S_JOINED);
+    if (seqno_j < 0 && S_JOINING == state_())
+    {
+        // #595, @todo: find a way to re-request state transfer
+        log_fatal << "Failed to receive state transfer: " << seqno_j
+                  << " (" << strerror (-seqno_j) << "), need to restart.";
+        abort();
+    }
+    else
+    {
+        state_.shift_to(S_JOINED);
+    }
+
     local_monitor_.leave(lo);
 }
 

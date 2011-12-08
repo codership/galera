@@ -138,8 +138,12 @@ void galera::GcsActionSource::dispatch(void*                 recv_ctx,
                                       act.seqno_g);
         break;
     case GCS_ACT_JOIN:
-        replicator_.process_join(act.seqno_l);
+    {
+        wsrep_seqno_t const seqno(
+            *(reinterpret_cast<const wsrep_seqno_t*>(act.buf)));
+        replicator_.process_join(seqno, act.seqno_l);
         break;
+    }
     case GCS_ACT_SYNC:
         replicator_.process_sync(act.seqno_l);
         break;
