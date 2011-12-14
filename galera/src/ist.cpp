@@ -383,7 +383,6 @@ namespace galera
                     + galera::serial_size(buffer.seqno_d()));
                 const bool rolled_back(buffer.seqno_d() == -1);
 
-                assert(offset = buf.size());
                 size_t n;
                 if (rolled_back == true)
                 {
@@ -625,9 +624,8 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
             gu_throw_error(EINVAL) << "IST receive address was not configured";
 
         recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
+        conf_.set(RECV_ADDR, recv_addr);
     }
-
-    conf_.set(RECV_ADDR, recv_addr);
 
 #if REMOVE
     if (addr != 0)

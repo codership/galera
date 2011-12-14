@@ -43,10 +43,19 @@ Gcs::~Gcs ()
 void
 Gcs::recv (gcs_action& act) throw (gu::Exception)
 {
+again:
     ssize_t ret = gcs_recv(gcs_, &act);
 
-    if (ret < 0)
+    if (gu_unlikely(ret < 0))
     {
+        if (-ECANCELED == ret)
+        {
+            ret = gcs_resume_recv (gcs_);
+            if (0 == ret) goto again;
+        }
+
+        log_fatal << "Receiving from group failed: " << ret
+                  << " (" << strerror(-ret) << ")";
         gu_throw_error(-ret) << "Receiving from group failed";
     }
 }
@@ -60,6 +69,7 @@ Gcs::request_state_transfer (const std::string& request,
     log_info << "Sending state transfer request: '" << request
              << "', size: " << request.length();
 
+again:
     ssize_t ret = gcs_request_state_transfer (gcs_,
                                               request.c_str(),
                                               request.length() + 1 /* \0 */,
@@ -67,6 +77,14 @@ Gcs::request_state_transfer (const std::string& request,
                                               &order);
     if (ret < 0)
     {
+        if (-EAGAIN == ret)
+        {
+            usleep (1000000);
+            goto again;
+        }
+
+        log_fatal << "State transfer request failed: " << ret
+                  << " (" << strerror(-ret) << ")";
         gu_throw_error(-ret) << "State transfer request failed";
     }
 }
@@ -78,7 +96,9 @@ Gcs::join (gcs_seqno_t seqno) throw (gu::Exception)
 
     if (ret < 0)
     {
-        gu_throw_error(-ret) << "Join group failed";
+        log_fatal << "Joining group failed: " << ret
+                  << " (" << strerror(-ret) << ")";
+        gu_throw_error(-ret) << "Joining group failed";
     }
 }
 

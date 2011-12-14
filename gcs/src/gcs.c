@@ -1530,8 +1530,11 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
             /* now we can go waiting for action delivery */
             if (ret >= 0) {
                 gu_cond_wait (&repl_act.wait_cond, &repl_act.wait_mutex);
-
+#ifndef GCS_FOR_GARB
                 assert (act->buf != 0);
+#else
+                assert (act->buf == 0);
+#endif /* GCS_FOR_GARB */
                 assert (act->buf != orig_buf);
 
                 if (act->seqno_g < 0) {
@@ -1602,7 +1605,11 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         *local = action.seqno_l;
 
         if (ret > 0) {
+#ifndef GCS_FOR_GARB
             assert (action.buf != NULL);
+#else
+            assert (action.buf == NULL);
+#endif
             assert (ret == (ssize_t)rst_size);
             assert (action.seqno_g >= 0);
             assert (action.seqno_l >  0);

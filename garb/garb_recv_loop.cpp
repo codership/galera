@@ -106,9 +106,8 @@ RecvLoop::loop() throw (gu::Exception)
             break;
         }
 
-        if (act.size > 0)
+        if (act.buf)
         {
-            assert (act.buf);
             free (const_cast<void*>(act.buf));
         }
     }

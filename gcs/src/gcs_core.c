@@ -484,13 +484,12 @@ core_handle_act_msg (gcs_core_t*          core,
         ret = gcs_group_handle_act_msg (group, &frg, msg, act);
 
         if (ret > 0) { /* complete action received */
-
             assert (ret  == act->act.buf_len);
 #ifndef GCS_FOR_GARB
             assert (NULL != act->act.buf);
 #else
             assert (NULL == act->act.buf);
-            act->act.buf_len = 0;
+//            act->act.buf_len = 0;
 #endif
             act->sender_idx = msg->sender_idx;
 
@@ -541,15 +540,19 @@ core_handle_act_msg (gcs_core_t*          core,
 
             if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
 #ifdef GCS_FOR_GARB
+            /* ignoring state requests from other nodes (not allocated) */
             if (my_msg) {
-                /* ignoring state requests from other nodes (not allocated) */
+                act->act.buf = act->repl_buf;
 #endif
                 ret = gcs_group_handle_state_request (group, act);
                 assert (ret <= 0 || ret == act->act.buf_len);
 #ifdef GCS_FOR_GARB
+                if (ret < 0) gu_fatal ("Handling state request failed: %d",ret);
+                act->act.buf = NULL;
             }
             else {
                 act->id = GCS_SEQNO_ILL;
+                act->act.buf_len = 0;
                 act->act.type = GCS_ACT_ERROR;
                 ret = 0;
             }

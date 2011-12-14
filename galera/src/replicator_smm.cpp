@@ -1259,12 +1259,12 @@ wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
     wsrep_seqno_t const ret(cert_.position());
 
     apply_monitor_.drain(ret);
-    assert (apply_monitor_.last_left() == ret);
+    assert (apply_monitor_.last_left() >= ret);
 
     if (co_mode_ != CommitOrder::BYPASS)
     {
         commit_monitor_.drain(ret);
-        assert (commit_monitor_.last_left() == ret);
+        assert (commit_monitor_.last_left() >= ret);
     }
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret;
