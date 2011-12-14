@@ -5,13 +5,16 @@
 namespace garb
 {
 
+static int const REPL_PROTO_VER(2);
+static int const APPL_PROTO_VER(1);
+
 Gcs::Gcs (gu::Config&        gconf,
           const std::string& address,
           const std::string& group) throw (gu::Exception)
 :
     closed_ (true),
     gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf), NULL,
-                      GCS_ARBITRATOR_NAME, "", 1, 1))
+                      GCS_ARBITRATOR_NAME, "", REPL_PROTO_VER, APPL_PROTO_VER))
 {
     if (!gcs_)
     {
