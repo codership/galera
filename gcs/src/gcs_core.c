@@ -551,9 +551,10 @@ core_handle_act_msg (gcs_core_t*          core,
                 act->act.buf = NULL;
             }
             else {
-                act->id = GCS_SEQNO_ILL;
                 act->act.buf_len = 0;
-                act->act.type = GCS_ACT_ERROR;
+                act->act.type    = GCS_ACT_ERROR;
+                act->id          = GCS_SEQNO_ILL;
+                act->sender_idx  = -1;
                 ret = 0;
             }
 #endif
