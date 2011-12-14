@@ -145,23 +145,36 @@ END_TEST
 
 START_TEST (uri_test2) // checking corner cases
 {
+#ifdef NDEBUG
     try { URI uri(""); fail ("URI should have failed."); }
     catch (Exception& e) {}
+#endif
+    mark_point();
 
     try { URI uri("scheme:"); }
     catch (Exception& e) { fail ("URI should be valid."); }
 
+    mark_point();
+#ifdef NDEBUG
     try { URI uri(":path"); fail ("URI should have failed."); }
     catch (Exception& e) {}
+#endif
+    mark_point();
 
     try { URI uri("a://b:c?d=e#f"); fail ("URI should have failed."); }
     catch (Exception& e) {}
 
+    mark_point();
+
     try { URI uri("a://b:99999?d=e#f"); fail ("URI should have failed."); }
     catch (Exception& e) {}
 
+    mark_point();
+#ifdef NDEBUG
     try { URI uri("?query"); fail ("URI should have failed."); }
     catch (Exception& e) {}
+#endif
+    mark_point();
 
     try
     {
@@ -189,6 +202,8 @@ START_TEST (uri_test2) // checking corner cases
         fail (e.what());
     }
 
+    mark_point();
+
     try
     {
         URI uri("scheme:///path");
@@ -213,6 +228,8 @@ START_TEST (uri_test2) // checking corner cases
         fail (e.what());
     }
 
+    mark_point();
+
     try
     {
         URI uri("scheme://@/path");
@@ -234,6 +251,8 @@ START_TEST (uri_test2) // checking corner cases
         fail (e.what());
     }
 
+    mark_point();
+
     try
     {
         URI uri("scheme://@:/path");
@@ -254,6 +273,8 @@ START_TEST (uri_test2) // checking corner cases
     {
         fail (e.what());
     }
+
+    mark_point();
 
     try
     {
@@ -284,6 +305,7 @@ END_TEST
 
 START_TEST (uri_test3) // Test from gcomm
 {
+#ifdef NDEBUG
     try
     {
         URI too_simple("http");
@@ -293,7 +315,7 @@ START_TEST (uri_test3) // Test from gcomm
     {
         fail_if (e.get_errno() != EINVAL);
     }
-
+#endif
     URI empty_auth("http://");
     fail_unless(empty_auth.get_scheme()    == "http");
     fail_unless(empty_auth.get_authority() == "");

@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <vector>
 
+#include "gu_assert.h"
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
 #include "gu_string.hpp"
@@ -142,6 +143,7 @@ void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 
     if (!scheme.is_set() || !scheme.str().length())
     {
+        assert(0);
         gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme";
     }
 
