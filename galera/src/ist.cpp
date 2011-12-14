@@ -752,6 +752,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 
     running_ = true;
 
+    log_info << "prepared IST receiver, listening in: " << recv_addr_;
     return recv_addr_;
 }
 
