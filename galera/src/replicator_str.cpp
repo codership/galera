@@ -610,18 +610,21 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
-    if (apply_monitor_.last_left() < group_seqno)
+    if (str_proto_ver_ >= 1)
     {
-        log_info << "Receiving IST: "
-                 << (group_seqno - apply_monitor_.last_left())
-                 << " writesets, seqnos " << apply_monitor_.last_left() << "-"
-                 << group_seqno;
-        ist_receiver_.ready();
-        recv_IST(recv_ctx);
-        sst_seqno_ = group_seqno;
+        // IST is prepared only with str proto ver 1 and above
+        if (apply_monitor_.last_left() < group_seqno)
+        {
+            log_info << "Receiving IST: "
+                     << (group_seqno - apply_monitor_.last_left())
+                     << " writesets, seqnos " << apply_monitor_.last_left() << "-"
+                     << group_seqno;
+            ist_receiver_.ready();
+            recv_IST(recv_ctx);
+            sst_seqno_ = group_seqno;
+        }
+        ist_receiver_.finished();
     }
-
-    ist_receiver_.finished();
 
     delete req;
 }

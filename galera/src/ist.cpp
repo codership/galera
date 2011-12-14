@@ -915,6 +915,11 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
 
 void galera::ist::Receiver::finished()
 {
+    if (recv_addr_ == "")
+    {
+        log_warn << "IST was not prepared before calling finished()";
+        return;
+    }
     int err;
     interrupt();
     if ((err = pthread_join(thread_, 0)) != 0)
@@ -929,6 +934,7 @@ void galera::ist::Receiver::finished()
         consumers_.top()->cond().signal();
         consumers_.pop();
     }
+    recv_addr_ = "";
 }
 
 
