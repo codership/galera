@@ -181,6 +181,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
+    state_seqno_        (-1),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
@@ -1118,6 +1119,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         cert_.assign_initial_position(group_seqno, trx_proto_ver_);
+        // record state seqno, needed for IST on DONOR
+        state_seqno_ = group_seqno;
 
         if (st_req == true)
         {
@@ -1394,6 +1397,7 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
     }
 
     update_state_uuid (uuid);
+    state_seqno_ = seqno;
     apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.set_initial_position(seqno);
     cert_.assign_initial_position(seqno, trx_proto_ver_);

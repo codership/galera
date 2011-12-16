@@ -321,10 +321,14 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     try
                     {
+                        // Note: End of IST range must be state_seqno_ instead
+                        // of istr.group_seqno() in case there are CCs between
+                        // sending and delivering STR. If there are no
+                        // intermediate CCs, state_seqno_ == istr.group_seqno().
                         ist_senders_.run(config_,
                                          istr.peer(),
                                          istr.last_applied() + 1,
-                                         istr.group_seqno(),
+                                         state_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -621,9 +625,18 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                      << group_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
-            sst_seqno_ = group_seqno;
+            sst_seqno_ = ist_receiver_.finished();
+
+            // Note: apply_monitor_ must be drained to avoid race between
+            // IST appliers and GCS appliers, GCS action source may
+            // provide actions that have already been applied.
+            apply_monitor_.drain(sst_seqno_);
+            log_info << "IST finished: " << state_uuid_ << ":" << sst_seqno_;
         }
-        ist_receiver_.finished();
+        else
+        {
+            (void)ist_receiver_.finished();
+        }
     }
 
     delete req;

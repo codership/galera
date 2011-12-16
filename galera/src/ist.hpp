@@ -42,7 +42,7 @@ namespace galera
             std::string prepare(wsrep_seqno_t, wsrep_seqno_t, int);
             void ready();
             int recv(TrxHandle** trx);
-            void finished();
+            wsrep_seqno_t finished();
             void run();
         private:
             void interrupt();

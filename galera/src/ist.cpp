@@ -860,7 +860,7 @@ err:
     }
 
     running_ = false;
-    if (ec != EINTR && current_seqno_ - 1 != last_seqno_)
+    if (ec != EINTR && current_seqno_ - 1 < last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
                   << last_seqno_ << " last received: " << current_seqno_ - 1;
@@ -913,12 +913,11 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
 }
 
 
-void galera::ist::Receiver::finished()
+wsrep_seqno_t galera::ist::Receiver::finished()
 {
     if (recv_addr_ == "")
     {
-        log_warn << "IST was not prepared before calling finished()";
-        return;
+        gu_throw_fatal << "IST was not prepared before calling finished()";
     }
     int err;
     interrupt();
@@ -935,6 +934,7 @@ void galera::ist::Receiver::finished()
         consumers_.pop();
     }
     recv_addr_ = "";
+    return (current_seqno_ - 1);
 }
 
 
