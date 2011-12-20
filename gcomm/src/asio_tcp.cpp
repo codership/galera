@@ -134,11 +134,19 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
             log_debug << "socket " << get_id() << " connected, remote endpoint "
                       << get_remote_addr() << " local endpoint "
                       << get_local_addr();
-            ssl_socket_->async_handshake(
-                asio::ssl::stream<asio::ip::tcp::socket>::client,
-                boost::bind(&AsioTcpSocket::handshake_handler,
-                            shared_from_this(),
-                            asio::placeholders::error));
+	    try
+	    {
+		ssl_socket_->async_handshake(
+                    asio::ssl::stream<asio::ip::tcp::socket>::client,
+                    boost::bind(&AsioTcpSocket::handshake_handler,
+                                shared_from_this(),
+                                asio::placeholders::error));
+	    }
+	    catch (asio::system_error& e)
+	    {
+		FAILED_HANDLER(e.code());
+		return;
+	    }
         }
         else
         {
@@ -159,36 +167,44 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
 
 void gcomm::AsioTcpSocket::connect(const URI& uri)
 {
-    Critical<AsioProtonet> crit(net_);
+    try
+    {
+	Critical<AsioProtonet> crit(net_);
 
-    asio::ip::tcp::resolver           resolver(net_.io_service_);
+	asio::ip::tcp::resolver           resolver(net_.io_service_);
 
-    asio::ip::tcp::resolver::query    query(unescape_addr(uri.get_host()),
-                                            uri.get_port());
+	asio::ip::tcp::resolver::query    query(unescape_addr(uri.get_host()),
+                                                uri.get_port());
 
-    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+	asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
 
 #ifdef HAVE_ASIO_SSL_HPP
-    if (uri.get_scheme() == "ssl")
-    {
-        ssl_socket_ = new asio::ssl::stream<asio::ip::tcp::socket>(
-            net_.io_service_, net_.ssl_context_);
-        ssl_socket_->lowest_layer().async_connect(
-            *i,
-            boost::bind(&AsioTcpSocket::connect_handler,
-                        shared_from_this(),
-                        asio::placeholders::error));
-    }
-    else
-    {
+	if (uri.get_scheme() == "ssl")
+	{
+	    ssl_socket_ = new asio::ssl::stream<asio::ip::tcp::socket>(
+                net_.io_service_, net_.ssl_context_);
+	    ssl_socket_->lowest_layer().async_connect(
+                *i,
+                boost::bind(&AsioTcpSocket::connect_handler,
+                            shared_from_this(),
+                            asio::placeholders::error));
+	}
+	else
+	{
 #endif // HAVE_ASIO_SSL_HPP
-        socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
-                                              shared_from_this(),
-                                              asio::placeholders::error));
+	    socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
+						  shared_from_this(),
+						  asio::placeholders::error));
 #ifdef HAVE_ASIO_SSL_HPP
-    }
+	}
 #endif // HAVE_ASIO_SSL_HPP
-    state_ = S_CONNECTING;
+	state_ = S_CONNECTING;
+    }
+    catch (asio::system_error& e)
+    {
+	gu_throw_error(e.code().value())
+            << "error while connecting to remote host " << uri.to_string();
+    }
 }
 
 void gcomm::AsioTcpSocket::close()
@@ -682,38 +698,46 @@ void gcomm::AsioTcpAcceptor::accept_handler(
 
 void gcomm::AsioTcpAcceptor::listen(const URI& uri)
 {
-    asio::ip::tcp::resolver resolver(net_.io_service_);
-    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                   uri.get_port());
-    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
-    acceptor_.open(i->endpoint().protocol());
-    acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
-    acceptor_.bind(*i);
-    acceptor_.listen();
-    AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));
-#ifdef HAVE_ASIO_SSL_HPP
-    if (uri_.get_scheme() == "ssl")
+    try
     {
-        new_socket->ssl_socket_ =
-            new asio::ssl::stream<asio::ip::tcp::socket>(
-                net_.io_service_, net_.ssl_context_);
-        acceptor_.async_accept(new_socket->ssl_socket_->lowest_layer(),
-                               boost::bind(&AsioTcpAcceptor::accept_handler,
-                                           this,
-                                           SocketPtr(new_socket),
-                                           asio::placeholders::error));
-    }
-    else
-    {
-#endif // HAVE_ASIO_SSL_HPP
-        acceptor_.async_accept(new_socket->socket_,
-                               boost::bind(&AsioTcpAcceptor::accept_handler,
-                                           this,
-                                           SocketPtr(new_socket),
-                                           asio::placeholders::error));
+	asio::ip::tcp::resolver resolver(net_.io_service_);
+	asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
+					     uri.get_port());
+	asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+	acceptor_.open(i->endpoint().protocol());
+	acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
+	acceptor_.bind(*i);
+	acceptor_.listen();
+	AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));
 #ifdef HAVE_ASIO_SSL_HPP
-    }
+	if (uri_.get_scheme() == "ssl")
+	{
+	    new_socket->ssl_socket_ =
+                new asio::ssl::stream<asio::ip::tcp::socket>(
+                    net_.io_service_, net_.ssl_context_);
+	    acceptor_.async_accept(new_socket->ssl_socket_->lowest_layer(),
+				   boost::bind(&AsioTcpAcceptor::accept_handler,
+					       this,
+					       SocketPtr(new_socket),
+					       asio::placeholders::error));
+	}
+	else
+	{
 #endif // HAVE_ASIO_SSL_HPP
+	    acceptor_.async_accept(new_socket->socket_,
+				   boost::bind(&AsioTcpAcceptor::accept_handler,
+					       this,
+					       SocketPtr(new_socket),
+					       asio::placeholders::error));
+#ifdef HAVE_ASIO_SSL_HPP
+	}
+#endif // HAVE_ASIO_SSL_HPP
+    }
+    catch (asio::system_error& e)
+    {
+        gu_throw_error(e.code().value())
+            << "error while trying to listen " << uri.to_string();
+    }
 }
 
 void gcomm::AsioTcpAcceptor::close()
