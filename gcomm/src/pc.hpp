@@ -25,7 +25,7 @@ namespace gcomm
         ~PC();
 
         void connect();
-        void close();
+        void close(bool force = false);
 
         void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
         int  handle_down(gu::Datagram&, const ProtoDownMeta&);

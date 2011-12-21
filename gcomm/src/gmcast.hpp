@@ -43,7 +43,7 @@ namespace gcomm
         bool supports_uuid()   const { return true; }
         const UUID& get_uuid() const { return my_uuid; }
         void connect();
-        void close();
+        void close(bool force = false);
         void close(const UUID& uuid) { gmcast_forget(uuid); }
 
         void listen()

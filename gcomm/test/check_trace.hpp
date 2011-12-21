@@ -195,7 +195,7 @@ namespace gcomm
 
         void connect(bool first) { }
 
-        void close() { }
+        void close(bool force) { }
         void close(const UUID&) { }
 
         void connect() { }

@@ -1698,6 +1698,36 @@ START_TEST(test_trac_599)
 }
 END_TEST
 
+// test for forced teardown
+START_TEST(test_trac_620)
+{
+    gu::Config conf;
+    auto_ptr<Protonet> net(Protonet::create(conf));
+    Transport* tp(Transport::create(*net, "pc://?"
+				    "evs.info_log_mask=0xff&"
+				    "gmcast.listen_addr=tcp://127.0.0.1:10001&"
+				    "gmcast.group=pc&"
+				    "gmcast.time_wait=PT0.5S&"
+				    "node.name=n1"));
+    class D : public gcomm::Toplay
+    {
+    public:
+        D(gu::Config& conf) : gcomm::Toplay(conf) { }
+        void handle_up(const void* id, const gu::Datagram& dg,
+                       const gcomm::ProtoUpMeta& um)
+        {
+
+        }
+    };
+    D d(conf);
+    gcomm::connect(tp, &d);
+    tp->connect();
+    tp->close(true);
+    gcomm::disconnect(tp, &d);
+    delete tp;
+}
+END_TEST
+
 
 Suite* pc_suite()
 {
@@ -1784,6 +1814,9 @@ Suite* pc_suite()
     tcase_add_test(tc, test_trac_599);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_trac_620");
+    tcase_add_test(tc, test_trac_620);
+    suite_add_tcase(s, tc);
 
     return s;
 }

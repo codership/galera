@@ -253,7 +253,7 @@ void GMCast::connect()
 }
 
 
-void GMCast::close()
+void GMCast::close(bool force)
 {
     log_debug << "gmcast " << get_uuid() << " close";
     pstack_.pop_proto(this);
