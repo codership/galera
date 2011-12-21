@@ -55,7 +55,7 @@ public:
     int                  get_errno() const;
     
     virtual void connect() = 0;
-    virtual void close()                     = 0;
+    virtual void close(bool force = false) = 0;
     virtual void close(const UUID& uuid)
     {        
         gu_throw_error(ENOTSUP) << "close(UUID) not supported by "

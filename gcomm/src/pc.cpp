@@ -168,34 +168,40 @@ void PC::connect()
 }
 
 
-void PC::close()
+void PC::close(bool force)
 {
 
-    log_debug << "PC/EVS Proto leaving";
-    pc->close();
-    evs->close();
-
-    Date wait_until(Date::now() + linger);
-
-    do
+    if (force == false)
     {
-        get_pnet().event_loop(Sec/2);
-    }
-    while (evs->get_state() != evs::Proto::S_CLOSED &&
-           Date::now()      <  wait_until);
+        log_debug << "PC/EVS Proto leaving";
+	pc->close();
+	evs->close();
 
-    if (evs->get_state() != evs::Proto::S_CLOSED)
+	Date wait_until(Date::now() + linger);
+
+	do
+	{
+            get_pnet().event_loop(Sec/2);
+	}
+	while (evs->get_state() != evs::Proto::S_CLOSED &&
+	       Date::now()      <  wait_until);
+
+	if (evs->get_state() != evs::Proto::S_CLOSED)
+	{
+            evs->shift_to(evs::Proto::S_CLOSED);
+	}
+
+	if (pc->get_state() != pc::Proto::S_CLOSED)
+	{
+            log_warn << "PCProto didn't reach closed state";
+	}
+
+	gmcast->close();
+    }
+    else
     {
-        evs->shift_to(evs::Proto::S_CLOSED);
+	log_info << "Forced PC close";
     }
-
-    if (pc->get_state() != pc::Proto::S_CLOSED)
-    {
-        log_warn << "PCProto didn't reach closed state";
-    }
-
-    gmcast->close();
-
     get_pnet().erase(&pstack_);
     pstack_.pop_proto(this);
     pstack_.pop_proto(pc);

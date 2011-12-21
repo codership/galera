@@ -250,7 +250,7 @@ public:
         log_info << "gcomm: joining thread";
         pthread_join(thd, 0);
         log_info << "gcomm: closing backend";
-        tp->close();
+        tp->close(error != 0);
         gcomm::disconnect(tp, this);
         delete tp;
         tp = 0;
@@ -353,7 +353,7 @@ private:
     Mutex mutex;
     size_t refcnt;
     bool terminated;
-    bool error;
+    int error;
     RecvBuf recv_buf;
     View current_view;
     Profile prof;
@@ -512,7 +512,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 {
     GCommConn::Ref ref(backend);
 
-    if (ref.get() == 0)
+    if (gu_unlikely(ref.get() == 0))
     {
         return -EBADFD;
     }
@@ -536,7 +536,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         if (gu_unlikely(conn.get_error() != 0))
         {
-            return -ENOTCONN;
+            return -ECONNABORTED;
         }
         int err = conn.send_down(
             dg,
@@ -778,6 +778,11 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
     try
     {
         gcomm::Critical<Protonet> crit(conn.get_pnet());
+        if (gu_unlikely(conn.get_error() != 0))
+        {
+            return -ECONNABORTED;
+        }
+
         if (conn.get_pnet().set_param(key, value) == false)
         {
             log_warn << "param " << key << " not recognized";
