@@ -1,6 +1,6 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-env = DefaultEnvironment()
+env = DefaultEnvironment().Clone()
 
 conf = Configure(env)
 
