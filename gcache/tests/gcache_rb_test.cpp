@@ -76,6 +76,8 @@ START_TEST(test1)
 
     tmp = rb.malloc (2 + bh_size);
     fail_if (NULL == tmp);
+
+    mark_point();
 }
 END_TEST
 

@@ -5,7 +5,7 @@
 namespace garb
 {
 
-static int const REPL_PROTO_VER(2);
+static int const REPL_PROTO_VER(1);
 static int const APPL_PROTO_VER(1);
 
 Gcs::Gcs (gu::Config&        gconf,

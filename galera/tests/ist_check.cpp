@@ -149,11 +149,10 @@ START_TEST(test_ist)
     conf.set("gcache.name", gcache_file);
     std::string dir("/tmp");
     std::string receiver_addr("tcp://127.0.0.1:4568");
-    gcache::GCache gcache(conf, dir);
     wsrep_uuid_t uuid;
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
 
-    gcache.reset();
+    gcache::GCache* gcache = new gcache::GCache(conf, dir);
 
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
@@ -167,13 +166,13 @@ START_TEST(test_ist)
         trx->append_data("bar", 3);
 
         size_t trx_size(serial_size(*trx));
-        gu::byte_t* ptr(reinterpret_cast<gu::byte_t*>(gcache.malloc(trx_size)));
+        gu::byte_t* ptr(reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size)));
         serialize(*trx, ptr, trx_size, 0);
-        gcache.seqno_assign(ptr, i, i - 1, false);
+        gcache->seqno_assign(ptr, i, i - 1, false);
         trx->unref();
     }
 
-    sender_args sargs(gcache, receiver_addr, 1, 10);
+    sender_args sargs(*gcache, receiver_addr, 1, 10);
     receiver_args rargs(receiver_addr, 1, 10, 1);
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
 
@@ -184,7 +183,11 @@ START_TEST(test_ist)
 
     pthread_join(sender_thread, 0);
     pthread_join(receiver_thread, 0);
+    mark_point();
 
+    delete gcache;
+
+    mark_point();
     unlink(gcache_file.c_str());
 }
 END_TEST
