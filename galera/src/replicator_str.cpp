@@ -554,11 +554,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 {
     assert(sst_req_len >= 0);
 
-    log_debug << "State transfer required: "
-              << "\n\tGroup state: "
-              << group_uuid << ":" << group_seqno
-              << "\n\tLocal state: " << state_uuid_
-              << ":" << apply_monitor_.last_left();
+    log_info << "State transfer required: "
+             << "\n\tGroup state: "
+             << group_uuid << ":" << group_seqno
+             << "\n\tLocal state: " << state_uuid_
+             << ":" << apply_monitor_.last_left();
 
     if (0 == sst_req_len && state_uuid_ != group_uuid)
     {
@@ -606,7 +606,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_info << "SST finished: " << state_uuid_ << ":" << sst_seqno_;
+            log_info << "SST received: " << state_uuid_ << ":" << sst_seqno_;
         }
     }
     else
@@ -631,7 +631,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             // IST appliers and GCS appliers, GCS action source may
             // provide actions that have already been applied.
             apply_monitor_.drain(sst_seqno_);
-            log_info << "IST finished: " << state_uuid_ << ":" << sst_seqno_;
+            log_info << "IST received: " << state_uuid_ << ":" << sst_seqno_;
         }
         else
         {
