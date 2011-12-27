@@ -5,8 +5,8 @@
 remove_cmd()
 {
     local node=${@:$#}
-    local dir="${NODE_TEST_DIR[$node]}"
-    echo -n "rm -rf \"$dir\""
+    local dirn="${NODE_TEST_DIR[$node]}"
+    echo -n 'rm -rf '"$dirn"'/*'
 }
 
 remove()
