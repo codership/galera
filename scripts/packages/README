@@ -424,7 +424,7 @@ All parameters in this group are prefixed by 'ist.'.
 recv_addr
     Address to receive incremental state transfer at. Setting this parameter
     turns on incremental state transfer. IST will use SSL if SSL is configured
-    as described above.
+    as described above. No default.
 
 
 4. GALERA ARBITRATOR
