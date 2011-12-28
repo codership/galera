@@ -1254,6 +1254,11 @@ public:
         return next_send;
     }
 
+    std::string get_listen_addr() const
+    {
+        return tp->get_listen_addr();
+    }
+
 };
 
 START_TEST(test_pc_transport)
@@ -1264,29 +1269,33 @@ START_TEST(test_pc_transport)
     PCUser2 pu1(*net,
                 "pc://?"
                 "evs.info_log_mask=0xff&"
-                "gmcast.listen_addr=tcp://127.0.0.1:10001&"
+                "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "node.name=n1");
-    PCUser2 pu2(*net,
-                "pc://127.0.0.1:10001?"
-                "evs.info_log_mask=0xff&"
-                "gmcast.group=pc&"
-                "gmcast.time_wait=PT0.5S&"
-                "gmcast.listen_addr=tcp://127.0.0.1:10002&"
-                "node.name=n2");
-    PCUser2 pu3(*net,
-                "pc://127.0.0.1:10001?"
-                "evs.info_log_mask=0xff&"
-                "gmcast.group=pc&"
-                "gmcast.time_wait=PT0.5S&"
-                "gmcast.listen_addr=tcp://127.0.0.1:10003&"
-                "node.name=n3");
 
     gu_conf_self_tstamp_on();
 
     pu1.start();
     net->event_loop(5*Sec);
+
+    PCUser2 pu2(*net,
+                std::string("pc://")
+                + pu1.get_listen_addr().erase(0, strlen("tcp://"))
+                + "?evs.info_log_mask=0xff&"
+                "gmcast.group=pc&"
+                "gmcast.time_wait=PT0.5S&"
+                "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "node.name=n2");
+    PCUser2 pu3(*net,
+                std::string("pc://")
+                + pu1.get_listen_addr().erase(0, strlen("tcp://"))
+                + "?evs.info_log_mask=0xff&"
+                "gmcast.group=pc&"
+                "gmcast.time_wait=PT0.5S&"
+                "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "node.name=n3");
+
 
     pu2.start();
     net->event_loop(5*Sec);
@@ -1608,7 +1617,7 @@ START_TEST(test_set_param)
     PCUser2 pu1(*net,
                 "pc://?"
                 "evs.info_log_mask=0xff&"
-                "gmcast.listen_addr=tcp://127.0.0.1:10001&"
+                "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "node.name=n1");
@@ -1705,7 +1714,7 @@ START_TEST(test_trac_620)
     auto_ptr<Protonet> net(Protonet::create(conf));
     Transport* tp(Transport::create(*net, "pc://?"
 				    "evs.info_log_mask=0xff&"
-				    "gmcast.listen_addr=tcp://127.0.0.1:10001&"
+				    "gmcast.listen_addr=tcp://127.0.0.1:0&"
 				    "gmcast.group=pc&"
 				    "gmcast.time_wait=PT0.5S&"
 				    "node.name=n1"));

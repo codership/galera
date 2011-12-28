@@ -93,6 +93,11 @@ const UUID& PC::get_uuid() const
     return gmcast->get_uuid();
 }
 
+std::string gcomm::PC::get_listen_addr() const
+{
+    return gmcast->get_listen_addr();
+}
+
 
 void PC::connect()
 {
@@ -165,6 +170,12 @@ void PC::connect()
     }
 
     pc->set_mtu(get_mtu());
+}
+
+void gcomm::PC::connect(const gu::URI& uri)
+{
+    uri_ = uri;
+    connect();
 }
 
 

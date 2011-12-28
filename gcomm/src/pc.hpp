@@ -25,6 +25,9 @@ namespace gcomm
         ~PC();
 
         void connect();
+        void connect(const gu::URI&);
+        std::string get_listen_addr() const;
+
         void close(bool force = false);
 
         void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
