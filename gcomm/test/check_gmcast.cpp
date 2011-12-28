@@ -136,6 +136,12 @@ START_TEST(test_gmcast_w_user_messages)
             return recvd;
         }
 
+        void set_recvd(size_t val)
+        {
+            recvd = val;
+        }
+
+
         Protostack& get_pstack() { return pstack; }
 
         std::string get_listen_addr() const
@@ -210,7 +216,17 @@ START_TEST(test_gmcast_w_user_messages)
     pnet->insert(&u1.get_pstack());
     u1.start(u2.get_listen_addr());
 
-    pnet->event_loop(3*Sec);
+    u1.set_recvd(0);
+    u2.set_recvd(0);
+    u3.set_recvd(0);
+    u4.set_recvd(0);
+
+    for (size_t i(0); i < 30; ++i)
+    {
+        u1.handle_timer();
+        u2.handle_timer();
+        pnet->event_loop(Sec/10);
+    }
 
     fail_unless(u1.get_recvd() != 0);
     fail_unless(u2.get_recvd() != 0);

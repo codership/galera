@@ -1686,7 +1686,7 @@ START_TEST(test_trac_599)
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
     std::auto_ptr<gcomm::Transport> tp(
         gcomm::Transport::create(*pnet,
-                                 "pc://?gmcast.group=test"));
+                                 "pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"));
     gcomm::connect(tp.get(), &d);
     gu::Buffer buf(10);
     gu::Datagram dg(buf);

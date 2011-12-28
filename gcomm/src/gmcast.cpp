@@ -283,6 +283,7 @@ void GMCast::close(bool force)
     delete listener;
     listener = 0;
 
+    mcast_tree.clear();
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         delete ProtoMap::get_value(i);
