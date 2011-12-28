@@ -85,46 +85,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
                                 << uri_.to_string();
     }
 
-    try
-    {
-        if (!host_is_any(uri_.get_host()))
-        {
-            string port;
-
-            try
-            {
-                port = uri_.get_port();
-            }
-            catch (gu::NotSet& )
-            {
-                port = Defaults::GMCastTcpPort;
-            }
-
-            initial_addr = resolve(
-                get_scheme(use_ssl) + "://" + uri_.get_host() + ":" + port
-                ).to_string();
-
-            // resolving sets scheme to tcp, have to rewrite for ssl
-            if (use_ssl == true)
-            {
-                initial_addr.replace(0, 3, "ssl");
-            }
-
-            if (check_tcp_uri(initial_addr) == false)
-            {
-                gu_throw_error (EINVAL) << "initial addr '" << initial_addr
-                                        << "' is not valid";
-            }
-
-            log_debug << self_string() << " initial addr: " << initial_addr;
-        }
-    }
-    catch (gu::NotSet&)
-    {
-        //@note: this is different from empty host and indicates URL without ://
-        gu_throw_error (EINVAL) << "Host not defined in URL: "
-                                << uri_.to_string();
-    }
+    set_initial_addr(uri_);
 
     try
     {
@@ -220,6 +181,51 @@ GMCast::~GMCast()
     delete proto_map;
 }
 
+void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
+{
+    try
+    {
+        if (!host_is_any(uri.get_host()))
+        {
+            string port;
+
+            try
+            {
+                port = uri.get_port();
+            }
+            catch (gu::NotSet& )
+            {
+                port = Defaults::GMCastTcpPort;
+            }
+
+            initial_addr = resolve(
+                get_scheme(use_ssl) + "://" + uri.get_host() + ":" + port
+                ).to_string();
+
+            // resolving sets scheme to tcp, have to rewrite for ssl
+            if (use_ssl == true)
+            {
+                initial_addr.replace(0, 3, "ssl");
+            }
+
+            if (check_tcp_uri(initial_addr) == false)
+            {
+                gu_throw_error (EINVAL) << "initial addr '" << initial_addr
+                                        << "' is not valid";
+            }
+
+            log_debug << self_string() << " initial addr: " << initial_addr;
+        }
+    }
+    catch (gu::NotSet&)
+    {
+        //@note: this is different from empty host and indicates URL without ://
+        gu_throw_error (EINVAL) << "Host not defined in URL: "
+                                << uri.to_string();
+    }
+}
+
+
 void GMCast::connect()
 {
     pstack_.push_proto(this);
@@ -251,6 +257,14 @@ void GMCast::connect()
         gu_trace (gmcast_connect(initial_addr));
     }
 }
+
+
+void gcomm::GMCast::connect(const gu::URI& uri)
+{
+    set_initial_addr(uri);
+    connect();
+}
+
 
 
 void GMCast::close(bool force)
@@ -294,7 +308,9 @@ void GMCast::gmcast_accept()
         return;
     }
 
-    Proto* peer = new Proto (version, tp, listen_addr, "", mcast_addr,
+    Proto* peer = new Proto (version, tp,
+                             listener->listen_addr() /* listen_addr */,
+                             "", mcast_addr,
                              get_uuid(), group_name);
     pair<ProtoMap::iterator, bool> ret =
         proto_map->insert(make_pair(tp->get_id(), peer));
@@ -344,7 +360,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
 
     Proto* peer = new Proto (version,
                              tp,
-                             listen_addr,
+                             listener->listen_addr()/* listen_addr*/ ,
                              remote_addr,
                              mcast_addr,
                              get_uuid(),

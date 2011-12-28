@@ -76,6 +76,7 @@ public:
     virtual ~Acceptor() { }
 
     virtual void listen(const gu::URI& uri) = 0;
+    virtual std::string listen_addr() const = 0;
     virtual void close() = 0;
     virtual State get_state() const = 0;
     virtual SocketPtr accept() = 0;

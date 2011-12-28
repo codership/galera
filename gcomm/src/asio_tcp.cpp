@@ -489,21 +489,22 @@ std::string gcomm::AsioTcpSocket::get_local_addr() const
 #ifdef HAVE_ASIO_SSL_HPP
     if (ssl_socket_ != 0)
     {
-        return "ssl://"
-            + escape_addr(ssl_socket_->lowest_layer().local_endpoint().address())
-            + ":"
-            + to_string(ssl_socket_->lowest_layer().local_endpoint().port());
+        return ("ssl://"
+                + escape_addr(ssl_socket_->lowest_layer().local_endpoint().address())
+                + ":"
+                + to_string(ssl_socket_->lowest_layer().local_endpoint().port()));
     }
     else
     {
 #endif // HAVE_ASIO_SSL_HPP
-        return "tcp://"
-            + escape_addr(socket_.local_endpoint().address())
-            + ":"
-            + to_string(socket_.local_endpoint().port());
+        return ("tcp://"
+                + escape_addr(socket_.local_endpoint().address())
+                + ":"
+                + to_string(socket_.local_endpoint().port()));
 #ifdef HAVE_ASIO_SSL_HPP
     }
 #endif // HAVE_ASIO_SSL_HPP
+
 }
 
 std::string gcomm::AsioTcpSocket::get_remote_addr() const
@@ -737,6 +738,23 @@ void gcomm::AsioTcpAcceptor::listen(const URI& uri)
     {
         gu_throw_error(e.code().value())
             << "error while trying to listen " << uri.to_string();
+    }
+}
+
+
+std::string gcomm::AsioTcpAcceptor::listen_addr() const
+{
+    try
+    {
+        return (uri_.get_scheme() + "://"
+                + escape_addr(acceptor_.local_endpoint().address())
+                + ":"
+                + gu::to_string(acceptor_.local_endpoint().port()));
+    }
+    catch (asio::system_error& e)
+    {
+        gu_throw_error(e.code().value()) << "failed to read listen addr";
+        throw;
     }
 }
 

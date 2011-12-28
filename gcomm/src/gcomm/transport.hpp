@@ -55,6 +55,10 @@ public:
     int                  get_errno() const;
     
     virtual void connect() = 0;
+    virtual void connect(const gu::URI& uri)
+    {
+        gu_throw_fatal << "connect(URI) not supported";
+    }
     virtual void close(bool force = false) = 0;
     virtual void close(const UUID& uuid)
     {        
@@ -62,8 +66,13 @@ public:
                                 << uri_.get_scheme();
     }
     
-    virtual void       listen();
-    virtual Transport* accept();
+    virtual void        listen();
+    virtual std::string get_listen_addr() const
+    {
+        gu_throw_fatal << "not supported";
+        throw;
+    }
+    virtual Transport*  accept();
     virtual void handle_accept(Transport*)
     {
         gu_throw_error(ENOTSUP) << "handle_accept() not supported by" 

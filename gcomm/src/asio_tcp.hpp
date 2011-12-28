@@ -82,6 +82,7 @@ public:
         SocketPtr socket,
         const asio::error_code& error);
     void listen(const gu::URI& uri);
+    std::string listen_addr() const;
     void close();
     SocketPtr accept();
 

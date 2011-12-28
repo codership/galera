@@ -43,12 +43,22 @@ namespace gcomm
         bool supports_uuid()   const { return true; }
         const UUID& get_uuid() const { return my_uuid; }
         void connect();
+        void connect(const gu::URI&);
         void close(bool force = false);
         void close(const UUID& uuid) { gmcast_forget(uuid); }
 
         void listen()
         {
             gu_throw_fatal << "gmcast transport listen not implemented";
+        }
+
+        std::string get_listen_addr() const
+        {
+            if (listener == 0)
+            {
+                gu_throw_error(ENOTCONN) << "not connected";
+            }
+            return listener->listen_addr();
         }
 
         Transport* accept()
@@ -175,6 +185,8 @@ namespace gcomm
                    const void* exclude_id);
         // Reconnecting
         void reconnect();
+
+        void set_initial_addr(const gu::URI&);
 
         std::string self_string() const
         {

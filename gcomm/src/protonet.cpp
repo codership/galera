@@ -4,8 +4,6 @@
  * $Id$
  */
 
-#include "gu.hpp"
-
 #ifdef HAVE_ASIO_HPP
 #include "asio_protonet.hpp"
 #endif // HAVE_ASIO_HPP
@@ -70,8 +68,6 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 {
 #ifdef HAVE_ASIO_HPP
     static const std::string& default_backend("asio");
-#else
-    static const std::string& default_backend("gu");
 #endif // HAVE_ASIO_HPP
     const std::string backend(conf.get(Conf::ProtonetBackend, default_backend));
     conf.set(Conf::ProtonetBackend, backend);
@@ -85,11 +81,11 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
     }
 
     log_info << "protonet " << backend << " version " << version;
-    if (backend == "gu")
-        return new GuProtonet(conf, version);
 #ifdef HAVE_ASIO_HPP
-    else if (backend == "asio")
+    if (backend == "asio")
         return new AsioProtonet(conf, version);
+#else
+#error "No protonet backends defined"
 #endif // HAVE_ASIO_HPP
     gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
                    << "' not supported";
