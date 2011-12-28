@@ -83,12 +83,12 @@ END_TEST
 
 Suite* gcache_rb_suite()
 {
-    Suite* s = suite_create("gcache::RbStore");
-    TCase* tc;
+    Suite* ts = suite_create("gcache::RbStore");
+    TCase* tc = tcase_create("test");
 
-    tc = tcase_create("test");
+    tcase_set_timeout(tc, 10);
     tcase_add_test(tc, test1);
-    suite_add_tcase(s, tc);
+    suite_add_tcase(ts, tc);
 
-    return s;
+    return ts;
 }

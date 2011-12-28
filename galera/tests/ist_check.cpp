@@ -195,10 +195,10 @@ END_TEST
 
 Suite* ist_suite()
 {
-    Suite* s = suite_create("ist");
-    TCase* tc;
+    Suite* s  = suite_create("ist");
+    TCase* tc = tcase_create("test_ist");
 
-    tc = tcase_create("test_ist");
+    tcase_set_timeout(tc, 10);
     tcase_add_test(tc, test_ist);
     suite_add_tcase(s, tc);
 
