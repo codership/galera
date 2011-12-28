@@ -621,7 +621,10 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
                              TODO: try to find from system. */
     {
         if (!addr)
-            gu_throw_error(EINVAL) << "IST receive address was not configured";
+        {
+            log_warn << "'" << RECV_ADDR << "' not set. IST will be unavailable.";
+            return;
+        }
 
         recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
         conf_.set(RECV_ADDR, recv_addr);
@@ -662,7 +665,7 @@ IST_determine_recv_addr (const gu::Config& conf)
     catch (gu::NotFound&)
     {
         gu_throw_error(EINVAL) << '\'' <<  galera::ist::Receiver::RECV_ADDR
-                               << '\'' << "not found.";
+                               << "' not set.";
     }
 
     /* check if explicit scheme is present */
@@ -738,7 +741,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     }
     catch (asio::system_error& e)
     {
-        gu_throw_error(e.code().value()) << "failed to open ist listener to "
+        gu_throw_error(e.code().value()) << "Failed to open IST listener at "
                                          << uri.to_string();
     }
 
@@ -747,12 +750,12 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
-        gu_throw_error(err) << "unable to create receiver thread";
+        gu_throw_error(err) << "Unable to create receiver thread";
     }
 
     running_ = true;
 
-    log_info << "prepared IST receiver, listening in: " << recv_addr_;
+    log_info << "Prepared IST receiver, listening at: " << recv_addr_;
     return recv_addr_;
 }
 
@@ -917,23 +920,33 @@ wsrep_seqno_t galera::ist::Receiver::finished()
 {
     if (recv_addr_ == "")
     {
-        gu_throw_fatal << "IST was not prepared before calling finished()";
+        log_debug << "IST was not prepared before calling finished()";
     }
-    int err;
-    interrupt();
-    if ((err = pthread_join(thread_, 0)) != 0)
+    else
     {
-        log_warn << "pthread_join() failed: " << err;
+        interrupt();
+
+        int err;
+        if ((err = pthread_join(thread_, 0)) != 0)
+        {
+            log_warn << "Failed to join IST receiver thread: " << err;
+        }
+
+        acceptor_.close();
+
+        gu::Lock lock(mutex_);
+
+        running_ = false;
+
+        while (consumers_.empty() == false)
+        {
+            consumers_.top()->cond().signal();
+            consumers_.pop();
+        }
+
+        recv_addr_ = "";
     }
-    acceptor_.close();
-    gu::Lock lock(mutex_);
-    running_ = false;
-    while (consumers_.empty() == false)
-    {
-        consumers_.top()->cond().signal();
-        consumers_.pop();
-    }
-    recv_addr_ = "";
+
     return (current_seqno_ - 1);
 }
 

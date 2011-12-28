@@ -422,7 +422,7 @@ ReplicatorSMM::prepare_state_request (const void* const sst_req,
             {
                 log_error
                     << "Failed to prepare for incremental state transfer: "
-                    << e.what() << ". It will be unavailable.";
+                    << e.what() << ". IST will be unavailable.";
             }
 
             StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
