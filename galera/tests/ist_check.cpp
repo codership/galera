@@ -31,7 +31,7 @@ private:
 struct sender_args
 {
     gcache::GCache& gcache_;
-    std::string   peer_;
+    const std::string& peer_;
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
     sender_args(gcache::GCache& gcache,
@@ -103,19 +103,19 @@ extern "C" void* trx_thread(void* arg)
         targs->monitor_.enter(to);
         targs->monitor_.leave(to);
         trx->unref();
-   }
+    }
     return 0;
 }
 
 extern "C" void* receiver_thd(void* arg)
 {
 
-    const receiver_args* rargs(reinterpret_cast<const receiver_args*>(arg));
+    receiver_args* rargs(reinterpret_cast<receiver_args*>(arg));
 
     gu::Config conf;
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, 0);
-    receiver.prepare(rargs->first_, rargs->last_, 1);
+    rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_, 1);
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);
@@ -148,7 +148,7 @@ START_TEST(test_ist)
     std::string gcache_file("/tmp/ist_check.cache");
     conf.set("gcache.name", gcache_file);
     std::string dir("/tmp");
-    std::string receiver_addr("tcp://127.0.0.1:4568");
+    std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
 
@@ -172,8 +172,9 @@ START_TEST(test_ist)
         trx->unref();
     }
 
-    sender_args sargs(*gcache, receiver_addr, 1, 10);
     receiver_args rargs(receiver_addr, 1, 10, 1);
+    sender_args sargs(*gcache, rargs.listen_addr_, 1, 10);
+
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
 
 

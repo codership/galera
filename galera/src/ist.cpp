@@ -25,6 +25,18 @@ namespace
     static std::string const CONF_SSL_CA        ("socket.ssl_ca");
     static std::string const CONF_SSL_PSWD_FILE ("socket.ssl_password_file");
 
+    std::string escape_addr(const asio::ip::address& addr)
+    {
+        if (addr.is_v4())
+        {
+            return addr.to_v4().to_string();
+        }
+        else
+        {
+            return "[" + addr.to_v6().to_string() + "]";
+        }
+    }
+
     static inline std::string unescape_addr(const std::string& addr)
     {
         std::string ret(addr);
@@ -738,6 +750,12 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
         acceptor_.bind(*i);
         acceptor_.listen();
+        // read recv_addr_ from acceptor_ in case zero port was specified
+        recv_addr_ = uri.get_scheme()
+            + "://"
+            + escape_addr(acceptor_.local_endpoint().address())
+            + ":"
+            + gu::to_string(acceptor_.local_endpoint().port());
     }
     catch (asio::system_error& e)
     {
