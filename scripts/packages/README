@@ -21,7 +21,7 @@ Please see COPYING file that came with this distribution.
 Source code can be found at http://www.codership.com/en/downloads/galera
 
 
-                        GALERA v1.x
+                        GALERA v2.x
 
 CONTENTS:
 =========
@@ -30,7 +30,8 @@ CONTENTS:
 3. GALERA CONFIGURATION PARAMETERS
 4. GALERA ARBITRATOR
 5. WRITESET CACHE
-6. SPECIAL NOTES
+6. INCREMENTAL STATE TRANSFER
+7. SPECIAL NOTES
 
 
 1. WHAT IS GALERA
@@ -409,12 +410,21 @@ ssl
    A boolean value to disable SSL even if certificate and key are configured.
    Default: yes (SSL is enabled if ssl_cert and ssl_key are set)
 
-To generate private key/dertificate pair the following command may be used:
+To generate private key/certificate pair the following command may be used:
 
 $ openssl req -new -x509 -days 365000 -nodes -keyout key.pem -out cert.pem
 
 Using short-living (in most web examples - 1 year) certificates is not
 advised as it will lead to complete cluster shutdown when certificate expires.
+
+3.2.7 Incremental State Transfer parameters
+
+All parameters in this group are prefixed by 'ist.'.
+
+recv_addr
+    Address to receive incremental state transfer at. Setting this parameter
+    turns on incremental state transfer. IST will use SSL if SSL is configured
+    as described above.
 
 
 4. GALERA ARBITRATOR
@@ -493,9 +503,34 @@ NOTE: Since all cache files are memory-mapped, the process may appear to use
 more memory than it actually does.
 
 
-6. SPECIAL NOTES
+6. INCREMENTAL STATE TRANSFER (IST)
 
-6.1 DEADLOCK ON COMMIT
+Galera 2.x introduces a long awaited functionality: incremental state transfer.
+The idea is that if
+   a) the joining node state UUID is the same as that of the group and
+   b) all of the writesets that it missed can be found in the donor's Gcache
+then instead of whole state snapshot it will receive the missing writesets and
+catch up with the group by replaying them.
+
+For example:
+ - local node state is 5a76ef62-30ec-11e1-0800-dba504cf2aab:197222
+ - group state is      5a76ef62-30ec-11e1-0800-dba504cf2aab:201913
+ - if writeset number 197223 is still in the donor's GCache, it will send
+   writests 197223-201913 to joiner instead of the whole state.
+
+IST can dramatically speed up remerging node into cluster. It also non-blocking
+on the donor.
+
+The most important parameter for IST (besides 'ist.recv_addr') is GCache size
+on donor. The bigger it is, the more writesets can be stored in it and the
+bigger seqno gaps can be closed with IST. On the other hand, if GCache is much
+bigger than the state size, serving IST may be less efficient than sending
+state snapshot.
+
+
+7. SPECIAL NOTES
+
+7.1 DEADLOCK ON COMMIT
 
 In multi-master mode transaction commit operation may return a deadlock error.
 This is a consequence of writeset certification and is a fundamental property
@@ -505,7 +540,7 @@ performed on the same node. This still has an advantage over the "traditional"
 master-slave replication: write load can still be distributed between nodes and
 since replication is synchronous, failover is trivial.
 
-6.2 "SPLIT-BRAIN" CONDITION
+7.2 "SPLIT-BRAIN" CONDITION
 
 Galera cluster is fully distributed and does not use any sort of centralized
 arbitrator, thus having no single point of failure. However, like any cluster
