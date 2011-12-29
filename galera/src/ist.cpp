@@ -759,6 +759,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     }
     catch (asio::system_error& e)
     {
+        recv_addr_ = "";
         gu_throw_error(e.code().value()) << "Failed to open IST listener at "
                                          << uri.to_string();
     }
@@ -768,6 +769,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
+        recv_addr_ = "";
         gu_throw_error(err) << "Unable to create receiver thread";
     }
 

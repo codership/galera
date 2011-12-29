@@ -614,7 +614,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
-    if (str_proto_ver_ >= 1)
+    if (req->ist_len() > 0)
     {
         // IST is prepared only with str proto ver 1 and above
         if (apply_monitor_.last_left() < group_seqno)
