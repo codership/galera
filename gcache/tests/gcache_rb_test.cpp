@@ -86,7 +86,7 @@ Suite* gcache_rb_suite()
     Suite* ts = suite_create("gcache::RbStore");
     TCase* tc = tcase_create("test");
 
-    tcase_set_timeout(tc, 10);
+    tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test1);
     suite_add_tcase(ts, tc);
 
