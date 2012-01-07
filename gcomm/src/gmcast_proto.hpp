@@ -2,6 +2,7 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
+#include "gu_datetime.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/util.hpp"
 #include "socket.hpp"

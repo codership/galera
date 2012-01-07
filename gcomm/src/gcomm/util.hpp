@@ -6,7 +6,7 @@
 #ifndef _GCOMM_UTIL_HPP_
 #define _GCOMM_UTIL_HPP_
 
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 #include "gu_logger.hpp"
 #include "gu_throw.hpp"
 

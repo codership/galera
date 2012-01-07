@@ -12,7 +12,6 @@ using namespace std;
 using namespace gcomm;
 using namespace gcomm::gmcast;
 using namespace gu;
-using namespace gu::net;
 using namespace gu::datetime;
 
 #include <check.h>

@@ -9,7 +9,6 @@
 
 using namespace std;
 using namespace gu;
-using namespace gu::net;
 
 #define FAILED_HANDLER(_e) failed_handler(_e, __FUNCTION__, __LINE__)
 

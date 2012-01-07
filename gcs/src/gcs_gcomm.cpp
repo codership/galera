@@ -43,7 +43,6 @@ using namespace std;
 using namespace gu;
 using namespace gu::prodcons;
 using namespace gu::datetime;
-using namespace gu::net;
 using namespace gcomm;
 using namespace prof;
 

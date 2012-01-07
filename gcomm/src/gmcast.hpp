@@ -68,7 +68,7 @@ namespace gcomm
 
         size_t get_mtu() const
         {
-            return gu::net::Network::get_mtu() - (4 + UUID::serial_size());
+            return pnet_.get_mtu() - (4 + UUID::serial_size());
         }
 
     private:

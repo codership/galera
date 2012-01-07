@@ -19,7 +19,7 @@
 #ifndef EVS_INPUT_MAP2_HPP
 #define EVS_INPUT_MAP2_HPP
 
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 
 #include "evs_message2.hpp"
 #include "gcomm/map.hpp"

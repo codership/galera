@@ -12,7 +12,6 @@
 
 using namespace std;
 using namespace gu;
-using namespace gu::net;
 
 
 static bool is_multicast(const asio::ip::udp::endpoint& ep)

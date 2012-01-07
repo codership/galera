@@ -22,7 +22,7 @@ static suite_creator_t suites[] =
 {
     gu_string_suite,
     gu_uri_suite,
-//    gu_net_suite,
+    gu_net_suite,
     gu_datetime_suite,
     gu_vlq_suite,
     0

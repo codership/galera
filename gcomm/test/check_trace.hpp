@@ -8,7 +8,7 @@
  * Classes for tracing views and messages
  */
 
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 #include "gu_uri.hpp"
 #include "gu_datetime.hpp"
 

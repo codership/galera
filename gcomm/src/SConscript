@@ -19,7 +19,8 @@ libgcomm_sources = [
     'protostack.cpp',
     'transport.cpp',
     'uuid.cpp',
-    'view.cpp']
+    'view.cpp',
+    'socket.cpp']
 
 libgcomm_env = env.Clone()
 libgcomm_env.Append(CPPFLAGS = ' ')

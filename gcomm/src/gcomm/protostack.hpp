@@ -8,7 +8,7 @@
 #include "gcomm/protolay.hpp"
 
 #include "gu_lock.hpp"
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 
 #include <deque>
 

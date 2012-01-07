@@ -4,14 +4,12 @@
 
 #include "gcomm/protostack.hpp"
 #include "socket.hpp"
-#include "gu.hpp"
 #include "gcomm/util.hpp"
 
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu;
 using namespace gu::datetime;
-using namespace gu::net;
 using namespace gcomm;
 
 

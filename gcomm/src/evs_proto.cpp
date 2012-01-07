@@ -25,7 +25,6 @@
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu;
-using namespace gu::net;
 using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::evs;

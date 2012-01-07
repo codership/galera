@@ -36,6 +36,15 @@ public:
         S_CLOSING
     } State;
 
+    /*!
+     * Symbolic option names (to specify in URI)
+     */
+    static const std::string OptNonBlocking; /*! socket.non_blocking */
+    static const std::string OptIfAddr;      /*! socket.if_addr      */
+    static const std::string OptIfLoop;      /*! socket.if_loop      */
+    static const std::string OptCRC32;       /*! socket.crc32        */
+    static const std::string OptMcastTTL;    /*! socket.mcast_ttl    */
+
     Socket(const gu::URI& uri)
         :
         uri_(uri)

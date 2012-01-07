@@ -9,7 +9,6 @@
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu;
-using namespace gu::net;
 using namespace gcomm;
 
 void gcomm::gmcast::Proto:: set_state(State new_state)

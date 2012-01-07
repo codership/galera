@@ -24,8 +24,6 @@ using std::string;
 #include <check.h>
 
 using namespace gu;
-using namespace gu::net;
-
 using namespace gcomm;
 
 

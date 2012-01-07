@@ -242,9 +242,9 @@ void GMCast::connect()
     {
         URI mcast_uri(
             mcast_addr + '?'
-            + gu::net::Socket::OptIfAddr + '=' + URI(listen_addr).get_host()+'&'
-            + gu::net::Socket::OptNonBlocking + "=1&"
-            + gu::net::Socket::OptMcastTTL    + '=' + to_string(mcast_ttl)
+            + gcomm::Socket::OptIfAddr + '=' + URI(listen_addr).get_host()+'&'
+            + gcomm::Socket::OptNonBlocking + "=1&"
+            + gcomm::Socket::OptMcastTTL    + '=' + to_string(mcast_ttl)
             );
 
         mcast = get_pnet().socket(mcast_uri);
@@ -343,7 +343,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
 
     if (!bind_ip.empty())
     {
-        connect_uri.set_option(gu::net::Socket::OptIfAddr, bind_ip);
+        connect_uri.set_option(gcomm::Socket::OptIfAddr, bind_ip);
     }
 
     SocketPtr tp = get_pnet().socket(connect_uri);

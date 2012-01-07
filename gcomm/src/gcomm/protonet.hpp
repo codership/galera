@@ -120,7 +120,7 @@ public:
 
     const std::string& get_type() const { return type_; }
 
-
+    virtual size_t get_mtu() const = 0;
 
 protected:
 

@@ -10,7 +10,7 @@
 
 #include "gu_lock.hpp"
 // For byte_t
-#include "gu_network.hpp"
+#include "gu_buffer.hpp"
 
 /* Forward declarations */
 namespace gu
