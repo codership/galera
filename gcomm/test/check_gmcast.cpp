@@ -248,6 +248,7 @@ START_TEST(test_gmcast_w_user_messages)
 END_TEST
 
 
+// not run by default, hard coded port
 START_TEST(test_gmcast_auto_addr)
 {
     log_info << "START";
@@ -339,6 +340,7 @@ START_TEST(test_gmcast_forget)
 END_TEST
 
 
+// not run by default, hard coded port
 START_TEST(test_trac_380)
 {
     gu_conf_self_tstamp_on();
@@ -408,6 +410,7 @@ Suite* gmcast_suite()
 
     if (run_all_tests == true)
     {
+        // not run by default, hard coded port
         tc = tcase_create("test_gmcast_auto_addr");
         tcase_add_test(tc, test_gmcast_auto_addr);
         suite_add_tcase(s, tc);
@@ -420,6 +423,7 @@ Suite* gmcast_suite()
 
     if (run_all_tests == true)
     {
+        // not run by default, hard coded port
         tc = tcase_create("test_trac_380");
         tcase_add_test(tc, test_trac_380);
         suite_add_tcase(s, tc);
