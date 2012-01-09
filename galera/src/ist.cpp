@@ -1025,24 +1025,32 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
     version_(version)
 {
     gu::URI uri(peer);
-    asio::ip::tcp::resolver resolver(io_service_);
-    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                         uri.get_port());
-    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
-    if (uri.get_scheme() == "ssl")
+    try
     {
-        use_ssl_ = true;
+        asio::ip::tcp::resolver resolver(io_service_);
+        asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
+                                             uri.get_port());
+        asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+        if (uri.get_scheme() == "ssl")
+        {
+            use_ssl_ = true;
+        }
+        if (use_ssl_ == true)
+        {
+            log_info << "IST sender using ssl";
+            prepare_ssl_ctx(conf, ssl_ctx_);
+            ssl_stream_.lowest_layer().connect(*i);
+            ssl_stream_.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
+        }
+        else
+        {
+            socket_.connect(*i);
+        }
     }
-    if (use_ssl_ == true)
+    catch (asio::system_error& e)
     {
-        log_info << "IST sender using ssl";
-        prepare_ssl_ctx(conf, ssl_ctx_);
-        ssl_stream_.lowest_layer().connect(*i);
-        ssl_stream_.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-    }
-    else
-    {
-        socket_.connect(*i);
+        gu_throw_error(e.code().value()) << "IST sender, failed to connect '"
+                                         << peer.c_str() << "': " << e.what();
     }
 }
 
