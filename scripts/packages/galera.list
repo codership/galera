@@ -4,6 +4,14 @@
 
 # this line is required by rpmbuild
 #d 755 root root /usr
+
+d 755 root root $CONF_DEST -
+c 644 root root $CONF_DEST/garb  $BUILD_BASE/garb/files/garb.cnf
+
+# i 755 root sys foo foo.sh - this creates links in rc*.d, we dont want it
+d 755 root root $INIT_DEST -
+f 755 root root $INIT_DEST/garb  $BUILD_BASE/garb/files/garb.sh
+
 d 755 root root $BINS_DEST -
 f 755 root root $BINS_DEST/garbd $BUILD_BASE/garb/garbd
 
