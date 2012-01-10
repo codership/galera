@@ -1,8 +1,9 @@
-The software and other files in this directory unless otherwise noted are
-the property of Codership Oy (info@codership.com).
 
-All rights reserved.
-Unauthorized copying and distribution in any form prohibited.
+Copyright (C) 2007-2012 Codership Oy <info@codership.com>
 
-For GPL'ed version of this software see https://launchpad.net/galera
+Distributed under the GNU General Public Licence v3.0
+as shown in LICENSE.txt or at http://www.gnu.org/copyleft/gpl.html)
+
+Exceptions: asio/ and tests/test_sysbench
+See asio/COPYING and tests/test_sysbench/COPYING for respective details.
 
