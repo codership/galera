@@ -21,7 +21,7 @@
 #endif
 
 #if defined(HAVE_BYTESWAP_H)
-#include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x) 
+#include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
 #endif /* GALERA_USE_BYTESWAP_H */
 
 #if !defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)

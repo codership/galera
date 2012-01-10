@@ -16,7 +16,7 @@
 
 %define name galera
 # use "rpmbuild --define 'version xxxx'" to define version
-%{!?version: %define version 0.8.x}
+%{!?version: %define version 0.1.x}
 %define release 1.rhel5
 %define copyright Copyright 2007-2011 Codership Oy. All rights reserved. Use is subject to license terms under GPLv3 license.
 %define libs %{_libdir}/%{name}
@@ -68,10 +68,16 @@ RBD=$RPM_BUILD_DIR
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
+install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
+install -m $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
+install -m $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+
 install -d $RBR%{_bindir}
 install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
+
 install -d $RBR%{libs}
 install -m 755 $RBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
+
 install -d $RBR%{docs}
 install -m 644 $RBD/COPYING                       $RBR%{docs}/COPYING
 install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
@@ -86,10 +92,18 @@ rm -f $(find %{libs} -type l)
 
 %files
 %defattr(-,root,root,0755)
+%attr(0755,root,root) %dir %{_sysconfdir}
+%attr(0755,root,root) %dir %{_sysconfdir}/sysconfig
+%ghost %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
+%attr(0755,root,root) %dir %{_sysconfdir}/init.d
+%attr(0755,root,root) %{_sysconfdir}/init.d/garb
+
 %attr(0755,root,root) %dir %{_bindir}
 %attr(0755,root,root) %{_bindir}/garbd
+
 %attr(0755,root,root) %dir %{libs}
 %attr(0755,root,root) %{libs}/libgalera_smm.so
+
 %attr(0755,root,root) %dir %{docs}
 %doc %attr(0644,root,root) %{docs}/COPYING
 %doc %attr(0644,root,root) %{docs}/README
