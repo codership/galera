@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "22"
+#define WSREP_INTERFACE_VERSION "23"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -358,11 +358,20 @@ struct wsrep_stats_var
     } value;                   //!< variable value
 };
 
-/*! Key struct used to pass certification keys for transaction handling calls */
+
+/*! Key part structure */
+typedef struct wsrep_key_part_
+{
+    const void* buf;     /*!< Buffer containing key part data */
+    size_t      buf_len; /*!< Length of buffer */
+} wsrep_key_part_t;
+
+/*! Key struct used to pass certification keys for transaction handling calls.
+ *  A key consists of zero or more key parts. */
 typedef struct wsrep_key_
 {
-    const void* key;
-    size_t      key_len;
+    const wsrep_key_part_t* key_parts;     /*!< Array of key parts        */
+    size_t                  key_parts_len; /*!< Length of key parts array */
 } wsrep_key_t;
 
 /*! Transaction handle struct passed for wsrep transaction handling calls */
@@ -588,8 +597,8 @@ struct wsrep_ {
    *
    * @param wsrep       this wsrep handle
    * @param trx_handle  transaction handle
-   * @param key         array of key parts
-   * @param key_len     length of the array of key parts
+   * @param key         array of keys
+   * @param key_len     length of the array of keys
    * @param action      action code according to enum wsrep_action
    */
     wsrep_status_t (*append_key)(wsrep_t*            wsrep,
@@ -653,8 +662,8 @@ struct wsrep_ {
    *
    * @param wsrep       this wsrep handle
    * @param conn_id     connection ID
-   * @param key         array of key parts
-   * @param key_len     lenght of the array of key parts
+   * @param key         array of keys
+   * @param key_len     lenght of the array of keys
    * @param query       query to be executed
    * @param query_len   length of the query string
    * @param seqno       seqno part of the action ID

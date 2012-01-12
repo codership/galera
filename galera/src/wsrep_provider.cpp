@@ -438,7 +438,12 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        trx->append_key(galera::Key(repl->trx_proto_ver(), key, key_len));
+        for (size_t i(0); i < key_len; ++i)
+        {
+            trx->append_key(galera::Key(repl->trx_proto_ver(),
+                                        key[i].key_parts,
+                                        key[i].key_parts_len));
+        }
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -543,8 +548,12 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
     try
     {
         TrxHandleLock lock(*trx);
-        trx->append_key(Key(repl->trx_proto_ver(), key, key_len));
-//        trx->append_key(Key(repl->trx_proto_ver(), static_cast<wsrep_key_t*>(0),0));
+        for (size_t i(0); i < key_len; ++i)
+        {
+            trx->append_key(Key(repl->trx_proto_ver(),
+                                key[i].key_parts,
+                                key[i].key_parts_len));
+        }
         trx->append_data(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 

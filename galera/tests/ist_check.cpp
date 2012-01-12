@@ -158,7 +158,7 @@ START_TEST(test_ist)
     for (size_t i(1); i <= 10; ++i)
     {
         TrxHandle* trx(new TrxHandle(0, uuid, 1234, 5678, false));
-        const wsrep_key_t key[2] = {
+        const wsrep_key_part_t key[2] = {
             {"key1", 4},
             {"key2", 4}
         };

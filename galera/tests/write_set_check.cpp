@@ -24,7 +24,7 @@ typedef std::vector<galera::KeyPart1> KeyPart1Sequence;
 START_TEST(test_key0)
 {
 
-    const wsrep_key_t kiovec[3] = {
+    const wsrep_key_part_t kiovec[3] = {
         {"k1",   2 },
         {"k2",   2 },
         {"key3", 4 }
@@ -57,7 +57,7 @@ START_TEST(test_key1)
     memset(k3, 0x9e, sizeof(k3));
     memset(k4, 0x8f, sizeof(k4));
 
-    const wsrep_key_t kiovec[4] = {
+    const wsrep_key_part_t kiovec[4] = {
         {k1, sizeof k1 },
         {k2, sizeof k2 },
         {k3, sizeof k3 },
@@ -100,12 +100,12 @@ START_TEST(test_write_set0)
 {
     WriteSet ws(0);
 
-    const wsrep_key_t key1[2] = {
+    const wsrep_key_part_t key1[2] = {
         {void_cast("dbt\0t1"), 6},
         {void_cast("aaa")    , 3}
     };
 
-    const wsrep_key_t key2[2] = {
+    const wsrep_key_part_t key2[2] = {
         {void_cast("dbt\0t2"), 6},
         {void_cast("bbbb"), 4}
     };
@@ -160,12 +160,12 @@ START_TEST(test_write_set1)
 {
     WriteSet ws(1);
 
-    const wsrep_key_t key1[2] = {
+    const wsrep_key_part_t key1[2] = {
         {void_cast("dbt\0t1"), 6},
         {void_cast("aaa")    , 3}
     };
 
-    const wsrep_key_t key2[2] = {
+    const wsrep_key_part_t key2[2] = {
         {void_cast("dbt\0t2"), 6},
         {void_cast("bbbb"), 4}
     };
@@ -267,7 +267,7 @@ START_TEST(test_cert)
     cert.assign_initial_position(0, 0);
     wsrep_uuid_t uuid = {{1, }};
 
-    const wsrep_key_t wss[6][2] = {
+    const wsrep_key_part_t wss[6][2] = {
         {{void_cast("foo"), strlen("foo")}, {void_cast("1"), 1}},
         {{void_cast("foo"), strlen("foo")}, {void_cast("2"), 1}},
         {{void_cast("foo"), strlen("foo")}, {void_cast("3"), 1}},
@@ -331,16 +331,16 @@ START_TEST(test_cert_hierarchical_v0)
 {
     log_info << "test_cert_hierarchical_v1";
     struct wsinfo_ {
-        wsrep_uuid_t    uuid;
-        wsrep_conn_id_t conn_id;
-        wsrep_trx_id_t  trx_id;
-        wsrep_key_t     key[3];
-        size_t          iov_len;
-        wsrep_seqno_t   local_seqno;
-        wsrep_seqno_t   global_seqno;
-        wsrep_seqno_t   last_seen_seqno;
-        wsrep_seqno_t   expected_depends_seqno;
-        int             flags;
+        wsrep_uuid_t     uuid;
+        wsrep_conn_id_t  conn_id;
+        wsrep_trx_id_t   trx_id;
+        wsrep_key_part_t key[3];
+        size_t           iov_len;
+        wsrep_seqno_t    local_seqno;
+        wsrep_seqno_t    global_seqno;
+        wsrep_seqno_t    last_seen_seqno;
+        wsrep_seqno_t    expected_depends_seqno;
+        int              flags;
         Certification::TestResult result;
     } wsi[] = {
         // 1: no dependencies
@@ -418,16 +418,16 @@ START_TEST(test_cert_hierarchical_v1)
 {
     log_info << "test_cert_hierarchical_v1";
     struct wsinfo_ {
-        wsrep_uuid_t    uuid;
-        wsrep_conn_id_t conn_id;
-        wsrep_trx_id_t  trx_id;
-        wsrep_key_t     key[3];
-        size_t          iov_len;
-        wsrep_seqno_t   local_seqno;
-        wsrep_seqno_t   global_seqno;
-        wsrep_seqno_t   last_seen_seqno;
-        wsrep_seqno_t   expected_depends_seqno;
-        int             flags;
+        wsrep_uuid_t     uuid;
+        wsrep_conn_id_t  conn_id;
+        wsrep_trx_id_t   trx_id;
+        wsrep_key_part_t key[3];
+        size_t           iov_len;
+        wsrep_seqno_t    local_seqno;
+        wsrep_seqno_t    global_seqno;
+        wsrep_seqno_t    last_seen_seqno;
+        wsrep_seqno_t    expected_depends_seqno;
+        int              flags;
         Certification::TestResult result;
     } wsi[] = {
         // 1 - 3, test symmetric case for dependencies

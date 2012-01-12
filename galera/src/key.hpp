@@ -127,7 +127,7 @@ namespace galera
     public:
         Key(int version) : version_(version), keys_() { }
 
-        Key(int version, const wsrep_key_t* keys, size_t keys_len)
+        Key(int version, const wsrep_key_part_t* keys, size_t keys_len)
             :
             version_(version),
             keys_   ()
@@ -143,15 +143,15 @@ namespace galera
             case 0:
                 for (size_t i(0); i < keys_len; ++i)
                 {
-                    if (keys[i].key_len > 256)
+                    if (keys[i].buf_len > 256)
                     {
                         gu_throw_error(EINVAL)
-                            << "key part length " << keys[i].key_len
+                            << "key part length " << keys[i].buf_len
                             << " greater than max 256";
                     }
-                    gu::byte_t len(keys[i].key_len);
+                    gu::byte_t len(keys[i].buf_len);
                     const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
-                                               keys[i].key));
+                                               keys[i].buf));
                     keys_.push_back(len);
                     keys_.insert(keys_.end(), base, base + len);
                 }
@@ -160,9 +160,9 @@ namespace galera
                 for (size_t i(0); i < keys_len; ++i)
                 {
                     size_t const offset(keys_.size());
-                    size_t key_len(keys[i].key_len);
+                    size_t key_len(keys[i].buf_len);
                     const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
-                                               keys[i].key));
+                                               keys[i].buf));
 #ifndef GALERA_KEY_VLQ
                     if (gu_unlikely(key_len > 0xff)) key_len = 0xff;
                     keys_.reserve(offset + 1 + key_len);
