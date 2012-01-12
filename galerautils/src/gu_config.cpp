@@ -30,11 +30,20 @@ gu::Config::parse (param_map_t& pmap, const std::string& params)
         std::vector<std::string> kvv =
             gu::tokenize (pv[i], KEY_VALUE_SEP, ESCAPE, true);
 
+        assert(kvv.size > 0);
+
         gu::trim(kvv[0]);
         const std::string& key = kvv[0];
 
         if (!key.empty())
         {
+            if (kvv.size() == 1)
+            {
+                gu_throw_error(EINVAL) <<"Key without value: '" << key
+                                       <<"' at position '"
+                                       << i << "' in parameter list.";
+            }
+
             if (kvv.size() > 2)
             {
                 gu_throw_error(EINVAL) <<"More than one value for key '" << key
