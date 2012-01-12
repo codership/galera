@@ -10,6 +10,7 @@
 #include "../src/gu_conf.h"
 #include "gu_mem_test.h"
 #include "gu_bswap_test.h"
+#include "gu_fnv_test.h"
 #include "gu_dbug_test.h"
 #include "gu_time_test.h"
 #include "gu_fifo_test.h"
@@ -24,6 +25,7 @@ static suite_creator_t suites[] =
     {
         gu_mem_suite,
         gu_bswap_suite,
+        gu_fnv_suite,
         gu_dbug_suite,
         gu_time_suite,
         gu_fifo_suite,
