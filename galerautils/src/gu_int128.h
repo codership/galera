@@ -31,10 +31,14 @@ typedef uint128_t gu_uint128_t;
 
 #if (GU_BYTE_ORDER == GU_LITTLE_ENDIAN)
 
-#define GU_64HI 1
 #define GU_64LO 0
-#define GU_32HI 3
+#define GU_64HI 1
 #define GU_32LO 0
+#define GU_32HI 3
+#define GU_32_0 0
+#define GU_32_1 1
+#define GU_32_2 2
+#define GU_32_3 3
 
 typedef union gu_int128 {
     uint64_t u64[2];

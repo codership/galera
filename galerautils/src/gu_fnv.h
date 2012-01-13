@@ -122,7 +122,18 @@ _x += (_x << 1) + (_x << 3) + (_x << 4) + (_x << 5) + (_x << 8) + (_x << 88);
 
 #define GU_FNV128_XOR(_s,_b) (_s).u32[GU_32LO] ^= _b
 
+#if defined(GU_FNV128_FULL_MULTIPLICATION)
 #define GU_FNV128_MUL(_x) GU_MUL128_INPLACE(_x, GU_FNV128_PRIME)
+#else /* no FULL_MULTIPLICATION */
+#define GU_FNV128_MUL(_x) { \
+    uint32_t carry = \
+    (((_x).u64[GU_64LO] & 0x00000000ffffffffULL) * 0x013b) >> 32; \
+    carry = (((_x).u64[GU_64LO] >> 32) * 0x013b + carry)   >> 32; \
+    (_x).u64[GU_64HI] *= 0x013b; \
+    (_x).u64[GU_64HI] += ((_x).u64[GU_64LO] << 24) + carry; \
+    (_x).u64[GU_64LO] *= 0x013b;\
+}
+#endif /* FULL_MULTIPLICATION */
 
 #endif /* GU_WORDSIZE */
 
