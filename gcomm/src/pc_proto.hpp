@@ -6,6 +6,7 @@
 #define GCOMM_PC_PROTO_HPP
 
 #include <list>
+#include <ostream>
 
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
@@ -23,6 +24,7 @@ namespace gcomm
     namespace pc
     {
         class Proto;
+        std::ostream& operator<<(std::ostream& os, const Proto& p);
     }
 }
 
@@ -162,7 +164,7 @@ public:
     void set_mtu(size_t mtu) { mtu_ = mtu; }
     size_t mtu() const { return mtu_; }
 private:
-
+    friend std::ostream& operator<<(std::ostream& os, const Proto& p);
     Proto (const Proto&);
     Proto& operator=(const Proto&);
 
