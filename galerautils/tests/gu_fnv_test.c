@@ -33,12 +33,19 @@ END_TEST
 
 START_TEST (gu_fnv128_test)
 {
-    uint128_t ret = 0;
+    gu_uint128_t GU_SET128(ret, 0, 0);
     gu_fnv128a (test_buf, strlen(test_buf), &ret);
-    fail_if (GU_FNV128_SEED != ret,
+#if (GU_WORDSIZE == 64)
+    fail_if (!GU_EQ128(GU_FNV128_SEED, ret),
              "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
              (uint64_t)(GU_FNV128_SEED >> 64), (uint64_t)GU_FNV128_SEED,
              (uint64_t)(ret >> 64), (uint64_t)ret);
+#else
+    fail_if (!GU_EQ128(GU_FNV128_SEED, ret),
+             "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
+             GU_FNV128_SEED.u64[GU_64HI], GU_FNV128_SEED.u64[GU_64LO],
+             ret.u64[GU_64HI], ret.u64[GU_64LO]);
+#endif
 }
 END_TEST
 

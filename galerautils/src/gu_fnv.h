@@ -24,22 +24,23 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdlib.h> // ssize_t
 #include <assert.h>
 
 #define GU_FNV32_PRIME 16777619UL
 #define GU_FNV32_SEED  2166136261UL
 
 #if !defined(GU_FNVBITSHIFT_OPTIMIZATION)
-#define GU_FNV32_MULT(_x) _x *= GU_FNV32_PRIME
+#define GU_FNV32_MUL(_x) _x *= GU_FNV32_PRIME
 #else /* GU_FNVBITSHIFT_OPTIMIZATION */
-#define GU_FNV32_MULT(_x) \
+#define GU_FNV32_MUL(_x) \
 _x += (_x << 1) + (_x << 4) + (_x << 7) + (_x << 8) + (_x << 24)
 #endif /* GU_FNVBITSHIFT_OPTIMIZATION */
 
 #if !defined(GU_FNV_NORMAL)
-#define GU_FNV32_ITERATION(_s,_b) _s ^= _b; GU_FNV32_MULT(_s);
+#define GU_FNV32_ITERATION(_s,_b) _s ^= _b; GU_FNV32_MUL(_s);
 #else
-#define GU_FNV32_ITERATION(_s,_b) GU_FNV32_MULT(_s); _s ^= _b;
+#define GU_FNV32_ITERATION(_s,_b) GU_FNV32_MUL(_s); _s ^= _b;
 #endif
 
 inline static void
@@ -66,16 +67,16 @@ gu_fnv32a (const void* buf, ssize_t const len, uint32_t* seed)
 #define GU_FNV64_SEED  14695981039346656037ULL
 
 #if !defined(GU_FNVBITSHIFT_OPTIMIZATION)
-#define GU_FNV64_MULT(_x) _x *= GU_FNV64_PRIME
+#define GU_FNV64_MUL(_x) _x *= GU_FNV64_PRIME
 #else /* GU_FNVBITSHIFT_OPTIMIZATION */
-#define GU_FNV64_MULT(_x) \
+#define GU_FNV64_MUL(_x) \
 _x += (_x << 1) + (_x << 4) + (_x << 5) + (_x << 7) + (_x << 8) + (_x << 40);
 #endif /* GU_FNVBITSHIFT_OPTIMIZATION */
 
 #if !defined(GU_FNV_NORMAL)
-#define GU_FNV64_ITERATION(_s,_b) _s ^= _b; GU_FNV64_MULT(_s);
+#define GU_FNV64_ITERATION(_s,_b) _s ^= _b; GU_FNV64_MUL(_s);
 #else
-#define GU_FNV64_ITERATION(_s,_b) GU_FNV64_MULT(_s); _s ^= _b;
+#define GU_FNV64_ITERATION(_s,_b) GU_FNV64_MUL(_s); _s ^= _b;
 #endif
 
 inline static void
@@ -98,30 +99,42 @@ gu_fnv64a (const void* buf, ssize_t const len, uint64_t* seed)
     assert(be == bp);
 }
 
-typedef          int __attribute__((__mode__(__TI__)))  int128_t;
-typedef unsigned int __attribute__((__mode__(__TI__))) uint128_t;
+#include "gu_int128.h"
 
-static uint128_t const GU_FNV128_PRIME =
-(((uint128_t)0x0000000001000000ULL << 64) + 0x000000000000013BULL);
+static gu_uint128_t const
+GU_SET128(GU_FNV128_PRIME, 0x0000000001000000ULL, 0x000000000000013BULL);
 
-static uint128_t const GU_FNV128_SEED =
-(((uint128_t)0x6C62272E07BB0142ULL << 64) + 0x62B821756295C58DULL);
+static gu_uint128_t const
+GU_SET128(GU_FNV128_SEED,  0x6C62272E07BB0142ULL, 0x62B821756295C58DULL);
+
+#if (GU_WORDSIZE == 64)
+
+#define GU_FNV128_XOR(_s,_b) _s ^= _b
 
 #if !defined(GU_FNVBITSHIFT_OPTIMIZATION)
-#define GU_FNV128_MULT(_x) _x *= GU_FNV128_PRIME
+#define GU_FNV128_MUL(_x) _x *= GU_FNV128_PRIME
 #else /* GU_FNVBITSHIFT_OPTIMIZATION */
-#define GU_FNV128_MULT(_x) \
+#define GU_FNV128_MUL(_x) \
 _x += (_x << 1) + (_x << 3) + (_x << 4) + (_x << 5) + (_x << 8) + (_x << 88);
 #endif /* GU_FNVBITSHIFT_OPTIMIZATION */
 
+#else /* GU_WORDSIZE == 32 */
+
+#define GU_FNV128_XOR(_s,_b) (_s).u32[GU_32LO] ^= _b
+
+#define GU_FNV128_MUL(_x) GU_MUL128_INPLACE(_x, GU_FNV128_PRIME)
+
+#endif /* GU_WORDSIZE */
+
+
 #if !defined(GU_FNV_NORMAL)
-#define GU_FNV128_ITERATION(_s,_b) _s ^= _b; GU_FNV128_MULT(_s);
+#define GU_FNV128_ITERATION(_s,_b) GU_FNV128_XOR(_s,_b); GU_FNV128_MUL(_s);
 #else
-#define GU_FNV128_ITERATION(_s,_b) GU_FNV128_MULT(_s); _s ^= _b;
+#define GU_FNV128_ITERATION(_s,_b) GU_FNV128_MUL(_s); GU_FNV128_XOR(_s,_b);
 #endif
 
 inline static void
-gu_fnv128a (const void* buf, ssize_t const len, uint128_t* seed)
+gu_fnv128a (const void* buf, ssize_t const len, gu_uint128_t* seed)
 {
     const uint8_t* bp = (const uint8_t*)buf;
     const uint8_t* const be = bp + len;
