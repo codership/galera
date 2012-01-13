@@ -11,9 +11,9 @@
  * gu_fnv_bench <buffer size> <N loops>
  */
 
+#include "gu_fnv.h"
+
 #include <stdio.h>
-#include <stdint.h>
-#include <inttypes.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -22,29 +22,7 @@
 
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <crypto++/md5.h>
-
-#include "gu_fnv.h"
-
-#ifdef __cplusplus
-#else
-int printf_128u (uint128_t x)
-{
-    return printf ("%016"PRIx64" %016"PRIx64, (uint64_t)(x>>64), (uint64_t)x);
-}
-
-int printf_128i (int128_t const x)
-{
-    if (x < 0)
-    {
-        printf ("-");
-        return printf_128u(-x);
-    }
-    else
-    {
-        return printf_128u(x);
-    }
-}
-#endif
+//#include <cryptopp/md5.h>
 
 enum algs
 {
@@ -106,9 +84,13 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "fnv128";
         INTERNAL_LOOP_BEGIN
-            uint128_t hash = GU_FNV128_SEED;
+            gu_uint128_t hash = GU_FNV128_SEED;
             gu_fnv128a (buf, len, &hash);
+#if (GU_WORDSIZE == 64)
             h = hash;
+#else
+            h = hash.u32[GU_32LO];
+#endif
         INTERNAL_LOOP_END
         break;
     }

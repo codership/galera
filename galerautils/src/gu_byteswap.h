@@ -9,39 +9,20 @@
 #ifndef _gu_byteswap_h_
 #define _gu_byteswap_h_
 
-#if defined(HAVE_CONFIG_H)
-#include "config.h"
-#endif
-
-/* GNU libc has them hardware optimized */
-#if defined(HAVE_ENDIAN_H)
-#include <endian.h>   // for __BYTE_ORDER et al.
-#elif defined(HAVE_SYS_ENDIAN_H)
-#include <sys/endian.h>
-#endif
+#include "gu_arch.h"
 
 #if defined(HAVE_BYTESWAP_H)
 #include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
 #endif /* GALERA_USE_BYTESWAP_H */
 
-#if !defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)
-#error "byte order not defined"
-#endif
-
 #if !defined(bswap16) && !defined(bswap_16)
-#error "bswap16 or bswap_16 not defined"
+#error "Neither bswap16 nor bswap_16 are defined"
 #endif
 
 #if !defined(bswap16)
 #define bswap16 bswap_16
 #define bswap32 bswap_32
 #define bswap64 bswap_64
-#endif
-
-#if !defined(__BYTE_ORDER)
-#define __BYTE_ORDER _BYTE_ORDER
-#define __LITTLE_ENDIAN _LITTLE_ENDIAN
-#define __BIG_ENDIAN _BIG_ENDIAN
 #endif
 
 /* @note: there are inline functions behind these macros,
@@ -57,7 +38,7 @@ static inline uint16_t bswap16(uint16_t x)
 { return static_cast<uint16_t>((x >> 8) | (x << 8)); }
 #endif // __cplusplus
 
-#if   __BYTE_ORDER == __LITTLE_ENDIAN
+#if GU_BYTE_ORDER == GU_LITTLE_ENDIAN
 /* convert to/from Little Endian representation */
 #define gu_le16(x) (x)
 #define gu_le32(x) (x)
@@ -68,7 +49,7 @@ static inline uint16_t bswap16(uint16_t x)
 #define gu_be32(x) bswap32(x)
 #define gu_be64(x) bswap64(x)
 
-#elif __BYTE_ORDER == __BIG_ENDIAN
+#else // GU_BIG_ENDIAN
 
 /* convert to/from Little Endian representation */
 #define gu_le16(x) bswap16(x)
@@ -80,11 +61,7 @@ static inline uint16_t bswap16(uint16_t x)
 #define gu_be32(x) (x)
 #define gu_be64(x) (x)
 
-#else
-
-#error "Byte order unrecognized!"
-
-#endif /* __BYTE_ORDER */
+#endif /* GU_BYTE_ORDER */
 
 /* Analogues to htonl and friends. Since we'll be dealing mostly with
  * little-endian architectures, there is more sense to use little-endian
