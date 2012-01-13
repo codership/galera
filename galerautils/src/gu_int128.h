@@ -22,7 +22,7 @@ typedef unsigned int __attribute__((__mode__(__TI__))) uint128_t;
 typedef int128_t  gu_int128_t;
 typedef uint128_t gu_uint128_t;
 
-#define GU_SET128(_a, hi64, lo64) _a = (((uint128_t)hi64) << 64) + lo64;
+#define GU_SET128(_a, hi64, lo64) _a = (((uint128_t)hi64) << 64) + lo64
 #define GU_MUL128_INPLACE(_a, _b) _a *= _b
 #define GU_IMUL128_INPLACE(_a, _b) GU_MUL128_INPLACE(_a, _b)
 #define GU_EQ128(_a, _b) (_a == _b)
