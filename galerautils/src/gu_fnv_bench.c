@@ -89,7 +89,7 @@ static int timer (const void* const buf, ssize_t const len,
 #if (GU_WORDSIZE == 64)
             h = hash;
 #else
-	    h = hash.u32[GU_32LO];
+            h = hash.u32[GU_32LO];
 #endif
         INTERNAL_LOOP_END
         break;

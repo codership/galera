@@ -21,6 +21,8 @@
 #ifndef _gu_fnv_h_
 #define _gu_fnv_h_
 
+#include "gu_int128.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
@@ -98,8 +100,6 @@ gu_fnv64a (const void* buf, ssize_t const len, uint64_t* seed)
 
     assert(be == bp);
 }
-
-#include "gu_int128.h"
 
 static gu_uint128_t const
 GU_SET128(GU_FNV128_PRIME, 0x0000000001000000ULL, 0x000000000000013BULL);
