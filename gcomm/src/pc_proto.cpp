@@ -73,6 +73,27 @@ static void test_checksum(pc::Message& msg, const gu::Datagram& dg,
     }
 }
 
+std::ostream& gcomm::pc::operator<<(std::ostream& os, const gcomm::pc::Proto& p)
+{
+    os << "pc::Proto{";
+    os << "uuid=" << p.my_uuid_ << ",";
+    os << "start_prim=" << p.start_prim_ << ",";
+    os << "npvo=" << p.npvo_ << ",";
+    os << "ignore_sb=" << p.ignore_sb_ << ",";
+    os << "ignore_quorum=" << p.ignore_quorum_ << ",";
+    os << "state=" << p.state_ << ",";
+    os << "last_sent_seq=" << p.last_sent_seq_ << ",";
+    os << "checksum=" << p.checksum_ << ",";
+    os << "instances=\n" << p.instances_ << ",";
+    os << "state_msgs=\n" << p.state_msgs_ << ",";
+    os << "current_view=" << p.current_view_ << ",";
+    os << "pc_view=" << p.pc_view_ << ",";
+    // os << "views=" << p.views_ << ",";
+    os << "mtu=" << p.mtu_ << "}";
+    return os;
+}
+
+
 //
 //
 //
@@ -780,24 +801,41 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
 
     // Set TO seqno according to install message
     int64_t to_seq(-1);
-
+    bool prim_found(false);
     for (mi = msg.get_node_map().begin(); mi != msg.get_node_map().end(); ++mi)
     {
         const Node& m_state = NodeMap::get_value(mi);
 
+        // check that all TO seqs coming from prim are same
         if (m_state.get_prim() == true && to_seq != -1)
         {
             if (m_state.get_to_seq() != to_seq)
             {
-                gu_throw_fatal << "Install message TO seqno inconsistent";
+                gu_throw_fatal << "Install message TO seqnos inconsistent";
             }
         }
 
         if (m_state.get_prim() == true)
         {
-            to_seq = max(to_seq, m_state.get_to_seq());
+            prim_found = true;
+            to_seq = std::max(to_seq, m_state.get_to_seq());
         }
     }
+
+    if (prim_found == false)
+    {
+        // #277
+        // prim comp was restored from non-prims, find out max known TO seq
+        for (mi = msg.get_node_map().begin(); mi != msg.get_node_map().end();
+             ++mi)
+        {
+            const Node& m_state = NodeMap::get_value(mi);
+            to_seq = std::max(to_seq, m_state.get_to_seq());
+        }
+        log_debug << "assigning TO seq to "
+                  << to_seq << " after restoring prim";
+    }
+
 
     log_debug << self_id() << " setting TO seq to " << to_seq;
 
@@ -964,7 +1002,16 @@ void gcomm::pc::Proto::handle_up(const void* cid,
             test_checksum(msg, rb, rb.get_offset());
         }
 
-        handle_msg(msg, rb, um);
+        try
+        {
+            handle_msg(msg, rb, um);
+        }
+        catch (gu::Exception& e)
+        {
+            log_error << "caught exception in PC, state dump to stderr follows:";
+            std::cerr << *this << std::endl;
+            throw;
+        }
     }
 }
 

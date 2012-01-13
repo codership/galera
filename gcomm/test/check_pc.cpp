@@ -1737,6 +1737,65 @@ START_TEST(test_trac_620)
 END_TEST
 
 
+START_TEST(test_trac_277)
+{
+    log_info << "START (test_trac_277)";
+    size_t n_nodes(3);
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
+    uint32_t view_seq = 0;
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, ++view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    log_info << "generate messages";
+    send_n(dn[0], 1);
+    send_n(dn[1], 1);
+    send_n(dn[2], 1);
+    gu_trace(prop.propagate_until_empty());
+
+    log_info << "isolate 3";
+    prop.split(1, 3);
+    prop.split(2, 3);
+    ++view_seq;
+    set_cvi(dn, 0, 1, view_seq, V_PRIM);
+    set_cvi(dn, 2, 2, view_seq, V_NON_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+    log_info << "isolate 1 and 2";
+    ++view_seq;
+    prop.split(1, 2);
+    set_cvi(dn, 0, 1, view_seq, V_NON_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+    log_info << "merge 1 and 2";
+    ++view_seq;
+    prop.merge(1, 2);
+    set_cvi(dn, 0, 1, view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+
+
+    log_info << "merge 3";
+    ++view_seq;
+    prop.merge(1, 3);
+    prop.merge(2, 3);
+    set_cvi(dn, 0, 2, view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
@@ -1825,6 +1884,11 @@ Suite* pc_suite()
     tc = tcase_create("test_trac_620");
     tcase_add_test(tc, test_trac_620);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_trac_277");
+    tcase_add_test(tc, test_trac_277);
+    suite_add_tcase(s, tc);
+
 
     return s;
 }
