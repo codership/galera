@@ -91,7 +91,8 @@ public:
      * Default constructor.
      */
     Proto(gu::Config& conf,
-          const UUID& my_uuid_, const gu::URI& uri = gu::URI("evs://"),
+          const UUID& my_uuid_,
+          const gu::URI& uri = gu::URI("evs://"),
           const size_t mtu_ = std::numeric_limits<size_t>::max());
     ~Proto();
 

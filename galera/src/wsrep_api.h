@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "23"
+#define WSREP_INTERFACE_VERSION "23a"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -312,6 +312,7 @@ struct wsrep_init_args
 
     /* Configuration parameters */
     const char* node_name;     //!< Symbolic name of this node (e.g. hostname)
+    const char* node_address;  //!< Address to be used by wsrep provider
     const char* node_incoming; //!< Address for incoming client connections
     const char* data_dir;      //!< Directory where wsrep files are kept if any
     const char* options;       //!< Provider-specific configuration string

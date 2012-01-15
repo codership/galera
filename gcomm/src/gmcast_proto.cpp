@@ -122,8 +122,9 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             }
             remote_uuid = hs.get_source_uuid();
             gu::URI remote_uri(tp->get_remote_addr());
-            remote_addr = remote_uri.get_scheme() + "://" + remote_uri.get_host() + ":"
-                + URI(hs.get_node_address()).get_port();
+            remote_addr = uri_string(remote_uri.get_scheme(),
+                                     remote_uri.get_host(),
+                                     URI(hs.get_node_address()).get_port());
 
             propagate_remote = true;
             Message ok(version, Message::T_HANDSHAKE_OK, handshake_uuid, local_uuid);

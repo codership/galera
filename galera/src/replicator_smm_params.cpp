@@ -1,7 +1,10 @@
-/* Copyright (C) 2010 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2012 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
 #include "gcs.hpp"
+#include "galera_common.hpp"
+
+#include <gu_uri.hpp>
 
 static const std::string common_prefix = "replicator.";
 
@@ -16,13 +19,39 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 
 galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
-                                                const Defaults& def)
+                                                const Defaults& def,
+                                                const char* const node_address)
 {
     std::map<std::string, std::string>::const_iterator i;
 
     for (i = def.map_.begin(); i != def.map_.end(); ++i)
     {
         if (!conf.has(i->first)) conf.set(i->first, i->second);
+    }
+
+    if (node_address && strlen(node_address) > 0)
+    {
+        gu::URI na(node_address, false);
+
+        try
+        {
+            std::string const host = na.get_host();
+
+            if (host == "0.0.0.0" || host == "0:0:0:0:0:0:0:0" || host == "::")
+            {
+                gu_throw_error(EINVAL) << "Bad value for 'node_address': '"
+                                       << host << '\'';
+            }
+
+            conf.set(BASE_HOST_KEY, host);
+        }
+        catch (gu::NotSet&) {}
+
+        try
+        {
+            conf.set(BASE_PORT_KEY, na.get_port());
+        }
+        catch (gu::NotSet&) {}
     }
 }
 

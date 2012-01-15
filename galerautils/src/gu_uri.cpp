@@ -100,7 +100,7 @@ static gu::URIQueryList extract_query_list(const string& s,
     return ret;
 }
 
-gu::URI::URI(const string& uri_str) throw (gu::Exception)
+gu::URI::URI(const string& uri_str, bool const strict) throw (gu::Exception)
     :
     modified   (true), // recompose to normalize on the first call to_string()
     str        (uri_str),
@@ -112,7 +112,7 @@ gu::URI::URI(const string& uri_str) throw (gu::Exception)
     fragment   (),
     query_list ()
 {
-    parse(uri_str);
+    parse(uri_str, strict);
 }
 
 /*! regexp suggested by RFC 3986 to parse URI into 5 canonical parts */
@@ -132,16 +132,27 @@ enum
 };
 
 gu::RegEx const gu::URI::regex(uri_regex);
+static string const UNSET_SCHEME("unset://");
 
-void gu::URI::parse (const string& uri_str) throw (gu::Exception)
+void gu::URI::parse (const string& uri_str, bool const strict)
+    throw (gu::Exception)
 {
     log_debug << "URI: " << uri_str;
 
-    vector<RegEx::Match> parts = regex.match (uri_str, NUM_PARTS);
+    vector<RegEx::Match> parts;
 
-    scheme = parts[SCHEME];
+    if (!strict && uri_str.find("://") == std::string::npos)
+    {
+        string tmp = UNSET_SCHEME + uri_str;
+        parts  = regex.match (tmp, NUM_PARTS);
+    }
+    else
+    {
+        parts  = regex.match (uri_str, NUM_PARTS);
+        scheme = parts[SCHEME]; //set scheme only if it was explicitly provided
+    }
 
-    if (!scheme.is_set() || !scheme.str().length())
+    if (strict && (!scheme.is_set() || !scheme.str().length()))
     {
         assert(0);
         gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme";

@@ -11,9 +11,6 @@ std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
 std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 
 // TCP
-std::string const gcomm::Conf::TcpScheme = "tcp";
-std::string const gcomm::Conf::SslScheme = "ssl";
-std::string const gcomm::Conf::UdpScheme = "udp";
 std::string const gcomm::Conf::TcpNonBlocking =
     "socket" + Delim + "non_blocking";
 std::string const gcomm::Conf::SocketUseSsl =

@@ -6,6 +6,7 @@
 #include "asio_addr.hpp"
 
 #include "gcomm/util.hpp"
+#include "gcomm/common.hpp"
 
 #include <boost/bind.hpp>
 #include <boost/array.hpp>
@@ -236,16 +237,14 @@ size_t gcomm::AsioUdpSocket::get_mtu() const
 
 string gcomm::AsioUdpSocket::get_local_addr() const
 {
-    return "udp://"
-        + escape_addr(socket_.local_endpoint().address())
-        + ":"
-        + to_string(socket_.local_endpoint().port());
+    return uri_string(UDP_SCHEME,
+                      escape_addr(socket_.local_endpoint().address()),
+                      to_string(socket_.local_endpoint().port()));
 }
 
 string gcomm::AsioUdpSocket::get_remote_addr() const
 {
-    return "udp://"
-        + escape_addr(socket_.remote_endpoint().address())
-        + ":"
-        + to_string(socket_.remote_endpoint().port());
+    return uri_string(UDP_SCHEME,
+                      escape_addr(socket_.remote_endpoint().address()),
+                      to_string(socket_.remote_endpoint().port()));
 }

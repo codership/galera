@@ -382,6 +382,44 @@ START_TEST (uri_test3) // Test from gcomm
 }
 END_TEST
 
+START_TEST(uri_non_strict)
+{
+    std::string const ip("1.2.3.4");
+    std::string const port("789");
+    std::string const addr(ip + ':' + port);
+
+    try
+    {
+        URI u(ip);
+        fail("Strict mode passed without scheme");
+    }
+    catch (gu::Exception& e)
+    {
+        fail_if (e.get_errno() != EINVAL, "Expected errno %d, got %d",
+                 EINVAL, e.get_errno());
+    }
+
+    try
+    {
+        URI u(addr, false);
+
+        fail_if (u.get_host() != ip);
+        fail_if (u.get_port() != port);
+
+        try
+        {
+            u.get_scheme();
+            fail("Scheme is '%s', should be unset", u.get_scheme().c_str());
+        }
+        catch (gu::NotSet&) {}
+    }
+    catch (gu::Exception& e)
+    {
+        fail_if (e.get_errno() != EINVAL);
+    }
+}
+END_TEST
+
 Suite *gu_uri_suite(void)
 {
   Suite *s  = suite_create("galerautils++ URI");
@@ -391,6 +429,7 @@ Suite *gu_uri_suite(void)
   tcase_add_test  (tc, uri_test1);
   tcase_add_test  (tc, uri_test2);
   tcase_add_test  (tc, uri_test3);
+  tcase_add_test  (tc, uri_non_strict);
   return s;
 }
 

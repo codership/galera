@@ -48,21 +48,6 @@ namespace gcomm
         static std::string const ProtonetVersion;
 
         /*!
-         * @brief TCP scheme for transport URI ("tcp")
-         */
-        static std::string const TcpScheme;
-
-        /*!
-         * @brief SSL scheme for transport URI ("ssl")
-         */
-        static std::string const SslScheme;
-
-        /*!
-         * @brief UDP scheme for transport URI ("udp");
-         */
-        static std::string const UdpScheme;
-
-        /*!
          * @brief TCP non-blocking flag ("socket.non_blocking")
          *
          * Parameter value is boolean (passed 0 or 1) denoting whether

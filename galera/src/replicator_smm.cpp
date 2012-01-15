@@ -168,7 +168,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
-    set_defaults_       (config_, defaults),
+    set_defaults_       (config_, defaults, args->node_address),
     trx_proto_ver_      (-1),
     str_proto_ver_      (-1),
     protocol_version_   (-1),

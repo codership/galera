@@ -8,8 +8,8 @@
 #include "gu_uri.hpp"
 
 #include "GCache.hpp"
-
 #include "serialization.hpp"
+#include "galera_common.hpp"
 #include "trx_handle.hpp"
 #include <boost/bind.hpp>
 #include <fstream>
@@ -629,28 +629,16 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     {
         recv_addr = conf_.get(RECV_ADDR);
     }
-    catch (gu::NotFound&) /* if not, check the alternative.
-                             TODO: try to find from system. */
+    catch (gu::NotFound&) {} /* if not, check the alternative.
+                                TODO: try to find from system. */
+    if (!addr)
     {
-        if (!addr)
-        {
-            log_warn << "'" << RECV_ADDR << "' not set. IST will be unavailable.";
-            return;
-        }
-
-        recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
-        conf_.set(RECV_ADDR, recv_addr);
+//        log_warn << "'" << RECV_ADDR << "' not set. IST will be unavailable.";
+        return;
     }
 
-#if REMOVE
-    if (addr != 0)
-    {
-        std::string recv_addr("tcp://");
-        recv_addr += gu::URI(recv_addr + addr).get_host();
-        recv_addr += ":4568";
-        conf_.set(RECV_ADDR, recv_addr);
-    }
-#endif
+    recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
+    conf_.set(RECV_ADDR, recv_addr);
 }
 
 
@@ -666,18 +654,26 @@ extern "C" void* run_receiver_thread(void* arg)
 }
 
 static std::string
-IST_determine_recv_addr (const gu::Config& conf)
+IST_determine_recv_addr (gu::Config& conf)
 {
     std::string recv_addr;
 
     try
     {
-        recv_addr = conf.get (galera::ist::Receiver::RECV_ADDR);
+        recv_addr = conf.get(galera::ist::Receiver::RECV_ADDR);
     }
     catch (gu::NotFound&)
     {
-        gu_throw_error(EINVAL) << '\'' <<  galera::ist::Receiver::RECV_ADDR
-                               << "' not set.";
+        try
+        {
+            recv_addr = conf.get(galera::BASE_HOST_KEY);
+        }
+        catch (gu::NotSet&)
+        {
+            gu_throw_error(EINVAL)
+                << "Could not determine IST receinve address: '"
+                << galera::ist::Receiver::RECV_ADDR << "' not set.";
+        }
     }
 
     /* check if explicit scheme is present */
@@ -698,10 +694,15 @@ IST_determine_recv_addr (const gu::Config& conf)
             recv_addr.insert(0, "tcp://");
     }
 
+    gu::URI ra_uri(recv_addr);
+
+    if (!conf.has(galera::BASE_HOST_KEY))
+        conf.set(galera::BASE_HOST_KEY, ra_uri.get_host());
+
     try /* check for explicit port,
            TODO: make it possible to use any free port (explicit 0?) */
     {
-        gu::URI(recv_addr).get_port();
+        ra_uri.get_port();
     }
     catch (gu::NotSet&) /* use gmcast listen port + 1 */
     {
@@ -710,13 +711,17 @@ IST_determine_recv_addr (const gu::Config& conf)
         try
         {
             port = gu::from_string<uint16_t>(
-                gu::URI(conf.get("gmcast.listen_addr")).get_port()) + 1;
+//                 gu::URI(conf.get("gmcast.listen_addr")).get_port()
+                    conf.get(galera::BASE_PORT_KEY)
+                );
 
         }
         catch (...)
         {
-            port = 4568;
+            port = gu::from_string<uint16_t>(galera::BASE_PORT_DEFAULT);
         }
+
+        port += 1;
 
         recv_addr += ":" + gu::to_string(port);
     }

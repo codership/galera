@@ -5,6 +5,7 @@
 #include "gmcast.hpp"
 #include "gmcast_proto.hpp"
 
+#include "gcomm/common.hpp"
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/map.hpp"
@@ -29,17 +30,17 @@ static void set_tcp_defaults (URI* uri)
 
 static bool check_tcp_uri(const URI& uri)
 {
-    return (uri.get_scheme() == Conf::TcpScheme ||
-            uri.get_scheme() == Conf::SslScheme);
+    return (uri.get_scheme() == TCP_SCHEME ||
+            uri.get_scheme() == SSL_SCHEME);
 }
 
 static std::string get_scheme(bool use_ssl)
 {
     if (use_ssl == true)
     {
-        return gcomm::Conf::SslScheme;
+        return SSL_SCHEME;
     }
-    return gcomm::Conf::TcpScheme;
+    return TCP_SCHEME;
 }
 
 
@@ -100,7 +101,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     catch (Exception&)
     {
         /* most probably no scheme, try to append one and see if it succeeds */
-        listen_addr = get_scheme(use_ssl) + "://" + listen_addr;
+        listen_addr = uri_string(get_scheme(use_ssl), listen_addr);
         gu_trace(gu::URI uri(listen_addr));
     }
 
@@ -119,28 +120,37 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     }
 
     string port(Defaults::GMCastTcpPort);
+
     try
     {
         port = listen_uri.get_port();
     }
     catch (gu::NotSet&)
     {
-        // if no port is set for listen address in the options,
-        // try one from authority part
+        // if no listen port is set for listen address in the options,
+        // see if base port was configured
         try
         {
-            port = uri_.get_port();
+            port = conf_.get(BASE_PORT_KEY);
         }
-        catch (gu::NotSet&) { }
+        catch (gu::NotFound&)
+        {
+            // if no base port configured, try port from the connection address
+            try { port = uri_.get_port(); } catch (gu::NotSet&) {}
+        }
 
         listen_addr += ":" + port;
     }
+
+    // if (!conf_.has(BASE_PORT_KEY)) {
+        conf_.set(BASE_PORT_KEY, port);
+    // }
 
     listen_addr = resolve(listen_addr).to_string();
     // resolving sets scheme to tcp, have to rewrite for ssl
     if (use_ssl == true)
     {
-        listen_addr.replace(0, 3, "ssl");
+        listen_addr.replace(0, 3, SSL_SCHEME);
     }
 
     if (listen_addr == initial_addr)
@@ -158,8 +168,9 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
         {
             port = uri_.get_option(Conf::GMCastMCastPort);
         }
-        catch (NotFound&) { }
-        mcast_addr = resolve("udp://" + mcast_addr + ":" + port).to_string();
+        catch (NotFound&) {}
+
+        mcast_addr = resolve(uri_string(UDP_SCHEME, mcast_addr, port)).to_string();
     }
 
     log_info << self_string() << " listening at " << listen_addr;
@@ -172,6 +183,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl));
     conf_.set(Conf::GMCastPeerTimeout, gu::to_string(peer_timeout));
+
 }
 
 GMCast::~GMCast()
@@ -195,17 +207,24 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
             }
             catch (gu::NotSet& )
             {
-                port = Defaults::GMCastTcpPort;
+                try
+                {
+                    port = conf_.get(BASE_PORT_KEY);
+                }
+                catch (gu::NotFound&)
+                {
+                    port = Defaults::GMCastTcpPort;
+                }
             }
 
             initial_addr = resolve(
-                get_scheme(use_ssl) + "://" + uri.get_host() + ":" + port
+                uri_string(get_scheme(use_ssl), uri.get_host(), port)
                 ).to_string();
 
             // resolving sets scheme to tcp, have to rewrite for ssl
             if (use_ssl == true)
             {
-                initial_addr.replace(0, 3, "ssl");
+                initial_addr.replace(0, 3, SSL_SCHEME);
             }
 
             if (check_tcp_uri(initial_addr) == false)
@@ -219,7 +238,8 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
     }
     catch (gu::NotSet&)
     {
-        //@note: this is different from empty host and indicates URL without ://
+        //@note: this is different from empty host and indicates URL without
+        //       ://
         gu_throw_error (EINVAL) << "Host not defined in URL: "
                                 << uri.to_string();
     }
