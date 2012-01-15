@@ -128,23 +128,24 @@ if sysname == 'freebsd':
 # 
 
 # Include paths
-env.Append(CPPPATH = Split('''#/asio
-                               #/galerautils/src
-                               #/gcomm/src
-                               #/gcomm/src/gcomm
-                               #/gcache/src
-                               #/gcs/src
-                               #/wsdb/src
-                               #/galera/src
-                               '''))
+env.Append(CPPPATH = Split('''#/common
+                              #/asio
+                              #/galerautils/src
+                              #/gcomm/src
+                              #/gcomm/src/gcomm
+                              #/gcache/src
+                              #/gcs/src
+                              #/wsdb/src
+                              #/galera/src
+                           '''))
 
 # Library paths
 #env.Append(LIBPATH = Split('''#/galerautils/src
-#                               #/gcomm/src
-#                               #/gcs/src
-#                               #/wsdb/src
-#                               #/galera/src
-#                               '''))
+#                              #/gcomm/src
+#                              #/gcs/src
+#                              #/wsdb/src
+#                              #/galera/src
+#                           '''))
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
@@ -161,6 +162,7 @@ env.Append(LINKFLAGS = ' ' + link_arch)
 
 # CPPFLAGS
 env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
+env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 
 # CFLAGS
 # Notes:
@@ -171,8 +173,6 @@ env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing')
 # CXXFLAGS
 env.Replace(CXXFLAGS =
             '-Wno-long-long -Wno-deprecated -Wold-style-cast -Weffc++ -pedantic -ansi')
-
-
 
 #
 # Check required headers and libraries (autoconf functionality)

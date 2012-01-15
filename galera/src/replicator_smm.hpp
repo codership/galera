@@ -335,7 +335,7 @@ namespace galera
 
         struct SetDefaults
         {
-            SetDefaults(gu::Config&, const Defaults&);
+            SetDefaults(gu::Config&, const Defaults&, const char* base_addr);
         }
             set_defaults_; // sets missing parameters to default values
 

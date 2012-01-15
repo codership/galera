@@ -168,7 +168,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
-    set_defaults_       (config_, defaults),
+    set_defaults_       (config_, defaults, args->node_address),
     protocol_version_   (args->proto_ver),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
@@ -816,17 +816,6 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
-#if 0 // REMOVE
-    if (trx->action() != 0)
-    {
-        gcache_.free(trx->action());
-        trx->set_action(0);
-    }
-    else
-    {
-        log_warn << "no assigned cached action for " << *trx;
-    }
-#endif
     trx->set_state(TrxHandle::S_COMMITTED);
     report_last_committed();
     ++local_commits_;

@@ -29,7 +29,7 @@ namespace gcomm
 }
 
 /*!
- * 
+ *
  */
 class gcomm::Transport : public Protolay
 {
@@ -42,18 +42,18 @@ public:
         S_LISTENING,
         S_FAILED
     } State;
-    
+
     virtual ~Transport();
-    
+
     virtual size_t      get_mtu()          const = 0;
     virtual bool        supports_uuid()    const;
     virtual const UUID& get_uuid()         const;
     virtual std::string get_local_addr()   const;
     virtual std::string get_remote_addr()  const;
-    
+
     virtual State        get_state() const;
     int                  get_errno() const;
-    
+
     virtual void connect() = 0;
     virtual void connect(const gu::URI& uri)
     {
@@ -61,11 +61,11 @@ public:
     }
     virtual void close(bool force = false) = 0;
     virtual void close(const UUID& uuid)
-    {        
+    {
         gu_throw_error(ENOTSUP) << "close(UUID) not supported by "
                                 << uri_.get_scheme();
     }
-    
+
     virtual void        listen();
     virtual std::string get_listen_addr() const
     {
@@ -83,13 +83,13 @@ public:
         gu_throw_error(ENOTSUP) << "handle_connect() not supported by"
                                 << uri_.get_scheme();
     }
-    
+
     virtual int  handle_down(gu::Datagram&, const ProtoDownMeta&) = 0;
     virtual void handle_up  (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
     virtual void handle_stable_view(const View& view) { }
     Protostack& get_pstack() { return pstack_; }
     Protonet&   get_pnet()   { return pnet_; }
-    
+
     static Transport* create(Protonet&, const std::string&);
     static Transport* create(Protonet&, const gu::URI&);
 protected:
@@ -101,7 +101,7 @@ protected:
 
     State             state_;
     int               error_no_;
-    
+
 private:
     Transport (const Transport&);
     Transport& operator=(const Transport&);

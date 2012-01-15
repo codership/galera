@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2012 Codership Oy <info@codership.com>
  */
-
 
 #ifndef _GCOMM_UTIL_HPP_
 #define _GCOMM_UTIL_HPP_
@@ -14,6 +13,17 @@
 
 namespace gcomm
 {
+    inline std::string
+    uri_string (const std::string& scheme, const std::string& addr,
+                const std::string& port = std::string(""))
+    {
+        if (port.length() > 0)
+            return (scheme + "://" + addr + ':' + port);
+        else
+            return (scheme + "://" + addr);
+    }
+
+
     inline bool host_is_any (const std::string& host)
     {
         return (host.length() == 0 || host == "0.0.0.0" ||
@@ -33,6 +43,7 @@ namespace gcomm
         return ret;
     }
 
+
     template <class C>
     size_t unserialize(const gu::Buffer& buf, size_t offset, C& c)
     {
@@ -40,6 +51,7 @@ namespace gcomm
         gu_trace(ret = c.unserialize(buf, buf.size(), offset));
         return ret;
     }
+
 
     template <class M>
     void push_header(const M& msg, gu::Datagram& dg)
@@ -63,6 +75,7 @@ namespace gcomm
 #endif
     }
 
+
     template <class M>
     void pop_header(const M& msg, gu::Datagram& dg)
     {
@@ -76,6 +89,7 @@ namespace gcomm
         dg.set_header_offset(dg.get_header_offset() + msg.serial_size());
 #endif
     }
+
 
     inline const gu::byte_t* get_begin(const gu::Datagram& dg)
     {

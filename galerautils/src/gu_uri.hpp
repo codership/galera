@@ -44,10 +44,12 @@ namespace gu
         /*!
          * @brief Construct URI from string
          *
+         * @param strict if true, throw exception when scheme is not found,
+         *               else use a default one
          * @throws std::invalid_argument if URI is not valid
          * @throws std::logic_error in case of internal error
          */
-        URI (const std::string&) throw (Exception);
+        URI (const std::string&, bool strict = true) throw (Exception);
 
         /*!
          * @brief Get URI string
@@ -71,7 +73,7 @@ namespace gu
          *
          * @return URI scheme (always set)
          */
-        const std::string& get_scheme() const throw ()
+        const std::string& get_scheme() const throw (NotSet)
         {
             return scheme.str();
         }
@@ -183,7 +185,7 @@ namespace gu
         /*!
          * @brief Parse URI from str
          */
-        void parse (const std::string& s) throw (Exception);
+        void parse (const std::string& s, bool strict) throw (Exception);
 
         /*!
          * @brief Recompose URI in str
