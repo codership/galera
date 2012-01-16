@@ -30,7 +30,7 @@ gu::Config::parse (param_map_t& pmap, const std::string& params)
         std::vector<std::string> kvv =
             gu::tokenize (pv[i], KEY_VALUE_SEP, ESCAPE, true);
 
-        assert(kvv.size > 0);
+        assert(kvv.size() > 0);
 
         gu::trim(kvv[0]);
         const std::string& key = kvv[0];
