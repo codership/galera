@@ -403,7 +403,6 @@ namespace galera
         wsrep_view_cb_t       view_cb_;
         wsrep_apply_cb_t      apply_cb_;
         wsrep_commit_cb_t     commit_cb_;
-        wsrep_rollback_cb_t   rollback_cb_;
         wsrep_sst_donate_cb_t sst_donate_cb_;
         wsrep_synced_cb_t     synced_cb_;
 
