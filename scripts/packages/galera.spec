@@ -69,8 +69,8 @@ RBD=$RPM_BUILD_DIR
 mkdir -p $RBR
 
 install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
-install -m $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
-install -m $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
+install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
 install -d $RBR%{_bindir}
 install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd

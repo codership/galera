@@ -53,6 +53,13 @@ int main(int argc, char* argv[])
         FILE* log_file = fopen ("check_gcomm.log", "w");
         if (!log_file) return EXIT_FAILURE;
         gu_conf_set_log_file (log_file);
+
+        // redirect occasional stderr there as well
+        if (dup2(fileno(log_file), 2) < 0)
+        {
+            perror("dup2() failed: ");
+            return EXIT_FAILURE;
+        }
     }
 
     if (::getenv("CHECK_GCOMM_DEBUG"))
