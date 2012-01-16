@@ -63,7 +63,7 @@ apply_wscoll(void*                    recv_ctx,
 static void
 apply_trx_ws(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
-             wsrep_rollback_cb_t      rollback_cb,
+             wsrep_commit_cb_t        commit_cb,
              const galera::TrxHandle& trx)
     throw (galera::ApplyException, gu::Exception)
 {
@@ -103,7 +103,7 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (WSREP_TRX_FAIL == err)
                 {
-                    int const rcode(rollback_cb(recv_ctx, trx.global_seqno()));
+                    int const rcode(commit_cb(recv_ctx,trx.global_seqno(),false));
                     if (WSREP_OK != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
@@ -183,7 +183,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
     commit_cb_          (args->commit_cb),
-    rollback_cb_        (args->rollback_cb),
     sst_donate_cb_      (args->sst_donate_cb),
     synced_cb_          (args->synced_cb),
     sst_donor_          (),
@@ -439,21 +438,23 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     CommitOrder co(*trx, co_mode_);
 
     gu_trace(apply_monitor_.enter(ao));
-    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, rollback_cb_, *trx));
+    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx));
     // at this point any exception in apply_trx_ws() is fatal, not
     // catching anything.
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
         gu_trace(commit_monitor_.enter(co));
 
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno())))
+        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
+                                                true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
 
         commit_monitor_.leave(co);
     }
     else
     {
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno())))
+        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
+                                                true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
     }
     apply_monitor_.leave(ao);
@@ -775,9 +776,10 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         ++local_replays_;
         trx->set_state(TrxHandle::S_REPLAYING);
 
-        gu_trace(apply_trx_ws(trx_ctx, apply_cb_, rollback_cb_, *trx));
+        gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx));
 
-        if (gu_unlikely (WSREP_OK != commit_cb_(trx_ctx, trx->global_seqno())))
+        if (gu_unlikely (WSREP_OK != commit_cb_(trx_ctx, trx->global_seqno(),
+                                                true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
 
         // apply, commit monitors are released in post commit

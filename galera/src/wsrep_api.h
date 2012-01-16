@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "23a"
+#define WSREP_INTERFACE_VERSION "23"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -182,6 +182,21 @@ typedef struct wsrep_view_info {
 } wsrep_view_info_t;
 
 /*!
+ * Magic string to tell provider to engage into trivial (empty) state transfer.
+ * No data will be passed, but the node shall be considered JOINED.
+ * Should be passed in sst_req parameter of wsrep_view_cb_t.
+ */
+#define WSREP_STATE_TRANSFER_TRIVIAL "trivial"
+
+/*!
+ * Magic string to tell provider not to engage in state transfer at all.
+ * The member will stay in WSREP_MEMBER_UNDEFINED state but will keep on
+ * receiving all writesets.
+ * Should be passed in sst_req parameter of wsrep_view_cb_t.
+ */
+#define WSREP_STATE_TRANSFER_NONE "none"
+
+/*!
  * @brief group view handler
  *
  * This handler is called in total order corresponding to the group
@@ -201,6 +216,7 @@ typedef struct wsrep_view_info {
  * @param state_len   lenght of current state
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code
+ *                    value of 0 means no SST.
  */
 typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
                                  void*                    recv_ctx,
@@ -224,7 +240,7 @@ typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
  * @return success code:
  * @retval WSREP_OK
  * @retval WSREP_NOT_IMPLEMENTED appl. does not support the write set format
- * @retval WSREP_ERRROR failed to apply the write set
+ * @retval WSREP_ERROR failed to apply the write set
  */
 typedef enum wsrep_status (*wsrep_apply_cb_t)   (void*               recv_ctx,
                                                  const void*         data,
@@ -238,28 +254,15 @@ typedef enum wsrep_status (*wsrep_apply_cb_t)   (void*               recv_ctx,
  *
  * @param recv_ctx receiver context pointer provided by the application
  * @param seqno    global seqno part of the write set to be committed
+ * @param commit   true - commit writeset, false - rollback writeset
  *
  * @return success code:
  * @retval WSREP_OK
- * @retval WSREP_ERRROR failed to commit the write set
+ * @retval WSREP_ERROR call failed
  */
 typedef enum wsrep_status (*wsrep_commit_cb_t)  (void*         recv_ctx,
-                                                 wsrep_seqno_t seqno);
-
-/*!
- * @brief rollback callback
- *
- * This handler is called to roll back the changes made by apply callback.
- *
- * @param recv_ctx receiver context pointer provided by the application
- * @param seqno    global seqno part of the write set to be rolled back
- *
- * @return success code:
- * @retval WSREP_OK
- * @retval WSREP_ERRROR failed to rollback the write set
- */
-typedef enum wsrep_status (*wsrep_rollback_cb_t)(void*         recv_ctx,
-                                                 wsrep_seqno_t seqno);
+                                                 wsrep_seqno_t seqno,
+                                                 bool          commit);
 
 /*!
  * @brief a callback to donate state snapshot
@@ -329,9 +332,8 @@ struct wsrep_init_args
     wsrep_view_cb_t       view_handler_cb; //!< group view change handler
 
     /* applier callbacks */
-    wsrep_apply_cb_t      apply_cb;        //!< applying callback
-    wsrep_commit_cb_t     commit_cb;       //!< commit   callback
-    wsrep_rollback_cb_t   rollback_cb;     //!< rollback callback
+    wsrep_apply_cb_t      apply_cb;        //!< apply  callback
+    wsrep_commit_cb_t     commit_cb;       //!< commit callback
 
     /* state snapshot transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
