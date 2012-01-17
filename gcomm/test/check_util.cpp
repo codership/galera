@@ -58,7 +58,7 @@ START_TEST(test_asio)
 {
     gu::Config conf;
     AsioProtonet pn(conf);
-    const string uri_str("tcp://localhost:10001");
+    const string uri_str("tcp://127.0.0.1:10001");
 
     Acceptor* acc = pn.acceptor(uri_str);
     acc->listen(uri_str);
