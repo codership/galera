@@ -275,7 +275,11 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     std::string const req_str(tmp);
     free (tmp);
 
-    bool const skip_state_transfer (req_str == TRIVIAL_SST);
+    bool const skip_state_transfer (req_str == TRIVIAL_SST
+                          /* compatibility with older garbd, to be removed in
+                           * the next release (2.1)*/
+                          || req_str == std::string(WSREP_STATE_TRANSFER_NONE)
+                                   );
     wsrep_seqno_t rcode (0);
 
     if (!skip_state_transfer)

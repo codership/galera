@@ -188,7 +188,7 @@ extern long gcs_send (gcs_conn_t*    conn,
  * and must be freed by application when action is no longer needed.
  * Also sets global and local action IDs. Global action ID uniquely identifies
  * action in the history of the group and can be used to identify the state
- * of the application for the state snapshot purposes. Local action ID is a
+ * of the application for state snapshot purposes. Local action ID is a
  * monotonic gapless number sequence starting with 1 which can be used
  * to serialize access to critical sections.
  *

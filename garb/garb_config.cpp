@@ -3,7 +3,7 @@
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
 
-#include <replicator.hpp>
+#include <wsrep_api.h>
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -14,7 +14,7 @@ namespace po = boost::program_options;
 namespace garb
 {
 
-    std::string const Config::DEFAULT_SST(GALERA_REPLICATOR_TRIVIAL_SST);
+    std::string const Config::DEFAULT_SST(WSREP_STATE_TRANSFER_TRIVIAL);
 
 Config::Config (int argc, char* argv[]) throw (gu::Exception)
     : daemon_  (false),

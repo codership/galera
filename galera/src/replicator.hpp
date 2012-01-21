@@ -25,9 +25,6 @@ namespace galera
     {
     public:
 
-        // this state transfer request won't be passed to application
-        // #define is needed to be able to use that value without linking
-        #define GALERA_REPLICATOR_TRIVIAL_SST WSREP_STATE_TRANSFER_TRIVIAL
         static const char* const TRIVIAL_SST;
 
         typedef enum

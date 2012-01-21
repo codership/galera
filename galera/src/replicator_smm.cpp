@@ -1050,6 +1050,13 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
               << trx_proto_ver_ << ", " << str_proto_ver_ << ")";
 }
 
+static bool
+app_requests_state_transfer (const void* const req, ssize_t const req_len)
+{
+    return (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
+            memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
+}
+
 void
 galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                                            const wsrep_view_info_t& view_info,
@@ -1124,7 +1131,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // record state seqno, needed for IST on DONOR
         state_seqno_ = group_seqno;
 
-        if (st_req == true)
+        if (st_req && app_requests_state_transfer(app_req, app_req_len))
         {
             request_state_transfer (recv_ctx,
                                     group_uuid, group_seqno, app_req,
