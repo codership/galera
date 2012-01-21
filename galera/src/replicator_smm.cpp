@@ -1035,6 +1035,12 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     local_monitor_.leave(lo);
 }
 
+static bool
+app_requests_state_transfer (const void* const req, ssize_t const req_len)
+{
+    return (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
+            memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
+}
 
 void
 galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
@@ -1107,7 +1113,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         protocol_version_ = view_info.proto_ver;
         cert_.assign_initial_position(group_seqno, protocol_version_);
 
-        if (st_req == true)
+        if (st_req && app_requests_state_transfer(app_req, app_req_len))
         {
             if (app_req_len > 0)
             {
@@ -1227,7 +1233,11 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
     char* const tmp(strndup(reinterpret_cast<const char*>(req), req_size));
     std::string const req_str(tmp);
     free (tmp);
-    bool const trivial_sst(req_str == TRIVIAL_SST);
+    bool const trivial_sst(req_str == TRIVIAL_SST
+                          /* compatibility with older garbd, to be removed in
+                           * the next release (1.3)*/
+                          || req_str == std::string(WSREP_STATE_TRANSFER_NONE)
+                          );
 
     if (!trivial_sst)
     {

@@ -8,7 +8,7 @@ namespace galera
 {
 
 const char* const
-Replicator::TRIVIAL_SST(GALERA_REPLICATOR_TRIVIAL_SST);
+Replicator::TRIVIAL_SST(WSREP_STATE_TRANSFER_TRIVIAL);
 
 } /* namespace galera */
 
