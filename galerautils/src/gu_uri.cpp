@@ -154,7 +154,6 @@ void gu::URI::parse (const string& uri_str, bool const strict)
 
     if (strict && (!scheme.is_set() || !scheme.str().length()))
     {
-        assert(0);
         gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme";
     }
 
