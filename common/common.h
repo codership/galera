@@ -16,4 +16,6 @@
 #define COMMON_BASE_PORT_KEY     "base_port"
 #define COMMON_BASE_PORT_DEFAULT "4567"
 
+#define COMMON_STATE_FILE "grastate.dat"
+
 #endif // COMMON_DEFS_H

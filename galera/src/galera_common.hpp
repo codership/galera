@@ -28,6 +28,8 @@ namespace galera
     static std::string const BASE_PORT_DEFAULT(COMMON_BASE_PORT_DEFAULT);
 
     static std::string const BASE_HOST_KEY(COMMON_BASE_HOST_KEY);
+
+    static std::string const GALERA_STATE_FILE(COMMON_STATE_FILE);
 #else
     static std::string const TCP_SCHEME("tcp");
     static std::string const UDP_SCHEME("udp");
@@ -37,6 +39,8 @@ namespace galera
     static std::string const BASE_PORT_DEFAULT("4567");
 
     static std::string const BASE_HOST_KEY("base_host");
+
+    static std::string const GALERA_STATE_FILE("grastate.dat");
 #endif
 }
 

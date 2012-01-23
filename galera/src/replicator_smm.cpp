@@ -2,7 +2,7 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
-
+#include "galera_common.hpp"
 #include "replicator_smm.hpp"
 #include "galera_exception.hpp"
 #include "uuid.hpp"
@@ -169,13 +169,14 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults, args->node_address),
-    protocol_version_   (args->proto_ver),
+    protocol_version_   (1),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
                              config_.get(Param::commit_order))),
-    data_dir_           (args->data_dir),
-    state_file_         (data_dir_ + "/grastate.dat"),
+    data_dir_           (args->data_dir ? args->data_dir : ""),
+    state_file_         (data_dir_.length() ?
+                         data_dir_+'/'+GALERA_STATE_FILE : GALERA_STATE_FILE),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
@@ -301,7 +302,6 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
         ret = WSREP_NODE_FAIL;
     }
 
-//    gcache_.seqno_init(cert_.position());
     gcache_.reset();
 
     if (ret == WSREP_OK &&
@@ -1036,7 +1036,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 }
 
 static bool
-app_requests_state_transfer (const void* const req, ssize_t const req_len)
+app_wants_state_transfer (const void* const req, ssize_t const req_len)
 {
     return (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
             memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
@@ -1068,9 +1068,9 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         uuid_ = view_info.members[view_info.my_idx].id;
     }
 
-    bool st_req(view_info.state_gap);
+    bool st_required(view_info.state_gap);
 
-    if (st_req)
+    if (st_required)
     {
         assert(view_info.view >= 0);
 
@@ -1080,21 +1080,21 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
                                           a valid state here */
             {
-                st_req = (apply_monitor_.last_left() < group_seqno);
+                st_required = (apply_monitor_.last_left() < group_seqno);
             }
             else
             {
-                st_req = (apply_monitor_.last_left() != group_seqno);
+                st_required = (apply_monitor_.last_left() != group_seqno);
             }
         }
     }
 
-    if (st_req && S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
+    if (st_required && S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
 
-    void* app_req(0);
+    void*   app_req(0);
     ssize_t app_req_len(0);
 
-    const_cast<wsrep_view_info_t&>(view_info).state_gap = st_req;
+    const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
     view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);
 
     if (app_req_len < 0)
@@ -1113,7 +1113,9 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         protocol_version_ = view_info.proto_ver;
         cert_.assign_initial_position(group_seqno, protocol_version_);
 
-        if (st_req && app_requests_state_transfer(app_req, app_req_len))
+        bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
+
+        if (st_required && app_wants_st)
         {
             if (app_req_len > 0)
             {
@@ -1130,7 +1132,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         }
         else
         {
-            if (view_info.view == 1)
+            if (view_info.view == 1 || !app_wants_st)
             {
                 update_state_uuid (group_uuid);
                 apply_monitor_.set_initial_position(group_seqno);
