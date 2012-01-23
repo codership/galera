@@ -143,7 +143,8 @@ wsrep_status_t galera_connect (wsrep_t*    gh,
 
     try
     {
-        return repl->connect(cluster_name, cluster_url, state_donor);
+        return repl->connect(cluster_name, cluster_url,
+                             state_donor ? state_donor : "");
     }
     catch (std::exception& e)
     {
