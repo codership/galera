@@ -27,9 +27,11 @@ static inline std::string escape_addr(const asio::ip::address& addr)
 static inline std::string unescape_addr(const std::string& addr)
 {
     std::string ret(addr);
-    remove(ret.begin(), ret.end(), '[');
-    remove(ret.begin(), ret.end(), ']');
-    return addr;
+    size_t pos(ret.find('['));
+    if (pos != std::string::npos) ret.erase(pos, 1);
+    pos = ret.find(']');
+    if (pos != std::string::npos) ret.erase(pos, 1);
+    return ret;
 }
 
 

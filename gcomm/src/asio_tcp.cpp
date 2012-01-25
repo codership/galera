@@ -170,11 +170,13 @@ void gcomm::AsioTcpSocket::connect(const URI& uri)
     {
         Critical<AsioProtonet> crit(net_);
 
-        asio::ip::tcp::resolver           resolver(net_.io_service_);
-
-        asio::ip::tcp::resolver::query    query(unescape_addr(uri.get_host()),
-                                                uri.get_port());
-
+        asio::ip::tcp::resolver resolver(net_.io_service_);
+        // Give query flags explicitly to avoid having AI_ADDRCONFIG in
+        // underlying getaddrinfo() hint flags.
+        asio::ip::tcp::resolver::query
+            query(unescape_addr(uri.get_host()),
+                  uri.get_port(),
+                  asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
 
 #ifdef HAVE_ASIO_SSL_HPP
@@ -204,7 +206,9 @@ void gcomm::AsioTcpSocket::connect(const URI& uri)
     catch (asio::system_error& e)
     {
         gu_throw_error(e.code().value())
-            << "error while connecting to remote host " << uri.to_string();
+            << "error while connecting to remote host "
+            << uri.to_string()
+            << "', asio error '" << e.what() << "'";
     }
 }
 
@@ -705,8 +709,11 @@ void gcomm::AsioTcpAcceptor::listen(const URI& uri)
     try
     {
         asio::ip::tcp::resolver resolver(net_.io_service_);
+        // Give query flags explicitly to avoid having AI_ADDRCONFIG in
+        // underlying getaddrinfo() hint flags.
         asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                             uri.get_port());
+                                             uri.get_port(),
+                                             asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
@@ -739,8 +746,10 @@ void gcomm::AsioTcpAcceptor::listen(const URI& uri)
     }
     catch (asio::system_error& e)
     {
+        log_error << e.what();
         gu_throw_error(e.code().value())
-            << "error while trying to listen " << uri.to_string();
+            << "error while trying to listen '" << uri.to_string()
+            << "', asio error '" << e.what() << "'";
     }
 }
 
@@ -757,7 +766,9 @@ std::string gcomm::AsioTcpAcceptor::listen_addr() const
     }
     catch (asio::system_error& e)
     {
-        gu_throw_error(e.code().value()) << "failed to read listen addr";
+        gu_throw_error(e.code().value())
+            << "failed to read listen addr "
+            << "', asio error '" << e.what() << "'";
         throw;
     }
 }
