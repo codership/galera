@@ -40,9 +40,11 @@ namespace
     static inline std::string unescape_addr(const std::string& addr)
     {
         std::string ret(addr);
-        remove(ret.begin(), ret.end(), '[');
-        remove(ret.begin(), ret.end(), ']');
-        return addr;
+        size_t pos(ret.find('['));
+        if (pos != std::string::npos) ret.erase(pos, 1);
+        pos = ret.find(']');
+        if (pos != std::string::npos) ret.erase(pos, 1);
+        return ret;
     }
 
 
@@ -748,8 +750,10 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         }
 
         asio::ip::tcp::resolver resolver(io_service_);
-        asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                             uri.get_port());
+        asio::ip::tcp::resolver::query
+            query(unescape_addr(uri.get_host()),
+                  uri.get_port(),
+                  asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
@@ -765,8 +769,10 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     catch (asio::system_error& e)
     {
         recv_addr_ = "";
-        gu_throw_error(e.code().value()) << "Failed to open IST listener at "
-                                         << uri.to_string();
+        gu_throw_error(e.code().value())
+            << "Failed to open IST listener at "
+            << uri.to_string()
+            << "', asio error '" << e.what() << "'";
     }
 
     current_seqno_ = first_seqno;
@@ -804,7 +810,9 @@ void galera::ist::Receiver::run()
     }
     catch (asio::system_error& e)
     {
-        gu_throw_error(e.code().value()) << "accept() failed";
+        gu_throw_error(e.code().value()) << "accept() failed"
+                                         << "', asio error '"
+                                         << e.what() << "'";
     }
     acceptor_.close();
     int ec(0);
@@ -979,12 +987,25 @@ wsrep_seqno_t galera::ist::Receiver::finished()
 void galera::ist::Receiver::interrupt()
 {
     gu::URI uri(recv_addr_);
-    asio::ip::tcp::resolver resolver(io_service_);
-    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                         uri.get_port());
-    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
     try
     {
+        asio::ip::tcp::resolver::iterator i;
+        try
+        {
+            asio::ip::tcp::resolver resolver(io_service_);
+            asio::ip::tcp::resolver::query
+                query(unescape_addr(uri.get_host()),
+                      uri.get_port(),
+                      asio::ip::tcp::resolver::query::flags(0));
+            i = resolver.resolve(query);
+        }
+        catch (asio::system_error& e)
+        {
+            gu_throw_error(e.code().value())
+                << "failed to resolve host '"
+                << uri.to_string()
+                << "', asio error '" << e.what() << "'";
+        }
         if (use_ssl_ == true)
         {
             asio::ssl::stream<asio::ip::tcp::socket>
@@ -1033,8 +1054,10 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
     try
     {
         asio::ip::tcp::resolver resolver(io_service_);
-        asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                             uri.get_port());
+        asio::ip::tcp::resolver::query
+            query(unescape_addr(uri.get_host()),
+                  uri.get_port(),
+                  asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         if (uri.get_scheme() == "ssl")
         {
@@ -1159,7 +1182,9 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
     }
     catch (asio::system_error& e)
     {
-        gu_throw_error(e.code().value()) << "ist send failed: " << e.code();
+        gu_throw_error(e.code().value()) << "ist send failed: " << e.code()
+                                         << "', asio error '" << e.what()
+                                         << "'";
     }
 }
 
