@@ -713,8 +713,8 @@ void gcomm::AsioTcpAcceptor::listen(const URI& uri)
         // Give query flags explicitly to avoid having AI_ADDRCONFIG in
         // underlying getaddrinfo() hint flags.
         asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                             uri.get_port());
-                                             // asio::ip::tcp::resolver::query::flags(0));
+                                             uri.get_port(),
+                                             asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
