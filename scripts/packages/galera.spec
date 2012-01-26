@@ -34,6 +34,7 @@ Packager:      Codership Oy
 Vendor:        Codership Oy
 Provides:      %{name} wsrep
 Obsoletes:     %{name}
+Requires:      chkconfig
 #Requires:      boost-program-options
 # BuildRequires: scons check boost-devel
 # This will be rm -rf
@@ -68,7 +69,7 @@ RBD=$RPM_BUILD_DIR
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
-install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
+#install -d $RBR%{_sysconfdir}/{init.d,sysconfig} - this is brought by chkconfig
 install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
