@@ -425,7 +425,7 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  const wsrep_key_t*  key,
                                  size_t              key_len,
-                                 enum wsrep_action   action)
+                                 bool                shared)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
