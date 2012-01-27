@@ -64,13 +64,6 @@ typedef int64_t  wsrep_seqno_t;   //!< sequence number of a writeset, etc.
 /*! undefined seqno */
 #define WSREP_SEQNO_UNDEFINED (-1)
 
-/*! DML operation codes */
-typedef enum wsrep_action {
-    WSREP_UPDATE,          //!< update for a row
-    WSREP_DELETE,          //!< row delete
-    WSREP_INSERT           //!< new row insert
-} wsrep_action_t;
-
 /*! wsrep status codes */
 typedef enum wsrep_status {
     WSREP_OK        = 0,   //!< success
@@ -602,13 +595,13 @@ struct wsrep_ {
    * @param trx_handle  transaction handle
    * @param key         array of keys
    * @param key_len     length of the array of keys
-   * @param action      action code according to enum wsrep_action
+   * @param shared      boolean denoting if key corresponds to shared resource
    */
     wsrep_status_t (*append_key)(wsrep_t*            wsrep,
                                  wsrep_trx_handle_t* trx_handle,
                                  const wsrep_key_t*  key,
                                  size_t              key_len,
-                                 wsrep_action_t      action);
+                                 bool                shared);
    /*!
     * @brief Appends data in transaction's write set
     *
