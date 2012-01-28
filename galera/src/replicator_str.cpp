@@ -30,7 +30,7 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
             {
                 if (local_seqno > group_seqno)
                 {
-                    gcs_.close();
+                    close();
                     gu_throw_fatal
                         << "Local state seqno (" << local_seqno
                         << ") is greater than group seqno (" <<group_seqno

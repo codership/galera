@@ -327,7 +327,6 @@ wsrep_status_t galera::ReplicatorSMM::close()
 }
 
 
-
 wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 {
     assert(recv_ctx != 0);
@@ -1103,14 +1102,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (app_req_len < 0)
     {
-        gcs_.close();
+        close();
         gu_throw_fatal << "View callback failed: " << -app_req_len << " ("
                        << strerror(-app_req_len) << "). This is unrecoverable, "
                        << "restart required.";
     }
     else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
     {
-        gcs_.close();
+        close();
         gu_throw_fatal << "Local state UUID " << state_uuid_
                        << " is different from group state UUID " << group_uuid
                        << ", and SST request is null: restart required.";
