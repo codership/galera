@@ -160,7 +160,8 @@ namespace galera
 
         void update_state_uuid (const wsrep_uuid_t& u);
 
-        void abort() throw(); /* aborts the program in a clean way */
+        /* aborts/exits the program in a clean way */
+        void abort() throw();
 
         class LocalOrder
         {
@@ -336,13 +337,20 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
-        void prepare_for_IST (void*& req, ssize_t& req_len,
-                              wsrep_seqno_t group_seqno)
+        bool state_transfer_required(const wsrep_view_info_t& view_info)
             throw (gu::Exception);
+
+        void prepare_for_IST (void*& req, ssize_t& req_len,
+                              const wsrep_uuid_t& group_uuid,
+                              wsrep_seqno_t       group_seqno)
+            throw (gu::Exception);
+
         void recv_IST(void* recv_ctx);
+
         StateRequest* prepare_state_request (const void* sst_req,
                                              ssize_t     sst_req_len,
-                                             wsrep_seqno_t group_seqno)
+                                             const wsrep_uuid_t& group_uuid,
+                                             wsrep_seqno_t       group_seqno)
             throw ();
 
         void send_state_request (const wsrep_uuid_t& group_uuid,
@@ -396,7 +404,7 @@ namespace galera
         wsrep_uuid_t          uuid_;
         wsrep_uuid_t const    state_uuid_;
         const char            state_uuid_str_[37];
-        wsrep_seqno_t         state_seqno_; // seqno of last CC
+        wsrep_seqno_t         cc_seqno_; // seqno of last CC
 
         // application callbacks
         void*                 app_ctx_;

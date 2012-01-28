@@ -2,12 +2,52 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
-
 #include "replicator_smm.hpp"
 #include "uuid.hpp"
 #include <galerautils.hpp>
 
 namespace galera {
+
+bool
+ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
+    throw (gu::Exception)
+{
+    if (view_info.state_gap)
+    {
+        assert(view_info.view >= 0);
+
+        if (state_uuid_ == view_info.uuid) // common history
+        {
+            wsrep_seqno_t const group_seqno(view_info.seqno);
+            wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
+
+            if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
+                                          a valid state here */
+            {
+                return (local_seqno < group_seqno);
+            }
+            else
+            {
+                if (local_seqno > group_seqno)
+                {
+                    gcs_.close();
+                    gu_throw_fatal
+                        << "Local state seqno (" << local_seqno
+                        << ") is greater than group seqno (" <<group_seqno
+                        << "): states diverged. Aborting to avoid potential "
+                        << "data loss. Remove '" << state_file_
+                        << "' file and restart if you wish to continue.";
+                }
+
+                return (local_seqno != group_seqno);
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
 
 wsrep_status_t
 ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
@@ -325,14 +365,14 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     try
                     {
-                        // Note: End of IST range must be state_seqno_ instead
+                        // Note: End of IST range must be cc_seqno_ instead
                         // of istr.group_seqno() in case there are CCs between
                         // sending and delivering STR. If there are no
-                        // intermediate CCs, state_seqno_ == istr.group_seqno().
+                        // intermediate CCs, cc_seqno_ == istr.group_seqno().
                         ist_senders_.run(config_,
                                          istr.peer(),
                                          istr.last_applied() + 1,
-                                         state_seqno_,
+                                         cc_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -380,13 +420,25 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
 void
 ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
-                                wsrep_seqno_t group_seqno)
+                                const wsrep_uuid_t& group_uuid,
+                                wsrep_seqno_t const group_seqno)
     throw (gu::Exception)
 {
+    if (state_uuid_ != group_uuid)
+    {
+        gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
+                               << ") does not match group state UUID ("
+                               << group_uuid << ')';
+    }
+
+    wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
+    assert(local_seqno < group_seqno); // we should not be here if GTIDs match
+    assert(local_seqno >= 0);
+
     std::ostringstream os;
 
     std::string recv_addr = ist_receiver_.prepare(
-        apply_monitor_.last_left() + 1, group_seqno, protocol_version_);
+        local_seqno + 1, group_seqno, protocol_version_);
 
     os << IST_request(recv_addr,
                       state_uuid_, apply_monitor_.last_left(), group_seqno);
@@ -402,9 +454,10 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
 
 ReplicatorSMM::StateRequest*
-ReplicatorSMM::prepare_state_request (const void* const sst_req,
-                                      ssize_t     const sst_req_len,
-                                      wsrep_seqno_t group_seqno)
+ReplicatorSMM::prepare_state_request (const void* const   sst_req,
+                                      ssize_t     const   sst_req_len,
+                                      const wsrep_uuid_t& group_uuid,
+                                      wsrep_seqno_t const group_seqno)
     throw()
 {
     try
@@ -420,11 +473,12 @@ ReplicatorSMM::prepare_state_request (const void* const sst_req,
 
             try
             {
-                gu_trace(prepare_for_IST (ist_req, ist_req_len, group_seqno));
+                gu_trace(prepare_for_IST (ist_req, ist_req_len,
+                                          group_uuid, group_seqno));
             }
             catch (gu::Exception& e)
             {
-                log_error
+                log_warn
                     << "Failed to prepare for incremental state transfer: "
                     << e.what() << ". IST will be unavailable.";
             }
@@ -558,22 +612,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 {
     assert(sst_req_len >= 0);
 
-    log_info << "State transfer required: "
-             << "\n\tGroup state: "
-             << group_uuid << ":" << group_seqno
-             << "\n\tLocal state: " << state_uuid_
-             << ":" << apply_monitor_.last_left();
-
-    if (0 == sst_req_len && state_uuid_ != group_uuid)
-    {
-        log_fatal << "Local state UUID " << state_uuid_
-                  << "is different from group state UUID " << group_uuid
-                  << ", and SST request is null: restart required.";
-        abort();
-    }
-
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
-                                                  group_seqno));
+                                                  group_uuid, group_seqno));
     gu::Lock lock(sst_mutex_);
 
     send_state_request (group_uuid, group_seqno, req);
@@ -581,7 +621,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
     /* while waiting for state transfer to complete is a good point
-     * to reset gcache, since it may ivolve some IO too */
+     * to reset gcache, since it may involve some IO too */
     gcache_.seqno_reset();
 
     if (sst_req_len != 0)

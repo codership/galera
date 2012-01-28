@@ -182,7 +182,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
-    state_seqno_        (-1),
+    cc_seqno_           (-1),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
@@ -1076,36 +1076,24 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 
-    wsrep_seqno_t const group_seqno(view_info.seqno);
-    const wsrep_uuid_t& group_uuid(view_info.uuid);
-
     if (view_info.my_idx >= 0)
     {
         uuid_ = view_info.members[view_info.my_idx].id;
     }
 
-    bool st_required(view_info.state_gap);
+    bool const          st_required(state_transfer_required(view_info));
+    wsrep_seqno_t const group_seqno(view_info.seqno);
+    const wsrep_uuid_t& group_uuid (view_info.uuid);
 
     if (st_required)
     {
-        assert(view_info.view >= 0);
+        log_info << "State transfer required: "
+                 << "\n\tGroup state: " << group_uuid << ":" << group_seqno
+                 << "\n\tLocal state: " << state_uuid_<< ":"
+                 << apply_monitor_.last_left();
 
-        if (state_uuid_ == group_uuid)
-        {
-            // common history
-            if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
-                                          a valid state here */
-            {
-                st_required = (apply_monitor_.last_left() < group_seqno);
-            }
-            else
-            {
-                st_required = (apply_monitor_.last_left() != group_seqno);
-            }
-        }
+        if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
-
-    if (st_required && S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
 
     void*   app_req(0);
     ssize_t app_req_len(0);
@@ -1115,10 +1103,17 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (app_req_len < 0)
     {
-        log_fatal << "View callback failed: " << -app_req_len << " ("
-                  << strerror(-app_req_len) << "). This is unrecoverable, "
-                  << "restart required.";
-        abort();
+        gcs_.close();
+        gu_throw_fatal << "View callback failed: " << -app_req_len << " ("
+                       << strerror(-app_req_len) << "). This is unrecoverable, "
+                       << "restart required.";
+    }
+    else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
+    {
+        gcs_.close();
+        gu_throw_fatal << "Local state UUID " << state_uuid_
+                       << " is different from group state UUID " << group_uuid
+                       << ", and SST request is null: restart required.";
     }
 
     if (view_info.view >= 0) // Primary configuration
@@ -1128,8 +1123,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         cert_.assign_initial_position(group_seqno, trx_proto_ver_);
+
         // record state seqno, needed for IST on DONOR
-        state_seqno_ = group_seqno;
+        cc_seqno_ = group_seqno;
 
         bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
@@ -1408,7 +1404,7 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
     }
 
     update_state_uuid (uuid);
-    state_seqno_ = seqno;
+    cc_seqno_ = seqno; // is it needed here?
     apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.set_initial_position(seqno);
     cert_.assign_initial_position(seqno, trx_proto_ver_);
@@ -1575,7 +1571,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 }
 
 void
-galera::ReplicatorSMM::abort() throw() /* aborts the program in a clean way */
+galera::ReplicatorSMM::abort() throw()
 {
     gcs_.close();
     gu_abort();
