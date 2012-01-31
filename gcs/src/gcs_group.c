@@ -166,7 +166,7 @@ group_redo_last_applied (gcs_group_t* group)
     gu_seqno_t last_applied = GU_LONG_LONG_MAX;
 
     for (n = 0; n < group->num; n++) {
-        const gcs_node_t* const node  = &group->nodes[n];
+        const gcs_node_t* const node = &group->nodes[n];
         gcs_seqno_t const seqno = node->last_applied;
         bool count = node->count_last_applied;
 
@@ -639,7 +639,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                  *        instead going straignt to SYNCED */
             }
             else {
-                assert(gcs_state_msg_flags(sender->state_msg) & GCS_STATE_FCLA);
+                assert(sender->count_last_applied);
                 sender->status = GCS_NODE_STATE_JOINED;
             }
         }
