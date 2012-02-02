@@ -428,7 +428,7 @@ void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
 
 
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
-    throw (ApplyException)
+    throw (ApplyException, gu::Exception)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
@@ -965,7 +965,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 
 
 void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
-    throw (ApplyException)
+    throw (ApplyException, gu::Exception)
 {
     assert(recv_ctx != 0);
     assert(trx != 0);
@@ -1030,12 +1030,16 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         trx_proto_ver_ = 0;
         str_proto_ver_ = 0;
         break;
-    case 1: 
+    case 1:
         trx_proto_ver_ = 1;
         str_proto_ver_ = 0;
         break;
     case 2:
         trx_proto_ver_ = 1;
+        str_proto_ver_ = 1;
+        break;
+    case 3:
+        trx_proto_ver_ = 2;
         str_proto_ver_ = 1;
         break;
     default:

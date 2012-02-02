@@ -56,10 +56,13 @@ echo "starting node0, node1..."
 ../../scripts/command.sh start_node "-d -g gcomm://" 0
 ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 
-MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
+MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD  -Dtest "
 
-declare -r port_0=$(( DBMS_PORT ))
-declare -r port_1=$(( DBMS_PORT + 1))
+declare -r host_0=${NODE_INCOMING_HOST[0]}
+declare -r port_0=${NODE_INCOMING_PORT[0]}
+
+declare -r host_1=${NODE_INCOMING_HOST[1]}
+declare -r port_1=${NODE_INCOMING_PORT[1]}
 
 declare -r ROUNDS=10000
 declare -r ERROR_LIMIT=10
@@ -73,14 +76,15 @@ declare ok_cnt=0
 updater()
 {
     local key=$1
-    local port=$2
+    local host=$2
+    local port=$3
     local errors=0
 
     echo "updater, key: $key, port: $port starting"
 
     for (( i=1; i<$ROUNDS; i++ )); do
 	fk=$(( $i % 2 ))
-	$MYSQL --port=$port -e "UPDATE test.lp922757child set fk=$fk WHERE pk=$key" 2>&1 > /tmp/lp922757.out 
+	$MYSQL --host=$host --port=$port -e "UPDATE test.lp922757child set fk=$fk WHERE pk=$key" 2>&1 > /tmp/lp922757.out 
 	ret=$?
 
 	if (( $ret != 0 )); then
@@ -103,25 +107,25 @@ updater()
 ########################
 
 echo "Creating database..."
-$MYSQL --port=$port_0  -e 'DROP TABLE IF EXISTS test.lp922757child'
-$MYSQL --port=$port_0  -e 'DROP TABLE IF EXISTS test.lp922757parent'
+$MYSQL --host=$host_0 --port=$port_0  -e 'DROP TABLE IF EXISTS test.lp922757child'
+$MYSQL --host=$host_0 --port=$port_0  -e 'DROP TABLE IF EXISTS test.lp922757parent'
 
-$MYSQL --port=$port_0  -e 'CREATE TABLE test.lp922757parent(pk int primary key) engine=innodb'
-$MYSQL --port=$port_0  -e 'CREATE TABLE test.lp922757child(pk int primary key, fk int, v int, foreign key (fk) references test.lp922757parent(pk)) engine=innodb'
+$MYSQL --host=$host_0 --port=$port_0  -e 'CREATE TABLE test.lp922757parent(pk int primary key) engine=innodb'
+$MYSQL --host=$host_0 --port=$port_0  -e 'CREATE TABLE test.lp922757child(pk int primary key, fk int, v int, foreign key (fk) references test.lp922757parent(pk)) engine=innodb'
 
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757parent(pk) VALUES (0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757parent(pk) VALUES (1)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757parent(pk) VALUES (0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757parent(pk) VALUES (1)'
 
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (1,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (2,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (3,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (4,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (5,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (6,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (7,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (8,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (9,1,0)'
-$MYSQL --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (10,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (1,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (2,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (3,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (4,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (5,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (6,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (7,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (8,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (9,1,0)'
+$MYSQL --host=$host_0 --port=$port_0 -e 'INSERT INTO test.lp922757child(pk,fk,v) VALUES (10,1,0)'
 
 
 #######################
@@ -131,34 +135,34 @@ echo
 echo "### Phase 1, launch updaters"
 echo
 
-updater 1  $port_0 &
+updater 1  $host_0 $port_0 &
 declare p1=$!
 
-updater 2  $port_1 &
+updater 2  $host_1 $port_1 &
 declare p2=$!
 
-updater 3  $port_0 &
+updater 3  $host_0 $port_0 &
 declare p3=$!
 
-updater 4  $port_1 &
+updater 4  $host_1 $port_1 &
 declare p4=$!
 
-updater 5  $port_0 &
+updater 5  $host_0 $port_0 &
 declare p5=$!
 
-updater 6  $port_1 &
+updater 6  $host_1 $port_1 &
 declare p6=$!
 
-updater 7  $port_0 &
+updater 7  $host_0 $port_0 &
 declare p7=$!
 
-updater 8  $port_1 &
+updater 8  $host_1 $port_1 &
 declare p8=$!
 
-updater 9  $port_0 &
+updater 9  $host_0 $port_0 &
 declare p9=$!
 
-updater 10  $port_1 &
+updater 10  $host_1 $port_1 &
 declare p10=$!
 
 echo "waiting load to end (PIDs $p1 $p2 $p3 $p4 $p5 $p6 $p7 $p8 $p9 $p10)"
@@ -170,13 +174,13 @@ echo "total succeeded: $ok_cnt"
 echo
 echo 
 echo "Processlist now:"
-$MYSQL --port=$port_0 -e 'SHOW PROCESSLIST'
+$MYSQL --host=$host_0 --port=$port_0 -e 'SHOW PROCESSLIST'
 echo
 #######################
 #       Cleanup
 ########################
-$MYSQL --port=$port_0 -e 'DROP TABLE test.lp922757child'
-$MYSQL --port=$port_0 -e 'DROP TABLE test.lp922757parent'
+$MYSQL --host=$host_0 --port=$port_0 -e 'DROP TABLE test.lp922757child'
+$MYSQL --host=$host_0 --port=$port_0 -e 'DROP TABLE test.lp922757parent'
 
 ../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1

@@ -140,7 +140,7 @@ extern "C" void* receiver_thd(void* arg)
 }
 
 
-START_TEST(test_ist)
+static void test_ist_common(int version)
 {
     using galera::TrxHandle;
     using galera::Key;
@@ -162,7 +162,7 @@ START_TEST(test_ist)
             {"key1", 4},
             {"key2", 4}
         };
-        trx->append_key(Key(0, key, 2));
+        trx->append_key(Key(0, key, 2, version));
         trx->append_data("bar", 3);
 
         size_t trx_size(serial_size(*trx));
@@ -191,15 +191,34 @@ START_TEST(test_ist)
     mark_point();
     unlink(gcache_file.c_str());
 }
+
+
+START_TEST(test_ist_v1)
+{
+    test_ist_common(1);
+}
+END_TEST
+
+
+START_TEST(test_ist_v2)
+{
+    test_ist_common(2);
+}
 END_TEST
 
 Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
-    TCase* tc = tcase_create("test_ist");
+    TCase* tc;
 
+    tc = tcase_create("test_ist_v1");
     tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist);
+    tcase_add_test(tc, test_ist_v1);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_v2");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v2);
     suite_add_tcase(s, tc);
 
     return s;

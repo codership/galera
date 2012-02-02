@@ -125,11 +125,18 @@ namespace galera
     class Key
     {
     public:
-        Key(int version) : version_(version), keys_() { }
+        enum
+        {
+            F_SHARED = 0x1
+        };
 
-        Key(int version, const wsrep_key_part_t* keys, size_t keys_len)
+        Key(int version) : version_(version), flags_(), keys_() { }
+
+        Key(int version, const wsrep_key_part_t* keys, size_t keys_len,
+            uint8_t flags)
             :
             version_(version),
+            flags_  (flags),
             keys_   ()
         {
             if (keys_len > 255)
@@ -157,6 +164,7 @@ namespace galera
                 }
                 break;
             case 1:
+            case 2:
                 for (size_t i(0); i < keys_len; ++i)
                 {
                     size_t const offset(keys_.size());
@@ -184,7 +192,8 @@ namespace galera
         }
 
         template <class Ci>
-        Key(int version, Ci begin, Ci end) : version_(version), keys_()
+        Key(int version, Ci begin, Ci end, uint8_t flags)
+            : version_(version), flags_(flags), keys_()
         {
 
             for (Ci i(begin); i != end; ++i)
@@ -253,6 +262,8 @@ namespace galera
             return ret;
         }
 
+        uint8_t flags() const { return flags_; }
+
         bool operator==(const Key& other) const
         {
             return (keys_ == other.keys_);
@@ -265,6 +276,7 @@ namespace galera
         friend size_t serial_size(const Key&);
         friend std::ostream& operator<<(std::ostream& os, const Key& key);
         int        version_;
+        uint8_t    flags_;
         gu::Buffer keys_;
     };
 
@@ -279,6 +291,9 @@ namespace galera
                       std::ostream_iterator<KeyPart0>(os, " "));
             break;
         }
+        case 2:
+            os << std::hex << static_cast<int>(key.flags()) << " ";
+            // Fall through
         case 1:
         {
             std::deque<KeyPart1> dq(key.key_parts1<std::deque<KeyPart1> >());
@@ -318,6 +333,9 @@ namespace galera
         case 0:
         case 1:
             return serialize<uint16_t>(key.keys_, buf, buflen, offset);
+        case 2:
+            offset = serialize<uint8_t>(key.flags_, buf, buflen, offset);
+            return serialize<uint16_t>(key.keys_, buf, buflen, offset);
 #else
         case 0:
             return serialize<uint16_t>(key.keys_, buf, buflen, offset);
@@ -346,6 +364,9 @@ namespace galera
         case 0:
         case 1:
             return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
+        case 2:
+            offset = unserialize(buf, buflen, offset, key.flags_);
+            return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
 #else
         case 0:
             return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
@@ -373,6 +394,8 @@ namespace galera
         case 0:
         case 1:
             return serial_size<uint16_t>(key.keys_);
+        case 2:
+            return (serial_size(key.flags_) + serial_size<uint16_t>(key.keys_));
 #else
         case 0:
             return serial_size<uint16_t>(key.keys_);

@@ -65,7 +65,7 @@ namespace galera
         void discard_local_conn(wsrep_conn_id_t conn_id);
 
         void apply_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException);
+            throw (ApplyException, gu::Exception);
 
         wsrep_status_t replicate(TrxHandle* trx);
         void abort_trx(TrxHandle* trx) throw (gu::Exception);
@@ -85,7 +85,7 @@ namespace galera
                                     const void*         state,
                                     size_t              state_len);
         void process_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException);
+            throw (ApplyException, gu::Exception);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l)
             throw (gu::Exception);
         void process_conf_change(void* recv_ctx,
@@ -380,10 +380,16 @@ namespace galera
         }
             set_defaults_; // sets missing parameters to default values
 
-        static const int       MAX_PROTO_VER = 2;
-        /* 
-         * 1 - trx_proto_ver_ = 1;
-         * 2 - str_proto_ver_ = 1;
+        static const int       MAX_PROTO_VER = 3;
+        /*
+         * |------------------------------------------------------
+         * | protocol_version_ | trx_proto_ver_ | str_proto_ver_ |
+         * |------------------------------------------------------
+         * |                 0 |              0 |              0 |
+         * |                 1 |              1 |              0 |
+         * |                 2 |              1 |              1 |
+         * |                 3 |              2                1 |
+         * -------------------------------------------------------
          */
 
         int                    trx_proto_ver_;// transaction protocol

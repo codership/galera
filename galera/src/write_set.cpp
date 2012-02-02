@@ -51,7 +51,7 @@ void galera::WriteSet::append_key(const Key& key)
 
         (void)galera::unserialize(&keys_[0], keys_.size(), i->second, cmp);
 
-        if (key == cmp) return;
+        if (key == cmp && key.flags() == cmp.flags()) return;
     }
 
     size_t key_size(serial_size(key));

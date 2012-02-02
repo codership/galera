@@ -75,7 +75,7 @@ namespace galera
 
         // action source interface
         virtual void process_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException) = 0;
+            throw (ApplyException, gu::Exception) = 0;
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l)
             throw (gu::Exception) = 0;

@@ -345,7 +345,7 @@ namespace galera
         //
         friend class Wsdb;
         friend class Certification;
-        typedef std::list<std::pair<KeyEntry*, bool> > CertKeySet;
+        typedef std::list<std::pair<KeyEntry*, std::pair<bool, bool> > > CertKeySet;
         CertKeySet cert_keys_;
 
         friend size_t serialize(const TrxHandle&, gu::byte_t* buf,

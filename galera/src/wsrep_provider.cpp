@@ -192,13 +192,18 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
+#ifdef NDEBUG
     try
     {
+#endif // NDEBUG
         return repl->async_recv(recv_ctx);
+
+#ifdef NDEBUG
     }
     catch (gu::Exception& e)
     {
         log_error << e.what();
+
         switch (e.get_errno())
         {
         case ENOTRECOVERABLE:
@@ -215,6 +220,7 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
     {
         log_fatal << "non-standard exception";
     }
+#endif // NDEBUG
 
     return WSREP_FATAL;
 }
@@ -443,7 +449,8 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
         {
             trx->append_key(galera::Key(repl->trx_proto_ver(),
                                         key[i].key_parts,
-                                        key[i].key_parts_len));
+                                        key[i].key_parts_len,
+                                        (shared == true ? galera::Key::F_SHARED : 0)));
         }
         retval = WSREP_OK;
     }
@@ -553,7 +560,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
         {
             trx->append_key(Key(repl->trx_proto_ver(),
                                 key[i].key_parts,
-                                key[i].key_parts_len));
+                                key[i].key_parts_len, 0));
         }
         trx->append_data(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);

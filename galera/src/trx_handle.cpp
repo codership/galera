@@ -195,6 +195,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         {
         case 0:
         case 1:
+        case 2:
             offset = unserialize(buf, buflen, offset, trx.source_id_);
             offset = unserialize(buf, buflen, offset, trx.conn_id_);
             offset = unserialize(buf, buflen, offset, trx.trx_id_);

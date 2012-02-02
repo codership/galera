@@ -30,7 +30,7 @@ namespace
         const galera::TrxHandle* trx_;
     };
 
-    typedef std::list<std::pair<galera::Key, bool> > KeyList;
+    typedef std::list<std::pair<galera::Key, std::pair<bool, bool> > > KeyList;
 }
 
 
@@ -39,7 +39,9 @@ inline galera::KeyEntry::KeyEntry(
     :
     key_buf_(0),
     ref_trx_(0),
-    ref_full_trx_(0)
+    ref_full_trx_(0),
+    ref_shared_trx_(0),
+    ref_full_shared_trx_(0)
 {
     const size_t ss(serial_size(key));
     key_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
@@ -51,6 +53,8 @@ inline galera::KeyEntry::~KeyEntry()
 {
     assert(ref_trx_ == 0);
     assert(ref_full_trx_ == 0);
+    assert(ref_shared_trx_ == 0);
+    assert(ref_full_shared_trx_ == 0);
     delete[] key_buf_;
 }
 
@@ -74,6 +78,18 @@ inline const galera::TrxHandle*
 galera::KeyEntry::ref_full_trx() const
 {
     return ref_full_trx_;
+}
+
+inline const galera::TrxHandle*
+galera::KeyEntry::ref_shared_trx() const
+{
+    return ref_shared_trx_;
+}
+
+inline const galera::TrxHandle*
+galera::KeyEntry::ref_full_shared_trx() const
+{
+    return ref_full_shared_trx_;
 }
 
 
@@ -101,6 +117,30 @@ galera::KeyEntry::unref(TrxHandle* trx, bool full_key)
     }
 }
 
+inline void
+galera::KeyEntry::ref_shared(TrxHandle* trx, bool full_key)
+{
+    assert(ref_shared_trx_ == 0 ||
+           ref_shared_trx_->global_seqno() <= trx->global_seqno());
+    ref_shared_trx_ = trx;
+    if (full_key == true)
+    {
+        ref_full_shared_trx_ = trx;
+    }
+}
+
+
+inline void
+galera::KeyEntry::unref_shared(TrxHandle* trx, bool full_key)
+{
+    assert(ref_shared_trx_ != 0);
+    if (ref_shared_trx_ == trx) ref_shared_trx_ = 0;
+    if (full_key == true && ref_full_shared_trx_ == trx)
+    {
+        ref_full_shared_trx_ = 0;
+    }
+}
+
 
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/
@@ -120,13 +160,23 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
     {
         // Unref all referenced and remove if was referenced by us
         KeyEntry* ke(i->first);
-        if (ke->ref_trx() == trx || ke->ref_full_trx() == trx)
+        const bool full_key(i->second.first);
+        const bool shared(i->second.second);
+        if (shared == false &&
+            (ke->ref_trx() == trx || ke->ref_full_trx() == trx))
         {
-            ke->unref(trx, i->second);
+            ke->unref(trx, full_key);
         }
-        if (ke->ref_trx() == 0)
+        if (shared == true &&
+            (ke->ref_shared_trx() == trx || ke->ref_full_shared_trx() == trx))
+        {
+            ke->unref_shared(trx, full_key);
+        }
+
+        if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
         {
             assert(ke->ref_full_trx() == 0);
+            assert(ke->ref_full_shared_trx() == 0);
             CertIndex::iterator ci(cert_index_.find(ke->get_key(version_)));
             assert(ci != cert_index_.end());
             delete ci->second;
@@ -198,7 +248,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
             {
                 full_key = (end == key_parts.end());
                 CertIndex::iterator ci;
-                Key key(0, begin, end);
+                Key key(0, begin, end, 0);
                 cert_debug << "key: " << key;
                 if ((ci = cert_index_.find(key)) != cert_index_.end())
                 {
@@ -259,7 +309,9 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
                     store_keys == true)
                 {
                     cert_debug << "match: " << ci->first;
-                    match.push_back(std::make_pair(ci->second, full_key));
+                    match.push_back(std::make_pair(
+                                        ci->second,
+                                        std::make_pair(full_key, false)));
                 }
             }
         }
@@ -277,7 +329,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
         for (TrxHandle::CertKeySet::iterator i(match.begin());
              i != match.end(); ++i)
         {
-            i->first->ref(trx, i->second);
+            i->first->ref(trx, i->second.first);
         }
 
         key_count_ += key_count;
@@ -292,10 +344,10 @@ cert_fail:
 
 
 static bool
-certify_v1(galera::TrxHandle*                              trx,
-           galera::Certification::CertIndex&               cert_index,
-           galera::WriteSet::KeySequence::const_iterator   key_seq_iter,
-           KeyList& key_list, bool store_keys)
+certify_v1to2(galera::TrxHandle*                              trx,
+              galera::Certification::CertIndex&               cert_index,
+              galera::WriteSet::KeySequence::const_iterator   key_seq_iter,
+              KeyList& key_list, bool store_keys)
 {
     typedef std::list<galera::KeyPart1> KPS;
 
@@ -306,7 +358,7 @@ certify_v1(galera::TrxHandle*                              trx,
     {
         full_key = (end == key_parts.end());
         galera::Certification::CertIndex::iterator ci;
-        galera::Key key(1, begin, end);
+        galera::Key key(key_seq_iter->version(), begin, end, key_seq_iter->flags());
 
         cert_debug << "key: " << key
                    << " ("
@@ -336,9 +388,43 @@ certify_v1(galera::TrxHandle*                              trx,
             const galera::TrxHandle* ref_trx(full_key == true      ?
                                              ci->second->ref_trx() :
                                              ci->second->ref_full_trx());
-            if (ref_trx != 0)
+            const galera::TrxHandle* ref_shared_trx(
+                full_key == true ?
+                ci->second->ref_shared_trx() :
+                ci->second->ref_full_shared_trx());
+
+            if (ref_trx != 0 && ref_shared_trx != 0)
             {
-                cert_debug << "match ("
+                // figure out whether to match against shared or exclusive
+                if (trx->last_seen_seqno() <= ref_trx->global_seqno() ||
+                    ref_trx->global_seqno() >= ref_shared_trx->global_seqno())
+                {
+                    // if exclusive reference is in cert range or
+                    // has greater or equal seqno than shared, use exclusive
+                    ref_shared_trx = 0;
+                }
+                else
+                {
+                    ref_trx = 0;
+                }
+            }
+
+
+            if (ref_shared_trx != 0)
+            {
+                cert_debug << "shared match ("
+                           << (full_key == true ? "full" : "partial")
+                           << ") " << *trx << " <-----> " << *ref_shared_trx;
+                if ((key.flags() & galera::Key::F_SHARED) == 0)
+                {
+                    trx->set_depends_seqno(std::max(
+                                               trx->depends_seqno(),
+                                               ref_shared_trx->global_seqno()));
+                }
+            }
+            else if (ref_trx != 0)
+            {
+                cert_debug << "exclusive match ("
                            << (full_key == true ? "full" : "partial")
                            << ") " << *trx << " <-----> " << *ref_trx;
                 // trx should not have any references in index at this point
@@ -357,17 +443,26 @@ certify_v1(galera::TrxHandle*                              trx,
                     return false;
                 }
                 trx->set_depends_seqno(std::max(trx->depends_seqno(),
-                                       ref_trx->global_seqno()));
+                                                ref_trx->global_seqno()));
             }
         }
-        key_list.push_back(std::make_pair(key, full_key));
+        if ((key.flags() & galera::Key::F_SHARED) != 0)
+        {
+            key_list.push_back(std::make_pair(
+                                   key, std::make_pair(full_key, true)));
+        }
+        else
+        {
+            key_list.push_back(std::make_pair(
+                                   key, std::make_pair(full_key, false)));
+        }
     }
     return true;
 }
 
 
 galera::Certification::TestResult
-galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
+galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 {
     cert_debug << "BEGIN CERTIFICATION: " << *trx;
     size_t offset(serial_size(*trx));
@@ -390,7 +485,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
     // Scan over write sets
     while (offset < wscoll.size())
     {
-        WriteSet ws(1);
+        WriteSet ws(trx->version());
         if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
         {
             gu_throw_fatal << "failed to unserialize write set";
@@ -403,7 +498,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
         for (WriteSet::KeySequence::const_iterator i(rk.begin());
              i != rk.end(); ++i)
         {
-            if (certify_v1(trx, cert_index_, i, key_list, store_keys) == false)
+            if (certify_v1to2(trx, cert_index_, i, key_list, store_keys) == false)
             {
                 goto cert_fail;
             }
@@ -425,12 +520,29 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
                                << i->first << "' from cert index";
             }
             KeyEntry* ke(ci->second);
-            const bool full_key(i->second);
-            if ((full_key == false && ke->ref_trx() != trx) ||
-                (full_key == true  && ke->ref_full_trx() != trx))
+            const bool full_key(i->second.first);
+            const bool shared_key(i->second.second);
+            if (shared_key == false)
             {
-                trx->cert_keys_.push_back(std::make_pair(ke, i->second));
-                ke->ref(trx, i->second);
+                if ((full_key == false && ke->ref_trx() != trx) ||
+                    (full_key == true  && ke->ref_full_trx() != trx))
+                {
+                    trx->cert_keys_.push_back(
+                        std::make_pair(ke,
+                                       std::make_pair(full_key, shared_key)));
+                    ke->ref(trx, full_key);
+                }
+            }
+            else
+            {
+                if ((full_key == false && ke->ref_shared_trx() != trx) ||
+                    (full_key == true  && ke->ref_full_shared_trx() != trx))
+                {
+                    trx->cert_keys_.push_back(
+                        std::make_pair(ke,
+                                       std::make_pair(full_key, shared_key)));
+                    ke->ref_shared(trx, full_key);
+                }
             }
         }
 
@@ -455,9 +567,10 @@ cert_fail:
             }
 
             KeyEntry* ke(ci->second);
-            if (ke->ref_trx() == 0)
+            if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
             {
                 assert(ke->ref_full_trx() == 0);
+                assert(ke->ref_full_shared_trx() == 0);
                 delete ke;
                 cert_index_.erase(ci);
             }
@@ -503,7 +616,8 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
         res = do_test_v0(trx, store_keys);
         break;
     case 1:
-        res = do_test_v1(trx, store_keys);
+    case 2:
+        res = do_test_v1to2(trx, store_keys);
         break;
     default:
         gu_throw_fatal << "certification test for version "

@@ -26,14 +26,20 @@ namespace galera
         Key get_key(int version) const;
         void ref(TrxHandle* trx, bool full_key);
         void unref(TrxHandle* trx, bool full_key);
+        void ref_shared(TrxHandle* trx, bool full_key);
+        void unref_shared(TrxHandle* trx, bool full_key);
         const TrxHandle* ref_trx() const;
         const TrxHandle* ref_full_trx() const;
+        const TrxHandle* ref_shared_trx() const;
+        const TrxHandle* ref_full_shared_trx() const;
     private:
         KeyEntry(const KeyEntry& other);
         void operator=(const KeyEntry&);
         gu::byte_t* key_buf_;
         TrxHandle* ref_trx_;
         TrxHandle* ref_full_trx_;
+        TrxHandle* ref_shared_trx_;
+        TrxHandle* ref_full_shared_trx_;
     };
 
     class Certification
@@ -116,7 +122,7 @@ namespace galera
     private:
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v0(TrxHandle*, bool);
-        TestResult do_test_v1(TrxHandle*, bool);
+        TestResult do_test_v1to2(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
 
         // unprotected variants for internal use
