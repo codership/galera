@@ -393,6 +393,10 @@ certify_v1to2(galera::TrxHandle*                              trx,
                 ci->second->ref_shared_trx() :
                 ci->second->ref_full_shared_trx());
 
+            // trx should not have any references in index at this point
+            assert(ref_trx != trx);
+            assert(ref_shared_trx != trx);
+
             if (ref_trx != 0 && ref_shared_trx != 0)
             {
                 // figure out whether to match against shared or exclusive
@@ -405,10 +409,26 @@ certify_v1to2(galera::TrxHandle*                              trx,
                 }
                 else
                 {
+                    // Here we have a case like
+                    // <exclusive> i
+                    // <shared>    i + n
+                    // <shared>    i + n + 1 <--- this key
+                    //
+                    // Shared entry between this and exclusive shadows
+                    // dependency calculation in following code
+                    // (ref_shared_trx != 0 branch below), so we will do
+                    // it here
+                    if ((key.flags() & galera::Key::F_SHARED) != 0)
+                    {
+                        cert_debug << "dep shadow: " << *ref_trx << " <---> "
+                                   << *ref_shared_trx << " <---> "
+                                   << *trx;
+                        trx->set_depends_seqno(std::max(trx->depends_seqno(),
+                                                        ref_trx->global_seqno()));
+                    }
                     ref_trx = 0;
                 }
             }
-
 
             if (ref_shared_trx != 0)
             {
@@ -427,8 +447,6 @@ certify_v1to2(galera::TrxHandle*                              trx,
                 cert_debug << "exclusive match ("
                            << (full_key == true ? "full" : "partial")
                            << ") " << *trx << " <-----> " << *ref_trx;
-                // trx should not have any references in index at this point
-                assert(ref_trx != trx);
                 // cert conflict takes place if
                 // 1) write sets originated from different nodes, are within
                 //    cert range

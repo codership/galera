@@ -684,6 +684,15 @@ START_TEST(test_cert_hierarchical_v2)
         { { {1, } }, 1, 8,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, true,
           8, 8, 4, -1, 0, Certification::TEST_FAILED},
+        // 9 - 10: shared key shadows dependency to 5
+        // 9: depends on 5
+        { { {2, } }, 1, 9,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, true,
+          9, 9, 0, 5, 0, Certification::TEST_OK},
+        // 10: depends on 5
+        { { {2, } }, 1, 10,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, true,
+          10, 10, 6, 5, 0, Certification::TEST_OK},
 
     };
 
