@@ -95,6 +95,14 @@ namespace gcache
                 seqno_g_(other.seqno_g_),
                 seqno_d_(other.seqno_d_)
             { }
+            Buffer& operator= (const Buffer& other)
+            {
+                ptr_ = other.ptr_;
+                size_ = other.size_;
+                seqno_g_ = other.seqno_g_;
+                seqno_d_ = other.seqno_d_;
+                return *this;
+            }
             const void* ptr()     const { return ptr_;     }
             ssize_t     size()    const { return size_;    }
             int64_t     seqno_g() const { return seqno_g_; }
@@ -108,9 +116,6 @@ namespace gcache
             { size_ = s; seqno_g_ = g; seqno_d_ = d; }
 
         private:
-
-
-            Buffer& operator= (const Buffer&);
 
             const void* ptr_;
             ssize_t     size_;
