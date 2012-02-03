@@ -385,52 +385,22 @@ certify_v1to2(galera::TrxHandle*                              trx,
         {
             // 1) if the key is full, match for any trx
             // 2) if the key is partial, match for trx with full key
-            const galera::TrxHandle* ref_trx(full_key == true      ?
-                                             ci->second->ref_trx() :
-                                             ci->second->ref_full_trx());
-            const galera::TrxHandle* ref_shared_trx(
-                full_key == true ?
-                ci->second->ref_shared_trx() :
-                ci->second->ref_full_shared_trx());
+            const galera::TrxHandle* const ref_trx(full_key == true      ?
+                                                    ci->second->ref_trx() :
+                                                    ci->second->ref_full_trx());
+            // get shared reference iff exclusive reference is not found
+            const galera::TrxHandle* const ref_shared_trx(
+                ref_trx == 0 ?
+                (full_key == true ?
+                 ci->second->ref_shared_trx() :
+                 ci->second->ref_full_shared_trx()) :
+                0);
 
             // trx should not have any references in index at this point
             assert(ref_trx != trx);
             assert(ref_shared_trx != trx);
 
-            if (ref_trx != 0 && ref_shared_trx != 0)
-            {
-                // figure out whether to match against shared or exclusive
-                if (trx->last_seen_seqno() <= ref_trx->global_seqno() ||
-                    ref_trx->global_seqno() >= ref_shared_trx->global_seqno())
-                {
-                    // if exclusive reference is in cert range or
-                    // has greater or equal seqno than shared, use exclusive
-                    ref_shared_trx = 0;
-                }
-                else
-                {
-                    // Here we have a case like
-                    // <exclusive> i
-                    // <shared>    i + n
-                    // <shared>    i + n + 1 <--- this key
-                    //
-                    // Shared entry between this and exclusive shadows
-                    // dependency calculation in following code
-                    // (ref_shared_trx != 0 branch below), so we will do
-                    // it here
-                    if ((key.flags() & galera::Key::F_SHARED) != 0)
-                    {
-                        cert_debug << "dep shadow: " << *ref_trx << " <---> "
-                                   << *ref_shared_trx << " <---> "
-                                   << *trx;
-                        trx->set_depends_seqno(std::max(trx->depends_seqno(),
-                                                        ref_trx->global_seqno()));
-                    }
-                    ref_trx = 0;
-                }
-            }
-
-            if (ref_shared_trx != 0)
+            if (gu_unlikely(ref_shared_trx != 0))
             {
                 cert_debug << "shared match ("
                            << (full_key == true ? "full" : "partial")
@@ -442,7 +412,7 @@ certify_v1to2(galera::TrxHandle*                              trx,
                                                ref_shared_trx->global_seqno()));
                 }
             }
-            else if (ref_trx != 0)
+            else if (gu_likely(ref_trx != 0))
             {
                 cert_debug << "exclusive match ("
                            << (full_key == true ? "full" : "partial")
