@@ -3,6 +3,8 @@
 #include "gu_assert.hpp"
 #include "gu_string.hpp"
 
+#include <sys/types.h>
+
 using std::string;
 using std::vector;
 
