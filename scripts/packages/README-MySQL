@@ -26,7 +26,7 @@ This document briefly explains how to use Galera wsrep provider with MySQL
 RDBMS. For more information check http://www.codership.com/wiki/doku.php
 
 
-                     Using MySQL with GALERA v0.8.x
+                     Using MySQL with GALERA v1.x
 
 CONTENTS:
 =========
@@ -157,10 +157,3 @@ Will show all parameters and their current values.
    code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
 
 7) XA transactions can not be supported due to possible rollback on commit.
-
-8) Currently supported only in master-slave mode without parallel applying
-   (will be fixed in the nearest release):
-    * cascading foreign key constraints,
-    * secondary unique indexes and
-    * primary varchar indexes with non-binary collation.
-
