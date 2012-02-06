@@ -193,6 +193,7 @@ namespace gcache
                 {
                     cond.signal();
                 }
+
                 seqno_locked = start;
 
                 do {
@@ -200,7 +201,9 @@ namespace gcache
                     assert (p->second);
                     v[found].set_ptr(p->second);
                 }
-                while (++found < max && ++p != seqno2ptr.end());
+                while (++found < max && ++p != seqno2ptr.end() &&
+                       p->first == (start + found));
+                /* the latter condition ensures seqno continuty, #643 */
             }
         }
 
