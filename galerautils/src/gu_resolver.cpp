@@ -9,6 +9,7 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <unistd.h> // for close()
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <net/if.h>
