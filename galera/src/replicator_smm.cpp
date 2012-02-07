@@ -862,7 +862,14 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 {
     wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
     if (cseq < 0) return WSREP_TRX_FAIL;
-    apply_monitor_.wait(cseq);
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+    {
+        commit_monitor_.wait(cseq);
+    }
+    else
+    {
+        apply_monitor_.wait(cseq);
+    }
     if (seqno != 0) *seqno = cseq;
     return WSREP_OK;
 }
