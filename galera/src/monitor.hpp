@@ -95,6 +95,11 @@ namespace galera
                 drain_common(seqno, lock);
                 drain_seqno_ = LLONG_MAX;
             }
+            if (seqno != -1)
+            {
+                const size_t idx(indexof(seqno));
+                process_[idx].wait_cond_.broadcast();
+            }
         }
 
         void enter(C& obj) throw (gu::Exception)
