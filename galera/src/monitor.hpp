@@ -310,6 +310,17 @@ namespace galera
             }
         }
 
+        void wait(wsrep_seqno_t seqno, const gu::datetime::Date& wait_until)
+        {
+            gu::Lock lock(mutex_);
+            if (last_left_ < seqno)
+            {
+                size_t idx(indexof(seqno));
+                lock.wait(process_[idx].wait_cond_, wait_until);
+            }
+        }
+
+
         void get_stats(double* oooe, double* oool, double* win_size)
         {
             gu::Lock lock(mutex_);

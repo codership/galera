@@ -209,6 +209,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
+    causal_read_timeout_("PT30S"),
     receivers_          (),
     replicated_         (),
     replicated_bytes_   (),
@@ -862,16 +863,33 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 {
     wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
     if (cseq < 0) return WSREP_TRX_FAIL;
-    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+    try
     {
-        commit_monitor_.wait(cseq);
+        // @note: Using timed wait for monitor is currently a hack
+        // to avoid deadlock resulting from race between monitor wait
+        // and drain during configuration change. Instead of this,
+        // monitor should have proper mechanism to interrupt waiters
+        // at monitor drain and disallowing further waits until
+        // configuration change related operations (SST etc) have been
+        // finished.
+        gu::datetime::Date wait_until(gu::datetime::Date::calendar()
+                                      + causal_read_timeout_);
+        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+        {
+            commit_monitor_.wait(cseq, wait_until);
+        }
+        else
+        {
+            apply_monitor_.wait(cseq, wait_until);
+        }
+        if (seqno != 0) *seqno = cseq;
+        return WSREP_OK;
     }
-    else
+    catch (gu::Exception& e)
     {
-        apply_monitor_.wait(cseq);
+        log_debug << "monitor wait failed for causal read: " << e.what();
+        return WSREP_TRX_FAIL;
     }
-    if (seqno != 0) *seqno = cseq;
-    return WSREP_OK;
 }
 
 
