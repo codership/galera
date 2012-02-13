@@ -134,6 +134,7 @@ namespace galera
         struct Param
         {
             static const std::string commit_order;
+            static const std::string causal_read_timeout;
         };
 
         typedef std::pair<std::string, std::string> Default;
@@ -390,6 +391,7 @@ namespace galera
         Monitor<LocalOrder> local_monitor_;
         Monitor<ApplyOrder> apply_monitor_;
         Monitor<CommitOrder> commit_monitor_;
+        gu::datetime::Period causal_read_timeout_;
 
         // counters
         gu::Atomic<size_t>    receivers_;

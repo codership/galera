@@ -115,8 +115,20 @@ namespace gu
 
             /*!
              * @brief Get system time.
+             * @note This call should be deprecated in favor of calendar()
+             *       and monotonic().
              */
             static inline Date now() { return gu_time_monotonic(); }
+
+            /*!
+             * @brief Get time from system-wide realtime clock.
+             */
+            static inline Date calendar() { return gu_time_calendar(); }
+
+            /*!
+             * @brief Get time from monotonic clock.
+             */
+            static inline Date monotonic() { return gu_time_monotonic(); }
 
             /*!
              * @brief Get maximum representable timestamp.

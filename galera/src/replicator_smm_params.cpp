@@ -10,10 +10,13 @@ static const std::string common_prefix = "replicator.";
 
 const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
+const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
+    common_prefix + "causal_read_timeout";
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::commit_order, "3"));
+    map_.insert(Default(Param::causal_read_timeout, "PT30S"));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -64,6 +67,10 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     {
         gu_throw_error(EPERM)
             << "setting '" << key << "' during runtime not allowed";
+    }
+    else if (key == Param::causal_read_timeout)
+    {
+        causal_read_timeout_ = gu::datetime::Period(value);
     }
 }
 
