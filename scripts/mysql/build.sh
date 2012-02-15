@@ -274,7 +274,7 @@ then
     if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
-        url2=http://mysql.dataphone.se/Downloads/MySQL-$MYSQL_MAJOR
+        url2=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-$MYSQL_MAJOR
         url1=http://downloads.mysql.com/archives/mysql-$MYSQL_MAJOR
         if [ ! -r $mysql_orig_tar_gz ]
         then
