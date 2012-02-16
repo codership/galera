@@ -43,9 +43,11 @@ program_start() {
 	else
 		log_daemon_msg "Starting $prog: "
 		start-stop-daemon --start --quiet --background \
-		                  --pidfile $PIDFILE --make-pidfile \
 		                  --exec $prog -- $*
 		rcode=$?
+		# Hack: sleep a bit to give garbd some time to fork
+		sleep 1
+		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE
 		log_end_msg $rcode
 	fi
 	return $rcode
@@ -60,7 +62,7 @@ program_stop() {
 		[ $rcode -eq 0 ] && echo_success || echo_failure
 #		echo
 	else
-		start-stop-daemon --stop --quiet --oknodo --retry=TERM/forever \
+		start-stop-daemon --stop --quiet --oknodo --retry TERM/30/KILL/5 \
 		                  --pidfile $PIDFILE
 		rcode=$?
 		log_end_msg $rcode
