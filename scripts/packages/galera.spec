@@ -69,7 +69,7 @@ RBD=$RPM_BUILD_DIR
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
-#install -d $RBR%{_sysconfdir}/{init.d,sysconfig} - this is brought by chkconfig
+install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
 install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
@@ -93,10 +93,7 @@ rm -f $(find %{libs} -type l)
 
 %files
 %defattr(-,root,root,0755)
-%attr(0755,root,root) %dir %{_sysconfdir}
-%attr(0755,root,root) %dir %{_sysconfdir}/sysconfig
-%ghost %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
-%attr(0755,root,root) %dir %{_sysconfdir}/init.d
+%config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
 
 %attr(0755,root,root) %dir %{_bindir}
@@ -109,7 +106,6 @@ rm -f $(find %{libs} -type l)
 %doc %attr(0644,root,root) %{docs}/COPYING
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
-
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
