@@ -2,6 +2,7 @@
 
 %include common.list
 
+%requires    libaio1
 %requires    mysql-client
 
 %replaces    mysql-server-core-5.5 0.0.0 ${mysql_version}
