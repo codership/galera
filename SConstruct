@@ -260,7 +260,7 @@ if ssl == 1:
         print 'compile with ssl=0 or check that openssl devel headers are usable'
         Exit(1)
     if conf.CheckLib('ssl'):
-        conf.env.Append(LINKFLAGS = ' -lssl')
+        conf.CheckLib('crypto')
     else:
         print 'ssl support required but openssl library not found'
         print 'compile with ssl=0 or check that openssl library is usable'
