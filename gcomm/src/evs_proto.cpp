@@ -859,9 +859,6 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                 // for leaving node anyway and it is not guaranteed if
                 // the others get the leave message, so it is not safe
                 // to assume then as left.
-                log_info << self_string()
-                         << " uuid " << NodeMap::get_key(i)
-                         << " missing from install message, assuming partitioned";
                 view.add_partitioned(NodeMap::get_key(i), "");
             }
         }
