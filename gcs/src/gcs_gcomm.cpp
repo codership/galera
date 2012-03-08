@@ -733,7 +733,18 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     {
         log_error << "failed to close gcomm backend connection: "
                   << e.get_errno() << ": " << e.what();
-        return -e.get_errno();
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
+        conn.handle_up(0, Datagram(),
+                       ProtoUpMeta(UUID::nil(),
+                                   ViewId(V_NON_PRIM),
+                                   0,
+                                   0xff,
+                                   O_DROP,
+                                   -1,
+                                   e.get_errno()));
+        // #661: Pretend that closing was successful, backend should be
+        // in unusable state anyway. This allows gcs to finish shutdown
+        // sequence properly.
     }
 
     return 0;
