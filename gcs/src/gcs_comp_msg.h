@@ -26,6 +26,7 @@ gcs_comp_memb_t;
 typedef struct gcs_comp_msg
 {
     bool            primary;   /// 1 if we have a quorum, 0 if not
+    bool            bootstrap; /// 1 if primary was bootstrapped
     long            my_idx;    /// this node's index in membership
     long            memb_num;  /// number of members in configuration
     gcs_comp_memb_t memb[];    /// member array
@@ -38,12 +39,13 @@ typedef struct gcs_comp_msg gcs_comp_msg_t;
 
 /*! Allocates new component message 
  * @param prim     whether component is primary or not
+ * @param bootstrap whether prim was bootstrapped
  * @param my_idx   this node index in the membership
  * @param memb_num number of members in component
  * @return
  *        allocated message buffer */
 extern gcs_comp_msg_t*
-gcs_comp_msg_new    (bool prim, long my_idx, long memb_num);
+gcs_comp_msg_new    (bool prim, bool bootstrap, long my_idx, long memb_num);
 
 /*! Standard empty "leave" component message (to be returned on shutdown) */
 extern gcs_comp_msg_t*
@@ -80,6 +82,10 @@ gcs_comp_msg_idx    (const gcs_comp_msg_t* comp, const char* id);
 /*! Returns primary status of the component */
 extern bool
 gcs_comp_msg_primary (const gcs_comp_msg_t* comp);
+
+/*! Returns bootstrap flag */
+extern bool
+gcs_comp_msg_bootstrap(const gcs_comp_msg_t* comp);
 
 /*! Returns our own idx */
 extern long

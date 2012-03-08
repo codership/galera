@@ -641,6 +641,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             assert(view.get_type() == V_PRIM || view.get_type() == V_NON_PRIM);
 
             gcs_comp_msg_t* cm(gcs_comp_msg_new(view.get_type() == V_PRIM,
+                                                view.is_bootstrap(),
                                                 view.is_empty() ? -1 : 0,
                                                 view.get_members().size()));
 

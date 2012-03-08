@@ -26,4 +26,5 @@ namespace gcomm
     std::string const Defaults::EvsUserSendWindow       = "2";
     std::string const Defaults::EvsUserSendWindowMin    = "1";
     std::string const Defaults::EvsMaxInstallTimeouts   = "1";
+    std::string const Defaults::PcAnnounceTimeout       = "PT3S";
 }

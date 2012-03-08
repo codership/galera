@@ -136,7 +136,7 @@ public:
 
     void shift_to    (State);
     void send_state  ();
-    void send_install();
+    void send_install(bool bootstrap);
 
     void handle_first_trans (const View&);
     void handle_trans       (const View&);
@@ -178,7 +178,7 @@ private:
     void handle_install(const Message&, const UUID&);
     void handle_user(const Message&, const gu::Datagram&,
                      const ProtoUpMeta&);
-    void deliver_view();
+    void deliver_view(bool bootstrap = false);
 
     int               version_;
     static const int  max_version_ = GCOMM_PC_MAX_VERSION;

@@ -291,8 +291,11 @@ static const gcs_state_msg_t*
 state_nodes_compare (const gcs_state_msg_t* left, const gcs_state_msg_t* right)
 {
     assert (0 == gu_uuid_compare(&left->group_uuid, &right->group_uuid));
-    assert (left->prim_seqno  != GCS_SEQNO_ILL);
-    assert (right->prim_seqno != GCS_SEQNO_ILL);
+    /* Allow GCS_SEQNO_ILL seqnos if bootstrapping from non-prim */
+    assert ((gcs_state_msg_flags(left) & GCS_STATE_BOOTSTRAP) ||
+            left->prim_seqno  != GCS_SEQNO_ILL);
+    assert ((gcs_state_msg_flags(right) & GCS_STATE_BOOTSTRAP) ||
+            right->prim_seqno != GCS_SEQNO_ILL);
 
     if (left->received < right->received) {
         assert (left->prim_seqno <= right->prim_seqno);
@@ -366,8 +369,14 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
         if (buf) {
             state_report_uuids (buf, buf_len, states, states_num,
                                 GCS_NODE_STATE_NON_PRIM);
-            gu_warn ("Quorum: No node with complete state:\n%s",
-                     buf);
+#ifdef GCS_CORE_TESTING
+            gu_warn ("Quorum: No node with complete state:\n%s", buf);
+#else
+            /* Print buf into stderr in order to message truncation
+             * of application logger. */
+            gu_warn ("Quorum: No node with complete state:\n");
+            fprintf(stderr, "%s\n", buf);
+#endif /* GCS_CORE_TESTING */
             gu_free (buf);
         }
 
@@ -444,7 +453,14 @@ state_rep_candidate (const struct candidate const c[],
     int i;
 
     for (i = 1; i < c_num; i++) {
-        if (gu_uuid_compare(&state_uuid, &c[i].state_uuid)) {
+        if (!gu_uuid_compare(&c[i].state_uuid, &GU_UUID_NIL))
+        {
+            /* Ignore nodes with undefined state uuid, they have been
+             * added to group before remerge and have clean state. */
+            continue;
+        }
+        else if (gu_uuid_compare(&state_uuid, &GU_UUID_NIL) &&
+                 gu_uuid_compare(&state_uuid, &c[i].state_uuid)) {
             /* There are candidates from different groups */
             return NULL;
         }
@@ -564,6 +580,95 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
     return rep;
 }
 
+/*! Checks for prim comp bootstrap */
+static const gcs_state_msg_t*
+state_quorum_bootstrap (const gcs_state_msg_t* const states[],
+                        long                   const states_num,
+                        gcs_state_quorum_t*    const quorum)
+{
+    struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
+
+    if (!candidates) {
+        gu_error ("Quorum: could not allocate %zd bytes for re-merge check.",
+                  states_num * sizeof(struct candidate));
+        return NULL;
+    }
+
+    int i, j;
+    int candidates_found = 0;
+
+    /* 1. Sort and count all nodes which have bootstrap flag set */
+    for (i = 0; i < states_num; i++) {
+        if (gcs_state_msg_flags(states[i]) & GCS_STATE_BOOTSTRAP) {
+            gu_debug("found node %s with bootstrap flag",
+                     gcs_state_msg_name(states[i]));
+            for (j = 0; j < candidates_found; j++) {
+                if (state_match_candidate (states[i], &candidates[j],
+                                           quorum->version)) {
+                    assert(states[i]->prim_joined == candidates[j].prim_joined);
+                    assert(candidates[j].found > 0);
+
+                    candidates[j].found++;
+
+                    candidates[j].rep =
+                        state_nodes_compare (candidates[j].rep, states[i]);
+
+                    break;
+                }
+            }
+
+            if (j == candidates_found) {
+                // we don't have this candidate in the list yet
+                candidates[j].prim_uuid   = states[i]->prim_uuid;
+                candidates[j].state_uuid  = states[i]->group_uuid;
+                candidates[j].state_seqno = states[i]->received;
+                candidates[j].prim_joined = states[i]->prim_joined;
+                candidates[j].rep         = states[i];
+                candidates[j].found       = 1;
+                candidates_found++;
+
+                assert(candidates_found <= states_num);
+            }
+        }
+    }
+
+    const gcs_state_msg_t* rep = NULL;
+
+    if (candidates_found) {
+        assert (candidates_found > 0);
+
+        const struct candidate* const rc =
+            state_rep_candidate (candidates, candidates_found);
+
+        if (!rc) {
+            gu_error ("Found more than one bootstrap primary component "
+                      "candidate.");
+            rep = NULL;
+        }
+        else {
+            gu_info ("Bootstrapped primary "GU_UUID_FORMAT" found: %d.",
+                     GU_UUID_ARGS(&rc->prim_uuid), rc->found);
+
+            rep = rc->rep;
+            assert (NULL != rep);
+
+            quorum->act_id     = rep->received;
+            quorum->conf_id    = rep->prim_seqno;
+            quorum->group_uuid = rep->group_uuid;
+            quorum->primary    = true;
+        }
+    }
+    else {
+        assert (0 == candidates_found);
+        gu_warn ("No bootstrapped primary component found.");
+    }
+
+    gu_free (candidates);
+
+    return rep;
+}
+
+
 /* Get quorum decision from state messages */
 long 
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
@@ -591,6 +696,10 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
 
     if (!quorum->primary && rep != GCS_STATE_BAD_REP) {
         rep = state_quorum_remerge (states, states_num, quorum);
+    }
+
+    if (!quorum->primary && rep != GCS_STATE_BAD_REP) {
+        rep = state_quorum_bootstrap(states, states_num, quorum);
     }
 
     if (!quorum->primary) {

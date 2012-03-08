@@ -339,6 +339,11 @@ namespace gcomm
         static std::string const PcChecksum;
 
         /*!
+         * @brief PC starup announce timeout
+         */
+        static std::string const PcAnnounceTimeout;
+
+        /*!
          * @brief PC close linger timeout
          */
         static std::string const PcLinger;
@@ -347,6 +352,11 @@ namespace gcomm
          * @brief PC newer prim view overrides
          */
         static std::string const PcNpvo;
+
+        /*!
+         * @brief If set during runtime bootstraps new PC
+         */
+        static std::string const PcBootstrap;
     };
 
 

@@ -130,7 +130,7 @@ void gcomm::pc::Proto::send_state()
     }
 }
 
-void gcomm::pc::Proto::send_install()
+void gcomm::pc::Proto::send_install(bool bootstrap)
 {
     log_debug << self_id() << " send install";
 
@@ -152,7 +152,15 @@ void gcomm::pc::Proto::send_install()
         }
     }
 
-    log_debug << self_id() << " sending install: " << pci;
+    if (bootstrap == true)
+    {
+        pci.flags(pci.flags() | InstallMessage::F_BOOTSTRAP);
+        log_debug << self_id() << " sending PC bootstrap message " << pci;
+    }
+    else
+    {
+        log_debug << self_id() << " sending install: " << pci;
+    }
 
     Buffer buf;
     serialize(pci, buf);
@@ -166,9 +174,9 @@ void gcomm::pc::Proto::send_install()
 }
 
 
-void gcomm::pc::Proto::deliver_view()
+void gcomm::pc::Proto::deliver_view(bool bootstrap)
 {
-    View v(pc_view_.get_id());
+    View v(pc_view_.get_id(), bootstrap);
 
     v.add_members(current_view_.get_members().begin(),
                   current_view_.get_members().end());
@@ -226,7 +234,7 @@ void gcomm::pc::Proto::shift_to(const State s)
         // Trans
         { true,  true,  false, false, false, true  },
         // Non-prim
-        { true,  false,  false, false, true,  true  }
+        { true,  false,  false, true, true,  true  }
     };
 
 
@@ -759,7 +767,7 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
             if (current_view_.get_members().find(get_uuid()) ==
                 current_view_.get_members().begin())
             {
-                send_install();
+                send_install(false);
             }
         }
         else
@@ -779,11 +787,24 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
 {
     gcomm_assert(msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(get_state()    == S_INSTALL);
+    gcomm_assert(get_state() == S_INSTALL || get_state() == S_NON_PRIM);
 
-    log_debug << self_id()
-              << " handle install from " << source << " " << msg;
-
+    if ((msg.flags() & Message::F_BOOTSTRAP) == 0)
+    {
+        log_debug << self_id()
+                  << " handle install from " << source << " " << msg;
+    }
+    else
+    {
+        log_debug << self_id()
+                  << " handle bootstrap install from " << source << " " << msg;
+        if (get_state() == S_INSTALL)
+        {
+            log_info << "ignoring bootstrap install in "
+                     << to_string(get_state()) << " state";
+            return;
+        }
+    }
     // Validate own state
 
     NodeMap::const_iterator mi(msg.get_node_map().find_checked(get_uuid()));
@@ -805,7 +826,6 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
     for (mi = msg.get_node_map().begin(); mi != msg.get_node_map().end(); ++mi)
     {
         const Node& m_state = NodeMap::get_value(mi);
-
         // check that all TO seqs coming from prim are same
         if (m_state.get_prim() == true && to_seq != -1)
         {
@@ -842,7 +862,7 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
     set_to_seq(to_seq);
 
     shift_to(S_PRIM);
-    deliver_view();
+    deliver_view(msg.flags() & Message::F_BOOTSTRAP);
     cleanup_instances();
 }
 
@@ -916,11 +936,11 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
         {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL
 
-        {  FAIL,   FAIL,    FAIL,     ACCEPT  },  // PRIM
+        {  FAIL,   FAIL,    DROP,     ACCEPT  },  // PRIM
 
         {  FAIL,   DROP,    DROP,     ACCEPT  },  // TRANS
 
-        {  FAIL,   ACCEPT,  FAIL,     ACCEPT  }   // NON-PRIM
+        {  FAIL,   ACCEPT,  ACCEPT,   ACCEPT  }   // NON-PRIM
     };
 
     Message::Type msg_type(msg.get_type());
@@ -1065,6 +1085,20 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
     if (key == gcomm::Conf::PcIgnoreQuorum)
     {
         ignore_quorum_ = gu::from_string<bool>(value);
+        return true;
+    }
+
+    if (key == gcomm::Conf::PcBootstrap)
+    {
+        if (get_state() != S_NON_PRIM)
+        {
+            log_info << "ignoring '" << key << "' in state "
+                     << to_string(get_state());
+        }
+        else
+        {
+            send_install(true);
+        }
         return true;
     }
 

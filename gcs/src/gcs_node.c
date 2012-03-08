@@ -24,6 +24,7 @@ gcs_node_init (gcs_node_t* const node,
 
     memset (node, 0, sizeof (gcs_node_t));
     strncpy ((char*)node->id, id, sizeof(node->id) - 1);
+    node->bootstrap = false;
     node->status    = GCS_NODE_STATE_NON_PRIM;
     node->name      = strdup (name     ? name     : NODE_NO_NAME);
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
@@ -199,4 +200,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
          */
         node->status = GCS_NODE_STATE_NON_PRIM;
     }
+    /* Clear bootstrap flag so that it does not get carried to
+     * subsequent configuration changes. */
+    node->bootstrap = false;
 }

@@ -56,7 +56,7 @@ START_TEST (gcs_comp_test)
     long memb_num     = sizeof(members)/sizeof(char*);
     long my_idx       = getpid() % memb_num;
     long prim         = my_idx % 2;
-    gcs_comp_msg_t* m = gcs_comp_msg_new (prim, my_idx, memb_num);
+    gcs_comp_msg_t* m = gcs_comp_msg_new (prim, false, my_idx, memb_num);
     gcs_comp_msg_t* n = NULL;
     size_t buf_len    = gcs_comp_msg_size (m);
     char   buf[buf_len];

@@ -368,15 +368,17 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     gcs_node_t* new_nodes = NULL;
     ulong       new_memb  = 0;
 
-    const bool prim_comp     = gcs_comp_msg_primary(comp);
-    const long new_my_idx    = gcs_comp_msg_self   (comp);
-    const long new_nodes_num = gcs_comp_msg_num    (comp);
+    const bool prim_comp     = gcs_comp_msg_primary  (comp);
+    const bool bootstrap     = gcs_comp_msg_bootstrap(comp);
+    const long new_my_idx    = gcs_comp_msg_self     (comp);
+    const long new_nodes_num = gcs_comp_msg_num      (comp);
 
     group_check_comp_msg (prim_comp, new_my_idx, new_nodes_num);
 
     if (new_my_idx >= 0) {
-        gu_info ("New COMPONENT: primary = %s, my_idx = %ld, memb_num = %ld",
-                 prim_comp ? "yes" : "no", new_my_idx, new_nodes_num);
+        gu_info ("New COMPONENT: primary = %s, bootstrap = %s, my_idx = %ld, memb_num = %ld",
+                 prim_comp ? "yes" : "no", bootstrap ? "yes" : "no",
+                 new_my_idx, new_nodes_num);
 
         new_nodes = group_nodes_init (group, comp);
 
@@ -406,6 +408,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (new_my_idx >= 0);
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
+        }
+        else if (bootstrap)
+        {
+            /* Is there need to initialize something else in this case? */
+            group->nodes[group->my_idx].bootstrap = true;
         }
         else {
             const bool first_component =
@@ -472,7 +479,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->num    = new_nodes_num;
     group->nodes  = new_nodes;
 
-    if (gcs_comp_msg_primary(comp)) {
+    if (gcs_comp_msg_primary(comp) || bootstrap) {
         /* TODO: for now pretend that we always have new nodes and perform
          * state exchange because old states can carry outdated node status.
          * (also protocol voting needs to be redone)
@@ -1048,6 +1055,7 @@ group_get_node_state (gcs_group_t* group, long node_idx)
 
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
+    if (node->bootstrap)          flags |= GCS_STATE_BOOTSTRAP;
 
     return gcs_state_msg_create (
         &group->state_uuid,

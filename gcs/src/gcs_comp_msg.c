@@ -22,7 +22,7 @@ comp_msg_size (long memb_num)
 
 /*! Allocates membership object and zeroes it */
 gcs_comp_msg_t*
-gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
+gcs_comp_msg_new (bool prim, bool bootstrap, long my_idx, long memb_num)
 {
     gcs_comp_msg_t* ret;
 
@@ -31,9 +31,10 @@ gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
     ret = gu_calloc (1, comp_msg_size(memb_num));
 
     if (NULL != ret) {
-        ret->primary  = prim;
-        ret->my_idx   = my_idx;
-        ret->memb_num = memb_num;
+        ret->primary   = prim;
+        ret->bootstrap = bootstrap;
+        ret->my_idx    = my_idx;
+        ret->memb_num  = memb_num;
     }
 
     return ret;
@@ -42,7 +43,7 @@ gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
 gcs_comp_msg_t*
 gcs_comp_msg_leave ()
 {
-    return gcs_comp_msg_new (false, -1, 0);
+    return gcs_comp_msg_new (false, false, -1, 0);
 }
 
 /*! Destroys component message */
@@ -135,6 +136,13 @@ bool
 gcs_comp_msg_primary (const gcs_comp_msg_t* comp)
 {
     return comp->primary;
+}
+
+/*! Retruns bootstrap flag of the component */
+bool
+gcs_comp_msg_bootstrap(const gcs_comp_msg_t* comp)
+{
+    return comp->bootstrap;
 }
 
 /*! Returns our own index in the membership */

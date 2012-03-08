@@ -8,6 +8,7 @@
 #include "evs_proto.hpp"
 #include "evs_message2.hpp"
 #include "gmcast.hpp"
+#include "defaults.hpp"
 
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
@@ -24,26 +25,6 @@ using namespace gu::datetime;
 void PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
-
-#if 0
-    if (um.has_view() == true && um.get_view().get_type() == V_PRIM)
-    {
-        /* Call close gmcast transport for all nodes that have left
-         * or partitioned */
-        for (NodeList::const_iterator i = um.get_view().get_left().begin();
-             i != um.get_view().get_left().end(); ++i)
-        {
-            gmcast->close(NodeList::get_key(i));
-        }
-
-        for (NodeList::const_iterator i =
-                 um.get_view().get_partitioned().begin();
-             i != um.get_view().get_partitioned().end(); ++i)
-        {
-            gmcast->close(NodeList::get_key(i));
-        }
-    }
-#endif // 0
     send_up(rb, um);
 }
 
@@ -115,25 +96,19 @@ void PC::connect()
     evs->shift_to(evs::Proto::S_JOINING);
     pc->connect(start_prim);
 
-    Date try_until(Date::now() + Period("PT30S"));
+    // Due to #658 there is limited announce period after which
+    // node is allowed to proceed to non-prim if other nodes
+    // are not detected.
+    Date try_until(Date::now() + announce_timeout);
     while (start_prim == false && evs->get_known_size() <= 1)
     {
         // Send join messages without handling them
         evs->send_join(false);
         get_pnet().event_loop(Sec/2);
+
         if (try_until < Date::now())
         {
-            pc->close();
-            evs->close();
-            gmcast->close();
-
-            get_pnet().erase(&pstack_);
-            pstack_.pop_proto(this);
-            pstack_.pop_proto(pc);
-            pstack_.pop_proto(evs);
-            pstack_.pop_proto(gmcast);
-
-            gu_throw_error(ETIMEDOUT) << "failed to join group";
+            break;
         }
     }
 
@@ -147,10 +122,8 @@ void PC::connect()
                  evs->get_state() == evs::Proto::S_INSTALL ||
                  evs->get_state() == evs::Proto::S_OPERATIONAL);
 
-
-    // #596 Time out if PRIM view cannot be reached before connect
-    //      timeout expires.
-    while (pc->get_state() != pc::Proto::S_PRIM)
+    // Due to #658 we loop here only if node is told to start in prim.
+    while (start_prim == true && pc->get_state() != pc::Proto::S_PRIM)
     {
         get_pnet().event_loop(Sec/2);
         if (try_until < Date::now())
@@ -165,7 +138,6 @@ void PC::connect()
             pstack_.pop_proto(gmcast);
             gu_throw_error(ETIMEDOUT) << "failed to reach primary view";
         }
-
     }
 
     pc->set_mtu(get_mtu());
@@ -228,7 +200,9 @@ PC::PC(Protonet& net, const gu::URI& uri) :
     evs       (0),
     pc        (0),
     closed    (true),
-    linger    (param<Period>(conf_, uri, Conf::PcLinger, "PT2S"))
+    linger    (param<Period>(conf_, uri, Conf::PcLinger, "PT2S")),
+    announce_timeout(param<Period>(conf_, uri, Conf::PcAnnounceTimeout,
+                                   Defaults::PcAnnounceTimeout))
 {
     if (uri_.get_scheme() != Conf::PcScheme)
     {

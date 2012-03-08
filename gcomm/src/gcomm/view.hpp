@@ -115,6 +115,7 @@ namespace gcomm
     public:
 
         View() :
+            bootstrap   (false),
             view_id     (V_NONE),
             members     (),
             joined      (),
@@ -122,7 +123,8 @@ namespace gcomm
             partitioned ()
         { }
 
-        View(const ViewId& view_id_) :
+        View(const ViewId& view_id_, bool bootstrap_ = false) :
+            bootstrap   (bootstrap_),
             view_id     (view_id_),
             members     (),
             joined      (),
@@ -166,6 +168,7 @@ namespace gcomm
         const UUID&   get_representative () const;
 
         bool is_empty() const;
+        bool is_bootstrap() const { return bootstrap; }
 
         size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
             throw (gu::Exception);
@@ -177,11 +180,12 @@ namespace gcomm
 
 
     private:
-        ViewId   view_id;
-        NodeList members;
-        NodeList joined;
-        NodeList left;
-        NodeList partitioned;
+        bool     bootstrap;   // Flag indicating if view was bootstrapped
+        ViewId   view_id;     // View identifier
+        NodeList members;     // List of members in view
+        NodeList joined;      // List of newly joined members in view
+        NodeList left;        // Fracefully left members from previous view
+        NodeList partitioned; // Partitioned members from previous view
     };
 
     bool operator==(const gcomm::View&, const gcomm::View&);

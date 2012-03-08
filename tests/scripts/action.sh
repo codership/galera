@@ -1,3 +1,23 @@
+# Helper to get status variable value
+
+cluster_status()
+{
+    local node=$1
+    local status_str=""
+    case "$DBMS" in
+        "MYSQL")
+            echo -n $(mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+                -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
+                --skip-column-names -ss \
+                -e "SHOW STATUS WHERE Variable_name LIKE 'wsrep_cluster_status'
+                    OR Variable_name LIKE 'wsrep_cluster_size'" 2>/dev/null) \
+                        | awk '{ print $4 ":" $2; }'
+            ;;
+        "PGSQL"|*)
+            return -1
+    esac
+}
+
 #
 # Routines to start|stop|check cluster nodes
 #
@@ -198,6 +218,49 @@ _cluster_up()
     done
     wait_jobs
 }
+
+
+# start/restart nodes in group mode.
+bootstrap()
+{
+    SECONDS=0 # for wait_jobs
+
+    local cnt=0
+    for node in $NODE_LIST
+    do
+        echo "Starting ${NODE_ID[$node]}"
+        start_node "-g $(gcs_address $node)" "$@" $node &
+        cnt=$(($cnt + 1))
+    done
+    # TODO: Poll until all have reached non-prim
+    for node in $NODE_LIST
+    do
+        while true
+        do
+            st=$(cluster_status $node)
+            if test "x$st" == "xnon-Primary:$cnt"
+            then
+                break;
+            fi
+            sleep 1
+        done
+    done
+    # TODO: Figure out how to do this in DBMS indepent way
+    case "$DBMS" in
+        "MYSQL")
+            mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+                -h${NODE_INCOMING_HOST[0]} \
+                -P${NODE_INCOMING_PORT[0]} \
+                -e "SET GLOBAL wsrep_provider_options='pc.bootstrap=1'"
+            ;;
+        "PGSQL"|*)
+            return -1
+            ;;
+    esac
+    # Jobs will finish when nodes reach primary
+    wait_jobs
+}
+
 
 start()
 {

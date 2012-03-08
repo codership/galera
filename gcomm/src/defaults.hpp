@@ -30,6 +30,7 @@ namespace gcomm
         static std::string const EvsUserSendWindow        ;
         static std::string const EvsUserSendWindowMin     ;
         static std::string const EvsMaxInstallTimeouts    ;
+        static std::string const PcAnnounceTimeout        ;
     };
 }
 

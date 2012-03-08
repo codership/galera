@@ -481,8 +481,8 @@ START_TEST (gcs_core_test_own)
     action_t act_r    = { NULL, NULL, -1, -1, -1, -1 };
 
     // Create primary and non-primary component messages
-    gcs_comp_msg_t* prim     = gcs_comp_msg_new (true,  0, 1);
-    gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, 0, 1);
+    gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1);
+    gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, false, 0, 1);
     fail_if (NULL == prim);
     fail_if (NULL == non_prim);
     gcs_comp_msg_add (prim,     "node1");

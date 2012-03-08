@@ -28,6 +28,7 @@ struct gcs_node
 {
     gcs_seqno_t      last_applied; // last applied action on that node
     bool             count_last_applied; // should it be counted
+    bool             bootstrap; // is part of prim comp bootstrap process
 //    long           queue_len;    // action queue length on that node
     gcs_node_state_t status;       // node status
     int              gcs_proto_ver;// supported protocol versions

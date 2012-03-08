@@ -46,6 +46,7 @@ namespace gcomm
         bool        closed;             // flag for destructor
                                         // Period to wait graceful leave
         gu::datetime::Period linger;
+        gu::datetime::Period announce_timeout;
 
         PC(const PC&);
         void operator=(const PC&);

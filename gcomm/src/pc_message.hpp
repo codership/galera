@@ -142,7 +142,7 @@ class gcomm::pc::Message
 public:
 
     enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
-    enum { F_CRC16 = 0x1 };
+    enum { F_CRC16 = 0x1, F_BOOTSTRAP = 0x2 };
 
     static const char* to_string(Type t)
     {
@@ -185,6 +185,7 @@ public:
     Type     get_type()     const { return type_; }
     uint32_t get_seq()      const { return seq_; }
 
+    void flags(int flags) { flags_ = flags; }
     int flags() const { return flags_; }
     void checksum(uint16_t crc16, bool flag)
     {
@@ -281,6 +282,7 @@ public:
         std::ostringstream ret;
 
         ret << "pcmsg{ type=" << to_string(type_) << ", seq=" << seq_;
+        ret << ", flags=" << std::setw(2) << std::hex << flags_;
         ret << ", node_map {" << get_node_map() << "}";
         ret << '}';
 

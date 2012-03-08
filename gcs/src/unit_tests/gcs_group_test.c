@@ -138,7 +138,7 @@ START_TEST (gcs_group_configuration)
     fail_if (group.num != 1);
 
     // Prepare first  primary component message containing only one node
-    comp = gcs_comp_msg_new (TRUE, 0, 1);
+    comp = gcs_comp_msg_new (TRUE, false, 0, 1);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST));
 
@@ -208,7 +208,7 @@ START_TEST (gcs_group_configuration)
 
     // 10. New component message
     gcs_comp_msg_delete (comp);
-    comp = gcs_comp_msg_new (TRUE, 1, 2);
+    comp = gcs_comp_msg_new (TRUE, false, 1, 2);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
@@ -246,7 +246,7 @@ START_TEST (gcs_group_configuration)
 
     // 12. Try foreign action with a new node joined in the middle.
     gcs_comp_msg_delete (comp);
-    comp = gcs_comp_msg_new (TRUE, 1, 3);
+    comp = gcs_comp_msg_new (TRUE, false, 1, 3);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
@@ -316,7 +316,7 @@ START_TEST (gcs_group_configuration)
     // 13.2 configuration changes, one node disappears
     // (REMOTEHOST, LOCALHOST, DISTANTHOST) -> (LOCALHOST, REMOTEHOST)
     gcs_comp_msg_delete (comp);
-    comp = gcs_comp_msg_new (TRUE, 0, 2);
+    comp = gcs_comp_msg_new (TRUE, false, 0, 2);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
@@ -369,7 +369,7 @@ return;
     memset (&r_act, 0, sizeof(r_act));
 
     // Leave group
-    comp = gcs_comp_msg_new (FALSE, -1, 0);
+    comp = gcs_comp_msg_new (FALSE, false, -1, 0);
     fail_if (comp == NULL);
 
     ret = new_component (&group, comp);
@@ -413,7 +413,7 @@ START_TEST(gcs_group_last_applied)
     msg2.sender_idx = 2; msg3.sender_idx = 3;
 
     // Create 4-node component
-    comp = gcs_comp_msg_new (TRUE, 0, 4);
+    comp = gcs_comp_msg_new (TRUE, false, 0, 4);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
@@ -462,7 +462,7 @@ START_TEST(gcs_group_last_applied)
 
     // remove the lagging node
     gcs_comp_msg_delete(comp);
-    comp = gcs_comp_msg_new (TRUE, 0, 3);
+    comp = gcs_comp_msg_new (TRUE, false, 0, 3);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
@@ -480,7 +480,7 @@ START_TEST(gcs_group_last_applied)
 
     // add new node
     gcs_comp_msg_delete(comp);
-    comp = gcs_comp_msg_new (TRUE, 0, 4);
+    comp = gcs_comp_msg_new (TRUE, false, 0, 4);
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
