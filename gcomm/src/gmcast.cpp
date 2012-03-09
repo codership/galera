@@ -21,6 +21,8 @@ using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
 
+const long gcomm::GMCast::max_retry_cnt(std::numeric_limits<int>::max());
+
 static void set_tcp_defaults (URI* uri)
 {
     // what happens if there is already this parameter?
@@ -76,6 +78,10 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     time_wait     (param<Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period  ("PT0.5S"),
     peer_timeout  (param<Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
+    max_initial_reconnect_attempts(
+        param<int>(conf_, uri,
+                   Conf::GMCastMaxInitialReconnectAttempts,
+                   Defaults::GMCastMaxInitialReconnectAttempts)),
     next_check    (Date::now())
 {
     log_info << "GMCast version " << version;
@@ -274,6 +280,8 @@ void GMCast::connect()
     if (!initial_addr.empty())
     {
         insert_address(initial_addr, UUID(), pending_addrs);
+        AddrList::iterator ai(pending_addrs.find(initial_addr));
+        AddrList::get_value(ai).set_max_retries(max_retry_cnt);
         gu_trace (gmcast_connect(initial_addr));
     }
 }
@@ -417,7 +425,7 @@ void GMCast::gmcast_forget(const UUID& uuid)
     }
 
     /* Set all corresponding entries in address list to have retry cnt
-     * max_retry_cnt + 1 and next reconnect time after some period */
+     * greater than max retries and next reconnect time after some period */
     AddrList::iterator ai;
     for (ai = remote_addrs.begin(); ai != remote_addrs.end(); ++ai)
     {
@@ -439,7 +447,8 @@ void GMCast::gmcast_forget(const UUID& uuid)
                     proto_map->erase(pi);
                 }
             }
-            ae.set_retry_cnt(max_retry_cnt + 1);
+            ae.set_max_retries(0);
+            ae.set_retry_cnt(1);
             ae.set_next_reconnect(Date::now() + time_wait);
         }
     }
@@ -537,7 +546,8 @@ void GMCast::handle_established(Proto* est)
                                 est->get_remote_uuid())));
     }
 
-    if (AddrList::get_value(i).get_retry_cnt() > max_retry_cnt)
+    if (AddrList::get_value(i).get_retry_cnt() >
+        AddrList::get_value(i).get_max_retries())
     {
         log_warn << "discarding established (time wait) "
                  << est->get_remote_uuid()
@@ -550,7 +560,10 @@ void GMCast::handle_established(Proto* est)
 
     // send_up(Datagram(), p->get_remote_uuid());
 
-    AddrList::get_value(i).set_retry_cnt(max_retry_cnt - 60);
+    // init retry cnt to -1 to avoid unnecessary logging at first attempt
+    // max retries will be readjusted in handle stable view
+    AddrList::get_value(i).set_retry_cnt(-1);
+    AddrList::get_value(i).set_max_retries(max_initial_reconnect_attempts);
 
     // Cleanup all previously established entries with same
     // remote uuid. It is assumed that the most recent connection
@@ -773,16 +786,19 @@ void GMCast::update_addresses()
                     log_debug << self_string()
                               << " conn refers to but no addr in addr list for "
                               << link_addr;
-                    insert_address(link_addr, link_uuid, pending_addrs);
+                    insert_address(link_addr, link_uuid, remote_addrs);
 
-                    AddrList::iterator pi(pending_addrs.find(link_addr));
+                    AddrList::iterator pi(remote_addrs.find(link_addr));
 
-                    assert(pi != pending_addrs.end());
+                    assert(pi != remote_addrs.end());
 
                     AddrEntry& ae(AddrList::get_value(pi));
 
-                    // Try to connect 60 times before forgetting
-                    ae.set_retry_cnt(max_retry_cnt - 60);
+                    // init retry cnt to -1 to avoid unnecessary logging
+                    // at first attempt
+                    // max retries will be readjusted in handle stable view
+                    ae.set_retry_cnt(-1);
+                    ae.set_max_retries(max_initial_reconnect_attempts);
 
                     // Add some randomness for first reconnect to avoid
                     // simultaneous connects
@@ -843,7 +859,7 @@ void GMCast::reconnect()
         if (is_connected (pending_addr, UUID::nil()) == false &&
             ae.get_next_reconnect()                  <= now)
         {
-            if (ae.get_retry_cnt() > max_retry_cnt)
+            if (ae.get_retry_cnt() > ae.get_max_retries())
             {
                 log_info << "cleaning up pending addr " << pending_addr;
                 pending_addrs.erase(i);
@@ -871,7 +887,7 @@ void GMCast::reconnect()
         if (is_connected(remote_addr, remote_uuid) == false &&
             ae.get_next_reconnect()                <= now)
         {
-            if (ae.get_retry_cnt() > max_retry_cnt)
+            if (ae.get_retry_cnt() > ae.get_max_retries())
             {
                 log_info << " cleaning up " << remote_uuid << " ("
                          << remote_addr << ")";
@@ -921,8 +937,9 @@ void gcomm::GMCast::check_liveness()
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }
-        else
+        else if (p->get_state() == Proto::S_OK)
         {
+            // log_info << "live proto " << *p;
             live_uuids.insert(p->get_remote_uuid());
         }
         i = i_next;
@@ -938,7 +955,7 @@ void gcomm::GMCast::check_liveness()
          i != remote_addrs.end(); ++i)
     {
         const AddrEntry& ae(AddrList::get_value(i));
-        if (ae.get_retry_cnt()             <= max_retry_cnt &&
+        if (ae.get_retry_cnt()             <= ae.get_max_retries() &&
             live_uuids.find(ae.get_uuid()) == live_uuids.end())
         {
             // log_info << self_string()
@@ -1192,7 +1209,7 @@ int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 
 void gcomm::GMCast::handle_stable_view(const View& view)
 {
-    log_info << "GMCast::handle_stable_view: " << view;
+    log_debug << "GMCast::handle_stable_view: " << view;
     if (view.get_type() == V_PRIM)
     {
         std::set<UUID> gmcast_lst;
@@ -1227,11 +1244,104 @@ void gcomm::GMCast::handle_stable_view(const View& view)
             if ((ai = find_if(remote_addrs.begin(), remote_addrs.end(),
                               AddrListUUIDCmp(*i))) != remote_addrs.end())
             {
-                log_info << "declaring " << *i << " stable";
                 ai->second.set_retry_cnt(-1);
+                ai->second.set_max_retries(max_retry_cnt);
+            }
+        }
+    }
+    else if (view.get_type() == V_REG)
+    {
+        for (NodeList::const_iterator i(view.get_members().begin());
+             i != view.get_members().end(); ++i)
+        {
+            AddrList::iterator ai;
+            if ((ai = find_if(remote_addrs.begin(), remote_addrs.end(),
+                              AddrListUUIDCmp(NodeList::get_key(i))))
+                != remote_addrs.end())
+            {
+                log_info << "declaring " << NodeList::get_key(i) << " stable";
+                ai->second.set_retry_cnt(-1);
+                ai->second.set_max_retries(max_retry_cnt);
             }
         }
     }
     check_liveness();
 }
 
+void gcomm::GMCast::add_or_del_addr(const std::string& val)
+{
+    if (val.compare(0, 4, "add:") == 0)
+    {
+        gu::URI uri(val.substr(4));
+        std::string addr(resolve(uri_string(get_scheme(use_ssl),
+                                            uri.get_host(),
+                                            uri.get_port())).to_string());
+        log_info << "inserting address '" << addr << "'";
+        insert_address(addr, UUID(), remote_addrs);
+        AddrList::iterator ai(remote_addrs.find(addr));
+        AddrList::get_value(ai).set_max_retries(
+            max_initial_reconnect_attempts);
+        AddrList::get_value(ai).set_retry_cnt(-1);
+    }
+    else if (val.compare(0, 4, "del:") == 0)
+    {
+        std::string addr(val.substr(4));
+        AddrList::iterator ai(remote_addrs.find(addr));
+        if (ai != remote_addrs.end())
+        {
+            ProtoMap::iterator pi, pi_next;
+            for (pi = proto_map->begin(); pi != proto_map->end(); pi = pi_next)
+            {
+                pi_next = pi, ++pi_next;
+                Proto* rp = ProtoMap::get_value(pi);
+                if (rp->get_remote_addr() == AddrList::get_key(ai))
+                {
+                    log_info << "deleting entry " << AddrList::get_key(ai);
+                    delete rp;
+                    proto_map->erase(pi);
+                }
+            }
+            AddrEntry& ae(AddrList::get_value(ai));
+            ae.set_max_retries(0);
+            ae.set_retry_cnt(1);
+            ae.set_next_reconnect(Date::now() + time_wait);
+            update_addresses();
+        }
+        else
+        {
+            log_info << "address '" << addr
+                     << "' not found from remote addrs list";
+        }
+    }
+    else
+    {
+        gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+    }
+}
+
+
+bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
+{
+    if (key == Conf::GMCastMaxInitialReconnectAttempts)
+    {
+        max_initial_reconnect_attempts = gu::from_string<int>(val);
+        return true;
+    }
+    else if (key == Conf::GMCastPeerAddr)
+    {
+        try
+        {
+            add_or_del_addr(val);
+        }
+        catch (gu::NotFound& nf)
+        {
+            gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+        }
+        catch (gu::NotSet& ns)
+        {
+            gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+        }
+        return true;
+    }
+    return false;
+}

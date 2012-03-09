@@ -802,6 +802,7 @@ void gcomm::evs::Proto::deliver_reg_view()
 
     evs_log_info(I_VIEWS) << "delivering view " << view;
 
+    set_stable_view(view);
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     send_up(Datagram(), up_meta);
 }

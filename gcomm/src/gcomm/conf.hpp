@@ -161,6 +161,22 @@ namespace gcomm
         static std::string const GMCastPeerTimeout;
 
         /*!
+         * @brief Maximum initial reconnect attempts
+         *
+         * Maximum initial reconnect attempts for address reported by peer.
+         */
+        static std::string const GMCastMaxInitialReconnectAttempts;
+
+        /*!
+         * @brief Add or remove peer address.
+         *
+         * Setting value to add:<scheme>://<ip>:<port> will inject new peer
+         * address in address list. Setting value to del:<scheme>://<ip>:<port>
+         * will remove peer address from list (via forget procedure).
+         */
+        static std::string const GMCastPeerAddr;
+
+        /*!
          * @brief EVS scheme for transport URI ("evs")
          */
         static std::string const EvsScheme;

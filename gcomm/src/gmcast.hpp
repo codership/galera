@@ -39,6 +39,7 @@ namespace gcomm
         void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
         int  handle_down(gu::Datagram&, const ProtoDownMeta&);
         void handle_stable_view(const View& view);
+        bool set_param(const std::string& key, const std::string& val);
         // Transport interface
         bool supports_uuid()   const { return true; }
         const UUID& get_uuid() const { return my_uuid; }
@@ -76,7 +77,7 @@ namespace gcomm
         GMCast (const GMCast&);
         GMCast& operator=(const GMCast&);
 
-        static const long max_retry_cnt = 12*3600;
+        static const long max_retry_cnt;
 
         class AddrEntry
         {
@@ -88,7 +89,8 @@ namespace gcomm
                 uuid           (uuid_),
                 last_seen      (last_seen_),
                 next_reconnect (next_reconnect_),
-                retry_cnt      (0)
+                retry_cnt      (0),
+                max_retries    (0)
             { }
 
             const UUID& get_uuid() const { return uuid; }
@@ -108,6 +110,9 @@ namespace gcomm
 
             int get_retry_cnt() const { return retry_cnt; }
 
+            void set_max_retries(int mr) { max_retries = mr; }
+            int get_max_retries() const { return max_retries; }
+
         private:
             friend std::ostream& operator<<(std::ostream&, const AddrEntry&);
             void operator=(const AddrEntry&);
@@ -115,6 +120,7 @@ namespace gcomm
             gu::datetime::Date last_seen;
             gu::datetime::Date next_reconnect;
             int  retry_cnt;
+            int  max_retries;
         };
 
 
@@ -155,6 +161,7 @@ namespace gcomm
         gu::datetime::Period time_wait;
         gu::datetime::Period check_period;
         gu::datetime::Period peer_timeout;
+        int                  max_initial_reconnect_attempts;
         gu::datetime::Date next_check;
         gu::datetime::Date handle_timers();
 
@@ -187,6 +194,7 @@ namespace gcomm
         void reconnect();
 
         void set_initial_addr(const gu::URI&);
+        void add_or_del_addr(const std::string&);
 
         std::string self_string() const
         {

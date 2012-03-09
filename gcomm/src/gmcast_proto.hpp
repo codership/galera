@@ -16,6 +16,7 @@ namespace gcomm
     {
         class Proto;
         class ProtoMap;
+        std::ostream& operator<<(std::ostream& os, const Proto& p);
     }
 }
 
@@ -118,7 +119,7 @@ public:
     void set_tstamp(gu::datetime::Date ts) { tstamp = ts; }
     gu::datetime::Date get_tstamp() const { return tstamp; }
 private:
-
+    friend std::ostream& operator<<(std::ostream&, const Proto&);
     Proto(const Proto&);
     void operator=(const Proto&);
 
@@ -138,5 +139,21 @@ private:
     gu::datetime::Date tstamp;
 };
 
+
+inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
+{
+    os << p.version << ","
+       << p.local_uuid << ","
+       << p.remote_uuid << ","
+       << p.local_addr << ","
+       << p.remote_addr << ","
+       << p.mcast_addr << ","
+       << p.group_name << ","
+       << p.changed << ","
+       << p.state << ","
+       << p.propagate_remote << ","
+       << p.tstamp;
+    return os;
+}
 
 class gcomm::gmcast::ProtoMap : public Map<const SocketId, Proto*> { };

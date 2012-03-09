@@ -46,6 +46,10 @@ std::string const gcomm::Conf::GMCastTimeWait =
     GMCastScheme + Delim + "time_wait";
 std::string const gcomm::Conf::GMCastPeerTimeout =
     GMCastScheme + Delim + "peer_timeout";
+std::string const gcomm::Conf::GMCastMaxInitialReconnectAttempts =
+    GMCastScheme + Delim + "mira";
+std::string const gcomm::Conf::GMCastPeerAddr =
+    GMCastScheme + Delim + "peer_addr";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
 std::string const gcomm::Conf::EvsVersion = 

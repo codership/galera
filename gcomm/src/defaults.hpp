@@ -12,6 +12,7 @@ namespace gcomm
     struct Defaults
     {
         static std::string const GMCastTcpPort            ;
+        static std::string const GMCastMaxInitialReconnectAttempts;
         static std::string const EvsViewForgetTimeout     ;
         static std::string const EvsViewForgetTimeoutMin  ;
         static std::string const EvsInactiveCheckPeriod   ;
