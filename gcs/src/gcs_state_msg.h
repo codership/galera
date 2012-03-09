@@ -19,9 +19,9 @@
 #include <stdbool.h>
 
 /* State flags */
-#define GCS_STATE_FREP 0x01  // group representative
-#define GCS_STATE_FCLA 0x02  // count last applied (for JOINED node)
-#define GCS_STATE_BOOTSTRAP 0x04 // part of prim bootstrap process
+#define GCS_STATE_FREP       0x01 // group representative
+#define GCS_STATE_FCLA       0x02 // count last applied (for JOINED node)
+#define GCS_STATE_FBOOTSTRAP 0x04 // part of prim bootstrap process
 
 #ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg

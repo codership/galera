@@ -1055,7 +1055,7 @@ group_get_node_state (gcs_group_t* group, long node_idx)
 
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
-    if (node->bootstrap)          flags |= GCS_STATE_BOOTSTRAP;
+    if (node->bootstrap)          flags |= GCS_STATE_FBOOTSTRAP;
 
     return gcs_state_msg_create (
         &group->state_uuid,

@@ -292,9 +292,9 @@ state_nodes_compare (const gcs_state_msg_t* left, const gcs_state_msg_t* right)
 {
     assert (0 == gu_uuid_compare(&left->group_uuid, &right->group_uuid));
     /* Allow GCS_SEQNO_ILL seqnos if bootstrapping from non-prim */
-    assert ((gcs_state_msg_flags(left) & GCS_STATE_BOOTSTRAP) ||
+    assert ((gcs_state_msg_flags(left)  & GCS_STATE_FBOOTSTRAP) ||
             left->prim_seqno  != GCS_SEQNO_ILL);
-    assert ((gcs_state_msg_flags(right) & GCS_STATE_BOOTSTRAP) ||
+    assert ((gcs_state_msg_flags(right) & GCS_STATE_FBOOTSTRAP) ||
             right->prim_seqno != GCS_SEQNO_ILL);
 
     if (left->received < right->received) {
@@ -480,6 +480,7 @@ state_rep_candidate (const struct candidate const c[],
 static const gcs_state_msg_t*
 state_quorum_remerge (const gcs_state_msg_t* const states[],
                       long                   const states_num,
+                      bool                   const bootstrap,
                       gcs_state_quorum_t*    const quorum)
 {
     struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
@@ -496,8 +497,20 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
     /* 1. Sort and count all nodes who have ever been JOINED by primary
      *    component UUID */
     for (i = 0; i < states_num; i++) {
-        if (gcs_node_is_joined(states[i]->prim_state)) {
-            if (GCS_NODE_STATE_JOINER == states[i]->current_state) {
+        bool cond;
+
+        if (bootstrap) {
+            cond = gcs_state_msg_flags(states[i]) & GCS_STATE_FBOOTSTRAP;
+            if (cond) gu_debug("found node %s with bootstrap flag",
+                               gcs_state_msg_name(states[i]));
+        }
+        else {
+            cond = gcs_node_is_joined(states[i]->prim_state);
+        }
+
+        if (cond) {
+            if (!bootstrap &&
+                GCS_NODE_STATE_JOINER == states[i]->current_state) {
                 /* Joiner always has an undefined state
                  * (and it should be its prim_state!) */
                 gu_warn ("Inconsistent state message from %d (%s): current "
@@ -508,7 +521,8 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
                 continue;
             }
 
-            assert(gu_uuid_compare(&states[i]->prim_uuid, &GU_UUID_NIL));
+            assert(bootstrap ||
+                   gu_uuid_compare(&states[i]->prim_uuid, &GU_UUID_NIL));
 
             for (j = 0; j < candidates_found; j++) {
                 if (state_match_candidate (states[i], &candidates[j],
@@ -550,19 +564,26 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
             state_rep_candidate (candidates, candidates_found);
 
         if (!rc) {
-            gu_error ("Found more than one re-merged primary component "
-                      "candidate.");
+            gu_error ("Found more than one %s primary component candidate.",
+                      bootstrap ? "bootstrap" : "re-merged");
             rep = NULL;
         }
         else {
-            gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: %d of %d.",
-                     rc->found == rc->prim_joined ? "Full" : "Partial",
-                     GU_UUID_ARGS(&rc->prim_uuid),
-                     rc->found, rc->prim_joined);
+            if (bootstrap) {
+                gu_info ("Bootstrapped primary "GU_UUID_FORMAT" found: %d.",
+                         GU_UUID_ARGS(&rc->prim_uuid), rc->found);
+            }
+            else {
+                gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: "
+                         "%d of %d.",
+                         rc->found == rc->prim_joined ? "Full" : "Partial",
+                         GU_UUID_ARGS(&rc->prim_uuid),
+                         rc->found, rc->prim_joined);
+            }
 
             rep = rc->rep;
             assert (NULL != rep);
-            assert (gcs_node_is_joined(rep->prim_state));
+            assert (bootstrap || gcs_node_is_joined(rep->prim_state));
 
             quorum->act_id     = rep->received;
             quorum->conf_id    = rep->prim_seqno;
@@ -572,7 +593,8 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
     }
     else {
         assert (0 == candidates_found);
-        gu_warn ("No re-merged primary component found.");
+        gu_warn ("No %s primary component found.",
+                 bootstrap ? "bootstrapped" : "re-merged");
     }
 
     gu_free (candidates);
@@ -580,6 +602,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
     return rep;
 }
 
+#if 0 // REMOVE WHEN NO LONGER NEEDED FOR REFERENCE
 /*! Checks for prim comp bootstrap */
 static const gcs_state_msg_t*
 state_quorum_bootstrap (const gcs_state_msg_t* const states[],
@@ -599,7 +622,7 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
 
     /* 1. Sort and count all nodes which have bootstrap flag set */
     for (i = 0; i < states_num; i++) {
-        if (gcs_state_msg_flags(states[i]) & GCS_STATE_BOOTSTRAP) {
+        if (gcs_state_msg_flags(states[i]) & GCS_STATE_FBOOTSTRAP) {
             gu_debug("found node %s with bootstrap flag",
                      gcs_state_msg_name(states[i]));
             for (j = 0; j < candidates_found; j++) {
@@ -667,7 +690,7 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
 
     return rep;
 }
-
+#endif // 0
 
 /* Get quorum decision from state messages */
 long 
@@ -695,11 +718,11 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     rep = state_quorum_inherit (states, states_num, quorum);
 
     if (!quorum->primary && rep != GCS_STATE_BAD_REP) {
-        rep = state_quorum_remerge (states, states_num, quorum);
+        rep = state_quorum_remerge (states, states_num, false, quorum);
     }
 
     if (!quorum->primary && rep != GCS_STATE_BAD_REP) {
-        rep = state_quorum_bootstrap(states, states_num, quorum);
+        rep = state_quorum_remerge (states, states_num, true, quorum);
     }
 
     if (!quorum->primary) {
