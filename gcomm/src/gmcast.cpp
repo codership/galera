@@ -611,7 +611,7 @@ void GMCast::handle_established(Proto* est)
 
 void GMCast::handle_failed(Proto* failed)
 {
-    log_debug << "handle failed: " << failed->get_socket();
+    log_debug << "handle failed: " << *failed;
     const string& remote_addr = failed->get_remote_addr();
 
     bool found_ok(false);
@@ -619,9 +619,11 @@ void GMCast::handle_failed(Proto* failed)
          i != proto_map->end(); ++i)
     {
         Proto* p(ProtoMap::get_value(i));
-        if (p->get_state()       <= Proto::S_OK &&
-            p->get_remote_uuid() == failed->get_remote_uuid())
+        if (p                    != failed      &&
+            p->get_state()       <= Proto::S_OK &&
+            p->get_remote_addr() == failed->get_remote_addr())
         {
+            log_debug << "found live " << *p;
             found_ok = true;
             break;
         }
@@ -867,7 +869,7 @@ void GMCast::reconnect()
             }
             else if (ae.get_next_reconnect() <= now)
             {
-                // log_debug << "Connecting to " << pending_addr;
+                log_debug << "connecting to pending " << pending_addr;
                 gmcast_connect (pending_addr);
             }
         }

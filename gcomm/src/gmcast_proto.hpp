@@ -152,6 +152,7 @@ inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
        << p.changed << ","
        << p.state << ","
        << p.propagate_remote << ","
+       << p.tp << ","
        << p.tstamp;
     return os;
 }
