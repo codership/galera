@@ -129,6 +129,7 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
         {
             ssl_socket_->lowest_layer().set_option(
                 asio::ip::tcp::no_delay(true));
+            set_fd_options(ssl_socket_->lowest_layer());
             log_debug << "socket " << get_id() << " connected, remote endpoint "
                       << get_remote_addr() << " local endpoint "
                       << get_local_addr();
@@ -151,6 +152,7 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
         {
 #endif /* HAVE_ASIO_SSL_HPP */
             socket_.set_option(asio::ip::tcp::no_delay(true));
+            set_fd_options(socket_);
             log_debug << "socket " << get_id() << " connected, remote endpoint "
                       << get_remote_addr() << " local endpoint "
                       << get_local_addr();
@@ -650,6 +652,7 @@ void gcomm::AsioTcpAcceptor::accept_handler(
         {
             s->ssl_socket_->lowest_layer().set_option(
                 asio::ip::tcp::no_delay(true));
+            set_fd_options(s->ssl_socket_->lowest_layer());
             log_debug << "socket "
                       << s->get_id() << " connected, remote endpoint "
                       << s->get_remote_addr() << " local endpoint "
@@ -665,6 +668,7 @@ void gcomm::AsioTcpAcceptor::accept_handler(
         {
 #endif /* HAVE_ASIO_SSL_HP */
             s->socket_.set_option(asio::ip::tcp::no_delay(true));
+            set_fd_options(s->socket_);
             s->state_ = Socket::S_CONNECTED;
 #ifdef HAVE_ASIO_SSL_HPP
         }
@@ -717,6 +721,7 @@ void gcomm::AsioTcpAcceptor::listen(const URI& uri)
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
+        set_fd_options(acceptor_);
         acceptor_.bind(*i);
         acceptor_.listen();
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));

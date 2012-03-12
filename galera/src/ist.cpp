@@ -48,6 +48,18 @@ namespace
     }
 
 
+    template <class S>
+    void set_fd_options(S& socket)
+    {
+        long flags(FD_CLOEXEC);
+        if (fcntl(socket.native(), F_SETFD, flags) == -1)
+        {
+            gu_throw_error(errno) << "failed to set FD_CLOEXEC";
+        }
+    }
+
+
+
     class SSLPasswordCallback
     {
     public:
@@ -757,6 +769,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
+        set_fd_options(acceptor_);
         acceptor_.bind(*i);
         acceptor_.listen();
         // read recv_addr_ from acceptor_ in case zero port was specified
@@ -801,11 +814,13 @@ void galera::ist::Receiver::run()
         if (use_ssl_ == true)
         {
             acceptor_.accept(ssl_stream.lowest_layer());
+            set_fd_options(ssl_stream.lowest_layer());
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::server);
         }
         else
         {
             acceptor_.accept(socket);
+            set_fd_options(socket);
         }
     }
     catch (asio::system_error& e)
@@ -1011,6 +1026,7 @@ void galera::ist::Receiver::interrupt()
             asio::ssl::stream<asio::ip::tcp::socket>
                 ssl_stream(io_service_, ssl_ctx_);
             ssl_stream.lowest_layer().connect(*i);
+            set_fd_options(ssl_stream.lowest_layer());
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
             Proto p(version_,
                     conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
@@ -1022,6 +1038,7 @@ void galera::ist::Receiver::interrupt()
         {
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
+            set_fd_options(socket);
             Proto p(version_,
                     conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(socket);
@@ -1068,11 +1085,13 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
             log_info << "IST sender using ssl";
             prepare_ssl_ctx(conf, ssl_ctx_);
             ssl_stream_.lowest_layer().connect(*i);
+            set_fd_options(ssl_stream_.lowest_layer());
             ssl_stream_.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
         }
         else
         {
             socket_.connect(*i);
+            set_fd_options(socket_);
         }
     }
     catch (asio::system_error& e)

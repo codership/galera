@@ -50,4 +50,15 @@ static inline std::string anyaddr(const asio::ip::address& addr)
 }
 
 
+template <class S>
+void set_fd_options(S& socket)
+{
+    long flags(FD_CLOEXEC);
+    if (fcntl(socket.native(), F_SETFD, flags) == -1)
+    {
+        gu_throw_error(errno) << "failed to set FD_CLOEXEC";
+    }
+}
+
+
 #endif // GCOMM_ASIO_ADDR_HPP
