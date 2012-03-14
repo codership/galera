@@ -142,18 +142,18 @@ private:
 
 inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
 {
-    os << p.version << ","
-       << p.local_uuid << ","
-       << p.remote_uuid << ","
-       << p.local_addr << ","
-       << p.remote_addr << ","
-       << p.mcast_addr << ","
-       << p.group_name << ","
-       << p.changed << ","
-       << p.state << ","
-       << p.propagate_remote << ","
-       << p.tp << ","
-       << p.tstamp;
+    os << "v="  << p.version << ","
+       << "lu=" << p.local_uuid << ","
+       << "ru=" << p.remote_uuid << ","
+       << "la=" << p.local_addr << ","
+       << "ra=" << p.remote_addr << ","
+       << "mc=" << p.mcast_addr << ","
+       << "gn=" << p.group_name << ","
+       << "ch=" << p.changed << ","
+       << "st=" << gcomm::gmcast::Proto::to_string(p.state) << ","
+       << "pr=" << p.propagate_remote << ","
+       << "tp=" << p.tp << ","
+       << "ts=" << p.tstamp;
     return os;
 }
 

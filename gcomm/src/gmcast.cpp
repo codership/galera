@@ -81,7 +81,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     max_initial_reconnect_attempts(
         param<int>(conf_, uri,
                    Conf::GMCastMaxInitialReconnectAttempts,
-                   Defaults::GMCastMaxInitialReconnectAttempts)),
+                   gu::to_string(max_retry_cnt))),
     next_check    (Date::now())
 {
     log_info << "GMCast version " << version;
@@ -1268,6 +1268,12 @@ void gcomm::GMCast::handle_stable_view(const View& view)
         }
     }
     check_liveness();
+
+    for (ProtoMap::const_iterator i(proto_map->begin()); i != proto_map->end();
+         ++i)
+    {
+        log_debug << "proto: " << *ProtoMap::get_value(i);
+    }
 }
 
 void gcomm::GMCast::add_or_del_addr(const std::string& val)

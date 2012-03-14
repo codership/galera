@@ -9,7 +9,6 @@
 namespace gcomm
 {
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
-    std::string const Defaults::GMCastMaxInitialReconnectAttempts = "36000";
     std::string const Defaults::EvsViewForgetTimeout    = "PT5M";
     std::string const Defaults::EvsViewForgetTimeoutMin = "PT1S";
     std::string const Defaults::EvsInactiveCheckPeriod  = "PT0.5S";

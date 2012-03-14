@@ -25,6 +25,7 @@ declare -r TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
 . $DIST_SCRIPTS/remove.sh
 . $DIST_SCRIPTS/action.sh
 . $DIST_SCRIPTS/kill.sh
+. $DIST_SCRIPTS/signal.sh
 
 command=$1
 shift
