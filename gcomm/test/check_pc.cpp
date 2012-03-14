@@ -1796,6 +1796,57 @@ START_TEST(test_trac_277)
 END_TEST
 
 
+// This test checks the case when another node of two node cluster
+// crashes or becomes completely isolated and prim view of cluster
+// is established by starting third instance directly in prim mode.
+START_TEST(test_trac_622_638)
+{
+    log_info << "START (test_trac_622_638)";
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
+    uint32_t view_seq = 0;
+
+    // Create two node cluster and make it split. First node is
+    // considered crashed after split (stay isolated in non-prim).
+    dn.push_back(create_dummy_node(1, inactive_timeout, retrans_period));
+    gu_trace(join_node(&prop, dn[0], true));
+    set_cvi(dn, 0, 0, ++view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(false));
+
+    dn.push_back(create_dummy_node(2, inactive_timeout, retrans_period));
+    gu_trace(join_node(&prop, dn[1], false));
+    set_cvi(dn, 0, 1, ++view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(false));
+
+    log_info << "generate messages";
+    send_n(dn[0], 1);
+    send_n(dn[1], 1);
+    gu_trace(prop.propagate_until_empty());
+
+    log_info << "isolate 1 and 2";
+    prop.split(1, 2);
+    ++view_seq;
+    set_cvi(dn, 0, 0, view_seq, V_NON_PRIM);
+    set_cvi(dn, 1, 1, view_seq, V_NON_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+    // Add third node which will be connected with node 2. This will
+    // be started with prim status.
+    dn.push_back(create_dummy_node(3, inactive_timeout, retrans_period));
+    gu_trace(join_node(&prop, dn[2], true));
+    prop.split(1, 3); // avoid 1 <-> 3 communication
+    ++view_seq;
+    set_cvi(dn, 1, 2, view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(false));
+
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
@@ -1889,6 +1940,9 @@ Suite* pc_suite()
     tcase_add_test(tc, test_trac_277);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_trac_622_638");
+    tcase_add_test(tc, test_trac_622_638);
+    suite_add_tcase(s, tc);
 
     return s;
 }

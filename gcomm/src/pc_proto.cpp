@@ -22,6 +22,30 @@ using namespace gcomm;
 // Helpers
 //
 
+class SelectPrimOp
+{
+public:
+    SelectPrimOp(gcomm::pc::Proto::SMMap& states) : states_(states) { }
+    void operator()(const gcomm::pc::Proto::SMMap::value_type& vt) const
+    {
+        const gcomm::UUID& uuid(gcomm::pc::Proto::SMMap::get_key(vt));
+        const gcomm::pc::Message& msg(gcomm::pc::Proto::SMMap::get_value(vt));
+        const gcomm::pc::NodeMap& nm(msg.get_node_map());
+        gcomm::pc::NodeMap::const_iterator nm_i(nm.find(uuid));
+        if (nm_i == nm.end())
+        {
+            gu_throw_error(EPROTO) << "protocol error, self not found from "
+                                   << uuid << " state msg node list";
+        }
+        if (gcomm::pc::NodeMap::get_value(nm_i).get_prim() == true)
+        {
+            states_.insert(vt);
+        }
+    }
+private:
+    gcomm::pc::Proto::SMMap& states_;
+};
+
 class ToSeqCmpOp
 {
 public:
@@ -42,10 +66,11 @@ public:
     }
 };
 
-
+// Return max to seq found from states, -1 if states is empty
 static int64_t get_max_to_seq(const gcomm::pc::Proto::SMMap& states)
 {
-    gcomm_assert(states.empty() == false);
+    if (states.empty() == true) return -1;
+
     gcomm::pc::Proto::SMMap::const_iterator max_i(
         max_element(states.begin(), states.end(), ToSeqCmpOp()));
     const gcomm::pc::Node& state(
@@ -458,7 +483,11 @@ void gcomm::pc::Proto::handle_view(const View& view)
 // Validate state message agains local state
 void gcomm::pc::Proto::validate_state_msgs() const
 {
-    const int64_t max_to_seq(get_max_to_seq(state_msgs_));
+    // #622, #638 Compute max TO seq among states from prim
+    SMMap prim_state_msgs;
+    std::for_each(state_msgs_.begin(), state_msgs_.end(),
+                  SelectPrimOp(prim_state_msgs));
+    const int64_t max_to_seq(get_max_to_seq(prim_state_msgs));
 
     for (SMMap::const_iterator i = state_msgs_.begin(); i != state_msgs_.end();
          ++i)
@@ -773,12 +802,8 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
         else
         {
             // #571 Deliver NON-PRIM views in all cases.
-            // const bool was_prim(get_prim());
             shift_to(S_NON_PRIM);
-            // if (was_prim == true)
-            // {
             deliver_view();
-            // }
         }
     }
 }
