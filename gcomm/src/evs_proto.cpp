@@ -2004,7 +2004,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 
         {  false,  false,  true,  true,  true,   false }, // GATHER
 
-        {  false,  false,  true,  true,  false,  true  },  // INSTALL
+        {  false,  false,  false, true,  false,  true  },  // INSTALL
 
         {  false,  false,  true,  true,  false,  false }  // OPERATIONAL
     };
@@ -3457,7 +3457,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         {
             node.set_tstamp(Date::now());
         }
-        if (get_state() == S_OPERATIONAL || get_state() == S_INSTALL)
+        if (get_state() == S_OPERATIONAL)
         {
             profile_enter(shift_to_prof);
             evs_log_info(I_STATE)
