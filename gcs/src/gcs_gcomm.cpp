@@ -27,7 +27,6 @@ extern "C"
 #include <galerautils.hpp>
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
-//#include "gu_prodcons.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1

@@ -45,7 +45,7 @@ Commandline Options:
 build_target = 'all'
 
 # Optimization level
-opt_flags    = '-g -O3 -DNDEBUG'
+opt_flags    = ' -g -O3 -DNDEBUG'
 
 # Architecture (defaults to build host type)
 compile_arch = ''
@@ -66,10 +66,10 @@ debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
 
 if int(debug) >= 0 and int(debug) < 3:
-    opt_flags = '-g -O%d -fno-inline' % int(debug)
+    opt_flags = ' -g -O%d -fno-inline' % int(debug)
     dbug = True
 elif int(debug) == 3:
-    opt_flags = '-g -O3'
+    opt_flags = ' -g -O3'
 
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
@@ -79,13 +79,16 @@ arch = ARGUMENTS.get('arch', machine)
 print 'Target: ' + sysname + ' ' + arch
 
 if arch == 'i386' or arch == 'i686':
-    compile_arch = '-m32 -march=i686'
+    compile_arch = ' -m32 -march=i686'
     link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86_64' or arch == 'amd64':
-    compile_arch = '-m64'
+    compile_arch = ' -m64'
     link_arch    = compile_arch + ' -Wl,-melf_x86_64'
+elif sysname == 'sunos':
+    compile_arch = ''
+    link_arch    = ''
 else:
-    print 'Unrecognized target architecture: ' + arch
+    print 'Unsupported target architecture: ' + arch
     Exit(1)
 
 boost = int(ARGUMENTS.get('boost', 1))
@@ -95,6 +98,7 @@ GALERA_VER = ARGUMENTS.get('version', '2.1dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
+print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
 
 #
 # Set up and export default build environment
@@ -119,9 +123,9 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Freebsd ports are installed under /usr/local 
-if sysname == 'freebsd':
-    env.Append(LIBPATH = '-L/usr/local/lib')
-    env.Append(CPPFLAGS = '-I/usr/local/include')
+if sysname == 'freebsd' or sysname == 'sunos':
+    env.Append(LIBPATH  = ['/usr/local/lib'])
+    env.Append(CPPFLAGS = ' -I/usr/local/include')
 
 #
 # Set up build and link paths
@@ -147,39 +151,40 @@ env.Append(CPPPATH = Split('''#/common
 #                              #/galera/src
 #                           '''))
 
+# Preprocessor flags
+if sysname != 'sunos':
+    env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
+else:
+    env.Append(CPPFLAGS = ' -D__EXTENSIONS__')
+env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
+
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Replace(CCFLAGS =
-            opt_flags
-            + ' -pipe -Wall -Wextra -Werror -Wno-unused-parameter '
-            + compile_arch)
+env.Replace(CCFLAGS = opt_flags + compile_arch +
+                      ' -Wall -Wextra -Werror -Wno-unused-parameter')
+
+# C-specific flags
+env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
+
+# CXX-specific flags
+# Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
+#       adding those after checks
+env.Replace(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+if sysname != 'sunos':
+    env.Append(CXXFLAGS = ' -pipe')
+
 
 # Linker flags
 # TODO: enable '-Wl,--warn-common -Wl,--fatal-warnings' after warnings from
 # static linking have beed addressed
 #
-env.Append(LINKFLAGS = ' ' + link_arch)
-
-# CPPFLAGS
-env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
-env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
-
-# CFLAGS
-# Notes:
-# - Append -pedantic after header checks due to
-#   'error: ISO C forbids an empty translation unit'
-env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing')
-
-# CXXFLAGS
-env.Replace(CXXFLAGS =
-            '-Wno-long-long -Wno-deprecated -Wold-style-cast -Weffc++ -pedantic -ansi')
+env.Append(LINKFLAGS = link_arch)
 
 #
 # Check required headers and libraries (autoconf functionality)
 #
 
 conf = Configure(env)
-
 
 # System headers and libraries
 
@@ -191,6 +196,17 @@ if not conf.CheckLib('rt'):
     print 'Error: rt library not found'
     Exit(1)
 
+if sysname == 'sunos':
+    if not conf.CheckLib('socket'):
+        print 'Error: socket library not found'
+        Exit(1)
+    if not conf.CheckLib('crypto'):
+        print 'Error: crypto library not found'
+        Exit(1)
+    if not conf.CheckLib('nsl'):
+        print 'Error: nsl library not found'
+        Exit(1)
+
 if conf.CheckHeader('sys/epoll.h'):
     conf.env.Append(CPPFLAGS = ' -DGALERA_USE_GU_NETWORK')
 
@@ -199,33 +215,31 @@ if conf.CheckHeader('byteswap.h'):
 
 if conf.CheckHeader('endian.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_ENDIAN_H')
-
-if conf.CheckHeader('sys/endian.h'):
+elif conf.CheckHeader('sys/endian.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_ENDIAN_H')
+elif conf.CheckHeader('sys/byteorder.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_BYTEORDER_H')
+else:
+    print 'can\'t find byte order information'
+    Exit(1)
 
 # Additional C headers and libraries
 
 # boost headers
 
 if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
-    print 'boost/shared_ptr.hpp not found or not usable, trying without -Weffc++'
-    conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
-    if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
-        print 'boost/shared_ptr.hpp not found or not usable'
-        Exit(1)
+    print 'boost/shared_ptr.hpp not found or not usable'
+    Exit(1)
 conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
-
 
 if conf.CheckCXXHeader('boost/unordered_map.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
 else:
-    # note, tr1 header will probably not compile with -Weffc++
-    conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
     if not conf.CheckCXXHeader('tr1/unordered_map'):
+        conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
+    else:
         print 'no unordered map header available'
         Exit(1)
-    else:
-       conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 
 # pool allocator
 if boost == 1:
@@ -241,10 +255,7 @@ if boost == 1:
 else:
     print 'Not using boost'
 
-
 # asio
-conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
-conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Wold-style-cast', ''))
 if conf.CheckCXXHeader('asio.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
@@ -266,15 +277,11 @@ if ssl == 1:
         print 'compile with ssl=0 or check that openssl library is usable'
         Exit(1)
 
-
-conf.env.Append(CXXFLAGS = ' -Weffc++')
-conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
-conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
-
-conf.env.Append(CFLAGS = ' -pedantic');
+# these will be used only with our softaware
+conf.env.Append(CCFLAGS  = ' -pedantic')
+conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-
 
 #
 # Set up and export environment for check unit tests
@@ -316,7 +323,6 @@ bld = Builder(action = builder_unit_test)
 check_env.Append(BUILDERS = {'Test' :  bld})
 
 Export('check_env')
-
 
 #
 # Run root SConscript with variant_dir

@@ -137,13 +137,13 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
         if (GCS_ACT_TORDERED == act->type) {
             // local action buffer should not be copied
             FAIL_IF (act->repl_buf != buf,
-                     "Received buffer ptr is not the same as sent");
+                     "Received buffer ptr is not the same as sent", NULL);
         }
         else {
             FAIL_IF (act->repl_buf == buf,
-                     "Received the same buffer ptr as sent");
+                     "Received the same buffer ptr as sent", NULL);
             FAIL_IF (memcmp (buf, act->data, act->size),
-                     "Received buffer contents is not the same as sent");
+                     "Received buffer contents is not the same as sent", NULL);
         }
     }
 
@@ -463,10 +463,10 @@ DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
 
     action_t act;
 
-    FAIL_IF (gcs_dummy_set_component(Backend, comp), "");
-    FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "");
-    FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF), "");
-    FAIL_IF (core_test_check_conf(act.data, primary, my_idx, members), "");
+    FAIL_IF (gcs_dummy_set_component(Backend, comp), "", NULL);
+    FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "", NULL);
+    FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF), "", NULL);
+    FAIL_IF (core_test_check_conf(act.data, primary, my_idx, members),"",NULL);
     free ((void*)act.data);
     return false;
 }

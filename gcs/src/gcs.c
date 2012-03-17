@@ -1578,7 +1578,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
     size_t rst_size  = size + donor_len;
-    void*  rst       = gu_malloc (rst_size);
+    char*  rst       = gu_malloc (rst_size);
 
     *local = GCS_SEQNO_ILL;
 

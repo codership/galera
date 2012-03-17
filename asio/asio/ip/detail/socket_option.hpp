@@ -443,7 +443,11 @@ public:
       asio::detail::socket_ops::host_to_network_long(
           network_interface.to_ulong());
 
+#if defined(__sun)
+    asio::detail::in6_addr_type tmp_addr = {{IN6ADDR_ANY_INIT}};
+#else
     asio::detail::in6_addr_type tmp_addr = IN6ADDR_ANY_INIT;
+#endif
     ipv6_value_.ipv6mr_multiaddr = tmp_addr;
     ipv6_value_.ipv6mr_interface = 0;
   }

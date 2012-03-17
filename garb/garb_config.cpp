@@ -96,7 +96,7 @@ Config::Config (int argc, char* argv[]) throw (gu::Exception)
 
     if (!vm.count("group"))
     {
-        gu_throw_error(ENOKEY) << "Group name not specified";
+        gu_throw_error(EDESTADDRREQ) << "Group name not specified";
     }
 
     if (vm.count("daemon"))

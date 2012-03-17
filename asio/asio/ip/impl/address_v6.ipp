@@ -33,7 +33,11 @@ namespace ip {
 address_v6::address_v6()
   : scope_id_(0)
 {
+#if defined(__sun)
+  asio::detail::in6_addr_type tmp_addr = {{IN6ADDR_ANY_INIT}};
+#else
   asio::detail::in6_addr_type tmp_addr = IN6ADDR_ANY_INIT;
+#endif
   addr_ = tmp_addr;
 }
 
@@ -255,7 +259,11 @@ bool operator<(const address_v6& a1, const address_v6& a2)
 address_v6 address_v6::loopback()
 {
   address_v6 tmp;
+#if defined(__sun)
+  asio::detail::in6_addr_type tmp_addr = {{IN6ADDR_LOOPBACK_INIT}};
+#else
   asio::detail::in6_addr_type tmp_addr = IN6ADDR_LOOPBACK_INIT;
+#endif
   tmp.addr_ = tmp_addr;
   return tmp;
 }

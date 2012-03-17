@@ -14,7 +14,7 @@
 
 #include <stdint.h>
 
-#if (GU_WORDSIZE == 64)
+#if defined(__SIZEOF_INT128__)
 
 typedef          int __attribute__((__mode__(__TI__)))  int128_t;
 typedef unsigned int __attribute__((__mode__(__TI__))) uint128_t;
@@ -27,9 +27,9 @@ typedef uint128_t gu_uint128_t;
 #define GU_IMUL128_INPLACE(_a, _b) GU_MUL128_INPLACE(_a, _b)
 #define GU_EQ128(_a, _b) (_a == _b)
 
-#else /* GU_WORDSIZE == 32 */
+#else /* Uncapable of 16-byte integer arythmetic */
 
-#if (GU_BYTE_ORDER == GU_LITTLE_ENDIAN)
+#if defined(GU_LITTLE_ENDIAN)
 
 #define GU_64LO 0
 #define GU_64HI 1
@@ -84,7 +84,7 @@ typedef union gu_uint128 {
     (_a).u32[GU_32HI] += m30 + m21 + m12 + m03;          \
 }
 
-#else /* GU_BIG_ENDIAN */
+#else /* Big-Endian */
 
 #define GU_64HI 0
 #define GU_64LO 1
@@ -123,7 +123,7 @@ typedef union {
     _a.u32[GU_32HI] += m30 + m21 + m12 + m03;        \
 }
 
-#endif /* GU_BYTE_ORDER */
+#endif /* Big-Endian */
 
 #define GU_IMUL128_INPLACE(_a, _b) { \
     uint32_t sign = ((_a).u32[GU_32HI] ^ (_b).u32[GU_32HI]) & 0x80000000UL; \

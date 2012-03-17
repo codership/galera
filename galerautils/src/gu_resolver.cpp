@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2012 Codership Oy <info@codership.com>
 
 #include "gu_resolver.hpp"
 #include "gu_logger.hpp"
@@ -13,19 +13,26 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#define BSD_COMP /* For SIOCGIFCONF et al on Solaris */
 #include <sys/ioctl.h>
 #include <map>
 #include <stdexcept>
 
-using namespace std;
+extern "C" /* old style cast */
+{
+static int const GU_SIOCGIFCONF  = SIOCGIFCONF;
+static int const GU_SIOCGIFINDEX = SIOCGIFINDEX;
+}
 
+//using namespace std;
+using std::make_pair;
 
 // Map from scheme string to addrinfo
 class SchemeMap
 {
 public:
 
-    typedef map<string, addrinfo> Map;
+    typedef std::map<std::string, addrinfo> Map;
     typedef Map::const_iterator const_iterator;
 
     SchemeMap() : ai_map()
@@ -40,7 +47,7 @@ public:
         // TODO:
     }
 
-    const_iterator find(const string& key) const
+    const_iterator find(const std::string& key) const
     {
         return ai_map.find(key);
     }
@@ -182,7 +189,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     struct ifconf ifc;
     memset(&ifc, 0, sizeof(struct ifconf));
     ifc.ifc_len = 16*sizeof(struct ifreq);
-    vector<struct ifreq> ifr(16);
+    std::vector<struct ifreq> ifr(16);
     ifc.ifc_req = &ifr[0];
     
     int fd(socket(AF_INET, SOCK_DGRAM, 0));
@@ -192,7 +199,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
         err = errno;
         gu_throw_error(err) << "could not create socket";
     }
-    if ((err = ioctl(fd, SIOCGIFCONF, &ifc)) == -1)
+    if ((err = ioctl(fd, GU_SIOCGIFCONF, &ifc)) == -1)
     {
         err = errno;
         goto out;
@@ -210,11 +217,17 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
             if (sa.get_family() == addr.get_family() &&
                 memcmp(sa.get_addr(), addr.get_addr(), addr.get_addr_len()) == 0)
             {
-                if ((err = ioctl(fd, SIOCGIFINDEX, ifrp, sizeof(struct ifreq))) == -1)
+                if ((err = ioctl(fd, GU_SIOCGIFINDEX, ifrp, sizeof(struct ifreq))) == -1)
                 {
                     err = errno;
                 }
+#if defined(__linux__)
                 idx = ifrp->ifr_ifindex;
+#elif defined(__sun__)
+                idx = ifrp->ifr_index;
+#else
+# error "Unsupported ifreq structure"
+#endif
                 goto out;
             }
         }
@@ -377,12 +390,12 @@ gu::net::Addrinfo::~Addrinfo()
 }
 
 
-string gu::net::Addrinfo::to_string() const
+std::string gu::net::Addrinfo::to_string() const
 {
     static const size_t max_addr_str_len = (6 /* tcp|udp:// */ +
                                             INET6_ADDRSTRLEN + 2 /* [] */ +
                                             6 /* :portt */);
-    string ret;
+    std::string ret;
 
     ret.reserve(max_addr_str_len);
 
@@ -445,14 +458,14 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
 
     try
     {
-        string host(uri.get_host());
+        std::string host(uri.get_host());
         // remove [] if this is IPV6 address
         size_t pos(host.find_first_of('['));
-        if (pos != string::npos)
+        if (pos != std::string::npos)
         {
             host.erase(pos, pos + 1);
             pos = host.find_first_of(']');
-            if (pos == string::npos)
+            if (pos == std::string::npos)
             {
                 gu_throw_error(EINVAL) << "invalid host: " << uri.get_host();
 

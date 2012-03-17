@@ -29,16 +29,18 @@ libgalerautilsxx_sources = [
     'gu_uri.cpp',
     'gu_buffer.cpp',
     'gu_utils++.cpp',
-    'gu_config.cpp'
+    'gu_config.cpp',
+    'gu_resolver.cpp'
 ]
 
-if libgalerautils_env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
-    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
-                                'gu_resolver.cpp']
-    libgalerautils_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
+#if '-DGALERA_USE_GU_NETWORK' in libgalerautils_env['CPPFLAGS']:
+#    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
+#                                'gu_resolver.cpp']
+
+# disable old style cast warnings
+libgalerautils_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
 
 libgalerautils_env.StaticLibrary('galerautils++', libgalerautilsxx_sources)
-
 
 #
 env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(

@@ -44,6 +44,7 @@ namespace gcache
         const bool        sync; // sync on close
 
         bool write_byte (off_t offset)    throw (gu::Exception);
+        void write_file (off_t start = 0) throw (gu::Exception);
         void prealloc   (off_t start = 0) throw (gu::Exception); 
 
         void constructor_common() throw (gu::Exception);

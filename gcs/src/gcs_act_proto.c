@@ -102,7 +102,7 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
     frag->frag_no  = gtohl  (((uint32_t*)buf)[3]);
     frag->act_type = ((uint8_t*)buf)[PROTO_AT_OFFSET];
 
-    frag->frag     = buf + PROTO_DATA_OFFSET;
+    frag->frag     = ((uint8_t*)buf) + PROTO_DATA_OFFSET;
     frag->frag_len = buf_len - PROTO_DATA_OFFSET;
     return 0;
 }

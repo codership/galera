@@ -37,7 +37,7 @@ dev_poll_reactor::dev_poll_reactor(asio::io_service& io_service)
     shutdown_(false)
 {
   // Add the interrupter's descriptor to /dev/poll.
-  ::pollfd ev = { 0 };
+  ::pollfd ev = { 0, 0, 0 };
   ev.fd = interrupter_.read_descriptor();
   ev.events = POLLIN | POLLERR;
   ev.revents = 0;
@@ -178,8 +178,8 @@ void dev_poll_reactor::run(bool block, op_queue<operation>& ops)
   lock.unlock();
 
   // Block on the /dev/poll descriptor.
-  ::pollfd events[128] = { { 0 } };
-  ::dvpoll dp = { 0 };
+  ::pollfd events[128] = { { 0, 0, 0 } };
+  ::dvpoll dp = { 0, 0, 0 };
   dp.dp_fds = events;
   dp.dp_nfds = 128;
   dp.dp_timeout = timeout;
@@ -227,7 +227,7 @@ void dev_poll_reactor::run(bool block, op_queue<operation>& ops)
         // The poll operation can produce POLLHUP or POLLERR events when there
         // is no operation pending, so if we do not remove the descriptor we
         // can end up in a tight polling loop.
-        ::pollfd ev = { 0 };
+        ::pollfd ev = { 0, 0, 0 };
         ev.fd = descriptor;
         ev.events = POLLREMOVE;
         ev.revents = 0;
@@ -235,7 +235,7 @@ void dev_poll_reactor::run(bool block, op_queue<operation>& ops)
       }
       else
       {
-        ::pollfd ev = { 0 };
+        ::pollfd ev = { 0, 0, 0 };
         ev.fd = descriptor;
         ev.events = POLLERR | POLLHUP;
         if (more_reads)

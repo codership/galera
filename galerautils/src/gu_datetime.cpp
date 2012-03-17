@@ -7,21 +7,19 @@
 #include "gu_datetime.hpp"
 #include "gu_logger.hpp"
 #include "gu_utils.hpp"
+
 extern "C"
 {
 #include "gu_time.h"
 }
 
-using namespace std;
-using namespace gu;
-
-ostream& gu::datetime::operator<<(ostream& os, const Date& d)
+std::ostream& gu::datetime::operator<<(std::ostream& os, const Date& d)
 {
     os << d.get_utc();
     return os;
 }
 
-ostream& gu::datetime::operator<<(ostream& os, const Period& p)
+std::ostream& gu::datetime::operator<<(std::ostream& os, const Period& p)
 {
     os << "P";
 
@@ -39,7 +37,7 @@ ostream& gu::datetime::operator<<(ostream& os, const Period& p)
     return os;
 }
 
-void gu::datetime::Date::parse(const string& str)
+void gu::datetime::Date::parse(const std::string& str)
     throw (gu::Exception)
 {
     if (str == "")
@@ -57,25 +55,25 @@ const char* const gu::datetime::Period::period_regex =
 
 enum
 {
-    P     = 1,
-    YEAR  = 3,
-    MONTH = 5,
-    DAY   = 7,
-    HOUR  = 10,
-    MIN   = 12,
-    SEC   = 15,
-    SEC_D = 16,
-    NUM_PARTS = 17
+    GU_P     = 1,
+    GU_YEAR  = 3,
+    GU_MONTH = 5,
+    GU_DAY   = 7,
+    GU_HOUR  = 10,
+    GU_MIN   = 12,
+    GU_SEC   = 15,
+    GU_SEC_D = 16,
+    GU_NUM_PARTS = 17
 };
 
 gu::RegEx const gu::datetime::Period::regex(period_regex);
 
-void gu::datetime::Period::parse(const string& str)
+void gu::datetime::Period::parse(const std::string& str)
     throw (gu::Exception)
 {
-    vector<RegEx::Match> parts = regex.match(str, NUM_PARTS);
+    std::vector<RegEx::Match> parts = regex.match(str, GU_NUM_PARTS);
 
-    if (parts[P].is_set() == false)
+    if (parts[GU_P].is_set() == false)
     {
         if (str == "")
         {
@@ -87,40 +85,40 @@ void gu::datetime::Period::parse(const string& str)
         }
     }
 
-    if (parts[YEAR].is_set())
+    if (parts[GU_YEAR].is_set())
     {
-        nsecs += from_string<long long>(parts[YEAR].str())*Year;
+        nsecs += from_string<long long>(parts[GU_YEAR].str())*Year;
     }
 
-    if (parts[MONTH].is_set())
+    if (parts[GU_MONTH].is_set())
     {
-        nsecs += from_string<long long>(parts[MONTH].str())*Month;
+        nsecs += from_string<long long>(parts[GU_MONTH].str())*Month;
     }
 
-    if (parts[DAY].is_set())
+    if (parts[GU_DAY].is_set())
     {
-        nsecs += from_string<long long>(parts[DAY].str())*Day;
+        nsecs += from_string<long long>(parts[GU_DAY].str())*Day;
     }
 
-    if (parts[HOUR].is_set())
+    if (parts[GU_HOUR].is_set())
     {
-        nsecs += from_string<long long>(parts[HOUR].str())*Hour;
+        nsecs += from_string<long long>(parts[GU_HOUR].str())*Hour;
     }
 
-    if (parts[MIN].is_set())
+    if (parts[GU_MIN].is_set())
     {
-        nsecs += from_string<long long>(parts[MIN].str())*Min;
+        nsecs += from_string<long long>(parts[GU_MIN].str())*Min;
     }
 
-    if (parts[SEC].is_set())
+    if (parts[GU_SEC].is_set())
     {
-        long long s(from_string<long long>(parts[SEC].str()));
+        long long s(from_string<long long>(parts[GU_SEC].str()));
         nsecs += s*Sec;
     }
 
-    if (parts[SEC_D].is_set())
+    if (parts[GU_SEC_D].is_set())
     {
-        double d(from_string<double>(parts[SEC_D].str()));
+        double d(from_string<double>(parts[GU_SEC_D].str()));
         nsecs += static_cast<long long>(d*Sec);
     }
 }

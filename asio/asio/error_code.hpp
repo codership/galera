@@ -16,7 +16,7 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
-#include <string>
+#include <cstring>
 
 #if defined(GENERATING_DOCUMENTATION)
 # define ASIO_WIN_OR_POSIX(e_win, e_posix) implementation_defined

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <error.h>
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
@@ -124,9 +123,9 @@ static long gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
 	(pool->n_threads, sizeof (gcs_test_thread_t));
     if (!pool->threads)
     {
-	error (0, errno,
-	       "Failed to allocate %ld thread objects", n_threads);
 	err = errno;
+	fprintf (stderr, "Failed to allocate %ld thread objects: %ld (%s)\n",
+	         n_threads, err, strerror(err));
 	goto out1;
     }
 
@@ -134,9 +133,9 @@ static long gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
     {
 	if ((err = gcs_test_thread_create (pool->threads + i, i, n_tries)))
 	{
-	    error (0, errno,
-		   "Failed to create thread object %ld", i);
 	    err = errno;
+	    fprintf (stderr, "Failed to create thread object %ld: %ld (%s)\n",
+	             i, err, strerror(err));
 	    goto out2;
 	}
     }
@@ -204,7 +203,7 @@ test_log_open (gcs_test_log_t **log, const char *name)
 
     if (!l) return errno;
 
-    snprintf (real_name, 1024, "%s.%d", name, getpid());
+    snprintf (real_name, 1024, "%s.%lld", name, (long long)getpid());
     if (!(l->file = fopen (real_name, "w"))) return errno;
     pthread_mutex_init (&l->lock, NULL);
     *log = l;
@@ -562,7 +561,7 @@ static long gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
         thread_routine = gcs_test_recv;
         break;
     default:
-        error (0, 0, "Bad repl type %u\n", pool->type);
+        fprintf (stderr, "Bad repl type %u\n", pool->type);
         return -1;
     }
 
@@ -577,7 +576,7 @@ static long gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
     printf ("Started %ld threads of %s type (pool: %p)\n",
             pool->n_started,
             GCS_TEST_REPL == pool->type ? "REPL" :
-            (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"), pool);
+            (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"), (void*)pool);
 
     return 0;
 }
@@ -603,7 +602,7 @@ static long gcs_test_thread_pool_stop (const gcs_test_thread_pool_t *pool)
 long gcs_test_thread_pool_cancel (const gcs_test_thread_pool_t *pool)
 {
     long i;
-    printf ("Canceling pool: %p\n", pool); fflush(stdout);
+    printf ("Canceling pool: %p\n", (void*)pool); fflush(stdout);
     printf ("pool type: %u, pool threads: %ld\n", pool->type, pool->n_started);
     fflush(stdout);
     for (i = 0; i < pool->n_started; i++) {

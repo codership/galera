@@ -10,7 +10,7 @@
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 600
 #endif
-#include <sys/fcntl.h>
+#include <fcntl.h>
 
 static ssize_t
 check_size (ssize_t size)

@@ -1,6 +1,6 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-env = DefaultEnvironment().Clone()
+env = DefaultEnvironment() #.Clone()
 
 conf = Configure(env)
 
@@ -17,11 +17,14 @@ env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
 env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
 
 bpo_static = '/usr/lib/libboost_program_options.a'
+bpo_local_static = '/usr/local/lib/libboost_program_options.a'
 
 import os
 
 if os.path.isfile(bpo_static):
     env.Append(LIBS=File(bpo_static))
+elif os.path.isfile(bpo_local_static):
+    env.Append(LIBS=File(bpo_local_static))
 else:
     env.Append(LIBS=['boost_program_options'])
 

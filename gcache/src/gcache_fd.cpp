@@ -21,11 +21,15 @@
 #define O_CLOEXEC 0
 #endif
 
+#ifndef O_NOATIME
+#define O_NOATIME 0
+#endif
+
 namespace gcache
 {
     static const int OPEN_FLAGS   = O_RDWR | O_NOATIME | O_CLOEXEC;
     static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT /*| O_TRUNC*/;
- 
+
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     bool               sync_)
         throw (gu::Exception)
@@ -145,18 +149,18 @@ namespace gcache
         return true;
     }
 
-#if 0
+    /*! prealloc() fallback */
     void
-    FileDescriptor::prealloc(off_t const start) throw (gu::Exception)
+    FileDescriptor::write_file (off_t const start) throw (gu::Exception)
     {
         off_t const page_size (sysconf (_SC_PAGE_SIZE));
 
         // last byte of the start page
-        off_t offset = (start / page_size) * page_size - 1;
-        off_t const diff (size - offset);
+        off_t offset = (start / page_size + 1) * page_size - 1;
+//        off_t const diff (size - offset);
 
-        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
-                 << name << "'...";
+//        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
+//                 << name << "'...";
 
         while (offset < size && write_byte (offset))
         {
@@ -164,14 +168,13 @@ namespace gcache
         }
 
         if (offset > size && write_byte (size - 1) && fsync (value) == 0) {
-            log_info << "Preallocating " << diff << '/' << size
-                     << " bytes in '" << name << "' done.";
+//            log_info << "Preallocating " << diff << '/' << size
+//                     << " bytes in '" << name << "' done.";
             return;
         }
 
         gu_throw_error (errno) << "File preallocation failed";
     }
-#endif
 
     void
     FileDescriptor::prealloc(off_t const start) throw (gu::Exception)
@@ -183,7 +186,15 @@ namespace gcache
 
         if (0 != posix_fallocate (value, start, diff))
         {
-            gu_throw_error (errno) << "File preallocation failed";
+            if (EINVAL == errno && start >= 0 && diff > 0)
+            {
+                // FS does not support the operation, try physical write
+                write_file (start);
+            }
+            else
+            {
+                gu_throw_error (errno) << "File preallocation failed";
+            }
         }
     }
 }

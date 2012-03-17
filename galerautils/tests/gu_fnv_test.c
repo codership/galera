@@ -35,7 +35,7 @@ START_TEST (gu_fnv128_test)
 {
     gu_uint128_t GU_SET128(ret, 0, 0);
     gu_fnv128a (test_buf, strlen(test_buf), &ret);
-#if (GU_WORDSIZE == 64)
+#if defined(__SIZEOF_INT128__)
     fail_if (!GU_EQ128(GU_FNV128_SEED, ret),
              "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
              (uint64_t)(GU_FNV128_SEED >> 64), (uint64_t)GU_FNV128_SEED,

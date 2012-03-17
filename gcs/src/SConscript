@@ -8,12 +8,6 @@ libgcs_env = env.Clone()
 # Backends (TODO: Get from global options)
 libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
 
-# Need to live without -pedantic and use gnu99 std
-libgcs_env.Replace(CFLAGS = '-std=gnu99 -fno-strict-aliasing')
-
-# Need to live without -pedantic
-libgcs_env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -ansi')
-
 gcs4garb_env = libgcs_env.Clone()
 
 libgcs_sources = Split('''

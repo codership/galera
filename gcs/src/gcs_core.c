@@ -288,10 +288,11 @@ core_msg_send_retry (gcs_core_t*    core,
 
 ssize_t
 gcs_core_send (gcs_core_t*      const conn,
-               const void*            action,
+               const void*      const action,
                size_t                 act_size,
                gcs_act_type_t   const act_type)
 {
+    const char*    act  = action;
     ssize_t        ret  = 0;
     size_t         sent = 0;
     gcs_act_frag_t frg;
@@ -301,7 +302,7 @@ gcs_core_send (gcs_core_t*      const conn,
 
     core_act_t*    local_act;
 
-    assert (action != NULL);
+    assert (act != NULL);
     assert (act_size > 0);
 
     /*
@@ -321,9 +322,7 @@ gcs_core_send (gcs_core_t*      const conn,
 	goto out;
 
     if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
-        *local_act = (typeof(*local_act)){ conn->send_act_no,
-                                           action,
-                                           act_size };
+        *local_act = (core_act_t){ conn->send_act_no, act, act_size };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
@@ -337,14 +336,14 @@ gcs_core_send (gcs_core_t*      const conn,
 	    act_size < frg.frag_len ? act_size : frg.frag_len;
 
 	/* Here is the only time we have to cast frg.frag */
-	memcpy ((char*)frg.frag, action, chunk_size);
+	memcpy ((char*)frg.frag, act, chunk_size);
 
 	send_size = hdr_size + chunk_size;
 
 #ifdef GCS_CORE_TESTING
         gu_lock_step_wait (&conn->ls); // pause after every fragment
         gu_info ("Sent %p of size %zu. Total sent: %zu, left: %zu",
-                 conn->send_buf + hdr_size, chunk_size, sent, act_size);
+                 (char*)conn->send_buf + hdr_size, chunk_size, sent, act_size);
 #endif
         ret = core_msg_send_retry (conn, conn->send_buf, send_size,
                                    GCS_MSG_ACTION);
@@ -361,7 +360,7 @@ gcs_core_send (gcs_core_t*      const conn,
             ret -= hdr_size;
 
             sent     += ret;
-            action   += ret;
+            act      += ret;
             act_size -= ret;
 
             // adjust frag_len, don't copy more than we could send

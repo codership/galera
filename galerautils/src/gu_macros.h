@@ -15,7 +15,7 @@
  * strict type-checking.. See the
  * "unnecessary" pointer comparison.
  */
-
+#if 0 // typeof() is not in C99
 #define GU_MAX(x,y) ({       \
         typeof(x) _x = (x);  \
         typeof(y) _y = (y);  \
@@ -27,6 +27,7 @@
         typeof(y) _y = (y);  \
         (void) (&_x == &_y); \
         _x < _y ? _x : _y; })
+#endif
 
 #define gu_offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 

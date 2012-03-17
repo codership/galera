@@ -107,7 +107,7 @@ GU_SET128(GU_FNV128_PRIME, 0x0000000001000000ULL, 0x000000000000013BULL);
 static gu_uint128_t const
 GU_SET128(GU_FNV128_SEED,  0x6C62272E07BB0142ULL, 0x62B821756295C58DULL);
 
-#if (GU_WORDSIZE == 64)
+#if defined(__SIZEOF_INT128__)
 
 #define GU_FNV128_XOR(_s,_b) _s ^= _b
 
@@ -118,7 +118,7 @@ GU_SET128(GU_FNV128_SEED,  0x6C62272E07BB0142ULL, 0x62B821756295C58DULL);
 _x += (_x << 1) + (_x << 3) + (_x << 4) + (_x << 5) + (_x << 8) + (_x << 88);
 #endif /* GU_FNVBITSHIFT_OPTIMIZATION */
 
-#else /* GU_WORDSIZE == 32 */
+#else /* ! __SIZEOF_INT128__ */
 
 #define GU_FNV128_XOR(_s,_b) (_s).u32[GU_32LO] ^= _b
 

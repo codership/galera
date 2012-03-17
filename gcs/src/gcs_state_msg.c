@@ -34,7 +34,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       uint8_t          flags)
 {
 #define CHECK_PROTO_RANGE(LEVEL)                                        \
-    if (LEVEL < 0 || LEVEL > UINT8_MAX) {                               \
+    if (LEVEL < (int)0 || LEVEL > (int)UINT8_MAX) {                     \
         gu_error ("#LEVEL value %d is out of range [0, %d]", LEVEL,UINT8_MAX); \
         return NULL;                                                    \
     }
@@ -61,7 +61,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->gcs_proto_ver = gcs_proto_ver;
         ret->repl_proto_ver= repl_proto_ver;
         ret->appl_proto_ver= appl_proto_ver;
-        ret->name          = (void*)(ret) + sizeof (gcs_state_msg_t);
+        ret->name          = (void*)(ret + 1);
         ret->inc_addr      = ret->name + name_len;
         ret->flags         = flags;
 

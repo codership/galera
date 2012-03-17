@@ -34,7 +34,7 @@ _to_bool (const std::string& s) throw(NotFound)
             if (tmp.length() >=2 && tmp.length() <= 3)
             {
                 std::transform (tmp.begin(), tmp.end(), tmp.begin(),
-                                (int(*)(int)) std::tolower);
+                                static_cast<int(*)(int)>(std::tolower));
 
                 if (tmp == "yes" || tmp == "on") return true;
                 if (tmp == "off" || tmp == "no") return false;

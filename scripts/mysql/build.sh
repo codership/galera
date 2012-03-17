@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 if test -z "$MYSQL_SRC"
 then
@@ -37,7 +37,7 @@ else
 fi
 
 # Initializing variables to defaults
-uname -m | grep -q i686 && CPU=pentium || CPU=amd64
+uname -m | grep -q i686 && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
 DEBUG=no
 DEBUG_LEVEL=1
 NO_STRIP=no
@@ -52,8 +52,18 @@ SKIP_CONFIGURE=no
 SKIP_CLIENTS=no
 SCRATCH=no
 SCONS="yes"
-JOBS=$(cat /proc/cpuinfo | grep -c ^processor)
+JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+
+OS=$(uname)
+case $OS in
+    "Linux")
+        JOBS=$(grep -c ^processor /proc/cpuinfo) ;;
+    "SunOS")
+        JOBS=$(psrinfo | wc -l) ;;
+    *)
+        echo "CPU information not available: unsupported OS: '$OS'";;
+esac
 
 usage()
 {

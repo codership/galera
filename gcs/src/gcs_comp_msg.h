@@ -29,7 +29,7 @@ typedef struct gcs_comp_msg
     bool            bootstrap; /// 1 if primary was bootstrapped
     long            my_idx;    /// this node's index in membership
     long            memb_num;  /// number of members in configuration
-    gcs_comp_memb_t memb[];    /// member array
+    gcs_comp_memb_t memb[1];   /// member array
 }
 gcs_comp_msg_t;
 

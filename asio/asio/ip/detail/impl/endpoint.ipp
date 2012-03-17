@@ -56,7 +56,11 @@ endpoint::endpoint(int family, unsigned short port_num)
     data_.v6.sin6_port =
       asio::detail::socket_ops::host_to_network_short(port_num);
     data_.v6.sin6_flowinfo = 0;
+#if defined(__sun)
+    asio::detail::in6_addr_type tmp_addr = {{IN6ADDR_ANY_INIT}};
+#else
     asio::detail::in6_addr_type tmp_addr = IN6ADDR_ANY_INIT;
+#endif
     data_.v6.sin6_addr = tmp_addr;
     data_.v6.sin6_scope_id = 0;
   }

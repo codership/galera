@@ -27,13 +27,14 @@ namespace gcache
             gu_throw_error(errno) << "mmap() on '" << fd.get_name()
                                   << "' failed";
         }
-
+#if !defined(__sun__) /* Solaris does not have MADV_DONTFORK */
         if (posix_madvise (ptr, size, MADV_DONTFORK))
         {
             int const err(errno);
             log_warn << "Failed to set MADV_DONTFORK on " << fd.get_name()
                      << ": " << err << " (" << strerror(err) << ")";
         }
+#endif
 /* benefits are questionable
         if (posix_madvise (ptr, size, MADV_SEQUENTIAL))
         {
@@ -74,7 +75,7 @@ namespace gcache
     void
     MMap::dont_need() const
     {
-        if (madvise(ptr, size, MADV_DONTNEED))
+        if (madvise(reinterpret_cast<char*>(ptr), size, MADV_DONTNEED))
         {
             log_warn << "Failed to set MADV_DONTNEED on " << ptr << ": "
                      << errno << " (" << strerror(errno) << ')';

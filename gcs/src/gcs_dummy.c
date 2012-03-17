@@ -319,7 +319,8 @@ gcs_dummy_inject_msg (gcs_backend_t* backend,
                       long           sender_idx)
 {
     long         ret;
-    size_t       send_size = GU_MIN(buf_len, backend->conn->max_send_size);
+    size_t       send_size = buf_len < backend->conn->max_send_size ?
+                             buf_len : backend->conn->max_send_size;
     dummy_msg_t* msg = dummy_msg_create (type, send_size, sender_idx, buf);
 
     if (msg)

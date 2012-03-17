@@ -88,12 +88,14 @@ extern "C"
 {
 #endif
 
-    extern char _gu_dig_vec[];
+    extern char  _gu_dig_vec[];
+    extern FILE* _gu_db_fp_;
+
+#define GU_DBUG_FILE _gu_db_fp_
 
 #if defined(GU_DBUG_ON) && !defined(_lint)
     extern int   _gu_db_on_;
     extern int   _gu_no_db_;
-    extern FILE* _gu_db_fp_;
     extern char* _gu_db_process_;
     extern int   _gu_db_keyword_(const char* keyword);
     extern void  _gu_db_setjmp_ (void);
@@ -147,7 +149,6 @@ extern "C"
 #define GU_DBUG_PUSH(a1)        _gu_db_push_ (a1)
 #define GU_DBUG_POP()           _gu_db_pop_  ()
 #define GU_DBUG_PROCESS(a1)    (_gu_db_process_ = a1)
-#define GU_DBUG_FILE           (_gu_db_fp_)
 #define GU_DBUG_SETJMP(a1)     (_gu_db_setjmp_  (), setjmp  (a1))
 #define GU_DBUG_LONGJMP(a1,a2) (_gu_db_longjmp_ (), longjmp (a1, a2))
 
@@ -171,7 +172,6 @@ extern "C"
 #define GU_DBUG_PUSH(a1) {}
 #define GU_DBUG_POP() {}
 #define GU_DBUG_PROCESS(a1) {}
-#define GU_DBUG_FILE (stderr)
 #define GU_DBUG_SETJMP setjmp
 #define GU_DBUG_LONGJMP longjmp
 #define GU_DBUG_DUMP(keyword,a1,a2) {}

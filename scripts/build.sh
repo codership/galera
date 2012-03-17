@@ -2,6 +2,21 @@
 
 # $Id$
 
+get_cores()
+{
+    OS=$(uname)
+    case $OS in
+        "Linux")
+            echo "$(grep -c ^processor /proc/cpuinfo)" ;;
+        "SunOS")
+            echo "$(psrinfo | wc -l)" ;;
+        *)
+            echo "CPU information not available: unsupported OS: '$OS'" >/dev/stderr
+            echo 1
+            ;;
+    esac
+}
+
 usage()
 {
     cat << EOF
@@ -37,7 +52,7 @@ SOURCE=${SOURCE:-"no"}
 DEBUG=${DEBUG:-"no"}
 DEBUG_LEVEL=${DEBUG_LEVEL:-"1"}
 SCONS=${SCONS:-"yes"}
-JOBS=${JOBS:-"$(cat /proc/cpuinfo | grep -c ^processor)"}
+JOBS=${JOBS:-"$(get_cores)"}
 SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
 NO_STRIP=${NO_STRIP:-"no"}

@@ -29,7 +29,7 @@ gu_abort (void)
     /* restore default SIGABRT handler */
     signal (SIGABRT, SIG_DFL);
 
-#ifdef _GNU_SOURCE
+#ifndef __sun__
     gu_info ("%s: Terminated.", program_invocation_name);
 #else
     gu_info ("Program terminated.");

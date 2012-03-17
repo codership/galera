@@ -5,6 +5,7 @@
 /* Pthread yield */
 #define _GNU_SOURCE 1
 #include <pthread.h>
+#include <sched.h>
 #include <check.h>
 #include <time.h>
 #include "gu_dbug_test.h"
@@ -14,7 +15,7 @@ static void cf()
 {
     GU_DBUG_ENTER("cf");
     GU_DBUG_PRINT("galera", ("hello from cf"));
-    pthread_yield();
+    sched_yield();
     GU_DBUG_VOID_RETURN;
 }
 
@@ -22,7 +23,7 @@ static void bf()
 {
     GU_DBUG_ENTER("bf");
     GU_DBUG_PRINT("galera", ("hello from bf"));
-    pthread_yield();
+    sched_yield();
     cf();
     GU_DBUG_VOID_RETURN;
 }
@@ -31,7 +32,7 @@ static void af()
 {
     GU_DBUG_ENTER("af");
     GU_DBUG_PRINT("galera", ("hello from af"));
-    pthread_yield();
+    sched_yield();
     bf();
     GU_DBUG_VOID_RETURN;
 }

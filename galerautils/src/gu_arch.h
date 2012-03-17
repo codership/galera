@@ -9,29 +9,38 @@
 #ifndef _gu_arch_h_
 #define _gu_arch_h_
 
-#if defined(HAVE_SYS_ENDIAN_H)
-# include <sys/endian.h>
-#else
+#if defined(HAVE_ENDIAN_H)
 # include <endian.h>
-#endif
-
-#if !defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)
-# error "Byte order not defined"
+#elif defined(HAVE_SYS_ENDIAN_H)
+# include <sys/endian.h>
+#elif defined(HAVE_SYS_BYTEORDER_H)
+# include <sys/byteorder.h>
+#else
+# error "No byte order header file detected"
 #endif
 
 #if defined(__BYTE_ORDER)
-# define GU_BYTE_ORDER    __BYTE_ORDER
-# define GU_LITTLE_ENDIAN __LITTLE_ENDIAN
-# define GU_BIG_ENDIAN    __BIG_ENDIAN
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define GU_LITTLE_ENDIAN
+# endif
+#elif defined(_BYTE_ORDER)
+# if _BYTE_ORDER == _LITTLE_ENDIAN
+#  define GU_LITTLE_ENDIAN
+# endif
+#elif defined(__sun__)
+# if !defined(_BIG_ENDIAN)
+#  define GU_LITTLE_ENDIAN
+# endif
 #else
-# define GU_BYTE_ORDER     _BYTE_ORDER
-# define GU_LITTLE_ENDIAN  _LITTLE_ENDIAN
-# define GU_BIG_ENDIAN     _BIG_ENDIAN
+# error "Byte order not defined"
 #endif
 
-#include <bits/wordsize.h>
-
-#define GU_WORDSIZE __WORDSIZE
+#if defined(__sun__)
+# define GU_WORDSIZE 64 /* Solaris 11 is only 64-bit ATM */
+#else
+# include <bits/wordsize.h>
+# define GU_WORDSIZE __WORDSIZE
+#endif
 
 #if (GU_WORDSIZE != 32) && (GU_WORDSIZE != 64)
 # error "Unsupported wordsize"
