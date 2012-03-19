@@ -54,7 +54,7 @@ $MYSQL -Dtest -e "$STMTS"
 
 $SCRIPTS/command.sh check
 
-if test $?
+if test $? != 0
 then
     echo "test failed"
     exit 1
