@@ -98,6 +98,7 @@ typedef enum status_vars
     STATS_LOCAL_STATE,
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
+    STATS_CAUSAL_READS,
     STATS_MAX
 } StatusVars;
 
@@ -131,6 +132,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_state",          WSREP_VAR_INT64,  { 0 }  },
     { "local_state_comment",  WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",      WSREP_VAR_INT64,  { 0 }  },
+    { "causal_reads",         WSREP_VAR_INT64,  { 0 }  },
     { 0,                      WSREP_VAR_STRING, { 0 }  }
 };
 
@@ -200,5 +202,6 @@ galera::ReplicatorSMM::stats() const
     sv[STATS_LOCAL_STATE_COMMENT ].value._string = state2stats_str(state_(),
                                                                    sst_state_);
     sv[STATS_CERT_INDEX_SIZE].value._int64 = cert_.index_size();
+    sv[STATS_CAUSAL_READS].value._int64 = causal_reads_();
     return &wsrep_stats_[0];
 }

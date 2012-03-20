@@ -883,6 +883,7 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
             apply_monitor_.wait(cseq, wait_until);
         }
         if (seqno != 0) *seqno = cseq;
+        ++causal_reads_;
         return WSREP_OK;
     }
     catch (gu::Exception& e)

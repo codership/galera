@@ -459,6 +459,7 @@ namespace galera
         gu::Atomic<long long> local_cert_failures_;
         gu::Atomic<long long> local_bf_aborts_;
         gu::Atomic<long long> local_replays_;
+        gu::Atomic<long long> causal_reads_;
 
         mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
     };
