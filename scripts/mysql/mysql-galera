@@ -210,11 +210,9 @@ galera_start()
 #        LOGGING_OPTS=" --general_log=1 --log_output=FILE "
 #    fi
 
-    if [ "$WS_LEVEL" == "RBR" ]
+    if [ -n "$WS_LEVEL" ]
     then
-        RBR_OPTS=" --binlog_format=ROW "
-    else
-        RBR_OPTS=" --binlog_format=STATEMENT "
+        RBR_OPTS=" --binlog_format=$WS_LEVEL "
     fi
 
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
@@ -420,7 +418,7 @@ echo $CS
 VALGRIND=${VALGRIND:-""}
 
 # write set level, SQL, RBR or ROW
-WS_LEVEL="RBR"
+WS_LEVEL=""
 
 #DB="test" # use 'test' database if none given
 IGNORE_TABLES=""
