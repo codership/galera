@@ -155,7 +155,12 @@ namespace causal
                   config_.read_host(),
                   config_.user(),
                   config_.password())
-        { }
+        {
+            (void)conn_.query("SET wsrep_causal_reads=1").execute();
+        }
+        Reader(const Reader&)         = delete;
+        void operator=(const Reader&) = delete;
+
 
         long long value()
         {
@@ -200,6 +205,9 @@ namespace causal
                   config_.user(),
                   config_.password())
         { }
+
+        Writer(const Writer&)         = delete;
+        void operator=(const Writer&) = delete;
 
         void store_value(long long val)
         {
@@ -292,17 +300,11 @@ int main(int argc, char* argv[])
     causal::Writer writer(config);
     causal::Reader reader(config);
 
-    std::thread writer_thd(std::bind(writer_func, writer, config));
+    std::thread writer_thd(std::bind(writer_func, std::ref(writer), config));
+    std::thread reader_thd(std::bind(reader_func, std::ref(reader), config));
 
-    std::list<std::thread> reader_thds;
-    for (size_t i(0); i < config.readers(); ++i)
-    {
-        reader_thds.push_back(std::thread(
-                                  std::bind(reader_func, reader, config)));
-    }
     writer_thd.join();
-    for_each(reader_thds.begin(), reader_thds.end(),
-             [] (std::thread& th) { th.join(); } );
+    reader_thd.join();
 
     long long reads(causal::Global::reads_.load());
     long long violations(causal::Global::violations_.load());
