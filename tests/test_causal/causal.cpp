@@ -15,11 +15,11 @@
 //
 // Example build command with g++ 4.6:
 //
-// g++ -std=c++0x -O3 -Wextra -Wall -I../../galerautils/src
+// g++ -std=c++0x -g -O3 -Wextra -Wall -I../../galerautils/src
 //     -I/usr/include/mysql++ -I/usr/include/mysql causal.cpp
-//     -lboost_program_options -lmysqlpp -o causal
+//     -lboost_program_options -lmysqlpp -L../../galerautils/src -lgalerautils++
+//      -o causal
 //
-
 
 #include "gu_utils.hpp"
 
@@ -33,6 +33,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <memory>
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -47,25 +48,26 @@ namespace causal
         Config(int argc, char* argv[])
             :
             db_           ("test"),
-            read_host_    ("localhost"),
+            read_hosts_   (),
             write_host_   ("localhost"),
             user_         ("test"),
             password_     ("testpass"),
             transactional_(false),
             duration_     (10),
-            readers_      (1)
+            readers_      (1),
+            disable_causal_reads_(false)
         {
             po::options_description other("Other options");
             other.add_options()
                 ("help,h",  "Show help message")
                 ("dry-run", "Print config and exit");
 
-
+            std::string read_hosts_str("localhost");
             po::options_description config("Configuration");
             config.add_options()
                 ("db",            po::value<std::string>(&db_),
                  "Database")
-                ("read-host",     po::value<std::string>(&read_host_),
+                ("read-host",     po::value<std::string>(&read_hosts_str),
                  "Read host (<host>:<port>)")
                 ("write-host",    po::value<std::string>(&write_host_),
                  "Write host (<host>:<port>)")
@@ -78,7 +80,9 @@ namespace causal
                 ("duration",      po::value<time_t>(&duration_),
                  "Test duration in seconds")
                 ("readers",       po::value<size_t>(&readers_),
-                 "Number of reader threads");
+                 "Number of reader threads")
+                ("disable-causal-reads",
+                 "Disable causal reads for reader connections");
 
             po::options_description opts;
             opts.add(config).add(other);
@@ -86,6 +90,11 @@ namespace causal
             po::variables_map vm;
             store(po::command_line_parser(argc, argv).options(opts).run(), vm);
             notify(vm);
+
+            if (vm.count("disable-causal-reads"))
+            {
+                disable_causal_reads_ = true;
+            }
 
             if (vm.count("help"))
             {
@@ -98,19 +107,26 @@ namespace causal
             {
                 std::cerr << "Config: "
                           << "db            : " << db_            << "\n"
-                          << "read-host     : " << read_host_     << "\n"
+                          << "read-host     : " << read_hosts_str << "\n"
                           << "write-host    : " << write_host_    << "\n"
                           << "user          : " << user_          << "\n"
                           << "password      : " << password_      << "\n"
                           << "transactional : " << transactional_ << "\n"
                           << "duration      : " << duration_      << "\n"
-                          << "readers       : " << readers_       << std::endl;
+                          << "readers       : " << readers_       << "\n"
+                          << "disable-causal-reads: "
+                          << disable_causal_reads_ << std::endl;
                 exit(EXIT_SUCCESS);
             }
+
+            read_hosts_ = gu::strsplit(read_hosts_str, ',');
         }
 
         const char* db() const { return db_.c_str(); }
-        const char* read_host() const { return read_host_.c_str(); }
+        const char* read_host(size_t idx) const
+        {
+            return read_hosts_[idx % read_hosts_.size()].c_str();
+        }
 
         const char* write_host() const { return write_host_.c_str(); }
         const char* user() const { return user_.c_str(); }
@@ -118,15 +134,17 @@ namespace causal
         bool transactional() const { return transactional_; }
         time_t duration() const { return duration_; }
         size_t readers() const { return readers_; }
+        bool disable_causal_reads() const { return disable_causal_reads_; }
     private:
         std::string db_;
-        std::string read_host_;
+        std::vector<std::string> read_hosts_;
         std::string write_host_;
         std::string user_;
         std::string password_;
         bool transactional_;
         time_t duration_;
         size_t readers_;
+        bool disable_causal_reads_;
     };
 
 
@@ -148,16 +166,24 @@ namespace causal
     class Reader
     {
     public:
-        Reader(const Config& config)
+        Reader(const Config& config, size_t idx)
             :
             config_(config),
             conn_(config_.db(),
-                  config_.read_host(),
+                  config_.read_host(idx),
                   config_.user(),
                   config_.password())
         {
-            (void)conn_.query("SET wsrep_causal_reads=1").execute();
+            if (config.disable_causal_reads() == false)
+            {
+                (void)conn_.query("SET wsrep_causal_reads=1").execute();
+            }
         }
+        ~Reader()
+        {
+            conn_.disconnect();
+        }
+
         Reader(const Reader&)         = delete;
         void operator=(const Reader&) = delete;
 
@@ -205,7 +231,10 @@ namespace causal
                   config_.user(),
                   config_.password())
         { }
-
+        ~Writer()
+        {
+            conn_.disconnect();
+        }
         Writer(const Writer&)         = delete;
         void operator=(const Writer&) = delete;
 
@@ -230,34 +259,23 @@ namespace causal
               const char* password)
     {
         mysqlpp::Connection conn(db, server, user, password);
-        mysqlpp::Query query(conn.query("DROP TABLE IF EXISTS causal_test"));
-        mysqlpp::SimpleResult result(query.execute());
-        if (!result)
-        {
-            throw std::runtime_error("failed to drop table");
-        }
-        query = conn.query("CREATE TABLE causal_test (value BIGINT PRIMARY KEY)");
-        result = query.execute();
-        if (!result)
-        {
-            throw std::runtime_error("failed to create table");
-        }
+        (void)conn.query("DROP TABLE IF EXISTS causal_test").execute();
+        (void)conn.query(
+            "CREATE TABLE causal_test (value BIGINT PRIMARY KEY)")
+            .execute();
         std::ostringstream os;
         os << "INSERT INTO causal_test VALUES ("
            << Global::value_.fetch_add(1LL)
            << ")";
-        query = conn.query(os.str());
-        result = query.execute();
-        if (!result)
-        {
-            throw std::runtime_error("failed to insert initial value");
-        }
+        (void)conn.query(os.str()).execute();
+        conn.disconnect();
     }
 
 }
 
 
-void writer_func(causal::Writer& w, const causal::Config& config)
+void writer_func(std::shared_ptr<causal::Writer> w,
+                 const causal::Config& config)
 {
     std::chrono::system_clock::time_point until(
         std::chrono::system_clock::now()
@@ -265,14 +283,15 @@ void writer_func(causal::Writer& w, const causal::Config& config)
     while (std::chrono::system_clock::now() < until)
     {
         long long val(causal::Global::value_.load());
-        w.store_value(val);
+        w->store_value(val);
         causal::Global::written_value_.store(val);
         ++causal::Global::value_;
     }
 }
 
 
-void reader_func(causal::Reader& r, const causal::Config& config)
+void reader_func(std::shared_ptr<causal::Reader> r,
+                 const causal::Config& config)
 {
     std::chrono::system_clock::time_point until(
         std::chrono::system_clock::now()
@@ -280,7 +299,7 @@ void reader_func(causal::Reader& r, const causal::Config& config)
     while (std::chrono::system_clock::now() < until)
     {
         long long expected(causal::Global::written_value_.load());
-        long long val(r.value());
+        long long val(r->value());
         if (val < expected)
         {
             ++causal::Global::violations_;
@@ -297,14 +316,27 @@ int main(int argc, char* argv[])
     causal::init(config.db(), config.write_host(),
                  config.user(), config.password());
 
-    causal::Writer writer(config);
-    causal::Reader reader(config);
+    std::thread writer_thd(
+        std::bind(
+            writer_func,
+            std::shared_ptr<causal::Writer>(new causal::Writer(config)),
+            config));
 
-    std::thread writer_thd(std::bind(writer_func, std::ref(writer), config));
-    std::thread reader_thd(std::bind(reader_func, std::ref(reader), config));
+    std::list<std::thread> reader_thds;
+    for (size_t i(0); i < config.readers(); ++i)
+    {
+        reader_thds.push_back(
+            std::thread(
+                std::bind(
+                    reader_func,
+                    std::shared_ptr<causal::Reader>(
+                        new causal::Reader(config, i)),
+                    config)));
+    }
 
     writer_thd.join();
-    reader_thd.join();
+    std::for_each(reader_thds.begin(), reader_thds.end(),
+                  [](std::thread& thd) { thd.join(); });
 
     long long reads(causal::Global::reads_.load());
     long long violations(causal::Global::violations_.load());
