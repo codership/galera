@@ -72,20 +72,43 @@ Gcs::request_state_transfer (const std::string& request,
     log_info << "Sending state transfer request: '" << request
              << "', size: " << request.length();
 
-again:
-    ssize_t ret = gcs_request_state_transfer (gcs_,
-                                              request.c_str(),
-                                              request.length() + 1 /* \0 */,
-                                              donor.c_str(),
-                                              &order);
+    /* Need to substitute the first ':' for \0 */
+
+    ssize_t req_len = request.length() + 1 /* \0 */;
+    char* const req_str(
+	reinterpret_cast<char*>(::malloc(req_len + 1 /* potentially need one more \0 */)));
+
+    if (!req_str)
+    {
+        gu_throw_error (ENOMEM) << "Cannot allocate " << req_len
+                                << " bytes for state transfer request";
+    }
+
+    ::strcpy(req_str, request.c_str());
+    char* column_ptr = ::strchr(req_str, ':');
+
+    if (column_ptr)
+    {
+        *column_ptr = '\0';
+    }
+    else /* append an empty string */
+    {
+        req_str[req_len] = '\0';
+        req_len++;
+    }
+
+    ssize_t ret;
+    do
+    {
+        ret = gcs_request_state_transfer (gcs_, req_str, req_len, donor.c_str(),
+                                          &order);
+    }
+    while (-EAGAIN == ret && (usleep(1000000), true));
+
+    free (req_str);
+
     if (ret < 0)
     {
-        if (-EAGAIN == ret)
-        {
-            usleep (1000000);
-            goto again;
-        }
-
         log_fatal << "State transfer request failed: " << ret
                   << " (" << strerror(-ret) << ")";
         gu_throw_error(-ret) << "State transfer request failed";
