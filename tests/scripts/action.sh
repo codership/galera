@@ -9,7 +9,7 @@ cluster_status()
             echo -n $(mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
                 -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
                 --skip-column-names -ss \
-                -e "SHOW STATUS WHERE Variable_name LIKE 'wsrep_cluster_status'
+                -e "SET wsrep_on=0; SHOW STATUS WHERE Variable_name LIKE 'wsrep_cluster_status'
                     OR Variable_name LIKE 'wsrep_cluster_size'" 2>/dev/null) \
                         | awk '{ print $4 ":" $2; }'
             ;;
