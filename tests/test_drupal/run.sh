@@ -22,11 +22,9 @@
 # URL            - url pointing to installed site, should be specified only
 #                  if default does not work
 # TESTS          - drupal test suites to be run or --all to run all tests
+# VERBOSE        - to run test suite in verbose mode set this to --verbose
 #
 # NOTES:
-# * Many tests will fail. However, if site is installed through browser
-#   instead of drush, these tests will pass. Exact reason for this is
-#   still unknown.
 #
 # WARNINGS:
 # * Drops database drupal before site is installed
@@ -41,13 +39,16 @@ BASE_DIR=$(cd $(dirname $0); pwd -P)
 CONCURRENCY=${CONCURRENCY:-"1"}
 WORKDIR=${WORKDIR:-"$BASE_DIR/workdir"}
 DRUPAL_VERSION=${DRUPAL_VERSION:-"7.12"}
-URL=${URL:-"http://localhost/drupal_test/$DRUPAL_DIR"}
 TESTS=${TESTS:-"--all"}
+VERBOSE=${VERBOSE:-""}
 
 # Drupal pkg/dirname
 DRUPAL_PKG="drupal-${DRUPAL_VERSION}.tar.gz"
 DRUPAL_DIR="$(basename $DRUPAL_PKG .tar.gz)"
 
+# Construct url (note, should be done after setting DRUPAL_DIR
+# to get it right)
+URL=${URL:-"http://localhost/drupal_test/$DRUPAL_DIR"}
 
 PHP=$(which php)
 DRUSH=$(which drush)
@@ -118,6 +119,9 @@ $DRUSH si \
 # automatically.
 chmod -R a+rw .
 
+# Append base_url in settings.php
+echo "\$base_url = '"$URL"';" >> sites/default/settings.php
+
 # Enable modules
 MODULES=$(ls -1 modules | grep -v README.txt)
 $DRUSH en $MODULES -y
@@ -125,4 +129,17 @@ $DRUSH en $MODULES -y
 # Run tests
 cd scripts
 echo "-- Running tests $TESTS"
-$PHP run-tests.sh --concurrency $CONCURRENCY --php $PHP --url $URL $TESTS
+$PHP run-tests.sh --concurrency $CONCURRENCY --php $PHP \
+    --url $URL $VERBOSE $TESTS >& $WORKDIR/drupal-tests.log
+
+tests_failed=$(grep -v 'failed 0' $WORKDIR/drupal-tests.log | grep 'passed' | wc -l)
+if test $tests_failed != 0
+then
+    echo "Some tests failed:"
+    grep -v 'failed 0' $WORKDIR/drupal-tests.log | grep 'passed'
+    exit 1
+else
+    echo "Success"
+    exit 0
+fi
+
