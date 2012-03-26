@@ -132,11 +132,11 @@ echo "-- Running tests $TESTS"
 $PHP run-tests.sh --concurrency $CONCURRENCY --php $PHP \
     --url $URL $VERBOSE $TESTS >& $WORKDIR/drupal-tests.log
 
-tests_failed=$(grep -v 'failed 0' $WORKDIR/drupal-tests.log | grep 'passed' | wc -l)
+tests_failed=$(grep -v '0 fails' $WORKDIR/drupal-tests.log | grep 'passes' | wc -l)
 if test $tests_failed != 0
 then
     echo "Some tests failed:"
-    grep -v 'failed 0' $WORKDIR/drupal-tests.log | grep 'passed'
+    grep -v '0 fails' $WORKDIR/drupal-tests.log | grep 'passes'
     exit 1
 else
     echo "Success"
