@@ -1,0 +1,258 @@
+# InnoDB tests
+
+innodb-analyze
+innodb-autoinc-18274
+
+# Restarts the server
+# innodb-autoinc-44030
+
+innodb-autoinc-56228
+
+# Returns wrong result
+# innodb_autoinc_lock_mode_zero
+
+innodb-autoinc-optimize
+
+# Restarts the server
+# innodb-autoinc
+
+innodb_bug12400341
+innodb_bug12661768
+innodb_bug21704
+innodb_bug30423
+innodb_bug30919
+innodb_bug34053
+
+################################################################################
+# Crashes slaves with:
+# 120325 11:34:20 [ERROR] Error in Log_event::read_log_event(): 'Event too big', data_len: 8459305, event_type: 23
+# 08:34:20 UTC - mysqld got signal 11 ;
+# innodb_bug34300
+################################################################################
+
+innodb_bug35220
+innodb_bug36169
+innodb_bug36172
+innodb_bug38231
+innodb_bug39438
+innodb_bug40360
+innodb_bug40565
+innodb_bug41904
+
+################################################################################
+# Fails with
+# mysqltest: At line 9: query 'set global innodb_commit_concurrency=0' succeeded - should have failed with errno 1231...
+# innodb_bug42101-nonzero
+################################################################################
+
+innodb_bug42101
+
+################################################################################
+# Fails with
+# mysqltest: At line 63: query 'INSERT INTO t1_tmp (b) SELECT b FROM t1 WHERE a = 1' succeeded - should have failed with errno 1213...
+# innodb_bug42419
+################################################################################
+
+innodb_bug44032
+innodb_bug44369
+innodb_bug44571
+innodb_bug45357
+innodb_bug46000
+innodb_bug46676
+
+################################################################################
+# Fails with
+# mysqltest: Result content mismatch
+# Test seems to expect Antelope InnoDB file format
+# innodb_bug47167
+################################################################################
+
+innodb_bug47621
+innodb_bug47622
+innodb_bug47777
+innodb_bug48024
+innodb_bug49164
+innodb_bug51378
+innodb_bug51920
+innodb_bug52199
+innodb_bug52663
+innodb_bug52745
+innodb_bug53046
+innodb_bug53290
+innodb_bug53591
+
+################################################################################
+# Slaves crash with
+# 120325 12:15:13 [ERROR] Slave SQL: Could not execute Write_rows event on table test.bug53592_2; Cannot add or update a child row: a foreign key constraint fails (`test`.`bug53592_2`, CONSTRAINT `bug53592_2_ibfk_1` FOREIGN KEY (`col`) REFERENCES `bug53592_1` (`col1`) ON DELETE CASCADE ON UPDATE CASCADE), Error_code: 1452; handler error HA_ERR_NO_REFERENCED_ROW; the event's master log FIRST, end_log_pos 83, Error_code: 1452
+# 120325 12:15:13 [Warning] WSREP: RBR event 2 Write_rows apply warning: 151, 5213
+# 120325 12:15:13 [ERROR] WSREP: Failed to apply trx: source: 00d11c73-765b-11e1-0800-87ca13882573 version: 2 local: 0 state: CERTIFYING flags: 1 conn_id: 19 trx_id: 56451 seqnos (l: 25, g: 5213, s: 5212, d: 5209, ts: 1332666913209045854)
+# innodb_bug53592
+################################################################################
+
+innodb_bug53674
+innodb_bug53756
+innodb_bug54044
+innodb_bug56143
+innodb_bug56680
+innodb_bug56716
+innodb_bug56947
+innodb_bug57252
+innodb_bug57255
+innodb_bug57904
+innodb_bug59307
+innodb_bug59410
+
+# Shuts down the server
+# innodb_bug59641
+
+innodb_bug59733
+
+# Shuts down the server
+# innodb_bug60049
+# Shuts down the server
+# innodb_bug60196
+
+innodb_bug60229
+
+################################################################################
+# Fails with
+# mysqltest: Result length mismatch
+# innodb_cmp_drop_table
+################################################################################
+
+innodb-consistent
+innodb_corrupt_bit
+innodb-create-options
+
+################################################################################
+# Fails with
+# mysqltest: Result content mismatch
+# Seems to except Antelope file format
+# innodb_file_format
+################################################################################
+
+innodb_gis
+
+################################################################################
+# Crashes slaves with
+# 120325 12:26:14 [ERROR] Slave SQL: Error 'Specified key was too long; max key length is 767 bytes' on query. Default database: 'test'. Query: 'create table worklog5743(a TEXT not null, primary key (a(1000))) ROW_FORMAT=DYNAMIC, engine = innodb', Error_code: 1071
+# 120325 12:26:14 [Warning] WSREP: RBR event 1 Query apply warning: 1, 771
+# 120325 12:26:14 [Warning] WSREP: Ignoring error for TO isolated action: source: 8ddf8490-765c-11e1-0800-079e5531566f version: 2 local: 0 state: CERTIFYING flags: 65 conn_id: 14 trx_id: -1 seqnos (l: 5, g: 771, s: 770, d: 770, ts: 1332667574042005494)
+# 120325 12:26:14 [Note] WSREP, BF applier interrupted in log_event.cc
+# 120325 12:26:14 [ERROR] Slave SQL: Error executing row event: 'Table 'test.worklog5743' doesn't exist', Error_code: 1053
+# 120325 12:26:14 [Warning] WSREP: RBR event 2 Write_rows apply warning: 1053, 772
+# innodb_index_large_prefix
+################################################################################
+
+################################################################################
+# Crashes master with
+# 120325 13:42:44 [ERROR] WSREP: clustered index not passed for FK append InnoDB: unknown error code 11
+# 120325 13:42:44  InnoDB: Assertion failure in thread 140216146274048 in file row0mysql.c line 649
+# Crashes slaves with
+# 120325 13:42:32 [ERROR] Slave SQL: Could not execute Write_rows event on table test.t1_purge; Row size too large. The maximum row size for the used table type, not counting BLOBs, is 8126. You have to change some columns to TEXT or BLOBs, Error_code: 1118; Got error 139 from storage engine, Error_code: 1030; handler error HA_ERR_TO_BIG_ROW; the event's master log FIRST, end_log_pos 5471, Error_code: 1118
+# innodb-index
+################################################################################
+
+innodb-index_ucs2
+
+################################################################################
+# Fails with
+# mysqltest: Result content mismatch
+# innodb_information_schema
+################################################################################
+
+innodb-lock
+
+################################################################################
+# Fails with
+# mysqltest: At line 34: query 'UPDATE t1 SET a='7000000' WHERE a=(SELECT a FROM t2 WHERE b=7)' succeeded - should have failed with errno 1205...
+# innodb_lock_wait_timeout_1
+################################################################################
+
+################################################################################
+# Crashes master with
+# 120325 12:36:59  InnoDB: Error: in ALTER TABLE `test`.`t1`
+# InnoDB: has or is referenced in foreign key constraints
+# InnoDB: which are not compatible with the new table definition.
+# 120325 12:36:59 [Warning] Invalid (old?) table or database name '#sql-63dc_e'
+# 120325 12:36:59  InnoDB: Error: table `test`.`t1` does not exist in the InnoDB internal
+# InnoDB: data dictionary though MySQL is trying to drop it.
+# InnoDB: Have you copied the .frm file of the table to the
+# InnoDB: MySQL database directory from another database?
+# InnoDB: You can look for further help from
+# InnoDB: http://dev.mysql.com/doc/refman/5.5/en/innodb-troubleshooting.html
+# 120325 12:36:59  InnoDB: Error: in RENAME TABLE table `test`.`t1`
+# InnoDB: is referenced in foreign key constraints
+# InnoDB: which are not compatible with the new table definition.
+# 120325 12:36:59 [ERROR] WSREP: clustered index not passed for FK append
+# InnoDB: unknown error code 11
+# innodb_misc1
+################################################################################
+
+innodb_multi_update
+innodb_mysql_rbk
+
+################################################################################
+# Fails with
+# At line 461: query 'set global query_cache_type=1' failed: 1651: Query cache is disabled; restart the server with query_cache_type=1 to enable it
+# Needs query cache, won't fix
+# innodb_mysql
+################################################################################
+
+innodb_notembedded
+
+################################################################################
+# Crashes slaves with
+# 120325 12:48:29 [ERROR] Slave SQL: Error 'Specified key was too long; max key length is 767 bytes' on query. Default database: 'test'. Query: 'CREATE TABLE worklog5743 (col_1_varchar VARCHAR (4000) , col_2_varchar VARCHAR (4000) ,PRIMARY KEY (col_1_varchar(3072))) ROW_FORMAT=DYNAMIC, engine = innodb', Error_code: 1071
+# 120325 12:48:29 [Warning] WSREP: RBR event 1 Query apply warning: 1, 142
+# 120325 12:48:29 [Warning] WSREP: Ignoring error for TO isolated action: source: a9e2e595-765f-11e1-0800-5c593ee4a55e version: 2 local: 0 state: CERTIFYING flags: 65 conn_id: 14 trx_id: -1 seqnos (l: 6, g: 142, s: 141, d: 141, ts: 1332668909525378869)
+# 120325 12:48:29 [Note] WSREP, BF applier interrupted in log_event.cc
+# 120325 12:48:29 [ERROR] Slave SQL: Error executing row event: 'Table 'test.worklog5743' doesn't exist', Error_code: 1053
+# 120325 12:48:29 [Warning] WSREP: RBR event 2 Write_rows apply warning: 1053, 143
+# innodb_prefix_index_liftedlimit
+################################################################################
+
+# Restarts the server
+# innodb_prefix_index_restart_server
+
+innodb_replace
+innodb-replace
+
+################################################################################
+# Fails with
+# mysqltest: At line 25: query 'update t1 set a=10 where a=5' succeeded - should have failed with errno 1205...
+# innodb-semi-consistent
+################################################################################
+
+################################################################################
+# Crashes whole cluster
+# innodb
+################################################################################
+
+################################################################################
+# Fails with
+# mysqltest: Result content mismatch
+# innodb_timeout_rollback
+################################################################################
+
+innodb-timeout
+innodb-truncate
+
+################################################################################
+# Fails with
+# At line 29: query 'reap' succeeded - should have failed with errno 1213...
+# innodb_trx_weight
+################################################################################
+
+innodb-ucs2
+
+################################################################################
+# Fails with
+# mysqltest: At line 27: query 'create table t1(a int,b text,key(b(768))) engine=innodb DEFAULT CHARSET=latin1' succeeded - should have failed with errno 1709...
+# innodb-use-sys-malloc
+################################################################################
+
+################################################################################
+# Causes inconsistency
+# innodb-zip
+################################################################################
