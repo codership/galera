@@ -642,17 +642,15 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     try /* check if receive address is explicitly set */
     {
         recv_addr = conf_.get(RECV_ADDR);
+        return;
     }
     catch (gu::NotFound&) {} /* if not, check the alternative.
                                 TODO: try to find from system. */
-    if (!addr)
+    if (addr)
     {
-//        log_warn << "'" << RECV_ADDR << "' not set. IST will be unavailable.";
-        return;
+        recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
+        conf_.set(RECV_ADDR, recv_addr);
     }
-
-    recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
-    conf_.set(RECV_ADDR, recv_addr);
 }
 
 

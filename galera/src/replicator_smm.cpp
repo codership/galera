@@ -202,7 +202,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     service_thd_        (gcs_),
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
-    ist_receiver_       (config_, args->node_incoming),
+    ist_receiver_       (config_, args->node_address),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_),
