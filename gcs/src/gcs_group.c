@@ -118,10 +118,10 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
 }
 
 /* Free nodes array */
-static inline void
+static void
 group_nodes_free (gcs_group_t* group)
 {
-    register long i;
+    register int i;
 
     /* cleanup after disappeared members */
     for (i = 0; i < group->num; i++) {
@@ -129,6 +129,10 @@ group_nodes_free (gcs_group_t* group)
     }
 
     if (group->nodes) gu_free (group->nodes);
+
+    group->nodes  = NULL;
+    group->num    = 0;
+    group->my_idx = -1;
 }
 
 void
@@ -205,8 +209,18 @@ group_redo_last_applied (gcs_group_t* group)
 static void
 group_go_non_primary (gcs_group_t* group)
 {
-    group->nodes[group->my_idx].status = GCS_NODE_STATE_NON_PRIM;
-    //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
+    if (group->my_idx >= 0) {
+        assert(group->num > 0);
+        assert(group->nodes);
+
+        group->nodes[group->my_idx].status = GCS_NODE_STATE_NON_PRIM;
+        //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
+    }
+    else {
+        assert(-1   == group->my_idx);
+        assert(0    == group->num);
+        assert(NULL == group->nodes);
+    }
 
     group->state   = GCS_GROUP_NON_PRIMARY;
     group->conf_id = GCS_SEQNO_ILL;
@@ -376,9 +390,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group_check_comp_msg (prim_comp, new_my_idx, new_nodes_num);
 
     if (new_my_idx >= 0) {
-        gu_info ("New COMPONENT: primary = %s, bootstrap = %s, my_idx = %ld, memb_num = %ld",
-                 prim_comp ? "yes" : "no", bootstrap ? "yes" : "no",
-                 new_my_idx, new_nodes_num);
+        gu_info ("New COMPONENT: primary = %s, bootstrap = %s, my_idx = %ld, "
+                 "memb_num = %ld", prim_comp ? "yes" : "no",
+                 bootstrap ? "yes" : "no", new_my_idx, new_nodes_num);
 
         new_nodes = group_nodes_init (group, comp);
 
