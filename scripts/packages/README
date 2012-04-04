@@ -172,9 +172,9 @@ Currently Galera supports the following backends:
 connect to or replicate anything and the rest of the URL address string is
 ignored.
 
-'gcomm' - is a proprietary Group Communication backend that provides Virtual
-Synchrony quality of service. It uses TCP for membership service and TCP
-(and UDP multicast as of version 0.8) for data replication.
+'gcomm' - is a Codership's own Group Communication backend that provides
+Virtual Synchrony quality of service. It uses TCP for membership service and
+TCP (and UDP multicast as of version 0.8) for data replication.
 
 Normally one would use just the simplest form of the address URL:
 
