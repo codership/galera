@@ -10,18 +10,20 @@ use_mysql_5.1_sources()
 {
     MYSQL_MAJOR="5.1"
     export MYSQL_5_1=$MYSQL_MAJOR # for DEB build
+    export MYSQL_MAJOR_VER="5"
+    export MYSQL_MINOR_VER="1"
     MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
 }
 use_mariadb_5.1_sources()
 {
-    MYSQL_MAJOR="5.1"
-    export MYSQL_5_1=$MYSQL_MAJOR # for DEB build
-    MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
+    use_mysql_5.1_sources
 }
 use_mysql_5.5_sources()
 {
     MYSQL_MAJOR="5.5"
     export MYSQL_5_5=$MYSQL_MAJOR # for DEB build
+    export MYSQL_MAJOR_VER="5"
+    export MYSQL_MINOR_VER="5"
     MYSQL_VER=`awk -F '=' 'BEGIN { ORS = "" } /MYSQL_VERSION_MAJOR/ { print $2 "." } /MYSQL_VERSION_MINOR/ { print $2 "." } /MYSQL_VERSION_PATCH/ { print $2 }' $MYSQL_SRC/VERSION`
 }
 
@@ -568,14 +570,12 @@ build_packages()
         pushd debian
         $SUDO_ENV $(which epm) -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT $deb_basename
+        RET=$?
         $SUDO /bin/chown -R $WHOAMI.users $ARCH
     else # build RPM
         echo "RPMs are now built by a separate script."
         return 1
     fi
-    local RET=$?
-
-    set -e
 
     return $RET
 }

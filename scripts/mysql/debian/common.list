@@ -49,7 +49,7 @@ $LIBS_DST=${prefix}/lib/mysql
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
-$DOCS_DST=${prefix}/share/doc/mysql-server-5.1
+$DOCS_DST=${prefix}/share/doc/mysql-server-${MYSQL_MAJOR_VER}.${MYSQL_MINOR_VER}
 $MAN_DST=${prefix}/share/man
 
 # Distribution dependent files
@@ -63,11 +63,11 @@ d 755 root root /etc/logrotate.d  -
 f 755 root root /etc/logrotate.d/mysql-server      $ETC/logrotate.d/mysql-server
 d 755 root root /etc/logcheck                      -
 d 755 root root /etc/logcheck/ignore.d.paranoid    -
-f 644 root root /etc/logcheck/ignore.d.paranoid/mysql-server-5_1 $ETC/logcheck/ignore.d.paranoid/mysql-server-5_1
+f 644 root root /etc/logcheck/ignore.d.paranoid/mysql-server-${MYSQL_MAJOR_VER}_${MYSQL_MINOR_VER} $ETC/logcheck/ignore.d.paranoid/mysql-server-5_1
 d 755 root root /etc/logcheck/ignore.d.server      -
-f 644 root root /etc/logcheck/ignore.d.server/mysql-server-5_1 $ETC/logcheck/ignore.d.server/mysql-server-5_1
+f 644 root root /etc/logcheck/ignore.d.server/mysql-server-${MYSQL_MAJOR_VER}_${MYSQL_MINOR_VER} $ETC/logcheck/ignore.d.server/mysql-server-5_1
 d 755 root root /etc/logcheck/ignore.d.workstation -
-f 644 root root /etc/logcheck/ignore.d.workstation/mysql-server-5_1 $ETC/logcheck/ignore.d.workstation/mysql-server-5_1
+f 644 root root /etc/logcheck/ignore.d.workstation/mysql-server-${MYSQL_MAJOR_VER}_${MYSQL_MINOR_VER} $ETC/logcheck/ignore.d.workstation/mysql-server-5_1
 
 d 755 root root $CONF_DST
 f 755 root root $CONF_DST/debian-start                  $ETC/mysql/debian-start
@@ -80,7 +80,23 @@ f 755 root root $SHAR_DST/echo_stderr                   $SRC/echo_stderr
 
 f 755 root root $BINS_DST/my_print_defaults_wsrep       $MYSQL_SRC/extra/my_print_defaults
 
-# Distribution dependent scripts
+
+##########################
+#  wsrep-specific files  #
+##########################
+
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf  $MYSQL_SRC/support-files/wsrep.cnf
+f 755 root root $BINS_DST/wsrep_sst_mysqldump $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+f 755 root root $BINS_DST/wsrep_sst_rsync     $MYSQL_SRC/scripts/wsrep_sst_rsync
+l 755 root root $BINS_DST/wsrep_sst_rsync_wan wsrep_sst_rsync
+f 644 root root $DOCS_DST/README-wsrep        $MYSQL_SRC/Docs/README-wsrep
+f 644 root root $SHAR_DST/wsrep.cnf           $MYSQL_SRC/support-files/wsrep.cnf
+f 644 root root $SHAR_DST/wsrep_notify        $MYSQL_SRC/support-files/wsrep_notify
+
+
+##################################
+# Distribution dependent scripts #
+##################################
 
 $mysql_data=/var/lib/mysql
 

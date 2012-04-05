@@ -178,15 +178,4 @@ f 644 root root $SHAR_DST/${lang22}            $MYSQL_SRC/sql/share/${lang22}/*
 
 d 755 mysql root /var/run/mysqld -
 
-##########################
-#  wsrep-specific files  #
-##########################
-
-c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf  $MYSQL_SRC/support-files/wsrep.cnf
-f 755 root root $BINS_DST/wsrep_sst_mysqldump $MYSQL_SRC/scripts/wsrep_sst_mysqldump
-f 755 root root $BINS_DST/wsrep_sst_rsync     $MYSQL_SRC/scripts/wsrep_sst_rsync
-l 755 root root $BINS_DST/wsrep_sst_rsync_wan wsrep_sst_rsync
-f 644 root root $DOCS_DST/README-wsrep        $MYSQL_SRC/Docs/README-wsrep
-f 644 root root $SHAR_DST/wsrep.cnf           $MYSQL_SRC/support-files/wsrep.cnf
-
 #
