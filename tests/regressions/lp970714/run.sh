@@ -118,7 +118,25 @@ mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD                           \
 mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD                           \
     --host ${NODE_INCOMING_HOST[1]} --port ${NODE_INCOMING_PORT[1]} \
     -e "SET GLOBAL wsrep_convert_LOCK_to_trx=1"
-echo "ret:$?<"
+
+[ $? != "0" ] && echo "SET failed" && exit 1
+
+
+run_test
+
+echo "##"
+echo "##             wsrep_convert_LOCK_to_trx=0"
+echo "##"
+echo "setting wsrep_convert_LOCK_to_trx=0"
+mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD                           \
+    --host ${NODE_INCOMING_HOST[0]} --port ${NODE_INCOMING_PORT[0]} \
+    -e "SET GLOBAL wsrep_convert_LOCK_to_trx=0"
+[ $? != "0" ] && echo "SET failed" && exit 1
+
+mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD                           \
+    --host ${NODE_INCOMING_HOST[1]} --port ${NODE_INCOMING_PORT[1]} \
+    -e "SET GLOBAL wsrep_convert_LOCK_to_trx=0"
+
 [ $? != "0" ] && echo "SET failed" && exit 1
 
 
