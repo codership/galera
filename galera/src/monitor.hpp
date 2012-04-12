@@ -229,7 +229,11 @@ namespace galera
             }
         }
 
-        wsrep_seqno_t last_left()   const { return last_left_;    }
+        wsrep_seqno_t last_left()   const
+        {
+            gu::Lock lock(mutex_);
+            return last_left_;
+        }
         ssize_t       size()        const { return process_size_; }
 
         bool would_block (wsrep_seqno_t seqno) const

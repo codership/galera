@@ -488,7 +488,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
-    trx->set_last_seen_seqno(apply_monitor_.last_left());
+    trx->set_last_seen_seqno(co_mode_ != CommitOrder::BYPASS ? commit_monitor_.last_left() : apply_monitor_.last_left());
     trx->flush(0);
     trx->set_state(TrxHandle::S_REPLICATING);
 

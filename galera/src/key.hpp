@@ -282,6 +282,7 @@ namespace galera
 
     inline std::ostream& operator<<(std::ostream& os, const Key& key)
     {
+        std::ostream::fmtflags flags(os.flags());
         switch (key.version_)
         {
         case 0:
@@ -305,6 +306,7 @@ namespace galera
             gu_throw_fatal << "unsupported key version: " << key.version_;
             throw;
         }
+        os.flags(flags);
         return os;
     }
 
