@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2012 Codership Oy <info@codership.com>
  */
 
 #include <cstdlib>
@@ -16,6 +16,7 @@ extern Suite* write_set_suite();
 extern Suite* trx_handle_suite();
 extern Suite* service_thd_suite();
 extern Suite* ist_suite();
+extern Suite* saved_state_suite();
 
 static suite_creator_t suites[] =
 {
@@ -23,6 +24,7 @@ static suite_creator_t suites[] =
     trx_handle_suite,
     service_thd_suite,
     ist_suite,
+    saved_state_suite,
     0
 };
 

@@ -201,7 +201,7 @@ ssize_t gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid)
 {
     ssize_t ret;
     if (buflen < GU_UUID_STR_LEN) return -1;
-    ret = sscanf(buf, GU_UUID_FORMAT, GU_UUID_ARGS_REF(uuid));
+    ret = sscanf(buf, GU_UUID_FORMAT_SCANF, GU_UUID_ARGS_SCANF(uuid));
     if (ret != sizeof(uuid->data)) return -1;
     return ret;
 }

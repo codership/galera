@@ -13,7 +13,6 @@ extern "C"
 #include "galera_info.h"
 }
 
-#include <fstream>
 #include <sstream>
 #include <iostream>
 
@@ -179,10 +178,11 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     data_dir_           (args->data_dir ? args->data_dir : ""),
     state_file_         (data_dir_.length() ?
                          data_dir_+'/'+GALERA_STATE_FILE : GALERA_STATE_FILE),
+    st_                 (state_file_),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
-    cc_seqno_           (-1),
+    cc_seqno_           (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
@@ -220,9 +220,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_replays_      (),
     wsrep_stats_        ()
 {
-    strncpy (const_cast<char*>(state_uuid_str_), 
-             "00000000-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
-
     // @todo add guards (and perhaps actions)
     state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
@@ -256,6 +253,29 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     local_monitor_.set_initial_position(0);
 
+    wsrep_uuid_t  uuid;
+    wsrep_seqno_t seqno;
+
+    st_.get (uuid, seqno);
+
+    if (0 != args->state_uuid &&
+        *args->state_uuid != WSREP_UUID_UNDEFINED &&
+        *args->state_uuid == uuid &&
+        seqno == WSREP_SEQNO_UNDEFINED)
+    {
+        /* non-trivial recovery information provided on startup, and db is safe
+         * so use recovered seqno value */
+        seqno = args->state_seqno;
+    }
+    log_info << "End state: " << uuid << ':' << seqno << " #################";
+    update_state_uuid (uuid);
+
+    cc_seqno_ = seqno; // is it needed here?
+    apply_monitor_.set_initial_position(seqno);
+    if (co_mode_ != CommitOrder::BYPASS)
+        commit_monitor_.set_initial_position(seqno);
+    cert_.assign_initial_position(seqno, trx_proto_ver_);
+
     build_stats_vars(wsrep_stats_);
 }
 
@@ -283,17 +303,17 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
                                               const std::string& cluster_url,
                                               const std::string& state_donor)
 {
-    restore_state(state_file_);
     sst_donor_ = state_donor;
     service_thd_.reset();
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
+    wsrep_seqno_t const seqno(cert_.position());
+    wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
 
-    log_info << "Setting initial position to " << state_uuid_ << ':'
-             << cert_.position();
+    log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
 
-    if ((err = gcs_.set_initial_position(state_uuid_, cert_.position())) != 0)
+    if ((err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
@@ -787,11 +807,19 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         ++local_replays_;
         trx->set_state(TrxHandle::S_REPLAYING);
 
-        gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx));
+        try
+        {
+            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx));
 
-        if (gu_unlikely (WSREP_OK != commit_cb_(trx_ctx, trx->global_seqno(),
-                                                true)))
-            gu_throw_fatal << "Commit failed. Trx: " << trx;
+            if (gu_unlikely(WSREP_OK != commit_cb_(trx_ctx, trx->global_seqno(),
+                                                   true)))
+                gu_throw_fatal << "Commit failed. Trx: " << trx;
+        }
+        catch (gu::Exception& e)
+        {
+            st_.mark_corrupt();
+            throw;
+        }
 
         // apply, commit monitors are released in post commit
         return WSREP_OK;
@@ -923,6 +951,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 
         trx->set_state(TrxHandle::S_APPLYING);
         log_debug << "Executing TO isolated action: " << *trx;
+        st_.mark_unsafe();
         break;
     }
     case WSREP_TRX_FAIL:
@@ -953,6 +982,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
 
+    st_.mark_safe();
     cert_.set_trx_committed(trx);
     report_last_committed();
 
@@ -1012,6 +1042,8 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
         }
         catch (std::exception& e)
         {
+            st_.mark_corrupt();
+
             log_fatal << "Failed to apply trx: " << *trx;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, aborting...";
@@ -1200,7 +1232,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 }
             }
 
-            invalidate_state(state_file_);
+            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
         }
 
         if (state_() == S_JOINING && sst_state_ != SST_NONE)
@@ -1224,7 +1256,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // Non-primary configuration
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            store_state(state_file_);
+            st_.set (state_uuid_, apply_monitor_.last_left());
         }
 
         if (next_state != S_CONNECTED && next_state != S_CLOSING)
@@ -1346,113 +1378,6 @@ void galera::ReplicatorSMM::resync() throw (gu::Exception)
     gcs_.join(commit_monitor_.last_left());
 }
 
-void galera::ReplicatorSMM::store_state(const std::string& file) const
-{
-    std::ofstream fs(file.c_str(), std::ios::trunc);
-
-    if (fs.fail() == true)
-    {
-        gu_throw_fatal << "could not store state";
-    }
-
-    fs << "# GALERA saved state, version: " << 0.8 << ", date: (todo)\n";
-    fs << "uuid:  " << state_uuid_ << "\n";
-    fs << "seqno: " << apply_monitor_.last_left() << "\n";
-    fs << "cert_index:\n";
-}
-
-void galera::ReplicatorSMM::restore_state(const std::string& file)
-{
-    wsrep_uuid_t  uuid  (WSREP_UUID_UNDEFINED);
-    wsrep_seqno_t seqno (WSREP_SEQNO_UNDEFINED);
-    std::ifstream fs    (file.c_str());
-
-    if (fs.fail() == true)
-    {
-        log_warn << "state file not found: " << file;
-    }
-    else
-    {
-        std::string line;
-
-        getline(fs, line);
-
-        if (fs.good() == false)
-        {
-            log_warn << "could not read header from state file: " << file;
-        }
-        else
-        {
-            log_debug << "read state header: "<< line;
-
-            while (fs.good() == true)
-            {
-                getline(fs, line);
-
-                if (fs.good() == false) break;
-
-                std::istringstream istr(line);
-                std::string        param;
-
-                istr >> param;
-
-                if (param == "uuid:")
-                {
-                    try
-                    {
-                        istr >> uuid;
-                        log_debug << "read state uuid " << uuid;
-                    }
-                    catch (gu::Exception& e)
-                    {
-                        log_error << e.what();
-                        uuid = WSREP_UUID_UNDEFINED;
-                    }
-                }
-                else if (param == "seqno:")
-                {
-                    istr >> seqno;
-                    log_debug << "read seqno " << seqno;
-                }
-                else if (param == "cert_index:")
-                {
-                    // @todo
-                    log_debug << "cert index restore not implemented yet";
-                }
-            }
-        }
-
-        log_info << "Found saved state: " << uuid << ':' << seqno;
-    }
-
-    if (seqno < 0 && uuid != WSREP_UUID_UNDEFINED)
-    {
-        log_warn << "Negative seqno with valid UUID: "
-                 << uuid << ':' << seqno << ". Discarding UUID.";
-        uuid = WSREP_UUID_UNDEFINED;
-    }
-
-    update_state_uuid (uuid);
-    cc_seqno_ = seqno; // is it needed here?
-    apply_monitor_.set_initial_position(seqno);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.set_initial_position(seqno);
-    cert_.assign_initial_position(seqno, trx_proto_ver_);
-}
-
-
-void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
-{
-    std::ofstream fs(file.c_str(), std::ios::trunc);
-    if (fs.fail() == true)
-    {
-        gu_throw_fatal << "could not store state";
-    }
-
-    fs << "# GALERA saved state, version: " << 0.8 << ", date: (todo)\n";
-    fs << "uuid:  " << WSREP_UUID_UNDEFINED << "\n";
-    fs << "seqno: " << WSREP_SEQNO_UNDEFINED << "\n";
-    fs << "cert_index:\n";
-}
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -1597,6 +1522,8 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
         strncpy(const_cast<char*>(state_uuid_str_), os.str().c_str(),
                 sizeof(state_uuid_str_));
     }
+
+    st_.set(uuid, WSREP_SEQNO_UNDEFINED);
 }
 
 void

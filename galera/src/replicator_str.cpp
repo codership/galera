@@ -520,8 +520,6 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
 
     do
     {
-        invalidate_state(state_file_);
-
         tries++;
 
         gcs_seqno_t seqno_l;
@@ -533,7 +531,6 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
         {
             if (!retry_str(ret))
             {
-                store_state(state_file_);
                 log_error << "Requesting state transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
             }
@@ -586,6 +583,9 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
     {
         sst_state_ = SST_REQ_FAILED;
 
+        st_.set(state_uuid_, apply_monitor_.last_left());
+        st_.mark_safe();
+
         if (state_() > S_CLOSING)
         {
             log_fatal << "State transfer request failed unrecoverably: "
@@ -616,6 +616,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                                   group_uuid, group_seqno));
     gu::Lock lock(sst_mutex_);
 
+    st_.mark_unsafe();
+
     send_state_request (group_uuid, group_seqno, req);
 
     state_.shift_to(S_JOINING);
@@ -636,6 +638,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             sst_state_ = SST_FAILED;
             log_fatal << "Application state transfer failed. This is "
                       << "unrecoverable condition, restart required.";
+
+            st_.set(sst_uuid_, sst_seqno_);
+            st_.mark_safe();
+
             abort();
         }
         else
@@ -658,6 +664,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
+    st_.mark_safe();
+
     if (req->ist_len() > 0)
     {
         // IST is prepared only with str proto ver 1 and above
@@ -665,8 +673,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         {
             log_info << "Receiving IST: "
                      << (group_seqno - apply_monitor_.last_left())
-                     << " writesets, seqnos " << apply_monitor_.last_left() << "-"
-                     << group_seqno;
+                     << " writesets, seqnos " << apply_monitor_.last_left()
+                     << "-" << group_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
             sst_seqno_ = ist_receiver_.finished();

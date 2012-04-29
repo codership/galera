@@ -24,6 +24,7 @@
 #include "gcs_action_source.hpp"
 #include "ist.hpp"
 #include "gu_atomic.hpp"
+#include "saved_state.hpp"
 
 #include <map>
 
@@ -123,10 +124,6 @@ namespace galera
 
         void          desync() throw (gu::Exception);
         void          resync() throw (gu::Exception);
-
-        void store_state      (const std::string& file) const;
-        void restore_state    (const std::string& file);
-        void invalidate_state (const std::string& file) const;
 
     private:
 
@@ -389,7 +386,7 @@ namespace galera
          * |                 0 |              0 |              0 |
          * |                 1 |              1 |              0 |
          * |                 2 |              1 |              1 |
-         * |                 3 |              2                1 |
+         * |                 3 |              2 |              1 |
          * -------------------------------------------------------
          */
 
@@ -406,6 +403,7 @@ namespace galera
         // persistent data location
         std::string           data_dir_;
         std::string           state_file_;
+        SavedState            st_;
 
         // identifiers
         wsrep_uuid_t          uuid_;
@@ -438,8 +436,8 @@ namespace galera
         // action sources
         ActionSource*   as_;
         GcsActionSource gcs_as_;
-        galera::ist::Receiver ist_receiver_;
-        galera::ist::AsyncSenderMap ist_senders_;
+        ist::Receiver ist_receiver_;
+        ist::AsyncSenderMap ist_senders_;
         // trx processing
         Wsdb            wsdb_;
         Certification   cert_;
