@@ -43,10 +43,6 @@ SavedState::SavedState  (const std::string& file) :
     if (!fs_)
     {
         log_warn << "Could not open saved state file for writing: " << file;
-    }
-
-    if (ifs.fail() || !fs_)
-    {
         /* We are not reading anything from file we can't write to, since it
            may be terribly outdated. */
         return;

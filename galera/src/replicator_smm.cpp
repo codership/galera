@@ -267,7 +267,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
          * so use recovered seqno value */
         seqno = args->state_seqno;
     }
-    log_info << "End state: " << uuid << ':' << seqno << " #################";
+    log_debug << "End state: " << uuid << ':' << seqno << " #################";
     update_state_uuid (uuid);
 
     cc_seqno_ = seqno; // is it needed here?
