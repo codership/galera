@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -1338,6 +1338,8 @@ wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
         assert (commit_monitor_.last_left() >= ret);
     }
 
+    st_.set(state_uuid_, ret);
+
     log_info << "Provider paused at " << state_uuid_ << ':' << ret;
 
     return ret;
@@ -1345,6 +1347,7 @@ wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
 
 void galera::ReplicatorSMM::resume() throw ()
 {
+    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
     local_monitor_.unlock();
     log_info << "Provider resumed.";
 }
