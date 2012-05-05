@@ -285,6 +285,12 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
             >> c >> istr.group_seqno_ >> c >> istr.peer_);
 }
 
+static bool
+sst_is_trivial (const void* const req, size_t const len)
+{
+    return (len == (strlen(ReplicatorSMM::TRIVIAL_SST) + 1) &&
+            !memcmp (req, ReplicatorSMM::TRIVIAL_SST, len));
+}
 
 void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       const void* req,
@@ -306,26 +312,30 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
     state_.shift_to(S_DONOR);
 
+    StateRequest* const streq (read_state_request (req, req_size));
+
     // somehow the following does not work, string is initialized beyond
     // the first \0:
-    // std::string const req_str(reinterpret_cast<const char*>(req), req_size);
+    //std::string const req_str(reinterpret_cast<const char*>(streq->sst_req()),
+    //                          streq->sst_len());
     // have to resort to C ways.
 
-    char* const tmp(strndup(reinterpret_cast<const char*>(req), req_size));
+    char* const tmp(strndup(reinterpret_cast<const char*>(streq->sst_req()),
+                            streq->sst_len()));
     std::string const req_str(tmp);
     free (tmp);
 
-    bool const skip_state_transfer (req_str == TRIVIAL_SST
+    bool const skip_state_transfer (sst_is_trivial(streq->sst_req(),
+                                                   streq->sst_len())
                           /* compatibility with older garbd, to be removed in
                            * the next release (2.1)*/
                           || req_str == std::string(WSREP_STATE_TRANSFER_NONE)
                                    );
+
     wsrep_seqno_t rcode (0);
 
     if (!skip_state_transfer)
     {
-        StateRequest* const streq (read_state_request (req, req_size));
-
         if (streq->ist_len())
         {
             IST_request istr;
@@ -404,10 +414,10 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             log_warn << "SST request is null, SST canceled.";
             rcode = -ECANCELED;
         }
-
-    out:
-        delete streq;
     }
+
+out:
+    delete streq;
 
     local_monitor_.leave(lo);
 
@@ -628,7 +638,16 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     if (sst_req_len != 0)
     {
-        lock.wait(sst_cond_);
+
+        if (sst_is_trivial(sst_req, sst_req_len))
+        {
+            sst_uuid_  = group_uuid;
+            sst_seqno_ = group_seqno;
+        }
+        else
+        {
+            lock.wait(sst_cond_);
+        }
 
         if (sst_uuid_ != group_uuid)
         {
