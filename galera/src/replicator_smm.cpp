@@ -1097,6 +1097,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         str_proto_ver_ = 1;
         break;
     case 3:
+    case 4:
         trx_proto_ver_ = 2;
         str_proto_ver_ = 1;
         break;

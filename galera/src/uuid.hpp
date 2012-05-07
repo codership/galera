@@ -8,6 +8,7 @@
 #include "wsrep_api.h"
 #include "gu_uuid.h"
 #include "gu_assert.hpp"
+#include "gu_buffer.hpp"
 
 #include <iostream>
 
@@ -57,6 +58,29 @@ namespace galera
         string2uuid(cstr, uuid);
 
         return is;
+    }
+
+    inline size_t serial_size(const wsrep_uuid_t& uuid)
+    {
+        return sizeof(uuid.uuid);
+    }
+
+    inline size_t serialize(const wsrep_uuid_t& uuid, gu::byte_t* buf,
+                            size_t buflen, size_t offset)
+    {
+        if (offset + serial_size(uuid) > buflen) gu_throw_fatal;
+        memcpy(buf + offset, uuid.uuid, serial_size(uuid));
+        offset += serial_size(uuid);
+        return offset;
+    }
+
+    inline size_t unserialize(const gu::byte_t* buf, size_t buflen,
+                              size_t offset, wsrep_uuid_t& uuid)
+    {
+        if (offset + serial_size(uuid) > buflen) gu_throw_fatal;
+        memcpy(uuid.uuid, buf + offset, serial_size(uuid));
+        offset += serial_size(uuid);
+        return offset;
     }
 
 }

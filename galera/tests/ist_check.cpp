@@ -4,11 +4,62 @@
 
 
 #include "ist.hpp"
+#include "ist_proto.hpp"
 #include "trx_handle.hpp"
 #include "uuid.hpp"
 #include "monitor.hpp"
 #include "GCache.hpp"
+#include "gu_arch.h"
+
 #include <check.h>
+
+// Message tests
+
+START_TEST(test_ist_message)
+{
+
+    using namespace galera::ist;
+
+    Message m3(3, Message::T_HANDSHAKE, 0x2, 3, 1001);
+
+#if GU_WORDSIZE == 32
+    fail_unless(serial_size(m3) == 20, "serial size %zu != 20",
+                serial_size(m3));
+#elif GU_WORDSIZE == 64
+    fail_unless(serial_size(m3) == 24, "serial size %zu != 24",
+                serial_size(m3));
+#endif
+
+
+    gu::Buffer buf(serial_size(m3));
+    serialize(m3, &buf[0], buf.size(), 0);
+    Message mu3(3);
+    unserialize(&buf[0], buf.size(), 0, mu3);
+
+    fail_unless(mu3.version() == 3);
+    fail_unless(mu3.type()    == Message::T_HANDSHAKE);
+    fail_unless(mu3.flags()   == 0x2);
+    fail_unless(mu3.ctrl()    == 3);
+    fail_unless(mu3.len()     == 1001);
+
+    Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
+    fail_unless(serial_size(m4) == 12);
+
+    buf.clear();
+    buf.resize(serial_size(m4));
+    serialize(m4, &buf[0], buf.size(), 0);
+
+    Message mu4(4);
+    unserialize(&buf[0], buf.size(), 0, mu4);
+    fail_unless(mu4.version() == 4);
+    fail_unless(mu4.type()    == Message::T_HANDSHAKE);
+    fail_unless(mu4.flags()   == 0x2);
+    fail_unless(mu4.ctrl()    == 3);
+    fail_unless(mu4.len()     == 1001);
+}
+END_TEST
+
+// IST tests
 
 static pthread_barrier_t start_barrier;
 
@@ -206,10 +257,28 @@ START_TEST(test_ist_v2)
 }
 END_TEST
 
+
+START_TEST(test_ist_v3)
+{
+    test_ist_common(3);
+}
+END_TEST
+
+
+START_TEST(test_ist_v4)
+{
+    test_ist_common(4);
+}
+END_TEST
+
 Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
     TCase* tc;
+
+    tc = tcase_create("test_ist_message");
+    tcase_add_test(tc, test_ist_message);
+    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_ist_v1");
     tcase_set_timeout(tc, 60);
@@ -219,6 +288,16 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_v2");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v2);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_v3");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v3);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_v4");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v4);
     suite_add_tcase(s, tc);
 
     return s;
