@@ -33,7 +33,7 @@ f 755 root root $BINS_DST/mysql_upgrade        $MYSQL_SRC/client/mysql_upgrade
 f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
 f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/mysqlbinlog
 f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
-f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/debian/mysqld_safe
+f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/debian/mysqld_safe-5.1
 #f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/mysqltest

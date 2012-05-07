@@ -104,8 +104,8 @@ start() {
 
 	# Find a working node
 	for ADDRESS in ${GALERA_NODES} 0; do
-		HOST=$(echo $ADDRESS | awk -F \: '{ print $1 }')
-		PORT=$(echo $ADDRESS | awk -F \: '{ print $2 }')
+		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
+		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
 		nc -z $HOST $PORT >/dev/null && break
 	done
