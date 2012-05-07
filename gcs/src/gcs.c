@@ -727,7 +727,7 @@ gcs_become_synced (gcs_conn_t* conn)
 static void
 _set_fc_limits (gcs_conn_t* conn)
 {
-    /* Killing two hares with one stone: flat FC profile for master-slave setups
+    /* Killing two birds with one stone: flat FC profile for master-slave setups
      * plus #440: giving single node some slack at some math correctness exp.*/
     double fn = conn->params.fc_master_slave ? 1.0 : sqrt(conn->memb_num);
 
