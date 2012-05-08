@@ -142,6 +142,7 @@ struct gcs_conn
     long         upper_limit;         // upper slave queue limit
     long         lower_limit;         // lower slave queue limit
     long         fc_offset;           // offset for catchup phase
+    gcs_conn_state_t max_fc_state;    // maximum state when FC is enabled
     long         stats_fc_sent;       // FC stats counters
     long         stats_fc_received;   //
     gcs_fc_t     stfc; // state transfer FC object
@@ -279,6 +280,8 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
     conn->fc_offset    = 0;
     conn->timeout      = GU_TIME_ETERNITY;
     conn->gcache       = gcache;
+    conn->max_fc_state = conn->params.fc_sync_donor ?
+        GCS_CONN_DONOR : GCS_CONN_JOINED;
 
     gu_mutex_init (&conn->fc_lock, NULL);
 
@@ -365,10 +368,10 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = (conn->stop_count <= 0                 &&
-                conn->stop_sent  <= 0                 &&
+    bool ret = (conn->stop_count <= 0                                     &&
+                conn->stop_sent  <= 0                                     &&
                 conn->queue_len  >  (conn->upper_limit + conn->fc_offset) &&
-                conn->state      <= GCS_CONN_JOINED   &&
+                conn->state      <= conn->max_fc_state                    &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
@@ -419,7 +422,7 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
 
     bool ret = (conn->stop_sent    >  0                                   &&
                 (conn->lower_limit >= conn->queue_len || queue_decreased) &&
-                conn->state        <= GCS_CONN_JOINED                     &&
+                conn->state        <= conn->max_fc_state                  &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
@@ -641,7 +644,10 @@ static long
 gcs_become_donor (gcs_conn_t* conn)
 {
     if (gcs_shift_state (conn, GCS_CONN_DONOR)) {
-        long err = _release_flow_control (conn);
+        long err = 0;
+        if (conn->max_fc_state < GCS_CONN_DONOR) {
+            err = _release_flow_control (conn);
+        }
         return (0 == err ? 1 : err);
     }
 
@@ -1903,6 +1909,23 @@ _set_fc_debug (gcs_conn_t* conn, const char* value)
 }
 
 static long
+_set_fc_sync_donor (gcs_conn_t* conn, const char* value)
+{
+    bool sd;
+    const char* const endptr = gu_str2bool (value, &sd);
+
+    if (endptr[0] != '\0') return -EINVAL;
+
+    if (conn->params.fc_sync_donor != sd) {
+
+        conn->params.fc_sync_donor = sd;
+        conn->max_fc_state         = sd ? GCS_CONN_DONOR : GCS_CONN_JOINED;
+    }
+
+    return 0;
+}
+
+static long
 _set_pkt_size (gcs_conn_t* conn, const char* value)
 {
     char* endptr   = NULL;
@@ -1992,6 +2015,9 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     }
     else if (!strcmp (key, GCS_PARAMS_FC_DEBUG)) {
         return _set_fc_debug (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_FC_SYNC_DONOR)) {
+        return _set_fc_sync_donor (conn, value);
     }
     else if (!strcmp (key, GCS_PARAMS_MAX_PKT_SIZE)) {
         return _set_pkt_size (conn, value);

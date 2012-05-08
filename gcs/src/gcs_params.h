@@ -16,14 +16,16 @@ struct gcs_params
     ssize_t recv_q_hard_limit;
     long    fc_base_limit;
     long    max_packet_size;
-    bool    fc_master_slave;
     long    fc_debug;
+    bool    fc_master_slave;
+    bool    fc_sync_donor;
 };
 
 extern const char* const GCS_PARAMS_FC_FACTOR;
 extern const char* const GCS_PARAMS_FC_LIMIT;
 extern const char* const GCS_PARAMS_FC_MASTER_SLAVE;
 extern const char* const GCS_PARAMS_FC_DEBUG;
+extern const char* const GCS_PARAMS_FC_SYNC_DONOR;
 extern const char* const GCS_PARAMS_MAX_PKT_SIZE;
 extern const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT;
 extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
