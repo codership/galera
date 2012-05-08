@@ -280,7 +280,7 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
     conn->fc_offset    = 0;
     conn->timeout      = GU_TIME_ETERNITY;
     conn->gcache       = gcache;
-    conn->max_fc_state = conn->params.fc_sync_donor ?
+    conn->max_fc_state = conn->params.sync_donor ?
         GCS_CONN_DONOR : GCS_CONN_JOINED;
 
     gu_mutex_init (&conn->fc_lock, NULL);
@@ -1909,17 +1909,17 @@ _set_fc_debug (gcs_conn_t* conn, const char* value)
 }
 
 static long
-_set_fc_sync_donor (gcs_conn_t* conn, const char* value)
+_set_sync_donor (gcs_conn_t* conn, const char* value)
 {
     bool sd;
     const char* const endptr = gu_str2bool (value, &sd);
 
     if (endptr[0] != '\0') return -EINVAL;
 
-    if (conn->params.fc_sync_donor != sd) {
+    if (conn->params.sync_donor != sd) {
 
-        conn->params.fc_sync_donor = sd;
-        conn->max_fc_state         = sd ? GCS_CONN_DONOR : GCS_CONN_JOINED;
+        conn->params.sync_donor = sd;
+        conn->max_fc_state      = sd ? GCS_CONN_DONOR : GCS_CONN_JOINED;
     }
 
     return 0;
@@ -2016,8 +2016,8 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     else if (!strcmp (key, GCS_PARAMS_FC_DEBUG)) {
         return _set_fc_debug (conn, value);
     }
-    else if (!strcmp (key, GCS_PARAMS_FC_SYNC_DONOR)) {
-        return _set_fc_sync_donor (conn, value);
+    else if (!strcmp (key, GCS_PARAMS_SYNC_DONOR)) {
+        return _set_sync_donor (conn, value);
     }
     else if (!strcmp (key, GCS_PARAMS_MAX_PKT_SIZE)) {
         return _set_pkt_size (conn, value);

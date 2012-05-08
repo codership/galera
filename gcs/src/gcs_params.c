@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,7 +13,7 @@ const char* const GCS_PARAMS_FC_FACTOR         = "gcs.fc_factor";
 const char* const GCS_PARAMS_FC_LIMIT          = "gcs.fc_limit";
 const char* const GCS_PARAMS_FC_MASTER_SLAVE   = "gcs.fc_master_slave";
 const char* const GCS_PARAMS_FC_DEBUG          = "gcs.fc_debug";
-const char* const GCS_PARAMS_FC_SYNC_DONOR     = "gcs.fc_sync_donor";
+const char* const GCS_PARAMS_SYNC_DONOR        = "gcs.sync_donor";
 const char* const GCS_PARAMS_MAX_PKT_SIZE      = "gcs.max_packet_size";
 const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT = "gcs.recv_q_hard_limit";
 const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT = "gcs.recv_q_soft_limit";
@@ -23,7 +23,7 @@ static double  const GCS_PARAMS_DEFAULT_FC_FACTOR         = 0.5;
 static long    const GCS_PARAMS_DEFAULT_FC_LIMIT          = 16;
 static bool    const GCS_PARAMS_DEFAULT_FC_MASTER_SLAVE   = false;
 static long    const GCS_PARAMS_DEFAULT_FC_DEBUG          = 0;
-static bool    const GCS_PARAMS_DEFAULT_FC_SYNC_DONOR     = false;
+static bool    const GCS_PARAMS_DEFAULT_SYNC_DONOR        = false;
 static long    const GCS_PARAMS_DEFAULT_MAX_PKT_SIZE      = 64500;
 static ssize_t const GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT = SSIZE_MAX;
 static double  const GCS_PARAMS_DEFAULT_RECV_Q_SOFT_LIMIT = 0.25;
@@ -198,8 +198,8 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
                                  GCS_PARAMS_DEFAULT_FC_MASTER_SLAVE,
                                  &params->fc_master_slave))) return ret;
 
-    if ((ret = params_init_bool (config, GCS_PARAMS_FC_SYNC_DONOR,
-                                 GCS_PARAMS_DEFAULT_FC_SYNC_DONOR,
-                                 &params->fc_sync_donor))) return ret;
+    if ((ret = params_init_bool (config, GCS_PARAMS_SYNC_DONOR,
+                                 GCS_PARAMS_DEFAULT_SYNC_DONOR,
+                                 &params->sync_donor))) return ret;
     return 0;
 }

@@ -333,6 +333,10 @@ fc_limit
 fc_master_slave
     Should we assume that there is only one master in the group? Default: NO.
 
+sync_donor
+    Should we enable flow control in DONOR state the same way as in SYNCED
+    state. Useful for non-blocking state transfers. Default: NO.
+
 max_packet_size
     All writesets exceeding that size will be fragmented. Default: 32616.
 
