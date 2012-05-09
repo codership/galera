@@ -81,8 +81,14 @@ std::string gcomm::PC::get_listen_addr() const
 
 void PC::connect()
 {
-    const bool start_prim = host_is_any (uri_.get_host());
-
+    const bool start_prim(host_is_any (uri_.get_host()));
+    const bool wait_prim(
+        gu::from_string<bool>(
+            uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
+    const Period wait_prim_timeout(
+        gu::from_string<Period>(
+            uri_.get_option(Conf::PcWaitPrimTimeout,
+                            Defaults::PcWaitPrimTimeout)));
     pstack_.push_proto(gmcast);
     pstack_.push_proto(evs);
     pstack_.push_proto(pc);
@@ -122,8 +128,11 @@ void PC::connect()
                  evs->get_state() == evs::Proto::S_INSTALL ||
                  evs->get_state() == evs::Proto::S_OPERATIONAL);
 
-    // Due to #658 we loop here only if node is told to start in prim.
-    while (start_prim == true && pc->get_state() != pc::Proto::S_PRIM)
+    // - Due to #658 we loop here only if node is told to start in prim.
+    // - Fix for #680, bypass waiting prim only if explicitly required
+    try_until = Date::now() + wait_prim_timeout;
+    while ((wait_prim == true || start_prim == true) &&
+           pc->get_state() != pc::Proto::S_PRIM)
     {
         get_pnet().event_loop(Sec/2);
         if (try_until < Date::now())

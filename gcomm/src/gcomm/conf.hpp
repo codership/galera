@@ -373,6 +373,17 @@ namespace gcomm
          * @brief If set during runtime bootstraps new PC
          */
         static std::string const PcBootstrap;
+
+        /*!
+         * @brief Wait for prim comp unconditionally if set to true
+         */
+        static std::string const PcWaitPrim;
+
+        /*!
+         * @brief Timeout on waiting for primary component
+         */
+        static std::string const PcWaitPrimTimeout;
+
     };
 
 

@@ -31,6 +31,8 @@ namespace gcomm
         static std::string const EvsUserSendWindowMin     ;
         static std::string const EvsMaxInstallTimeouts    ;
         static std::string const PcAnnounceTimeout        ;
+        static std::string const PcWaitPrim               ;
+        static std::string const PcWaitPrimTimeout        ;
     };
 }
 
