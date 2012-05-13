@@ -30,13 +30,14 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
-    debug=n       debug build with optimization level n
-    arch=str      target architecture [i686|x86_64]
-    build_dir=dir build directory, default .
-    boost=[0|1]   disable or enable boost libraries
-    revno=XXXX    source code revision number
+    debug=n        debug build with optimization level n
+    arch=str       target architecture [i686|x86_64]
+    build_dir=dir  build directory, default: '.'
+    boost=[0|1]    disable or enable boost libraries
+    revno=XXXX     source code revision number
+    bpostatic=path a path to static libboost_program_options.a
 ''')
-
+# bpostatic option added on Percona request
 
 #
 # Default params
@@ -99,6 +100,9 @@ GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
 print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
+
+LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '');
+Export('LIBBOOST_PROGRAM_OPTIONS_A')
 
 #
 # Set up and export default build environment

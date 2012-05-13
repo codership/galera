@@ -1,6 +1,6 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-env = DefaultEnvironment() #.Clone()
+env = DefaultEnvironment().Clone()
 
 conf = Configure(env)
 
@@ -16,16 +16,30 @@ env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
 env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
 
-bpo_static = '/usr/lib/libboost_program_options.a'
-bpo_local_static = '/usr/local/lib/libboost_program_options.a'
+#bpo_static = '/usr/lib/libboost_program_options.a'
+#bpo_local_static = '/usr/local/lib/libboost_program_options.a'
+
+Import('LIBBOOST_PROGRAM_OPTIONS_A')
 
 import os
 
-if os.path.isfile(bpo_static):
-    env.Append(LIBS=File(bpo_static))
-elif os.path.isfile(bpo_local_static):
-    env.Append(LIBS=File(bpo_local_static))
+if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
+    if LIBBOOST_PROGRAM_OPTIONS_A != '':
+        print 'ERROR: file \'' + LIBBOOST_PROGRAM_OPTIONS_A + '\' does not exist'
+        Exit(1)
+    else:
+        LIBBOOST_PROGRAM_OPTIONS_A = '/usr/local/lib/libboost_program_options.a'
+        if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
+            LIBBOOST_PROGRAM_OPTIONS_A = '/usr/local/lib64/libboost_program_options.a'
+            if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
+                LIBBOOST_PROGRAM_OPTIONS_A = '/usr/lib/libboost_program_options.a'
+                if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
+                    LIBBOOST_PROGRAM_OPTIONS_A = '/usr/lib64/libboost_program_options.a'
+
+if os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
+    env.Append(LIBS=File(LIBBOOST_PROGRAM_OPTIONS_A))
 else:
+    # as a last resort try shared library
     env.Append(LIBS=['boost_program_options'])
 
 # special environment for garb_config.cpp
