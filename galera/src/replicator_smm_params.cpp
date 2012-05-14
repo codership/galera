@@ -65,6 +65,7 @@ galera::ReplicatorSMM::set_param (const std::string& key,
 {
     if (key == Param::commit_order)
     {
+        log_error << "setting '" << key << "' during runtime not allowed";
         gu_throw_error(EPERM)
             << "setting '" << key << "' during runtime not allowed";
     }

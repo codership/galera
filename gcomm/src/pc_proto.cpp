@@ -1106,14 +1106,12 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
         ignore_sb_ = gu::from_string<bool>(value);
         return true;
     }
-
-    if (key == gcomm::Conf::PcIgnoreQuorum)
+    else if (key == gcomm::Conf::PcIgnoreQuorum)
     {
         ignore_quorum_ = gu::from_string<bool>(value);
         return true;
     }
-
-    if (key == gcomm::Conf::PcBootstrap)
+    else if (key == gcomm::Conf::PcBootstrap)
     {
         if (get_state() != S_NON_PRIM)
         {
@@ -1126,6 +1124,15 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
         }
         return true;
     }
-
+    else if (key == Conf::PcChecksum ||
+             key == Conf::PcAnnounceTimeout ||
+             key == Conf::PcLinger ||
+             key == Conf::PcNpvo ||
+             key == Conf::PcWaitPrim ||
+             key == Conf::PcWaitPrimTimeout)
+    {
+        gu_throw_error(EPERM) << "can't change value for '"
+                              << key << "' during runtime";
+    }
     return false;
 }

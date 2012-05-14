@@ -1351,5 +1351,16 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
         }
         return true;
     }
+    else if (key == Conf::GMCastGroup ||
+             key == Conf::GMCastListenAddr ||
+             key == Conf::GMCastMCastAddr ||
+             key == Conf::GMCastMCastPort ||
+             key == Conf::GMCastMCastTTL ||
+             key == Conf::GMCastTimeWait ||
+             key == Conf::GMCastPeerTimeout)
+    {
+        gu_throw_error(EPERM) << "can't change value for '"
+                              << key << "' during runtime";
+    }
     return false;
 }

@@ -237,6 +237,21 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         conf_.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts));
         return true;
     }
+    else if (key == Conf::EvsViewForgetTimeout ||
+             key == Conf::EvsSuspectTimeout ||
+             key == Conf::EvsInactiveTimeout ||
+             key == Conf::EvsInactiveCheckPeriod ||
+             key == Conf::EvsInstallTimeout ||
+             key == Conf::EvsKeepalivePeriod ||
+             key == Conf::EvsJoinRetransPeriod ||
+             key == Conf::EvsStatsReportPeriod ||
+             key == Conf::EvsDebugLogMask ||
+             key == Conf::EvsInfoLogMask ||
+             key == Conf::EvsUseAggregate)
+    {
+        gu_throw_error(EPERM) << "can't change value for '"
+                              << key << "' during runtime";
+    }
     return false;
 }
 

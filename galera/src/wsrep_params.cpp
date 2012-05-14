@@ -44,11 +44,13 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
         catch (gu::NotFound&)
         {
             log_warn << "Unknown parameter '" << i->first << "'";
+            gu_throw_error(EINVAL) << "Unknown parameter' " << i->first << "'";
         }
         catch (gu::Exception& e)
         {
-            log_warn << "Setting parameter '" << i->first << "' to '"
-                     << i->second << "' failed: " << e.what();
+            log_debug << "Setting parameter '" << i->first << "' to '"
+                      << i->second << "' failed: " << e.what();
+            throw;
         }
     }
 }

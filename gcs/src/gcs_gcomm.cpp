@@ -795,7 +795,7 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
 
         if (conn.get_pnet().set_param(key, value) == false)
         {
-            log_warn << "param " << key << " not recognized";
+            log_debug << "param " << key << " not recognized";
             return 1;
         }
         else
