@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # lp:861212
 # https://bugs.launchpad.net/codership-mysql/+bug/861212
@@ -45,7 +45,7 @@ $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
     --stat-interval 30 --rows 1000 --ac-frac 10 --rollbacks 0.1 --alters 0.001
 
 echo "checking consistency"
-check
+check || (sleep 5 && check)
 
 echo "stopping cluster"
 stop

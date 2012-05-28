@@ -1,6 +1,6 @@
 #!/bin/sh -uex
 
-PORT=3305
+PORT=3306
 HOST=127.0.0.1
 USER=root
 PSWD=rootpass
@@ -29,3 +29,4 @@ do
     echo $DELETE | $MYSQL
 done
 
+echo "$i tries passed"
