@@ -15,18 +15,20 @@
 # include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
 #endif /* HAVE_BYTESWAP_H */
 
-#if !defined(bswap16)
-# if defined(bswap_16)
-#  define bswap16 bswap_16
-#  define bswap32 bswap_32
-#  define bswap64 bswap_64
-# elif defined(__sun__) /* BSWAP macros inherited from gu_arch.h */
-#  define bswap16 BSWAP_16
-#  define bswap32 BSWAP_32
-#  define bswap64 BSWAP_64
-# else
+#if defined(bswap16)
+#  define gu_bswap16 bswap16
+#  define gu_bswap32 bswap32
+#  define gu_bswap64 bswap64
+#elif defined(bswap_16)
+#  define gu_bswap16 bswap_16
+#  define gu_bswap32 bswap_32
+#  define gu_bswap64 bswap_64
+#elif defined(__sun__) /* BSWAP macros inherited from gu_arch.h */
+#  define gu_bswap16 BSWAP_16
+#  define gu_bswap32 BSWAP_32
+#  define gu_bswap64 BSWAP_64
+#else
 #  error "No byteswap macros are defined"
-# endif
 #endif
 
 /* @note: there are inline functions behind these macros,
@@ -34,8 +36,8 @@
 #ifdef __cplusplus
 // To pacify C++. Not loosing much optimization on 2 bytes anyways.
 #include <stdint.h>
-#undef bswap16
-static inline uint16_t bswap16(uint16_t const x)
+#undef gu_bswap16
+static inline uint16_t gu_bswap16(uint16_t const x)
 // Even though x is declared as 'uint16_t', g++-4.4.1 still treats results
 // of operations with it as 'int' and freaks out on return with -Wconversion.
 { return static_cast<uint16_t>((x >> 8) | (x << 8)); }
@@ -48,16 +50,16 @@ static inline uint16_t bswap16(uint16_t const x)
 #define gu_le64(x) (x)
 
 /* convert to/from Big Endian representation */
-#define gu_be16(x) bswap16(x)
-#define gu_be32(x) bswap32(x)
-#define gu_be64(x) bswap64(x)
+#define gu_be16(x) gu_bswap16(x)
+#define gu_be32(x) gu_bswap32(x)
+#define gu_be64(x) gu_bswap64(x)
 
 #else /* Big-Endian */
 
 /* convert to/from Little Endian representation */
-#define gu_le16(x) bswap16(x)
-#define gu_le32(x) bswap32(x)
-#define gu_le64(x) bswap64(x)
+#define gu_le16(x) gu_bswap16(x)
+#define gu_le32(x) gu_bswap32(x)
+#define gu_le64(x) gu_bswap64(x)
 
 /* convert to/from Big Endian representation */
 #define gu_be16(x) (x)
@@ -73,8 +75,8 @@ static inline uint16_t bswap16(uint16_t const x)
 #define gtohs(x) htogs(x)
 #define htogl(x) gu_le32(x)
 #define gtohl(x) htogl(x)
- 
-/* Analogues to htogs() and friends, named with type width */
+
+/* Analogues to htogs() and friends, suffixed with type width */
 #define htog16(x) gu_le16(x)
 #define gtoh16(x) htog16(x)
 #define htog32(x) gu_le32(x)
