@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -95,7 +95,7 @@ else:
 boost = int(ARGUMENTS.get('boost', 1))
 ssl   = int(ARGUMENTS.get('ssl', 1))
 
-GALERA_VER = ARGUMENTS.get('version', '2.1')
+GALERA_VER = ARGUMENTS.get('version', '2.2dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
