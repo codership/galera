@@ -2,16 +2,18 @@
 
 /*!
  * @file Benchmark for different hash implementations:
- *       fnv32, fnv64, fnv128, md5 from libssl and md5 from crypto++
+ *       fnv32, fnv64, fnv128, mmh3, md5 from libssl and md5 from crypto++
  *
  * To compile:
- * g++ -O3 -Wall -Werror -march=core2 gu_fnv_bench.c -lssl -lcrypto++
+ * g++ -DHAVE_ENDIAN_H -DHAVE_BYTESWAP_H -O3 -Wall -Werror -march=core2 \
+ *     gu_fnv_bench.c gu_mmh3.c -lssl/-lcrypto -lcrypto++
  *
  * To run:
  * gu_fnv_bench <buffer size> <N loops>
  */
 
 #include "gu_fnv.h"
+#include "gu_mmh3.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +31,9 @@ enum algs
     FNV32,
     FNV64,
     FNV128,
+    MMH32,
+    MMH128_x86,
+    MMH128_x64,
     MD5SSL,
     MD5CPP
 };
@@ -39,7 +44,7 @@ static int timer (const void* const buf, ssize_t const len,
     double begin, end;
     struct timeval tv;
     const char* alg = "undefined";
-    uint64_t volatile h; // this variable serves to prevet compiler from 
+    uint64_t volatile h; // this variable serves to prevet compiler from
                          // optimizeing out the calls
 
     gettimeofday (&tv, NULL); begin = (double)tv.tv_sec + 1.e-6 * tv.tv_usec;
@@ -94,6 +99,44 @@ static int timer (const void* const buf, ssize_t const len,
         INTERNAL_LOOP_END
         break;
     }
+    case MMH32:
+    {
+        alg = "mmh32";
+        INTERNAL_LOOP_BEGIN
+            uint32_t hash;
+            gu_mmh3_32 (buf, len, GU_FNV32_SEED, &hash);
+            h = hash;
+        INTERNAL_LOOP_END
+        break;
+    }
+    case MMH128_x86:
+    {
+        alg = "mmh128/32";
+        INTERNAL_LOOP_BEGIN
+            gu_uint128_t hash;
+            gu_mmh3_x86_128 (buf, len, GU_FNV32_SEED, &hash);
+#if (GU_WORDSIZE == 64)
+            h = hash;
+#else
+            h = hash.u32[GU_32LO];
+#endif
+        INTERNAL_LOOP_END
+        break;
+    }
+    case MMH128_x64:
+    {
+        alg = "mmh128/64";
+        INTERNAL_LOOP_BEGIN
+            gu_uint128_t hash;
+            gu_mmh3_x64_128 (buf, len, GU_FNV32_SEED, &hash);
+#if (GU_WORDSIZE == 64)
+            h = hash;
+#else
+            h = hash.u32[GU_32LO];
+#endif
+        INTERNAL_LOOP_END
+        break;
+    }
     case MD5SSL:
     {
         alg = "md5ssl";
@@ -118,7 +161,7 @@ static int timer (const void* const buf, ssize_t const len,
     gettimeofday (&tv, NULL); end   = (double)tv.tv_sec + 1.e-6 * tv.tv_usec;
 
     end -= begin;
-    return printf ("%s: %lld loops, %7.3f seconds, %7.3f Mb/sec\n",
+    return printf ("%s: %lld loops, %6.3f seconds, %8.3f Mb/sec\n",
                    alg, loops, end, (double)(loops * len)/end/1024/1024);
 }
 
@@ -139,6 +182,9 @@ int main (int argc, char* argv[])
     timer (buf, buf_size, loops, FNV32);
     timer (buf, buf_size, loops, FNV64);
     timer (buf, buf_size, loops, FNV128);
+    timer (buf, buf_size, loops, MMH32);
+    timer (buf, buf_size, loops, MMH128_x86);
+    timer (buf, buf_size, loops, MMH128_x64);
     timer (buf, buf_size, loops, MD5SSL);
     timer (buf, buf_size, loops, MD5CPP);
 

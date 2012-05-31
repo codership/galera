@@ -10,7 +10,9 @@ libgalerautils_sources = [
     'gu_lock_step.c',
     'gu_log.c',
     'gu_mem.c',
+    'gu_mmh3.c',
     'gu_mutex.c',
+    'gu_print_buf.c',
     'gu_to.c',
     'gu_utils.c',
     'gu_uuid.c'

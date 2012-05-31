@@ -17,7 +17,8 @@ START_TEST (gu_fnv32_test)
 {
     uint32_t ret = 0;
     gu_fnv32a (test_buf, strlen(test_buf), &ret);
-    fail_if (GU_FNV32_SEED != ret,"FNV32 failed: expected %"PRIu32", got %"PRIu32,
+    fail_if (GU_FNV32_SEED != ret,
+             "FNV32 failed: expected %"PRIu32", got %"PRIu32,
              GU_FNV32_SEED, ret);
 }
 END_TEST
@@ -26,7 +27,8 @@ START_TEST (gu_fnv64_test)
 {
     uint64_t ret = 0;
     gu_fnv64a (test_buf, strlen(test_buf), &ret);
-    fail_if (GU_FNV64_SEED != ret,"FNV64 failed: expected %"PRIu64", got %"PRIu64,
+    fail_if (GU_FNV64_SEED != ret,
+             "FNV64 failed: expected %"PRIu64", got %"PRIu64,
              GU_FNV64_SEED, ret);
 }
 END_TEST

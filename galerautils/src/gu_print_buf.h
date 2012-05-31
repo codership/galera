@@ -15,8 +15,19 @@
 extern "C" {
 #endif
 
-/*! This function is to dump contents of the binary buffer into a readable form */
-extern void gu_print_buf(const void* buf, ssize_t buf_size, char* str, ssize_t str_size);
+/*! Dumps contents of the binary buffer in a readable form to a 0-terminated
+ *  string of length not exeeding str_size - 1
+ * @param buf      input binary buffer
+ * @param but_size size of the input buffer
+ * @param str      target string buffer (will be always 0-terminated)
+ * @param str_size string buffer size (including terminating 0)
+ * @param alpha    dump alphanumeric characters as they are, padded with '.'
+ *                 (e.g. D.u.m.p.)
+ */
+extern void
+gu_print_buf(const void* buf, ssize_t buf_size,
+             char* str, ssize_t str_size,
+             bool alpha);
 
 #ifdef __cplusplus
 }
