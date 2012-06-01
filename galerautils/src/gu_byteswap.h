@@ -10,9 +10,40 @@
 #define _gu_byteswap_h_
 
 #include "gu_arch.h"
+#include "gu_types.h"
+#include "gu_macros.h"
+
+/*
+ * Platform-dependent macros
+ */
+
+#if defined(_MSC_VER)
+
+#include <stdlib.h>
+
+#define GU_ROTL32(x,y)     _rotl(x,y)
+#define GU_ROTL64(x,y)     _rotl64(x,y)
+
+#else   /* !defined(_MSC_VER) */
+
+static GU_FORCE_INLINE GU_UNUSED uint32_t GU_ROTL32 (uint32_t x, int8_t r)
+{
+  return (x << r) | (x >> (32 - r));
+}
+
+static GU_FORCE_INLINE GU_UNUSED uint64_t GU_ROTL64 (uint64_t x, int8_t r)
+{
+  return (x << r) | (x >> (64 - r));
+}
+
+#endif /* !defined(_MSC_VER) */
+
+/*
+ * End of paltform-dependent macros
+ */
 
 #if defined(HAVE_BYTESWAP_H)
-# include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
+#  include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
 #endif /* HAVE_BYTESWAP_H */
 
 #if defined(bswap16)
@@ -31,13 +62,13 @@
 #  error "No byteswap macros are defined"
 #endif
 
-/* @note: there are inline functions behind these macros,
+/* @note: there are inline functions behind these macros below,
  *        so typesafety is taken care of... However C++ still has issues: */
 #ifdef __cplusplus
 // To pacify C++. Not loosing much optimization on 2 bytes anyways.
 #include <stdint.h>
 #undef gu_bswap16
-static inline uint16_t gu_bswap16(uint16_t const x)
+static GU_FORCE_INLINE GU_UNUSED uint16_t gu_bswap16(uint16_t const x)
 // Even though x is declared as 'uint16_t', g++-4.4.1 still treats results
 // of operations with it as 'int' and freaks out on return with -Wconversion.
 { return static_cast<uint16_t>((x >> 8) | (x << 8)); }

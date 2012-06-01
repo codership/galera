@@ -9,6 +9,26 @@
 #ifndef _gu_macros_h_
 #define _gu_macros_h_
 
+/*
+ * Platform-dependent macros
+ */
+
+#if defined(_MSC_VER)
+#  define GU_INLINE          __forceinline
+#  define GU_FORCE_INLINE    __forceinline
+#  define GU_UNUSED
+#  define GU_BIG_CONSTANT(x) (x)
+#else   /* !defined(_MSC_VER) */
+#  define GU_INLINE          inline
+#  define GU_FORCE_INLINE    __attribute__((always_inline))
+#  define GU_UNUSED          __attribute__((unused))
+#  define GU_BIG_CONSTANT(x) (x##LLU)
+#endif /* !defined(_MSC_VER) */
+
+/*
+ * End of paltform-dependent macros
+ */
+
 /* "Shamelessly stolen" (tm) goods from Linux kernel */
 /*
  * min()/max() macros that also do
@@ -32,11 +52,11 @@
 #define gu_offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 #if __GNUC__ >= 3
-#define gu_likely(x)   __builtin_expect((x), 1)
-#define gu_unlikely(x) __builtin_expect((x), 0)
+#  define gu_likely(x)   __builtin_expect((x), 1)
+#  define gu_unlikely(x) __builtin_expect((x), 0)
 #else
-#define gu_likely(x)   (x)
-#define gu_unlikely(x) (x)
+#  define gu_likely(x)   (x)
+#  define gu_unlikely(x) (x)
 #endif
 
 #endif /* _gu_macros_h_ */

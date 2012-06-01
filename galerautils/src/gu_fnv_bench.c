@@ -104,7 +104,7 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "mmh32";
         INTERNAL_LOOP_BEGIN
             uint32_t hash;
-            gu_mmh3_32 (buf, len, GU_FNV32_SEED, &hash);
+            gu_mmh32 (buf, len, &hash);
             h = hash;
         INTERNAL_LOOP_END
         break;
@@ -128,7 +128,7 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "mmh128/64";
         INTERNAL_LOOP_BEGIN
             gu_uint128_t hash;
-            gu_mmh3_x64_128 (buf, len, GU_FNV32_SEED, &hash);
+            gu_mmh128 (buf, len, &hash);
 #if (GU_WORDSIZE == 64)
             h = hash;
 #else

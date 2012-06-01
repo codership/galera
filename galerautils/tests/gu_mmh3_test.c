@@ -143,7 +143,7 @@ check (const void* const exp, const void* const got, ssize_t size)
 {
     if (memcmp (exp, got, size))
     {
-        ssize_t str_size = size * 1.2 + 1;
+        ssize_t str_size = size * 2.2 + 1;
         char c[str_size], r[str_size];
 
         gu_print_buf (exp, size, c, sizeof(c), false);
