@@ -13,6 +13,7 @@ gu_tests = env.Program(target = 'gu_tests',
                             gu_bswap_test.c
                             gu_fnv_test.c
                             gu_mmh3_test.c
+                            gu_spooky_test.c
                             gu_time_test.c
                             gu_fifo_test.c
                             gu_uuid_test.c

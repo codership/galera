@@ -14,7 +14,7 @@
 
 #include "gu_fnv.h"
 #include "gu_mmh3.h"
-#include "spooky.h"
+#include "gu_spooky.h"
 
 #include <stdio.h>
 #include <stdlib.h>
