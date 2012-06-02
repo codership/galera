@@ -140,7 +140,8 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "Spooky";
         INTERNAL_LOOP_BEGIN
-            uint64_t h1, h2;
+            uint64_t h1 = 0;
+            uint64_t h2 = 0;
             gu_spooky (buf, len, &h1, &h2);
             h = h1;
         INTERNAL_LOOP_END
