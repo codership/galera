@@ -93,7 +93,7 @@ static int timer (const void* const buf, ssize_t const len,
         INTERNAL_LOOP_BEGIN
             gu_uint128_t hash = GU_FNV128_SEED;
             gu_fnv128a (buf, len, &hash);
-#if (GU_WORDSIZE == 64)
+#if defined(__SIZEOF_INT128__)
             h = hash;
 #else
             h = hash.u32[GU_32LO];
@@ -117,7 +117,7 @@ static int timer (const void* const buf, ssize_t const len,
         INTERNAL_LOOP_BEGIN
             gu_uint128_t hash;
             gu_mmh128 (buf, len, &hash);
-#if (GU_WORDSIZE == 64)
+#if defined(__SIZEOF_INT128__)
             h = hash;
 #else
             h = hash.u32[GU_32LO];
@@ -129,7 +129,8 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "SpookyS";
         INTERNAL_LOOP_BEGIN
-            uint64_t h1, h2;
+            uint64_t h1 = 0;
+            uint64_t h2 = 0;
             gu_spooky_short (buf, len, &h1, &h2);
             h = h1;
         INTERNAL_LOOP_END
