@@ -11,31 +11,6 @@
 
 #include "../src/gu_spooky.h"
 
-#if 0
-#include "../src/gu_log.h"
-#include "../src/gu_print_buf.h"
-
-/* returns true if check fails */
-static bool
-check (const void* const exp, const void* const got, ssize_t size)
-{
-    if (memcmp (exp, got, size))
-    {
-        ssize_t str_size = size * 2.2 + 1;
-        char c[str_size], r[str_size];
-
-        gu_print_buf (exp, size, c, sizeof(c), false);
-        gu_print_buf (got, size, r, sizeof(r), false);
-
-        gu_info ("expected Spooky hash:\n%s\nfound:\n%s\n", c, r);
-
-        return true;
-    }
-
-    return false;
-}
-#endif
-
 #define BUFSIZE 512
 static uint64_t const expected[BUFSIZE] = {
     0xa24295ec, 0xfe3a05ce, 0x257fd8ef, 0x3acd5217,
@@ -195,7 +170,7 @@ START_TEST (gu_spooky_test)
         uint64_t h2 = 0;
 
         buf[i] = i+128;
-        SpookyHash128(buf, i, &h1, &h2);
+        gu_spooky (buf, i, &h1, &h2);
         saw[i] = (uint32_t)gu_le64(h1);
         fail_if (saw[i] != gu_le32(expected[i]),
                  "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw[i], expected[i]);
@@ -211,14 +186,14 @@ START_TEST (gu_spooky_short_test)
     size_t i;
 
     /* Spooky Short apparently implements different algorithm and is used
-     * by Spooky only for the messages smaller than sc_bufSize (192) */
-    for (i = 0; i < sc_bufSize; ++i)
+     * by Spooky only for the messages smaller than _spooky_bufSize (192) */
+    for (i = 0; i < _spooky_bufSize; ++i)
     {
         uint64_t h1 = 0;
         uint64_t h2 = 0;
 
         buf[i] = i+128;
-        SpookyHashShort(buf, i, &h1, &h2);
+        gu_spooky_short (buf, i, &h1, &h2);
         saw[i] = (uint32_t)gu_le64(h1);
         fail_if (saw[i] != gu_le32(expected[i]),
                  "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw[i], expected[i]);

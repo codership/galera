@@ -46,4 +46,7 @@
 # error "Unsupported wordsize"
 #endif
 
+/* I'm not aware of the platforms that don't, but still */
+#define GU_ALLOW_UNALIGNED_READS 1
+
 #endif /* _gu_arch_h_ */

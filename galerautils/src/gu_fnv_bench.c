@@ -35,7 +35,7 @@ enum algs
     MMH32,
     MMH128,
     SPOOKYS,
-    SPOOKYL,
+    SPOOKY,
     MD5SSL,
     MD5CPP
 };
@@ -130,17 +130,17 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "SpookyS";
         INTERNAL_LOOP_BEGIN
             uint64_t h1, h2;
-            SpookyHashShort (buf, len, &h1, &h2);
+            gu_spooky_short (buf, len, &h1, &h2);
             h = h1;
         INTERNAL_LOOP_END
         break;
     }
-    case SPOOKYL:
+    case SPOOKY:
     {
-        alg = "SpookyL";
+        alg = "Spooky";
         INTERNAL_LOOP_BEGIN
             uint64_t h1, h2;
-            SpookyHash128 (buf, len, &h1, &h2);
+            gu_spooky (buf, len, &h1, &h2);
             h = h1;
         INTERNAL_LOOP_END
         break;
@@ -194,7 +194,7 @@ int main (int argc, char* argv[])
     timer (buf, buf_size, loops, MMH32);
     timer (buf, buf_size, loops, MMH128);
     timer (buf, buf_size, loops, SPOOKYS);
-    timer (buf, buf_size, loops, SPOOKYL);
+    timer (buf, buf_size, loops, SPOOKY);
     timer (buf, buf_size, loops, MD5SSL);
     timer (buf, buf_size, loops, MD5CPP);
 

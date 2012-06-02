@@ -4,6 +4,8 @@
  * @file Spooky hash by Bob Jenkins:
  *       http://www.burtleburtle.net/bob/c/spooky.h
  *
+ * Original author comments preserved in C++ style
+ *
  * $Id$
  */
 
@@ -13,25 +15,17 @@
 #include "gu_types.h"
 #include "gu_byteswap.h"
 
-typedef uint8_t  uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-#define Rot64 GU_ROTL64
-#define ALLOW_UNALIGNED_READS 1
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <string.h> // for memcpy()
 
-/*! gcc may complain about 'initializer element is not constant', hence macros*/
-#define sc_numVars   12
-#define sc_blockSize 96  /* (sc_numVars * 8)   */
-#define sc_bufSize   192 /* (sc_blockSize * 2) */
-static uint64_t const sc_const = GU_ULONG_LONG(0xDEADBEEFDEADBEEF);
+/*! GCC complains about 'initializer element is not constant', hence macros */
+#define _spooky_numVars   12
+#define _spooky_blockSize 96  /* (_spooky_numVars * 8)   */
+#define _spooky_bufSize   192 /* (_spooky_blockSize * 2) */
+static uint64_t const _spooky_const = GU_ULONG_LONG(0xDEADBEEFDEADBEEF);
 
 //
 // This is used if the input is 96 bytes long or longer.
@@ -46,7 +40,7 @@ static uint64_t const sc_const = GU_ULONG_LONG(0xDEADBEEFDEADBEEF);
 //   When run forward or backwards one Mix
 // I tried 3 pairs of each; they all differed by at least 212 bits.
 //
-static GU_INLINE void Mix(
+static GU_INLINE void _spooky_mix(
     const uint64_t *data,
     uint64_t* s0, uint64_t* s1, uint64_t* s2, uint64_t* s3,
     uint64_t* s4, uint64_t* s5, uint64_t* s6, uint64_t* s7,
@@ -82,7 +76,7 @@ static GU_INLINE void Mix(
 // Two iterations was almost good enough for a 64-bit result, but a
 // 128-bit result is reported, so End() does three iterations.
 //
-static GU_INLINE void EndPartial(
+static GU_INLINE void _spooky_end_part(
     uint64_t* h0, uint64_t* h1, uint64_t* h2, uint64_t* h3,
     uint64_t* h4, uint64_t* h5, uint64_t* h6, uint64_t* h7,
     uint64_t* h8, uint64_t* h9, uint64_t* h10,uint64_t* h11)
@@ -101,14 +95,14 @@ static GU_INLINE void EndPartial(
     *h10+= *h0;    *h1 ^= *h10;   *h0 = GU_ROTL64(*h0,54);
 }
 
-static GU_INLINE void End(
+static GU_INLINE void _spooky_end(
     uint64_t* h0, uint64_t* h1, uint64_t* h2, uint64_t* h3,
     uint64_t* h4, uint64_t* h5, uint64_t* h6, uint64_t* h7,
     uint64_t* h8, uint64_t* h9, uint64_t* h10,uint64_t* h11)
 {
-    EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
-    EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
-    EndPartial(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+    _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+    _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+    _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
 }
 
 //
@@ -126,7 +120,7 @@ static GU_INLINE void End(
 // with diffs defined by either xor or subtraction
 // with a base of all zeros plus a counter, or plus another bit, or random
 //
-static GU_INLINE void ShortMix(uint64_t* h0, uint64_t* h1,
+static GU_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
                                uint64_t* h2, uint64_t* h3)
 {
     *h2 = GU_ROTL64(*h2,50);  *h2 += *h3;  *h0 ^= *h2;
@@ -155,10 +149,8 @@ static GU_INLINE void ShortMix(uint64_t* h0, uint64_t* h1,
 // For every pair of input bits,
 // with probability 50 +- .75% (the worst case is approximately that)
 //
-static GU_INLINE void ShortEnd(uint64_t* h0,
-                               uint64_t* h1,
-                               uint64_t* h2,
-                               uint64_t* h3)
+static GU_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
+                                        uint64_t* h2, uint64_t* h3)
 {
     *h3 ^= *h2;  *h2 = GU_ROTL64(*h2,15);  *h3 += *h2;
     *h0 ^= *h3;  *h3 = GU_ROTL64(*h3,52);  *h0 += *h3;
@@ -177,45 +169,49 @@ static GU_INLINE void ShortEnd(uint64_t* h0,
 // short hash ... it could be used on any message,
 // but it's used by Spooky just for short messages.
 //
-static GU_INLINE void SpookyHashShort(
+static GU_INLINE void gu_spooky_short(
     const void* message,
     size_t      length,
     uint64_t*   hash1,
     uint64_t*   hash2)
 {
-    uint64_t buf[2*sc_numVars];
     union
     {
-        const uint8_t *p8;
-        uint32_t *p32;
-        uint64_t *p64;
+        const uint8_t* p8;
+        uint32_t*      p32;
+        uint64_t*      p64;
+#if !GU_ALLOW_UNALIGNED_READS
         size_t i;
+#endif /* !GU_ALLOW_UNALIGNED_READS */
     } u;
 
     u.p8 = (const uint8_t *)message;
 
-    if (!ALLOW_UNALIGNED_READS && (u.i & 0x7))
+#if !GU_ALLOW_UNALIGNED_READS
+    if (u.i & 0x7)
     {
+        uint64_t buf[_spooky_numVars << 1];
         memcpy(buf, message, length);
         u.p64 = buf;
     }
+#endif /* !GU_ALLOW_UNALIGNED_READS */
 
-    size_t remainder = length%32;
-    uint64_t a=*hash1;
-    uint64_t b=*hash2;
-    uint64_t c=sc_const;
-    uint64_t d=sc_const;
+    size_t   remainder = length & 0x1F; /* length%32 */
+    uint64_t a = gu_le64(*hash1);
+    uint64_t b = gu_le64(*hash2);
+    uint64_t c = _spooky_const;
+    uint64_t d = _spooky_const;
 
     if (length > 15)
     {
-        const uint64_t *end = u.p64 + (length/32)*4;
+        const uint64_t *end = u.p64 + ((length >> 5) << 2); /* (length/32)*4 */
 
         // handle all complete sets of 32 bytes
         for (; u.p64 < end; u.p64 += 4)
         {
             c += u.p64[0];
             d += u.p64[1];
-            ShortMix(&a,&b,&c,&d);
+            _spooky_short_mix(&a, &b, &c, &d);
             a += u.p64[2];
             b += u.p64[3];
         }
@@ -225,121 +221,128 @@ static GU_INLINE void SpookyHashShort(
         {
             c += u.p64[0];
             d += u.p64[1];
-            ShortMix(&a,&b,&c,&d);
+            _spooky_short_mix(&a, &b, &c, &d);
             u.p64 += 2;
             remainder -= 16;
         }
     }
 
     // Handle the last 0..15 bytes, and its length
-    d = ((uint64)length) << 56;
+    d = ((uint64_t)length) << 56;
     switch (remainder)
     {
     case 15:
-    d += ((uint64)u.p8[14]) << 48;
+        d += ((uint64_t)u.p8[14]) << 48;
     case 14:
-        d += ((uint64)u.p8[13]) << 40;
+        d += ((uint64_t)u.p8[13]) << 40;
     case 13:
-        d += ((uint64)u.p8[12]) << 32;
+        d += ((uint64_t)u.p8[12]) << 32;
     case 12:
         d += u.p32[2];
         c += u.p64[0];
         break;
     case 11:
-        d += ((uint64)u.p8[10]) << 16;
+        d += ((uint64_t)u.p8[10]) << 16;
     case 10:
-        d += ((uint64)u.p8[9]) << 8;
+        d += ((uint64_t)u.p8[9]) << 8;
     case 9:
-        d += (uint64)u.p8[8];
+        d += (uint64_t)u.p8[8];
     case 8:
         c += u.p64[0];
         break;
     case 7:
-        c += ((uint64)u.p8[6]) << 48;
+        c += ((uint64_t)u.p8[6]) << 48;
     case 6:
-        c += ((uint64)u.p8[5]) << 40;
+        c += ((uint64_t)u.p8[5]) << 40;
     case 5:
-        c += ((uint64)u.p8[4]) << 32;
+        c += ((uint64_t)u.p8[4]) << 32;
     case 4:
         c += u.p32[0];
         break;
     case 3:
-        c += ((uint64)u.p8[2]) << 16;
+        c += ((uint64_t)u.p8[2]) << 16;
     case 2:
-        c += ((uint64)u.p8[1]) << 8;
+        c += ((uint64_t)u.p8[1]) << 8;
     case 1:
-        c += (uint64)u.p8[0];
+        c += (uint64_t)u.p8[0];
         break;
     case 0:
-        c += sc_const;
-        d += sc_const;
+        c += _spooky_const;
+        d += _spooky_const;
     }
-    ShortEnd(&a,&b,&c,&d);
-    *hash1 = a;
-    *hash2 = b;
+
+    _spooky_short_end(&a, &b, &c, &d);
+    *hash1 = gu_le64(a);
+    *hash2 = gu_le64(b);
 }
 
 // do the whole hash in one call
-static GU_INLINE void SpookyHash128(
-    const void *message,
-    size_t length,
-    uint64_t *hash1,
-    uint64_t *hash2)
+static GU_INLINE void gu_spooky (
+    const void* message,
+    size_t      length,
+    uint64_t*   hash1,
+    uint64_t*   hash2)
 {
-    if (length < sc_bufSize)
+    if (length < _spooky_bufSize)
     {
-        SpookyHashShort(message, length, hash1, hash2);
+        gu_spooky_short (message, length, hash1, hash2);
         return;
     }
 
-    uint64_t h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11;
-    uint64_t buf[sc_numVars];
-    uint64_t *end;
+    uint64_t  h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11;
+    uint64_t  buf[_spooky_numVars];
+    uint64_t* end;
     union
     {
-        const uint8_t *p8;
-        uint64_t *p64;
-        size_t i;
+        const uint8_t* p8;
+        uint64_t*      p64;
+#if !GU_ALLOW_UNALIGNED_READS
+        size_t         i;
+#endif /* !GU_ALLOW_UNALIGNED_READS */
     } u;
     size_t remainder;
 
-    h0=h3=h6=h9  = *hash1;
-    h1=h4=h7=h10 = *hash2;
-    h2=h5=h8=h11 = sc_const;
+    h0=h3=h6=h9  = gu_le64(*hash1);
+    h1=h4=h7=h10 = gu_le64(*hash2);
+    h2=h5=h8=h11 = _spooky_const;
 
-    u.p8 = (const uint8_t *)message;
-    end = u.p64 + (length/sc_blockSize)*sc_numVars;
+    u.p8 = (const uint8_t*) message;
+    end  = u.p64 + (length/_spooky_blockSize)*_spooky_numVars;
 
-    // handle all whole sc_blockSize blocks of bytes
-    if (ALLOW_UNALIGNED_READS || ((u.i & 0x7) == 0))
+    // handle all whole _spooky_blockSize blocks of bytes
+#if !GU_ALLOW_UNALIGNED_READS
+    if ((u.i & 0x7) == 0)
     {
+#endif /* !GU_ALLOW_UNALIGNED_READS */
         while (u.p64 < end)
         {
-            Mix(u.p64, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-	    u.p64 += sc_numVars;
+            _spooky_mix(u.p64, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
+	    u.p64 += _spooky_numVars;
         }
+#if !GU_ALLOW_UNALIGNED_READS
     }
     else
     {
         while (u.p64 < end)
         {
-            memcpy(buf, u.p64, sc_blockSize);
-            Mix(buf, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-	    u.p64 += sc_numVars;
+            memcpy(buf, u.p64, _spooky_blockSize);
+            _spooky_mix(buf, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
+	    u.p64 += _spooky_numVars;
         }
     }
+#endif /* !GU_ALLOW_UNALIGNED_READS */
 
-    // handle the last partial block of sc_blockSize bytes
-    remainder = (length - ((const uint8_t*)end-(const uint8_t*)message));
+    // handle the last partial block of _spooky_blockSize bytes
+    remainder = (length - ((const uint8_t*)end - (const uint8_t*)message));
     memcpy(buf, end, remainder);
-    memset(((uint8_t*)buf)+remainder, 0, sc_blockSize-remainder);
-    ((uint8_t*)buf)[sc_blockSize-1] = remainder;
-    Mix(buf, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
+    memset(((uint8_t*)buf) + remainder, 0, _spooky_blockSize - remainder);
+    ((uint8_t*)buf)[_spooky_blockSize - 1] = remainder;
+    _spooky_mix(buf, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
 
     // do some final mixing
-    End(&h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-    *hash1 = h0;
-    *hash2 = h1;
+    _spooky_end(&h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
+    *hash1 = gu_le64(h0);
+    *hash2 = gu_le64(h1);
 }
 
 #ifdef __cplusplus
