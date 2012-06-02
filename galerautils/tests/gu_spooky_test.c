@@ -161,42 +161,25 @@ static uint64_t const expected[BUFSIZE] = {
 START_TEST (gu_spooky_test)
 {
     uint8_t  buf[BUFSIZE];
-    uint32_t saw[BUFSIZE];
     size_t i;
 
-    for (i=0; i < BUFSIZE; ++i)
+    for (i = 0; i < BUFSIZE; ++i)
     {
         uint64_t h1 = 0;
         uint64_t h2 = 0;
 
         buf[i] = i+128;
-        gu_spooky (buf, i, &h1, &h2);
-        saw[i] = (uint32_t)gu_le64(h1);
-        fail_if (saw[i] != gu_le32(expected[i]),
-                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw[i], expected[i]);
-    }
 
-}
-END_TEST
+        /* It looks like values for messages under bufSize are for the "short"
+         * algorithm, incompatible with the real one. */
+        if (i < _spooky_bufSize)
+            gu_spooky_short (buf, i, &h1, &h2);
+        else
+            gu_spooky (buf, i, &h1, &h2);
 
-START_TEST (gu_spooky_short_test)
-{
-    uint8_t  buf[BUFSIZE];
-    uint32_t saw[BUFSIZE];
-    size_t i;
-
-    /* Spooky Short apparently implements different algorithm and is used
-     * by Spooky only for the messages smaller than _spooky_bufSize (192) */
-    for (i = 0; i < _spooky_bufSize; ++i)
-    {
-        uint64_t h1 = 0;
-        uint64_t h2 = 0;
-
-        buf[i] = i+128;
-        gu_spooky_short (buf, i, &h1, &h2);
-        saw[i] = (uint32_t)gu_le64(h1);
-        fail_if (saw[i] != gu_le32(expected[i]),
-                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw[i], expected[i]);
+        uint32_t saw = (uint32_t)h1;
+        fail_if (saw != gu_le32(expected[i]),
+                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw, expected[i]);
     }
 
 }
@@ -209,7 +192,6 @@ Suite *gu_spooky_suite(void)
 
   suite_add_tcase (s, tc);
   tcase_add_test (tc, gu_spooky_test);
-  tcase_add_test (tc, gu_spooky_short_test);
 
   return s;
 }
