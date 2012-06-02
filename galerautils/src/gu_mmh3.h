@@ -15,21 +15,6 @@
 extern "C" {
 #endif
 
-#if 0
-//-----------------------------------------------------------------------------
-// Block read - if your platform needs to do endian-swapping or can only
-// handle aligned reads, do the conversion here
-
-static GU_FORCE_INLINE GU_UNUSED uint32_t _mmh3_getblock32 (const uint32_t* p, int i)
-{
-    return gu_le32(p[i]);
-}
-
-static GU_FORCE_INLINE GU_UNUSED uint64_t _mmh3_getblock64 (const uint64_t* p, int i)
-{
-    return gu_le64(p[i]);
-}
-#endif
 //-----------------------------------------------------------------------------
 // Finalization mix - force all bits of a hash block to avalanche
 
@@ -44,12 +29,12 @@ static GU_FORCE_INLINE uint32_t _mmh3_fmix32 (uint32_t h)
     return h;
 }
 
-static GU_FORCE_INLINE GU_UNUSED uint64_t _mmh3_fmix64 (uint64_t k)
+static GU_FORCE_INLINE uint64_t _mmh3_fmix64 (uint64_t k)
 {
     k ^= k >> 33;
-    k *= GU_BIG_CONSTANT(0xff51afd7ed558ccd);
+    k *= GU_ULONG_LONG(0xff51afd7ed558ccd);
     k ^= k >> 33;
-    k *= GU_BIG_CONSTANT(0xc4ceb9fe1a85ec53);
+    k *= GU_ULONG_LONG(0xc4ceb9fe1a85ec53);
     k ^= k >> 33;
 
     return k;
@@ -82,6 +67,9 @@ _mmh3_blocks_32 (const uint32_t* const blocks,size_t const nblocks,uint32_t* h1)
     size_t i;
     for (i = 0; i < nblocks; i++)
     {
+//-----------------------------------------------------------------------------
+// Block read - if your platform needs to do endian-swapping or can only
+// handle aligned reads, do the conversion here
         _mmh3_block_32 (gu_le32(blocks[i]), h1);/* convert from little-endian */
     }
 }
@@ -113,7 +101,7 @@ _mmh3_tail_32 (const uint8_t* const tail, size_t const len, uint32_t h1)
 }
 
 static GU_INLINE void
-_mmh32_seed (const void* key, int const len, uint32_t seed, void* out)
+_mmh32_seed (const void* key, size_t const len, uint32_t seed, void* out)
 {
     size_t const nblocks = len >> 2;
     const uint32_t* const blocks = (const uint32_t*)key;
@@ -124,20 +112,18 @@ _mmh32_seed (const void* key, int const len, uint32_t seed, void* out)
     *(uint32_t*)out = _mmh3_tail_32 (tail, len, seed);
 }
 
-static uint32_t const GU_MMH32_SEED = 2166136261; // same as FNV32 seed
+// same as FNV32 seed
+static uint32_t const GU_MMH32_SEED = GU_ULONG(2166136261);
 
 /*! A function to hash buffer in one go */
-static GU_INLINE void
-gu_mmh32 (const void* buf, int const buf_len, uint32_t* out)
-{
-    _mmh32_seed (buf, buf_len, GU_MMH32_SEED, out);
-}
+#define gu_mmh32(_buf, _len, _out) \
+    _mmh32_seed (_buf, _len, GU_MMH32_SEED, _out);
 
 /*
  * 128-bit MurmurHash3
  */
-static uint64_t const _mmh3_128_c1 = GU_BIG_CONSTANT(0x87c37b91114253d5);
-static uint64_t const _mmh3_128_c2 = GU_BIG_CONSTANT(0x4cf5ad432745937f);
+static uint64_t const _mmh3_128_c1 = GU_ULONG_LONG(0x87c37b91114253d5);
+static uint64_t const _mmh3_128_c2 = GU_ULONG_LONG(0x4cf5ad432745937f);
 
 static GU_FORCE_INLINE void
 _mmh3_128_block (uint64_t k1, uint64_t k2, uint64_t* h1, uint64_t* h2)
@@ -161,6 +147,9 @@ _mmh3_128_blocks (const uint64_t* const blocks, size_t const nblocks,
     size_t i;
     for(i = 0; i < nblocks;)
     {
+//-----------------------------------------------------------------------------
+// Block read - if your platform needs to do endian-swapping or can only
+// handle aligned reads, do the conversion here
         uint64_t k1 = gu_le64(blocks[i++]);
         uint64_t k2 = gu_le64(blocks[i++]);
 
@@ -231,14 +220,11 @@ _mmh3_128_seed (const void* const key, size_t const len,
 }
 
 // same as FNV128 seed
-static uint64_t const GU_MMH128_SEED1 = GU_BIG_CONSTANT(0x6C62272E07BB0142);
-static uint64_t const GU_MMH128_SEED2 = GU_BIG_CONSTANT(0x62B821756295C58D);
+static uint64_t const GU_MMH128_SEED1 = GU_ULONG_LONG(0x6C62272E07BB0142);
+static uint64_t const GU_MMH128_SEED2 = GU_ULONG_LONG(0x62B821756295C58D);
 
-static GU_INLINE void
-gu_mmh128 (const void* key, int len, void* out)
-{
-    _mmh3_128_seed (key, len, GU_MMH128_SEED1, GU_MMH128_SEED2, out);
-}
+#define gu_mmh128(_buf, _len, _out) \
+    _mmh3_128_seed (_buf, _len, GU_MMH128_SEED1, GU_MMH128_SEED2, _out);
 
 /*
  * Below are fuctions with reference signatures for implementation verification
@@ -246,22 +232,16 @@ gu_mmh128 (const void* key, int len, void* out)
 extern void
 gu_mmh3_32      (const void* key, int len, uint32_t seed, void* out);
 
+#if 0 /* x86 variant is faulty and unsuitable for short keys, ignore */
 extern void
 gu_mmh3_x86_128 (const void* key, int len, uint32_t seed, void* out);
+#endif /* 0 */
 
 extern void
 gu_mmh3_x64_128 (const void* key, int len, uint32_t seed, void* out);
 
 #ifdef __cplusplus
 }
-#endif
-
-#if (GU_WORDSIZE == 32)
-#  define gu_mmh3_128 gu_mmh3_x86_128
-#elif (GU_WORDSIZE == 64)
-#  define gu_mmh3_128 gu_mmh3_x64_128
-#else
-#  error "Unsupported wordsize"
 #endif
 
 #endif /* _gu_mmh3_h_ */

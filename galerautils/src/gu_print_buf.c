@@ -12,12 +12,13 @@
 #define GU_ASCII_10 0x3a
 #define GU_ASCII_A  0x41
 #define GU_ASCII_a  0x61
+#define GU_ASCII_A_10 (GU_ASCII_A - GU_ASCII_10)
 #define GU_ASCII_a_10 (GU_ASCII_a - GU_ASCII_10)
 
 static inline int
 _hex_code (uint8_t const x)
 {
-    return (x + GU_ASCII_0 + (x > 9)*GU_ASCII_a_10);
+    return (x + GU_ASCII_0 + (x > 9)*GU_ASCII_A_10);
 }
 
 static inline void

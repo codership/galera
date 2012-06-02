@@ -14,6 +14,7 @@
 
 #include "gu_fnv.h"
 #include "gu_mmh3.h"
+#include "spooky.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +33,9 @@ enum algs
     FNV64,
     FNV128,
     MMH32,
-    MMH128_x86,
-    MMH128_x64,
+    MMH128,
+    SPOOKYS,
+    SPOOKYL,
     MD5SSL,
     MD5CPP
 };
@@ -44,8 +46,8 @@ static int timer (const void* const buf, ssize_t const len,
     double begin, end;
     struct timeval tv;
     const char* alg = "undefined";
-    uint64_t volatile h; // this variable serves to prevet compiler from
-                         // optimizeing out the calls
+    size_t volatile h; // this variable serves to prevent compiler from
+                       // optimizing out the calls
 
     gettimeofday (&tv, NULL); begin = (double)tv.tv_sec + 1.e-6 * tv.tv_usec;
 
@@ -109,23 +111,9 @@ static int timer (const void* const buf, ssize_t const len,
         INTERNAL_LOOP_END
         break;
     }
-    case MMH128_x86:
+    case MMH128:
     {
-        alg = "mmh128/32";
-        INTERNAL_LOOP_BEGIN
-            gu_uint128_t hash;
-            gu_mmh3_x86_128 (buf, len, GU_FNV32_SEED, &hash);
-#if (GU_WORDSIZE == 64)
-            h = hash;
-#else
-            h = hash.u32[GU_32LO];
-#endif
-        INTERNAL_LOOP_END
-        break;
-    }
-    case MMH128_x64:
-    {
-        alg = "mmh128/64";
+        alg = "mmh128";
         INTERNAL_LOOP_BEGIN
             gu_uint128_t hash;
             gu_mmh128 (buf, len, &hash);
@@ -134,6 +122,26 @@ static int timer (const void* const buf, ssize_t const len,
 #else
             h = hash.u32[GU_32LO];
 #endif
+        INTERNAL_LOOP_END
+        break;
+    }
+    case SPOOKYS:
+    {
+        alg = "SpookyS";
+        INTERNAL_LOOP_BEGIN
+            uint64_t h1, h2;
+            SpookyHashShort (buf, len, &h1, &h2);
+            h = h1;
+        INTERNAL_LOOP_END
+        break;
+    }
+    case SPOOKYL:
+    {
+        alg = "SpookyL";
+        INTERNAL_LOOP_BEGIN
+            uint64_t h1, h2;
+            SpookyHash128 (buf, len, &h1, &h2);
+            h = h1;
         INTERNAL_LOOP_END
         break;
     }
@@ -161,8 +169,9 @@ static int timer (const void* const buf, ssize_t const len,
     gettimeofday (&tv, NULL); end   = (double)tv.tv_sec + 1.e-6 * tv.tv_usec;
 
     end -= begin;
-    return printf ("%s: %lld loops, %6.3f seconds, %8.3f Mb/sec\n",
-                   alg, loops, end, (double)(loops * len)/end/1024/1024);
+    return printf ("%s: %lld loops, %6.3f seconds, %8.3f Mb/sec%s\n",
+                   alg, loops, end, (double)(loops * len)/end/1024/1024,
+                   h ? "" : " ");
 }
 
 int main (int argc, char* argv[])
@@ -183,8 +192,9 @@ int main (int argc, char* argv[])
     timer (buf, buf_size, loops, FNV64);
     timer (buf, buf_size, loops, FNV128);
     timer (buf, buf_size, loops, MMH32);
-    timer (buf, buf_size, loops, MMH128_x86);
-    timer (buf, buf_size, loops, MMH128_x64);
+    timer (buf, buf_size, loops, MMH128);
+    timer (buf, buf_size, loops, SPOOKYS);
+    timer (buf, buf_size, loops, SPOOKYL);
     timer (buf, buf_size, loops, MD5SSL);
     timer (buf, buf_size, loops, MD5CPP);
 

@@ -17,6 +17,7 @@ gu_mmh3_32 (const void* key, int len, uint32_t seed, void* out)
 
 //-----------------------------------------------------------------------------
 
+#if 0 /* x86 variant is faulty and unsuitable for short keys, ignore */
 void gu_mmh3_x86_128 (const void* key, const int len,
                       const uint32_t seed, void* out)
 {
@@ -120,7 +121,7 @@ void gu_mmh3_x86_128 (const void* key, const int len,
     ((uint32_t*)out)[2] = gu_le32(h3);
     ((uint32_t*)out)[3] = gu_le32(h4);
 }
-
+#endif /* 0 */
 //-----------------------------------------------------------------------------
 
 void

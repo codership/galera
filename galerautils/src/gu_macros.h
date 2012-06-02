@@ -14,15 +14,21 @@
  */
 
 #if defined(_MSC_VER)
-#  define GU_INLINE          __forceinline
-#  define GU_FORCE_INLINE    __forceinline
+#  define GU_INLINE        __forceinline
+#  define GU_FORCE_INLINE  __forceinline
 #  define GU_UNUSED
-#  define GU_BIG_CONSTANT(x) (x)
+#  define GU_LONG(x)       (x)
+#  define GU_ULONG(x)      (x)
+#  define GU_LONG_LONG(x)  (x)
+#  define GU_ULONG_LONG(x) (x)
 #else   /* !defined(_MSC_VER) */
-#  define GU_INLINE          inline
-#  define GU_FORCE_INLINE    __attribute__((always_inline))
-#  define GU_UNUSED          __attribute__((unused))
-#  define GU_BIG_CONSTANT(x) (x##LLU)
+#  define GU_INLINE        inline
+#  define GU_FORCE_INLINE  __attribute__((always_inline))
+#  define GU_UNUSED        __attribute__((unused))
+#  define GU_LONG(x)       (x##L)
+#  define GU_ULONG(x)      (x##LU)
+#  define GU_LONG_LONG(x)  (x##LL)
+#  define GU_ULONG_LONG(x) (x##LLU)
 #endif /* !defined(_MSC_VER) */
 
 /*
