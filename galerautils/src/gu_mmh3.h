@@ -11,6 +11,8 @@
 
 #include "gu_byteswap.h"
 
+#include <string.h> // for memset() and memcpy()
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -212,7 +214,7 @@ _mmh3_128_seed (const void* const key, size_t const len,
                 uint64_t s1, uint64_t s2, void* const out)
 {
     size_t const nblocks = (len >> 4) << 1; /* using 64-bit half-blocks */
-    const uint64_t* const blocks = (const uint64_t *)(key);
+    const uint64_t* const blocks = (const uint64_t*)(key);
     const uint8_t*  const tail   = (const uint8_t*)(blocks + nblocks);
 
     _mmh3_128_blocks (blocks, nblocks, &s1, &s2);
@@ -225,6 +227,81 @@ static uint64_t const GU_MMH128_SEED2 = GU_ULONG_LONG(0x62B821756295C58D);
 
 #define gu_mmh128(_buf, _len, _out) \
     _mmh3_128_seed (_buf, _len, GU_MMH128_SEED1, GU_MMH128_SEED2, _out);
+
+/*
+ * Functions to hash message by parts
+ * (only 128-bit version, 32-bit is not relevant any more)
+ */
+
+typedef struct gu_mmh128_ctx
+{
+    uint64_t hash[2];
+    uint64_t tail[2];
+    size_t   length;
+} gu_mmh128_ctx_t;
+
+/*! Initialize/reset MMH context with a particular seed, should not be used
+ *  directly. */
+static GU_INLINE void
+_mmh128_init_seed (gu_mmh128_ctx_t* const mmh,
+                   uint64_t         const s1,
+                   uint64_t         const s2)
+{
+    memset (mmh, 0, sizeof(*mmh));
+    mmh->hash[0] = s1;
+    mmh->hash[1] = s2;
+}
+
+/*! Initialize MMH context with a default Galera seed. */
+#define gu_mmh128_init(_mmh) \
+    _mmh128_init_seed (_mmh, GU_MMH128_SEED1, GU_MMH128_SEED2);
+
+/*! Apeend message part to hash context */
+static GU_INLINE void
+gu_mmh128_append (gu_mmh128_ctx_t* const mmh,
+                  const void*      part,
+                  size_t           len)
+{
+    size_t tail_len = mmh->length & 15;
+
+    mmh->length += len;
+
+    if (tail_len) /* there's something in the tail */// do we need this if()?
+    {
+        size_t const to_fill  = 16 - tail_len;
+        void*  const tail_end = (uint8_t*)mmh->tail + tail_len;
+
+        if (len >= to_fill) /* we can fill a full block */
+        {
+            memcpy (tail_end, part, to_fill);
+            _mmh3_128_block (gu_le64(mmh->tail[0]), gu_le64(mmh->tail[1]),
+                             &mmh->hash[0], &mmh->hash[1]);
+            part = ((char*)part) + to_fill;
+            len -= to_fill;
+        }
+        else
+        {
+            memcpy (tail_end, part, len);
+            return;
+        }
+    }
+
+    size_t const nblocks = (len >> 4) << 1; /* using 64-bit half-blocks */
+    const uint64_t* const blocks = (const uint64_t*)(part);
+
+    _mmh3_128_blocks (blocks, nblocks, &mmh->hash[0], &mmh->hash[1]);
+
+    /* save possible trailing bytes to tail */
+    memcpy (mmh->tail, blocks + nblocks, len & 15);
+}
+
+/*! Get the accumulated message hash (does not change the context) */
+static GU_INLINE void
+gu_mmh128_get (const gu_mmh128_ctx_t* const mmh, void* res)
+{
+    _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
+                    mmh->hash[0], mmh->hash[1], res);
+}
 
 /*
  * Below are fuctions with reference signatures for implementation verification

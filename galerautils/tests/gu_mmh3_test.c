@@ -214,6 +214,53 @@ START_TEST (gu_mmh128_x64_test)
 }
 END_TEST
 
+/* Tests partial hashing functions */
+START_TEST (gu_mmh128_partial)
+{
+    hash128_t part;
+    gu_mmh128_ctx_t ctx;
+    gu_mmh128_init (&ctx);
+    gu_mmh128_append (&ctx, test_input, 31);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[31], &part, sizeof(part)),
+            "gu_mmh128_get() failed at one go");
+
+    gu_mmh128_init (&ctx);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[0], &part, sizeof(part)),
+            "gu_mmh128_get() failed at init");
+    gu_mmh128_append (&ctx, test_input + 0, 0);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[0], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d", 0);
+    gu_mmh128_append (&ctx, test_input + 0, 1);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[1], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d", 1);
+    gu_mmh128_append (&ctx, test_input + 1, 2);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[3], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d", 3);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[3], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d again", 3);
+    gu_mmh128_append (&ctx, test_input + 3, 20);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[23], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d", 23);
+    gu_mmh128_append (&ctx, test_input + 23, 0);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[23], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d again", 23);
+    gu_mmh128_append (&ctx, test_input + 23, 3);
+    gu_mmh128_append (&ctx, test_input + 26, 3);
+    gu_mmh128_append (&ctx, test_input + 29, 2);
+    gu_mmh128_get (&ctx, &part);
+    fail_if(check (&test_output128[31], &part, sizeof(part)),
+            "gu_mmh128_get() failed at length %d", 31);
+}
+END_TEST
+
 Suite *gu_mmh3_suite(void)
 {
   Suite *s  = suite_create("Galera MurmurHash3");
@@ -223,6 +270,7 @@ Suite *gu_mmh3_suite(void)
   tcase_add_test (tc, gu_mmh32_test);
 //  tcase_add_test (tc, gu_mmh128_x86_test);
   tcase_add_test (tc, gu_mmh128_x64_test);
+  tcase_add_test (tc, gu_mmh128_partial);
 
   return s;
 }
