@@ -15,6 +15,7 @@
 #include "gu_fnv.h"
 #include "gu_mmh3.h"
 #include "gu_spooky.h"
+#include "gu_hash.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +38,9 @@ enum algs
     SPOOKYS,
     SPOOKY,
     MD5SSL,
-    MD5CPP
+    MD5CPP,
+    FAST128,
+    TABLE
 };
 
 static int timer (const void* const buf, ssize_t const len,
@@ -105,9 +108,7 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "mmh32";
         INTERNAL_LOOP_BEGIN
-            uint32_t hash;
-            gu_mmh32 (buf, len, &hash);
-            h = hash;
+            h = gu_mmh32 (buf, len);
         INTERNAL_LOOP_END
         break;
     }
@@ -129,10 +130,9 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "SpookyS";
         INTERNAL_LOOP_BEGIN
-            uint64_t h1 = 0;
-            uint64_t h2 = 0;
-            gu_spooky_short (buf, len, &h1, &h2);
-            h = h1;
+            uint64_t hash[2];
+            gu_spooky_short (buf, len, hash);
+            h = hash[0];
         INTERNAL_LOOP_END
         break;
     }
@@ -140,10 +140,9 @@ static int timer (const void* const buf, ssize_t const len,
     {
         alg = "Spooky";
         INTERNAL_LOOP_BEGIN
-            uint64_t h1 = 0;
-            uint64_t h2 = 0;
-            gu_spooky (buf, len, &h1, &h2);
-            h = h1;
+            uint64_t hash[2];
+            gu_spooky_inline (buf, len, hash);
+            h = hash[0];
         INTERNAL_LOOP_END
         break;
     }
@@ -162,6 +161,24 @@ static int timer (const void* const buf, ssize_t const len,
         INTERNAL_LOOP_BEGIN
             unsigned char md[16];
             CryptoPP::Weak::MD5().CalculateDigest(md, (const byte*)buf, len);
+        INTERNAL_LOOP_END
+        break;
+    }
+    case FAST128:
+    {
+        alg = "fast128";
+        INTERNAL_LOOP_BEGIN
+            uint64_t hash[2];
+            gu_fast_hash128 (buf, len, hash);
+            h = hash[0];
+        INTERNAL_LOOP_END
+        break;
+    }
+    case TABLE:
+    {
+        alg = "table";
+        INTERNAL_LOOP_BEGIN
+            h = gu_table_hash (buf, len);
         INTERNAL_LOOP_END
         break;
     }
@@ -199,6 +216,8 @@ int main (int argc, char* argv[])
     timer (buf, buf_size, loops, SPOOKY);
     timer (buf, buf_size, loops, MD5SSL);
     timer (buf, buf_size, loops, MD5CPP);
+    timer (buf, buf_size, loops, FAST128);
+    timer (buf, buf_size, loops, TABLE);
 
     return 0;
 }

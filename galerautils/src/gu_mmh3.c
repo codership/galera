@@ -12,7 +12,7 @@
 void
 gu_mmh3_32 (const void* key, int len, uint32_t seed, void* out)
 {
-    _mmh32_seed (key, len, seed, out);
+    *((uint32_t*)out) = _mmh32_seed (key, len, seed);
 }
 
 //-----------------------------------------------------------------------------

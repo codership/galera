@@ -11,6 +11,7 @@ libgalerautils_sources = [
     'gu_log.c',
     'gu_mem.c',
     'gu_mmh3.c',
+    'gu_spooky.c',
     'gu_mutex.c',
     'gu_print_buf.c',
     'gu_to.c',

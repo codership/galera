@@ -165,19 +165,18 @@ START_TEST (gu_spooky_test)
 
     for (i = 0; i < BUFSIZE; ++i)
     {
-        uint64_t h1 = 0;
-        uint64_t h2 = 0;
+        uint64_t h[2] /* = { 0, } - this should not be necesary */;
 
         buf[i] = i+128;
 
         /* It looks like values for messages under bufSize are for the "short"
          * algorithm, incompatible with the real one. */
         if (i < _spooky_bufSize)
-            gu_spooky_short (buf, i, &h1, &h2);
+            gu_spooky_short (buf, i, h);
         else
-            gu_spooky (buf, i, &h1, &h2);
+            gu_spooky128 (buf, i, h);
 
-        uint32_t saw = (uint32_t)h1;
+        uint32_t saw = (uint32_t)h[0];
         fail_if (saw != gu_le32(expected[i]),
                  "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw, expected[i]);
     }

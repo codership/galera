@@ -43,6 +43,7 @@
 
 #include "../gcs_core.h"
 #include "../gcs_dummy.h"
+#include "../gcs_seqno.h"
 #include "gcs_core_test.h"
 
 extern ssize_t gcs_tests_get_allocated();
@@ -332,7 +333,7 @@ core_test_init ()
     fail_if (ret != 0, "gcs_core_send_sync(): %ld (%s)",
              ret, strerror(-ret));
     fail_if (CORE_RECV_ACT(&act,NULL,sizeof(gcs_seqno_t),GCS_ACT_SYNC));
-    fail_if (Seqno != *(gcs_seqno_t*)act.data);
+    fail_if (Seqno != gcs_seqno_le(*(gcs_seqno_t*)act.data));
 
     gcs_core_send_lock_step (Core, true);
     mark_point();

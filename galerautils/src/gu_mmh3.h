@@ -102,8 +102,8 @@ _mmh3_tail_32 (const uint8_t* const tail, size_t const len, uint32_t h1)
     return gu_le32(h1);  /* convert to little-endian */
 }
 
-static GU_INLINE void
-_mmh32_seed (const void* key, size_t const len, uint32_t seed, void* out)
+static GU_INLINE uint32_t
+_mmh32_seed (const void* key, size_t const len, uint32_t seed)
 {
     size_t const nblocks = len >> 2;
     const uint32_t* const blocks = (const uint32_t*)key;
@@ -111,15 +111,15 @@ _mmh32_seed (const void* key, size_t const len, uint32_t seed, void* out)
 
     _mmh3_blocks_32 (blocks, nblocks, &seed);
 
-    *(uint32_t*)out = _mmh3_tail_32 (tail, len, seed);
+    return _mmh3_tail_32 (tail, len, seed);
 }
 
 // same as FNV32 seed
 static uint32_t const GU_MMH32_SEED = GU_ULONG(2166136261);
 
 /*! A function to hash buffer in one go */
-#define gu_mmh32(_buf, _len, _out) \
-    _mmh32_seed (_buf, _len, GU_MMH32_SEED, _out);
+#define gu_mmh32(_buf, _len) \
+    _mmh32_seed (_buf, _len, GU_MMH32_SEED);
 
 /*
  * 128-bit MurmurHash3
@@ -228,6 +228,22 @@ static uint64_t const GU_MMH128_SEED2 = GU_ULONG_LONG(0x62B821756295C58D);
 #define gu_mmh128(_buf, _len, _out) \
     _mmh3_128_seed (_buf, _len, GU_MMH128_SEED1, GU_MMH128_SEED2, _out);
 
+static GU_INLINE uint64_t
+gu_mmh128_64 (const void* const msg, size_t len)
+{
+    uint64_t res[2];
+    gu_mmh128 (msg, len, res);
+    return res[0];
+}
+
+static GU_INLINE uint32_t
+gu_mmh128_32 (const void* const msg, size_t len)
+{
+    uint32_t res[4];
+    gu_mmh128 (msg, len, res);
+    return res[0];
+}
+
 /*
  * Functions to hash message by parts
  * (only 128-bit version, 32-bit is not relevant any more)
@@ -301,6 +317,24 @@ gu_mmh128_get (const gu_mmh128_ctx_t* const mmh, void* res)
 {
     _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
                     mmh->hash[0], mmh->hash[1], res);
+}
+
+static GU_INLINE uint64_t
+gu_mmh128_get64 (const gu_mmh128_ctx_t* const mmh)
+{
+    uint64_t res[2];
+    _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
+                    mmh->hash[0], mmh->hash[1], res);
+    return res[0];
+}
+
+static GU_INLINE uint32_t
+gu_mmh128_get32 (const gu_mmh128_ctx_t* const mmh)
+{
+    uint32_t res[4];
+    _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
+                    mmh->hash[0], mmh->hash[1], res);
+    return res[0];
 }
 
 /*

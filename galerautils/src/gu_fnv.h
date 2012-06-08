@@ -192,21 +192,31 @@ gu_fnv128a_internal (const void* buf, ssize_t const len, gu_uint128_t* seed)
 #  define gu_fnv64a  gu_fnv64a_internal
 #  define gu_fnv128a gu_fnv128a_internal
 #else
-#  define gu_fnv32a(_buf, _len, _seed) {                \
-        uint32_t tmp_seed = gu_bswap32(*_seed);         \
-        gu_fnv32a_internal (_buf, _len, &tmp_seed);     \
-        *_seed = gu_bswap32(tmp_seed);                  \
-    }
-#  define gu_fnv64a(_buf, _len, _seed) {                \
-        uint64_t tmp_seed = gu_bswap64(*_seed);         \
-        gu_fnv64a_internal (_buf, _len, &tmp_seed);     \
-        *_seed = gu_bswap64(tmp_seed);                  \
-    }
-#  define gu_fnv128a(_buf, _len, _seed) {               \
-        gu_bswap128(_seed);                             \
-        gu_fnv128a_internal (_buf, _len, _seed);        \
-        gu_bswap128(_seed);                             \
-    }
+
+static GU_INLINE void
+gu_fnv32a(_buf, _len, _seed)
+{
+    uint32_t tmp_seed = gu_bswap32(*_seed);
+    gu_fnv32a_internal (_buf, _len, &tmp_seed);
+    *_seed = gu_bswap32(tmp_seed);
+}
+
+static GU_INLINE void
+gu_fnv64a(_buf, _len, _seed)
+{
+    uint64_t tmp_seed = gu_bswap64(*_seed);
+    gu_fnv64a_internal (_buf, _len, &tmp_seed);
+    *_seed = gu_bswap64(tmp_seed);
+}
+
+static GU_INLINE void
+gu_fnv128a(_buf, _len, _seed)
+{
+    gu_bswap128(_seed);
+    gu_fnv128a_internal (_buf, _len, _seed);
+    gu_bswap128(_seed);
+}
+
 #endif /* GU_LITTLE_ENDIAN */
 
 #endif /* _gu_fnv_h_ */

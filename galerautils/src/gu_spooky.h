@@ -172,8 +172,7 @@ static GU_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
 static GU_INLINE void gu_spooky_short(
     const void* message,
     size_t      length,
-    uint64_t*   hash1,
-    uint64_t*   hash2)
+    void* const hash)
 {
     union
     {
@@ -197,8 +196,13 @@ static GU_INLINE void gu_spooky_short(
 #endif /* !GU_ALLOW_UNALIGNED_READS */
 
     size_t   remainder = length & 0x1F; /* length%32 */
-    uint64_t a = gu_le64(*hash1);
-    uint64_t b = gu_le64(*hash2);
+
+    /* author version : */
+    // uint64_t a = gu_le64(*hash1);
+    // uint64_t b = gu_le64(*hash2);
+    /* consistent seed version: */
+    uint64_t a = 0;
+    uint64_t b = 0;
     uint64_t c = _spooky_const;
     uint64_t d = _spooky_const;
 
@@ -272,22 +276,24 @@ static GU_INLINE void gu_spooky_short(
     }
 
     _spooky_short_end(&a, &b, &c, &d);
-    *hash1 = gu_le64(a);
-    *hash2 = gu_le64(b);
+
+    ((uint64_t*)hash)[0] = gu_le64(a);
+    ((uint64_t*)hash)[1] = gu_le64(b);
 }
 
 // do the whole hash in one call
-static GU_INLINE void gu_spooky (
+static GU_INLINE void gu_spooky_inline (
     const void* message,
     size_t      length,
-    uint64_t*   hash1,
-    uint64_t*   hash2)
+    void* const hash)
 {
+#ifdef GU_USE_SPOOKY_SHORT
     if (length < _spooky_bufSize)
     {
-        gu_spooky_short (message, length, hash1, hash2);
+        gu_spooky_short (message, length, hash);
         return;
     }
+#endif /* GU_USE_SPOOKY_SHORT */
 
     uint64_t  h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11;
     uint64_t  buf[_spooky_numVars];
@@ -302,8 +308,12 @@ static GU_INLINE void gu_spooky (
     } u;
     size_t remainder;
 
-    h0=h3=h6=h9  = gu_le64(*hash1);
-    h1=h4=h7=h10 = gu_le64(*hash2);
+    /* this is how the author wants it: a possibility for different seeds
+     h0=h3=h6=h9  = gu_le64(((uint64_t*)hash)[0]);
+     h1=h4=h7=h10 = gu_le64(((uint64_t*)hash)[1]);
+     * this is we want it - constant seed */
+    h0=h3=h6=h9  = 0;
+    h1=h4=h7=h10 = 0;
     h2=h5=h8=h11 = _spooky_const;
 
     u.p8 = (const uint8_t*) message;
@@ -341,8 +351,31 @@ static GU_INLINE void gu_spooky (
 
     // do some final mixing
     _spooky_end(&h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-    *hash1 = gu_le64(h0);
-    *hash2 = gu_le64(h1);
+
+    ((uint64_t*)hash)[0] = gu_le64(h0);
+    ((uint64_t*)hash)[1] = gu_le64(h1);
+}
+
+/* As is apparent from the gu_spooky_inline() Spooky hash is enormous. 
+ * Since it has advantage only on long messages, it makes sense to make it
+ * a regular function to avoid code bloat. */
+extern void
+gu_spooky128 (const void* const msg, size_t const len, void* res);
+
+static GU_INLINE uint64_t
+gu_spooky64 (const void* const msg, size_t const len)
+{
+    uint64_t res[2];
+    gu_spooky128 (msg, len, &res);
+    return res[0];
+}
+
+static GU_INLINE uint32_t
+gu_spooky32 (const void* const msg, size_t const len)
+{
+    uint32_t res[4];
+    gu_spooky128 (msg, len, &res);
+    return res[0];
 }
 
 #ifdef __cplusplus

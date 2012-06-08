@@ -168,7 +168,7 @@ START_TEST (gu_mmh32_test)
 
     for (i = 0; i < NUM_32_TESTS; i++)
     {
-        gu_mmh32 (test_input, i, &out);
+        uint32_t out = gu_mmh32 (test_input, i);
         fail_if(check (&test_output32[i], &out, sizeof(out)),
                 "gu_mmh32() failed at step %d",i);
     }
