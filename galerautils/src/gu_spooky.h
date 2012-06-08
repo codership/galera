@@ -40,7 +40,7 @@ static uint64_t const _spooky_const = GU_ULONG_LONG(0xDEADBEEFDEADBEEF);
 //   When run forward or backwards one Mix
 // I tried 3 pairs of each; they all differed by at least 212 bits.
 //
-static GU_INLINE void _spooky_mix(
+static GU_FORCE_INLINE void _spooky_mix(
     const uint64_t *data,
     uint64_t* s0, uint64_t* s1, uint64_t* s2, uint64_t* s3,
     uint64_t* s4, uint64_t* s5, uint64_t* s6, uint64_t* s7,
@@ -76,7 +76,7 @@ static GU_INLINE void _spooky_mix(
 // Two iterations was almost good enough for a 64-bit result, but a
 // 128-bit result is reported, so End() does three iterations.
 //
-static GU_INLINE void _spooky_end_part(
+static GU_FORCE_INLINE void _spooky_end_part(
     uint64_t* h0, uint64_t* h1, uint64_t* h2, uint64_t* h3,
     uint64_t* h4, uint64_t* h5, uint64_t* h6, uint64_t* h7,
     uint64_t* h8, uint64_t* h9, uint64_t* h10,uint64_t* h11)
@@ -95,14 +95,21 @@ static GU_INLINE void _spooky_end_part(
     *h10+= *h0;    *h1 ^= *h10;   *h0 = GU_ROTL64(*h0,54);
 }
 
-static GU_INLINE void _spooky_end(
+static GU_FORCE_INLINE void _spooky_end(
     uint64_t* h0, uint64_t* h1, uint64_t* h2, uint64_t* h3,
     uint64_t* h4, uint64_t* h5, uint64_t* h6, uint64_t* h7,
     uint64_t* h8, uint64_t* h9, uint64_t* h10,uint64_t* h11)
 {
+#if 0
     _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
     _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
     _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+#endif
+    int i;
+    for (i = 0; i < 3; i++)
+    {
+        _spooky_end_part(h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11);
+    }
 }
 
 //
@@ -120,7 +127,7 @@ static GU_INLINE void _spooky_end(
 // with diffs defined by either xor or subtraction
 // with a base of all zeros plus a counter, or plus another bit, or random
 //
-static GU_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
+static GU_FORCE_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
                                uint64_t* h2, uint64_t* h3)
 {
     *h2 = GU_ROTL64(*h2,50);  *h2 += *h3;  *h0 ^= *h2;
@@ -149,7 +156,7 @@ static GU_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
 // For every pair of input bits,
 // with probability 50 +- .75% (the worst case is approximately that)
 //
-static GU_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
+static GU_FORCE_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
                                         uint64_t* h2, uint64_t* h3)
 {
     *h3 ^= *h2;  *h2 = GU_ROTL64(*h2,15);  *h3 += *h2;
@@ -356,7 +363,7 @@ static GU_INLINE void gu_spooky_inline (
     ((uint64_t*)hash)[1] = gu_le64(h1);
 }
 
-/* As is apparent from the gu_spooky_inline() Spooky hash is enormous. 
+/* As is apparent from the gu_spooky_inline(), Spooky hash is enormous.
  * Since it has advantage only on long messages, it makes sense to make it
  * a regular function to avoid code bloat. */
 extern void

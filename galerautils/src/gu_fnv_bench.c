@@ -75,7 +75,7 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "fnv32a";
         INTERNAL_LOOP_BEGIN
             uint32_t hash = GU_FNV32_SEED;
-            gu_fnv32a (buf, len, &hash);
+            gu_fnv32a_internal (buf, len, &hash);
             h = hash;
         INTERNAL_LOOP_END
         break;
@@ -85,7 +85,7 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "fnv64a";
         INTERNAL_LOOP_BEGIN
             uint64_t hash = GU_FNV64_SEED;;
-            gu_fnv64a (buf, len, &hash);
+            gu_fnv64a_internal (buf, len, &hash);
             h = hash;
         INTERNAL_LOOP_END
         break;
@@ -95,7 +95,7 @@ static int timer (const void* const buf, ssize_t const len,
         alg = "fnv128";
         INTERNAL_LOOP_BEGIN
             gu_uint128_t hash = GU_FNV128_SEED;
-            gu_fnv128a (buf, len, &hash);
+            gu_fnv128a_internal (buf, len, &hash);
 #if defined(__SIZEOF_INT128__)
             h = hash;
 #else

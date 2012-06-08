@@ -16,8 +16,8 @@
  *               Hence by default functions perform FNVa. GU_FNV_NORMAL macro
  *               is needed for unit tests.
  *
- * gu_fnv*_internal() functions are endian-unsafe but may save a cycle or two
- * on big-endian systems.
+ * gu_fnv*_internal() functions are endian-unsafe, their output should be
+ * converted to little-endian format if it is to be exported to other machines.
  */
 
 #ifndef _gu_fnv_h_
@@ -47,7 +47,7 @@
 #  define GU_FNV32_ITERATION(_s,_b) GU_FNV32_MUL(_s); _s ^= _b;
 #endif
 
-inline static void
+static GU_FORCE_INLINE void
 gu_fnv32a_internal (const void* buf, ssize_t const len, uint32_t* seed)
 {
     const uint8_t* bp = (const uint8_t*)buf;
@@ -83,7 +83,7 @@ gu_fnv32a_internal (const void* buf, ssize_t const len, uint32_t* seed)
 #  define GU_FNV64_ITERATION(_s,_b) GU_FNV64_MUL(_s); _s ^= _b;
 #endif
 
-inline static void
+static GU_FORCE_INLINE void
 gu_fnv64a_internal (const void* buf, ssize_t const len, uint64_t* seed)
 {
     const uint8_t* bp = (const uint8_t*)buf;
@@ -186,38 +186,6 @@ gu_fnv128a_internal (const void* buf, ssize_t const len, gu_uint128_t* seed)
 
     assert(be == bp);
 }
-
-#if defined(GU_LITTLE_ENDIAN)
-#  define gu_fnv32a  gu_fnv32a_internal
-#  define gu_fnv64a  gu_fnv64a_internal
-#  define gu_fnv128a gu_fnv128a_internal
-#else
-
-static GU_INLINE void
-gu_fnv32a(_buf, _len, _seed)
-{
-    uint32_t tmp_seed = gu_bswap32(*_seed);
-    gu_fnv32a_internal (_buf, _len, &tmp_seed);
-    *_seed = gu_bswap32(tmp_seed);
-}
-
-static GU_INLINE void
-gu_fnv64a(_buf, _len, _seed)
-{
-    uint64_t tmp_seed = gu_bswap64(*_seed);
-    gu_fnv64a_internal (_buf, _len, &tmp_seed);
-    *_seed = gu_bswap64(tmp_seed);
-}
-
-static GU_INLINE void
-gu_fnv128a(_buf, _len, _seed)
-{
-    gu_bswap128(_seed);
-    gu_fnv128a_internal (_buf, _len, _seed);
-    gu_bswap128(_seed);
-}
-
-#endif /* GU_LITTLE_ENDIAN */
 
 #endif /* _gu_fnv_h_ */
 

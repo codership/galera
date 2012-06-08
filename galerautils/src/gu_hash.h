@@ -50,8 +50,8 @@ extern "C" {
  * be usable as global identifier
  */
 
-#define GU_SHORT_LIMIT 16
-#define GU_MEDIUM_LIMIT 1025
+#define GU_SHORT_LIMIT  16
+#define GU_MEDIUM_LIMIT 512
 
 static GU_INLINE void
 gu_fast_hash128 (const void* const msg, size_t const len, void* const res)
