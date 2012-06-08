@@ -72,7 +72,7 @@ gu_fast_hash64_short (const void* const msg, size_t const len)
     uint64_t res = GU_FNV64_SEED;
     gu_fnv64a_internal (msg, len, &res);
     /* to make 8th bit variations to escalate to 1st */
-    res ^= GU_ROTL64(res, 25);
+    res += GU_ROTL64(res, 55);
     return gu_le64(res);
 }
 
@@ -102,7 +102,7 @@ gu_fast_hash32_short (const void* const msg, size_t const len)
     uint32_t res = GU_FNV32_SEED;
     gu_fnv32a_internal (msg, len, &res);
     /* to make 8th bit variations to escalate to 1st */
-    res ^= GU_ROTL32(res, 17);
+    res += GU_ROTL32(res, 23);
     return gu_le32(res);
 }
 
@@ -145,13 +145,13 @@ gu_table_hash32_short (const void* const msg, size_t const len)
     uint32_t res = GU_FNV32_SEED;
     gu_fnv32a_internal (msg, len, &res);
     /* to make 8th bit variations to escalate to 1st */
-    res ^= GU_ROTL32(res, 17);
+    res += GU_ROTL32(res, 23);
     return res;
 }
 
 #define gu_table_hash32_long(_msg, _len)  gu_mmh32(_msg, _len)
 
-static GU_INLINE uint64_t
+static GU_INLINE uint32_t
 gu_table_hash (const void* const msg, size_t const len)
 {
     if (len < 16)
