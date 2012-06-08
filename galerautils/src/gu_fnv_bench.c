@@ -214,8 +214,8 @@ int main (int argc, char* argv[])
     timer (buf, buf_size, loops, MMH128);
     timer (buf, buf_size, loops, SPOOKYS);
     timer (buf, buf_size, loops, SPOOKY);
-    timer (buf, buf_size, loops, MD5SSL);
-    timer (buf, buf_size, loops, MD5CPP);
+//    timer (buf, buf_size, loops, MD5SSL);
+//    timer (buf, buf_size, loops, MD5CPP);
     timer (buf, buf_size, loops, FAST128);
     timer (buf, buf_size, loops, TABLE);
 
