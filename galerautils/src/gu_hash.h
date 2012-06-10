@@ -66,13 +66,13 @@ gu_fast_hash128 (const void* const msg, size_t const len, void* const res)
     }
 }
 
-static GU_INLINE uint64_t
+static GU_FORCE_INLINE uint64_t
 gu_fast_hash64_short (const void* const msg, size_t const len)
 {
     uint64_t res = GU_FNV64_SEED;
     gu_fnv64a_internal (msg, len, &res);
     /* to make 8th bit variations to escalate to 1st */
-    res += GU_ROTL64(res, 55);
+    res *= GU_ROTL64(res, 55);
     return gu_le64(res);
 }
 

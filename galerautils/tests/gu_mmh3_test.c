@@ -263,7 +263,7 @@ END_TEST
 
 Suite *gu_mmh3_suite(void)
 {
-  Suite *s  = suite_create("Galera MurmurHash3");
+  Suite *s  = suite_create("MurmurHash3");
   TCase *tc = tcase_create("gu_mmh3");
 
   suite_add_tcase (s, tc);

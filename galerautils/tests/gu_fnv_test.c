@@ -53,7 +53,7 @@ END_TEST
 
 Suite *gu_fnv_suite(void)
 {
-  Suite *s = suite_create("Galera FNV hash");
+  Suite *s = suite_create("FNV hash");
   TCase *tc_fnv = tcase_create("gu_fnv");
 
   suite_add_tcase (s, tc_fnv);

@@ -186,7 +186,7 @@ END_TEST
 
 Suite *gu_spooky_suite(void)
 {
-  Suite *s  = suite_create("Galera Spooky hash");
+  Suite *s  = suite_create("Spooky hash");
   TCase *tc = tcase_create("gu_spooky");
 
   suite_add_tcase (s, tc);
