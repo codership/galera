@@ -207,8 +207,8 @@ END_TEST
 #elif GU_WORDSIZE == 32
 
 static const uint8_t table_hash32_check0   [4] = { 0x0B, 0x7C, 0x3E, 0xAB };
-static const uint8_t table_hash32_check32  [4] = { 0x1E, 0xFF, 0x48, 0x38 };
-static const uint8_t table_hash32_check2011[4] = { 0x63, 0xC2, 0x53, 0x0D };
+static const uint8_t table_hash32_check32  [4] = { 0x65, 0x16, 0x17, 0x42 };
+static const uint8_t table_hash32_check2011[4] = { 0xF9, 0xBC, 0xEF, 0x7A };
 
 START_TEST (gu_table_hash_test)
 {
