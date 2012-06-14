@@ -71,9 +71,9 @@ gu_fast_hash64_short (const void* const msg, size_t const len)
 {
     uint64_t res = GU_FNV64_SEED;
     gu_fnv64a_internal (msg, len, &res);
-    /* to make 8th bit variations to escalate to 1st */
-    res *= GU_ROTL64(res, 55);
-    return gu_le64(res);
+    /* mix to improve avalanche effect */
+    res *= GU_ROTL64(res, 56);
+    return res ^ GU_ROTL64(res, 43);
 }
 
 #define gu_fast_hash64_medium  gu_mmh128_64
@@ -84,7 +84,7 @@ gu_fast_hash64 (const void* const msg, size_t const len)
 {
     if (len < GU_SHORT64_LIMIT)
     {
-        return gu_fast_hash64_short (msg, len);
+        return gu_le64 (gu_fast_hash64_short (msg, len));
     }
     else if (len < GU_MEDIUM64_LIMIT)
     {
