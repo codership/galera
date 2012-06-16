@@ -462,7 +462,7 @@ if [ $TAR == "yes" ]; then
     # Copy required Galera libraries
     GALERA_BINS=$GALERA_DIST_DIR/bin
     GALERA_LIBS=$GALERA_DIST_DIR/lib
-    install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
+    install -m 644 -D ../../LICENSE $GALERA_DIST_DIR/LICENSE.galera
     install -m 755 -d $GALERA_BINS
     install -m 755 -d $GALERA_LIBS
 
