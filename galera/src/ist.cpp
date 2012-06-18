@@ -298,7 +298,8 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         // read recv_addr_ from acceptor_ in case zero port was specified
         recv_addr_ = uri.get_scheme()
             + "://"
-            + escape_addr(acceptor_.local_endpoint().address())
+            // + 
+            + uri.get_host()
             + ":"
             + gu::to_string(acceptor_.local_endpoint().port());
     }
@@ -322,7 +323,12 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 
     running_ = true;
 
-    log_info << "Prepared IST receiver, listening at: " << recv_addr_;
+    log_info << "Prepared IST receiver, listening at: "
+             << (uri.get_scheme()
+                 + "://"
+                 + escape_addr(acceptor_.local_endpoint().address())
+                 + ":"
+                 + gu::to_string(acceptor_.local_endpoint().port()));
     return recv_addr_;
 }
 
