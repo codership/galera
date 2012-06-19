@@ -55,9 +55,10 @@ ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
                             const void*         state,
                             size_t              state_len)
 {
-    log_info << "Received SST: " << uuid << ':' << seqno;
+    log_info << "SST received: " << uuid << ':' << seqno;
 
     gu::Lock lock(sst_mutex_);
+
     if (state_() != S_JOINING)
     {
         log_error << "not JOINING when sst_received() called, state: "
@@ -680,7 +681,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_info << "SST received: " << state_uuid_ << ":" << sst_seqno_;
+            log_debug << "Installed new state: " << state_uuid_ << ":" << sst_seqno_;
         }
     }
     else
