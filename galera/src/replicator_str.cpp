@@ -442,8 +442,13 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     }
 
     wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
-    assert(local_seqno < group_seqno); // we should not be here if GTIDs match
-    assert(local_seqno >= 0);
+
+    if (local_seqno < 0)
+    {
+        gu_throw_error (EPERM) << "Local state seqno is undefined";
+    }
+
+    assert(local_seqno < group_seqno);
 
     std::ostringstream os;
 
