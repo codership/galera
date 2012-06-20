@@ -102,7 +102,7 @@ _mmh3_tail_32 (const uint8_t* const tail, size_t const len, uint32_t h1)
     return h1;
 }
 
-static GU_INLINE uint32_t
+static GU_FORCE_INLINE uint32_t
 _mmh32_seed (const void* key, size_t const len, uint32_t seed)
 {
     size_t const nblocks = len >> 2;
@@ -210,7 +210,7 @@ _mmh3_128_tail (const uint8_t* const tail, size_t const len,
     out[1] = h2;
 }
 
-static GU_INLINE void
+static GU_FORCE_INLINE void
 _mmh3_128_seed (const void* const key, size_t const len,
                 uint64_t s1, uint64_t s2, uint64_t* const out)
 {
@@ -230,8 +230,8 @@ static uint64_t const GU_MMH128_SEED2 = GU_ULONG_LONG(0x62B821756295C58D);
 static GU_FORCE_INLINE void
 gu_mmh128 (const void* const msg, size_t const len, void* const out)
 {
+    _mmh3_128_seed (msg, len, GU_MMH128_SEED1, GU_MMH128_SEED2, (uint64_t*)out);
     uint64_t* const res = (uint64_t*)out;
-    _mmh3_128_seed (msg, len, GU_MMH128_SEED1, GU_MMH128_SEED2, res);
     res[0] = gu_le64(res[0]);
     res[1] = gu_le64(res[1]);
 }
