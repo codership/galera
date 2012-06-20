@@ -92,19 +92,31 @@ typedef union gu_uint128 {
 #define GU_32HI 0
 #define GU_32LO 3
 
-typedef union {
+typedef union gu_int128 {
     uint64_t u64[2];
     uint32_t u32[4];
     struct {int32_t hi; uint64_t mid; uint32_t lo;}__attribute__((packed)) m;
+#ifdef __cplusplus
+    gu_int128() {}
+    gu_int128(int64_t hi, uint64_t lo) { u64[0] = hi; u64[1] = lo; }
+#endif
 } gu_int128_t;
 
-typedef union {
+typedef union gu_uint128 {
     uint64_t u64[2];
     uint32_t u32[4];
     struct {uint32_t hi; uint64_t mid; uint32_t lo;}__attribute__((packed)) m;
+#ifdef __cplusplus
+    gu_uint128() {}
+    gu_uint128(uint64_t hi, uint64_t lo) { u64[0] = hi; u64[1] = lo; }
+#endif
 } gu_uint128_t;
 
+#ifdef __cplusplus
+#define GU_SET128(_a, hi64, lo64) _a = gu_uint128(hi64, lo64);
+#else
 #define GU_SET128(_a, hi64, lo64) _a = { .u64 = { hi64, lo64 } }
+#endif
 
 #define GU_MUL128_INPLACE(_a,_b) {                   \
     uint64_t m33 = (uint64_t)_a.u32[3] * _b.u32[3];  \
