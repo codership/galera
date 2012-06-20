@@ -13,8 +13,8 @@
  *
  * 128-bit result is returned through void* parameter as a byte array in
  * canonical order.
- * 64/32-bit results are returned as uint64_t/uint32_t integers in host byte
- * order (require conversion to network/Galera byte order for serialization).
+ * 64/32-bit results are returned as uint64_t/uint32_t integers and thus in host
+ * byte order (require conversion to network/Galera byte order for serialization).
  *
  * $Id$
  */
@@ -86,7 +86,7 @@ gu_fast_hash64 (const void* const msg, size_t const len)
 {
     if (len < GU_SHORT64_LIMIT)
     {
-        return gu_le64 (gu_fast_hash64_short (msg, len));
+        return gu_fast_hash64_short (msg, len);
     }
     else if (len < GU_MEDIUM64_LIMIT)
     {

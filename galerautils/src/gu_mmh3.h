@@ -266,8 +266,9 @@ typedef struct gu_mmh128_ctx
     size_t   length;
 } gu_mmh128_ctx_t;
 
-/*! Initialize/reset MMH context with a particular seed, should not be used
- *  directly. */
+/*! Initialize/reset MMH context with a particular seed.
+ *  The seed is two 8-byte _integers_, obviously in HOST BYTE ORDER.
+ *  Should not be used directly. */
 static GU_INLINE void
 _mmh128_init_seed (gu_mmh128_ctx_t* const mmh,
                    uint64_t         const s1,
@@ -323,10 +324,13 @@ gu_mmh128_append (gu_mmh128_ctx_t* const mmh,
 
 /*! Get the accumulated message hash (does not change the context) */
 static GU_INLINE void
-gu_mmh128_get (const gu_mmh128_ctx_t* const mmh, void* res)
+gu_mmh128_get (const gu_mmh128_ctx_t* const mmh, void* const res)
 {
+    uint64_t* const r = (uint64_t*)res;
     _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
-                    mmh->hash[0], mmh->hash[1], res);
+                    mmh->hash[0], mmh->hash[1], r);
+    r[0] = gu_le64(r[0]);
+    r[1] = gu_le64(r[1]);
 }
 
 static GU_INLINE uint64_t

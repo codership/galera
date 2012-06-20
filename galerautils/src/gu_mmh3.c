@@ -10,9 +10,10 @@
 #include "gu_mmh3.h"
 
 void
-gu_mmh3_32 (const void* key, int len, uint32_t seed, void* out)
+gu_mmh3_32 (const void* const key, int const len, uint32_t const seed, void* const out)
 {
-    *((uint32_t*)out) = _mmh32_seed (key, len, seed);
+    uint32_t const res = _mmh32_seed (key, len, seed);
+    *((uint32_t*)out)  = gu_le32(res);
 }
 
 //-----------------------------------------------------------------------------
@@ -125,9 +126,12 @@ void gu_mmh3_x86_128 (const void* key, const int len,
 //-----------------------------------------------------------------------------
 
 void
-gu_mmh3_x64_128 (const void* key, int len, uint32_t seed, void* out)
+gu_mmh3_x64_128 (const void* key, int len, uint32_t const seed, void* const out)
 {
-    _mmh3_128_seed (key, len, seed, seed, out);
+    uint64_t* const res = (uint64_t*)out;
+    _mmh3_128_seed (key, len, seed, seed, res);
+    res[0] = gu_le64(res[0]);
+    res[1] = gu_le64(res[1]);
 }
 
 

@@ -73,7 +73,7 @@ typedef void (*hash_f_t) (const void* key, int len, uint32_t seed, void* out);
 
 /* Verification code from the original SMHasher test suite */
 static void
-smhasher_verification (hash_f_t hash, size_t hashbytes, hash32_t* res)
+smhasher_verification (hash_f_t hash, size_t const hashbytes, uint32_t* const res)
 {
     ssize_t const n_tests = 256;
     uint8_t key[n_tests];
@@ -126,10 +126,9 @@ check (const void* const exp, const void* const got, ssize_t size)
 START_TEST (gu_mmh32_test)
 {
     int i;
-    hash32_t out;
+    uint32_t out;
 
-    smhasher_verification (gu_mmh3_32, sizeof(hash32_t), &out);
-    out = gu_le32(out);
+    smhasher_verification (gu_mmh3_32, sizeof(out), &out);
     fail_if (check (&smhasher_checks[0], &out, sizeof(out)),
              "gu_mmh3_32 failed.");
 
@@ -147,7 +146,7 @@ END_TEST
 START_TEST (gu_mmh128_x86_test)
 {
     int i;
-    hash32_t out32;
+    uint32_t out32;
 
     smhasher_verification (gu_mmh3_x86_128, sizeof(hash128_t), &out32);
     fail_if (check (&smhasher_checks[1], &out32, sizeof(out32)),
@@ -166,7 +165,7 @@ END_TEST
 START_TEST (gu_mmh128_x64_test)
 {
     int i;
-    hash32_t out32;
+    uint32_t out32;
 
     smhasher_verification (gu_mmh3_x64_128, sizeof(hash128_t), &out32);
     fail_if (check (&smhasher_checks[2], &out32, sizeof(out32)),

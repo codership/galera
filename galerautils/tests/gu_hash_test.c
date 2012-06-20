@@ -5,6 +5,9 @@
  * correctness of hash algorithms definitions is checked in respective unit
  * tests.
  *
+ * By convention checks are made against etalon byte arrays, so integers must be
+ * converted to little-endian.
+ *
  * $Id$
  */
 
@@ -63,14 +66,16 @@ START_TEST (gu_hash_test)
              "gu_hash_get128() failed.");
 
     uint64_t res64 = gu_hash_get64(&h);
+    fail_if (gu_hash64(test_msg, GU_HASH_TEST_LENGTH) != res64);
+    res64 = gu_le64(res64);
     fail_if (check (gu_hash64_check, &res64, sizeof(res64)),
              "gu_hash_get64() failed.");
-    fail_if (gu_hash64(test_msg, GU_HASH_TEST_LENGTH) != res64);
 
     uint32_t res32 = gu_hash_get32(&h);
+    fail_if (gu_hash32(test_msg, GU_HASH_TEST_LENGTH) != res32);
+    res32 = gu_le32(res32);
     fail_if (check (gu_hash32_check, &res32, sizeof(res32)),
              "gu_hash_get32() failed.");
-    fail_if (gu_hash32(test_msg, GU_HASH_TEST_LENGTH) != res32);
 }
 END_TEST
 
@@ -132,42 +137,42 @@ START_TEST (gu_fast_hash_test)
 
     uint64_t res64;
 
-    res64 = gu_fast_hash64 (test_msg, 0);
+    res64 = gu_fast_hash64 (test_msg, 0); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check0, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 15);
+    res64 = gu_fast_hash64 (test_msg, 15); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check15, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 16);
+    res64 = gu_fast_hash64 (test_msg, 16); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check16, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 511);
+    res64 = gu_fast_hash64 (test_msg, 511); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check511, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 512);
+    res64 = gu_fast_hash64 (test_msg, 512); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check512, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 2011);
+    res64 = gu_fast_hash64 (test_msg, 2011); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check2011, &res64, sizeof(res64)));
 
     uint32_t res32;
 
-    res32 = gu_fast_hash32 (test_msg, 0);
+    res32 = gu_fast_hash32 (test_msg, 0); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check0, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 31);
+    res32 = gu_fast_hash32 (test_msg, 31); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check31, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 32);
+    res32 = gu_fast_hash32 (test_msg, 32); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check32, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 511);
+    res32 = gu_fast_hash32 (test_msg, 511); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check511, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 512);
+    res32 = gu_fast_hash32 (test_msg, 512); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check512, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 2011);
+    res32 = gu_fast_hash32 (test_msg, 2011); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check2011, &res32, sizeof(res32)));
 }
 END_TEST
@@ -184,22 +189,22 @@ START_TEST (gu_table_hash_test)
 
     fail_if (sizeof(res) > 8);
 
-    res = gu_table_hash (test_msg, 0);
+    res = gu_table_hash (test_msg, 0); res = gu_le64(res);
     fail_if (check (fast_hash64_check0, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 15);
+    res = gu_table_hash (test_msg, 15); res = gu_le64(res);
     fail_if (check (fast_hash64_check15, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 16);
+    res = gu_table_hash (test_msg, 16); res = gu_le64(res);
     fail_if (check (fast_hash64_check16, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 511);
+    res = gu_table_hash (test_msg, 511); res = gu_le64(res);
     fail_if (check (fast_hash64_check511, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 512);
+    res = gu_table_hash (test_msg, 512); res = gu_le64(res);
     fail_if (check (fast_hash64_check512, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 2011);
+    res = gu_table_hash (test_msg, 2011); res = gu_le64(res);
     fail_if (check (fast_hash64_check2011, &res, sizeof(res)));
 }
 END_TEST
@@ -216,13 +221,13 @@ START_TEST (gu_table_hash_test)
 
     fail_if (sizeof(res) > 4);
 
-    res = gu_table_hash (test_msg, 0);
+    res = gu_table_hash (test_msg, 0); res = gu_le32(res);
     fail_if (check (table_hash32_check0, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 32);
+    res = gu_table_hash (test_msg, 32); res = gu_le32(res);
     fail_if (check (table_hash32_check32, &res, sizeof(res)));
 
-    res = gu_table_hash (test_msg, 2011);
+    res = gu_table_hash (test_msg, 2011); res = gu_le32(res);
     fail_if (check (table_hash32_check2011, &res, sizeof(res)));
 }
 END_TEST
