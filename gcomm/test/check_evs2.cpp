@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -57,7 +57,7 @@ START_TEST(test_range)
     log_info << "START";
     Range r(3, 6);
 
-    check_serialization(r, 2 * gcomm::serial_size(seqno_t()), Range());
+    check_serialization(r, 2 * sizeof(seqno_t), Range());
 
 }
 END_TEST

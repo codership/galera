@@ -147,13 +147,14 @@ _mmh3_128_blocks (const uint64_t* const blocks, size_t const nblocks,
     // body
 
     size_t i;
-    for(i = 0; i < nblocks;)
+    for(i = 0; i < nblocks; i++)
     {
 //-----------------------------------------------------------------------------
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
-        uint64_t k1 = gu_le64(blocks[i++]);
-        uint64_t k2 = gu_le64(blocks[i++]);
+        uint64_t k1 = gu_le64(blocks[i]);
+        i++;
+        uint64_t k2 = gu_le64(blocks[i]);
 
         _mmh3_128_block (k1, k2, h1, h2);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/view.hpp"
@@ -24,7 +24,7 @@ size_t gcomm::ViewId::unserialize(const byte_t* buf,
     
     gu_trace (off = uuid.unserialize(buf, buflen, offset));
     uint32_t w;
-    gu_trace (off = gcomm::unserialize(buf, buflen, off, &w));
+    gu_trace (off = gu::unserialize4(buf, buflen, off, w));
     seq = w & 0x3fffffff;
     type = static_cast<ViewType>(w >> 30);
     return off;
@@ -40,7 +40,7 @@ size_t gcomm::ViewId::serialize(byte_t* buf,
     gcomm_assert(type != V_NONE);
     gu_trace (off = uuid.serialize(buf, buflen, offset));
     uint32_t w((seq & 0x3fffffff) | (type << 30));
-    gu_trace (off = gcomm::serialize(w, buf, buflen, off));
+    gu_trace (off = gu::serialize4(w, buf, buflen, off));
     
     return off;
 }

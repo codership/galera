@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
  */
 
 #ifndef GU_DATAGRAM_HPP
@@ -83,16 +83,16 @@ namespace gu
     inline size_t serialize(const NetHeader& hdr, byte_t* buf, size_t buflen,
                             size_t offset)
     {
-        offset = serialize(hdr.len_, buf, buflen, offset);
-        offset = serialize(hdr.crc32_, buf, buflen, offset);
+        offset = serialize4(hdr.len_, buf, buflen, offset);
+        offset = serialize4(hdr.crc32_, buf, buflen, offset);
         return offset;
     }
 
     inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
                               NetHeader& hdr)
     {
-        offset = unserialize(buf, buflen, offset, hdr.len_);
-        offset = unserialize(buf, buflen, offset, hdr.crc32_);
+        offset = unserialize4(buf, buflen, offset, hdr.len_);
+        offset = unserialize4(buf, buflen, offset, hdr.crc32_);
         switch (hdr.version())
         {
         case 0:
@@ -254,7 +254,7 @@ namespace gu
         boost::crc_16_type crc;
         assert(offset < dg.get_len());
         byte_t lenb[4];
-        serialize<uint32_t>(dg.get_len() - offset, lenb, sizeof(lenb), 0);
+        serialize4(static_cast<int32_t>(dg.get_len() - offset), lenb, sizeof(lenb), 0);
         crc.process_block(lenb, lenb + sizeof(lenb));
         if (offset < dg.get_header_len())
         {
@@ -275,7 +275,7 @@ namespace gu
     {
         boost::crc_32_type crc;
         byte_t lenb[4];
-        serialize<uint32_t>(dg.get_len() - offset, lenb, sizeof(lenb), 0);
+        serialize4(static_cast<int32_t>(dg.get_len() - offset), lenb, sizeof(lenb), 0);
         crc.process_block(lenb, lenb + sizeof(lenb));
         if (offset < dg.get_header_len())
         {

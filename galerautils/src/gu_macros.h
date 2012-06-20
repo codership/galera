@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2012 Codership Oy <info@codership.com>
 
 /**
  * @file Miscellaneous macros
@@ -23,7 +23,7 @@
 #  define GU_ULONG_LONG(x) (x)
 #else   /* !defined(_MSC_VER) */
 #  define GU_INLINE        inline
-#  define GU_FORCE_INLINE  __attribute__((always_inline,unused))
+#  define GU_FORCE_INLINE  inline __attribute__((always_inline))
 #  define GU_UNUSED        __attribute__((unused))
 #  define GU_LONG(x)       (x##L)
 #  define GU_ULONG(x)      (x##LU)

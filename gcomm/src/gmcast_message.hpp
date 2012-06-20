@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/types.hpp"
@@ -205,10 +205,10 @@ public:
     {
         size_t off;
 
-        gu_trace (off = gcomm::serialize(version, buf, buflen, offset));
-        gu_trace (off = gcomm::serialize(static_cast<gu::byte_t>(type),buf,buflen,off));
-        gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
-        gu_trace (off = gcomm::serialize(segment_id, buf, buflen, off));
+        gu_trace (off = gu::serialize1(version, buf, buflen, offset));
+        gu_trace (off = gu::serialize1(static_cast<gu::byte_t>(type),buf,buflen,off));
+        gu_trace (off = gu::serialize1(flags, buf, buflen, off));
+        gu_trace (off = gu::serialize1(segment_id, buf, buflen, off));
         gu_trace (off = source_uuid.serialize(buf, buflen, off));
 
         if (flags & F_HANDSHAKE_UUID)
@@ -239,7 +239,7 @@ public:
         size_t off;
         gu::byte_t t;
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &t));
+        gu_trace (off = gu::unserialize1(buf, buflen, offset, t));
         type = static_cast<Type>(t);
         switch (type)
         {
@@ -255,8 +255,8 @@ public:
                                    << static_cast<int>(type);
             throw;
         }
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &segment_id));
+        gu_trace (off = gu::unserialize1(buf, buflen, off, flags));
+        gu_trace (off = gu::unserialize1(buf, buflen, off, segment_id));
         gu_trace (off = source_uuid.unserialize(buf, buflen, off));
 
         if (flags & F_HANDSHAKE_UUID)
@@ -287,7 +287,7 @@ public:
     {
         size_t off;
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &version));
+        gu_trace (off = gu::unserialize1(buf, buflen, offset, version));
 
         switch (version) {
         case 0:

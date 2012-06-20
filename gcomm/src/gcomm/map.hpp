@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -11,6 +11,8 @@
 
 #ifndef GCOMM_MAP_HPP
 #define GCOMM_MAP_HPP
+
+#include "gu_serialize.hpp"
 
 #include <utility>
 #include <iterator>
@@ -103,7 +105,7 @@ namespace gcomm
                          size_t        offset) const
             throw (gu::Exception)
         {
-            gu_trace(offset = gcomm::serialize(
+            gu_trace(offset = gu::serialize4(
                          static_cast<uint32_t>(size()), buf, buflen, offset));
             for (const_iterator i = map.begin(); i != map.end(); ++i)
             {
@@ -122,7 +124,7 @@ namespace gcomm
             // Clear map in case this object is reused
             map.clear();
 
-            gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &len));;
+            gu_trace(offset = gu::unserialize4(buf, buflen, offset, len));;
 
             for (uint32_t i = 0; i < len; ++i)
             {

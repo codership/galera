@@ -26,12 +26,12 @@
 
 #else   /* !defined(_MSC_VER) */
 
-static GU_FORCE_INLINE GU_UNUSED uint32_t GU_ROTL32 (uint32_t x, int8_t r)
+static GU_FORCE_INLINE uint32_t GU_ROTL32 (uint32_t x, int8_t r)
 {
   return (x << r) | (x >> (32 - r));
 }
 
-static GU_FORCE_INLINE GU_UNUSED uint64_t GU_ROTL64 (uint64_t x, int8_t r)
+static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 {
   return (x << r) | (x >> (64 - r));
 }
@@ -68,7 +68,7 @@ static GU_FORCE_INLINE GU_UNUSED uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 // To pacify C++. Not loosing much optimization on 2 bytes anyways.
 #include <stdint.h>
 #undef gu_bswap16
-static GU_FORCE_INLINE GU_UNUSED uint16_t gu_bswap16(uint16_t const x)
+static GU_FORCE_INLINE uint16_t gu_bswap16(uint16_t const x)
 // Even though x is declared as 'uint16_t', g++-4.4.1 still treats results
 // of operations with it as 'int' and freaks out on return with -Wconversion.
 { return static_cast<uint16_t>((x >> 8) | (x << 8)); }

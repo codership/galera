@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #ifndef EVS_SEQNO_HPP
@@ -7,7 +7,9 @@
 
 #include "gcomm/types.hpp"
 
-#include <stdint.h> // for uint16_t
+#include "gu_serialize.hpp"
+
+//#include <stdint.h> // for uint16_t
 #include <ostream>
 #include <cassert>
 
@@ -41,21 +43,21 @@ public:
     
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
-        gu_trace(offset = gcomm::serialize(lu_, buf, buflen, offset));
-        gu_trace(offset = gcomm::serialize(hs_, buf, buflen, offset));
+        gu_trace(offset = gu::serialize8(lu_, buf, buflen, offset));
+        gu_trace(offset = gu::serialize8(hs_, buf, buflen, offset));
         return offset;
     }
     
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
-        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &lu_));
-        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &hs_));
+        gu_trace(offset = gu::unserialize8(buf, buflen, offset, lu_));
+        gu_trace(offset = gu::unserialize8(buf, buflen, offset, hs_));
         return offset;
     }
     
     static size_t serial_size()
     {
-        return 2 * gcomm::serial_size(seqno_t());
+        return 2 * sizeof(seqno_t);
     }
 
     bool operator==(const Range& cmp) const

@@ -10,6 +10,7 @@
 #include "gu_spooky_test.h"
 
 #include "../src/gu_spooky.h"
+#include "../src/gu_print_buf.h"
 
 #define BUFSIZE 512
 static uint64_t const expected[BUFSIZE] = {
@@ -176,9 +177,16 @@ START_TEST (gu_spooky_test)
         else
             gu_spooky128 (buf, i, h);
 
-        uint32_t saw = (uint32_t)h[0];
-        fail_if (saw != gu_le32(expected[i]),
-                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw, expected[i]);
+        uint32_t saw = (uint32_t)gtoh64(h[0]);
+        if (saw != expected[i])
+        {
+            char hash[40];
+            gu_print_buf(h, sizeof(h), hash, sizeof(hash), false);
+            fail ("%d: expected 0x%.8lX, saw 0x%.8lX,\n full hash: %s",
+                     i, expected[i], saw, hash);
+        }
+//        fail_if (saw != expected[i],
+//                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw, expected[i]);
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -106,7 +106,7 @@ public:
      *
      * @return Port in nework byte order
      */
-    short get_port() const
+    unsigned short get_port() const
     {
         switch(sa_->sa_family)
         {

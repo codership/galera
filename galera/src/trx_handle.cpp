@@ -1,11 +1,11 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
-#include "serialization.hpp"
-
 #include "uuid.hpp"
+
+#include "gu_serialize.hpp"
 
 std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 {
@@ -129,7 +129,7 @@ size_t galera::serialize(const TrxHandle::Mac& mac, gu::byte_t* buf,
     // header:
     // type: 1 byte
     // len:  1 byte
-    return serialize(uint16_t(0), buf, buflen, offset);
+    return gu::serialize2(uint16_t(0), buf, buflen, offset);
 }
 
 
@@ -137,7 +137,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                            TrxHandle::Mac& mac)
 {
     uint16_t hdr;
-    offset = unserialize(buf, buflen, offset, hdr);
+    offset = gu::unserialize2(buf, buflen, offset, hdr);
     switch ((hdr >> 8) & 0xff)
     {
     case 0:
@@ -153,7 +153,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
 
 size_t galera::serial_size(const TrxHandle::Mac& mac)
 {
-    return serial_size(uint16_t());
+    return 2; // sizeof(uint16_t); // Hm, isn't is somewhat short for mac?
 }
 
 
@@ -161,15 +161,15 @@ size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
                          size_t buflen, size_t offset)
 {
     uint32_t hdr((trx.version_ << 24) | (trx.write_set_flags_ & 0xff));
-    offset = serialize(hdr, buf, buflen, offset);
+    offset = gu::serialize4(hdr, buf, buflen, offset);
     offset = serialize(trx.source_id_, buf, buflen, offset);
-    offset = serialize(trx.conn_id_, buf, buflen, offset);
-    offset = serialize(trx.trx_id_, buf, buflen, offset);
-    offset = serialize(trx.last_seen_seqno_, buf, buflen, offset);
-    offset = serialize(trx.timestamp_, buf, buflen, offset);
+    offset = gu::serialize8(trx.conn_id_, buf, buflen, offset);
+    offset = gu::serialize8(trx.trx_id_, buf, buflen, offset);
+    offset = gu::serialize8(trx.last_seen_seqno_, buf, buflen, offset);
+    offset = gu::serialize8(trx.timestamp_, buf, buflen, offset);
     if (trx.has_annotation())
     {
-        offset = serialize<uint32_t>(trx.annotation_, buf, buflen, offset);
+        offset = gu::serialize4(trx.annotation_, buf, buflen, offset);
     }
     if (trx.has_mac())
     {
@@ -186,7 +186,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
 
     try
     {
-        offset = unserialize(buf, buflen, offset, hdr);
+        offset = gu::unserialize4(buf, buflen, offset, hdr);
         trx.write_set_flags_ = hdr & 0xff;
         trx.version_ = hdr >> 24;
         trx.write_set_.set_version(trx.version_);
@@ -197,14 +197,14 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         case 1:
         case 2:
             offset = unserialize(buf, buflen, offset, trx.source_id_);
-            offset = unserialize(buf, buflen, offset, trx.conn_id_);
-            offset = unserialize(buf, buflen, offset, trx.trx_id_);
-            offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
-            offset = unserialize(buf, buflen, offset, trx.timestamp_);
+            offset = gu::unserialize8(buf, buflen, offset, trx.conn_id_);
+            offset = gu::unserialize8(buf, buflen, offset, trx.trx_id_);
+            offset = gu::unserialize8(buf, buflen, offset, trx.last_seen_seqno_);
+            offset = gu::unserialize8(buf, buflen, offset, trx.timestamp_);
             if (trx.has_annotation())
             {
-                offset = unserialize<uint32_t>(buf, buflen, offset,
-                                               trx.annotation_);
+                offset = gu::unserialize4(buf, buflen, offset,
+                                          trx.annotation_);
             }
             if (trx.has_mac())
             {
@@ -236,14 +236,14 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
 
 size_t galera::serial_size(const TrxHandle& trx)
 {
-    return (sizeof(uint32_t) // hdr
+    return (4 // hdr
             + serial_size(trx.source_id_)
-            + serial_size(trx.conn_id_)
-            + serial_size(trx.trx_id_)
-            + serial_size(trx.last_seen_seqno_)
-            + serial_size(trx.timestamp_)
+            + 8 // serial_size(trx.conn_id_)
+            + 8 // serial_size(trx.trx_id_)
+            + 8 // serial_size(trx.last_seen_seqno_)
+            + 8 // serial_size(trx.timestamp_)
             + (trx.has_annotation() ?
-               serial_size<uint32_t>(trx.annotation_) : 0)
+               gu::serial_size4(trx.annotation_) : 0)
             + (trx.has_mac() ? serial_size(trx.mac_) : 0));
 }
 

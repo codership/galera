@@ -1,8 +1,7 @@
 /*
- * Copyright (C) 2010-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
  */
 
-#include "serialization.hpp"
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "gu_logger.hpp"
@@ -14,7 +13,6 @@
 #include <check.h>
 
 using namespace std;
-using namespace gu;
 using namespace galera;
 
 typedef std::vector<galera::KeyPart0> KeyPart0Sequence;
@@ -31,16 +29,16 @@ START_TEST(test_key0)
     };
 
     galera::Key key(0, kiovec, 3, 0);
-    fail_unless(galera::serial_size(key) == 2 + 3 + 3 + 5, "%ld <-> %ld",
-                galera::serial_size(key), 2 + 3 + 3 + 5);
+    fail_unless(serial_size(key) == 2 + 3 + 3 + 5, "%ld <-> %ld",
+                serial_size(key), 2 + 3 + 3 + 5);
 
     KeyPart0Sequence kp(key.key_parts0<KeyPart0Sequence>());
     fail_unless(kp.size() == 3);
 
-    gu::Buffer buf(galera::serial_size(key));
-    galera::serialize(key, &buf[0], buf.size(), 0);
-    galera::Key key2(0);
-    galera::unserialize(&buf[0], buf.size(), 0, key2);
+    gu::Buffer buf(serial_size(key));
+    serialize(key, &buf[0], buf.size(), 0);
+    Key key2(0);
+    unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -64,7 +62,7 @@ START_TEST(test_key1)
         {k4, sizeof k4 }
     };
 
-    galera::Key key(1, kiovec, 4, 0);
+    Key key(1, kiovec, 4, 0);
     size_t expected_size(0);
 
 #ifndef GALERA_KEY_VLQ
@@ -81,16 +79,16 @@ START_TEST(test_key1)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(galera::serial_size(key) == expected_size, "%ld <-> %ld",
-                galera::serial_size(key), expected_size);
+    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
+                serial_size(key), expected_size);
 
     KeyPart1Sequence kp(key.key_parts1<KeyPart1Sequence>());
     fail_unless(kp.size() == 4);
 
     gu::Buffer buf(galera::serial_size(key));
-    galera::serialize(key, &buf[0], buf.size(), 0);
-    galera::Key key2(1);
-    galera::unserialize(&buf[0], buf.size(), 0, key2);
+    serialize(key, &buf[0], buf.size(), 0);
+    Key key2(1);
+    unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -115,7 +113,7 @@ START_TEST(test_key2)
         {k4, sizeof k4 }
     };
 
-    galera::Key key(2, kiovec, 4, 0);
+    Key key(2, kiovec, 4, 0);
     size_t expected_size(0);
 
     expected_size += 1; // flags
@@ -133,16 +131,16 @@ START_TEST(test_key2)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(galera::serial_size(key) == expected_size, "%ld <-> %ld",
-                galera::serial_size(key), expected_size);
+    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
+                serial_size(key), expected_size);
 
     KeyPart1Sequence kp(key.key_parts1<KeyPart1Sequence>());
     fail_unless(kp.size() == 4);
 
-    gu::Buffer buf(galera::serial_size(key));
-    galera::serialize(key, &buf[0], buf.size(), 0);
-    galera::Key key2(2);
-    galera::unserialize(&buf[0], buf.size(), 0, key2);
+    gu::Buffer buf(serial_size(key));
+    serialize(key, &buf[0], buf.size(), 0);
+    Key key2(2);
+    unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -166,15 +164,15 @@ START_TEST(test_write_set0)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(galera::Key(0, key1, 2, 0));
+    ws.append_key(Key(0, key1, 2, 0));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(galera::Key(0, key2, 2, 0));
+    ws.append_key(Key(0, key2, 2, 0));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
-    log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
+    log_info << "rbrlen " << gu::serial_size4(rbrbuf);
     log_info << "wsrbr " << serial_size(ws);
 
     gu::Buffer buf(serial_size(ws));
@@ -226,15 +224,15 @@ START_TEST(test_write_set1)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(galera::Key(1, key1, 2, 0));
+    ws.append_key(Key(1, key1, 2, 0));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(galera::Key(1, key2, 2, 0));
+    ws.append_key(Key(1, key2, 2, 0));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
-    log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
+    log_info << "rbrlen " << gu::serial_size4(rbrbuf);
     log_info << "wsrbr " << serial_size(ws);
 
     gu::Buffer buf(serial_size(ws));
@@ -293,15 +291,15 @@ START_TEST(test_write_set2)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(galera::Key(2, key1, 2, 0));
+    ws.append_key(Key(2, key1, 2, 0));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(galera::Key(2, key2, 2, 0));
+    ws.append_key(Key(2, key2, 2, 0));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
-    log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
+    log_info << "rbrlen " << gu::serial_size4(rbrbuf);
     log_info << "wsrbr " << serial_size(ws);
 
     gu::Buffer buf(serial_size(ws));
@@ -350,30 +348,30 @@ START_TEST(test_mapped_buffer)
     mb.resize(16);
     for (size_t i = 0; i < 16; ++i)
     {
-        mb[i] = static_cast<byte_t>(i);
+        mb[i] = static_cast<gu::byte_t>(i);
     }
 
     mb.resize(1 << 8);
     for (size_t i = 0; i < 16; ++i)
     {
-        fail_unless(mb[i] == static_cast<byte_t>(i));
+        fail_unless(mb[i] == static_cast<gu::byte_t>(i));
     }
 
     for (size_t i = 16; i < (1 << 8); ++i)
     {
-        mb[i] = static_cast<byte_t>(i);
+        mb[i] = static_cast<gu::byte_t>(i);
     }
 
     mb.resize(1 << 20);
 
     for (size_t i = 0; i < (1 << 8); ++i)
     {
-        fail_unless(mb[i] == static_cast<byte_t>(i));
+        fail_unless(mb[i] == static_cast<gu::byte_t>(i));
     }
 
     for (size_t i = 0; i < (1 << 20); ++i)
     {
-        mb[i] = static_cast<byte_t>(i);
+        mb[i] = static_cast<gu::byte_t>(i);
     }
 
 }
@@ -610,7 +608,7 @@ START_TEST(test_cert_hierarchical_v1)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(galera::unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
         log_info << "ws: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -716,7 +714,7 @@ START_TEST(test_cert_hierarchical_v2)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(galera::unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
         log_info << "ws: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 

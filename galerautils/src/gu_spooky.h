@@ -46,18 +46,18 @@ static GU_FORCE_INLINE void _spooky_mix(
     uint64_t* s4, uint64_t* s5, uint64_t* s6, uint64_t* s7,
     uint64_t* s8, uint64_t* s9, uint64_t* sA, uint64_t* sB)
 {
-    *s0 += data[0];  *s2 ^= *sA; *sB ^= *s0; *s0 =GU_ROTL64(*s0,11); *sB += *s1;
-    *s1 += data[1];  *s3 ^= *sB; *s0 ^= *s1; *s1 =GU_ROTL64(*s1,32); *s0 += *s2;
-    *s2 += data[2];  *s4 ^= *s0; *s1 ^= *s2; *s2 =GU_ROTL64(*s2,43); *s1 += *s3;
-    *s3 += data[3];  *s5 ^= *s1; *s2 ^= *s3; *s3 =GU_ROTL64(*s3,31); *s2 += *s4;
-    *s4 += data[4];  *s6 ^= *s2; *s3 ^= *s4; *s4 =GU_ROTL64(*s4,17); *s3 += *s5;
-    *s5 += data[5];  *s7 ^= *s3; *s4 ^= *s5; *s5 =GU_ROTL64(*s5,28); *s4 += *s6;
-    *s6 += data[6];  *s8 ^= *s4; *s5 ^= *s6; *s6 =GU_ROTL64(*s6,39); *s5 += *s7;
-    *s7 += data[7];  *s9 ^= *s5; *s6 ^= *s7; *s7 =GU_ROTL64(*s7,57); *s6 += *s8;
-    *s8 += data[8];  *sA ^= *s6; *s7 ^= *s8; *s8 =GU_ROTL64(*s8,55); *s7 += *s9;
-    *s9 += data[9];  *sB ^= *s7; *s8 ^= *s9; *s9 =GU_ROTL64(*s9,54); *s8 += *sA;
-    *sA += data[10]; *s0 ^= *s8; *s9 ^= *sA; *sA =GU_ROTL64(*sA,22); *s9 += *sB;
-    *sB += data[11]; *s1 ^= *s9; *sA ^= *sB; *sB =GU_ROTL64(*sB,46); *sA += *s0;
+    *s0 += gtoh64(data[0]);  *s2 ^= *sA; *sB ^= *s0; *s0 =GU_ROTL64(*s0,11); *sB += *s1;
+    *s1 += gtoh64(data[1]);  *s3 ^= *sB; *s0 ^= *s1; *s1 =GU_ROTL64(*s1,32); *s0 += *s2;
+    *s2 += gtoh64(data[2]);  *s4 ^= *s0; *s1 ^= *s2; *s2 =GU_ROTL64(*s2,43); *s1 += *s3;
+    *s3 += gtoh64(data[3]);  *s5 ^= *s1; *s2 ^= *s3; *s3 =GU_ROTL64(*s3,31); *s2 += *s4;
+    *s4 += gtoh64(data[4]);  *s6 ^= *s2; *s3 ^= *s4; *s4 =GU_ROTL64(*s4,17); *s3 += *s5;
+    *s5 += gtoh64(data[5]);  *s7 ^= *s3; *s4 ^= *s5; *s5 =GU_ROTL64(*s5,28); *s4 += *s6;
+    *s6 += gtoh64(data[6]);  *s8 ^= *s4; *s5 ^= *s6; *s6 =GU_ROTL64(*s6,39); *s5 += *s7;
+    *s7 += gtoh64(data[7]);  *s9 ^= *s5; *s6 ^= *s7; *s7 =GU_ROTL64(*s7,57); *s6 += *s8;
+    *s8 += gtoh64(data[8]);  *sA ^= *s6; *s7 ^= *s8; *s8 =GU_ROTL64(*s8,55); *s7 += *s9;
+    *s9 += gtoh64(data[9]);  *sB ^= *s7; *s8 ^= *s9; *s9 =GU_ROTL64(*s9,54); *s8 += *sA;
+    *sA += gtoh64(data[10]); *s0 ^= *s8; *s9 ^= *sA; *sA =GU_ROTL64(*sA,22); *s9 += *sB;
+    *sB += gtoh64(data[11]); *s1 ^= *s9; *sA ^= *sB; *sB =GU_ROTL64(*sB,46); *sA += *s0;
 }
 
 //
@@ -128,7 +128,7 @@ static GU_FORCE_INLINE void _spooky_end(
 // with a base of all zeros plus a counter, or plus another bit, or random
 //
 static GU_FORCE_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
-                               uint64_t* h2, uint64_t* h3)
+                                              uint64_t* h2, uint64_t* h3)
 {
     *h2 = GU_ROTL64(*h2,50);  *h2 += *h3;  *h0 ^= *h2;
     *h3 = GU_ROTL64(*h3,52);  *h3 += *h0;  *h1 ^= *h3;
@@ -157,7 +157,7 @@ static GU_FORCE_INLINE void _spooky_short_mix(uint64_t* h0, uint64_t* h1,
 // with probability 50 +- .75% (the worst case is approximately that)
 //
 static GU_FORCE_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
-                                        uint64_t* h2, uint64_t* h3)
+                                              uint64_t* h2, uint64_t* h3)
 {
     *h3 ^= *h2;  *h2 = GU_ROTL64(*h2,15);  *h3 += *h2;
     *h0 ^= *h3;  *h3 = GU_ROTL64(*h3,52);  *h0 += *h3;
@@ -205,8 +205,8 @@ static GU_INLINE void gu_spooky_short(
     size_t   remainder = length & 0x1F; /* length%32 */
 
     /* author version : */
-    // uint64_t a = gu_le64(*hash1);
-    // uint64_t b = gu_le64(*hash2);
+    // uint64_t a = gtoh64(*hash1);
+    // uint64_t b = gtoh64(*hash2);
     /* consistent seed version: */
     uint64_t a = 0;
     uint64_t b = 0;
@@ -220,18 +220,18 @@ static GU_INLINE void gu_spooky_short(
         // handle all complete sets of 32 bytes
         for (; u.p64 < end; u.p64 += 4)
         {
-            c += u.p64[0];
-            d += u.p64[1];
+            c += gtoh64(u.p64[0]);
+            d += gtoh64(u.p64[1]);
             _spooky_short_mix(&a, &b, &c, &d);
-            a += u.p64[2];
-            b += u.p64[3];
+            a += gtoh64(u.p64[2]);
+            b += gtoh64(u.p64[3]);
         }
 
         //Handle the case of 16+ remaining bytes.
         if (remainder >= 16)
         {
-            c += u.p64[0];
-            d += u.p64[1];
+            c += gtoh64(u.p64[0]);
+            d += gtoh64(u.p64[1]);
             _spooky_short_mix(&a, &b, &c, &d);
             u.p64 += 2;
             remainder -= 16;
@@ -249,8 +249,8 @@ static GU_INLINE void gu_spooky_short(
     case 13:
         d += ((uint64_t)u.p8[12]) << 32;
     case 12:
-        d += u.p32[2];
-        c += u.p64[0];
+        d += gtoh32(u.p32[2]);
+        c += gtoh64(u.p64[0]);
         break;
     case 11:
         d += ((uint64_t)u.p8[10]) << 16;
@@ -259,7 +259,7 @@ static GU_INLINE void gu_spooky_short(
     case 9:
         d += (uint64_t)u.p8[8];
     case 8:
-        c += u.p64[0];
+        c += gtoh64(u.p64[0]);
         break;
     case 7:
         c += ((uint64_t)u.p8[6]) << 48;
@@ -268,7 +268,7 @@ static GU_INLINE void gu_spooky_short(
     case 5:
         c += ((uint64_t)u.p8[4]) << 32;
     case 4:
-        c += u.p32[0];
+        c += gtoh32(u.p32[0]);
         break;
     case 3:
         c += ((uint64_t)u.p8[2]) << 16;
@@ -284,8 +284,8 @@ static GU_INLINE void gu_spooky_short(
 
     _spooky_short_end(&a, &b, &c, &d);
 
-    ((uint64_t*)hash)[0] = gu_le64(a);
-    ((uint64_t*)hash)[1] = gu_le64(b);
+    ((uint64_t*)hash)[0] = htog64(a);
+    ((uint64_t*)hash)[1] = htog64(b);
 }
 
 // do the whole hash in one call
@@ -305,6 +305,7 @@ static GU_INLINE void gu_spooky_inline (
     uint64_t  h0,h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11;
     uint64_t  buf[_spooky_numVars];
     uint64_t* end;
+
     union
     {
         const uint8_t* p8;
@@ -313,11 +314,12 @@ static GU_INLINE void gu_spooky_inline (
         size_t         i;
 #endif /* !GU_ALLOW_UNALIGNED_READS */
     } u;
+
     size_t remainder;
 
     /* this is how the author wants it: a possibility for different seeds
-     h0=h3=h6=h9  = gu_le64(((uint64_t*)hash)[0]);
-     h1=h4=h7=h10 = gu_le64(((uint64_t*)hash)[1]);
+     h0=h3=h6=h9  = gtoh64(((uint64_t*)hash)[0]);
+     h1=h4=h7=h10 = gtoh64(((uint64_t*)hash)[1]);
      * this is we want it - constant seed */
     h0=h3=h6=h9  = 0;
     h1=h4=h7=h10 = 0;
@@ -359,8 +361,8 @@ static GU_INLINE void gu_spooky_inline (
     // do some final mixing
     _spooky_end(&h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
 
-    ((uint64_t*)hash)[0] = gu_le64(h0);
-    ((uint64_t*)hash)[1] = gu_le64(h1);
+    ((uint64_t*)hash)[0] = htog64(h0);
+    ((uint64_t*)hash)[1] = htog64(h1);
 }
 
 /* As is apparent from the gu_spooky_inline(), Spooky hash is enormous.

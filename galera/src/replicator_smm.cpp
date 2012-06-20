@@ -6,7 +6,6 @@
 #include "replicator_smm.hpp"
 #include "galera_exception.hpp"
 #include "uuid.hpp"
-#include "serialization.hpp"
 
 extern "C"
 {
@@ -25,7 +24,7 @@ apply_wscoll(void*                    recv_ctx,
 {
     const galera::MappedBuffer& wscoll(trx.write_set_collection());
     // skip over trx header
-    size_t offset(galera::serial_size(trx));
+    size_t offset(serial_size(trx));
     galera::WriteSet ws(trx.version());
 
     while (offset < wscoll.size())

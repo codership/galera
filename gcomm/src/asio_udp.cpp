@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
  */
 
 #include "asio_udp.hpp"
@@ -145,7 +145,7 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
         hdr.set_crc32(crc32(dg));
     }
     byte_t buf[NetHeader::serial_size_];
-    gcomm::serialize(hdr, buf, sizeof(buf), 0);
+    gu::serialize(hdr, buf, sizeof(buf), 0);
     cbs[0] = asio::const_buffer(buf, sizeof(buf));
     cbs[1] = asio::const_buffer(dg.get_header() + dg.get_header_offset(),
                           dg.get_header_len());
@@ -178,7 +178,7 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
         NetHeader hdr;
         try
         {
-            unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+            gu::unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
         }
         catch (Exception& e)
         {

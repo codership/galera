@@ -88,6 +88,9 @@ elif arch == 'x86_64' or arch == 'amd64':
 elif sysname == 'sunos':
     compile_arch = ''
     link_arch    = ''
+elif arch == 'ppc64':
+    compile_arch = ''
+    link_arch    = ''
 else:
     print 'Unsupported target architecture: ' + arch
     Exit(1)

@@ -1,11 +1,11 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 
 #include "write_set.hpp"
-#include "serialization.hpp"
 
+#include "gu_serialize.hpp"
 #include "gu_logger.hpp"
 
 
@@ -14,8 +14,8 @@ size_t galera::serialize(const WriteSet& ws,
                          size_t          buf_len,
                          size_t          offset)
 {
-    offset = serialize<uint32_t>(ws.keys_, buf, buf_len, offset);
-    offset = serialize<uint32_t>(ws.data_, buf, buf_len, offset);
+    offset = gu::serialize4(ws.keys_, buf, buf_len, offset);
+    offset = gu::serialize4(ws.data_, buf, buf_len, offset);
     return offset;
 }
 
@@ -26,15 +26,15 @@ size_t galera::unserialize(const gu::byte_t* buf,
                            WriteSet&         ws)
 {
     ws.keys_.clear();
-    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.keys_);
-    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
+    offset = gu::unserialize4(buf, buf_len, offset, ws.keys_);
+    offset = gu::unserialize4(buf, buf_len, offset, ws.data_);
     return offset;
 }
 
 
 size_t galera::serial_size(const WriteSet& ws)
 {
-    return (serial_size<uint32_t>(ws.keys_) + serial_size<uint32_t>(ws.data_));
+    return (gu::serial_size4(ws.keys_) + gu::serial_size4(ws.data_));
 }
 
 
@@ -49,7 +49,7 @@ void galera::WriteSet::append_key(const Key& key)
     {
         Key cmp(version_);
 
-        (void)galera::unserialize(&keys_[0], keys_.size(), i->second, cmp);
+        (void)unserialize(&keys_[0], keys_.size(), i->second, cmp);
 
         if (key == cmp && key.flags() == cmp.flags()) return;
     }

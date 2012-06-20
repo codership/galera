@@ -43,7 +43,9 @@ public:
   }
 
   // Get the name of the IO control command.
-  int name() const
+  // On Linux/PPC this is a 32-bit unsigned value,
+  // GCC 4.4.6 complains about overflow if using signed int
+  unsigned int name() const
   {
     return FIONBIO;
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #ifndef PC_MESSAGE_HPP
@@ -9,6 +9,8 @@
 #include "gcomm/types.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/map.hpp"
+
+#include "gu_serialize.hpp"
 
 #include <limits>
 
@@ -61,13 +63,13 @@ public:
         size_t   off = offset;
         uint32_t flags;
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
+        gu_trace (off = gu::unserialize4(buf, buflen, off, flags));
 
         prim_ = flags & F_PRIM;
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &last_seq_));
+        gu_trace (off = gu::unserialize4(buf, buflen, off, last_seq_));
         gu_trace (off = last_prim_.unserialize(buf, buflen, off));
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &to_seq_));
+        gu_trace (off = gu::unserialize8(buf, buflen, off, to_seq_));
 
         return off;
     }
@@ -80,10 +82,10 @@ public:
 
         flags |= prim_ ? F_PRIM : 0;
 
-        gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
-        gu_trace (off = gcomm::serialize(last_seq_, buf, buflen, off));
+        gu_trace (off = gu::serialize4(flags, buf, buflen, off));
+        gu_trace (off = gu::serialize4(last_seq_, buf, buflen, off));
         gu_trace (off = last_prim_.serialize(buf, buflen, off));
-        gu_trace (off = gcomm::serialize(to_seq_, buf, buflen, off));
+        gu_trace (off = gu::serialize8(to_seq_, buf, buflen, off));
 
         assert (serial_size() == (off - offset));
 
@@ -215,7 +217,7 @@ public:
 
         node_map_.clear();
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
+        gu_trace (off = gu::unserialize4(buf, buflen, offset, b));
 
         version_ = b & 0x0f;
         flags_   = (b & 0xf0) >> 4;
@@ -229,7 +231,7 @@ public:
 
         crc16_ = ((b >> 16) & 0xffff);
 
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq_));
+        gu_trace (off = gu::unserialize4(buf, buflen, off, seq_));
 
         if (type_ == T_STATE || type_ == T_INSTALL)
         {
@@ -252,8 +254,8 @@ public:
         b |= version_ & 0x0f;
         b |= (flags_ << 4) & 0xf0;
 
-        gu_trace (off = gcomm::serialize(b, buf, buflen, offset));
-        gu_trace (off = gcomm::serialize(seq_, buf, buflen, off));
+        gu_trace (off = gu::serialize4(b, buf, buflen, offset));
+        gu_trace (off = gu::serialize4(seq_, buf, buflen, off));
 
 
         if (type_ == T_STATE || type_ == T_INSTALL)

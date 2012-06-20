@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -322,7 +322,7 @@ namespace gcomm
             const int64_t seq(curr_seq);
             gu::byte_t buf[sizeof(seq)];
             size_t sz;
-            gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
+            gu_trace(sz = gu::serialize8(seq, buf, sizeof(buf), 0));
             gu::Datagram dg(gu::Buffer(buf, buf + sz));
             int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
@@ -380,10 +380,10 @@ namespace gcomm
                 }
                 gcomm_assert(available == 8);
                 int64_t seq;
-                gu_trace(gcomm::unserialize(begin,
-                                            available,
-                                            0,
-                                            &seq));
+                gu_trace(gu::unserialize8(begin,
+                                          available,
+                                          0,
+                                          seq));
                 tr.insert_msg(TraceMsg(um.get_source(), um.get_source_view_id(),
                                        seq));
             }

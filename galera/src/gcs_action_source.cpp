@@ -1,11 +1,12 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #include "replicator.hpp"
 #include "gcs_action_source.hpp"
 #include "trx_handle.hpp"
-#include "serialization.hpp"
+
+#include "gu_serialize.hpp"
 
 extern "C"
 {
@@ -112,8 +113,8 @@ void galera::GcsActionSource::dispatch(void*                 recv_ctx,
     case GCS_ACT_COMMIT_CUT:
     {
         wsrep_seqno_t seq;
-        unserialize(reinterpret_cast<const gu::byte_t*>(act.buf), act.size, 0,
-                    seq);
+        gu::unserialize8(reinterpret_cast<const gu::byte_t*>(act.buf),
+                         act.size, 0, seq);
         replicator_.process_commit_cut(seq, act.seqno_l);
         break;
     }

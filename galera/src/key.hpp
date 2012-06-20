@@ -1,13 +1,13 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_KEY_HPP
 #define GALERA_KEY_HPP
 
-#include "serialization.hpp"
 #include "wsrep_api.h"
 
+#include "gu_serialize.hpp"
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
 #include "gu_vlq.hpp"
@@ -334,13 +334,13 @@ namespace galera
 #ifndef GALERA_KEY_VLQ
         case 0:
         case 1:
-            return serialize<uint16_t>(key.keys_, buf, buflen, offset);
+            return gu::serialize2(key.keys_, buf, buflen, offset);
         case 2:
-            offset = serialize<uint8_t>(key.flags_, buf, buflen, offset);
-            return serialize<uint16_t>(key.keys_, buf, buflen, offset);
+            offset = gu::serialize1(key.flags_, buf, buflen, offset);
+            return gu::serialize2(key.keys_, buf, buflen, offset);
 #else
         case 0:
-            return serialize<uint16_t>(key.keys_, buf, buflen, offset);
+            return gu::serialize2(key.keys_, buf, buflen, offset);
         case 1:
         {
             size_t keys_size(key.keys_.size());
@@ -365,13 +365,13 @@ namespace galera
 #ifndef GALERA_KEY_VLQ
         case 0:
         case 1:
-            return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
+            return gu::unserialize2(buf, buflen, offset, key.keys_);
         case 2:
-            offset = unserialize(buf, buflen, offset, key.flags_);
-            return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
+            offset = gu::unserialize1(buf, buflen, offset, key.flags_);
+            return gu::unserialize2(buf, buflen, offset, key.keys_);
 #else
         case 0:
-            return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
+            return gu::unserialize2(buf, buflen, offset, key.keys_);
         case 1:
         {
             size_t len;
@@ -395,12 +395,12 @@ namespace galera
 #ifndef GALERA_KEY_VLQ
         case 0:
         case 1:
-            return serial_size<uint16_t>(key.keys_);
+            return gu::serial_size2(key.keys_);
         case 2:
-            return (serial_size(key.flags_) + serial_size<uint16_t>(key.keys_));
+            return (gu::serial_size(key.flags_) + gu::serial_size2(key.keys_));
 #else
         case 0:
-            return serial_size<uint16_t>(key.keys_);
+            return gu::serial_size2(key.keys_);
         case 1:
         {
             size_t size(gu::uleb128_size(key.keys_.size()));

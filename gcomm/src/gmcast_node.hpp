@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #ifndef GMCAST_NODE_HPP
@@ -7,6 +7,8 @@
 
 #include "gcomm/types.hpp"
 #include "gcomm/uuid.hpp"
+
+#include "gu_serialize.hpp"
 
 namespace gcomm
 {
@@ -33,7 +35,7 @@ public:
     {
         size_t  off;
         uint32_t bits;
-        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &bits));
+        gu_trace (off = gu::unserialize4(buf, buflen, offset, bits));
         gu_trace (off = addr_.unserialize(buf, buflen, off));
         gu_trace (off = mcast_addr_.unserialize(buf, buflen, off));
         return off;
@@ -44,7 +46,7 @@ public:
     {
         size_t  off;
         uint32_t bits(0);
-        gu_trace (off = gcomm::serialize(bits, buf, buflen, offset));
+        gu_trace (off = gu::serialize4(bits, buf, buflen, offset));
         gu_trace (off = addr_.serialize(buf, buflen, off));
         gu_trace (off = mcast_addr_.serialize(buf, buflen, off));
         return off;

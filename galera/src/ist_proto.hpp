@@ -1,14 +1,16 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
 #define GALERA_IST_PROTO_HPP
 
-#include "serialization.hpp"
 #include "trx_handle.hpp"
-#include "gu_logger.hpp"
+
 #include "GCache.hpp"
+
+#include "gu_logger.hpp"
+#include "gu_serialize.hpp"
 
 //
 // Sender                            Receiver
@@ -70,7 +72,8 @@ namespace galera
             friend size_t unserialize(const gu::byte_t*, size_t, size_t,
                                       Message&);
 
-            int      version_;
+            int      version_; // unfortunately for compatibility with older
+                               // versions we must leave it as int (4 bytes)
             Type     type_;
             uint8_t  flags_;
             int8_t   ctrl_;
@@ -140,13 +143,13 @@ namespace galera
 #endif // NDEBUG
             if (msg.version_ > 3)
             {
-                offset = galera::serialize(static_cast<uint8_t>(msg.version_),
-                                           buf, buflen, offset);
-                offset = galera::serialize(static_cast<uint8_t>(msg.type_),
-                                           buf, buflen, offset);
-                offset = galera::serialize(msg.flags_, buf, buflen, offset);
-                offset = galera::serialize(msg.ctrl_, buf, buflen, offset);
-                offset = galera::serialize(msg.len(), buf, buflen, offset);
+                offset = gu::serialize1(uint8_t(msg.version_),
+                                        buf, buflen, offset);
+                offset = gu::serialize1(uint8_t(msg.type_),
+                                        buf, buflen, offset);
+                offset = gu::serialize1(msg.flags_, buf, buflen, offset);
+                offset = gu::serialize1(msg.ctrl_, buf, buflen, offset);
+                offset = gu::serialize8(msg.len(), buf, buflen, offset);
             }
             else
             {
@@ -173,27 +176,33 @@ namespace galera
             size_t orig_offset(offset);
 #endif // NDEBUG
             uint8_t u8;
-            offset = galera::unserialize(buf, buflen, offset, u8);
-            if (u8 != msg.version_)
+            if (msg.version_ > 3)
             {
-                gu_throw_error(EPROTO) << "invalid protocol version "
-                                       << static_cast<int>(u8)
-                                       << ", expected " << msg.version_;
-            }
-            if (u8 > 3)
-            {
-                msg.version_ = u8;
-                offset = galera::unserialize(buf, buflen, offset, u8);
-                msg.type_ = static_cast<Message::Type>(u8);
-                offset = galera::unserialize(buf, buflen, offset, msg.flags_);
-                offset = galera::unserialize(buf, buflen, offset, msg.ctrl_);
-                offset = galera::unserialize(buf, buflen, offset, msg.len_);
+                offset = gu::unserialize1(buf, buflen, offset, u8);
             }
             else
             {
-                // Decrement offset by one to revert adjustment by
-                // version number unserialization.
-                offset -= 1;
+                u8 = *reinterpret_cast<const int*>(buf + offset);
+            }
+
+            if (u8 != msg.version_)
+            {
+                gu_throw_error(EPROTO) << "invalid protocol version "
+                                       << int(u8)
+                                       << ", expected " << msg.version_;
+            }
+
+            if (u8 > 3)
+            {
+                msg.version_ = u8;
+                offset = gu::unserialize1(buf, buflen, offset, u8);
+                msg.type_ = static_cast<Message::Type>(u8);
+                offset = gu::unserialize1(buf, buflen, offset, msg.flags_);
+                offset = gu::unserialize1(buf, buflen, offset, msg.ctrl_);
+                offset = gu::unserialize8(buf, buflen, offset, msg.len_);
+            }
+            else
+            {
                 if (buflen < offset + sizeof(msg))
                 {
                     gu_throw_error(EMSGSIZE) << "buffer too short for version "
@@ -204,6 +213,7 @@ namespace galera
                 msg = *reinterpret_cast<const Message*>(buf + offset);
                 offset += sizeof(msg);
             }
+
             assert((msg.version_ > 3 && offset - orig_offset == 12) ||
                    (offset - orig_offset == sizeof(msg)));
 
@@ -384,12 +394,13 @@ namespace galera
 
 
             template <class ST>
-            void send_trx(ST&        socket,
+            void send_trx(ST&                           socket,
                           const gcache::GCache::Buffer& buffer)
             {
                 const size_t trx_meta_size(
-                    galera::serial_size(buffer.seqno_g())
-                    + galera::serial_size(buffer.seqno_d()));
+                    8   // serial_size(buffer.seqno_g())
+                    + 8 // serial_size(buffer.seqno_d())
+                    );
                 const bool rolled_back(buffer.seqno_d() == -1);
 
                 size_t n;
@@ -398,10 +409,10 @@ namespace galera
                     Trx trx_msg(version_, trx_meta_size);
                     gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
                     size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
-                    offset = galera::serialize(buffer.seqno_g(),
-                                               &buf[0], buf.size(), offset);
-                    offset = galera::serialize(buffer.seqno_d(),
-                                               &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_g(),
+                                                     &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_d(),
+                                                     &buf[0], buf.size(), offset);
                     n = asio::write(socket, asio::buffer(&buf[0], buf.size()));
                 }
                 else if (keep_keys_ == true)
@@ -409,10 +420,10 @@ namespace galera
                     Trx trx_msg(version_, trx_meta_size + buffer.size());
                     gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
                     size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
-                    offset = galera::serialize(buffer.seqno_g(),
-                                               &buf[0], buf.size(), offset);
-                    offset = galera::serialize(buffer.seqno_d(),
-                                               &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_g(),
+                                            &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_d(),
+                                            &buf[0], buf.size(), offset);
                     boost::array<asio::const_buffer, 2> cbs;
                     cbs[0] = asio::const_buffer(&buf[0], buf.size());
                     cbs[1] = asio::const_buffer(buffer.ptr(), buffer.size());
@@ -436,16 +447,15 @@ namespace galera
                     galera::TrxHandle* trx(ar.trx());
                     const gu::byte_t* const ptr(
                         reinterpret_cast<const gu::byte_t*>(buffer.ptr()));
-                    size_t offset(galera::unserialize(ptr,
-                                                      buffer.size(), 0, *trx));
+                    size_t offset(unserialize(ptr,buffer.size(), 0, *trx));
                     while (offset < static_cast<size_t>(buffer.size()))
                     {
                         // skip over keys
                         uint32_t len;
-                        offset = galera::unserialize(
+                        offset = gu::unserialize4(
                             ptr, buffer.size(), offset, len);
                         offset += len;
-                        offset = galera::unserialize(
+                        offset = gu::unserialize4(
                             ptr, buffer.size(), offset, len);
                         if (offset + len > static_cast<size_t>(buffer.size()))
                         {
@@ -461,10 +471,10 @@ namespace galera
                                 + trx->write_set_collection().size());
                     gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
                     offset = serialize(trx_msg, &buf[0], buf.size(), 0);
-                    offset = galera::serialize(buffer.seqno_g(),
-                                               &buf[0], buf.size(), offset);
-                    offset = galera::serialize(buffer.seqno_d(),
-                                               &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_g(),
+                                                     &buf[0], buf.size(), offset);
+                    offset = gu::serialize8(buffer.seqno_d(),
+                                                     &buf[0], buf.size(), offset);
                     boost::array<asio::const_buffer, 2> cbs;
                     cbs[0] = asio::const_buffer(&buf[0], buf.size());
                     cbs[1] = asio::const_buffer(
@@ -504,8 +514,8 @@ namespace galera
                     }
                     wsrep_seqno_t seqno_g, seqno_d;
                     galera::TrxHandle* trx(new galera::TrxHandle);
-                    size_t offset(galera::unserialize(&buf[0], buf.size(), 0, seqno_g));
-                    offset = galera::unserialize(&buf[0], buf.size(), offset, seqno_d);
+                    size_t offset(gu::unserialize8(&buf[0], buf.size(), 0, seqno_g));
+                    offset = gu::unserialize8(&buf[0], buf.size(), offset, seqno_d);
                     if (seqno_d == -1)
                     {
                         if (offset != msg.len())

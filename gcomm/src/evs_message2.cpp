@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -56,12 +56,12 @@ size_t gcomm::evs::MessageNode::serialize(byte_t* const buf,
     uint8_t b = 
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) | 
                              (suspected_   == true ? F_SUSPECTED   : 0));
-    gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
     uint8_t pad(0);
-    gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(leave_seq_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(pad, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(leave_seq_, buf, buflen, offset));
     gu_trace(offset = view_id_.serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(safe_seq_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(safe_seq_, buf, buflen, offset));
     gu_trace(offset = im_range_.serialize(buf, buflen, offset));    
     return offset;
 }
@@ -73,7 +73,7 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
     throw(gu::Exception)
 {
     uint8_t b;
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
     if ((b & ~(F_OPERATIONAL | F_SUSPECTED)) != 0)
     {
         log_warn << "unknown flags: " << static_cast<int>(b);
@@ -82,14 +82,14 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
     suspected_   = b & F_SUSPECTED;
     
     uint8_t pad(0);
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, pad));
     if (pad != 0)
     {
         gu_throw_error(EINVAL) << "invalid pad" << pad;
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &leave_seq_));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, leave_seq_));
     gu_trace(offset = view_id_.unserialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &safe_seq_));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, safe_seq_));
     gu_trace(offset = im_range_.unserialize(buf, buflen, offset));    
     return offset;
 }
@@ -97,9 +97,9 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
 size_t gcomm::evs::MessageNode::serial_size()
 {
     return 2 +                  // 4 bytes reserved for flags
-        gcomm::serial_size(seqno_t()) +
+        sizeof(seqno_t) +
         ViewId::serial_size() + 
-        gcomm::serial_size(seqno_t()) + 
+        sizeof(seqno_t) + 
         Range::serial_size();
 }
 
@@ -131,11 +131,11 @@ size_t gcomm::evs::Message::serialize(byte_t* const buf,
 {
     
     uint8_t b = static_cast<uint8_t>(version | (type << 2) | (order << 5));
-    gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(flags, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(flags, buf, buflen, offset));
     uint16_t pad(0);
-    gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(fifo_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize2(pad, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(fifo_seq, buf, buflen, offset));
     if (flags & F_SOURCE)
     {
         gu_trace(offset = source.serialize(buf, buflen, offset));
@@ -151,7 +151,7 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
     throw(gu::Exception)
 {
     uint8_t b;
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
     
     version = static_cast<uint8_t>(b & 0x3);
     if (version != 0)
@@ -171,29 +171,34 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
         gu_throw_error(EINVAL) << "invalid safety prefix " 
                                     << order;
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &flags));
+
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, flags));
 
     uint16_t pad;
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
+    gu_trace(offset = gu::unserialize2(buf, buflen, offset, pad));
+
     if (pad != 0)
     {
         gu_throw_error(EINVAL) << "invalid pad" << pad;
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
+
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, fifo_seq));
+
     if (flags & F_SOURCE)
     {
         gu_trace(offset = source.unserialize(buf, buflen, offset));
     }
     
     gu_trace(offset = source_view_id.unserialize(buf, buflen, offset));
+
     return offset;
 }
 
 size_t gcomm::evs::Message::serial_size() const
 {
-    return (1 +                // version | type | order
-            1 +              // flags
-            2 +              // pad
+    return (1 +                 // version | type | order
+            1 +                 // flags
+            2 +                 // pad
             sizeof(fifo_seq) +  // fifo_seq
             ((flags & F_SOURCE) ? UUID::serial_size() : 0) +
             ViewId::serial_size()); // source_view_id
@@ -206,14 +211,14 @@ size_t gcomm::evs::UserMessage::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(user_type, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(user_type, buf, buflen, offset));
     
     gcomm_assert(seq_range <= seqno_t(0xff));
     uint8_t b = static_cast<uint8_t>(seq_range);
-    gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(uint16_t(0), buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
+    gu_trace(offset = gu::serialize2(uint16_t(0), buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(aru_seq, buf, buflen, offset));
     
     return offset;
 }
@@ -228,30 +233,30 @@ size_t gcomm::evs::UserMessage::unserialize(const byte_t* const buf,
     {
         gu_trace(offset = Message::unserialize(buf, buflen, offset));
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &user_type));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, user_type));
     uint8_t b;
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
     seq_range = b;
     uint16_t pad;
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
+    gu_trace(offset = gu::unserialize2(buf, buflen, offset, pad));
     if (pad != 0)
     {
         log_warn << "invalid pad: " << pad;
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq));
     
     return offset;
 }
 
 size_t gcomm::evs::UserMessage::serial_size() const
 {
-    return Message::serial_size() +     // Header
-        1 +                             // User type
-        1 +                             // Seq range
-        2 +                             // Pad/reserved
-        gcomm::serial_size(seqno_t()) + // Seq
-        gcomm::serial_size(seqno_t());  // Aru seq
+    return Message::serial_size() + // Header
+        1 +                         // User type
+        1 +                         // Seq range
+        2 +                         // Pad/reserved
+        sizeof(seqno_t) +           // Seq
+        sizeof(seqno_t);            // Aru seq
         
 }
 
@@ -261,9 +266,9 @@ size_t gcomm::evs::AggregateMessage::serialize(byte_t* const buf,
                                                size_t        offset) const
     throw (gu::Exception)
 {
-    gu_trace(offset = gcomm::serialize(flags_, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(user_type_, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(len_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(flags_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(user_type_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize2(len_, buf, buflen, offset));
     return offset;
 }
 
@@ -273,17 +278,17 @@ size_t gcomm::evs::AggregateMessage::unserialize(const byte_t* const buf,
                                                  size_t       offset)
     throw (gu::Exception)
 {
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &flags_));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &user_type_));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &len_));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, flags_));
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, user_type_));
+    gu_trace(offset = gu::unserialize2(buf, buflen, offset, len_));
     return offset;
 }
 
 size_t gcomm::evs::AggregateMessage::serial_size() const
 {
-    return gcomm::serial_size(flags_) 
-        + gcomm::serial_size(len_) 
-        + gcomm::serial_size(user_type_);
+    return sizeof(flags_) 
+         + sizeof(len_) 
+         + sizeof(user_type_);
 }
 
 size_t gcomm::evs::DelegateMessage::serialize(byte_t* const buf,
@@ -321,8 +326,8 @@ size_t gcomm::evs::GapMessage::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(aru_seq, buf, buflen, offset));
     gu_trace(offset = range_uuid.serialize(buf, buflen, offset));
     gu_trace(offset = range.serialize(buf, buflen, offset));
     return offset;
@@ -338,8 +343,8 @@ size_t gcomm::evs::GapMessage::unserialize(const byte_t* const buf,
     {
         gu_trace(offset = Message::unserialize(buf, buflen, offset));
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq));
     gu_trace(offset = range_uuid.unserialize(buf, buflen, offset));
     gu_trace(offset = range.unserialize(buf, buflen, offset));
     return offset;
@@ -348,7 +353,7 @@ size_t gcomm::evs::GapMessage::unserialize(const byte_t* const buf,
 size_t gcomm::evs::GapMessage::serial_size() const
 {
     return (Message::serial_size()
-            + 2 * gcomm::serial_size(seqno_t())
+            + 2 * sizeof(seqno_t)
             + UUID::serial_size() 
             + Range::serial_size());
 }
@@ -359,8 +364,8 @@ size_t gcomm::evs::JoinMessage::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(aru_seq, buf, buflen, offset));
     gu_trace(offset = node_list.serialize(buf, buflen, offset));
     return offset;
 }
@@ -375,8 +380,8 @@ size_t gcomm::evs::JoinMessage::unserialize(const byte_t* const buf,
     {
         gu_trace(offset = Message::unserialize(buf, buflen, offset));
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq));
     node_list.clear();
     gu_trace(offset = node_list.unserialize(buf, buflen, offset));
     return offset;
@@ -385,7 +390,7 @@ size_t gcomm::evs::JoinMessage::unserialize(const byte_t* const buf,
 size_t gcomm::evs::JoinMessage::serial_size() const
 {
     return (Message::serial_size()
-            + 2 * gcomm::serial_size(seqno_t())
+            + 2 * sizeof(seqno_t)
             + node_list.serial_size());
 }
 
@@ -395,8 +400,8 @@ size_t gcomm::evs::InstallMessage::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(aru_seq, buf, buflen, offset));
     gu_trace(offset = install_view_id.serialize(buf, buflen, offset));
     gu_trace(offset = node_list.serialize(buf, buflen, offset));
     return offset;
@@ -412,8 +417,8 @@ size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
     {
         gu_trace(offset = Message::unserialize(buf, buflen, offset));
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq));
     gu_trace(offset = install_view_id.unserialize(buf, buflen, offset));
     node_list.clear();
     gu_trace(offset = node_list.unserialize(buf, buflen, offset));
@@ -423,7 +428,7 @@ size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
 size_t gcomm::evs::InstallMessage::serial_size() const
 {
     return (Message::serial_size()
-            + 2 * gcomm::serial_size(seqno_t())
+            + 2 * sizeof(seqno_t)
             + ViewId::serial_size()
             + node_list.serial_size());
 }
@@ -435,8 +440,8 @@ size_t gcomm::evs::LeaveMessage::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(seq, buf, buflen, offset));
+    gu_trace(offset = gu::serialize8(aru_seq, buf, buflen, offset));
     return offset;
 }
 
@@ -450,12 +455,12 @@ size_t gcomm::evs::LeaveMessage::unserialize(const byte_t* const buf,
     {
         gu_trace(offset = Message::unserialize(buf, buflen, offset));
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq));
+    gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq));
     return offset;
 }
 
 size_t gcomm::evs::LeaveMessage::serial_size() const
 {
-    return (Message::serial_size() + 2 * gcomm::serial_size(seqno_t()));
+    return (Message::serial_size() + 2 * sizeof(seqno_t));
 }
