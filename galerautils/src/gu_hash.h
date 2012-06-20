@@ -11,8 +11,10 @@
  *                    inconsistent hash functions to be used only in local hash
  *                    tables. Only size_t variants defined.
  *
- * 128-bit result is returned through void* parameter, 64/32-bit results are
- * returned as uint64_t/uint32_t return value.
+ * 128-bit result is returned through void* parameter as a byte array in
+ * canonical order.
+ * 64/32-bit results are returned as uint64_t/uint32_t integers in host byte
+ * order (require conversion to network/Galera byte order for serialization).
  *
  * $Id$
  */

@@ -9,7 +9,7 @@
 #include "gu_spooky.h"
 
 void
-gu_spooky128 (const void* const msg, size_t const len, void* res)
+gu_spooky128_host (const void* const msg, size_t const len, uint64_t* res)
 {
     gu_spooky_inline (msg, len, res);
 }

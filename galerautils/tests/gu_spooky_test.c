@@ -166,29 +166,29 @@ START_TEST (gu_spooky_test)
 
     for (i = 0; i < BUFSIZE; ++i)
     {
-        uint64_t h[2] /* = { 0, } - this should not be necesary */;
+        uint32_t res;
 
         buf[i] = i+128;
 
         /* It looks like values for messages under bufSize are for the "short"
          * algorithm, incompatible with the real one. */
         if (i < _spooky_bufSize)
+        { /* using 128-bit version */
+            uint64_t h[2];
             gu_spooky_short (buf, i, h);
-        else
-            gu_spooky128 (buf, i, h);
-
-        uint32_t saw = (uint32_t)gtoh64(h[0]);
-        if (saw != expected[i])
-        {
-            char hash[40];
-            gu_print_buf(h, sizeof(h), hash, sizeof(hash), false);
-            fail ("%d: expected 0x%.8lX, saw 0x%.8lX,\n full hash: %s",
-                     i, expected[i], saw, hash);
+            res = (uint32_t)gu_le64(h[0]);
         }
-//        fail_if (saw != expected[i],
-//                 "%d: saw 0x%.8lx, expected 0x%.8lx\n", i, saw, expected[i]);
-    }
+        else
+        { /* using 32-bit version */
+            res = gu_spooky32 (buf, i);
+        }
 
+        if (res != expected[i])
+        {
+            fail ("%d: expected: 0x%.8lX, found: 0x%.8lX",
+                  i, expected[i], res);
+        }
+    }
 }
 END_TEST
 

@@ -103,40 +103,6 @@ smhasher_checks[3] =
     {{ 0x69, 0xBA, 0x84, 0x63 }}  /* mmh3_x64_128 */
 };
 
-#if 0
-/* Verification code for Galera variant of MurmurHash3 - with constant seed */
-static void
-gu_verification (hash_f_t hash, size_t hashbytes, hash128_t* res)
-{
-    ssize_t const n_tests = 256;
-    uint8_t key[n_tests];
-    uint8_t hashes[hashbytes * n_tests];
-    uint8_t final[hashbytes];
-
-    /* Hash keys of the form {0}, {0,1}, {0,1,2}... up to N=255, using constant
-     * seed */
-    ssize_t i;
-    for(i = 0; i < n_tests; i++)
-    {
-        key[i] = (uint8_t)i;
-        hash (key, i, n_tests - i, &hashes[i * hashbytes]);
-    }
-
-    /* Then hash the result array */
-    hash (hashes, hashbytes * n_tests, 0, final);
-
-    memcpy (res, final, hashbytes);
-}
-
-static hash128_t
-gu_checks[3] =
-{
-    {{ 0xE3, 0x7E, 0xF5, 0xB0, }}, /* mmh3_32      */
-    {{ 0x2A, 0xE6, 0xEC, 0xB3, }}, /* mmh3_x86_128 */
-    {{ 0x69, 0xBA, 0x84, 0x63, }}  /* mmh3_x64_128 */
-};
-#endif
-
 /* returns true if check fails */
 static bool
 check (const void* const exp, const void* const got, ssize_t size)
@@ -163,13 +129,15 @@ START_TEST (gu_mmh32_test)
     hash32_t out;
 
     smhasher_verification (gu_mmh3_32, sizeof(hash32_t), &out);
+    out = gu_le32(out);
     fail_if (check (&smhasher_checks[0], &out, sizeof(out)),
              "gu_mmh3_32 failed.");
 
     for (i = 0; i < NUM_32_TESTS; i++)
     {
-        uint32_t out = gu_mmh32 (test_input, i);
-        fail_if(check (&test_output32[i], &out, sizeof(out)),
+        uint32_t res = gu_mmh32 (test_input, i);
+        res = gu_le32(res);
+        fail_if(check (&test_output32[i], &res, sizeof(res)),
                 "gu_mmh32() failed at step %d",i);
     }
 }
