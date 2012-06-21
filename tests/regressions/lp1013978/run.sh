@@ -74,8 +74,8 @@ echo "starting node0, node1..."
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
 
-declare -r port_0=$(( DBMS_PORT ))
-declare -r port_1=$(( DBMS_PORT + 1))
+declare -r port_0=${NODE_INCOMING_PORT[0]}
+declare -r port_1=${NODE_INCOMING_PORT[1]}
 
 ROUNDS=10000
 SUCCESS=0
