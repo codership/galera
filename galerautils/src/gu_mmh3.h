@@ -167,6 +167,7 @@ _mmh3_128_tail (const uint8_t* const tail, size_t const len,
     //----------
     // tail
 
+#if 0 /* Reference implementation */
     uint64_t k1 = 0;
     uint64_t k2 = 0;
 
@@ -191,6 +192,29 @@ _mmh3_128_tail (const uint8_t* const tail, size_t const len,
     case  1: k1 ^= ((uint64_t)tail[ 0]) << 0;
         k1 *= _mmh3_128_c1; k1 = GU_ROTL64(k1,31); k1 *= _mmh3_128_c2; h1 ^= k1;
     };
+#else /* Optimized implementation */
+
+    size_t const tail_len = len & 15;
+    if (tail_len)
+    {
+        uint64_t k1 = gu_le64(((uint64_t*)tail)[0]);
+        size_t const shift = ((16 - tail_len) & 7) << 3;
+        uint64_t const mask = GU_ULONG_LONG(0xffffffffffffffff) >> shift;
+
+        if (tail_len <= 8)
+        {
+            k1 &= mask;
+        }
+        else
+        {
+            uint64_t k2 = gu_le64(((uint64_t*)tail)[1]) & mask;
+            k2 *= _mmh3_128_c2; k2 = GU_ROTL64(k2,33); k2 *= _mmh3_128_c1; h2 ^= k2;
+        }
+
+        k1 *= _mmh3_128_c1; k1 = GU_ROTL64(k1,31); k1 *= _mmh3_128_c2; h1 ^= k1;
+    }
+
+#endif
 
     //----------
     // finalization

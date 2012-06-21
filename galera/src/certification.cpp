@@ -388,7 +388,7 @@ certify_v1to2(galera::TrxHandle*                              trx,
             const galera::TrxHandle* const ref_trx(full_key == true      ?
                                                     ci->second->ref_trx() :
                                                     ci->second->ref_full_trx());
-            // get shared reference iff exclusive reference is not found
+            // get shared reference if exclusive reference is not found
             const galera::TrxHandle* const ref_shared_trx(
                 ref_trx == 0 ?
                 (full_key == true ?
