@@ -85,10 +85,10 @@ if arch == 'i386' or arch == 'i686':
 elif arch == 'x86_64' or arch == 'amd64':
     compile_arch = ' -m64'
     link_arch    = compile_arch + ' -Wl,-melf_x86_64'
-elif sysname == 'sunos':
-    compile_arch = ''
-    link_arch    = ''
 elif arch == 'ppc64':
+    compile_arch = ' -mtune=native'
+    link_arch    = ''
+elif sysname == 'sunos':
     compile_arch = ''
     link_arch    = ''
 else:
