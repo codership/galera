@@ -82,6 +82,7 @@ _mmh3_tail_32 (const uint8_t* const tail, size_t const len, uint32_t h1)
     //----------
     // tail
 
+#if 0 /* Reference implementation */
     uint32_t k1 = 0;
 
     switch(len & 3)
@@ -92,6 +93,14 @@ _mmh3_tail_32 (const uint8_t* const tail, size_t const len, uint32_t h1)
 
         k1 *= _mmh3_32_c1; k1 = GU_ROTL32(k1,15); k1 *= _mmh3_32_c2; h1 ^= k1;
     };
+#else /* Optimized implementation */
+    size_t const shift = (len & 3) << 3;
+    if (shift)
+    {
+        uint32_t k1 = gu_le32(((uint32_t*)tail)[0]) & (0x00ffffff>>(24-shift));
+        k1 *= _mmh3_32_c1; k1 = GU_ROTL32(k1,15); k1 *= _mmh3_32_c2; h1 ^= k1;
+    }
+#endif /* Optimized implementation */
 
     //----------
     // finalization
