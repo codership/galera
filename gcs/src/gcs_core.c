@@ -1187,10 +1187,10 @@ gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
 static inline long
 core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
 {
-    gcs_seqno_t seqno_le = gcs_seqno_le (seqno);
-    ssize_t     ret      = core_msg_send_retry (core, &seqno_le,
-                                                sizeof(seqno_le),
-                                                msg_type);
+    gcs_seqno_t const htogs = gcs_seqno_htog (seqno);
+    ssize_t           ret   = core_msg_send_retry (core, &htogs,
+                                                   sizeof(htogs),
+                                                   msg_type);
     if (ret > 0) {
         assert(ret == sizeof(seqno));
         ret = 0;

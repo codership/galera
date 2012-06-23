@@ -93,7 +93,7 @@ galera::GcsActionTrx::~GcsActionTrx()
 }
 
 
-void galera::GcsActionSource::dispatch(void*                 recv_ctx,
+void galera::GcsActionSource::dispatch(void*                    recv_ctx,
                                        const struct gcs_action& act)
 {
     assert(recv_ctx != 0);
@@ -141,7 +141,8 @@ void galera::GcsActionSource::dispatch(void*                 recv_ctx,
     case GCS_ACT_JOIN:
     {
         wsrep_seqno_t const seqno(
-            *(reinterpret_cast<const wsrep_seqno_t*>(act.buf)));
+            gtoh64(*(reinterpret_cast<const wsrep_seqno_t*>(act.buf)))
+            );
         replicator_.process_join(seqno, act.seqno_l);
         break;
     }
