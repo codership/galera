@@ -460,24 +460,28 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     CommitOrder co(*trx, co_mode_);
 
     gu_trace(apply_monitor_.enter(ao));
+    trx->set_state(TrxHandle::S_APPLYING);
     gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx));
     // at this point any exception in apply_trx_ws() is fatal, not
     // catching anything.
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
         gu_trace(commit_monitor_.enter(co));
-
+        trx->set_state(TrxHandle::S_COMMITTING);
         if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
                                                 true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
 
         commit_monitor_.leave(co);
+        trx->set_state(TrxHandle::S_COMMITTED);
     }
     else
     {
+        trx->set_state(TrxHandle::S_COMMITTING);
         if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
                                                 true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
+        trx->set_state(TrxHandle::S_COMMITTED);
     }
     apply_monitor_.leave(ao);
 
@@ -1056,6 +1060,8 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
                      << *trx;
         }
         // certification failed, apply monitor has been canceled
+        trx->set_state(TrxHandle::S_ABORTING);
+        trx->set_state(TrxHandle::S_ROLLED_BACK);
         break;
     default:
         // this should not happen for remote actions

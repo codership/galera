@@ -743,6 +743,10 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                 }
                 else
                 {
+                    // replicating and certifying stages have been
+                    // processed on donor, just adjust states here
+                    trx->set_state(TrxHandle::S_REPLICATING);
+                    trx->set_state(TrxHandle::S_CERTIFYING);
                     apply_trx(recv_ctx, trx);
                 }
                 trx->unref();
