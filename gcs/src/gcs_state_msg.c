@@ -134,12 +134,12 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *repl_proto_ver = state->repl_proto_ver;
     *prim_state     = state->prim_state;
     *curr_state     = state->current_state;
-    *prim_joined    = gu_le16(((int16_t)state->prim_joined));
+    *prim_joined    = htog16(((int16_t)state->prim_joined));
     *state_uuid     = state->state_uuid;
     *group_uuid     = state->group_uuid;
     *prim_uuid      = state->prim_uuid;
-    *received       = gu_le64(state->received);
-    *prim_seqno     = gu_le64(state->prim_seqno);
+    *received       = htog64(state->received);
+    *prim_seqno     = htog64(state->prim_seqno);
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
@@ -164,9 +164,9 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
         state_uuid,
         group_uuid,
         prim_uuid,
-        gu_le64(*prim_seqno),
-        gu_le64(*received),
-        gu_le16(*prim_joined),
+        gtoh64(*prim_seqno),
+        gtoh64(*received),
+        gtoh16(*prim_joined),
         *prim_state,
         *curr_state,
         name,

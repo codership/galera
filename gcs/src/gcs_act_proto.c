@@ -31,7 +31,7 @@ static const size_t PROTO_FRAG_NO_OFFSET  = 12;
 static const size_t PROTO_AT_OFFSET       = 16;
 static const size_t PROTO_DATA_OFFSET     = 20;
 
-static const gcs_seqno_t PROTO_ACT_ID_MAX = 0x00FFFFFFFFFFFFLL;
+static const gcs_seqno_t PROTO_ACT_ID_MAX   = 0x00FFFFFFFFFFFFLL;
 static const size_t      PROTO_ACT_SIZE_MAX = 0xFFFFFFFF;
 static const ulong       PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
 static const ulong       PROTO_AT_MAX       = 0xFF;

@@ -5,7 +5,7 @@
  *
  *
  * Implementation of the generic communication layer.
- * See gcs_core.h 
+ * See gcs_core.h
  */
 
 #include <string.h> // for mempcpy
@@ -605,7 +605,9 @@ core_handle_last_msg (gcs_core_t*          core,
             /* commit cut changed */
             if ((act->buf = malloc (sizeof (commit_cut)))) {
                 act->type                 = GCS_ACT_COMMIT_CUT;
-                *((gcs_seqno_t*)act->buf) = commit_cut;
+                /* #701 - everything that goes into the action buffer
+                 *        is expected to be serialized. */
+                *((gcs_seqno_t*)act->buf) = gcs_seqno_htog(commit_cut);
                 act->buf_len              = sizeof(commit_cut);
                 return act->buf_len;
             }
@@ -667,7 +669,7 @@ core_handle_comp_msg (gcs_core_t*          core,
             ret = -ENOTRECOVERABLE;
         }
         else {
-            if (0 == gcs_proto_ver) { core->proto_ver = 0; } 
+            if (0 == gcs_proto_ver) { core->proto_ver = 0; }
         }
         assert (ret == act->buf_len);
         break;

@@ -958,7 +958,7 @@ gcs_handle_state_change (gcs_conn_t*           conn,
                          const struct gcs_act* act)
 {
     gu_debug ("Got '%s' dated %lld", gcs_act_type_to_str (act->type),
-              gcs_seqno_le(*(gcs_seqno_t*)act->buf));
+              gcs_seqno_gtoh(*(gcs_seqno_t*)act->buf));
 
     void* buf = malloc (act->buf_len);
 
@@ -1000,7 +1000,7 @@ gcs_handle_actions (gcs_conn_t*          conn,
         break;
     case GCS_ACT_JOIN:
         ret = gcs_handle_state_change (conn, &rcvd->act);
-        if (gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf) < 0 &&
+        if (gcs_seqno_gtoh(*(gcs_seqno_t*)rcvd->act.buf) < 0 &&
             GCS_CONN_JOINER == conn->state)
             gcs_become_primary (conn);
         else

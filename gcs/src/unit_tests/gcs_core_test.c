@@ -333,7 +333,7 @@ core_test_init ()
     fail_if (ret != 0, "gcs_core_send_sync(): %ld (%s)",
              ret, strerror(-ret));
     fail_if (CORE_RECV_ACT(&act,NULL,sizeof(gcs_seqno_t),GCS_ACT_SYNC));
-    fail_if (Seqno != gcs_seqno_le(*(gcs_seqno_t*)act.data));
+    fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act.data));
 
     gcs_core_send_lock_step (Core, true);
     mark_point();
