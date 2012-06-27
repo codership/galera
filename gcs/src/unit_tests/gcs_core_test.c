@@ -415,7 +415,7 @@ START_TEST (gcs_core_test_api)
                  ret, strerror(-ret));
         fail_if (CORE_RECV_ACT (&act_r, NULL, sizeof(gcs_seqno_t),
                                 GCS_ACT_COMMIT_CUT));
-        fail_if (Seqno != *(gcs_seqno_t*)act_r.data);
+        fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act_r.data));
         free ((void*)act_r.data);
     }
 
