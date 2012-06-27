@@ -39,6 +39,10 @@
 #       happen that parent delete will vbe processed first, and it will fail for
 #       FK violation
 #
+# D. delete with FK on PK
+#    *  same as phase C, but with tables where FK constraint is on
+#    primary key column
+#
 # If bug is present, slave appliers can easily conflict and cause crash.
 #
 # TEST SETUP:
@@ -77,8 +81,33 @@ MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD 
 declare -r port_0=${NODE_INCOMING_PORT[0]}
 declare -r port_1=${NODE_INCOMING_PORT[1]}
 
-ROUNDS=10000
+ROUNDS=1000
 SUCCESS=0
+
+create_FK_parent_PK()
+{
+    $MYSQL --port=$port_0 -e '
+        CREATE TABLE  test.lp1013978p
+        (
+             i int NOT NULL,
+             j int DEFAULT NULL,
+             PRIMARY KEY (i)
+        ) ENGINE=InnoDB
+    '
+}
+
+create_FK_child_PK()
+{
+    $MYSQL --port=$port_0 -e '
+        CREATE TABLE  test.lp1013978c
+        (
+             i int NOT NULL,
+             f int DEFAULT NULL,
+             PRIMARY KEY (i),
+             FOREIGN KEY (i) REFERENCES test.lp1013978p (i)
+        ) ENGINE=InnoDB
+    '
+}
 
 create_FK_parent_NON_UNIQ()
 {
@@ -93,11 +122,8 @@ create_FK_parent_NON_UNIQ()
     '
 }
 
-create_DB_NON_UNIQ()
+create_FK_child_NON_UNIQ()
 {
-
-    create_FK_parent_NON_UNIQ
-
     $MYSQL --port=$port_0 -e '
         CREATE TABLE  test.lp1013978c
         (
@@ -109,10 +135,9 @@ create_DB_NON_UNIQ()
         ) ENGINE=InnoDB
     '
 }
-create_DB_NON_UNIQ_ON_UPDATE_CASCADE()
-{
-    create_FK_parent_NON_UNIQ
 
+create_FK_child_NON_UNIQ_ON_UPDATE_CASCADE()
+{
     $MYSQL --port=$port_0 -e '
         CREATE TABLE  test.lp1013978c
         (
@@ -123,6 +148,24 @@ create_DB_NON_UNIQ_ON_UPDATE_CASCADE()
              FOREIGN KEY (f) REFERENCES test.lp1013978p (j) ON UPDATE CASCADE
         ) ENGINE=InnoDB
     '
+}
+
+create_DB_PK()
+{
+    create_FK_parent_PK
+    create_FK_child_PK
+}
+
+create_DB_NON_UNIQ()
+{
+    create_FK_parent_NON_UNIQ
+    create_FK_child_NON_UNIQ
+}
+
+create_DB_NON_UNIQ_ON_UPDATE_CASCADE()
+{
+    create_FK_parent_NON_UNIQ
+    create_FK_child_NON_UNIQ_ON_UPDATE_CASCADE
 }
 
 #
@@ -198,7 +241,7 @@ C_createdb()
     #
     # we can re-use tables from test phase B
     #
-    B_cleanup
+    C_cleanup
 
     create_DB_NON_UNIQ_ON_UPDATE_CASCADE
     B_inserter  $port_0 
@@ -213,6 +256,29 @@ C_deleter()
           DELETE FROM test.lp1013978p WHERE i=$i; 
         " 2>&1
     done
+}
+
+#
+# Test phase D procedures, FK by PK
+#
+D_cleanup()
+{
+    A_cleanup
+}
+
+D_createdb()
+{ 
+    D_cleanup
+
+    create_DB_PK
+
+    # populate by phase B inserts
+    B_inserter  $port_0 
+}
+
+D_deleter()
+{
+    C_deleter
 }
 
 run_test()
@@ -269,6 +335,7 @@ echo "applier check: $threads"
 run_test A A_createdb A_inserter A_cleanup
 run_test B B_createdb B_inserter B_cleanup
 run_test C C_createdb C_deleter  C_cleanup
+run_test D D_createdb D_deleter  D_cleanup
 
 echo
 echo "Done!"
