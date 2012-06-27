@@ -46,7 +46,7 @@ inline galera::KeyEntry::KeyEntry(
     const size_t ss(serial_size(key));
     key_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
     *reinterpret_cast<uint32_t*>(key_buf_) = ss;
-    (void)serialize(key, key_buf_ + sizeof(uint32_t), ss, 0);
+    gu_trace((void)serialize(key, key_buf_ + sizeof(uint32_t), ss, 0));
 }
 
 inline galera::KeyEntry::~KeyEntry()
@@ -63,7 +63,7 @@ galera::KeyEntry::get_key(int version) const
 {
     Key rk(version);
     uint32_t ss(*reinterpret_cast<uint32_t*>(key_buf_));
-    (void)unserialize(key_buf_ + sizeof(uint32_t), ss, 0, rk);
+    gu_trace((void)unserialize(key_buf_ + sizeof(uint32_t), ss, 0, rk));
     return rk;
 }
 
@@ -342,6 +342,72 @@ cert_fail:
     return TEST_FAILED;
 }
 
+static inline bool
+certify_and_depend_v1to2(const galera::KeyEntry* const match,
+                         galera::TrxHandle*      const trx,
+                         bool                    const full_key,
+                         bool                    const exclusive_key)
+{
+    // 1) if the key is full, match for any trx
+    // 2) if the key is partial, match for trx with full key
+    const galera::TrxHandle* const ref_trx(full_key == true ?
+                                           match->ref_trx() :
+                                           match->ref_full_trx());
+
+    if (cert_debug_on && ref_trx)
+    {
+        cert_debug << "exclusive match ("
+                   << (full_key == true ? "full" : "partial")
+                   << ") " << *trx << " <-----> " << *ref_trx;
+    }
+
+    wsrep_seqno_t const ref_seqno(ref_trx ? ref_trx->global_seqno() : -1);
+
+    // trx should not have any references in index at this point
+    assert(ref_trx != trx);
+
+    if (gu_likely(0 != ref_trx))
+    {
+        // cert conflict takes place if
+        // 1) write sets originated from different nodes, are within cert range
+        // 2) ref_trx is in isolation mode, write sets are within cert range
+        if ((trx->source_id() != ref_trx->source_id() ||
+             (ref_trx->flags() & galera::TrxHandle::F_ISOLATION) != 0)&&
+            ref_seqno >  trx->last_seen_seqno())
+        {
+            log_debug << "trx conflict for key "
+                      // << match->get_key(1) - this breaks unit tests
+                      << ": " << *trx << " <--X--> " << *ref_trx;
+            return true;
+        }
+    }
+
+    wsrep_seqno_t depends_seqno(ref_seqno);
+
+    if (exclusive_key) // exclusive keys must depend on shared refs as well
+    {
+        const galera::TrxHandle* const ref_shared_trx(full_key == true ?
+                                                      match->ref_shared_trx() :
+                                                      match->ref_full_shared_trx());
+        assert(ref_shared_trx != trx);
+        // at least one reference should be non-0
+        assert(ref_trx || ref_shared_trx);
+
+        if (ref_shared_trx)
+        {
+            cert_debug << "shared match ("
+                       << (full_key == true ? "full" : "partial")
+                       << ") " << *trx << " <-----> " << *ref_shared_trx;
+
+            depends_seqno = std::max(ref_shared_trx->global_seqno(),
+                                     depends_seqno);
+        }
+    }
+
+    trx->set_depends_seqno(std::max(trx->depends_seqno(), depends_seqno));
+
+    return false;
+}
 
 static bool
 certify_v1to2(galera::TrxHandle*                              trx,
@@ -364,6 +430,9 @@ certify_v1to2(galera::TrxHandle*                              trx,
                    << " ("
                    << (full_key == true ? "full" : "partial")
                    << ")";
+
+        bool const shared_key(key.flags() & galera::Key::F_SHARED);
+
         if ((ci = cert_index.find(key)) == cert_index.end())
         {
             if (store_keys == false)
@@ -377,74 +446,21 @@ certify_v1to2(galera::TrxHandle*                              trx,
         else
         {
             cert_debug << "found existing entry";
-        }
 
-        // Note: For we skip certification for isolated trxs, only
-        // cert index and key_list is populated.
-        if ((trx->flags() & galera::TrxHandle::F_ISOLATION) == 0)
-        {
-            // 1) if the key is full, match for any trx
-            // 2) if the key is partial, match for trx with full key
-            const galera::TrxHandle* const ref_trx(full_key == true      ?
-                                                    ci->second->ref_trx() :
-                                                    ci->second->ref_full_trx());
-            // get shared reference if exclusive reference is not found
-            const galera::TrxHandle* const ref_shared_trx(
-                ref_trx == 0 ?
-                (full_key == true ?
-                 ci->second->ref_shared_trx() :
-                 ci->second->ref_full_shared_trx()) :
-                0);
-
-            // trx should not have any references in index at this point
-            assert(ref_trx != trx);
-            assert(ref_shared_trx != trx);
-
-            if (gu_unlikely(ref_shared_trx != 0))
+            // Note: For we skip certification for isolated trxs, only
+            // cert index and key_list is populated.
+            if ((trx->flags() & galera::TrxHandle::F_ISOLATION) == 0 &&
+                certify_and_depend_v1to2(ci->second, trx, full_key,!shared_key))
             {
-                cert_debug << "shared match ("
-                           << (full_key == true ? "full" : "partial")
-                           << ") " << *trx << " <-----> " << *ref_shared_trx;
-                if ((key.flags() & galera::Key::F_SHARED) == 0)
-                {
-                    trx->set_depends_seqno(std::max(
-                                               trx->depends_seqno(),
-                                               ref_shared_trx->global_seqno()));
-                }
-            }
-            else if (gu_likely(ref_trx != 0))
-            {
-                cert_debug << "exclusive match ("
-                           << (full_key == true ? "full" : "partial")
-                           << ") " << *trx << " <-----> " << *ref_trx;
-                // cert conflict takes place if
-                // 1) write sets originated from different nodes, are within
-                //    cert range
-                // 2) ref_trx is in isolation mode, write sets are within
-                //    cert range
-                if ((trx->source_id()        != ref_trx->source_id() ||
-                     (ref_trx->flags() & galera::TrxHandle::F_ISOLATION) != 0) &&
-                    ref_trx->global_seqno() >  trx->last_seen_seqno())
-                {
-                    log_debug << "trx conflict for key " << key << ": "
-                              << *trx << " <--X--> " << *ref_trx;
-                    return false;
-                }
-                trx->set_depends_seqno(std::max(trx->depends_seqno(),
-                                                ref_trx->global_seqno()));
+                return false;
             }
         }
-        if ((key.flags() & galera::Key::F_SHARED) != 0)
-        {
-            key_list.push_back(std::make_pair(
-                                   key, std::make_pair(full_key, true)));
-        }
-        else
-        {
-            key_list.push_back(std::make_pair(
-                                   key, std::make_pair(full_key, false)));
-        }
+
+        key_list.push_back(std::make_pair(key,
+                                          std::make_pair(full_key,
+                                                         shared_key)));
     }
+
     return true;
 }
 

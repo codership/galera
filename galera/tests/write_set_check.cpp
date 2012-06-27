@@ -691,6 +691,16 @@ START_TEST(test_cert_hierarchical_v2)
         { { {2, } }, 1, 10,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, true,
           10, 10, 6, 5, 0, Certification::TEST_OK},
+        // 11 - 13: exclusive - shared - exclusive dependency
+        { { {2, } }, 1, 11,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, false,
+          11, 11, 10, 10, 0, Certification::TEST_OK},
+        { { {2, } }, 1, 12,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, true,
+          12, 12, 10, 11, 0, Certification::TEST_OK},
+        { { {2, } }, 1, 13,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, false,
+          13, 13, 10, 12, 0, Certification::TEST_OK},
 
     };
 
@@ -720,7 +730,7 @@ START_TEST(test_cert_hierarchical_v2)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
+        fail_unless(result == wsi[i].result, "g: %lld res: %d exp: %d",
                     trx->global_seqno(), result, wsi[i].result);
         fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
                     "g: %lld ld: %lld eld: %lld",
