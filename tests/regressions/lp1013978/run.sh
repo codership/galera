@@ -68,13 +68,12 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:1013978"
 echo "##################################################################"
-echo "stopping node0, node1..."
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster..."
+stop
 echo
 echo "starting node0, node1..."
-../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
-../../scripts/command.sh start_node "-d -g $(gcs_address 1) --slave_threads 4" 1
+start_node "-d -g gcomm://$(extra_params 0)" 0
+start_node "-d -g $(gcs_address 1) --slave_threads 4" 1
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
 
@@ -370,8 +369,8 @@ echo
 echo "Done!"
 echo
 
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+stop_node 0
+stop_node 1
 
 exit $SUCCESS
 
