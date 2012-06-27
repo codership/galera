@@ -445,7 +445,7 @@ case $1 in
 #            MYSQL_LOG="log"
             ;;
     --valgrind)
-            VALGRIND="valgrind --log-file=/tmp/mysql_vg --leak-check=full"
+            VALGRIND="valgrind --log-file=$MYSQL_DATA_DIR/vg.log --leak-check=full"
             ;;
     --gdb)
             GDB="gdb"
