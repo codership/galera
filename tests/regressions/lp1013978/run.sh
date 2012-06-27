@@ -281,6 +281,34 @@ D_deleter()
     C_deleter
 }
 
+#
+# Test phase E procedures
+#
+E_cleanup()
+{ 
+    A_cleanup
+}
+
+E_createdb()
+{ 
+    E_cleanup
+    create_DB_NON_UNIQ_ON_UPDATE_CASCADE
+}
+
+E_inserter()
+{
+    local port=$1
+    for (( i=1; i<=$ROUNDS; i++ )); do
+	$MYSQL --port=$port -e "
+          INSERT INTO test.lp1013978p values ($i, $i); 
+          INSERT INTO test.lp1013978c values ($i, $i); 
+          DELETE FROM test.lp1013978c WHERE i=$i;
+          DELETE FROM test.lp1013978p WHERE i=$i;
+        " 2>&1
+    done
+}
+
+
 run_test()
 {
     phase=$1
@@ -336,6 +364,7 @@ run_test A A_createdb A_inserter A_cleanup
 run_test B B_createdb B_inserter B_cleanup
 run_test C C_createdb C_deleter  C_cleanup
 run_test D D_createdb D_deleter  D_cleanup
+run_test E E_createdb E_inserter E_cleanup
 
 echo
 echo "Done!"
