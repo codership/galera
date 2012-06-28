@@ -277,7 +277,7 @@ D_createdb()
 
 D_deleter()
 {
-    C_deleter
+    C_deleter $port_0
 }
 
 #
@@ -333,8 +333,24 @@ run_test()
     $MYSQL --port=$port_1 -e 'SHOW PROCESSLIST'
     [ "$?" != "0" ] && echo "failed!" && exit 1
 
-    $SCRIPTS/command.sh check
+    #$SCRIPTS/command.sh check
+    echo "consistency checking..."
+    check0=$(check_node 0)
+    check1=$(check_node 1)
 
+    cs0=$(echo $check0 | cut -d" " -f 11)
+    cs1=$(echo $check1 | cut -d" " -f 11)
+
+    echo "node 0: $cs0"
+    echo "node 1: $cs1"
+
+    if test "$cs0" != "$cs1"
+    then
+	echo "Consistency check failed"
+	echo "$check0 $cs0"
+	echo "$check1 $cs1"
+	exit 1
+    fi
     if test $? != 0
     then
 	echo "Consistency check failed"
