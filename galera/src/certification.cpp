@@ -342,6 +342,7 @@ cert_fail:
     return TEST_FAILED;
 }
 
+/*! for convenience returns true if conflict and false if not */
 static inline bool
 certify_and_depend_v1to2(const galera::KeyEntry* const match,
                          galera::TrxHandle*      const trx,
@@ -372,11 +373,11 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
         // 1) write sets originated from different nodes, are within cert range
         // 2) ref_trx is in isolation mode, write sets are within cert range
         if ((trx->source_id() != ref_trx->source_id() ||
-             (ref_trx->flags() & galera::TrxHandle::F_ISOLATION) != 0)&&
+             (ref_trx->flags() & galera::TrxHandle::F_ISOLATION) != 0) &&
             ref_seqno >  trx->last_seen_seqno())
         {
             log_debug << "trx conflict for key "
-                      // << match->get_key(1) - this breaks unit tests
+                      << match->get_key(ref_trx->version())
                       << ": " << *trx << " <--X--> " << *ref_trx;
             return true;
         }
@@ -427,9 +428,7 @@ certify_v1to2(galera::TrxHandle*                              trx,
         galera::Key key(key_seq_iter->version(), begin, end, key_seq_iter->flags());
 
         cert_debug << "key: " << key
-                   << " ("
-                   << (full_key == true ? "full" : "partial")
-                   << ")";
+                   << " (" << (full_key == true ? "full" : "partial") << ")";
 
         bool const shared_key(key.flags() & galera::Key::F_SHARED);
 
