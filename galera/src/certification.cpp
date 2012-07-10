@@ -391,8 +391,8 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
                                                       match->ref_shared_trx() :
                                                       match->ref_full_shared_trx());
         assert(ref_shared_trx != trx);
-        // at least one reference should be non-0
-        assert(ref_trx || ref_shared_trx);
+        // at least one reference should be non-0 when matching for full key
+        assert(full_key == false || (ref_trx || ref_shared_trx));
 
         if (ref_shared_trx)
         {
