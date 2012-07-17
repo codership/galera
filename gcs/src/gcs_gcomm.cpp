@@ -216,12 +216,22 @@ public:
         tp = Transport::create(*net, uri);
         gcomm::connect(tp, this);
 
-        string host("");
-        string port("");
-        try { host = uri.get_host(); } catch (NotSet&) { }
-        try { port = uri.get_port(); } catch (NotSet&) { }
-        string peer(host != "" ? host + ":" + port : "");
-
+        string peer;
+        URI::AuthorityList::const_iterator i, i_next;
+        for (i = uri.get_authority_list().begin(); i != uri.get_authority_list().end(); ++i)
+        {
+            i_next = i;
+            ++i_next;
+            string host;
+            string port;
+            try { host = i->host(); } catch (NotSet&) { }
+            try { port = i->port(); } catch (NotSet&) { }
+            peer += host != "" ? host + ":" + port : "";
+            if (i_next != uri.get_authority_list().end())
+            {
+                peer += ",";
+            }
+        }
         log_info << "gcomm: connecting to group '" << channel
                  << "', peer '" << peer << "'";
         tp->connect();

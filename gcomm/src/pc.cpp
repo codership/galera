@@ -81,7 +81,16 @@ std::string gcomm::PC::get_listen_addr() const
 
 void PC::connect()
 {
-    const bool start_prim(host_is_any (uri_.get_host()));
+    bool start_prim(false);
+
+    try
+    {
+        start_prim = host_is_any (uri_.get_host());
+    }
+    catch (gu::NotSet& ns)
+    {
+        start_prim = true;
+    }
     const bool wait_prim(
         gu::from_string<bool>(
             uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));

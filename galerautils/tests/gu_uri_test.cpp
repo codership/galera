@@ -211,8 +211,8 @@ START_TEST (uri_test2) // checking corner cases
         try             { fail_if (uri.get_authority() != ""); }
         catch (NotSet&) { fail ("Authority should be set"); }
 
-        try             { fail_if (uri.get_host() != ""); }
-        catch (NotSet&) { fail ("Host should be set"); }
+        try { uri.get_host(); fail("Host should be unset"); }
+        catch (NotSet&) { }
 
         try             { uri.get_user(); fail ("User should be unset"); }
         catch (NotSet&) {}
@@ -286,8 +286,8 @@ START_TEST (uri_test2) // checking corner cases
         try             { uri.get_user(); fail ("User should be unset"); }
         catch (NotSet&) {}
 
-        try             { fail_if (uri.get_host() != ""); }
-        catch (NotSet&) { fail ("Host should be set"); }
+        try { uri.get_host(); fail("Host should be unset"); }
+        catch (NotSet&) { }
 
         try             { uri.get_port(); fail ("Port should be unset"); }
         catch (NotSet&) {}
@@ -373,12 +373,6 @@ START_TEST (uri_test3) // Test from gcomm
     {
         fail_if (e.get_errno() != EINVAL);
     }
-
-    // Check rewriting
-    URI rew("gcomm+gmcast://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
-    rew._set_scheme("gcomm+tcp");
-    fail_unless(rew.to_string() == "gcomm+tcp://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
-
 }
 END_TEST
 
@@ -420,6 +414,59 @@ START_TEST(uri_non_strict)
 }
 END_TEST
 
+START_TEST(uri_test_multihost)
+{
+    try
+    {
+        gu::URI uri("tcp://host1,host2");
+
+        fail_unless(uri.get_authority_list().size() == 2);
+        try
+        {
+            uri.get_authority_list()[0].user();
+            fail("User should not be set");
+        }
+        catch (NotSet&) { }
+        fail_unless(uri.get_authority_list()[0].host() == "host1");
+        try
+        {
+            uri.get_authority_list()[0].port();
+            fail("Port should not be set");
+        }
+        catch (NotSet&) { }
+
+        fail_unless(uri.get_authority_list()[1].host() == "host2");
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        gu::URI uri("tcp://host1:1234,host2:,host3:3456");
+
+        fail_unless(uri.get_authority_list().size() == 3);
+        try
+        {
+            uri.get_authority_list()[0].user();
+            fail("User should not be set");
+        }
+        catch (NotSet&) { }
+        fail_unless(uri.get_authority_list()[0].host() == "host1");
+        fail_unless(uri.get_authority_list()[0].port() == "1234");
+
+        fail_unless(uri.get_authority_list()[1].host() == "host2");
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+
+}
+END_TEST
+
 Suite *gu_uri_suite(void)
 {
   Suite *s  = suite_create("galerautils++ URI");
@@ -430,6 +477,8 @@ Suite *gu_uri_suite(void)
   tcase_add_test  (tc, uri_test2);
   tcase_add_test  (tc, uri_test3);
   tcase_add_test  (tc, uri_non_strict);
+  tcase_add_test  (tc, uri_test_multihost);
+
   return s;
 }
 

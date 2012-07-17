@@ -14,6 +14,8 @@
 #include "gcomm/transport.hpp"
 #include "gcomm/types.hpp"
 
+#include <set>
+
 #ifndef GCOMM_GMCAST_MAX_VERSION
 #define GCOMM_GMCAST_MAX_VERSION 0
 #endif // GCOMM_GMCAST_MAX_VERSION
@@ -144,7 +146,7 @@ namespace gcomm
         bool              use_ssl;
         std::string       group_name;
         std::string       listen_addr;
-        std::string       initial_addr;
+        std::set<std::string>       initial_addrs;
         std::string       mcast_addr;
         std::string       bind_ip;
         int               mcast_ttl;

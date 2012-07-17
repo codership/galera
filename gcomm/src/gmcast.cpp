@@ -60,7 +60,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
         param<std::string>(
             conf_, uri, Conf::GMCastListenAddr,
             get_scheme(use_ssl) + "://0.0.0.0")), // how to make it IPv6 safe?
-    initial_addr  (""),
+    initial_addrs (),
     mcast_addr    (param<std::string>(conf_, uri, Conf::GMCastMCastAddr, "")),
     bind_ip       (""),
     mcast_ttl     (check_range(
@@ -159,7 +159,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
         listen_addr.replace(0, 3, SSL_SCHEME);
     }
 
-    if (listen_addr == initial_addr)
+    if (initial_addrs.find(listen_addr) != initial_addrs.end())
     {
         gu_throw_error(EINVAL) << "connect address points to listen address '"
                                << listen_addr
@@ -201,54 +201,61 @@ GMCast::~GMCast()
 
 void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
 {
-    try
-    {
-        if (!host_is_any(uri.get_host()))
-        {
-            string port;
 
+    const gu::URI::AuthorityList& al(uri.get_authority_list());
+
+    for (gu::URI::AuthorityList::const_iterator i(al.begin());
+         i != al.end(); ++i)
+    {
+        std::string host;
+        try
+        {
+            host = i->host();
+        }
+        catch (gu::NotSet& ns)
+        {
+            gu_throw_error(EINVAL) << "Unset host in URL " << uri;
+        }
+
+        if (host_is_any(host)) continue;
+
+        string port;
+        try
+        {
+            port = i->port();
+        }
+        catch (gu::NotSet& )
+        {
             try
             {
-                port = uri.get_port();
+                port = conf_.get(BASE_PORT_KEY);
             }
-            catch (gu::NotSet& )
+            catch (gu::NotFound&)
             {
-                try
-                {
-                    port = conf_.get(BASE_PORT_KEY);
-                }
-                catch (gu::NotFound&)
-                {
-                    port = Defaults::GMCastTcpPort;
-                }
+                port = Defaults::GMCastTcpPort;
             }
-
-            initial_addr = resolve(
-                uri_string(get_scheme(use_ssl), uri.get_host(), port)
-                ).to_string();
-
-            // resolving sets scheme to tcp, have to rewrite for ssl
-            if (use_ssl == true)
-            {
-                initial_addr.replace(0, 3, SSL_SCHEME);
-            }
-
-            if (check_tcp_uri(initial_addr) == false)
-            {
-                gu_throw_error (EINVAL) << "initial addr '" << initial_addr
-                                        << "' is not valid";
-            }
-
-            log_debug << self_string() << " initial addr: " << initial_addr;
         }
+        std::string initial_addr = resolve(
+            uri_string(get_scheme(use_ssl), host, port)
+            ).to_string();
+
+        // resolving sets scheme to tcp, have to rewrite for ssl
+        if (use_ssl == true)
+        {
+            initial_addr.replace(0, 3, SSL_SCHEME);
+        }
+
+        if (check_tcp_uri(initial_addr) == false)
+        {
+            gu_throw_error (EINVAL) << "initial addr '" << initial_addr
+                                    << "' is not valid";
+        }
+
+        log_debug << self_string() << " initial addr: " << initial_addr;
+        initial_addrs.insert(initial_addr);
+
     }
-    catch (gu::NotSet&)
-    {
-        //@note: this is different from empty host and indicates URL without
-        //       ://
-        gu_throw_error (EINVAL) << "Host not defined in URL: "
-                                << uri.to_string();
-    }
+
 }
 
 
@@ -277,12 +284,16 @@ void GMCast::connect()
         gu_trace(mcast->connect(mcast_uri));
     }
 
-    if (!initial_addr.empty())
+    if (!initial_addrs.empty())
     {
-        insert_address(initial_addr, UUID(), pending_addrs);
-        AddrList::iterator ai(pending_addrs.find(initial_addr));
-        AddrList::get_value(ai).set_max_retries(max_retry_cnt);
-        gu_trace (gmcast_connect(initial_addr));
+        for (std::set<std::string>::const_iterator i(initial_addrs.begin());
+             i != initial_addrs.end(); ++i)
+        {
+            insert_address(*i, UUID(), pending_addrs);
+            AddrList::iterator ai(pending_addrs.find(*i));
+            AddrList::get_value(ai).set_max_retries(max_retry_cnt);
+            gu_trace (gmcast_connect(*i));
+        }
     }
 }
 
@@ -480,14 +491,15 @@ void GMCast::handle_established(Proto* est)
     if (est->get_remote_uuid() == get_uuid())
     {
         // connected to self
-        if (est->get_remote_addr() == initial_addr)
+        if (initial_addrs.find(est->get_remote_addr()) !=
+            initial_addrs.end())
         {
             proto_map->erase(
                 proto_map->find_checked(est->get_socket()->get_id()));
             delete est;
             gu_throw_error(EINVAL)
                 << "connected to own listening address '"
-                <<  initial_addr
+                <<  est->get_remote_addr()
                 << "', check that cluster address '"
                 << uri_.get_host()
                 << "' points to correct location";
@@ -1214,6 +1226,7 @@ void gcomm::GMCast::handle_stable_view(const View& view)
     log_debug << "GMCast::handle_stable_view: " << view;
     if (view.get_type() == V_PRIM)
     {
+        // discard addr list entries not in view
         std::set<UUID> gmcast_lst;
         for (AddrList::const_iterator i(remote_addrs.begin());
              i != remote_addrs.end(); ++i)
@@ -1249,6 +1262,37 @@ void gcomm::GMCast::handle_stable_view(const View& view)
                 ai->second.set_retry_cnt(-1);
                 ai->second.set_max_retries(max_retry_cnt);
             }
+        }
+
+        // iterate over pending address list and discard entries without UUID
+        for (AddrList::iterator i(pending_addrs.begin());
+             i != pending_addrs.end(); )
+        {
+            AddrList::iterator i_next(i);
+            ++i_next;
+            const AddrEntry& ae(AddrList::get_value(i));
+            if (ae.get_uuid() == UUID())
+            {
+                const std::string addr(AddrList::get_key(i));
+                log_info << "discarding pending addr without UUID: "
+                         << addr;
+                for (ProtoMap::iterator pi(proto_map->begin());
+                     pi != proto_map->end();)
+                {
+                    ProtoMap::iterator pi_next(pi);
+                    ++pi_next;
+                    Proto* p(ProtoMap::get_value(pi));
+                    if (p->get_remote_addr() == addr)
+                    {
+                        log_info << "discarding pending addr proto entry " << p;
+                        delete p;
+                        proto_map->erase(pi);
+                    }
+                    pi = pi_next;
+                }
+                pending_addrs.erase(i);
+            }
+            i = i_next;
         }
     }
     else if (view.get_type() == V_REG)

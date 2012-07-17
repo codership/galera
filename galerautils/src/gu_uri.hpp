@@ -18,6 +18,7 @@
 
 #include <string>
 #include <map>
+#include <list>
 
 #include "gu_utils.hpp"
 #include "gu_regex.hpp"
@@ -40,6 +41,51 @@ namespace gu
     class URI
     {
     public:
+        /*!
+         * @class Helper class for authority list representation.
+         */
+        class Authority
+        {
+        public:
+
+            /*!
+             * @brief Get "user" part of authority
+             *
+             * @return user substring
+             */
+            const std::string& user() const throw (NotSet)
+            {
+                return user_.str();
+            }
+
+            /*!
+             * @brief Get "host" part of authority
+             *
+             * @return host substring
+             */
+            const std::string& host() const throw (NotSet)
+            {
+                return host_.str();
+            }
+
+            /*!
+             * @brief Get "port" part of authority
+             *
+             * @return port
+             */
+            const std::string& port() const throw (NotSet)
+            {
+                return port_.str();
+            }
+        private:
+            friend class gu::URI;
+            Authority() : user_(), host_(), port_() { }
+            RegEx::Match user_;
+            RegEx::Match host_;
+            RegEx::Match port_;
+        };
+
+        typedef std::vector<Authority> AuthorityList;
 
         /*!
          * @brief Construct URI from string
@@ -57,16 +103,9 @@ namespace gu
          */
         const std::string& to_string() const
         {
-            if (modified) recompose();
-            return str;
+            if (modified_) recompose();
+            return str_;
         }
-
-        /*!
-         * @brief Reset URI scheme
-         *
-         * @param scheme New URI scheme
-         */
-        void _set_scheme(const std::string& scheme);
 
         /*!
          * @brief Get URI scheme
@@ -75,10 +114,8 @@ namespace gu
          */
         const std::string& get_scheme() const throw (NotSet)
         {
-            return scheme.str();
+            return scheme_.str();
         }
-
-        void _set_authority(const std::string& auth);
 
         /*!
          * @brief Get URI authority component
@@ -88,33 +125,49 @@ namespace gu
         std::string get_authority() const throw (NotSet);
 
         /*!
-         * @brief Get "user" part of authority
+         * @brief Get "user" part of the first entry in authority list
          *
-         * @return user substring
+         * @return User substring
          */
         const std::string& get_user() const throw (NotSet)
         {
-            return user.str();
+            if (authority_.empty())
+                throw NotSet();
+            return authority_.front().user();
         }
 
         /*!
-         * @brief Get "host" part of authority
+         * @brief Get "host" part of the first entry in authority list
          *
-         * @return host substring
+         * @return Host substring
          */
         const std::string& get_host() const throw (NotSet)
         {
-            return host.str();
+            if (authority_.empty())
+                throw NotSet();
+            return authority_.front().host();
         }
 
         /*!
-         * @brief Get "port" part of authority
+         * @brief Get "port" part of the first entry in authority list
          *
-         * @return port
+         * @return Port substring
          */
         const std::string& get_port() const throw (NotSet)
         {
-            return port.str();
+            if (authority_.empty())
+                throw NotSet();
+            return authority_.front().port();
+        }
+
+        /*!
+         * @brief Get authority list
+         *
+         * @return Authority list
+         */
+        const AuthorityList& get_authority_list() const
+        {
+            return authority_;
         }
 
         /*!
@@ -124,7 +177,7 @@ namespace gu
          */
         const std::string& get_path() const throw()
         {
-            return path.str();
+            return path_.str();
         }
 
         /*!
@@ -134,7 +187,7 @@ namespace gu
          */
         const std::string& get_fragment() const throw(NotSet)
         {
-            return fragment.str();
+            return fragment_.str();
         }
 
         /*!
@@ -153,7 +206,7 @@ namespace gu
         /*!
          * @brief Get URI query list
          */
-        const URIQueryList& get_query_list() const { return query_list; }
+        const URIQueryList& get_query_list() const { return query_list_; }
 
         /*!
          * @brief return opton by name
@@ -169,18 +222,14 @@ namespace gu
         }
 
     private:
+        bool         modified_;
+        mutable std::string  str_; /*! URI string */
 
-        bool         modified;
-        mutable std::string  str; /*! URI string */
-
-        RegEx::Match scheme;    /*! URI scheme part */
-        RegEx::Match user;      /*! URI user part */
-        RegEx::Match host;      /*! URI host part */
-        RegEx::Match port;      /*! URI port part */
-        RegEx::Match path;      /*! URI path part */
-        RegEx::Match fragment;  /*! URI fragment part */
-
-        URIQueryList query_list; /*! URI query list */
+        RegEx::Match  scheme_;    /*! URI scheme part */
+        AuthorityList authority_;
+        RegEx::Match  path_;      /*! URI path part */
+        RegEx::Match  fragment_;  /*! URI fragment part */
+        URIQueryList  query_list_; /*! URI query list */
 
         /*!
          * @brief Parse URI from str
@@ -192,8 +241,10 @@ namespace gu
          */
         void recompose() const;
 
-        static const char* const uri_regex; /*! regexp string to parse URI */
-        static RegEx const regex;           /*! URI regexp parser */
+        std::string get_authority(const Authority&) const throw (NotSet);
+
+        static const char* const uri_regex_; /*! regexp string to parse URI */
+        static RegEx const regex_;           /*! URI regexp parser */
     };
 
     inline std::ostream& operator<<(std::ostream& os, const URI& uri)

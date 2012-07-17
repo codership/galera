@@ -85,7 +85,7 @@ static gu::URIQueryList extract_query_list(const string& s,
     // scan all key=value pairs
     vector<string> qlist = gu::strsplit(query, '&');
 
-    for (vector<string>::iterator i = qlist.begin(); i != qlist.end(); ++i)
+    for (vector<string>::const_iterator i = qlist.begin(); i != qlist.end(); ++i)
     {
         vector<string> kvlist = gu::strsplit(*i, '=');
 
@@ -102,21 +102,19 @@ static gu::URIQueryList extract_query_list(const string& s,
 
 gu::URI::URI(const string& uri_str, bool const strict) throw (gu::Exception)
     :
-    modified   (true), // recompose to normalize on the first call to_string()
-    str        (uri_str),
-    scheme     (),
-    user       (),
-    host       (),
-    port       (),
-    path       (),
-    fragment   (),
-    query_list ()
+    modified_  (true), // recompose to normalize on the first call to_string()
+    str_       (uri_str),
+    scheme_    (),
+    authority_ (),
+    path_      (),
+    fragment_  (),
+    query_list_()
 {
     parse(uri_str, strict);
 }
 
 /*! regexp suggested by RFC 3986 to parse URI into 5 canonical parts */
-const char* const gu::URI::uri_regex =
+const char* const gu::URI::uri_regex_ =
         "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?";
 /*        12            3  4          5       6  7        8 9        */
 
@@ -131,7 +129,7 @@ enum
     NUM_PARTS
 };
 
-gu::RegEx const gu::URI::regex(uri_regex);
+gu::RegEx const gu::URI::regex_(uri_regex_);
 static string const UNSET_SCHEME("unset://");
 
 void gu::URI::parse (const string& uri_str, bool const strict)
@@ -144,28 +142,38 @@ void gu::URI::parse (const string& uri_str, bool const strict)
     if (!strict && uri_str.find("://") == std::string::npos)
     {
         string tmp = UNSET_SCHEME + uri_str;
-        parts  = regex.match (tmp, NUM_PARTS);
+        parts  = regex_.match (tmp, NUM_PARTS);
     }
     else
     {
-        parts  = regex.match (uri_str, NUM_PARTS);
-        scheme = parts[SCHEME]; //set scheme only if it was explicitly provided
+        parts  = regex_.match (uri_str, NUM_PARTS);
+        scheme_ = parts[SCHEME]; //set scheme only if it was explicitly provided
     }
 
-    if (strict && (!scheme.is_set() || !scheme.str().length()))
+    if (strict && (!scheme_.is_set() || !scheme_.str().length()))
     {
         gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme";
     }
 
     try
     {
-        parse_authority (parts[AUTHORITY].str(), user, host, port);
+        std::vector<std::string> auth_list(
+            strsplit(parts[AUTHORITY].str(), ','));
+        for (size_t i(0); i < auth_list.size(); ++i)
+        {
+            Authority auth;
+            parse_authority (auth_list[i], auth.user_, auth.host_, auth.port_);
+            authority_.push_back(auth);
+        }
     }
-    catch (NotSet&) {}
+    catch (NotSet&)
+    {
+        authority_.push_back(Authority());
+    }
 
-    path = parts[PATH];
+    path_ = parts[PATH];
 
-    if (!parts[AUTHORITY].is_set() && !path.is_set())
+    if (!parts[AUTHORITY].is_set() && !path_.is_set())
     {
         gu_throw_error (EINVAL) << "URI '" << uri_str
                                 << "' has no hierarchical part";
@@ -173,11 +181,11 @@ void gu::URI::parse (const string& uri_str, bool const strict)
 
     try
     {
-        query_list = extract_query_list(str, parts[QUERY].str());
+        query_list_ = extract_query_list(str_, parts[QUERY].str());
     }
     catch (NotSet&) {}
 
-    fragment   = parts[FRAGMENT];
+    fragment_ = parts[FRAGMENT];
 
 #if 0
     try
@@ -189,8 +197,15 @@ void gu::URI::parse (const string& uri_str, bool const strict)
 #endif
 }
 
-string gu::URI::get_authority() const throw (NotSet)
+
+std::string gu::URI::get_authority(const gu::URI::Authority& authority) const
+    throw (NotSet)
 {
+
+    const RegEx::Match& user(authority.user_);
+    const RegEx::Match& host(authority.host_);
+    const RegEx::Match& port(authority.port_);
+
     if (!user.is_set() && !host.is_set()) throw NotSet();
 
     size_t auth_len = 0;
@@ -218,100 +233,106 @@ string gu::URI::get_authority() const throw (NotSet)
     }
 
     return auth;
+
 }
+
+string gu::URI::get_authority() const throw (NotSet)
+{
+    if (authority_.empty()) return "";
+    return get_authority(authority_.front());
+}
+
+
 
 void gu::URI::recompose() const
 {
-    size_t l = str.length();
-    str.clear ();
-    str.reserve (l); // resulting string length will be close to this
+    size_t l = str_.length();
+    str_.clear ();
+    str_.reserve (l); // resulting string length will be close to this
 
-    if (scheme.is_set())
+    if (scheme_.is_set())
     {
-        str += scheme.str();
-        str += ':';
+        str_ += scheme_.str();
+        str_ += ':';
     }
 
-    try
+    str_ += "//";
+    for (AuthorityList::const_iterator i(authority_.begin());
+         i != authority_.end(); ++i)
     {
-        string auth = get_authority();
-        str += "//";
-        str += auth;
+        AuthorityList::const_iterator i_next(i);
+        ++i_next;
+        try
+        {
+            string auth = get_authority(*i);
+            str_ += auth;
+        }
+        catch (NotSet&) {}
+        if (i_next != authority_.end()) str_ += ",";
     }
-    catch (NotSet&) {}
+    if (path_.is_set()) str_ += path_.str();
 
-    if (path.is_set()) str += path.str();
-
-    if (query_list.size() > 0)
+    if (query_list_.size() > 0)
     {
-        str += '?';
+        str_ += '?';
     }
 
-    URIQueryList::const_iterator i = query_list.begin();
+    URIQueryList::const_iterator i = query_list_.begin();
 
-    while (i != query_list.end())
+    while (i != query_list_.end())
     {
-        str += i->first + '=' + i->second;
+        str_ += i->first + '=' + i->second;
 
         URIQueryList::const_iterator i_next = i;
 
         ++i_next;
 
-        if (i_next != query_list.end())
+        if (i_next != query_list_.end())
         {
-            str += '&';
+            str_ += '&';
         }
 
         i = i_next;
     }
 
-    if (fragment.is_set())
+    if (fragment_.is_set())
     {
-        str += '#';
-        str += fragment.str();
+        str_ += '#';
+        str_ += fragment_.str();
     }
 }
 
-void gu::URI::_set_scheme(const std::string& s)
-{
-    scheme = RegEx::Match(s);
-    modified = true;
-}
-
-void gu::URI::_set_authority(const std::string& s)
-{
-    parse_authority (s, user, host, port);
-    modified = true;
-}
 
 void gu::URI::set_query_param(const string& key, const string& val,
                               bool override)
 {
     if (override == false)
     {
-        query_list.insert(make_pair(key, val));
+        query_list_.insert(make_pair(key, val));
     }
     else
     {
-        URIQueryList::iterator i(query_list.find(key));
-        if (i == query_list.end())
+        URIQueryList::iterator i(query_list_.find(key));
+        if (i == query_list_.end())
         {
-            query_list.insert(make_pair(key, val));
+            query_list_.insert(make_pair(key, val));
         }
         else
         {
             i->second = val;
         }
     }
-    modified = true;
+
+    modified_ = true;
 }
+
 
 const std::string& gu::URI::get_option (const std::string& name) const
     throw (gu::NotFound)
 {
-    gu::URIQueryList::const_iterator i = query_list.find(name);
+    gu::URIQueryList::const_iterator i = query_list_.find(name);
 
-    if (i == query_list.end()) throw NotFound();
+    if (i == query_list_.end()) throw NotFound();
 
     return i->second;
 }
