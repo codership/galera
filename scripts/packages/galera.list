@@ -19,7 +19,7 @@ d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST/libgalera_smm.so $BUILD_BASE/libgalera_smm.so
 
 d 755 root root $DOCS_DEST -
-f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/LICENSE.galera
+f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/LICENSE
 f 644 root root $DOCS_DEST/README       README
 f 644 root root $DOCS_DEST/README-MySQL README-MySQL
 
