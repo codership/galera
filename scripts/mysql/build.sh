@@ -287,7 +287,7 @@ then
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
         url2=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-$MYSQL_MAJOR
-        url1=http://downloads.mysql.com/archives/mysql-$MYSQL_MAJOR
+        url1=ftp://sunsite.informatik.rwth-aachen.de/pub/mirror/www.mysql.com/Downloads/MySQL-$MYSQL_MAJOR
         if [ ! -r $mysql_orig_tar_gz ]
         then
             echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
