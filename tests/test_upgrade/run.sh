@@ -81,8 +81,9 @@ for node in $NODE_LIST
 do
     upgrade $node
     pause
-    consistency_check $sqlgen_pid
 done
+
+consistency_check $sqlgen_pid
 
 exit
 

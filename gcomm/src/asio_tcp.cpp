@@ -85,7 +85,9 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
 {
     if (ec)
     {
-        log_error << "handshake failed for " << get_id() << ": " << ec;
+        log_error << "handshake with remote endpoint "
+                  << get_remote_addr() << " failed: " << ec.message()
+                  << " (" << ec << ")"; ;
         FAILED_HANDLER(ec);
         return;
     }
