@@ -29,6 +29,7 @@ namespace galera
 
         typedef enum
         {
+            S_DESTROYED,
             S_CLOSED,
             S_CLOSING,
             S_CONNECTED,
@@ -94,8 +95,9 @@ namespace galera
             throw (gu::Exception) = 0;
         virtual void process_sync(wsrep_seqno_t seqno_l) = 0;
 
-        // wsrep_status_t snapshot();
-        virtual const struct wsrep_stats_var* stats() const = 0;
+        virtual const struct wsrep_stats_var* stats_get()  const = 0;
+        // static void stats_free(struct wsrep_stats_var*) must be declared in
+        // the child class
 
         virtual void        param_set (const std::string& key,
                                        const std::string& value)

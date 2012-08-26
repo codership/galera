@@ -21,8 +21,8 @@
 #include <gcache.h>
 
 #define NODE_NO_ID   "undefined"
-#define NODE_NO_NAME "unknown"
-#define NODE_NO_ADDR "unknown"
+#define NODE_NO_NAME "unspecified"
+#define NODE_NO_ADDR "unspecified"
 
 struct gcs_node
 {

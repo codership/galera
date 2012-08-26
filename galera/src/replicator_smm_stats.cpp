@@ -4,7 +4,7 @@
 #include "uuid.hpp"
 
 // @todo: should be protected static member of the parent class
-static const size_t GALERA_STAGE_MAX(10);
+static const size_t GALERA_STAGE_MAX(11);
 // @todo: should be protected static member of the parent class
 static const char* state_str[GALERA_STAGE_MAX] =
 {
@@ -18,6 +18,7 @@ static const char* state_str[GALERA_STAGE_MAX] =
     "Donor (+)",
     "SST request failed (-)",
     "SST failed (-)",
+    "Destroyed"
 };
 
 // @todo: should be protected static member of the parent class
@@ -25,6 +26,7 @@ static wsrep_member_status_t state2stats(galera::ReplicatorSMM::State state)
 {
     switch (state)
     {
+    case galera::ReplicatorSMM::S_DESTROYED :
     case galera::ReplicatorSMM::S_CLOSED    :
     case galera::ReplicatorSMM::S_CLOSING   :
     case galera::ReplicatorSMM::S_CONNECTED : return WSREP_MEMBER_UNDEFINED;
@@ -46,6 +48,8 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
 
     switch (state)
     {
+    case galera::ReplicatorSMM::S_DESTROYED :
+        return state_str[10];
     case galera::ReplicatorSMM::S_CLOSED :
     case galera::ReplicatorSMM::S_CLOSING:
     case galera::ReplicatorSMM::S_CONNECTED:
@@ -99,6 +103,7 @@ typedef enum status_vars
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
     STATS_CAUSAL_READS,
+    STATS_INCOMING_LIST,
     STATS_MAX
 } StatusVars;
 
@@ -133,6 +138,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_state_comment",  WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",      WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",         WSREP_VAR_INT64,  { 0 }  },
+    { "incoming_addresses",   WSREP_VAR_STRING, { 0 }  },
     { 0,                      WSREP_VAR_STRING, { 0 }  }
 };
 
@@ -152,8 +158,10 @@ galera::ReplicatorSMM::build_stats_vars (
 }
 
 const struct wsrep_stats_var*
-galera::ReplicatorSMM::stats() const
+galera::ReplicatorSMM::stats_get() const
 {
+    if (S_DESTROYED == state_()) return 0;
+
     std::vector<struct wsrep_stats_var>& sv(wsrep_stats_);
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
@@ -193,15 +201,49 @@ galera::ReplicatorSMM::stats() const
     const_cast<Monitor<CommitOrder>&>(commit_monitor_).
         get_stats(&oooe, &oool, &win);
 
-    sv[STATS_COMMIT_OOOE          ].value._double = oooe;
-    sv[STATS_COMMIT_OOOL          ].value._double = oool;
-    sv[STATS_COMMIT_WINDOW        ].value._double = win;
+    sv[STATS_COMMIT_OOOE         ].value._double = oooe;
+    sv[STATS_COMMIT_OOOL         ].value._double = oool;
+    sv[STATS_COMMIT_WINDOW       ].value._double = win;
 
 
     sv[STATS_LOCAL_STATE         ].value._int64  = state2stats(state_());
     sv[STATS_LOCAL_STATE_COMMENT ].value._string = state2stats_str(state_(),
                                                                    sst_state_);
     sv[STATS_CERT_INDEX_SIZE].value._int64 = cert_.index_size();
-    sv[STATS_CAUSAL_READS].value._int64 = causal_reads_();
-    return &wsrep_stats_[0];
+    sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
+
+    /* Create a buffer to be passed to the caller. */
+    gu::Lock lock_inc(incoming_mutex_);
+
+    size_t const inc_size(incoming_list_.size() + 1);
+    size_t const vec_size(sv.size()*sizeof(struct wsrep_stats_var));
+    struct wsrep_stats_var* const buf(
+        reinterpret_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
+
+    if (buf)
+    {
+        char* const inc_buf(reinterpret_cast<char*>(buf + sv.size()));
+
+        wsrep_stats_[STATS_INCOMING_LIST].value._string = inc_buf;
+
+        memcpy(buf, &sv[0], vec_size);
+        memcpy(inc_buf, incoming_list_.c_str(), inc_size);
+        assert(inc_buf[inc_size - 1] == '\0');
+    }
+    else
+    {
+        log_warn << "Failed to allocate stats vars buffer to "
+                 << (inc_size + vec_size)
+                 << " bytes. System is running out of memory.";
+    }
+
+    return buf;
+}
+
+void
+galera::ReplicatorSMM::stats_free(struct wsrep_stats_var* arg)
+{
+    if (!arg) return;
+    log_debug << "########### Freeing stats object ##########";
+    gu_free(arg);
 }

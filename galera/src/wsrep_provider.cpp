@@ -39,10 +39,12 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     {
         log_error << e.what();
     }
+#ifdef NDEBUG
     catch (...)
     {
         log_fatal << "non-standard exception";
     }
+#endif
 
     return WSREP_NODE_FAIL;
 }
@@ -715,13 +717,15 @@ struct wsrep_stats_var* galera_stats_get (wsrep_t* gh)
     assert(gh != 0);
     assert(gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    return const_cast<struct wsrep_stats_var*>(repl->stats());
+    return const_cast<struct wsrep_stats_var*>(repl->stats_get());
 }
 
 
 extern "C"
 void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 {
+    // REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    REPL_CLASS::stats_free(s);
 }
 
 

@@ -143,6 +143,7 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
     {
+    case ReplicatorSMM::S_DESTROYED: return (os << "DESTROYED");
     case ReplicatorSMM::S_CLOSED:    return (os << "CLOSED");
     case ReplicatorSMM::S_CLOSING:   return (os << "CLOSING");
     case ReplicatorSMM::S_CONNECTED: return (os << "CONNECTED");
@@ -217,9 +218,12 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_cert_failures_(),
     local_bf_aborts_    (),
     local_replays_      (),
+    incoming_list_      (""),
+    incoming_mutex_     (),
     wsrep_stats_        ()
 {
     // @todo add guards (and perhaps actions)
+    state_.add_transition(Transition(S_CLOSED,  S_DESTROYED));
     state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
 
@@ -293,6 +297,8 @@ galera::ReplicatorSMM::~ReplicatorSMM()
         // @todo wait that all users have left the building
     case S_CLOSED:
         ist_senders_.cancel();
+        break;
+    case S_DESTROYED:
         break;
     }
 }
@@ -1125,6 +1131,39 @@ app_wants_state_transfer (const void* const req, ssize_t const req_len)
 }
 
 void
+galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
+{
+    static std::string const separator(", ");
+
+    ssize_t new_size(0);
+
+    if (view.memb_num > 0)
+    {
+        new_size += (view.memb_num - 1) * separator.size();
+
+        for (int i = 0; i < view.memb_num; ++i)
+        {
+            new_size += strlen(view.members[i].incoming);
+        }
+    }
+
+    gu::Lock lock(incoming_mutex_);
+
+    incoming_list_.clear();
+    incoming_list_.resize(new_size);
+
+    if (new_size <= 0) return;
+
+    incoming_list_ = view.members[0].incoming;
+
+    for (int i = 1; i < view.memb_num; ++i)
+    {
+        incoming_list_ += separator;
+        incoming_list_ += view.members[i].incoming;
+    }
+}
+
+void
 galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                                            const wsrep_view_info_t& view_info,
                                            int                      repl_proto,
@@ -1133,8 +1172,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     throw (gu::Exception)
 {
     assert(seqno_l > -1);
-    LocalOrder lo(seqno_l);
 
+    update_incoming_list(view_info);
+
+    LocalOrder lo(seqno_l);
     gu_trace(local_monitor_.enter(lo));
 
     wsrep_seqno_t const upto(cert_.position());

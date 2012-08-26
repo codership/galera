@@ -169,12 +169,16 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
         recv_addr = conf_.get(RECV_ADDR);
         return;
     }
-    catch (gu::NotFound&) {} /* if not, check the alternative.
+    catch (gu::NotFound& e) {} /* if not, check the alternative.
                                 TODO: try to find from system. */
     if (addr)
     {
-        recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
-        conf_.set(RECV_ADDR, recv_addr);
+        try
+        {
+            recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
+            conf_.set(RECV_ADDR, recv_addr);
+        }
+        catch (gu::NotSet& e) {}
     }
 }
 

@@ -103,7 +103,9 @@ namespace galera
             throw (gu::Exception);
         void process_sync(wsrep_seqno_t seqno_l)
             throw (gu::Exception);
-        const struct wsrep_stats_var* stats() const;
+
+        const struct wsrep_stats_var* stats_get()  const;
+        static void                   stats_free(struct wsrep_stats_var*);
 
         // helper function
         void           set_param (const std::string& key,
@@ -157,6 +159,7 @@ namespace galera
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
 
         void update_state_uuid (const wsrep_uuid_t& u);
+        void update_incoming_list (const wsrep_view_info_t& v);
 
         /* aborts/exits the program in a clean way */
         void abort() throw();
@@ -263,7 +266,7 @@ namespace galera
                 switch (mode_)
                 {
                 case BYPASS:
-                    gu_throw_fatal 
+                    gu_throw_fatal
                         << "commit order condition called in bypass mode";
                     throw;
                 case OOOC:
@@ -437,15 +440,15 @@ namespace galera
         // action sources
         ActionSource*   as_;
         GcsActionSource gcs_as_;
-        ist::Receiver ist_receiver_;
+        ist::Receiver   ist_receiver_;
         ist::AsyncSenderMap ist_senders_;
         // trx processing
         Wsdb            wsdb_;
         Certification   cert_;
 
         // concurrency control
-        Monitor<LocalOrder> local_monitor_;
-        Monitor<ApplyOrder> apply_monitor_;
+        Monitor<LocalOrder>  local_monitor_;
+        Monitor<ApplyOrder>  apply_monitor_;
         Monitor<CommitOrder> commit_monitor_;
         gu::datetime::Period causal_read_timeout_;
 
@@ -459,6 +462,10 @@ namespace galera
         gu::Atomic<long long> local_bf_aborts_;
         gu::Atomic<long long> local_replays_;
         gu::Atomic<long long> causal_reads_;
+
+        // non-atomic stats
+        std::string           incoming_list_;
+        mutable gu::Mutex     incoming_mutex_;
 
         mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
     };
