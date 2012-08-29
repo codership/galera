@@ -9,10 +9,10 @@
 # Foreign key constraint on non-unique index in parent table can cause
 # a crash in slave configured for parallel applying.
 # Current wsrep patch does not populate any key information for non-unique
-# keys and dependencies for parent rowe existence are not respected in PA 
+# keys and dependencies for parent row existence are not respected in PA 
 # control. 
 #
-# There are two scenarios how this problem can surface:
+# There are five scenarios how foreign key problems can surface:
 # A. FK has ON UPDATE CASCADE option
 #    1. Parent table has two rows with same fk key value 
 #    2. One transaction issues update on one parent row, which triggers
@@ -21,27 +21,35 @@
 #       This is now safe because child references have been changed to
 #       point to the first parent row
 #    => These WSs don't have mutual dependency and in slave side it may
-#       happen that DELETE will bve processed first, and it will fail for 
+#       happen that DELETE will be processed first, and it will fail for 
 #       FK violation
 #
-# B. insert
+# B. shared reference to non-UK column in parent row with inserts
 #    1.  one transaction does insert on parent table
 #    2.  another transaction does insert on child table referencing the
 #        inserted row
 #    => These WSs don't have mutual dependency and in slave side it may
-#       happen that child INSERT will vbe processed first, and it will fail for
+#       happen that child INSERT will be processed first, and it will fail for
 #       FK violation
 #
-# C. delete
+# C. shared reference to non-UK column in parent row with deletes
 #    1.  one transaction deletes a row from child table
 #    2.  another transaction deletes corresponding row in parent table
 #    => These WSs don't have mutual dependency and in slave side it may
-#       happen that parent delete will vbe processed first, and it will fail for
+#       happen that parent delete will be processed first, and it will fail for
 #       FK violation
 #
 # D. delete with FK on PK
 #    *  same as phase C, but with tables where FK constraint is on
-#    primary key column
+#       primary key column
+#
+# E. shared reference to non-UK column in parent row with insert + delete
+#    1. one transaction first inserts a row in parent table
+#    2. second transaction inserts referencing row in child table
+#    3. third transaction deletes the row from child table
+#    4. fourths transaction deletes the row from parent table
+#    => either insert or delete transactions can get applied in wrong order
+#       in slave due to missing dependency
 #
 # If bug is present, slave appliers can easily conflict and cause crash.
 #
