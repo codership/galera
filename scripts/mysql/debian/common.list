@@ -86,9 +86,11 @@ f 755 root root $BINS_DST/my_print_defaults_wsrep       $MYSQL_SRC/extra/my_prin
 ##########################
 
 c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf  $MYSQL_SRC/support-files/wsrep.cnf
+f 755 root root $BINS_DST/wsrep_sst_common    $MYSQL_SRC/scripts/wsrep_sst_common
 f 755 root root $BINS_DST/wsrep_sst_mysqldump $MYSQL_SRC/scripts/wsrep_sst_mysqldump
 f 755 root root $BINS_DST/wsrep_sst_rsync     $MYSQL_SRC/scripts/wsrep_sst_rsync
 l 755 root root $BINS_DST/wsrep_sst_rsync_wan wsrep_sst_rsync
+#f 755 root root $BINS_DST/wsrep_sst_xtrabackup $MYSQL_SRC/scripts/wsrep_sst_xtrabackup
 f 644 root root $DOCS_DST/README-wsrep        $MYSQL_SRC/Docs/README-wsrep
 f 644 root root $SHAR_DST/wsrep.cnf           $MYSQL_SRC/support-files/wsrep.cnf
 f 644 root root $SHAR_DST/wsrep_notify        $MYSQL_SRC/support-files/wsrep_notify

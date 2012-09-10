@@ -42,6 +42,8 @@ f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
 f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
 
+f 755 root root $BINS_DST/wsrep_sst_xtrabackup $MYSQL_SRC/scripts/wsrep_sst_xtrabackup
+
 d 755 root root $LIBS_DST        -
 d 755 root root $LIBS_DST/plugin -
 #f 755 root root $LIBS_DST/plugin/ha_innodb_plugin.so.0.0.0 $MYSQL_SRC/storage/innodb_plugin/ha_innodb_plugin.so.0.0.0

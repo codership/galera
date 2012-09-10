@@ -408,6 +408,7 @@ install_mysql_5.1_demo()
         install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
     fi
 
+    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_common
     install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
     install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
     install -m 755 -d $MYSQL_CHARSETS
