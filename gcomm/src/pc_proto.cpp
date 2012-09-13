@@ -1104,11 +1104,13 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
     if (key == gcomm::Conf::PcIgnoreSb)
     {
         ignore_sb_ = gu::from_string<bool>(value);
+        conf_.set(gcomm::Conf::PcIgnoreSb, value);
         return true;
     }
     else if (key == gcomm::Conf::PcIgnoreQuorum)
     {
         ignore_quorum_ = gu::from_string<bool>(value);
+        conf_.set(gcomm::Conf::PcIgnoreQuorum, value);
         return true;
     }
     else if (key == gcomm::Conf::PcBootstrap)
