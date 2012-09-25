@@ -11,11 +11,6 @@
 # failed in certification, were never retried, they were immune to
 # wsrep_retry_autocommit setting.
 #
-# Test scenarios:
-# A. 
-#
-# B. DDL on applier node
-#
 #
 # TEST SETUP:
 #   - two nodes to be started, wsrep_retry_autocommit set to 100
