@@ -49,6 +49,11 @@ namespace galera
             return ((write_set_flags_ & F_ANNOTATION) != 0);
         }
 
+        bool is_toi() const
+        {
+            return ((write_set_flags_ & F_ISOLATION) != 0);
+        }
+
         bool pa_safe() const
         {
             return ((write_set_flags_ & F_PA_UNSAFE) == 0);

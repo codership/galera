@@ -73,24 +73,24 @@ apply_trx_ws(void*                    recv_ctx,
         try
         {
 #if 0
-            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
+            if (trx.is_toi())
             {
                 log_info << "Executing TO isolated action: " << trx;
             }
 #endif
             gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
 #if 0
-            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
+            if (trx.is_toi())
             {
                 log_info << "Done executing TO isolated action: "
-                          << trx.global_seqno();
+                         << trx.global_seqno();
             }
 #endif
             break;
         }
         catch (galera::ApplyException& e)
         {
-            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
+            if (trx.is_toi())
             {
                 log_warn << "Ignoring error for TO isolated action: " << trx;
                 break;
@@ -965,7 +965,6 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
     }
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
-        log_warn << "Certification for TO isolated action faled: " << *trx;
         trx->set_state(TrxHandle::S_ABORTING);
         report_last_committed();
         break;
@@ -1060,11 +1059,6 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
         }
         break;
     case WSREP_TRX_FAIL:
-        if (trx->flags() & galera::TrxHandle::F_ISOLATION) // REMOVE
-        {
-            log_warn << "Certification failed for TO isolated action: "
-                     << *trx;
-        }
         // certification failed, apply monitor has been canceled
         trx->set_state(TrxHandle::S_ABORTING);
         trx->set_state(TrxHandle::S_ROLLED_BACK);
@@ -1487,7 +1481,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                local_cert_failures_ += trx->is_local();
                 cert_.set_trx_committed(trx);
                 retval = WSREP_TRX_FAIL;
             }
@@ -1495,6 +1488,12 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         case Certification::TEST_FAILED:
             if (trx->global_seqno() > apply_monitor_.last_left())
             {
+                if (gu_unlikely(trx->is_toi())) // small sanity check
+                {
+                    log_error << "Certification failed for TO isolated action: "
+                              << *trx;
+                    assert(0); // should never happen
+                }
                 apply_monitor_.self_cancel(ao);
                 if (co_mode_ != CommitOrder::BYPASS)
                     commit_monitor_.self_cancel(co);
