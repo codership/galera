@@ -398,7 +398,7 @@ private:
     uint32_t max_output_size;
     size_t mtu;
     bool use_aggregate;
-
+    bool hard_causal;
     bool self_loopback;
     State state;
     int shift_to_rfcnt;

@@ -156,6 +156,7 @@ namespace gcomm
         AddrList          remote_addrs;
         AddrList          addr_blacklist;
         bool              relaying;
+        bool              isolate;
 
         gmcast::ProtoMap*  proto_map;
         std::list<Socket*> mcast_tree;

@@ -55,7 +55,9 @@ namespace causal
             transactional_(false),
             duration_     (10),
             readers_      (1),
-            disable_causal_reads_(false)
+            disable_causal_reads_(false),
+            compact_      (false),
+            write_delay_  (0)
         {
             po::options_description other("Other options");
             other.add_options()
@@ -82,7 +84,11 @@ namespace causal
                 ("readers",       po::value<size_t>(&readers_),
                  "Number of reader threads")
                 ("disable-causal-reads",
-                 "Disable causal reads for reader connections");
+                 "Disable causal reads for reader connections")
+                ("compact",       po::value<bool>(&compact_),
+                 "Print output in one line")
+                ("write-delay",   po::value<time_t>(&write_delay_),
+                 "Delay between write operations in milliseconds");
 
             po::options_description opts;
             opts.add(config).add(other);
@@ -115,7 +121,8 @@ namespace causal
                           << "duration      : " << duration_      << "\n"
                           << "readers       : " << readers_       << "\n"
                           << "disable-causal-reads: "
-                          << disable_causal_reads_ << std::endl;
+                          << disable_causal_reads_                << "\n"
+                          << "compact       : " << compact_ << std::endl;
                 exit(EXIT_SUCCESS);
             }
 
@@ -135,6 +142,8 @@ namespace causal
         time_t duration() const { return duration_; }
         size_t readers() const { return readers_; }
         bool disable_causal_reads() const { return disable_causal_reads_; }
+        bool compact() const { return compact_; }
+        time_t write_delay() const { return write_delay_; }
     private:
         std::string db_;
         std::vector<std::string> read_hosts_;
@@ -145,6 +154,8 @@ namespace causal
         time_t duration_;
         size_t readers_;
         bool disable_causal_reads_;
+        bool compact_;
+        time_t write_delay_;
     };
 
 
@@ -156,11 +167,13 @@ namespace causal
         static std::atomic_llong value_;
         static std::atomic_llong written_value_;
         static std::atomic_llong reads_;
+        static std::atomic_llong failures_;
     };
     std::atomic_llong Global::violations_(0);
     std::atomic_llong Global::value_(0);
     std::atomic_llong Global::written_value_(0);
     std::atomic_llong Global::reads_(0);
+    std::atomic_llong Global::failures_(0);
 
     // Reader class
     class Reader
@@ -286,6 +299,7 @@ void writer_func(std::shared_ptr<causal::Writer> w,
         w->store_value(val);
         causal::Global::written_value_.store(val);
         ++causal::Global::value_;
+        std::this_thread::sleep_for(std::chrono::milliseconds(config.write_delay()));
     }
 }
 
@@ -296,15 +310,23 @@ void reader_func(std::shared_ptr<causal::Reader> r,
     std::chrono::system_clock::time_point until(
         std::chrono::system_clock::now()
         + std::chrono::seconds(config.duration()));
-    while (std::chrono::system_clock::now() < until)
+    try
     {
-        long long expected(causal::Global::written_value_.load());
-        long long val(r->value());
-        if (val < expected)
+        while (std::chrono::system_clock::now() < until)
         {
-            ++causal::Global::violations_;
+            long long expected(causal::Global::written_value_.load());
+            long long val(r->value());
+            if (val < expected)
+            {
+                ++causal::Global::violations_;
+            }
+            ++causal::Global::reads_;
         }
-        ++causal::Global::reads_;
+    }
+    catch (...)
+    {
+        std::cerr << "reader failed" << std::endl;
+        ++causal::Global::failures_;
     }
 }
 
@@ -340,11 +362,21 @@ int main(int argc, char* argv[])
 
     long long reads(causal::Global::reads_.load());
     long long violations(causal::Global::violations_.load());
-    std::cout << "Reads            : " << reads << "\n"
-              << "Causal violations: " << violations << "\n"
-              << "Fraction         : "
-              << (double)violations/(reads == 0 ? 1 : reads)
-              << std::endl;
-
+    if (config.compact() == true)
+    {
+        std::cout << "Reads "       << reads
+                  << " Violations " << violations
+                  << " Writes " << causal::Global::value_.load()
+                  << " Failures " << causal::Global::failures_.load()
+                  << std::endl;
+    }
+    else
+    {
+        std::cout << "Reads            : " << reads << "\n"
+                  << "Causal violations: " << violations << "\n"
+                  << "Fraction         : "
+                  << (double)violations/(reads == 0 ? 1 : reads)
+                  << std::endl;
+    }
     exit(EXIT_SUCCESS);
 }

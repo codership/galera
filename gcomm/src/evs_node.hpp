@@ -92,6 +92,16 @@ public:
 
     bool is_inactive() const;
     bool is_suspected() const;
+
+    void set_suspect_timeout(const gu::datetime::Period& p)
+    {
+        suspect_timeout_ = p;
+    }
+    void set_inactive_timeout(const gu::datetime::Period& p)
+    {
+        inactive_timeout_ = p;
+    }
+
 private:
 
     void operator=(const Node&);

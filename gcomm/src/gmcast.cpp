@@ -73,6 +73,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     remote_addrs  (),
     addr_blacklist(),
     relaying      (false),
+    isolate       (false),
     proto_map     (new ProtoMap()),
     mcast_tree    (),
     time_wait     (param<Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
@@ -345,6 +346,13 @@ void GMCast::gmcast_accept()
     catch (Exception& e)
     {
         log_warn << e.what();
+        return;
+    }
+
+    if (isolate == true)
+    {
+        log_debug << "dropping accepted socket due to isolation";
+        tp->close();
         return;
     }
 
@@ -858,6 +866,12 @@ void GMCast::update_addresses()
 
 void GMCast::reconnect()
 {
+    if (isolate == true)
+    {
+        log_debug << "skipping reconnect due to isolation";
+        return;
+    }
+
     /* Loop over known remote addresses and connect if proto entry
      * does not exist */
     Date now = Date::now();
@@ -1392,6 +1406,26 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
         catch (gu::NotSet& ns)
         {
             gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+        }
+        return true;
+    }
+    else if (key == Conf::GMCastIsolate)
+    {
+        isolate = gu::from_string<bool>(val);
+        log_info << "turning isolation "
+                 << (isolate == true ? "on" : "off");
+        if (isolate == true)
+        {
+            // delete all entries in proto map
+            ProtoMap::iterator pi, pi_next;
+            for (pi = proto_map->begin(); pi != proto_map->end(); pi = pi_next)
+            {
+                pi_next = pi, ++pi_next;
+                Proto* rp = ProtoMap::get_value(pi);
+                delete rp;
+                proto_map->erase(pi);
+            }
+            mcast_tree.clear();
         }
         return true;
     }

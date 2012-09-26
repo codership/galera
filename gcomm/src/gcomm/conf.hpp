@@ -177,6 +177,17 @@ namespace gcomm
         static std::string const GMCastPeerAddr;
 
         /*!
+         * @brief Isolate node from peers
+         *
+         * Setting this value to 'true' closes all conections
+         * and will prevent forming of new connections until
+         * value is set again to 'false'. This parameter should be
+         * used for testing purposes only and it will not be visible
+         * in global configuration array.
+         */
+        static std::string const GMCastIsolate;
+
+        /*!
          * @brief EVS scheme for transport URI ("evs")
          */
         static std::string const EvsScheme;
@@ -310,6 +321,12 @@ namespace gcomm
          * adviced so.
          */
         static std::string const EvsUseAggregate;
+
+        /*!
+         * @brief Hard causal semantics
+         *
+         */
+        static std::string const EvsHardCausal;
 
         /*!
          * @brief EVS maximum install timeouts ("evs.max_install_timeouts")
