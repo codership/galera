@@ -1127,13 +1127,13 @@ app_wants_state_transfer (const void* const req, ssize_t const req_len)
 void
 galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
 {
-    static std::string const separator(", ");
+    static char const separator(',');
 
     ssize_t new_size(0);
 
     if (view.memb_num > 0)
     {
-        new_size += (view.memb_num - 1) * separator.size();
+        new_size += view.memb_num - 1; // separators
 
         for (int i = 0; i < view.memb_num; ++i)
         {

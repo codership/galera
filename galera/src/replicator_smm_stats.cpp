@@ -8,16 +8,16 @@ static const size_t GALERA_STAGE_MAX(11);
 // @todo: should be protected static member of the parent class
 static const char* state_str[GALERA_STAGE_MAX] =
 {
-    "Initialized (0)",
-    "Joining (1)",
-    "Prepare for SST (2)",
-    "SST request sent (3)",
-    "Waiting for SST (4)",
-    "Joined (5)",
-    "Synced (6)",
-    "Donor (+)",
-    "SST request failed (-)",
-    "SST failed (-)",
+    "Initialized",
+    "Joining",
+    "Joining: preparing for State Transfer",
+    "Joining: requested State Transfer",
+    "Joining: receiving State Transfer",
+    "Joined",
+    "Synced",
+    "Donor/Desynced",
+    "Joining: State Transfer request failed",
+    "Joining: State Transfer failed",
     "Destroyed"
 };
 
