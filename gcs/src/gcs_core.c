@@ -942,15 +942,20 @@ static long core_msg_causal(gcs_core_t* conn,
                             struct gcs_recv_msg* msg)
 {
     causal_act_t* act;
-    if (msg->size != sizeof(*act))
+    if (gu_unlikely(msg->size != sizeof(*act)))
     {
         gu_error("invalid causal act len %ld, expected %ld",
                  msg->size, sizeof(*act));
         return -EPROTO;
     }
+
+    gcs_seqno_t const causal_seqno =
+        GCS_GROUP_PRIMARY == conn->group.state ?
+        conn->group.act_id : GCS_SEQNO_ILL;
+
     act = (causal_act_t*)msg->buf;
     gu_mutex_lock(act->mtx);
-    *act->act_id = conn->group.act_id;
+    *act->act_id = causal_seqno;
     gu_cond_signal(act->cond);
     gu_mutex_unlock(act->mtx);
     return msg->size;
