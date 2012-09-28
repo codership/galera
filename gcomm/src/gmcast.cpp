@@ -498,42 +498,30 @@ void GMCast::handle_established(Proto* est)
 
     if (est->get_remote_uuid() == get_uuid())
     {
-        // connected to self
-        if (initial_addrs.find(est->get_remote_addr()) !=
-            initial_addrs.end())
+        std::set<std::string>::iterator
+            ia_i(initial_addrs.find(est->get_remote_addr()));
+        if (ia_i != initial_addrs.end())
         {
-            proto_map->erase(
-                proto_map->find_checked(est->get_socket()->get_id()));
-            delete est;
-            gu_throw_error(EINVAL)
-                << "connected to own listening address '"
-                <<  est->get_remote_addr()
-                << "', check that cluster address '"
-                << uri_.get_host()
-                << "' points to correct location";
+            initial_addrs.erase(ia_i);
         }
-        else
+        AddrList::iterator i(pending_addrs.find(est->get_remote_addr()));
+        if (i != pending_addrs.end())
         {
-            AddrList::iterator i(pending_addrs.find(est->get_remote_addr()));
-            if (i != pending_addrs.end())
-            {
-                log_warn << self_string()
-                         << " address '" << est->get_remote_addr()
-                         << "' points to own listening address, blacklisting";
-                pending_addrs.erase(i);
-                addr_blacklist.insert(make_pair(est->get_remote_addr(),
-                                                AddrEntry(Date::now(),
-                                                          Date::now(),
-                                                          est->get_remote_uuid())));
-            }
-            proto_map->erase(
-                proto_map->find_checked(est->get_socket()->get_id()));
-            delete est;
-            update_addresses();
+            log_warn << self_string()
+                     << " address '" << est->get_remote_addr()
+                     << "' points to own listening address, blacklisting";
+            pending_addrs.erase(i);
+            addr_blacklist.insert(make_pair(est->get_remote_addr(),
+                                            AddrEntry(Date::now(),
+                                                      Date::now(),
+                                                      est->get_remote_uuid())));
         }
+        proto_map->erase(
+            proto_map->find_checked(est->get_socket()->get_id()));
+        delete est;
+        update_addresses();
         return;
     }
-
 
     // If address is found from pending_addrs, move it to remote_addrs list
     // and set retry cnt to -1
