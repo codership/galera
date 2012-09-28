@@ -114,9 +114,9 @@ fi
 # Stage 2
 #
 
-echo "stage 2: check that causal violations are generated in view change if evs.hard_causal=false"
+echo "stage 2: check that causal violations are generated in view change if evs.causal_keepalive_period is high enough"
 
-$READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.hard_causal=false'"
+$READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.causal_keepalive_period=PT100S'"
 
 round=10
 violations=0
@@ -160,19 +160,19 @@ fi
 # Stage 3
 #
 
-echo "stage 3: check that causal violations don't happen if evs.hard_causal=true"
+echo "stage 3: check that causal violations don't happen if evs.causal_keepalive_period is short enough"
 
-$READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.hard_causal=true'"
+$READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.causal_keepalive_period=PT0.5S'"
 
-round=100
+round=1000
 violations=0
 
 echo "running $round rounds, reader is isolated"
 while test $round -gt 0 && test $violations == 0
 do
     $READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.suspect_timeout=PT9S; evs.keepalive_period=PT100S'"
-
     echo "round: $round"
+
     f=`mktemp`
     ( causal --duration 15 > $f ) &
     pid=$!
@@ -180,41 +180,18 @@ do
 
     sleep 1
 
-    echo "isolating second node"
-    $READ_MYSQL_CTRL -e "set global wsrep_provider_options='gmcast.isolate=true'"
-
-    echo "waiting for causal test to finish"
-    wait $pid
-
-    str=`cat $f`
-    rm $f
-
-    echo "output: $str"
-    violations=`echo $str | awk '{ print $4; }'`
-    $READ_MYSQL_CTRL -e "set global wsrep_provider_options='gmcast.isolate=false'"
-    wait_prim_synced
-    round=$(($round - 1))
-done
-
-round=100
-
-echo "running $round rounds, reader is stopped"
-while test $round -gt 0 && test $violations == 0
-do
-    $READ_MYSQL_CTRL -e "set global wsrep_provider_options='evs.suspect_timeout=PT9S; evs.keepalive_period=PT100S'"
-
-    echo "round: $round"
-    f=`mktemp`
-    ( causal --duration 15 > $f ) &
-    pid=$!
-    echo "started causal with pid $pid"
-
-    sleep 1
-
-    echo "signalling node 1 to stop"
-    signal_node STOP 1
-    sleep 9
-    signal_node CONT 1
+    if test $(($round % 2)) == 0
+    then
+        echo "isolating second node"
+        $READ_MYSQL_CTRL -e "set global wsrep_provider_options='gmcast.isolate=true'"
+        sleep 9
+        $READ_MYSQL_CTRL -e "set global wsrep_provider_options='gmcast.isolate=false'"
+    else
+        echo "signalling node 1 to stop"
+        signal_node STOP 1
+        sleep 9
+        signal_node CONT 1
+    fi
 
     echo "waiting for causal test to finish"
     wait $pid
@@ -228,7 +205,6 @@ do
     wait_prim_synced
     round=$(($round - 1))
 done
-
 
 if test $violations != 0
 then

@@ -323,10 +323,10 @@ namespace gcomm
         static std::string const EvsUseAggregate;
 
         /*!
-         * @brief Hard causal semantics
+         * @brief Period to generate keepalives for causal messages
          *
          */
-        static std::string const EvsHardCausal;
+        static std::string const EvsCausalKeepalivePeriod;
 
         /*!
          * @brief EVS maximum install timeouts ("evs.max_install_timeouts")

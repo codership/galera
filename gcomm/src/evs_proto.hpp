@@ -339,8 +339,10 @@ private:
     gu::datetime::Period install_timeout;
     gu::datetime::Period join_retrans_period;
     gu::datetime::Period stats_report_period;
+    gu::datetime::Period causal_keepalive_period;
 
     gu::datetime::Date last_inactive_check;
+    gu::datetime::Date last_causal_keepalive;
 
     // Current view id
     // ViewId current_view;
@@ -398,7 +400,6 @@ private:
     uint32_t max_output_size;
     size_t mtu;
     bool use_aggregate;
-    bool hard_causal;
     bool self_loopback;
     State state;
     int shift_to_rfcnt;

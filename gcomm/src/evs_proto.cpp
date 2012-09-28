@@ -126,7 +126,9 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
                                   Defaults::EvsStatsReportPeriod),
                     gu::from_string<Period>(Defaults::EvsStatsReportPeriodMin),
                     Period::max())),
+    causal_keepalive_period(retrans_period),
     last_inactive_check   (gu::datetime::Date::now()),
+    last_causal_keepalive (gu::datetime::Date::now()),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -160,7 +162,6 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
     max_output_size(128),
     mtu(mtu_),
     use_aggregate(param<bool>(conf, uri, Conf::EvsUseAggregate, "true")),
-    hard_causal(param<bool>(conf, uri, Conf::EvsHardCausal, "false")),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
@@ -177,13 +178,15 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
     conf.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period));
     conf.set(Conf::EvsInstallTimeout, gu::to_string(install_timeout));
     conf.set(Conf::EvsStatsReportPeriod, gu::to_string(stats_report_period));
+    conf.set(Conf::EvsCausalKeepalivePeriod,
+             gu::to_string(causal_keepalive_period));
     conf.set(Conf::EvsSendWindow, gu::to_string(send_window));
     conf.set(Conf::EvsUserSendWindow, gu::to_string(user_send_window));
     conf.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate));
-    conf.set(Conf::EvsHardCausal, gu::to_string(hard_causal));
     conf.set(Conf::EvsDebugLogMask, gu::to_string(debug_mask, std::hex));
     conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask, std::hex));
     conf.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts));
+
     //
 
     known.insert_unique(make_pair(my_uuid, Node(inactive_timeout, suspect_timeout)));
@@ -237,12 +240,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<int>(val),
             0, std::numeric_limits<int>::max());
         conf_.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts));
-        return true;
-    }
-    else if (key == Conf::EvsHardCausal)
-    {
-        hard_causal = gu::from_string<bool>(val);
-        conf_.set(Conf::EvsHardCausal, gu::to_string(hard_causal));
         return true;
     }
     else if (key == Conf::EvsStatsReportPeriod)
@@ -301,6 +298,18 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             Period::max());
         conf_.set(Conf::EvsKeepalivePeriod, gu::to_string(retrans_period));
         reset_timers();
+        return true;
+    }
+    else if (key == Conf::EvsCausalKeepalivePeriod)
+    {
+        causal_keepalive_period = check_range(
+            Conf::EvsCausalKeepalivePeriod,
+            gu::from_string<Period>(val),
+            Period(0),
+            Period::max());
+        conf_.set(Conf::EvsCausalKeepalivePeriod,
+                  gu::to_string(causal_keepalive_period));
+        // no timer reset here, causal keepalives don't rely on timer
         return true;
     }
     else if (key == Conf::EvsViewForgetTimeout ||
@@ -2009,9 +2018,11 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 
     if (dm.get_order() == O_LOCAL_CAUSAL)
     {
-        if (hard_causal == false &&
-            causal_queue_.empty() == true &&
-            last_sent == input_map->get_safe_seq())
+        gu::datetime::Date now(gu::datetime::Date::now());
+        if (causal_queue_.empty() == true &&
+            last_sent == input_map->get_safe_seq() &&
+            causal_keepalive_period > Period(0) &&
+            last_causal_keepalive + causal_keepalive_period > now)
         {
             hs_local_causal.insert(0.0);
             deliver_causal(dm.get_user_type(), last_sent, wb);
@@ -2019,17 +2030,22 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
         else
         {
             seqno_t causal_seqno(input_map->get_aru_seq());
-            if (hard_causal == true &&
-                last_sent == input_map->get_safe_seq())
+            if (causal_keepalive_period == Period(0) ||
+                last_causal_keepalive + causal_keepalive_period <= now)
             {
                 // generate traffic to make sure that group is live
                 Datagram dg;
-                gu_trace((void)send_user(dg, 0xff, O_DROP, -1, -1));
+                int err(send_user(dg, 0xff, O_DROP, -1, -1));
+                if (err != 0)
+                {
+                    return err;
+                }
                 // reassign causal_seqno to be last_sent:
                 // in order to make sure that the group is live,
                 // safe seqno must be advanced and in this case
                 // safe seqno equals to aru seqno.
                 causal_seqno = last_sent;
+                last_causal_keepalive = now;
             }
             causal_queue_.push_back(CausalMessage(dm.get_user_type(),
                                                   causal_seqno, wb));

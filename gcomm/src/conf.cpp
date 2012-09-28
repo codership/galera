@@ -83,8 +83,8 @@ std::string const gcomm::Conf::EvsUserSendWindow =
     EvsScheme + Delim + "user_send_window";
 std::string const gcomm::Conf::EvsUseAggregate =
     EvsScheme + Delim + "use_aggregate";
-std::string const gcomm::Conf::EvsHardCausal =
-    EvsScheme + Delim + "hard_causal";
+std::string const gcomm::Conf::EvsCausalKeepalivePeriod =
+    EvsScheme + Delim + "causal_keepalive_period";
 std::string const gcomm::Conf::EvsMaxInstallTimeouts =
     EvsScheme + Delim + "max_install_timeouts";
 // PC
