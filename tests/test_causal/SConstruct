@@ -1,0 +1,5 @@
+Program('causal.cpp',
+        CXXFLAGS='-O2 -std=c++0x',
+        CPPFLAGS='-I../../galerautils/src -I/usr/include/mysql++ -I/usr/include/mysql',
+        LIBS=['mysqlpp', 'boost_program_options', 'galerautils++'],
+        LIBPATH=['../../galerautils/src'])
