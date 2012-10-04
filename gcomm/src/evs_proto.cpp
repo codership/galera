@@ -259,6 +259,12 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         conf_.set(Conf::EvsInfoLogMask, gu::to_string<int>(info_mask, std::hex));
         return true;
     }
+    else if (key == Conf::EvsDebugLogMask)
+    {
+        debug_mask = gu::from_string<int>(val, std::hex);
+        conf_.set(Conf::EvsDebugLogMask, gu::to_string<int>(debug_mask, std::hex));
+        return true;
+    }
     else if (key == Conf::EvsSuspectTimeout)
     {
         suspect_timeout = check_range(
@@ -312,11 +318,29 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         // no timer reset here, causal keepalives don't rely on timer
         return true;
     }
+    else if (key == Conf::EvsJoinRetransPeriod)
+    {
+        join_retrans_period = check_range(
+            Conf::EvsJoinRetransPeriod,
+            gu::from_string<Period>(val),
+            gu::from_string<Period>(Defaults::EvsRetransPeriodMin),
+            Period::max());
+        conf_.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period));
+        reset_timers();
+        return true;
+    }
+    else if (key == Conf::EvsInstallTimeout)
+    {
+        install_timeout = check_range(
+            Conf::EvsInstallTimeout,
+            gu::from_string<Period>(val),
+            retrans_period*2, inactive_timeout + 1);
+        conf_.set(Conf::EvsInstallTimeout, gu::to_string(install_timeout));
+        reset_timers();
+        return true;
+    }
     else if (key == Conf::EvsViewForgetTimeout ||
              key == Conf::EvsInactiveCheckPeriod ||
-             key == Conf::EvsInstallTimeout ||
-             key == Conf::EvsJoinRetransPeriod ||
-             key == Conf::EvsDebugLogMask ||
              key == Conf::EvsUseAggregate)
     {
         gu_throw_error(EPERM) << "can't change value for '"
