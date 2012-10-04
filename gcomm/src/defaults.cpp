@@ -18,7 +18,7 @@ namespace gcomm
     std::string const Defaults::EvsInactiveTimeoutMin   = "PT0.1S";
     std::string const Defaults::EvsRetransPeriod        = "PT1S";
     std::string const Defaults::EvsRetransPeriodMin     = "PT0.1S";
-    std::string const Defaults::EvsJoinRetransPeriod    = "PT0.3S";
+    std::string const Defaults::EvsJoinRetransPeriod    = "PT1S";
     std::string const Defaults::EvsStatsReportPeriod    = "PT1M";
     std::string const Defaults::EvsStatsReportPeriodMin = "PT1S";
     std::string const Defaults::EvsSendWindow           = "4";
