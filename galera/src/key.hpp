@@ -7,6 +7,7 @@
 
 #include "wsrep_api.h"
 
+#include "gu_hash.h"
 #include "gu_serialize.hpp"
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
@@ -321,6 +322,7 @@ namespace galera
     public:
         size_t operator()(const Key& k) const
         {
+/* #711
             size_t prime(5381);
             for (gu::Buffer::const_iterator i(k.keys_.begin());
                  i != k.keys_.end(); ++i)
@@ -328,6 +330,8 @@ namespace galera
                 prime = ((prime << 5) + prime) + *i;
             }
             return prime;
+*/
+            return gu_table_hash(&k.keys_[0], k.keys_.size());
         }
     };
 

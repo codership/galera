@@ -22,13 +22,13 @@
 #ifndef _gu_hash_h_
 #define _gu_hash_h_
 
-#include "gu_fnv.h"
-#include "gu_mmh3.h"
-#include "gu_spooky.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "gu_fnv.h"
+#include "gu_mmh3.h"
+#include "gu_spooky.h"
 
 /*
  * General purpose globally consistent _fast_ hash, if in doubt use that.

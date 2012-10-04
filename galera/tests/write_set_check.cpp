@@ -507,6 +507,9 @@ START_TEST(test_cert_hierarchical_v0)
 
     galera::Certification cert;
     cert.assign_initial_position(0, 0);
+
+    mark_point();
+
     for (size_t i(0); i < nws; ++i)
     {
 //        gcs_action act;
@@ -593,6 +596,9 @@ START_TEST(test_cert_hierarchical_v1)
 
     galera::Certification cert;
     cert.assign_initial_position(0, 1);
+
+    mark_point();
+
     for (size_t i(0); i < nws; ++i)
     {
         TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
@@ -708,6 +714,9 @@ START_TEST(test_cert_hierarchical_v2)
 
     galera::Certification cert;
     cert.assign_initial_position(0, version);
+
+    mark_point();
+
     for (size_t i(0); i < nws; ++i)
     {
         TrxHandle* trx(new TrxHandle(version, wsi[i].uuid, wsi[i].conn_id,

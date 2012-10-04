@@ -53,7 +53,7 @@ gu_fnv32a_internal (const void* buf, ssize_t const len, uint32_t* seed)
     const uint8_t* bp = (const uint8_t*)buf;
     const uint8_t* const be = bp + len;
 
-    while (bp <= be - 2)
+    while (bp + 2 <= be)
     {
         GU_FNV32_ITERATION(*seed,*bp++);
         GU_FNV32_ITERATION(*seed,*bp++);
@@ -89,7 +89,7 @@ gu_fnv64a_internal (const void* buf, ssize_t const len, uint64_t* seed)
     const uint8_t* bp = (const uint8_t*)buf;
     const uint8_t* const be = bp + len;
 
-    while (bp <= be - 2)
+    while (bp + 2 <= be)
     {
         GU_FNV64_ITERATION(*seed,*bp++);
         GU_FNV64_ITERATION(*seed,*bp++);
@@ -153,7 +153,7 @@ gu_fnv128a_internal (const void* buf, ssize_t const len, gu_uint128_t* seed)
     const uint8_t* const be = bp + len;
 
     /* this manual loop unrolling seems to be essential */
-    while (bp <= be - 8)
+    while (bp + 8 <= be)
     {
         GU_FNV128_ITERATION(*seed, *bp++);
         GU_FNV128_ITERATION(*seed, *bp++);
@@ -165,7 +165,7 @@ gu_fnv128a_internal (const void* buf, ssize_t const len, gu_uint128_t* seed)
         GU_FNV128_ITERATION(*seed, *bp++);
     }
 
-    if (bp <= be - 4)
+    if (bp + 4 <= be)
     {
         GU_FNV128_ITERATION(*seed, *bp++);
         GU_FNV128_ITERATION(*seed, *bp++);
@@ -173,7 +173,7 @@ gu_fnv128a_internal (const void* buf, ssize_t const len, gu_uint128_t* seed)
         GU_FNV128_ITERATION(*seed, *bp++);
     }
 
-    if (bp <= be - 2)
+    if (bp + 2 <= be)
     {
         GU_FNV128_ITERATION(*seed, *bp++);
         GU_FNV128_ITERATION(*seed, *bp++);
