@@ -269,6 +269,11 @@ namespace galera
             return (keys_ == other.keys_);
         }
 
+        size_t size() const
+        {
+            return keys_.size() + sizeof(*this);
+        }
+
     private:
         friend class KeyHash;
         friend size_t serialize(const Key&, gu::byte_t*, size_t, size_t);

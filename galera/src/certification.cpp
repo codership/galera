@@ -30,7 +30,10 @@ namespace
         const galera::TrxHandle* trx_;
     };
 
-    typedef std::list<std::pair<galera::Key, std::pair<bool, bool> > > KeyList;
+// #711    typedef std::list<std::pair<galera::Key, std::pair<bool, bool> > > KeyList;
+    typedef gu::UnorderedMap<galera::Key,
+                             std::pair<bool, bool>,
+                             galera::KeyHash> KeyList;
 }
 
 
@@ -410,6 +413,7 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
     return false;
 }
 
+
 static bool
 certify_v1to2(galera::TrxHandle*                              trx,
               galera::Certification::CertIndex&               cert_index,
@@ -455,9 +459,10 @@ certify_v1to2(galera::TrxHandle*                              trx,
             }
         }
 
-        key_list.push_back(std::make_pair(key,
-                                          std::make_pair(full_key,
-                                                         shared_key)));
+// #711        key_list.push_back(std::make_pair(key
+        key_list.insert(std::make_pair(key,
+                                       std::make_pair(full_key,
+                                                      shared_key)));
     }
 
     return true;

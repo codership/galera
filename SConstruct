@@ -239,11 +239,11 @@ if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     Exit(1)
 conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 
-if conf.CheckCXXHeader('boost/unordered_map.hpp'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
+if conf.CheckCXXHeader('tr1/unordered_map'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 else:
-    if not conf.CheckCXXHeader('tr1/unordered_map'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
+    if conf.CheckCXXHeader('boost/unordered_map.hpp'):
+        conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
     else:
         print 'no unordered map header available'
         Exit(1)

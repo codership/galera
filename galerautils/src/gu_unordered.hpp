@@ -2,10 +2,10 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
-//! 
+//!
 // @file gu_unordered.hpp unordered_[multi]map definition
 //
-// We still have environments where neither boost or std unordered 
+// We still have environments where neither boost or std unordered
 // stuff is available. Wrapper classes are provided for alternate
 // implementations with standard semantics.
 //

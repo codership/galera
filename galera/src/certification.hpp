@@ -32,6 +32,10 @@ namespace galera
         const TrxHandle* ref_full_trx() const;
         const TrxHandle* ref_shared_trx() const;
         const TrxHandle* ref_full_shared_trx() const;
+        size_t size() const
+        {
+            return *reinterpret_cast<unsigned int*>(key_buf_) + sizeof(*this);
+        }
     private:
         KeyEntry(const KeyEntry& other);
         void operator=(const KeyEntry&);
