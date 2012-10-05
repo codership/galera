@@ -819,6 +819,16 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
                  << ": " << e.what();
         return -e.get_errno();
     }
+    catch (gu::NotFound& nf)
+    {
+        log_warn << "error setting param " << key << " to value " << value;
+        return -EINVAL;
+    }
+    catch (gu::NotSet& nf)
+    {
+        log_warn << "error setting param " << key << " to value " << value;
+        return -EINVAL;
+    }
     catch (...)
     {
         log_fatal << "gcomm param set: caught unknown exception";

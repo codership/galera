@@ -63,8 +63,14 @@ from_string(const std::string& s,
     std::istringstream iss(s);
     T                  ret;
 
-    if ((iss >> f >> ret).fail()) throw NotFound();
-
+    try
+    {
+        if ((iss >> f >> ret).fail()) throw NotFound();
+    }
+    catch (gu::Exception& e)
+    {
+        throw NotFound();
+    }
     return ret;
 }
 

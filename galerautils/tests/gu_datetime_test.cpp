@@ -6,6 +6,7 @@
 
 #include "gu_datetime.hpp"
 #include "gu_logger.hpp"
+#include "gu_utils.hpp"
 
 #include "gu_datetime_test.hpp"
 
@@ -86,6 +87,20 @@ START_TEST(test_date)
 }
 END_TEST
 
+START_TEST(test_trac_712)
+{
+    try
+    {
+        Period p;
+        p = gu::from_string<Period>("0x3"); // used to throw gu::Exception
+    }
+    catch (gu::NotFound& nf)
+    {
+
+    }
+}
+END_TEST
+
 Suite* gu_datetime_suite()
 {
     Suite* s = suite_create("gu::datetime");
@@ -101,6 +116,10 @@ Suite* gu_datetime_suite()
 
     tc = tcase_create("test_date");
     tcase_add_test(tc, test_date);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_trac_712");
+    tcase_add_test(tc, test_trac_712);
     suite_add_tcase(s, tc);
 
     return s;
