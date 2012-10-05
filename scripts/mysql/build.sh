@@ -416,8 +416,8 @@ install_mysql_5.1_demo()
     install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/README
 }
 
-install_mysql_5.5_demo() {
-
+install_mysql_5.5_demo()
+{
     export DESTDIR=$BUILD_ROOT/dist/mysql
 
     mkdir -p $DIST_DIR/mysql/etc
@@ -450,7 +450,7 @@ if [ $TAR == "yes" ]; then
         install_mysql_5.1_demo
         install -m 644 -D my-5.1.cnf $MYSQL_DIST_CNF
     else
-        install_mysql_5.5_demo
+        install_mysql_5.5_demo > /dev/null
         install -m 644 -D my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
