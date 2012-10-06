@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -21,9 +21,44 @@ namespace galera
     class KeyEntry
     {
     public:
-        KeyEntry(const Key& row_key);
-        ~KeyEntry();
-        Key get_key(int version) const;
+        KeyEntry(const Key& row_key)
+            :
+            key_(row_key),
+            ref_trx_(0),
+            ref_full_trx_(0),
+            ref_shared_trx_(0),
+            ref_full_shared_trx_(0)
+        {}
+
+        template <class Ci>
+        KeyEntry(int version, Ci begin, Ci end, uint8_t flags)
+            :
+            key_(version, begin, end, flags),
+            ref_trx_(0),
+            ref_full_trx_(0),
+            ref_shared_trx_(0),
+            ref_full_shared_trx_(0)
+        {}
+
+        KeyEntry(const KeyEntry& other)
+            :
+            key_(other.key_),
+            ref_trx_(other.ref_trx_),
+            ref_full_trx_(other.ref_full_trx_),
+            ref_shared_trx_(other.ref_shared_trx_),
+            ref_full_shared_trx_(other.ref_full_shared_trx_)
+        {}
+
+        ~KeyEntry()
+        {
+            assert(ref_trx_ == 0);
+            assert(ref_full_trx_ == 0);
+            assert(ref_shared_trx_ == 0);
+            assert(ref_full_shared_trx_ == 0);
+        }
+
+        const Key& get_key() const { return key_; }
+        const Key& get_key(int version) const { return key_; }
         void ref(TrxHandle* trx, bool full_key);
         void unref(TrxHandle* trx, bool full_key);
         void ref_shared(TrxHandle* trx, bool full_key);
@@ -34,22 +69,52 @@ namespace galera
         const TrxHandle* ref_full_shared_trx() const;
         size_t size() const
         {
-            return *reinterpret_cast<unsigned int*>(key_buf_) + sizeof(*this);
+            return key_.size() + sizeof(*this);
         }
+
     private:
-        KeyEntry(const KeyEntry& other);
         void operator=(const KeyEntry&);
-        gu::byte_t* key_buf_;
+        Key        key_;
         TrxHandle* ref_trx_;
         TrxHandle* ref_full_trx_;
         TrxHandle* ref_shared_trx_;
         TrxHandle* ref_full_shared_trx_;
     };
 
+    class KeyEntryPtrHash
+    {
+    public:
+        size_t operator()(const KeyEntry* const ke) const
+        {
+            return KeyHash()(ke->get_key());
+        }
+    };
+
+    class KeyEntryPtrEqual
+    {
+    public:
+        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
+            const
+        {
+            return left->get_key() == right->get_key();
+        }
+    };
+
+    class KeyEntryPtrEqualAll
+    {
+    public:
+        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
+            const
+        {
+            return left->get_key().equal_all(right->get_key());
+        }
+    };
+
     class Certification
     {
     public:
-        typedef gu::UnorderedMap<Key, KeyEntry*, KeyHash> CertIndex;
+        typedef gu::UnorderedMap<KeyEntry*, KeyEntry*,
+                                 KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
     private:
         class DiscardRK
         {

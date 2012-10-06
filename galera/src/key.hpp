@@ -270,6 +270,13 @@ namespace galera
             return (keys_ == other.keys_);
         }
 
+        bool equal_all(const Key& other) const
+        {
+            return (version_ == other.version_ &&
+                    flags_   == other.flags_   &&
+                    keys_    == other.keys_);
+        }
+
         size_t size() const
         {
             return keys_.size() + sizeof(*this);

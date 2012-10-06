@@ -615,7 +615,7 @@ START_TEST(test_cert_hierarchical_v1)
         trx->unref();
         trx = new TrxHandle();
         size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
-        log_info << "ws: " << buf.size() - offset;
+        log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
@@ -623,8 +623,8 @@ START_TEST(test_cert_hierarchical_v1)
         fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
                     trx->global_seqno(), result, wsi[i].result);
         fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                    "g: %lld ld: %lld eld: %lld",
-                    trx->global_seqno(), trx->depends_seqno(),
+                    "wsi: %zu g: %lld ld: %lld eld: %lld",
+                    i, trx->global_seqno(), trx->depends_seqno(),
                     wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
         trx->unref();
@@ -734,7 +734,7 @@ START_TEST(test_cert_hierarchical_v2)
         trx->unref();
         trx = new TrxHandle();
         size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
-        log_info << "ws: " << buf.size() - offset;
+        log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
@@ -742,8 +742,8 @@ START_TEST(test_cert_hierarchical_v2)
         fail_unless(result == wsi[i].result, "g: %lld res: %d exp: %d",
                     trx->global_seqno(), result, wsi[i].result);
         fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                    "g: %lld ld: %lld eld: %lld",
-                    trx->global_seqno(), trx->depends_seqno(),
+                    "wsi: %zu g: %lld ld: %lld eld: %lld",
+                    i, trx->global_seqno(), trx->depends_seqno(),
                     wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
         trx->unref();
