@@ -17,99 +17,6 @@
 
 namespace galera
 {
-
-    class KeyEntry
-    {
-    public:
-        KeyEntry(const Key& row_key)
-            :
-            key_(row_key),
-            ref_trx_(0),
-            ref_full_trx_(0),
-            ref_shared_trx_(0),
-            ref_full_shared_trx_(0)
-        {}
-
-        template <class Ci>
-        KeyEntry(int version, Ci begin, Ci end, uint8_t flags)
-            :
-            key_(version, begin, end, flags),
-            ref_trx_(0),
-            ref_full_trx_(0),
-            ref_shared_trx_(0),
-            ref_full_shared_trx_(0)
-        {}
-
-        KeyEntry(const KeyEntry& other)
-            :
-            key_(other.key_),
-            ref_trx_(other.ref_trx_),
-            ref_full_trx_(other.ref_full_trx_),
-            ref_shared_trx_(other.ref_shared_trx_),
-            ref_full_shared_trx_(other.ref_full_shared_trx_)
-        {}
-
-        ~KeyEntry()
-        {
-            assert(ref_trx_ == 0);
-            assert(ref_full_trx_ == 0);
-            assert(ref_shared_trx_ == 0);
-            assert(ref_full_shared_trx_ == 0);
-        }
-
-        const Key& get_key() const { return key_; }
-        const Key& get_key(int version) const { return key_; }
-        void ref(TrxHandle* trx, bool full_key);
-        void unref(TrxHandle* trx, bool full_key);
-        void ref_shared(TrxHandle* trx, bool full_key);
-        void unref_shared(TrxHandle* trx, bool full_key);
-        const TrxHandle* ref_trx() const;
-        const TrxHandle* ref_full_trx() const;
-        const TrxHandle* ref_shared_trx() const;
-        const TrxHandle* ref_full_shared_trx() const;
-        size_t size() const
-        {
-            return key_.size() + sizeof(*this);
-        }
-
-    private:
-        void operator=(const KeyEntry&);
-        Key        key_;
-        TrxHandle* ref_trx_;
-        TrxHandle* ref_full_trx_;
-        TrxHandle* ref_shared_trx_;
-        TrxHandle* ref_full_shared_trx_;
-    };
-
-    class KeyEntryPtrHash
-    {
-    public:
-        size_t operator()(const KeyEntry* const ke) const
-        {
-            return KeyHash()(ke->get_key());
-        }
-    };
-
-    class KeyEntryPtrEqual
-    {
-    public:
-        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
-            const
-        {
-            return left->get_key() == right->get_key();
-        }
-    };
-
-    class KeyEntryPtrEqualAll
-    {
-    public:
-        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
-            const
-        {
-            return left->get_key().equal_all(right->get_key());
-        }
-    };
-
     class Certification
     {
     public:
@@ -215,10 +122,11 @@ namespace galera
                         log_warn << "trx not committed in purge and discard: "
                                  << *trx;
                     }
-                    cert_.purge_for_trx(trx);
+//                    cert_.purge_for_trx(trx);
 
                     if (trx->depends_seqno() > -1)
                     {
+                        cert_.purge_for_trx(trx);
                         cert_.n_certified_--;
                         cert_.deps_dist_ -=
                             (trx->global_seqno() - trx->depends_seqno());

@@ -7,6 +7,7 @@ libgaleraxx_srcs = [
     'mapped_buffer.cpp',
     'write_set.cpp',
     'trx_handle.cpp',
+    'key_entry.cpp',
     'wsdb.cpp',
     'certification.cpp',
     'galera_service_thd.cpp',

@@ -40,7 +40,7 @@ size_t galera::serial_size(const WriteSet& ws)
 
 void galera::WriteSet::append_key(const Key& key)
 {
-    const size_t hash(KeyHash()(key));
+    const size_t hash(key.hash());
 
     std::pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator>
         range(key_refs_.equal_range(hash));

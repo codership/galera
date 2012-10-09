@@ -84,7 +84,8 @@ namespace gu
         iterator erase(iterator i) { return impl_.erase(i); }
         size_t size() const { return impl_.size(); }
         bool empty() const { return impl_.empty(); }
-        void clear() { return impl_.clear(); }
+        void clear() { impl_.clear(); }
+        void rehash(size_t n) { impl_.rehash(n); }
     };
 
     template <typename K, typename V, typename H = Hash<K> >

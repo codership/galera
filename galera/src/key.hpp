@@ -282,8 +282,17 @@ namespace galera
             return keys_.size() + sizeof(*this);
         }
 
+        size_t hash() const
+        {
+            return gu_table_hash(&keys_[0], keys_.size());
+        }
+
+        size_t hash_with_flags() const
+        {
+            return hash() ^ gu_table_hash(&flags_, sizeof(flags_));
+        }
+
     private:
-        friend class KeyHash;
         friend size_t serialize(const Key&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, Key&);
         friend size_t serial_size(const Key&);
@@ -323,24 +332,6 @@ namespace galera
         return os;
     }
 
-
-    class KeyHash
-    {
-    public:
-        size_t operator()(const Key& k) const
-        {
-/* #711
-            size_t prime(5381);
-            for (gu::Buffer::const_iterator i(k.keys_.begin());
-                 i != k.keys_.end(); ++i)
-            {
-                prime = ((prime << 5) + prime) + *i;
-            }
-            return prime;
-*/
-            return gu_table_hash(&k.keys_[0], k.keys_.size());
-        }
-    };
 
     inline size_t serialize(const Key& key, gu::byte_t* buf, size_t buflen,
                             size_t offset)

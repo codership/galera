@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 
@@ -9,18 +9,20 @@
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "fsm.hpp"
+#include "key_entry.hpp"
 
 #include "wsrep_api.h"
 #include "gu_mutex.hpp"
 #include "gu_atomic.hpp"
 #include "gu_datetime.hpp"
+#include "gu_unordered.hpp"
 
 #include <set>
 
 namespace galera
 {
 
-    class KeyEntry; // Forward declaration
+//    class KeyEntry; // Forward declaration
 
     static const std::string working_dir = "/tmp";
 
@@ -350,7 +352,13 @@ namespace galera
         //
         friend class Wsdb;
         friend class Certification;
-        typedef std::list<std::pair<KeyEntry*, std::pair<bool, bool> > > CertKeySet;
+//        typedef std::list<std::pair<KeyEntry*, std::pair<bool, bool> > > CertKeySet;
+public:
+        typedef gu::UnorderedMap<KeyEntry*,
+                                 std::pair<bool, bool>,
+                                 KeyEntryPtrHash,
+                                 KeyEntryPtrEqualAll> CertKeySet;
+private:
         CertKeySet cert_keys_;
 
         friend size_t serialize(const TrxHandle&, gu::byte_t* buf,

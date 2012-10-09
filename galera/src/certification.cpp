@@ -16,101 +16,6 @@ static const bool cert_debug_on(false);
     else log_info << "cert debug: "
 
 
-namespace galera
-{
-    class RefTrxListCmpTrx
-    {
-    public:
-        RefTrxListCmpTrx(const galera::TrxHandle* trx) : trx_(trx) { }
-        bool operator()(const std::pair<galera::TrxHandle*, bool>& val)
-        {
-            return (val.first == trx_);
-        }
-    private:
-        const galera::TrxHandle* trx_;
-    };
-
-// #711    typedef std::list<std::pair<galera::Key, std::pair<bool, bool> > > KeyList;
-    typedef gu::UnorderedMap<KeyEntry*,
-                             std::pair<bool, bool>,
-                             KeyEntryPtrHash,
-                             KeyEntryPtrEqualAll> KeyList;
-}
-
-inline const galera::TrxHandle*
-galera::KeyEntry::ref_trx() const
-{
-    return ref_trx_;
-}
-
-inline const galera::TrxHandle*
-galera::KeyEntry::ref_full_trx() const
-{
-    return ref_full_trx_;
-}
-
-inline const galera::TrxHandle*
-galera::KeyEntry::ref_shared_trx() const
-{
-    return ref_shared_trx_;
-}
-
-inline const galera::TrxHandle*
-galera::KeyEntry::ref_full_shared_trx() const
-{
-    return ref_full_shared_trx_;
-}
-
-
-inline void
-galera::KeyEntry::ref(TrxHandle* trx, bool full_key)
-{
-    assert(ref_trx_ == 0 ||
-           ref_trx_->global_seqno() <= trx->global_seqno());
-    ref_trx_ = trx;
-    if (full_key == true)
-    {
-        ref_full_trx_ = trx;
-    }
-}
-
-
-inline void
-galera::KeyEntry::unref(TrxHandle* trx, bool full_key)
-{
-    assert(ref_trx_ != 0);
-    if (ref_trx_ == trx) ref_trx_ = 0;
-    if (full_key == true && ref_full_trx_ == trx)
-    {
-        ref_full_trx_ = 0;
-    }
-}
-
-inline void
-galera::KeyEntry::ref_shared(TrxHandle* trx, bool full_key)
-{
-    assert(ref_shared_trx_ == 0 ||
-           ref_shared_trx_->global_seqno() <= trx->global_seqno());
-    ref_shared_trx_ = trx;
-    if (full_key == true)
-    {
-        ref_full_shared_trx_ = trx;
-    }
-}
-
-
-inline void
-galera::KeyEntry::unref_shared(TrxHandle* trx, bool full_key)
-{
-    assert(ref_shared_trx_ != 0);
-    if (ref_shared_trx_ == trx) ref_shared_trx_ = 0;
-    if (full_key == true && ref_full_shared_trx_ == trx)
-    {
-        ref_full_shared_trx_ = 0;
-    }
-}
-
-
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/
 long const
@@ -128,31 +33,37 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
          ++i)
     {
         // Unref all referenced and remove if was referenced by us
-        KeyEntry* ke(i->first);
+        KeyEntry* const kel(i->first);
+
         const bool full_key(i->second.first);
         const bool shared(i->second.second);
+
+        CertIndex::iterator ci(cert_index_.find(kel));
+        assert(ci != cert_index_.end());
+        KeyEntry* const ke(ci->second);
+
         if (shared == false &&
             (ke->ref_trx() == trx || ke->ref_full_trx() == trx))
         {
             ke->unref(trx, full_key);
         }
+
         if (shared == true &&
             (ke->ref_shared_trx() == trx || ke->ref_full_shared_trx() == trx))
         {
             ke->unref_shared(trx, full_key);
         }
 
-        if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
+        if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0 && kel == ke)
         {
             assert(ke->ref_full_trx() == 0);
             assert(ke->ref_full_shared_trx() == 0);
-            CertIndex::iterator ci(cert_index_.find(ke));
-            assert(ci != cert_index_.end());
-            delete ci->second;
+            delete ke;
             cert_index_.erase(ci);
         }
+
+        if (kel != ke) delete kel;
     }
-    refs.clear();
 }
 
 
@@ -277,7 +188,9 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
                     store_keys == true)
                 {
                     cert_debug << "match: " << ci->first;
-                    match.push_back(std::make_pair(
+//                    match.push_back(std::make_pair(
+//                                        ci->second,
+                    match.insert(std::make_pair(
                                         ci->second,
                                         std::make_pair(full_key, false)));
                 }
@@ -306,7 +219,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
     return TEST_OK;
 
 cert_fail:
-    purge_for_trx(trx);
+//    purge_for_trx(trx); - no need, it is cleaned up after certification
     return TEST_FAILED;
 }
 
@@ -380,10 +293,10 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
 
 
 static bool
-certify_v1to2(galera::TrxHandle*                              trx,
-              galera::Certification::CertIndex&               cert_index,
-              galera::WriteSet::KeySequence::const_iterator   key_seq_iter,
-              galera::KeyList& key_list, bool store_keys)
+certify_v1to2(galera::TrxHandle*                            trx,
+              galera::Certification::CertIndex&             cert_index,
+              galera::WriteSet::KeySequence::const_iterator key_seq_iter,
+              galera::TrxHandle::CertKeySet& key_list, bool store_keys)
 {
     typedef std::list<galera::KeyPart1> KPS;
 
@@ -461,7 +374,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
     cert_debug << "BEGIN CERTIFICATION: " << *trx;
     size_t offset(serial_size(*trx));
     const MappedBuffer& wscoll(trx->write_set_collection());
-    KeyList key_list;
+    galera::TrxHandle::CertKeySet& key_list(trx->cert_keys_);
     long key_count(0);
     gu::Lock lock(mutex_);
 
@@ -505,7 +418,8 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
-        for (KeyList::iterator i(key_list.begin()); i != key_list.end();)
+        for (TrxHandle::CertKeySet::iterator i(key_list.begin());
+             i != key_list.end();)
         {
             KeyEntry* const kel(i->first);
             CertIndex::const_iterator ci(cert_index_.find(kel));
@@ -519,16 +433,18 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
             KeyEntry* const ke(ci->second);
             const bool full_key(i->second.first);
             const bool shared_key(i->second.second);
+            bool keep(false);
 
             if (shared_key == false)
             {
                 if ((full_key == false && ke->ref_trx() != trx) ||
                     (full_key == true  && ke->ref_full_trx() != trx))
                 {
-                    trx->cert_keys_.push_back(
-                        std::make_pair(ke,
-                                       std::make_pair(full_key, shared_key)));
+//                    trx->cert_keys_.push_back(
+//                        std::make_pair(ke,
+//                                       std::make_pair(full_key, shared_key)));
                     ke->ref(trx, full_key);
+                    keep = true;
                 }
             }
             else
@@ -536,24 +452,25 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
                 if ((full_key == false && ke->ref_shared_trx() != trx) ||
                     (full_key == true  && ke->ref_full_shared_trx() != trx))
                 {
-                    trx->cert_keys_.push_back(
-                        std::make_pair(ke,
-                                       std::make_pair(full_key, shared_key)));
+//                    trx->cert_keys_.push_back(
+//                        std::make_pair(ke,
+//                                       std::make_pair(full_key, shared_key)));
                     ke->ref_shared(trx, full_key);
+                    keep = true;
                 }
             }
 
-            if (gu_likely(kel == ke))
+            if (keep)
             {
-                // kel is managed in cert_index_
                 ++i;
             }
             else
             {
-                // duplicate managed outside cert_index_
+                // this should not happen with Map, but with List is possible
                 i = key_list.erase(i);
-                delete kel;
+                if (kel != ke) delete kel;
             }
+
         }
 
         if (!trx->pa_safe()) last_pa_unsafe_ = trx->global_seqno();
@@ -567,7 +484,8 @@ cert_fail:
     if (store_keys == true)
     {
         // Clean up key entries allocated for this trx
-        for (KeyList::iterator i(key_list.begin()); i != key_list.end(); ++i)
+        for (TrxHandle::CertKeySet::iterator i(key_list.begin());
+             i != key_list.end(); ++i)
         {
             KeyEntry* const kel(i->first);
 
@@ -589,7 +507,7 @@ cert_fail:
                 }
                 else if (ke == kel)
                 {
-                     // kel was added and is referenced by another trx - skip it
+                    // kel was added and is referenced by another trx - skip it
                     continue;
                 }
                 // else kel != ke : kel is a duplicate of ke with different

@@ -241,6 +241,11 @@ galera_start()
         WSREP_OPTS="$WSREP_OPTS --wsrep_slave_threads=$SLAVE_THREADS"
     fi
 
+    if test -f "$MYSQL_DATA_DIR/core"
+    then
+        mv "$MYSQL_DATA_DIR/core" "$MYSQL_DATA_DIR/core.old"
+    fi
+
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
     if test -z $GDB
@@ -285,7 +290,7 @@ galera_start()
     fi
     my_pid=$!
 
-#    echo "Waiting for pid file" 
+#    echo "Waiting for pid file"
     while ! test -r $MYSQL_PID
     do
         sleep 1
