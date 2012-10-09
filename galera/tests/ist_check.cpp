@@ -86,14 +86,17 @@ struct sender_args
     const std::string& peer_;
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
+    int version_;
     sender_args(gcache::GCache& gcache,
                 const std::string& peer,
-                wsrep_seqno_t first, wsrep_seqno_t last)
+                wsrep_seqno_t first, wsrep_seqno_t last,
+                int version)
         :
         gcache_(gcache),
         peer_  (peer),
         first_ (first),
-        last_  (last)
+        last_  (last),
+        version_(version)
     { }
 };
 
@@ -104,14 +107,16 @@ struct receiver_args
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
     size_t        n_receivers_;
+    int           version_;
     receiver_args(const std::string listen_addr,
         wsrep_seqno_t first, wsrep_seqno_t last,
-                  size_t n_receivers)
+                  size_t n_receivers, int version)
         :
         listen_addr_(listen_addr),
         first_(first),
         last_(last),
-        n_receivers_(n_receivers)
+        n_receivers_(n_receivers),
+        version_(version)
     { }
 };
 
@@ -131,7 +136,8 @@ extern "C" void* sender_thd(void* arg)
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
     gu::Config conf;
     pthread_barrier_wait(&start_barrier);
-    galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_, 1);
+    galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
+                               sargs->version_);
     sender.send(sargs->first_, sargs->last_);
     return 0;
 }
@@ -167,7 +173,8 @@ extern "C" void* receiver_thd(void* arg)
     gu::Config conf;
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, 0);
-    rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_, 1);
+    rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
+                                           rargs->version_);
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);
@@ -192,10 +199,28 @@ extern "C" void* receiver_thd(void* arg)
 }
 
 
+static int select_trx_version(int protocol_version)
+{
+    // see protocol version table in replicator_smm.hpp
+    switch (protocol_version)
+    {
+    case 1:
+    case 2:
+        return 1;
+    case 3:
+    case 4:
+        return 2;
+    }
+    fail("unknown protocol version %i", protocol_version);
+    return -1;
+}
+
+
 static void test_ist_common(int version)
 {
     using galera::TrxHandle;
     using galera::Key;
+    int trx_version(select_trx_version(version));
     gu::Config conf;
     std::string gcache_file("ist_check.cache");
     conf.set("gcache.name", gcache_file);
@@ -209,12 +234,12 @@ static void test_ist_common(int version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx(new TrxHandle(0, uuid, 1234, 5678, false));
+        TrxHandle* trx(new TrxHandle(trx_version, uuid, 1234, 5678, false));
         const wsrep_key_part_t key[2] = {
             {"key1", 4},
             {"key2", 4}
         };
-        trx->append_key(Key(0, key, 2, version));
+        trx->append_key(Key(trx_version, key, 2, 0));
         trx->append_data("bar", 3);
 
         size_t trx_size(serial_size(*trx));
@@ -224,11 +249,10 @@ static void test_ist_common(int version)
         trx->unref();
     }
 
-    receiver_args rargs(receiver_addr, 1, 10, 1);
-    sender_args sargs(*gcache, rargs.listen_addr_, 1, 10);
+    receiver_args rargs(receiver_addr, 1, 10, 1, version);
+    sender_args sargs(*gcache, rargs.listen_addr_, 1, 10, version);
 
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
-
 
     pthread_t sender_thread, receiver_thread;
     pthread_create(&sender_thread, 0, &sender_thd, &sargs);
