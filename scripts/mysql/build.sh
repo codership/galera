@@ -42,6 +42,7 @@ fi
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
 DEBUG=no
 DEBUG_LEVEL=1
+GALERA_DEBUG=no
 NO_STRIP=no
 RELEASE=""
 TAR=no
@@ -124,6 +125,9 @@ do
         --dl|--debug-level)
             shift;
             DEBUG_LEVEL=$1
+            ;;
+        --gd|--galera-debug)
+            GALERA_DEBUG="yes"
             ;;
         -r|--release)
             RELEASE="$2"    # Compile without debug
@@ -261,7 +265,12 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
     cd $GALERA_SRC
-    scripts/build.sh # options are passed via environment variables
+    debug_opt=""
+    if [ $GALERA_DEBUG == "yes" ]
+    then
+        debug_opt="-d"
+    fi
+    scripts/build.sh $debug_opt # options are passed via environment variables
     GALERA_REV=$(bzr revno 2>/dev/null)     || \
     GALERA_REV=$(svnversion | sed s/\:/,/g) || \
     GALERA_REV=$(echo "xxxx")

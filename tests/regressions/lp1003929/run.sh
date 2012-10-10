@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash -e
 ##
 #
 # lp:1003929
@@ -27,6 +27,7 @@
 # allow two subsequent inserts to happen in parallel, althoug they 
 # try to insert same unique key
 #
+
 declare -r DIST_BASE=$(cd $(dirname $0)/../..; pwd -P)
 TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
 
@@ -40,24 +41,26 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:1003929"
 echo "##################################################################"
-echo "stopping node0, node1..."
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster"
+$SCRIPTS/command.sh stop
 echo
 echo "starting node0, node1..."
 ../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
 ../../scripts/command.sh start_node "-d -g $(gcs_address 1) --slave_threads 4" 1
 
-MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
+MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD  -Dtest "
 
 declare -r port_0=$(( DBMS_PORT ))
 declare -r port_1=$(( DBMS_PORT + 1))
 
+declare -r node_0="-h${NODE_INCOMING_HOST[0]} -P${NODE_INCOMING_PORT[0]}"
+declare -r node_1="-h${NODE_INCOMING_HOST[1]} -P${NODE_INCOMING_PORT[1]}"
+
 inserter()
 {
-    local port=$1
+    local node="$@"
     for i in {1..10000}; do
-	$MYSQL --port=$port -e "
+	$MYSQL $node -e "
           DELETE FROM test.lp1003929; 
           INSERT INTO test.lp1003929 VALUES('a',1,1);
           DELETE FROM test.lp1003929; 
@@ -68,10 +71,10 @@ inserter()
 
 createdb()
 { 
-    $MYSQL --port=$port_0 -e "
+    $MYSQL $node_0 -e "
         DROP TABLE IF EXISTS test.lp1003929;"
 
-    $MYSQL --port=$port_0 -e '
+    $MYSQL $node_0 -e '
         CREATE TABLE test.lp1003929
         (
            a varchar(20),
@@ -87,7 +90,7 @@ createdb()
 #
 #########################################################
 
-threads=$($MYSQL --port=$port_1 -e "SHOW VARIABLES LIKE 'wsrep_slave_threads'")
+threads=$($MYSQL $node_1 -e "SHOW VARIABLES LIKE 'wsrep_slave_threads'")
 
 echo "applier check: $threads"
 [ "$threads" = "wsrep_slave_threads	4" ] && echo "enough slaves"
@@ -96,14 +99,14 @@ echo "Creating database..."
 createdb
 
 echo "Starting inserter..."
-inserter $port_0 &
+inserter $node_0 &
 declare inserter_pid=$!
 
 echo "Waiting load to end ($inserter_pid)"
 wait
-$MYSQL --port=$port_0 -e 'SHOW PROCESSLIST'
+$MYSQL $node_0 -e 'SHOW PROCESSLIST'
 echo
-$MYSQL --port=$port_1 -e 'SHOW PROCESSLIST'
+$MYSQL $node_1 -e 'SHOW PROCESSLIST'
 [ "$?" != "0" ] && echo "failed!" && exit 1
 
 $SCRIPTS/command.sh check
