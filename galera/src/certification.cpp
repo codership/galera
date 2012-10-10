@@ -15,6 +15,11 @@ static const bool cert_debug_on(false);
     if (cert_debug_on == false) { }             \
     else log_info << "cert debug: "
 
+std::string const
+galera::Certification::Param::log_conflicts = "cert.log_conflicts";
+
+std::string const
+galera::Certification::Defaults::log_conflicts = "no";
 
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/
@@ -72,7 +77,8 @@ static inline bool
 certify_and_depend_v1to2(const galera::KeyEntry* const match,
                          galera::TrxHandle*      const trx,
                          bool                    const full_key,
-                         bool                    const exclusive_key)
+                         bool                    const exclusive_key,
+                         bool                    const log_conflict)
 {
     // 1) if the key is full, match for any trx
     // 2) if the key is partial, match for trx with full key
@@ -101,9 +107,12 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
              (ref_trx->flags() & galera::TrxHandle::F_ISOLATION) != 0) &&
             ref_seqno >  trx->last_seen_seqno())
         {
-            log_debug << "trx conflict for key "
-                      << match->get_key(ref_trx->version())
-                      << ": " << *trx << " <--X--> " << *ref_trx;
+            if (gu_unlikely(log_conflict == true))
+            {
+                log_info << "trx conflict for key "
+                         << match->get_key(ref_trx->version())
+                         << ": " << *trx << " <--X--> " << *ref_trx;
+            }
             return true;
         }
     }
@@ -138,7 +147,8 @@ static bool
 certify_v1to2(galera::TrxHandle*                            trx,
               galera::Certification::CertIndex&             cert_index,
               galera::WriteSet::KeySequence::const_iterator key_seq_iter,
-              galera::TrxHandle::CertKeySet& key_list, bool store_keys)
+              galera::TrxHandle::CertKeySet&                key_list,
+              bool const store_keys, bool const log_conflicts)
 {
     typedef std::list<galera::KeyPart> KPS;
 
@@ -182,7 +192,8 @@ certify_v1to2(galera::TrxHandle*                            trx,
             // Note: For we skip certification for isolated trxs, only
             // cert index and key_list is populated.
             if ((trx->flags() & galera::TrxHandle::F_ISOLATION) == 0 &&
-                certify_and_depend_v1to2(ci->second, trx, full_key,!shared_key))
+                certify_and_depend_v1to2(ci->second, trx, full_key,
+                                         !shared_key, log_conflicts))
             {
                 return false;
             }
@@ -251,7 +262,8 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
         for (WriteSet::KeySequence::const_iterator i(rk.begin());
              i != rk.end(); ++i)
         {
-            if (certify_v1to2(trx, cert_index_, i, key_list, store_keys) == false)
+            if (certify_v1to2(trx, cert_index_, i, key_list, store_keys,
+                              log_conflicts_) == false)
             {
                 goto cert_fail;
             }
@@ -424,7 +436,7 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 }
 
 
-galera::Certification::Certification(const gu::Config& conf)
+galera::Certification::Certification(gu::Config& conf)
     :
     version_               (-1),
     trx_map_               (),
@@ -445,8 +457,19 @@ galera::Certification::Certification(const gu::Config& conf)
                                           max_length_default)),
     max_length_check_     (conf.get<unsigned long>("cert.max_length_check",
                                                    max_length_check_default)),
+    log_conflicts_        (false),
     key_count_            (0)
-{ }
+{
+    try // this is for unit tests where conf may lack some parameters
+    {
+        log_conflicts_ = conf.get<bool>(Param::log_conflicts);
+    }
+    catch (gu::NotFound& e)
+    {
+        conf.set(Param::log_conflicts, Defaults::log_conflicts);
+        log_conflicts_ = conf.get<bool>(Param::log_conflicts);
+    }
+}
 
 
 galera::Certification::~Certification()
@@ -646,3 +669,25 @@ galera::TrxHandle* galera::Certification::get_trx(wsrep_seqno_t seqno)
 
     return i->second;
 }
+
+void
+galera::Certification::set_log_conflicts(const std::string& str)
+{
+    try
+    {
+        bool const old(log_conflicts_);
+        log_conflicts_ = gu::from_string<bool>(str);
+        if (old != log_conflicts_)
+        {
+            log_info << (log_conflicts_ ? "Enabled" : "Disabled")
+                     << " logging of certification conflicts.";
+        }
+    }
+    catch (gu::NotFound& e)
+    {
+        gu_throw_error(EINVAL) << "Bad value '" << str
+                               << "' for boolean parameter '"
+                               << Param::log_conflicts << '\'';
+    }
+}
+

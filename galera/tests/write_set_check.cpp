@@ -352,7 +352,8 @@ START_TEST(test_cert_hierarchical_v1)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    galera::Certification cert;
+    gu::Config conf;
+    galera::Certification cert(conf);
     cert.assign_initial_position(0, 1);
 
     mark_point();
@@ -470,7 +471,8 @@ START_TEST(test_cert_hierarchical_v2)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    galera::Certification cert;
+    gu::Config conf;
+    galera::Certification cert(conf);
     cert.assign_initial_position(0, version);
 
     mark_point();

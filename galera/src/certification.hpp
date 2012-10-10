@@ -20,6 +20,16 @@ namespace galera
     class Certification
     {
     public:
+        struct Param
+        {
+            static const std::string log_conflicts;
+        };
+
+        struct Defaults
+        {
+            static const std::string log_conflicts;
+        };
+
         typedef gu::UnorderedMap<KeyEntry*, KeyEntry*,
                                  KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
     private:
@@ -44,7 +54,7 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(const gu::Config& conf = gu::Config());
+        Certification(gu::Config& conf);
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
@@ -95,6 +105,8 @@ namespace galera
                     (key_count_ += count /* restore count */, false));
         }
 
+        void set_log_conflicts(const std::string& str);
+
     private:
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v0(TrxHandle*, bool);
@@ -122,7 +134,6 @@ namespace galera
                         log_warn << "trx not committed in purge and discard: "
                                  << *trx;
                     }
-//                    cert_.purge_for_trx(trx);
 
                     if (trx->depends_seqno() > -1)
                     {
@@ -174,8 +185,10 @@ namespace galera
         unsigned long const max_length_check_; /* Mask how often to check */
         static unsigned long  const max_length_check_default;
 
-        static long const purge_interval_ = (1UL<<10);
-        gu::Atomic<long> key_count_;
+        bool                log_conflicts_;
+
+        static long   const purge_interval_ = (1UL<<10);
+        gu::Atomic<long>    key_count_;
     };
 }
 

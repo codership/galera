@@ -48,8 +48,8 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
         }
         catch (gu::Exception& e)
         {
-            log_debug << "Setting parameter '" << i->first << "' to '"
-                      << i->second << "' failed: " << e.what();
+            log_warn << "Setting parameter '" << i->first << "' to '"
+                     << i->second << "' failed: " << e.what();
             throw;
         }
     }

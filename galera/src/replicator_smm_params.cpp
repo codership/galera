@@ -17,6 +17,8 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::commit_order, "3"));
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
+    map_.insert(Default(Certification::Param::log_conflicts,
+                        Certification::Defaults::log_conflicts));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -72,6 +74,16 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     else if (key == Param::causal_read_timeout)
     {
         causal_read_timeout_ = gu::datetime::Period(value);
+    }
+    else if (key == Certification::Param::log_conflicts)
+    {
+        cert_.set_log_conflicts(value);
+    }
+    else
+    {
+        log_warn << "parameter '" << "' not found";
+        assert(0);
+        throw gu::NotFound();
     }
 }
 

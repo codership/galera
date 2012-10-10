@@ -1,5 +1,5 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
- 
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+
 /**
  * @file
  * Configuration management class
@@ -96,7 +96,7 @@ public:
     }
 
     const std::string&
-    get(const std::string& key, const std::string& def) const throw (Exception)
+    get (const std::string& key, const std::string& def) const throw (Exception)
     {
         try               { return get(key); }
         catch (NotFound&) { return def     ; }

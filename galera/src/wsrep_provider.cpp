@@ -96,7 +96,7 @@ wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
         }
         catch (std::exception& e)
         {
-            log_debug << e.what();
+            log_debug << e.what(); // better logged in wsrep_set_params
         }
     }
     else

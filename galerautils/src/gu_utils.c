@@ -85,6 +85,8 @@ gu_str2bool (const char* str, bool* b)
         break;
     case 4:
         if (!strcasecmp(str, "true")) res = 1;
+        if (!strcasecmp(str, "sure")) res = 1;
+        if (!strcasecmp(str, "nope")) res = 0;
         break;
     case 5:
         if (!strcasecmp(str, "false")) res = 0;
