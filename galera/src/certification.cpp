@@ -54,7 +54,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
             ke->unref_shared(trx, full_key);
         }
 
-        if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0 && kel == ke)
+        if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
         {
             assert(ke->ref_full_trx() == 0);
             assert(ke->ref_full_shared_trx() == 0);
@@ -116,8 +116,6 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
                                                       match->ref_shared_trx() :
                                                       match->ref_full_shared_trx());
         assert(ref_shared_trx != trx);
-        // at least one reference should be non-0 when matching for full key
-        assert(full_key == false || (ref_trx || ref_shared_trx));
 
         if (ref_shared_trx)
         {
@@ -193,10 +191,14 @@ certify_v1to2(galera::TrxHandle*                            trx,
             {
                 if (gu_likely(
                         true == ke.get_key().equal_all(ci->second->get_key())))
+                {
                     kep = ci->second;
+                }
                 else
+                {
                     // duplicate with different flags - need to store a copy
                     kep = new galera::KeyEntry(ke);
+                }
             }
         }
 
@@ -284,9 +286,6 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
                 if ((full_key == false && ke->ref_trx() != trx) ||
                     (full_key == true  && ke->ref_full_trx() != trx))
                 {
-//                    trx->cert_keys_.push_back(
-//                        std::make_pair(ke,
-//                                       std::make_pair(full_key, shared_key)));
                     ke->ref(trx, full_key);
                     keep = true;
                 }
@@ -296,9 +295,6 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
                 if ((full_key == false && ke->ref_shared_trx() != trx) ||
                     (full_key == true  && ke->ref_full_shared_trx() != trx))
                 {
-//                    trx->cert_keys_.push_back(
-//                        std::make_pair(ke,
-//                                       std::make_pair(full_key, shared_key)));
                     ke->ref_shared(trx, full_key);
                     keep = true;
                 }
