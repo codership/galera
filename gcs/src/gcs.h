@@ -275,16 +275,18 @@ extern long gcs_request_state_transfer (gcs_conn_t  *conn,
                                         const void  *req,
                                         size_t       size,
                                         const char  *donor,
-                                        gcs_seqno_t *local_act_id);
+                                        gcs_seqno_t *seqno);
 
 /*! @brief Turns off flow control on the node.
  * Effectively desynchronizes the node from the cluster (while the node keeps on
  * receiving all the actions). Requires gcs_join() to return to normal.
  *
  * @param conn  connection to group
- * @return negative error code, local seqno in case of success
+ * @param seqno response to request was ordered with this seqno.
+ *              Must be skipped in local queues.
+ * @return negative error code, 0 in case of success.
  */
-extern gcs_seqno_t gcs_desync (gcs_conn_t* conn);
+extern long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* seqno);
 
 /*! @brief Informs group on behalf of donor that state stransfer is over.
  * If status is non-negative, joiner will be considered fully joined to group.

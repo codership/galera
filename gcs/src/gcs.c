@@ -1632,18 +1632,17 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     return ret;
 }
 
-gcs_seqno_t gcs_desync (gcs_conn_t* conn)
+long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* local)
 {
-    gcs_seqno_t local;
-    long ret;
+    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, local);
 
-    ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, &local);
-
-    if (ret >= 0) return local;
-
-    assert (GCS_SEQNO_ILL == local);
-
-    return ret;
+    if (ret >= 0) {
+        assert (ret == conn->my_idx);
+        return 0;
+    }
+    else {
+        return ret;
+    }
 }
 
 static inline void

@@ -39,7 +39,7 @@ namespace galera
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
                                                gcs_seqno_t* seqno_l) = 0;
-        virtual gcs_seqno_t desync() throw () = 0;
+        virtual ssize_t desync(gcs_seqno_t* seqno_l) throw () = 0;
         virtual void    join(gcs_seqno_t seqno) throw (gu::Exception) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
 
@@ -47,7 +47,7 @@ namespace galera
                                    const std::string& value)
             throw (gu::Exception, gu::NotFound) = 0;
 
-        virtual char*   param_get (const std::string& key) const 
+        virtual char*   param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound) = 0;
     };
 
@@ -133,21 +133,9 @@ namespace galera
                                               sst_donor.c_str(), seqno_l);
         }
 
-        gcs_seqno_t desync () throw ()
+        ssize_t desync (gcs_seqno_t* seqno_l) throw ()
         {
-            gcs_seqno_t ret;
-
-            // WARNING: Here we have application block on this call which
-            //          may prevent application from resolving the issue.
-            //          (Not that we expect that application can resolve it.)
-            for (long i = 0; i < 100 && (-EAGAIN == (ret = gcs_desync(conn_)));
-                 ++i) // limit blocking time to 10s
-            {
-                log_warn << "Retrying DESYNC request.";
-                usleep (100000); // 0.1s
-            }
-
-            return ret;
+            return gcs_desync(conn_, seqno_l);
         }
 
         void join (gcs_seqno_t seqno) throw (gu::Exception)
@@ -255,7 +243,7 @@ namespace galera
                 }
             }
 
-            if (gu_likely(0 != gcache_ && ret > 0)) 
+            if (gu_likely(0 != gcache_ && ret > 0))
             {
                 assert (ret == act.size);
                 void* ptr = gcache_->malloc(act.size);
@@ -299,8 +287,9 @@ namespace galera
             return -ENOSYS;
         }
 
-        gcs_seqno_t desync () throw ()
+        ssize_t desync (gcs_seqno_t* seqno_l) throw ()
         {
+            *seqno_l = GCS_SEQNO_ILL;
             return -ENOTCONN;
         }
 

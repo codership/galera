@@ -1391,9 +1391,11 @@ void galera::ReplicatorSMM::resume() throw ()
 
 void galera::ReplicatorSMM::desync() throw (gu::Exception)
 {
-    wsrep_seqno_t const seqno_l(gcs_.desync());
+    wsrep_seqno_t seqno_l;
 
-    if (seqno_l >= 0)
+    ssize_t const ret(gcs_.desync(&seqno_l));
+
+    if (seqno_l > 0)
     {
         if (local_monitor_.would_block(seqno_l))
         {
@@ -1403,13 +1405,22 @@ void galera::ReplicatorSMM::desync() throw (gu::Exception)
         }
 
         LocalOrder lo(seqno_l);
-        local_monitor_.enter(lo);
-        state_.shift_to(S_DONOR);
-        local_monitor_.leave(lo);
+
+        if (ret == 0)
+        {
+            local_monitor_.enter(lo);
+            state_.shift_to(S_DONOR);
+            local_monitor_.leave(lo);
+        }
+        else
+        {
+            local_monitor_.self_cancel(lo);
+        }
     }
-    else
+
+    if (ret)
     {
-        gu_throw_error (-seqno_l) << "Node desync failed";
+        gu_throw_error (-ret) << "Node desync failed";
     }
 }
 
