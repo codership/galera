@@ -1621,7 +1621,8 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
             assert (action.seqno_l >  0);
 
             gcs_gcache_free (conn->gcache, action.buf);
-            // index of donor is in the global seqno
+            // on joiner global seqno stores donor index
+            // on donor global seqno stores global seqno
             ret = action.seqno_g;
         }
         else {
@@ -1637,7 +1638,6 @@ long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* local)
     long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, local);
 
     if (ret >= 0) {
-        assert (ret == conn->my_idx);
         return 0;
     }
     else {
