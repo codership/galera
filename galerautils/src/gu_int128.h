@@ -46,8 +46,8 @@ typedef union gu_int128 {
     uint32_t u32[4];
     struct {uint32_t lo; uint64_t mid; int32_t hi;}__attribute__((packed)) m;
 #ifdef __cplusplus
-    gu_int128() {}
-    gu_int128(int64_t hi, uint64_t lo) { u64[0] = lo; u64[1] = hi; }
+    gu_int128() : m() {}
+    gu_int128(int64_t hi, uint64_t lo) : m() { u64[0] = lo; u64[1] = hi; }
 #endif
 } gu_int128_t;
 
@@ -56,13 +56,13 @@ typedef union gu_uint128 {
     uint32_t u32[4];
     struct {uint32_t lo; uint64_t mid; uint32_t hi;}__attribute__((packed)) m;
 #ifdef __cplusplus
-    gu_uint128() {}
-    gu_uint128(uint64_t hi, uint64_t lo) { u64[0] = lo; u64[1] = hi; }
+    gu_uint128() : m() {}
+    gu_uint128(uint64_t hi, uint64_t lo) : m() { u64[0] = lo; u64[1] = hi; }
 #endif
 } gu_uint128_t;
 
 #ifdef __cplusplus
-#define GU_SET128(_a, hi64, lo64) _a = gu_uint128(hi64, lo64);
+#define GU_SET128(_a, hi64, lo64) _a = gu_uint128(hi64, lo64)
 #else
 #define GU_SET128(_a, hi64, lo64) _a = { .u64 = { lo64, hi64 } }
 #endif
@@ -113,7 +113,7 @@ typedef union gu_uint128 {
 } gu_uint128_t;
 
 #ifdef __cplusplus
-#define GU_SET128(_a, hi64, lo64) _a = gu_uint128(hi64, lo64);
+#define GU_SET128(_a, hi64, lo64) _a = gu_uint128(hi64, lo64)
 #else
 #define GU_SET128(_a, hi64, lo64) _a = { .u64 = { hi64, lo64 } }
 #endif
