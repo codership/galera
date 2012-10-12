@@ -22,11 +22,13 @@ namespace galera
     public:
         struct Param
         {
+#define CERTIFICATION_PARAM_LOG_CONFLICTS_STR "cert.log_conflicts"
             static const std::string log_conflicts;
         };
 
         struct Defaults
         {
+#define CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR "no"
             static const std::string log_conflicts;
         };
 

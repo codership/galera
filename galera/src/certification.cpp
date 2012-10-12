@@ -16,10 +16,12 @@ static const bool cert_debug_on(false);
     else log_info << "cert debug: "
 
 std::string const
-galera::Certification::Param::log_conflicts = "cert.log_conflicts";
+galera::Certification::Param::log_conflicts =
+                     CERTIFICATION_PARAM_LOG_CONFLICTS_STR;
 
 std::string const
-galera::Certification::Defaults::log_conflicts = "no";
+galera::Certification::Defaults::log_conflicts =
+                     CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR;
 
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/

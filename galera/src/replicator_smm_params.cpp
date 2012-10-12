@@ -17,8 +17,8 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::commit_order, "3"));
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
-    map_.insert(Default(Certification::Param::log_conflicts,
-                        Certification::Defaults::log_conflicts));
+    map_.insert(Default(CERTIFICATION_PARAM_LOG_CONFLICTS_STR,
+                        CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
