@@ -899,7 +899,14 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 {
     wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
-    if (cseq < 0) return WSREP_TRX_FAIL;
+
+    if (cseq < 0)
+    {
+        log_warn << "gcs_caused() returned " << csec << " (" << strerror(-csec)
+                 << ')';
+        return WSREP_TRX_FAIL;
+    }
+
     try
     {
         // @note: Using timed wait for monitor is currently a hack

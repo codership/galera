@@ -34,9 +34,8 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
             }
             else
             {
-                log_debug << "Setting param '" << i->first
-                          << "' = '" << i->second
-                          << "'";
+                log_debug << "Setting param '"
+                          << i->first << "' = '" << i->second << "'";
                 repl.param_set(i->first, i->second);
             }
 
