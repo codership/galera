@@ -902,7 +902,7 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 
     if (cseq < 0)
     {
-        log_warn << "gcs_caused() returned " << csec << " (" << strerror(-csec)
+        log_warn << "gcs_caused() returned " << cseq << " (" << strerror(-cseq)
                  << ')';
         return WSREP_TRX_FAIL;
     }
