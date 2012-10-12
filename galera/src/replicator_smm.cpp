@@ -1404,17 +1404,20 @@ void galera::ReplicatorSMM::desync() throw (gu::Exception)
 
     if (seqno_l > 0)
     {
-        if (local_monitor_.would_block(seqno_l))
-        {
-            gu_throw_error (-EDEADLK) << "Ran out of resources waiting to "
-                                      << "desync the node."
-                                      << "Application restart required";
-        }
-
-        LocalOrder lo(seqno_l);
+        LocalOrder lo(seqno_l); // need to process it regardless of ret value
 
         if (ret == 0)
         {
+/* #706 - the check below must be state request-specific. We are not holding
+          any locks here and must be able to wait like any other action.
+          However practice may prove different, leaving it here as a reminder.
+            if (local_monitor_.would_block(seqno_l))
+            {
+                gu_throw_error (-EDEADLK) << "Ran out of resources waiting to "
+                                          << "desync the node. "
+                                          << "The node must be restarted.";
+            }
+*/
             local_monitor_.enter(lo);
             state_.shift_to(S_DONOR);
             local_monitor_.leave(lo);
@@ -1427,7 +1430,7 @@ void galera::ReplicatorSMM::desync() throw (gu::Exception)
 
     if (ret)
     {
-        gu_throw_error (-ret) << "Node desync failed";
+        gu_throw_error (-ret) << "Node desync failed.";
     }
 }
 
