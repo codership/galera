@@ -17,6 +17,12 @@ function get_status
     echo $(mysql -s -s -u$DBMS_TEST_USER -p$DBMS_TEST_PSWD -h${NODE_INCOMING_HOST[$1]} -P${NODE_INCOMING_PORT[$1]} -e "$cmd" | awk '{print $2;}');
 }
 
+echo "regression test for #281"
+echo "restarting cluster"
+
+$SCRIPTS/command.sh restart
+
+
 mysql -s -s -u$DBMS_TEST_USER -p$DBMS_TEST_PSWD \
     -h${NODE_INCOMING_HOST[1]} -P${NODE_INCOMING_PORT[1]} test \
     -e "DROP TABLE IF EXISTS t281";
@@ -51,5 +57,7 @@ fi
 mysql -s -s -u$DBMS_TEST_USER -p$DBMS_TEST_PSWD \
     -h${NODE_INCOMING_HOST[1]} -P${NODE_INCOMING_PORT[1]} test \
     -e "DROP TABLE IF EXISTS t281";
+
+$SCRIPTS/command.sh stop
 
 exit 0;

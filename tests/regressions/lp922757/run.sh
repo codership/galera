@@ -48,12 +48,14 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:922757"
 echo "##################################################################"
-echo "stopping node0, node1..."
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster"
+../../scripts/command.sh stop
+#echo "stopping node0, node1..."
+#../../scripts/command.sh stop_node 0
+#../../scripts/command.sh stop_node 1
 echo
 echo "starting node0, node1..."
-../../scripts/command.sh start_node "-d -g gcomm://" 0
+../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
 ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD  -Dtest "
@@ -64,7 +66,7 @@ declare -r port_0=${NODE_INCOMING_PORT[0]}
 declare -r host_1=${NODE_INCOMING_HOST[1]}
 declare -r port_1=${NODE_INCOMING_PORT[1]}
 
-declare -r ROUNDS=10000
+declare -r ROUNDS=1000
 declare -r ERROR_LIMIT=10
 declare success=0
 declare err_cnt=0

@@ -55,12 +55,11 @@ echo "##             regression test for lp:909155"
 echo "##################################################################"
 
 if [ "$1" = "-f" ]; then
-    echo "stopping node0, node1..."
-    ../../scripts/command.sh stop_node 0
-    ../../scripts/command.sh stop_node 1
+    echo "stopping cluster"
+    ../../scripts/command.sh stop
     echo
     echo "starting node0, node1..."
-    ../../scripts/command.sh start_node "-d -g gcomm://" 0
+    ../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
     ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 fi
 

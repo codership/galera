@@ -35,7 +35,7 @@ echo "##################################################################"
 
 echo "starting two nodes"
 stop
-start_node "-d -g gcomm://" 0
+start_node "-d -g gcomm://$(extra_params 0)" 0
 start_node "-d -g $(gcs_address 1)" 1
 
 echo "starting sqlgen load for $DURATION" seconds

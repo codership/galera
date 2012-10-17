@@ -50,18 +50,17 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:917416"
 echo "##################################################################"
-echo "stopping node0, node1..."
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster"
+../../scripts/command.sh stop
 echo
 echo "starting node0, node1..."
-../../scripts/command.sh start_node "-d -g gcomm://" 0
+../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
 ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
 
-declare -r port_0=$(( DBMS_PORT ))
-declare -r port_1=$(( DBMS_PORT + 1))
+declare -r port_0=${NODE_INCOMING_PORT[0]}
+declare -r port_1=${NODE_INCOMING_PORT[1]}
 
 declare -r ROUNDS=10000
 declare -r ERROR_LIMIT=10
@@ -86,7 +85,7 @@ send_sql()
 	    echo "SELECT failed ($ret $i) " && \
 	    cat /tmp/lp917416.out           && \
 	    success=1                       && \
-            erross=$(( $errors + 1 ))
+            errors=$(( $errors + 1 ))
 
        [ $errors -gt $ERROR_LIMIT ]  && echo "$type STOPPED" && exit 1
        sleep $sleep

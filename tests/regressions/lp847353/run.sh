@@ -42,19 +42,17 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:847353"
 echo "##################################################################"
-echo "stopping node0, node1..."
-
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster"
+../../scripts/command.sh stop
 echo
 echo "starting node0, node1..."
-../../scripts/command.sh start_node "-d -g gcomm://" 0
+../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
 ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
-$SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
-        --port $DBMS_PORT --users 1 --duration 300 \
+$SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host ${NODE_INCOMING_HOST[0]} \
+        --port ${NODE_INCOMING_PORT[0]} --users 1 --duration 300 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
         --rollbacks 0.1 \
         >/dev/null 2>$BASE_RUN/lp.err &
@@ -62,21 +60,21 @@ declare -r sqlgen1_pid=$!
 
 sleep 0.2
 
-$SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
-        --port $(( DBMS_PORT + 1 )) --users 1 --duration 300 \
+$SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host ${NODE_INCOMING_HOST[1]} \
+        --port ${NODE_INCOMING_PORT[1]} --users 1 --duration 300 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
         --rollbacks 0.1 --create 0 \
         >/dev/null 2>$BASE_RUN/lp.err &
 declare -r sqlgen2_pid=$!
 
 for i in {1..150}; do
-  mysql --show-warnings --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST --port=$(( $DBMS_PORT + 1 )) test -e 'FLUSH TABLES WITH READ LOCK';
+  mysql --show-warnings --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=${NODE_INCOMING_HOST[1]} --port=${NODE_INCOMING_PORT[1]} test -e 'FLUSH TABLES WITH READ LOCK';
 
   sleep 0.5;
 done
   
 echo "waiting sqlgens ($sqlgen1_pid $sqlgen2_pid) to complete"
-wai
+wait
 
 echo "Done!"
 ../../scripts/command.sh stop_node 0

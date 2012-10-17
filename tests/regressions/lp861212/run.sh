@@ -14,7 +14,7 @@
 # PARAMETERS
 #
 # Duration of test run
-DURATION=${DURATION:-"3600"}
+DURATION=${DURATION:-"600"}
 #
 #
 

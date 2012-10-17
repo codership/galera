@@ -37,9 +37,11 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 echo "##################################################################"
 echo "##             regression test for lp:994579"
 echo "##################################################################"
-echo "stopping node0, node1..."
-../../scripts/command.sh stop_node 0
-../../scripts/command.sh stop_node 1
+echo "stopping cluster"
+../../scripts/command.sh stop
+#echo "stopping node0, node1..."
+#../../scripts/command.sh stop_node 0
+#../../scripts/command.sh stop_node 1
 echo
 echo "starting node0, node1..."
 ../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
@@ -47,8 +49,8 @@ echo "starting node0, node1..."
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
 
-declare -r port_0=$(( DBMS_PORT ))
-declare -r port_1=$(( DBMS_PORT + 1))
+declare -r port_0=${NODE_INCOMING_PORT[0]}
+declare -r port_1=${NODE_INCOMING_PORT[1]}
 
 inserter_int_trx()
 {
