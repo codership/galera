@@ -12,6 +12,8 @@ const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
 const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
     common_prefix + "causal_read_timeout";
+const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
+const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
@@ -19,6 +21,7 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
     map_.insert(Default(CERTIFICATION_PARAM_LOG_CONFLICTS_STR,
                         CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR));
+    map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -79,6 +82,12 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     {
         cert_.set_log_conflicts(value);
     }
+    else if (key == Param::base_host ||
+             key == Param::base_port)
+    {
+        // nothing to do here, these params take effect only at
+        // provider (re)start
+    }
     else
     {
         log_warn << "parameter '" << "' not found";
@@ -100,7 +109,10 @@ galera::ReplicatorSMM::param_set (const std::string& key,
 
     bool found(false);
 
-    if (defaults.map_.find(key) != defaults.map_.end()) // is my key?
+    // Note: base_host is treated separately here as it cannot have
+    // default value known at compile time.
+    if (defaults.map_.find(key) != defaults.map_.end() ||
+        key                     == Param::base_host) // is my key?
     {
         found = true;
         set_param (key, value);
