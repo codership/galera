@@ -54,14 +54,12 @@ echo "##################################################################"
 echo "##             regression test for lp:909155"
 echo "##################################################################"
 
-if [ "$1" = "-f" ]; then
-    echo "stopping cluster"
-    ../../scripts/command.sh stop
-    echo
-    echo "starting node0, node1..."
-    ../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
-    ../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
-fi
+echo "stopping cluster"
+../../scripts/command.sh stop
+echo
+echo "starting node0, node1..."
+../../scripts/command.sh start_node "-d -g gcomm://$(extra_params 0)" 0
+../../scripts/command.sh start_node "-d -g $(gcs_address 1)" 1
 
 MYSQL="mysql --batch --silent --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --host=$DBMS_HOST test "
 
@@ -158,10 +156,8 @@ echo
 echo "Done!"
 echo
 
-if [ "$1" = "-f" ]; then
-    ../../scripts/command.sh stop_node 0
-    ../../scripts/command.sh stop_node 1
-fi
+../../scripts/command.sh stop_node 0
+../../scripts/command.sh stop_node 1
 
 exit
 
