@@ -209,7 +209,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
-    causal_read_timeout_("PT30S"),
+    causal_read_timeout_(config_.get(Param::causal_read_timeout)),
     receivers_          (),
     replicated_         (),
     replicated_bytes_   (),
