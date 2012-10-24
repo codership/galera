@@ -830,7 +830,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
             gu_fatal ("Failed to lock mutex.");
             abort();
         }
- 
+
         conn->sync_sent = false;
 
         // need to wake up send monitor if it was paused during CC
@@ -1826,10 +1826,12 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 static long
 _set_fc_limit (gcs_conn_t* conn, const char* value)
 {
-    char* endptr = NULL;
-    long  limit  = strtol (value, &endptr, 0);
+    long long limit;
+    const char* const endptr = gu_str2ll(value, &limit);
 
-    if (limit > 0 && *endptr == '\0') {
+    if (limit > 0LL && *endptr == '\0') {
+
+        if (limit > LONG_MAX) limit = LONG_MAX;
 
         gu_fifo_lock(conn->recv_q);
         {
@@ -1857,8 +1859,8 @@ _set_fc_limit (gcs_conn_t* conn, const char* value)
 static long
 _set_fc_factor (gcs_conn_t* conn, const char* value)
 {
-    char*  endptr = NULL;
-    double factor = strtod (value, &endptr);
+    double factor;
+    const char* const endptr = gu_str2dbl(value, &factor);
 
     if (factor >= 0.0 && factor <= 1.0 && *endptr == '\0') {
 
@@ -1890,15 +1892,16 @@ _set_fc_factor (gcs_conn_t* conn, const char* value)
 static long
 _set_fc_debug (gcs_conn_t* conn, const char* value)
 {
-    char* endptr = NULL;
-    long  debug  = strtol (value, &endptr, 0);
+    bool debug;
+    const char* const endptr = gu_str2bool(value, &debug);
 
-    if (debug >= 0 && *endptr == '\0') {
+    if (*endptr == '\0') {
 
         if (conn->params.fc_debug == debug) return 0;
 
         conn->params.fc_debug = debug;
         gcs_fc_debug (&conn->stfc, debug);
+        gu_config_set_bool (conn->config, GCS_PARAMS_FC_DEBUG, debug);
 
         return 0;
     }
@@ -1927,16 +1930,24 @@ _set_sync_donor (gcs_conn_t* conn, const char* value)
 static long
 _set_pkt_size (gcs_conn_t* conn, const char* value)
 {
-    char* endptr   = NULL;
-    long  pkt_size = strtol (value, &endptr, 0);
+    long long pkt_size;
+    const char* const endptr = gu_str2ll (value, &pkt_size);
 
     if (pkt_size > 0 && *endptr == '\0') {
+
+        if (pkt_size > LONG_MAX) pkt_size = LONG_MAX;
 
         if (conn->params.max_packet_size == pkt_size) return 0;
 
         long ret = gcs_set_pkt_size (conn, pkt_size);
 
-        return (ret >= 0 ? 0 : ret);
+        if (ret >= 0)
+        {
+            ret = 0;
+            gu_config_set_int64(conn->config,GCS_PARAMS_MAX_PKT_SIZE,pkt_size);
+        }
+
+        return ret;
     }
     else {
 //        gu_warn ("Invalid value for %s: '%s'", GCS_PARAMS_PKT_SIZE, value);
@@ -1947,15 +1958,19 @@ _set_pkt_size (gcs_conn_t* conn, const char* value)
 static long
 _set_recv_q_hard_limit (gcs_conn_t* conn, const char* value)
 {
-    char*   endptr = NULL;
-    ssize_t limit  = strtoll (value, &endptr, 0);
+    long long limit;
+    const char* const endptr = gu_str2ll (value, &limit);
 
     if (limit > 0 && *endptr == '\0') {
 
-        if (conn->params.recv_q_hard_limit == limit) return 0;
+        if (limit > LONG_MAX) limit = LONG_MAX;
+
+        long long limit_fixed = limit * gcs_fc_hard_limit_fix;
+
+        if (conn->params.recv_q_hard_limit == limit_fixed) return 0;
 
         gu_config_set_int64 (conn->config, GCS_PARAMS_RECV_Q_HARD_LIMIT, limit);
-        conn->params.recv_q_hard_limit = limit * gcs_fc_hard_limit_fix;
+        conn->params.recv_q_hard_limit = limit_fixed;
 
         return 0;
     }
@@ -1967,8 +1982,8 @@ _set_recv_q_hard_limit (gcs_conn_t* conn, const char* value)
 static long
 _set_recv_q_soft_limit (gcs_conn_t* conn, const char* value)
 {
-    char*  endptr = NULL;
-    double dbl    = strtod (value, &endptr);
+    double dbl;
+    const char* const endptr = gu_str2dbl (value, &dbl);
 
     if (dbl >= 0.0 && dbl < 1.0 && *endptr == '\0') {
 
@@ -1987,8 +2002,8 @@ _set_recv_q_soft_limit (gcs_conn_t* conn, const char* value)
 static long
 _set_max_throttle (gcs_conn_t* conn, const char* value)
 {
-    char*  endptr = NULL;
-    double dbl    = strtod (value, &endptr);
+    double dbl;
+    const char* const endptr = gu_str2dbl (value, &dbl);
 
     if (dbl >= 0.0 && dbl < 1.0 && *endptr == '\0') {
 

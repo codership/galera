@@ -1,5 +1,5 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
- 
+
 /**
  * @file
  * C-interface for configuration management
@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <unistd.h> // for ssize_t
 
-#ifdef __cplusplus 
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -61,7 +61,7 @@ gu_config_set_bool   (gu_config_t* cnf, const char* key, bool val);
 ssize_t
 gu_config_print      (gu_config_t* cnf, char* buf, ssize_t buf_len);
 
-#ifdef __cplusplus 
+#ifdef __cplusplus
 }
 #endif
 

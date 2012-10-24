@@ -127,6 +127,13 @@ galera::ReplicatorSMM::param_set (const std::string& key,
             found = true;
         }
         catch (gu::NotFound&) {}
+
+        try
+        {
+            gcache_.param_set (key, value);
+            found = true;
+        }
+        catch (gu::NotFound&) {}
     }
 
     if (!found) throw gu::NotFound();
