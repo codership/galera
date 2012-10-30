@@ -72,20 +72,16 @@ apply_trx_ws(void*                    recv_ctx,
     {
         try
         {
-#if 0
             if (trx.is_toi())
             {
-                log_info << "Executing TO isolated action: " << trx;
+                log_debug << "Executing TO isolated action: " << trx;
             }
-#endif
             gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
-#if 0
             if (trx.is_toi())
             {
-                log_info << "Done executing TO isolated action: "
+                log_debug << "Done executing TO isolated action: "
                          << trx.global_seqno();
             }
-#endif
             break;
         }
         catch (galera::ApplyException& e)
@@ -991,6 +987,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_APPLYING);
+
+    log_debug << "Done executing TO isolated action: " << *trx;
 
     CommitOrder co(*trx, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);

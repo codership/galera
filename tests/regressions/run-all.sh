@@ -1,6 +1,7 @@
 #!/bin/bash
 
-tests="lp1003929
+tests="lp1073220
+       lp1003929
        lp1013978
        lp1026181
        lp1055961
