@@ -87,6 +87,9 @@ INNODB_OPTS=" --default-storage-engine=InnoDB "
 #DEBUG_OPTS=" --debug "
 #DEBUG_OPTS=" --debug=d,galera,wsdb:t:i:o,$MYSQL_DATA_DIR/mysqld.trc"
 
+SKIP_RECOVERY=0
+START_POSITION=""
+
 err_log="$MYSQL_DATA_DIR/$(hostname).err"
 mysql_log="$MYSQL_DATA_DIR/$(hostname).log"
 
@@ -114,6 +117,8 @@ Options:
     --ws_level        : RBR (default) or SQL
     -P|--port         : port for MySQL client connections
     -S|--socket       : location of mysqld socket
+    --skip-recovery   : skip recovery phase
+    --start-position  : start position passed to server
 
 Commands:
 check                 : check cosistency of database given with --db option
@@ -189,6 +194,34 @@ check_gcs_address()
     fi
 }
 
+wsrep_start_position_opt=""
+
+# Run mysqld with --wsrep-recover and parse recovered position from log.
+# Position will be stored in wsrep_start_position_opt global.
+wsrep_recovery() {
+  cmd="$@"
+  wr_logfile=$(mktemp)
+  echo "WSREP: Running position recovery"
+  $cmd --log_error=$wr_logfile --wsrep-recover
+  rp=$(grep "WSREP: Recovered position:" $wr_logfile)
+  if [ -z "$rp" ]; then
+    skipped=$(grep WSREP $wr_logfile | grep "skipping position recovery")
+    if [ -z "$skipped" ]; then
+      echo "WSREP: Failed to recover position: " \
+          `cat $wr_logfile`;
+    else
+      echo "WSREP: Position recovery skipped"
+    fi
+  else
+    start_pos=$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+        | sed 's/^[ \t]*//')
+    wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+    echo "WSREP: Recovered position $start_pos"
+  fi
+  rm $wr_logfile
+}
+
+
 galera_start()
 {
     local failed
@@ -248,6 +281,34 @@ galera_start()
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
+    if test $SKIP_RECOVERY = 0
+    then
+        wsrep_recovery $MYSQLD \
+            $DEFAULTS_OPTION \
+            --user="$MYSQLD_USER" \
+            --basedir="$MYSQL_BASE_DIR" \
+            --datadir="$MYSQL_DATA_DIR" \
+            --plugin-dir=lib/mysql/plugin \
+            --pid-file="$MYSQL_PID" \
+            --port=$MYSQL_PORT \
+            --socket=$MYSQL_SOCKET \
+            --skip-external-locking \
+            --log_error=$err_log \
+            $MYSQLD_OPTS \
+            $INNODB_OPTS \
+            $WSREP_OPTS \
+            $DEBUG_OPTS \
+            $LOGGING_OPTS \
+            $RBR_OPTS \
+            $PLUGIN_OPTS
+    else
+        echo "skipping recovery"
+        if test -n "$START_POSITION"
+        then
+            wsrep_start_position_opt="--wsrep-start-position=$START_POSITION"
+        fi
+    fi
+
     if test -z $GDB
     then
         nohup $VALGRIND $MYSQLD \
@@ -268,6 +329,7 @@ galera_start()
             $LOGGING_OPTS \
             $RBR_OPTS \
             $PLUGIN_OPTS \
+            $wsrep_start_position_opt \
             1>/dev/null 2>>$err_log &
     else
         $GDB --args $MYSQLD \
@@ -286,7 +348,8 @@ galera_start()
             $DEBUG_OPTS \
             $LOGGING_OPTS \
             $RBR_OPTS \
-            $PLUGIN_OPTS
+            $PLUGIN_OPTS \
+            $wsrep_start_position_opt
     fi
     my_pid=$!
 
@@ -509,6 +572,13 @@ case $1 in
             MYSQL_SOCKET="$2"
             shift
             ;;
+    --skip-recovery)
+            SKIP_RECOVERY=1
+            ;;
+    --start-position)
+            START_POSITION="$2"
+            shift
+            ;;
 'dump')
             COMMAND="dump"
             ;;
@@ -533,6 +603,7 @@ case $1 in
             ;;
     *)
         # must be command
+            echo "error parsing: $@"
             usage
             exit 1
             ;;

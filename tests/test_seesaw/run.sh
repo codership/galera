@@ -12,6 +12,8 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/misc.sh
 
 TRIES=${1:-"-1"} # -1 stands for indefinite loop
+KILL_RATE=${KILL_RATE:-"3"}
+SST_RATE=${SST_RATE:-"2"}
 
 #restart # cluster restart should be triggered by user
 
@@ -46,7 +48,7 @@ cycle()
     local -r node_id=${NODE_ID[$node]}
 
     local pause_var=10
-    local var_kill=$(( $RANDOM % 3 ))
+    local var_kill=$(( $RANDOM % $KILL_RATE ))
 
     if [ $var_kill -eq 0 ]
     then
@@ -69,12 +71,19 @@ cycle()
 
     echo "Restarting node $node_id..."
 
+    local skip_recovery_opt=""
+    if [ $var_kill -eq 0 ] && [ $(($RANDOM % $SST_RATE)) -eq 0 ]
+    then
+        echo "Enforcing SST"
+        skip_recovery_opt="--skip-recovery --start-position '00000000-0000-0000-0000-000000000000:-2'"
+    fi
+
     if test $pause_var -gt 3
     then
-        restart_node "-g $(gcs_address $node)" $node
+        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
     else
         stop_node $node || : # just in case the process is still lingering
-        restart_node "-g $(gcs_address $node)" $node
+        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
     fi
 }
 
