@@ -36,7 +36,7 @@ copy_config()
 
     if [ -n "$common_cnf" ] || [ -n "$cnf_src" ]
     then
-        if [ "${NODE_LOCATION[$node]}" == "local" ]
+        if [ "${NODE_LOCATION[$node]}" = "local" ]
         then
             ([ -n "$common_cnf" ] && cat "$common_cnf" && \
              [ -n "$cnf_src" ]    && cat "$cnf_src") > "$cnf_dst"

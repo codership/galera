@@ -3,19 +3,51 @@
 cluster_status()
 {
     local node=$1
-    local status_str=""
     case "$DBMS" in
         "MYSQL")
-            echo -n $(mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+            local res=$(mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
                 -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
                 --skip-column-names -ss \
-                -e "SET wsrep_on=0; SHOW STATUS WHERE Variable_name LIKE 'wsrep_cluster_status'
-                    OR Variable_name LIKE 'wsrep_cluster_size'" 2>/dev/null) \
-                        | awk '{ print $4 ":" $2; }'
+                -e "SET wsrep_on=0;
+                    SHOW STATUS WHERE Variable_name LIKE 'wsrep_cluster_status'
+                    OR Variable_name LIKE 'wsrep_cluster_size'" 2>/dev/null)
+            echo -n $res | awk '{ print $4 ":" $2; }'
             ;;
         "PGSQL"|*)
             return -1
     esac
+}
+
+mysql_query()
+{
+    local node=$1
+    local query=$2
+    mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+          -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
+          --skip-column-names -ss -e "$query" 2>/dev/null
+}
+
+wait_node_state()
+{
+    local node=$1
+    local state=$2
+
+    while true
+    do
+        local res="-1"
+
+        case "$DBMS" in
+        "MYSQL")
+            res=$(mysql_query $node "SHOW STATUS LIKE 'wsrep_local_state'" \
+                  | awk '{ print $2 }')
+            ;;
+        "PGSQL"|*)
+            return -1
+        esac
+
+        if [ "$res" = "$state" ]; then break; fi
+        sleep 1
+    done
 }
 
 #
@@ -232,19 +264,21 @@ bootstrap()
         start_node "-g $(gcs_address $node)" "$@" $node &
         cnt=$(($cnt + 1))
     done
+
     # TODO: Poll until all have reached non-prim
-    for node in $NODE_LIST
+    for node in 0 # only one node is sufficient
     do
         while true
         do
             st=$(cluster_status $node)
-            if test "x$st" == "xnon-Primary:$cnt"
+            if test "x$st" = "xnon-Primary:$cnt"
             then
                 break;
             fi
             sleep 1
         done
     done
+
     # TODO: Figure out how to do this in DBMS indepent way
     case "$DBMS" in
         "MYSQL")
@@ -257,6 +291,7 @@ bootstrap()
             return -1
             ;;
     esac
+
     # Jobs will finish when nodes reach primary
     wait_jobs
 }

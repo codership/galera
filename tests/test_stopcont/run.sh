@@ -51,6 +51,11 @@ cycle()
 
     echo "Signaling node $node_id with CONT..."
     signal_node CONT $node
+
+    sleep 10 # this pause needed to get node to notice that it lost the PC
+             # if it did...
+
+    wait_node_state $node 4 # 4 - SYNCED
 }
 
 node=0
@@ -67,7 +72,6 @@ do
 
     cycle $node
 
-    pause 1 5
     consistency_check $sqlgen_pid
     pause 2
 

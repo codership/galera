@@ -22,7 +22,6 @@ do
 
     echo -e "\nTry ${try}/${TRIES}\n"
 
-
     start
     pause 5
     stop

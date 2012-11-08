@@ -228,7 +228,7 @@ group_go_non_primary (gcs_group_t* group)
 }
 
 static const char group_empty_id[GCS_COMP_MEMB_ID_MAX_LEN + 1] = { 0, };
- 
+
 static void
 group_check_donor (gcs_group_t* group)
 {
@@ -289,7 +289,7 @@ group_post_state_exchange (gcs_group_t* group)
             group->last_applied_proto_ver = 0;
         }
         else {
-            group->last_applied_proto_ver = 1;            
+            group->last_applied_proto_ver = 1;
         }
     }
     else {

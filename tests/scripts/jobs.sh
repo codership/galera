@@ -34,7 +34,7 @@ virtual_job()
     local out="$BASE_OUT/${1}_${NODE_ID[$node]}.out"
     local cmd="$($@)"
 
-    if [ "${NODE_LOCATION[$node]}" == "local" ]
+    if [ "${NODE_LOCATION[$node]}" = "local" ]
     then
 #        local_job "$cmd" 1>"$out"
         eval "$cmd" 1>"$out"
