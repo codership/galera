@@ -75,8 +75,8 @@ Gcs::request_state_transfer (const std::string& request,
     /* Need to substitute the first ':' for \0 */
 
     ssize_t req_len = request.length() + 1 /* \0 */;
-    char* const req_str(
-	reinterpret_cast<char*>(::malloc(req_len + 1 /* potentially need one more \0 */)));
+    char* const req_str(reinterpret_cast<char*>(::malloc(
+                        req_len + 1 /* potentially need one more \0 */)));
 
     if (!req_str)
     {

@@ -289,8 +289,10 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
 static bool
 sst_is_trivial (const void* const req, size_t const len)
 {
-    return (len == (strlen(ReplicatorSMM::TRIVIAL_SST) + 1) &&
-            !memcmp (req, ReplicatorSMM::TRIVIAL_SST, len));
+    /* Check that the first string in request == ReplicatorSMM::TRIVIAL_SST */
+    size_t const trivial_len = strlen(ReplicatorSMM::TRIVIAL_SST) + 1;
+    return (len >= trivial_len &&
+            !memcmp (req, ReplicatorSMM::TRIVIAL_SST, trivial_len));
 }
 
 void ReplicatorSMM::process_state_req(void*       recv_ctx,
