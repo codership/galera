@@ -121,7 +121,7 @@ log_notice () {
 }
 
 eval_log_error () {
-  cmd="$1"
+  local cmd="$1"
   case $logging in
     file) cmd="$cmd >> "`shell_quote_string "$err_log"`" 2>&1" ;;
     syslog)
@@ -180,10 +180,12 @@ wsrep_pick_url() {
 # Run mysqld with --wsrep-recover and parse recovered position from log.
 # Position will be stored in wsrep_start_position_opt global.
 wsrep_recovery() {
-  cmd="$@"
+  local mysqld_cmd="$@"
   wr_logfile=$(mktemp)
-  log_notice "WSREP: Running position recovery"
-  $cmd --log_error=$wr_logfile --wsrep-recover
+  [ "$EUID" = "0" ] && chown $user $wr_logfile
+  chmod 600 $wr_logfile
+  log_notice "WSREP: Running position recovery with --log_error=$wr_logfile"
+  $mysqld_cmd --log_error=$wr_logfile --wsrep-recover
   rp=$(grep "WSREP: Recovered position:" $wr_logfile)
   if [ -z "$rp" ]; then
     skipped=$(grep WSREP $wr_logfile | grep "skipping position recovery")
@@ -888,6 +890,8 @@ do
       I=`expr $I + 1`
     done
   fi
+  log_notice "WSREP: sleeping 15 seconds before restart"
+  sleep 15
   log_notice "mysqld restarted"
 done
 
