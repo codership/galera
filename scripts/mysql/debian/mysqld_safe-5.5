@@ -182,7 +182,7 @@ wsrep_pick_url() {
 wsrep_recovery() {
   local mysqld_cmd="$@"
   wr_logfile=$(mktemp)
-  [ "$EUID" = "0" ] && chown $user $wr_logfile
+  [ `id -u` = "0" ] && chown $user $wr_logfile
   chmod 600 $wr_logfile
   log_notice "WSREP: Running position recovery with --log_error=$wr_logfile"
   $mysqld_cmd --log_error=$wr_logfile --wsrep-recover
