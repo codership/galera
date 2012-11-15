@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <check.h>
 #include <string.h>
+#include <unistd.h>
 
 // <using namespace gcomm;
 

@@ -224,8 +224,8 @@ namespace gcomm
             if (false == ret.second)
             {
                 gu_throw_fatal << "duplicate entry "
-                               << "key=" << get_key(p) << " "
-                               << "value=" << get_value(p) << " "
+                               << "key=" << MapBase<K, V, C>::get_key(p) << " "
+                               << "value=" << MapBase<K, V, C>::get_value(p) << " "
                                << "map=" << *this;
             }
             return ret.first;
@@ -260,23 +260,5 @@ namespace gcomm
             return MapBase<K, V, C>::map.equal_range(k);
         }
     };
-
-    template <typename K, typename V>
-    const K& get_key(const typename Map<K, V>::const_iterator i)
-    {
-        return i->first;
-    }
-
-    template <typename K, typename V>
-    const K& get_key(const typename Map<K, V>::value_type& vt)
-    {
-        return vt.first;
-    }
-
-    template <typename K, typename V>
-    const V& get_value(const typename Map<K, V>::value_type& vt)
-    {
-        return vt.second;
-    }
 }
 #endif /* GCOMM_MAP_HPP */
