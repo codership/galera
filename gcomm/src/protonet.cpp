@@ -11,11 +11,6 @@
 #include "gcomm/util.hpp"
 #include "gcomm/conf.hpp"
 
-using namespace std;
-using namespace gu;
-using namespace gu::datetime;
-using namespace gcomm;
-
 void gcomm::Protonet::insert(Protostack* pstack)
 {
     log_debug << "insert pstack " << pstack;
@@ -37,16 +32,16 @@ void gcomm::Protonet::erase(Protostack* pstack)
     protos_.erase(i);
 }
 
-Date gcomm::Protonet::handle_timers()
+gu::datetime::Date gcomm::Protonet::handle_timers()
 {
     Critical<Protonet> crit(*this);
-    Date next_time(Date::max());
+    gu::datetime::Date next_time(gu::datetime::Date::max());
     {
-        for (deque<Protostack*>::iterator i = protos_.begin();
+        for (std::deque<Protostack*>::iterator i = protos_.begin();
              i != protos_.end();
              ++i)
         {
-            next_time = min(next_time, (*i)->handle_timers());
+            next_time = std::min(next_time, (*i)->handle_timers());
         }
     }
     return next_time;

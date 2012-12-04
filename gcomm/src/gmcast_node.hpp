@@ -24,13 +24,13 @@ class gcomm::gmcast::Node
 {
 
 public:
-    
+
     Node(const std::string& addr   = "") : addr_(addr), mcast_addr_("") { }
-    
-    const std::string& get_addr() const { return addr_.to_string(); }
-    const std::string& get_mcast_addr() const { return mcast_addr_.to_string(); } 
-    
-    size_t unserialize(const gu::byte_t* buf, 
+
+    const std::string& addr() const { return addr_.to_string(); }
+    const std::string& mcast_addr() const { return mcast_addr_.to_string(); }
+
+    size_t unserialize(const gu::byte_t* buf,
                        const size_t buflen, const size_t offset)
     {
         size_t  off;
@@ -40,8 +40,8 @@ public:
         gu_trace (off = mcast_addr_.unserialize(buf, buflen, off));
         return off;
     }
-    
-    size_t serialize(gu::byte_t* buf, const size_t buflen, 
+
+    size_t serialize(gu::byte_t* buf, const size_t buflen,
                      const size_t offset) const
     {
         size_t  off;
@@ -51,9 +51,9 @@ public:
         gu_trace (off = mcast_addr_.serialize(buf, buflen, off));
         return off;
     }
-    
+
     static size_t serial_size() { return (4 + 2 * ADDR_SIZE); }
-    
+
 private:
     static const size_t ADDR_SIZE = 64;
     gcomm::String<ADDR_SIZE> addr_;

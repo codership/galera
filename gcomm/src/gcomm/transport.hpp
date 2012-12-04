@@ -34,25 +34,14 @@ namespace gcomm
 class gcomm::Transport : public Protolay
 {
 public:
-    typedef enum {
-        S_CLOSED,
-        S_CONNECTING,
-        S_CONNECTED,
-        S_CLOSING,
-        S_LISTENING,
-        S_FAILED
-    } State;
-
     virtual ~Transport();
 
-    virtual size_t      get_mtu()          const = 0;
-    virtual bool        supports_uuid()    const;
-    virtual const UUID& get_uuid()         const;
-    virtual std::string get_local_addr()   const;
-    virtual std::string get_remote_addr()  const;
+    virtual size_t      mtu()           const = 0;
+    virtual const UUID& uuid()          const = 0;
+    virtual std::string local_addr()    const;
+    virtual std::string remote_addr()   const;
 
-    virtual State        get_state() const;
-    int                  get_errno() const;
+    int                 err_no()        const;
 
     virtual void connect() = 0;
     virtual void connect(const gu::URI& uri)
@@ -67,7 +56,7 @@ public:
     }
 
     virtual void        listen();
-    virtual std::string get_listen_addr() const
+    virtual std::string listen_addr() const
     {
         gu_throw_fatal << "not supported";
         throw;
@@ -84,22 +73,19 @@ public:
                                 << uri_.get_scheme();
     }
 
-    virtual int  handle_down(gu::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up  (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
+    virtual int  handle_down(Datagram&, const ProtoDownMeta&) = 0;
+    virtual void handle_up  (const void*, const Datagram&, const ProtoUpMeta&) = 0;
     virtual void handle_stable_view(const View& view) { }
-    Protostack& get_pstack() { return pstack_; }
-    Protonet&   get_pnet()   { return pnet_; }
+    Protostack& pstack() { return pstack_; }
+    Protonet&   pnet()   { return pnet_; }
 
     static Transport* create(Protonet&, const std::string&);
     static Transport* create(Protonet&, const gu::URI&);
 protected:
     Transport (Protonet&, const gu::URI&);
-    void              set_state(State);
     Protostack        pstack_;
     Protonet&         pnet_;
     gu::URI           uri_;
-
-    State             state_;
     int               error_no_;
 
 private:

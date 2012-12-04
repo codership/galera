@@ -8,47 +8,28 @@
 #include "pc.hpp"
 #include "gcomm/conf.hpp"
 
-
-// Private methods
-
-void gcomm::Transport::set_state(const State state)
-{
-    state_ = state;
-}
-
 // Public methods
 
-bool gcomm::Transport::supports_uuid() const
-{
-    return false;
-}
-
-const gcomm::UUID& gcomm::Transport::get_uuid() const
+const gcomm::UUID& gcomm::Transport::uuid() const
 {
     gu_throw_fatal << "UUID not supported by " + uri_.get_scheme();
     throw;
 }
 
-std::string gcomm::Transport::get_local_addr() const
+std::string gcomm::Transport::local_addr() const
 {
     gu_throw_fatal << "get local url not supported";
     throw;
 }
 
-std::string gcomm::Transport::get_remote_addr() const
+std::string gcomm::Transport::remote_addr() const
 {
     gu_throw_fatal << "get remote url not supported";
     throw;
 }
 
 
-
-gcomm::Transport::State gcomm::Transport::get_state() const
-{
-    return state_;
-}
-
-int gcomm::Transport::get_errno() const
+int gcomm::Transport::err_no() const
 {
     return error_no_;
 }
@@ -73,7 +54,6 @@ gcomm::Transport::Transport(Protonet& pnet, const gu::URI& uri)
     pstack_(),
     pnet_(pnet),
     uri_(uri),
-    state_(S_CLOSED),
     error_no_(0)
 { }
 

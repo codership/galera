@@ -8,10 +8,10 @@
  * Classes for tracing views and messages
  */
 
-#include "gu_datagram.hpp"
 #include "gu_uri.hpp"
 #include "gu_datetime.hpp"
 
+#include "gcomm/datagram.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/protostack.hpp"
@@ -31,32 +31,32 @@ namespace gcomm
     class TraceMsg
     {
     public:
-        TraceMsg(const UUID& source_           = UUID::nil(),
-                 const ViewId& source_view_id_ = ViewId(),
-                 const int64_t seq_            = -1) :
-            source(source_),
-            source_view_id(source_view_id_),
-            seq(seq_)
+        TraceMsg(const UUID& source           = UUID::nil(),
+                 const ViewId& source_view_id = ViewId(),
+                 const int64_t seq            = -1) :
+            source_(source),
+            source_view_id_(source_view_id),
+            seq_(seq)
         { }
 
-        const UUID& get_source() const { return source; }
+        const UUID& source() const { return source_; }
 
-        const ViewId& get_source_view_id() const { return source_view_id; }
+        const ViewId& source_view_id() const { return source_view_id_; }
 
-        int64_t get_seq() const { return seq; }
+        int64_t seq() const { return seq_; }
 
         bool operator==(const TraceMsg& cmp) const
         {
-            return (source         == cmp.source         &&
-                    source_view_id == cmp.source_view_id &&
-                    seq            == cmp.seq              );
+            return (source_         == cmp.source_         &&
+                    source_view_id_ == cmp.source_view_id_ &&
+                    seq_            == cmp.seq_              );
 
         }
 
     private:
-        UUID    source;
-        ViewId  source_view_id;
-        int64_t seq;
+        UUID    source_;
+        ViewId  source_view_id_;
+        int64_t seq_;
     };
 
     std::ostream& operator<<(std::ostream& os, const TraceMsg& msg);
@@ -64,68 +64,68 @@ namespace gcomm
     class ViewTrace
     {
     public:
-        ViewTrace(const View& view_) : view(view_), msgs() { }
+        ViewTrace(const View& view) : view_(view), msgs_() { }
 
         void insert_msg(const TraceMsg& msg)
             throw (gu::Exception)
         {
-            switch (view.get_type())
+            switch (view_.type())
             {
             case V_REG:
-                gcomm_assert(view.get_id() == msg.get_source_view_id());
-                gcomm_assert(contains(msg.get_source()) == true)
-                    << "msg source " << msg.get_source() << " not int view "
-                    << view;
+                gcomm_assert(view_.id() == msg.source_view_id());
+                gcomm_assert(contains(msg.source()) == true)
+                    << "msg source " << msg.source() << " not int view "
+                    << view_;
                 break;
             case V_TRANS:
-                gcomm_assert(view.get_id().get_uuid() ==
-                             msg.get_source_view_id().get_uuid() &&
-                             view.get_id().get_seq() ==
-                             msg.get_source_view_id().get_seq());
+                gcomm_assert(view_.id().uuid() ==
+                             msg.source_view_id().uuid() &&
+                             view_.id().seq() ==
+                             msg.source_view_id().seq());
                 break;
             case V_NON_PRIM:
                 break;
             case V_PRIM:
-                gcomm_assert(view.get_id() == msg.get_source_view_id())
-                    << " view id " << view.get_id()
-                    <<  " source view " << msg.get_source_view_id();
-                gcomm_assert(contains(msg.get_source()) == true);
+                gcomm_assert(view_.id() == msg.source_view_id())
+                    << " view id " << view_.id()
+                    <<  " source view " << msg.source_view_id();
+                gcomm_assert(contains(msg.source()) == true);
                 break;
             case V_NONE:
                 gu_throw_fatal;
                 break;
             }
 
-            if (view.get_type() != V_NON_PRIM)
+            if (view_.type() != V_NON_PRIM)
             {
-                msgs.push_back(msg);
+                msgs_.push_back(msg);
             }
         }
 
-        const View& get_view() const { return view; }
+        const View& view() const { return view_; }
 
-        const std::deque<TraceMsg>& get_msgs() const { return msgs; }
+        const std::deque<TraceMsg>& msgs() const { return msgs_; }
 
         bool operator==(const ViewTrace& cmp) const
         {
             // Note: Cannot compare joining members since seen differently
             // on different merging subsets
-            return (view.get_members()     == cmp.view.get_members()     &&
-                    view.get_left()        == cmp.view.get_left()        &&
-                    view.get_partitioned() == cmp.view.get_partitioned() &&
-                    msgs                   == cmp.msgs                     );
+            return (view_.members()     == cmp.view_.members()     &&
+                    view_.left()        == cmp.view_.left()        &&
+                    view_.partitioned() == cmp.view_.partitioned() &&
+                    msgs_              == cmp.msgs_                     );
         }
     private:
 
         bool contains(const UUID& uuid) const
         {
-            return (view.get_members().find(uuid) != view.get_members().end() ||
-                    view.get_left().find(uuid)    != view.get_left().end() ||
-                    view.get_partitioned().find(uuid) != view.get_partitioned().end());
+            return (view_.members().find(uuid) != view_.members().end() ||
+                    view_.left().find(uuid)    != view_.left().end() ||
+                    view_.partitioned().find(uuid) != view_.partitioned().end());
         }
 
-        View       view;
-        std::deque<TraceMsg> msgs;
+        View       view_;
+        std::deque<TraceMsg> msgs_;
     };
 
     std::ostream& operator<<(std::ostream& os, const ViewTrace& vtr);
@@ -136,31 +136,31 @@ namespace gcomm
     public:
         class ViewTraceMap : public Map<ViewId, ViewTrace> { };
 
-        Trace() : views(), current_view(views.end()) { }
+        Trace() : views_(), current_view_(views_.end()) { }
 
         void insert_view(const View& view)
         {
-            gu_trace(current_view = views.insert_unique(
-                         std::make_pair(view.get_id(), ViewTrace(view))));
+            gu_trace(current_view_ = views_.insert_unique(
+                         std::make_pair(view.id(), ViewTrace(view))));
 
             log_debug << view;
         }
         void insert_msg(const TraceMsg& msg)
         {
-            gcomm_assert(current_view != views.end()) << "no view set before msg delivery";
-            gu_trace(ViewTraceMap::get_value(current_view).insert_msg(msg));
+            gcomm_assert(current_view_ != views_.end()) << "no view set before msg delivery";
+            gu_trace(ViewTraceMap::value(current_view_).insert_msg(msg));
         }
-        const ViewTraceMap& get_view_traces() const { return views; }
+        const ViewTraceMap& view_traces() const { return views_; }
 
-        const ViewTrace& get_current_view_trace() const
+        const ViewTrace& current_view_trace() const
         {
-            gcomm_assert(current_view != views.end());
-            return ViewTraceMap::get_value(current_view);
+            gcomm_assert(current_view_ != views_.end());
+            return ViewTraceMap::value(current_view_);
         }
 
     private:
-        ViewTraceMap views;
-        ViewTraceMap::iterator current_view;
+        ViewTraceMap views_;
+        ViewTraceMap::iterator current_view_;
     };
 
 
@@ -168,30 +168,27 @@ namespace gcomm
 
     class DummyTransport : public Transport
     {
-        UUID uuid;
-        std::deque<gu::Datagram*> out;
-        bool queue;
+        UUID uuid_;
+        std::deque<Datagram*> out_;
+        bool queue_;
     public:
-        DummyTransport(const UUID& uuid_ = UUID::nil(), bool queue_ = true,
+        DummyTransport(const UUID& uuid = UUID::nil(), bool queue = true,
                        const gu::URI& uri = gu::URI("dummy:")) :
             Transport(*std::auto_ptr<Protonet>(Protonet::create(check_trace_conf)),
                       uri),
-            uuid(uuid_),
-            out(),
-            queue(queue_)
+            uuid_(uuid),
+            out_(),
+            queue_(queue)
         {}
 
         ~DummyTransport()
         {
-            out.clear();
+            out_.clear();
         }
 
-        bool supports_uuid() const { return true; }
+        const UUID& uuid() const { return uuid_; }
 
-        const UUID& get_uuid() const { return uuid; }
-
-
-        size_t get_mtu() const { return (1U << 31); }
+        size_t mtu() const { return (1U << 31); }
 
         void connect(bool first) { }
 
@@ -211,34 +208,34 @@ namespace gcomm
             return 0;
         }
 
-        void handle_up(const void* cid, const gu::Datagram& rb,
+        void handle_up(const void* cid, const Datagram& rb,
                        const ProtoUpMeta& um)
         {
             send_up(rb, um);
         }
 
-        int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm)
+        int handle_down(Datagram& wb, const ProtoDownMeta& dm)
         {
-            if (queue == true)
+            if (queue_ == true)
             {
-                // assert(wb.get_header().size() == 0);
-                out.push_back(new gu::Datagram(wb));
+                // assert(wb.header().size() == 0);
+                out_.push_back(new Datagram(wb));
                 return 0;
             }
             else
             {
-                gu_trace(return send_down(wb, ProtoDownMeta(0xff, O_UNRELIABLE, uuid)));
+                gu_trace(return send_down(wb, ProtoDownMeta(0xff, O_UNRELIABLE, uuid_)));
             }
         }
 
-        gu::Datagram* get_out()
+        Datagram* out()
         {
-            if (out.empty())
+            if (out_.empty())
             {
                 return 0;
             }
-            gu::Datagram* rb = out.front();
-            out.pop_front();
+            Datagram* rb = out_.front();
+            out_.pop_front();
             return rb;
         }
     };
@@ -248,20 +245,20 @@ namespace gcomm
     {
     public:
         DummyNode(gu::Config& conf,
-                  const size_t index_,
-                  const std::list<Protolay*>& protos_) :
+                  const size_t index,
+                  const std::list<Protolay*>& protos) :
             Toplay (conf),
-            index  (index_),
-            uuid   (UUID(static_cast<int32_t>(index))),
-            protos (protos_),
-            cvi    (),
-            tr     (),
-            curr_seq(0)
+            index_  (index),
+            uuid_   (UUID(static_cast<int32_t>(index))),
+            protos_ (protos),
+            cvi_    (),
+            tr_     (),
+            curr_seq_(0)
         {
-            gcomm_assert(protos.empty() == false);
+            gcomm_assert(protos_.empty() == false);
             std::list<Protolay*>::iterator i, i_next;
-            i = i_next = protos.begin();
-            for (++i_next; i_next != protos.end(); ++i, ++i_next)
+            i = i_next = protos_.begin();
+            for (++i_next; i_next != protos_.end(); ++i, ++i_next)
             {
                 gu_trace(gcomm::connect(*i, *i_next));
             }
@@ -271,33 +268,33 @@ namespace gcomm
         ~DummyNode()
         {
             std::list<Protolay*>::iterator i, i_next;
-            i = i_next = protos.begin();
-            for (++i_next; i_next != protos.end(); ++i, ++i_next)
+            i = i_next = protos_.begin();
+            for (++i_next; i_next != protos_.end(); ++i, ++i_next)
             {
                 gu_trace(gcomm::disconnect(*i, *i_next));
             }
             gu_trace(gcomm::disconnect(*i, this));
-            std::for_each(protos.begin(), protos.end(), gu::DeleteObject());
+            std::for_each(protos_.begin(), protos_.end(), gu::DeleteObject());
         }
 
 
-        const UUID& get_uuid() const { return uuid; }
+        const UUID& uuid() const { return uuid_; }
 
-        std::list<Protolay*>& get_protos() { return protos; }
+        std::list<Protolay*>& protos() { return protos_; }
 
-        size_t get_index() const { return index; }
+        size_t index() const { return index_; }
 
         void connect(bool first)
         {
-            gu_trace(std::for_each(protos.rbegin(), protos.rend(),
+            gu_trace(std::for_each(protos_.rbegin(), protos_.rend(),
                                    std::bind2nd(
                                        std::mem_fun(&Protolay::connect), first)));
         }
 
         void close()
         {
-            for (std::list<Protolay*>::iterator i = protos.begin();
-                 i != protos.end(); ++i)
+            for (std::list<Protolay*>::iterator i = protos_.begin();
+                 i != protos_.end(); ++i)
             {
                 (*i)->close();
             }
@@ -308,8 +305,8 @@ namespace gcomm
 
         void close(const UUID& uuid)
         {
-            for (std::list<Protolay*>::iterator i = protos.begin();
-                 i != protos.end(); ++i)
+            for (std::list<Protolay*>::iterator i = protos_.begin();
+                 i != protos_.end(); ++i)
             {
                 (*i)->close(uuid);
             }
@@ -319,11 +316,11 @@ namespace gcomm
 
         void send()
         {
-            const int64_t seq(curr_seq);
+            const int64_t seq(curr_seq_);
             gu::byte_t buf[sizeof(seq)];
             size_t sz;
             gu_trace(sz = gu::serialize8(seq, buf, sizeof(buf), 0));
-            gu::Datagram dg(gu::Buffer(buf, buf + sz));
+            Datagram dg(gu::Buffer(buf, buf + sz));
             int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
             {
@@ -331,27 +328,27 @@ namespace gcomm
             }
             else
             {
-                ++curr_seq;
+                ++curr_seq_;
             }
         }
 
-        const Trace& get_trace() const { return tr; }
+        const Trace& trace() const { return tr_; }
 
         void set_cvi(const ViewId& vi)
         {
-            log_debug << get_uuid() << " setting cvi to " << vi;
-            cvi = vi;
+            log_debug << uuid() << " setting cvi to " << vi;
+            cvi_ = vi;
         }
 
         bool in_cvi() const
         {
             for (Trace::ViewTraceMap::const_reverse_iterator i(
-                     tr.get_view_traces().rbegin());
-                 i != tr.get_view_traces().rend(); ++i)
+                     tr_.view_traces().rbegin());
+                 i != tr_.view_traces().rend(); ++i)
             {
-                if (i->first.get_uuid() == cvi.get_uuid() &&
-                    i->first.get_type() == cvi.get_type() &&
-                    i->first.get_seq()  >= cvi.get_seq())
+                if (i->first.uuid() == cvi_.uuid() &&
+                    i->first.type() == cvi_.type() &&
+                    i->first.seq()  >= cvi_.seq())
                 {
                     return true;
                 }
@@ -359,21 +356,21 @@ namespace gcomm
             return false;
         }
 
-        void handle_up(const void* cid, const gu::Datagram& rb,
+        void handle_up(const void* cid, const Datagram& rb,
                        const ProtoUpMeta& um)
         {
-            if (rb.get_len() != 0)
+            if (rb.len() != 0)
             {
-                gcomm_assert((um.get_source() == UUID::nil()) == false);
-                // assert(rb.get_header().size() == 0);
-                const gu::byte_t* begin(get_begin(rb));
-                const size_t available(get_available(rb));
+                gcomm_assert((um.source() == UUID::nil()) == false);
+                // assert(rb.header().size() == 0);
+                const gu::byte_t* begin(gcomm::begin(rb));
+                const size_t available(gcomm::available(rb));
 
 
-                // log_debug << um.get_source() << " " << get_uuid()
+                // log_debug << um.source() << " " << uuid()
                 //         << " " << available ;
-                // log_debug << rb.get_len() << " " << rb.get_offset() << " "
-                //         << rb.get_header_len();
+                // log_debug << rb.len() << " " << rb.offset() << " "
+                //         << rb.header_len();
                 if (available != 8)
                 {
                     log_info << "check_trace fail";
@@ -384,31 +381,31 @@ namespace gcomm
                                           available,
                                           0,
                                           seq));
-                tr.insert_msg(TraceMsg(um.get_source(), um.get_source_view_id(),
-                                       seq));
+                tr_.insert_msg(TraceMsg(um.source(), um.source_view_id(),
+                                        seq));
             }
             else
             {
                 gcomm_assert(um.has_view() == true);
-                tr.insert_view(um.get_view());
+                tr_.insert_view(um.view());
             }
         }
 
 
         gu::datetime::Date handle_timers()
         {
-            std::for_each(protos.begin(), protos.end(),
+            std::for_each(protos_.begin(), protos_.end(),
                           std::mem_fun(&Protolay::handle_timers));
             return gu::datetime::Date::max();
         }
 
     private:
-        size_t index;
-        UUID uuid;
-        std::list<Protolay*> protos;
-        ViewId cvi;
-        Trace tr;
-        int64_t curr_seq;
+        size_t index_;
+        UUID uuid_;
+        std::list<Protolay*> protos_;
+        ViewId cvi_;
+        Trace tr_;
+        int64_t curr_seq_;
     };
 
 
@@ -416,16 +413,16 @@ namespace gcomm
     class ChannelMsg
     {
     public:
-        ChannelMsg(const gu::Datagram& rb_, const UUID& source_) :
-            rb(rb_),
-            source(source_)
+        ChannelMsg(const Datagram& rb, const UUID& source) :
+            rb_(rb),
+            source_(source)
         {
         }
-        const gu::Datagram& get_rb() const { return rb; }
-        const UUID& get_source() const { return source; }
+        const Datagram& rb() const { return rb_; }
+        const UUID& source() const { return source_; }
     private:
-        gu::Datagram rb;
-        UUID source;
+        Datagram rb_;
+        UUID source_;
     };
 
 
@@ -433,48 +430,48 @@ namespace gcomm
     {
     public:
         Channel(gu::Config& conf,
-                const size_t ttl_ = 1,
-                const size_t latency_ = 1,
-                const double loss_ = 1.) :
+                const size_t ttl = 1,
+                const size_t latency = 1,
+                const double loss = 1.) :
             Bottomlay(conf),
-            ttl(ttl_),
-            latency(latency_),
-            loss(loss_),
-            queue()
+            ttl_(ttl),
+            latency_(latency),
+            loss_(loss),
+            queue_()
         { }
 
 
 
         ~Channel() { }
 
-        int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm)
+        int handle_down(Datagram& wb, const ProtoDownMeta& dm)
         {
-            gcomm_assert((dm.get_source() == UUID::nil()) == false);
-            gu_trace(put(wb, dm.get_source()));
+            gcomm_assert((dm.source() == UUID::nil()) == false);
+            gu_trace(put(wb, dm.source()));
             return 0;
         }
 
-        void put(const gu::Datagram& rb, const UUID& source);
+        void put(const Datagram& rb, const UUID& source);
         ChannelMsg get();
-        void set_ttl(const size_t t) { ttl = t; }
-        size_t get_ttl() const { return ttl; }
+        void set_ttl(const size_t t) { ttl_ = t; }
+        size_t ttl() const { return ttl_; }
         void set_latency(const size_t l)
         {
             gcomm_assert(l > 0);
-            latency = l;
+            latency_ = l;
         }
-        size_t get_latency() const { return latency; }
-        void set_loss(const double l) { loss = l; }
-        double get_loss() const { return loss; }
-        size_t get_n_msgs() const
+        size_t latency() const { return latency_; }
+        void set_loss(const double l) { loss_ = l; }
+        double loss() const { return loss_; }
+        size_t n_msgs() const
         {
-            return queue.size();
+            return queue_.size();
         }
     private:
-        size_t ttl;
-        size_t latency;
-        double loss;
-        std::deque<std::pair<size_t, ChannelMsg> > queue;
+        size_t ttl_;
+        size_t latency_;
+        double loss_;
+        std::deque<std::pair<size_t, ChannelMsg> > queue_;
     };
 
 
@@ -487,16 +484,16 @@ namespace gcomm
     class MatrixElem
     {
     public:
-        MatrixElem(const size_t ii_, const size_t jj_) : ii(ii_), jj(jj_) { }
-        size_t get_ii() const { return ii; }
-        size_t get_jj() const { return jj; }
+        MatrixElem(const size_t ii, const size_t jj) : ii_(ii), jj_(jj) { }
+        size_t ii() const { return ii_; }
+        size_t jj() const { return jj_; }
         bool operator<(const MatrixElem& cmp) const
         {
-            return (ii < cmp.ii || (ii == cmp.ii && jj < cmp.jj));
+            return (ii_ < cmp.ii_ || (ii_ == cmp.ii_ && jj_ < cmp.jj_));
         }
     private:
-        size_t ii;
-        size_t jj;
+        size_t ii_;
+        size_t jj_;
     };
 
     std::ostream& operator<<(std::ostream& os, const MatrixElem& me);
@@ -508,7 +505,7 @@ namespace gcomm
         {
             void operator()(ChannelMap::value_type& vt)
             {
-                delete ChannelMap::get_value(vt);
+                delete ChannelMap::value(vt);
             }
         };
     };
@@ -518,7 +515,7 @@ namespace gcomm
         {
             void operator()(NodeMap::value_type& vt)
             {
-                delete NodeMap::get_value(vt);
+                delete NodeMap::value(vt);
             }
         };
 
@@ -527,7 +524,7 @@ namespace gcomm
     class PropagationMatrix
     {
     public:
-        PropagationMatrix() : tp(), prop() { }
+        PropagationMatrix() : tp_(), prop_() { }
         ~PropagationMatrix();
 
         void insert_tp(DummyNode* t);
@@ -546,8 +543,8 @@ namespace gcomm
         size_t count_channel_msgs() const;
         bool all_in_cvi() const;
 
-        NodeMap    tp;
-        ChannelMap prop;
+        NodeMap    tp_;
+        ChannelMap prop_;
     };
 
 

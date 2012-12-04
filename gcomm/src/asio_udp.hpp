@@ -25,14 +25,14 @@ public:
     ~AsioUdpSocket();
     void connect(const gu::URI& uri);
     void close();
-    int send(const gu::Datagram& dg);
+    int send(const Datagram& dg);
     void read_handler(const asio::error_code&, size_t);
     void async_receive();
-    size_t get_mtu() const;
-    std::string get_local_addr() const;
-    std::string get_remote_addr() const;
-    State get_state() const { return state_; }
-    SocketId get_id() const { return &socket_; }
+    size_t mtu() const;
+    std::string local_addr() const;
+    std::string remote_addr() const;
+    State state() const { return state_; }
+    SocketId id() const { return &socket_; }
 
 private:
     AsioProtonet&            net_;

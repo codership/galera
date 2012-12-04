@@ -118,9 +118,9 @@ public:
     //
     static Protonet* create(gu::Config& conf);
 
-    const std::string& get_type() const { return type_; }
+    const std::string& type() const { return type_; }
 
-    virtual size_t get_mtu() const = 0;
+    virtual size_t mtu() const = 0;
 
 protected:
 

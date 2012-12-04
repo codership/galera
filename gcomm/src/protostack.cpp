@@ -6,13 +6,6 @@
 #include "socket.hpp"
 #include "gcomm/util.hpp"
 
-using namespace std;
-using namespace std::rel_ops;
-using namespace gu;
-using namespace gu::datetime;
-using namespace gcomm;
-
-
 void gcomm::Protostack::push_proto(Protolay* p)
 {
     Critical<Protostack> crit(*this);

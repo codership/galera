@@ -52,10 +52,10 @@ public:
     void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
     void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
 
-    bool          get_prim()      const { return prim_     ; }
-    uint32_t      get_last_seq()  const { return last_seq_ ; }
-    const ViewId& get_last_prim() const { return last_prim_; }
-    int64_t       get_to_seq()    const { return to_seq_   ; }
+    bool          prim()      const { return prim_     ; }
+    uint32_t      last_seq()  const { return last_seq_ ; }
+    const ViewId& last_prim() const { return last_prim_; }
+    int64_t       to_seq()    const { return to_seq_   ; }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
@@ -103,10 +103,10 @@ public:
 
     bool operator==(const Node& cmp) const
     {
-        return get_prim()   == cmp.get_prim()      &&
-            get_last_seq()  == cmp.get_last_seq()  &&
-            get_last_prim() == cmp.get_last_prim() &&
-            get_to_seq()    == cmp.get_to_seq();
+        return prim()   == cmp.prim()      &&
+            last_seq()  == cmp.last_seq()  &&
+            last_prim() == cmp.last_prim() &&
+            to_seq()    == cmp.to_seq();
     }
 
     std::string to_string() const
@@ -183,9 +183,9 @@ public:
     virtual ~Message() { }
 
 
-    int      get_version()  const { return version_; }
-    Type     get_type()     const { return type_; }
-    uint32_t get_seq()      const { return seq_; }
+    int      version()  const { return version_; }
+    Type     type()     const { return type_; }
+    uint32_t seq()      const { return seq_; }
 
     void flags(int flags) { flags_ = flags; }
     int flags() const { return flags_; }
@@ -203,11 +203,11 @@ public:
     }
     uint16_t checksum() const { return crc16_; }
 
-    const NodeMap& get_node_map() const { return node_map_; }
-    NodeMap&       get_node_map()       { return node_map_; }
+    const NodeMap& node_map() const { return node_map_; }
+    NodeMap&       node_map()       { return node_map_; }
 
-    const Node&    get_node(const UUID& uuid) const
-    { return NodeMap::get_value(node_map_.find_checked(uuid)); }
+    const Node&    node(const UUID& uuid) const
+    { return NodeMap::value(node_map_.find_checked(uuid)); }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
@@ -285,7 +285,7 @@ public:
 
         ret << "pcmsg{ type=" << to_string(type_) << ", seq=" << seq_;
         ret << ", flags=" << std::setw(2) << std::hex << flags_;
-        ret << ", node_map {" << get_node_map() << "}";
+        ret << ", node_map {" << node_map() << "}";
         ret << '}';
 
         return ret.str();
@@ -332,11 +332,11 @@ public:
 
 inline bool gcomm::pc::operator==(const Message& a, const Message& b)
 {
-    return (a.get_version()  == b.get_version() &&
+    return (a.version()  == b.version() &&
             a.checksum()     == b.checksum()    &&
-            a.get_type()     == b.get_type()    &&
-            a.get_seq()      == b.get_seq()     &&
-            a.get_node_map() == b.get_node_map());
+            a.type()     == b.type()    &&
+            a.seq()      == b.seq()     &&
+            a.node_map() == b.node_map());
 }
 
 

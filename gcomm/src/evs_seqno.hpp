@@ -18,7 +18,7 @@ namespace gcomm
     namespace evs
     {
         typedef int64_t seqno_t;
-        
+
         class Range;
         std::ostream& operator<<(std::ostream&, const Range&);
     }
@@ -35,26 +35,26 @@ public:
         lu_(lu),
         hs_(hs)
     {}
-    seqno_t get_lu() const { return lu_; }
-    seqno_t get_hs() const { return hs_; }
-    
+    seqno_t lu() const { return lu_; }
+    seqno_t hs() const { return hs_; }
+
     void set_lu(const seqno_t s) { lu_ = s; }
     void set_hs(const seqno_t s) { hs_ = s; }
-    
+
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
         gu_trace(offset = gu::serialize8(lu_, buf, buflen, offset));
         gu_trace(offset = gu::serialize8(hs_, buf, buflen, offset));
         return offset;
     }
-    
+
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
         gu_trace(offset = gu::unserialize8(buf, buflen, offset, lu_));
         gu_trace(offset = gu::unserialize8(buf, buflen, offset, hs_));
         return offset;
     }
-    
+
     static size_t serial_size()
     {
         return 2 * sizeof(seqno_t);
@@ -72,7 +72,7 @@ private:
 
 inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Range& r)
 {
-    return (os << "[" << r.get_lu() << "," << r.get_hs() << "]");
+    return (os << "[" << r.lu() << "," << r.hs() << "]");
 }
 
 #endif // EVS_SEQNO_HPP

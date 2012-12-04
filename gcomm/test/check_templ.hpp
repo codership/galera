@@ -15,14 +15,14 @@
 namespace gcomm
 {
 
-    
+
     template<class T>
-    void check_serialization(const T& c, const size_t expected_size, 
+    void check_serialization(const T& c, const size_t expected_size,
                              const T& default_c)
     {
-        
-        fail_unless(c.serial_size() == expected_size, 
-                    "size = %lu expected = %lu", 
+
+        fail_unless(c.serial_size() == expected_size,
+                    "size = %lu expected = %lu",
                     c.serial_size(), expected_size);
         gu::byte_t* buf = new gu::byte_t[expected_size + 7];
         size_t ret;
@@ -37,7 +37,7 @@ namespace gcomm
             // OK
         }
         fail_unless(c.serialize(buf, expected_size, 0) == expected_size);
-    
+
         T c2(default_c);
 
         try
@@ -56,12 +56,12 @@ namespace gcomm
             log_warn << "\n\t" << c << " !=\n\t" << c2;
         }
         fail_unless(c == c2);
-    
+
         // Check that read/write return offset properly
-    
+
         fail_unless(c.serialize(buf, expected_size + 7, 5) == expected_size + 5);
         fail_unless(c2.unserialize(buf, expected_size + 7, 5) == expected_size + 5);
-    
+
         fail_unless(c == c2);
 
         delete[] buf;

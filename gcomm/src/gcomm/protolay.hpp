@@ -18,10 +18,10 @@
 #include "gcomm/view.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/order.hpp"
+#include "gcomm/datagram.hpp"
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
-#include "gu_datagram.hpp"
 #include "gu_config.hpp"
 
 #include <cerrno>
@@ -77,88 +77,88 @@ namespace gcomm
 class gcomm::ProtoUpMeta
 {
 public:
-    ProtoUpMeta(const int err_no_) :
-        source(),
-        source_view_id(),
-        user_type(),
-        order(),
-        to_seq(),
-        err_no(err_no_),
-        view(0)
+    ProtoUpMeta(const int err_no) :
+        source_(),
+        source_view_id_(),
+        user_type_(),
+        order_(),
+        to_seq_(),
+        err_no_(err_no),
+        view_(0)
     { }
 
-    ProtoUpMeta(const UUID    source_         = UUID::nil(),
-                const ViewId  source_view_id_ = ViewId(),
-                const View*   view_           = 0,
-                const uint8_t user_type_      = 0xff,
-                const Order   order_          = O_DROP,
-                const int64_t to_seq_         = -1,
-                const int err_no_ = 0) :
-        source         (source_      ),
-        source_view_id (source_view_id_ ),
-        user_type      (user_type_   ),
-        order          (order_),
-        to_seq         (to_seq_      ),
-        err_no         (err_no_),
-        view           (view_ != 0 ? new View(*view_) : 0)
+    ProtoUpMeta(const UUID    source         = UUID::nil(),
+                const ViewId  source_view_id = ViewId(),
+                const View*   view           = 0,
+                const uint8_t user_type      = 0xff,
+                const Order   order          = O_DROP,
+                const int64_t to_seq         = -1,
+                const int err_no = 0) :
+        source_         (source         ),
+        source_view_id_ (source_view_id ),
+        user_type_      (user_type      ),
+        order_          (order          ),
+        to_seq_         (to_seq         ),
+        err_no_         (err_no         ),
+        view_           (view != 0 ? new View(*view) : 0)
     { }
 
     ProtoUpMeta(const ProtoUpMeta& um) :
-        source         (um.source      ),
-        source_view_id (um.source_view_id ),
-        user_type      (um.user_type   ),
-        order          (um.order       ),
-        to_seq         (um.to_seq      ),
-        err_no         (um.err_no),
-        view           (um.view ? new View(*um.view) : 0)
+        source_         (um.source_         ),
+        source_view_id_ (um.source_view_id_ ),
+        user_type_      (um.user_type_      ),
+        order_          (um.order_          ),
+        to_seq_         (um.to_seq_         ),
+        err_no_         (um.err_no_         ),
+        view_           (um.view_ ? new View(*um.view_) : 0)
     { }
 
-    ~ProtoUpMeta() { delete view; }
+    ~ProtoUpMeta() { delete view_; }
 
-    const UUID&   get_source()         const { return source; }
+    const UUID&   source()         const { return source_; }
 
-    const ViewId& get_source_view_id() const { return source_view_id; }
+    const ViewId& source_view_id() const { return source_view_id_; }
 
-    uint8_t       get_user_type()      const { return user_type; }
+    uint8_t       user_type()      const { return user_type_; }
 
-    Order         get_order()          const { return order; }
+    Order         order()          const { return order_; }
 
-    int64_t       get_to_seq()         const { return to_seq; }
+    int64_t       to_seq()         const { return to_seq_; }
 
-    int           get_errno()          const { return err_no; }
+    int           err_no()          const { return err_no_; }
 
-    bool          has_view()           const { return view != 0; }
+    bool          has_view()           const { return view_ != 0; }
 
-    const View&   get_view()           const { return *view; }
+    const View&   view()           const { return *view_; }
 
 private:
     ProtoUpMeta& operator=(const ProtoUpMeta&);
 
-    UUID    const source;
-    ViewId  const source_view_id;
-    uint8_t const user_type;
-    Order   const order;
-    int64_t const to_seq;
-    int     const err_no;
-    View*   const view;
+    UUID    const source_;
+    ViewId  const source_view_id_;
+    uint8_t const user_type_;
+    Order   const order_;
+    int64_t const to_seq_;
+    int     const err_no_;
+    View*   const view_;
 };
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 {
     os << "proto_up_meta: { ";
-    if (not (um.get_source() == UUID::nil()))
+    if (not (um.source() == UUID::nil()))
     {
-        os << "source=" << um.get_source() << ",";
+        os << "source=" << um.source() << ",";
     }
-    if (um.get_source_view_id().get_type() != V_NONE)
+    if (um.source_view_id().type() != V_NONE)
     {
-        os << "source_view_id=" << um.get_source_view_id() << ",";
+        os << "source_view_id=" << um.source_view_id() << ",";
     }
-    os << "user_type=" << static_cast<int>(um.get_user_type()) << ",";
-    os << "to_seq=" << um.get_to_seq() << ",";
+    os << "user_type=" << static_cast<int>(um.user_type()) << ",";
+    os << "to_seq=" << um.to_seq() << ",";
     if (um.has_view() == true)
     {
-        os << "view=" << um.get_view();
+        os << "view=" << um.view();
     }
     os << "}";
     return os;
@@ -168,21 +168,21 @@ inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 class gcomm::ProtoDownMeta
 {
 public:
-    ProtoDownMeta(const uint8_t user_type_ = 0xff,
-                  const Order   order_     = O_SAFE,
-                  const UUID&   uuid_      = UUID::nil()) :
-        user_type (user_type_),
-        order     (order_),
-        source    (uuid_)
+    ProtoDownMeta(const uint8_t user_type = 0xff,
+                  const Order   order     = O_SAFE,
+                  const UUID&   uuid      = UUID::nil()) :
+        user_type_ (user_type),
+        order_     (order),
+        source_    (uuid)
     { }
 
-    uint8_t     get_user_type() const { return user_type; }
-    Order       get_order()     const { return order;     }
-    const UUID& get_source()    const { return source;    }
+    uint8_t     user_type() const { return user_type_; }
+    Order       order()     const { return order_;     }
+    const UUID& source()    const { return source_;    }
 private:
-    const uint8_t user_type;
-    const Order   order;
-    const UUID    source;
+    const uint8_t user_type_;
+    const Order   order_;
+    const UUID    source_;
 };
 
 class gcomm::Protolay
@@ -212,8 +212,8 @@ public:
     virtual void close(const UUID& uuid) { }
 
     /* apparently handles data from upper layer. what is return value? */
-    virtual int  handle_down (gu::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up   (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
+    virtual int  handle_down (Datagram&, const ProtoDownMeta&) = 0;
+    virtual void handle_up   (const void*, const Datagram&, const ProtoUpMeta&) = 0;
 
     void set_up_context(Protolay *up)
     {
@@ -263,7 +263,7 @@ public:
     }
 
     /* apparently passed data buffer to the upper layer */
-    void send_up(const gu::Datagram& dg, const ProtoUpMeta& up_meta)
+    void send_up(const Datagram& dg, const ProtoUpMeta& up_meta)
     {
 	if (up_context_.empty() == true)
         {
@@ -279,7 +279,7 @@ public:
     }
 
     /* apparently passes data buffer to lower layer, what is return value? */
-    int send_down(gu::Datagram& dg, const ProtoDownMeta& down_meta)
+    int send_down(Datagram& dg, const ProtoDownMeta& down_meta)
     {
 	if (down_context_.empty() == true)
         {
@@ -291,11 +291,11 @@ public:
         for (CtxList::iterator i = down_context_.begin();
              i != down_context_.end(); ++i)
         {
-            const size_t hdr_offset(dg.get_header_offset());
+            const size_t hdr_offset(dg.header_offset());
             int err = (*i)->handle_down(dg, down_meta);
             // Verify that lower layer rolls back any modifications to
             // header
-            if (hdr_offset != dg.get_header_offset())
+            if (hdr_offset != dg.header_offset())
             {
                 gu_throw_fatal;
             }
@@ -328,7 +328,7 @@ public:
         return false;
     }
 
-    const Protolay* get_id() const { return this; }
+    const Protolay* id() const { return this; }
 
 };
 
@@ -337,7 +337,7 @@ class gcomm::Toplay : public Protolay
 public:
     Toplay(gu::Config& conf) : Protolay(conf) { }
 private:
-    int handle_down(gu::Datagram& dg, const ProtoDownMeta& dm)
+    int handle_down(Datagram& dg, const ProtoDownMeta& dm)
     {
 	gu_throw_fatal << "Toplay handle_down() called";
 	throw;
@@ -349,7 +349,7 @@ class gcomm::Bottomlay : public Protolay
 public:
     Bottomlay(gu::Config& conf) : Protolay(conf) { }
 private:
-    void handle_up(const void* id, const gu::Datagram&, const ProtoUpMeta& um)
+    void handle_up(const void* id, const Datagram&, const ProtoUpMeta& um)
     {
 	gu_throw_fatal << "Bottomlay handle_up() called";
     }

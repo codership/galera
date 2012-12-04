@@ -48,22 +48,22 @@ using namespace prof;
 class RecvBufData
 {
 public:
-    RecvBufData(const size_t source_idx_,
-                const Datagram& dgram_,
-                const ProtoUpMeta& um_) :
-        source_idx(source_idx_),
-        dgram(dgram_),
-        um(um_)
+    RecvBufData(const size_t source_idx,
+                const Datagram& dgram,
+                const ProtoUpMeta& um) :
+        source_idx_(source_idx),
+        dgram_     (dgram),
+        um_        (um)
     { }
 
-    size_t get_source_idx() const { return source_idx; }
-    const Datagram& get_dgram() const { return dgram; }
-    const ProtoUpMeta& get_um() const { return um; }
+    size_t get_source_idx() const { return source_idx_; }
+    const Datagram& get_dgram() const { return dgram_; }
+    const ProtoUpMeta& get_um() const { return um_; }
 
 private:
-    size_t source_idx;
-    Datagram dgram;
-    ProtoUpMeta um;
+    size_t source_idx_;
+    Datagram dgram_;
+    ProtoUpMeta um_;
 };
 
 
@@ -82,43 +82,43 @@ private:
 
 public:
 
-    RecvBuf() : mutex(), cond(), queue(), waiting(false) { }
+    RecvBuf() : mutex_(), cond_(), queue_(), waiting_(false) { }
 
     void push_back(const RecvBufData& p)
     {
-        Lock lock(mutex);
+        Lock lock(mutex_);
 
-        queue.push_back(p);
+        queue_.push_back(p);
 
-        if (waiting == true) { cond.signal(); }
+        if (waiting_ == true) { cond_.signal(); }
     }
 
     const RecvBufData& front(const Date& timeout) throw (Exception)
     {
-        Lock lock(mutex);
+        Lock lock(mutex_);
 
-        while (queue.empty())
+        while (queue_.empty())
         {
-            Waiting w(waiting);
+            Waiting w(waiting_);
             if (gu_likely (timeout == GU_TIME_ETERNITY))
             {
-                lock.wait(cond);
+                lock.wait(cond_);
             }
             else
             {
-                lock.wait(cond, timeout);
+                lock.wait(cond_, timeout);
             }
         }
-        assert (false == waiting);
+        assert (false == waiting_);
 
-        return queue.front();
+        return queue_.front();
     }
 
     void pop_front()
     {
-        Lock lock(mutex);
-        assert(queue.empty() == false);
-        queue.pop_front();
+        Lock lock(mutex_);
+        assert(queue_.empty() == false);
+        queue_.pop_front();
     }
 
 private:
@@ -130,36 +130,36 @@ private:
         void unlock() {}
     };
 
-    Mutex mutex;
-    Cond cond;
+    Mutex mutex_;
+    Cond cond_;
     deque<RecvBufData,
           boost::fast_pool_allocator<
               RecvBufData,
-              boost::default_user_allocator_new_delete, DummyMutex> > queue;
-    bool waiting;
+              boost::default_user_allocator_new_delete, DummyMutex> > queue_;
+    bool waiting_;
 };
 
 
 class MsgData : public MessageData
 {
 public:
-    MsgData(const byte_t* data_,
-            const size_t data_size_,
-            const gcs_msg_type_t msg_type_) :
-        data(data_),
-        data_size(data_size_),
-        msg_type(msg_type_)
+    MsgData(const byte_t* data,
+            const size_t data_size,
+            const gcs_msg_type_t msg_type) :
+        data_     (data),
+        data_size_(data_size),
+        msg_type_ (msg_type)
     { }
-    const byte_t* get_data() const { return data; }
-    size_t get_data_size() const { return data_size; }
-    gcs_msg_type_t get_msg_type() const { return msg_type; }
+    const byte_t* get_data() const { return data_; }
+    size_t get_data_size() const { return data_size_; }
+    gcs_msg_type_t get_msg_type() const { return msg_type_; }
 
 public:
     MsgData(const MsgData&);
     void operator=(const MsgData&);
-    const byte_t* data;
-    size_t  data_size;
-    gcs_msg_type_t msg_type;
+    const byte_t*  data_;
+    size_t         data_size_;
+    gcs_msg_type_t msg_type_;
 };
 
 
@@ -169,35 +169,29 @@ public:
 
     GCommConn(const URI& u, gu::Config& cnf) :
         Toplay(cnf),
-        conf(cnf),
-        uuid(),
-        thd(),
-        uri(u),
-        use_prod_cons(from_string<bool>(
-                          uri.get_option("gcomm.use_prod_cons", "false"))),
-        net(Protonet::create(conf)),
-        tp(0),
-        mutex(),
-        refcnt(0),
-        terminated(false),
-        error(0),
-        recv_buf(),
-        current_view(),
-        prof("gcs_gcomm")
+        conf_(cnf),
+        uuid_(),
+        thd_(),
+        uri_(u),
+        net_(Protonet::create(conf_)),
+        tp_(0),
+        mutex_(),
+        refcnt_(0),
+        terminated_(false),
+        error_(0),
+        recv_buf_(),
+        current_view_(),
+        prof_("gcs_gcomm")
     {
-        if (use_prod_cons == false)
-        {
-            log_debug << "gcomm: disabling prod/cons";
-        }
-        log_info << "backend: " << net->get_type();
+        log_info << "backend: " << net_->type();
     }
 
     ~GCommConn()
     {
-        delete net;
+        delete net_;
     }
 
-    const UUID& get_uuid() const { return uuid; }
+    const UUID& get_uuid() const { return uuid_; }
 
     static void* run_fn(void* arg)
     {
@@ -207,18 +201,19 @@ public:
 
     void connect(const string& channel)
     {
-        if (tp != 0)
+        if (tp_ != 0)
         {
             gu_throw_fatal << "backend connection already open";
         }
 
-        uri.set_option("gmcast.group", channel);
-        tp = Transport::create(*net, uri);
-        gcomm::connect(tp, this);
+        uri_.set_option("gmcast.group", channel);
+        tp_ = Transport::create(*net_, uri_);
+        gcomm::connect(tp_, this);
 
         string peer;
         URI::AuthorityList::const_iterator i, i_next;
-        for (i = uri.get_authority_list().begin(); i != uri.get_authority_list().end(); ++i)
+        for (i = uri_.get_authority_list().begin();
+             i != uri_.get_authority_list().end(); ++i)
         {
             i_next = i;
             ++i_next;
@@ -227,19 +222,19 @@ public:
             try { host = i->host(); } catch (NotSet&) { }
             try { port = i->port(); } catch (NotSet&) { }
             peer += host != "" ? host + ":" + port : "";
-            if (i_next != uri.get_authority_list().end())
+            if (i_next != uri_.get_authority_list().end())
             {
                 peer += ",";
             }
         }
         log_info << "gcomm: connecting to group '" << channel
                  << "', peer '" << peer << "'";
-        tp->connect();
-        uuid = tp->get_uuid();
+        tp_->connect();
+        uuid_ = tp_->uuid();
 
         int err;
 
-        if ((err = pthread_create(&thd, 0, &run_fn, this)) != 0)
+        if ((err = pthread_create(&thd_, 0, &run_fn, this)) != 0)
         {
             gu_throw_error(err);
         }
@@ -248,7 +243,7 @@ public:
 
     void close()
     {
-        if (tp == 0)
+        if (tp_ == 0)
         {
             log_warn << "gcomm: backend already closed";
             return;
@@ -256,12 +251,12 @@ public:
         log_info << "gcomm: terminating thread";
         terminate();
         log_info << "gcomm: joining thread";
-        pthread_join(thd, 0);
+        pthread_join(thd_, 0);
         log_info << "gcomm: closing backend";
-        tp->close(error != 0);
-        gcomm::disconnect(tp, this);
-        delete tp;
-        tp = 0;
+        tp_->close(error_ != 0);
+        gcomm::disconnect(tp_, this);
+        delete tp_;
+        tp_ = 0;
 
         const Message* msg;
 
@@ -270,18 +265,18 @@ public:
             return_ack(Message(&msg->get_producer(), 0, -ECONNABORTED));
         }
         log_info << "gcomm: closed";
-        log_debug << prof;
+        log_debug << prof_;
     }
 
     void run();
 
-    void notify() { net->interrupt(); }
+    void notify() { net_->interrupt(); }
 
     void terminate()
     {
-        Lock lock(mutex);
-        terminated = true;
-        net->interrupt();
+        Lock lock(mutex_);
+        terminated_ = true;
+        net_->interrupt();
     }
 
     void handle_up     (const void*        id,
@@ -290,29 +285,28 @@ public:
 
     void queue_and_wait(const Message& msg, Message* ack);
 
-    RecvBuf&    get_recv_buf()            { return recv_buf; }
+    RecvBuf&    get_recv_buf()            { return recv_buf_; }
     size_t      get_mtu()           const
     {
-        if (tp == 0)
+        if (tp_ == 0)
         {
             gu_throw_fatal << "GCommConn::get_mtu(): "
                            << "backend connection not open";
         }
-        return tp->get_mtu();
+        return tp_->mtu();
     }
-    bool        get_use_prod_cons() const { return use_prod_cons; }
-    Protonet&   get_pnet()                { return *net; }
-    gu::Config& get_conf()                { return conf; }
-    int         get_error() const         { return error; }
+    Protonet&   get_pnet()                { return *net_; }
+    gu::Config& get_conf()                { return conf_; }
+    int         get_error() const         { return error_; }
     class Ref
     {
     public:
 
-        Ref(gcs_backend_t* ptr, bool unset = false) : conn(0)
+        Ref(gcs_backend_t* ptr, bool unset = false) : conn_(0)
         {
             if (ptr->conn != 0)
             {
-                conn = reinterpret_cast<GCommConn*>(ptr->conn)->ref(unset);
+                conn_ = reinterpret_cast<GCommConn*>(ptr->conn)->ref(unset);
 
                 if (unset == true)
                 {
@@ -323,20 +317,20 @@ public:
 
         ~Ref()
         {
-            if (conn != 0)
+            if (conn_ != 0)
             {
-                conn->unref();
+                conn_->unref();
             }
         }
 
-        GCommConn* get() { return conn; }
+        GCommConn* get() { return conn_; }
 
     private:
 
         Ref(const Ref&);
         void operator=(const Ref&);
 
-        GCommConn* conn;
+        GCommConn* conn_;
     };
 
 private:
@@ -351,35 +345,35 @@ private:
 
     void unref() { }
 
-    gu::Config& conf;
-    UUID uuid;
-    pthread_t thd;
-    URI uri;
-    bool use_prod_cons;
-    Protonet* net;
-    Transport* tp;
-    Mutex mutex;
-    size_t refcnt;
-    bool terminated;
-    int error;
-    RecvBuf recv_buf;
-    View current_view;
-    Profile prof;
+    gu::Config& conf_;
+    UUID        uuid_;
+    pthread_t   thd_;
+    URI         uri_;
+    Protonet*   net_;
+    Transport*  tp_;
+    Mutex       mutex_;
+    size_t      refcnt_;
+    bool        terminated_;
+    int         error_;
+    RecvBuf     recv_buf_;
+    View        current_view_;
+    Profile     prof_;
 };
 
 
-void GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
+void
+GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
 {
-    if (um.get_errno() != 0)
+    if (um.err_no() != 0)
     {
-        error = um.get_errno();
-        recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
+        error_ = um.err_no();
+        recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
     }
     else if (um.has_view() == true)
     {
-        current_view = um.get_view();
-        recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
-        if (current_view.is_empty())
+        current_view_ = um.view();
+        recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
+        if (current_view_.is_empty())
         {
             log_debug << "handle_up: self leave";
         }
@@ -387,19 +381,19 @@ void GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta&
     else
     {
         size_t idx(0);
-        for (NodeList::const_iterator i = current_view.get_members().begin();
-             i != current_view.get_members().end(); ++i)
+        for (NodeList::const_iterator i = current_view_.members().begin();
+             i != current_view_.members().end(); ++i)
         {
-            if (NodeList::get_key(i) == um.get_source())
+            if (NodeList::key(i) == um.source())
             {
-                profile_enter(prof);
-                recv_buf.push_back(RecvBufData(idx, dg, um));
-                profile_leave(prof);
+                profile_enter(prof_);
+                recv_buf_.push_back(RecvBufData(idx, dg, um));
+                profile_leave(prof_);
                 break;
             }
             ++idx;
         }
-        assert(idx < current_view.get_members().size());
+        assert(idx < current_view_.members().size());
     }
 }
 
@@ -407,16 +401,16 @@ void GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta&
 void GCommConn::queue_and_wait(const Message& msg, Message* ack)
 {
     {
-        Lock lock(mutex);
-        if (terminated == true)
+        Lock lock(mutex_);
+        if (terminated_ == true)
         {
             *ack = Message(&msg.get_producer(), 0, -ECONNABORTED);
             return;
         }
     }
-    profile_enter(prof);
+    profile_enter(prof_);
     Consumer::queue_and_wait(msg, ack);
-    profile_leave(prof);
+    profile_leave(prof_);
 }
 
 
@@ -425,44 +419,17 @@ void GCommConn::run()
     while (true)
     {
         {
-            Lock lock(mutex);
+            Lock lock(mutex_);
 
-            if (terminated == true)
+            if (terminated_ == true)
             {
-                if (get_use_prod_cons() == true)
-                {
-                    const Message* msg;
-
-                    while ((msg = get_next_msg()) != 0)
-                    {
-                        return_ack(Message(&msg->get_producer(), 0,
-                                           -ECONNABORTED));
-                    }
-                }
                 break;
-            }
-        }
-
-        if (get_use_prod_cons() == true)
-        {
-            const Message* msg;
-
-            if ((msg = get_next_msg()) != 0)
-            {
-                const MsgData* md(static_cast<const MsgData*>(msg->get_data()));
-                Buffer buf(md->get_data(), md->get_data() + md->get_data_size());
-                Datagram dg(buf);
-                int err = send_down(dg, ProtoDownMeta(md->get_msg_type(),
-                                                      md->get_msg_type() == GCS_MSG_CAUSAL ? O_LOCAL_CAUSAL : O_SAFE));
-
-                return_ack(Message(&msg->get_producer(), 0, err != 0 ?
-                                   -err : static_cast<int>(dg.get_len())));
             }
         }
 
         try
         {
-            net->event_loop(Sec);
+            net_->event_loop(Sec);
         }
         catch (gu::Exception& e)
         {
@@ -527,31 +494,20 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 
     GCommConn& conn(*ref.get());
 
-    if (conn.get_use_prod_cons() == true)
+    Datagram dg(
+        SharedBuffer(
+            new Buffer(reinterpret_cast<const byte_t*>(buf),
+                       reinterpret_cast<const byte_t*>(buf) + len)));
+    gcomm::Critical<Protonet> crit(conn.get_pnet());
+    if (gu_unlikely(conn.get_error() != 0))
     {
-        Producer prod(conn);
-        Message ack;
-        MsgData msg_data(reinterpret_cast<const byte_t*>(buf), len, msg_type);
-        conn.queue_and_wait(Message(&prod, &msg_data), &ack);
-        return ack.get_val();
+        return -ECONNABORTED;
     }
-    else
-    {
-        Datagram dg(
-            SharedBuffer(
-                new Buffer(reinterpret_cast<const byte_t*>(buf),
-                           reinterpret_cast<const byte_t*>(buf) + len)));
-        gcomm::Critical<Protonet> crit(conn.get_pnet());
-        if (gu_unlikely(conn.get_error() != 0))
-        {
-            return -ECONNABORTED;
-        }
-        int err = conn.send_down(
-            dg,
-            ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ?
-                          O_LOCAL_CAUSAL : O_SAFE));
-        return (err == 0 ? len : -err);
-    }
+    int err = conn.send_down(
+        dg,
+        ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ?
+                      O_LOCAL_CAUSAL : O_SAFE));
+    return (err == 0 ? len : -err);
 }
 
 
@@ -560,10 +516,10 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
 {
     size_t n(0);
 
-    for (NodeList::const_iterator i = view.get_members().begin();
-         i != view.get_members().end(); ++i)
+    for (NodeList::const_iterator i = view.members().begin();
+         i != view.members().end(); ++i)
     {
-        const UUID& uuid(NodeList::get_key(i));
+        const UUID& uuid(NodeList::key(i));
 
         log_debug << "member: " << n << " uuid: " << uuid;
 
@@ -604,19 +560,19 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         const Datagram&    dg(d.get_dgram());
         const ProtoUpMeta& um(d.get_um());
 
-        if (gu_likely(dg.get_len() != 0))
+        if (gu_likely(dg.len() != 0))
         {
-            assert(dg.get_len() > dg.get_offset());
+            assert(dg.len() > dg.offset());
 
-            const byte_t* b(get_begin(dg));
-            const ssize_t pload_len(get_available(dg));
+            const byte_t* b(gcomm::begin(dg));
+            const ssize_t pload_len(gcomm::available(dg));
 
             msg->size = pload_len;
 
             if (gu_likely(pload_len <= msg->buf_len))
             {
                 memcpy(msg->buf, b, pload_len);
-                msg->type = static_cast<gcs_msg_type_t>(um.get_user_type());
+                msg->type = static_cast<gcs_msg_type_t>(um.user_type());
                 recv_buf.pop_front();
             }
             else
@@ -624,7 +580,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
                 msg->type = GCS_MSG_ERROR;
             }
         }
-        else if (um.get_errno() != 0)
+        else if (um.err_no() != 0)
         {
             gcs_comp_msg_t* cm(gcs_comp_msg_leave());
             const ssize_t cm_size(gcs_comp_msg_size(cm));
@@ -645,14 +601,14 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         {
             assert(um.has_view() == true);
 
-            const View& view(um.get_view());
+            const View& view(um.view());
 
-            assert(view.get_type() == V_PRIM || view.get_type() == V_NON_PRIM);
+            assert(view.type() == V_PRIM || view.type() == V_NON_PRIM);
 
-            gcs_comp_msg_t* cm(gcs_comp_msg_new(view.get_type() == V_PRIM,
+            gcs_comp_msg_t* cm(gcs_comp_msg_new(view.type() == V_PRIM,
                                                 view.is_bootstrap(),
                                                 view.is_empty() ? -1 : 0,
-                                                view.get_members().size()));
+                                                view.members().size()));
 
             const ssize_t cm_size(gcs_comp_msg_size(cm));
 

@@ -38,18 +38,18 @@ public:
     void close();
     void write_handler(const asio::error_code& ec,
                        size_t bytes_transferred);
-    int send(const gu::Datagram& dg);
+    int send(const Datagram& dg);
     size_t read_completion_condition(
         const asio::error_code& ec,
         const size_t bytes_transferred);
     void read_handler(const asio::error_code& ec,
                       const size_t bytes_transferred);
     void async_receive();
-    size_t get_mtu() const;
-    std::string get_local_addr() const;
-    std::string get_remote_addr() const;
-    State get_state() const { return state_; }
-    SocketId get_id() const { return &socket_; }
+    size_t mtu() const;
+    std::string local_addr() const;
+    std::string remote_addr() const;
+    State state() const { return state_; }
+    SocketId id() const { return &socket_; }
 private:
     friend class gcomm::AsioTcpAcceptor;
 
@@ -65,7 +65,7 @@ private:
 #ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
 #endif // HAVE_ASIO_SSL_HPP
-    std::deque<gu::Datagram>                  send_q_;
+    std::deque<Datagram>                  send_q_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;
     State                                     state_;
@@ -86,13 +86,13 @@ public:
     void close();
     SocketPtr accept();
 
-    State get_state() const
+    State state() const
     {
         gu_throw_fatal << "TODO:";
         throw;
     }
 
-    SocketId get_id() const { return &acceptor_; }
+    SocketId id() const { return &acceptor_; }
 
 private:
     AsioProtonet& net_;

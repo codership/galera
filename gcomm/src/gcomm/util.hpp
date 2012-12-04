@@ -5,7 +5,8 @@
 #ifndef _GCOMM_UTIL_HPP_
 #define _GCOMM_UTIL_HPP_
 
-#include "gu_datagram.hpp"
+#include "gcomm/datagram.hpp"
+
 #include "gu_logger.hpp"
 #include "gu_throw.hpp"
 
@@ -54,54 +55,38 @@ namespace gcomm
 
 
     template <class M>
-    void push_header(const M& msg, gu::Datagram& dg)
+    void push_header(const M& msg, Datagram& dg)
     {
-#if 0
-        dg.get_header().resize(dg.get_header().size() + msg.serial_size());
-        memmove(&dg.get_header()[0] + msg.serial_size(),
-                &dg.get_header()[0],
-                dg.get_header().size() - msg.serial_size());
-        msg.serialize(&dg.get_header()[0],
-                      dg.get_header().size(), 0);
-#else
-        if (dg.get_header_offset() < msg.serial_size())
+        if (dg.header_offset() < msg.serial_size())
         {
             gu_throw_fatal;
         }
-        msg.serialize(dg.get_header(),
-                      dg.get_header_size(),
-                      dg.get_header_offset() - msg.serial_size());
-        dg.set_header_offset(dg.get_header_offset() - msg.serial_size());
-#endif
+        msg.serialize(dg.header(),
+                      dg.header_size(),
+                      dg.header_offset() - msg.serial_size());
+        dg.set_header_offset(dg.header_offset() - msg.serial_size());
     }
 
 
     template <class M>
-    void pop_header(const M& msg, gu::Datagram& dg)
+    void pop_header(const M& msg, Datagram& dg)
     {
-#if 0
-        memmove(&dg.get_header()[0],
-                &dg.get_header()[0] + msg.serial_size(),
-                dg.get_header().size() - msg.serial_size());
-        dg.get_header().resize(dg.get_header().size() - msg.serial_size());
-#else
-        assert(dg.get_header_size() >= dg.get_header_offset() + msg.serial_size());
-        dg.set_header_offset(dg.get_header_offset() + msg.serial_size());
-#endif
+        assert(dg.header_size() >= dg.header_offset() + msg.serial_size());
+        dg.set_header_offset(dg.header_offset() + msg.serial_size());
     }
 
 
-    inline const gu::byte_t* get_begin(const gu::Datagram& dg)
+    inline const gu::byte_t* begin(const Datagram& dg)
     {
-        return (dg.get_offset() < dg.get_header_len() ?
-                dg.get_header() + dg.get_header_offset() + dg.get_offset() :
-                &dg.get_payload()[0] + (dg.get_offset() - dg.get_header_len()));
+        return (dg.offset() < dg.header_len() ?
+                dg.header() + dg.header_offset() + dg.offset() :
+                &dg.payload()[0] + (dg.offset() - dg.header_len()));
     }
-    inline size_t get_available(const gu::Datagram& dg)
+    inline size_t available(const Datagram& dg)
     {
-        return (dg.get_offset() < dg.get_header_len() ?
-                dg.get_header_len() - dg.get_offset() :
-                dg.get_payload().size() - (dg.get_offset() - dg.get_header_len()));
+        return (dg.offset() < dg.header_len() ?
+                dg.header_len() - dg.offset() :
+                dg.payload().size() - (dg.offset() - dg.header_len()));
     }
 
 

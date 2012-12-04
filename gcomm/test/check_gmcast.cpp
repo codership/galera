@@ -45,9 +45,9 @@ START_TEST(test_gmcast_w_user_messages)
 
     class User : public Toplay
     {
-        Transport* tp;
-        size_t recvd;
-        Protostack pstack;
+        Transport* tp_;
+        size_t recvd_;
+        Protostack pstack_;
         User(const User&);
         void operator=(User&);
     public:
@@ -56,9 +56,9 @@ START_TEST(test_gmcast_w_user_messages)
              const std::string& listen_addr,
              const std::string& remote_addr) :
             Toplay(pnet.conf()),
-            tp(0),
-            recvd(0),
-            pstack()
+            tp_(0),
+            recvd_(0),
+            pstack_()
         {
             string uri("gmcast://");
             uri += remote_addr; // != 0 ? remote_addr : "";
@@ -74,34 +74,34 @@ START_TEST(test_gmcast_w_user_messages)
             uri += "&gmcast.listen_addr=tcp://";
             uri += listen_addr;
 
-            tp = Transport::create(pnet, uri);
+            tp_ = Transport::create(pnet, uri);
         }
 
         ~User()
         {
-            delete tp;
+            delete tp_;
         }
 
         void start(const std::string& peer = "")
         {
             if (peer == "")
             {
-                tp->connect();
+                tp_->connect();
             }
             else
             {
-                tp->connect(peer);
+                tp_->connect(peer);
             }
-            pstack.push_proto(tp);
-            pstack.push_proto(this);
+            pstack_.push_proto(tp_);
+            pstack_.push_proto(this);
         }
 
 
         void stop()
         {
-            pstack.pop_proto(this);
-            pstack.pop_proto(tp);
-            tp->close();
+            pstack_.pop_proto(this);
+            pstack_.pop_proto(tp_);
+            tp_->close();
         }
 
         void handle_timer()
@@ -117,35 +117,35 @@ START_TEST(test_gmcast_w_user_messages)
         void handle_up(const void* cid, const Datagram& rb,
                        const ProtoUpMeta& um)
         {
-            if (rb.get_len() < rb.get_offset() + 16)
+            if (rb.len() < rb.offset() + 16)
             {
                 gu_throw_fatal << "offset error";
             }
             char buf[16];
             memset(buf, 'a', sizeof(buf));
-            if (memcmp(buf, &rb.get_payload()[0] + rb.get_offset(), 16) != 0)
+            if (memcmp(buf, &rb.payload()[0] + rb.offset(), 16) != 0)
             {
                 gu_throw_fatal << "content mismatch";
             }
-            recvd++;
+            recvd_++;
         }
 
-        size_t get_recvd() const
+        size_t recvd() const
         {
-            return recvd;
+            return recvd_;
         }
 
         void set_recvd(size_t val)
         {
-            recvd = val;
+            recvd_ = val;
         }
 
 
-        Protostack& get_pstack() { return pstack; }
+        Protostack& pstack() { return pstack_; }
 
-        std::string get_listen_addr() const
+        std::string listen_addr() const
         {
-            return tp->get_listen_addr();
+            return tp_->listen_addr();
         }
 
     };
@@ -155,7 +155,7 @@ START_TEST(test_gmcast_w_user_messages)
     auto_ptr<Protonet> pnet(Protonet::create(conf));
 
     User u1(*pnet, "127.0.0.1:0", "");
-    pnet->insert(&u1.get_pstack());
+    pnet->insert(&u1.pstack());
 
     log_info << "u1 start";
     u1.start();
@@ -163,16 +163,16 @@ START_TEST(test_gmcast_w_user_messages)
 
     pnet->event_loop(Sec/10);
 
-    fail_unless(u1.get_recvd() == 0);
+    fail_unless(u1.recvd() == 0);
 
     log_info << "u2 start";
     User u2(*pnet, "127.0.0.1:0",
-            u1.get_listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u2.get_pstack());
+            u1.listen_addr().erase(0, strlen("tcp://")));
+    pnet->insert(&u2.pstack());
 
     u2.start();
 
-    while (u1.get_recvd() <= 50 || u2.get_recvd() <= 50)
+    while (u1.recvd() <= 50 || u2.recvd() <= 50)
     {
         u1.handle_timer();
         u2.handle_timer();
@@ -181,11 +181,11 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "u3 start";
     User u3(*pnet, "127.0.0.1:0",
-            u2.get_listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u3.get_pstack());
+            u2.listen_addr().erase(0, strlen("tcp://")));
+    pnet->insert(&u3.pstack());
     u3.start();
 
-    while (u3.get_recvd() <= 50)
+    while (u3.recvd() <= 50)
     {
         u1.handle_timer();
         u2.handle_timer();
@@ -194,11 +194,11 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "u4 start";
     User u4(*pnet, "127.0.0.1:0",
-            u2.get_listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u4.get_pstack());
+            u2.listen_addr().erase(0, strlen("tcp://")));
+    pnet->insert(&u4.pstack());
     u4.start();
 
-    while (u4.get_recvd() <= 50)
+    while (u4.recvd() <= 50)
     {
         u1.handle_timer();
         u2.handle_timer();
@@ -207,13 +207,13 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "u1 stop";
     u1.stop();
-    pnet->erase(&u1.get_pstack());
+    pnet->erase(&u1.pstack());
 
     pnet->event_loop(3*Sec);
 
     log_info << "u1 start";
-    pnet->insert(&u1.get_pstack());
-    u1.start(u2.get_listen_addr());
+    pnet->insert(&u1.pstack());
+    u1.start(u2.listen_addr());
 
     u1.set_recvd(0);
     u2.set_recvd(0);
@@ -227,15 +227,15 @@ START_TEST(test_gmcast_w_user_messages)
         pnet->event_loop(Sec/10);
     }
 
-    fail_unless(u1.get_recvd() != 0);
-    fail_unless(u2.get_recvd() != 0);
-    fail_unless(u3.get_recvd() != 0);
-    fail_unless(u4.get_recvd() != 0);
+    fail_unless(u1.recvd() != 0);
+    fail_unless(u2.recvd() != 0);
+    fail_unless(u3.recvd() != 0);
+    fail_unless(u4.recvd() != 0);
 
-    pnet->erase(&u4.get_pstack());
-    pnet->erase(&u3.get_pstack());
-    pnet->erase(&u2.get_pstack());
-    pnet->erase(&u1.get_pstack());
+    pnet->erase(&u4.pstack());
+    pnet->erase(&u3.pstack());
+    pnet->erase(&u2.pstack());
+    pnet->erase(&u1.pstack());
 
     u1.stop();
     u2.stop();
@@ -257,16 +257,16 @@ START_TEST(test_gmcast_auto_addr)
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
     Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
 
-    pnet->insert(&tp1->get_pstack());
-    pnet->insert(&tp2->get_pstack());
+    pnet->insert(&tp1->pstack());
+    pnet->insert(&tp2->pstack());
 
     tp1->connect();
     tp2->connect();
 
     pnet->event_loop(Sec);
 
-    pnet->erase(&tp2->get_pstack());
-    pnet->erase(&tp1->get_pstack());
+    pnet->erase(&tp2->pstack());
+    pnet->erase(&tp1->pstack());
 
     tp1->close();
     tp2->close();
@@ -288,30 +288,30 @@ START_TEST(test_gmcast_forget)
     gu::Config conf;
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
-    pnet->insert(&tp1->get_pstack());
+    pnet->insert(&tp1->pstack());
     tp1->connect();
 
     Transport* tp2 = Transport::create(*pnet,
                                        std::string("gmcast://")
-                                       + tp1->get_listen_addr().erase(
+                                       + tp1->listen_addr().erase(
                                            0, strlen("tcp://"))
                                        + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
     Transport* tp3 = Transport::create(*pnet,
                                        std::string("gmcast://")
-                                       + tp1->get_listen_addr().erase(
+                                       + tp1->listen_addr().erase(
                                            0, strlen("tcp://"))
                                        + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
 
 
-    pnet->insert(&tp2->get_pstack());
-    pnet->insert(&tp3->get_pstack());
+    pnet->insert(&tp2->pstack());
+    pnet->insert(&tp3->pstack());
 
     tp2->connect();
     tp3->connect();
 
     pnet->event_loop(Sec);
 
-    UUID uuid1 = tp1->get_uuid();
+    UUID uuid1 = tp1->uuid();
 
     tp1->close();
     tp2->close(uuid1);
@@ -323,9 +323,9 @@ START_TEST(test_gmcast_forget)
     log_info << "####";
     pnet->event_loop(Sec);
 
-    pnet->erase(&tp3->get_pstack());
-    pnet->erase(&tp2->get_pstack());
-    pnet->erase(&tp1->get_pstack());
+    pnet->erase(&tp3->pstack());
+    pnet->erase(&tp2->pstack());
+    pnet->erase(&tp1->pstack());
 
     tp1->close();
     tp2->close();
@@ -353,7 +353,7 @@ START_TEST(test_trac_380)
                               *pnet,
                               "gmcast://127.0.0.1:4567?"
                               "gmcast.group=test"));
-    pnet->insert(&tp1->get_pstack());
+    pnet->insert(&tp1->pstack());
     tp1->connect();
     try
     {
@@ -365,7 +365,7 @@ START_TEST(test_trac_380)
                     "unexpected errno: %d, cause %s",
                     e.get_errno(), e.what());
     }
-    pnet->erase(&tp1->get_pstack());
+    pnet->erase(&tp1->pstack());
     tp1->close();
     delete tp1;
     pnet->event_loop(0);

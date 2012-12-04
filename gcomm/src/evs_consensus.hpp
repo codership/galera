@@ -25,9 +25,9 @@ public:
               const NodeMap&  known,
               const InputMap& input_map,
               const View&     current_view) :
-        uuid_(uuid),
-        known_(known),
-        input_map_(input_map),
+        uuid_        (uuid),
+        known_       (known),
+        input_map_   (input_map),
         current_view_(current_view)
     { }
 
@@ -61,10 +61,10 @@ public:
     bool is_consensus() const;
 private:
 
-    const UUID& get_uuid() const { return uuid_; }
+    const UUID& uuid() const { return uuid_; }
 
-    const UUID& uuid_;
-    const NodeMap& known_;
+    const UUID&     uuid_;
+    const NodeMap&  known_;
     const InputMap& input_map_;
-    const View& current_view_;
+    const View&     current_view_;
 };

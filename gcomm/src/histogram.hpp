@@ -19,7 +19,7 @@ namespace gcomm
         void clear();
         friend std::ostream& operator<<(std::ostream&, const Histogram&);
     private:
-        std::map<const double, long long> cnt;
+        std::map<double, long long> cnt_;
     };
 
     std::ostream& operator<<(std::ostream&, const Histogram&);

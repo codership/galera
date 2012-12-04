@@ -41,64 +41,64 @@ namespace gcomm
 
     protected:
 
-        MapType map;
+        MapType map_;
     public:
 
-        MapBase() : map() {}
+        MapBase() : map_() {}
 
         virtual ~MapBase() {}
 
-        iterator begin()          { return map.begin(); }
+        iterator begin()          { return map_.begin(); }
 
-        iterator end()            { return map.end();   }
+        iterator end()            { return map_.end();   }
 
-        iterator find(const K& k) { return map.find(k); }
+        iterator find(const K& k) { return map_.find(k); }
 
         iterator find_checked(const K& k)
         {
-            iterator ret = map.find(k);
-            if (ret == map.end())
+            iterator ret = map_.find(k);
+            if (ret == map_.end())
             {
                 gu_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }
 
-        iterator lower_bound(const K& k) { return map.lower_bound(k); }
+        iterator lower_bound(const K& k) { return map_.lower_bound(k); }
 
-        const_iterator begin()          const { return map.begin(); }
+        const_iterator begin()          const { return map_.begin(); }
 
-        const_iterator end()            const { return map.end();   }
+        const_iterator end()            const { return map_.end();   }
 
-        const_reverse_iterator rbegin()         const { return map.rbegin(); }
+        const_reverse_iterator rbegin()         const { return map_.rbegin(); }
 
-        const_reverse_iterator rend()           const { return map.rend(); }
+        const_reverse_iterator rend()           const { return map_.rend(); }
 
-        const_iterator find(const K& k) const { return map.find(k); }
+        const_iterator find(const K& k) const { return map_.find(k); }
 
         const_iterator find_checked(const K& k) const
         {
-            const_iterator ret = map.find(k);
-            if (ret == map.end())
+            const_iterator ret = map_.find(k);
+            if (ret == map_.end())
             {
                 gu_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }
 
-        mapped_type& operator[](const key_type& k) { return map[k]; }
+        mapped_type& operator[](const key_type& k) { return map_[k]; }
 
-        void erase(iterator i) { map.erase(i); }
+        void erase(iterator i) { map_.erase(i); }
 
-        void erase(iterator i, iterator j) { map.erase(i, j); }
+        void erase(iterator i, iterator j) { map_.erase(i, j); }
 
-        void erase(const K& k) { map.erase(k); }
+        void erase(const K& k) { map_.erase(k); }
 
-        void clear()           { map.clear(); }
+        void clear()           { map_.clear(); }
 
-        size_t size() const    { return map.size(); }
+        size_t size() const    { return map_.size(); }
 
-        bool empty() const     { return map.empty(); }
+        bool empty() const     { return map_.empty(); }
 
         size_t serialize(gu::byte_t* const buf,
                          size_t  const buflen,
@@ -107,10 +107,10 @@ namespace gcomm
         {
             gu_trace(offset = gu::serialize4(
                          static_cast<uint32_t>(size()), buf, buflen, offset));
-            for (const_iterator i = map.begin(); i != map.end(); ++i)
+            for (const_iterator i = map_.begin(); i != map_.end(); ++i)
             {
-                gu_trace(offset = get_key(i).serialize(buf, buflen, offset));
-                gu_trace(offset = get_value(i).serialize(buf, buflen, offset));
+                gu_trace(offset = key(i).serialize(buf, buflen, offset));
+                gu_trace(offset = value(i).serialize(buf, buflen, offset));
             }
             return offset;
         }
@@ -122,7 +122,7 @@ namespace gcomm
         {
             uint32_t len;
             // Clear map in case this object is reused
-            map.clear();
+            map_.clear();
 
             gu_trace(offset = gu::unserialize4(buf, buflen, offset, len));;
 
@@ -132,7 +132,7 @@ namespace gcomm
                 V v;
                 gu_trace(offset = k.unserialize(buf, buflen, offset));
                 gu_trace(offset = v.unserialize(buf, buflen, offset));
-                if (map.insert(std::make_pair(k, v)).second == false)
+                if (map_.insert(std::make_pair(k, v)).second == false)
                 {
                     gu_throw_fatal << "Failed to unserialize map";
                 }
@@ -147,45 +147,45 @@ namespace gcomm
 
         bool operator==(const MapBase& other) const
         {
-            return (map == other.map);
+            return (map_ == other.map_);
         }
 
         bool operator!=(const MapBase& other) const
         {
-            return !(map == other.map);
+            return !(map_ == other.map_);
         }
 
-        static const K& get_key(const_iterator i)
+        static const K& key(const_iterator i)
         {
             return i->first;
         }
 
-        static const K& get_key(iterator i)
+        static const K& key(iterator i)
         {
             return i->first;
         }
 
-        static const V& get_value(const_iterator i)
+        static const V& value(const_iterator i)
         {
             return i->second;
         }
 
-        static V& get_value(iterator i)
+        static V& value(iterator i)
         {
             return i->second;
         }
 
-        static const K& get_key(const value_type& vt)
+        static const K& key(const value_type& vt)
         {
             return vt.first;
         }
 
-        static V& get_value(value_type& vt)
+        static V& value(value_type& vt)
         {
             return vt.second;
         }
 
-        static const V& get_value(const value_type& vt)
+        static const V& value(const value_type& vt)
         {
             return vt.second;
         }
@@ -215,17 +215,17 @@ namespace gcomm
         typedef typename MapBase<K, V, C>::iterator iterator;
         std::pair<iterator, bool> insert(const std::pair<K, V>& p)
         {
-            return MapBase<K, V, C>::map.insert(p);
+            return MapBase<K, V, C>::map_.insert(p);
         }
 
         iterator insert_unique(const typename MapBase<K, V, C>::value_type& p)
         {
-            std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
+            std::pair<iterator, bool> ret = MapBase<K, V, C>::map_.insert(p);
             if (false == ret.second)
             {
                 gu_throw_fatal << "duplicate entry "
-                               << "key=" << MapBase<K, V, C>::get_key(p) << " "
-                               << "value=" << MapBase<K, V, C>::get_value(p) << " "
+                               << "key=" << MapBase<K, V, C>::key(p) << " "
+                               << "value=" << MapBase<K, V, C>::value(p) << " "
                                << "map=" << *this;
             }
             return ret.first;
@@ -247,17 +247,17 @@ namespace gcomm
 
         iterator insert(const std::pair<K, V>& p)
         {
-            return MapBase<K, V, C>::map.insert(p);
+            return MapBase<K, V, C>::map_.insert(p);
         }
 
         iterator insert(iterator position, const value_type& vt)
         {
-            return MapBase<K, V, C>::map.insert(position, vt);
+            return MapBase<K, V, C>::map_.insert(position, vt);
         }
 
         std::pair<const_iterator, const_iterator> equal_range(const K& k) const
         {
-            return MapBase<K, V, C>::map.equal_range(k);
+            return MapBase<K, V, C>::map_.equal_range(k);
         }
     };
 }

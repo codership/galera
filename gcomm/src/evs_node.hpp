@@ -56,39 +56,39 @@ public:
     ~Node();
 
     void set_index(const size_t idx) { index_ = idx; }
-    size_t get_index() const { return index_; }
+    size_t index() const { return index_; }
 
     void set_operational(const bool op)
     {
         gcomm_assert(op == false);
         operational_ = op;
     }
-    bool get_operational() const { return operational_; }
+    bool operational() const { return operational_; }
 
     void set_suspected(const bool s)
     {
         suspected_ = s;
     }
-    bool get_suspected() const { return suspected_; }
+    bool suspected() const { return suspected_; }
 
     void set_committed(const bool comm) { committed_ = comm; }
-    bool get_committed() const { return committed_; }
+    bool committed() const { return committed_; }
     void set_installed(const bool inst) { installed_ = inst; }
-    bool get_installed() const { return installed_; }
+    bool installed() const { return installed_; }
 
     void set_join_message(const JoinMessage* msg);
 
-    const JoinMessage* get_join_message() const { return join_message_; }
+    const JoinMessage* join_message() const { return join_message_; }
 
     void set_leave_message(const LeaveMessage* msg);
 
-    const LeaveMessage* get_leave_message() const { return leave_message_; }
+    const LeaveMessage* leave_message() const { return leave_message_; }
 
     void set_tstamp(const gu::datetime::Date& t) { tstamp_ = t; }
-    const gu::datetime::Date& get_tstamp() const { return tstamp_; }
+    const gu::datetime::Date& tstamp() const { return tstamp_; }
 
     void set_fifo_seq(const int64_t seq) { fifo_seq_ = seq; }
-    int64_t get_fifo_seq() const { return fifo_seq_; }
+    int64_t fifo_seq() const { return fifo_seq_; }
 
     bool is_inactive() const;
     bool is_suspected() const;
@@ -141,7 +141,7 @@ public:
 
     void operator()(const NodeMap::value_type& vt) const
     {
-        if (NodeMap::get_value(vt).get_operational() == true)
+        if (NodeMap::value(vt).operational() == true)
         {
             nm.insert_unique(vt);
         }
@@ -158,7 +158,7 @@ public:
     {
         Node& node(p.second);
         gu::datetime::Date now(gu::datetime::Date::now());
-        if (node.get_tstamp() + node.suspect_timeout_ < now)
+        if (node.tstamp() + node.suspect_timeout_ < now)
         {
             if (node.suspected_ == false)
             {
@@ -172,7 +172,7 @@ public:
         {
             node.suspected_ = false;
         }
-        if (node.get_tstamp() + node.inactive_timeout_ < now)
+        if (node.tstamp() + node.inactive_timeout_ < now)
         {
             if (node.inactive_ == false)
             {

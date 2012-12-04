@@ -70,13 +70,13 @@ public:
         im_range_    (mn.im_range_   )
     { }
 
-    bool          get_operational() const { return operational_       ; }
-    bool          get_suspected()   const { return suspected_         ; }
-    bool          get_leaving()     const { return (leave_seq_ != -1) ; }
-    seqno_t       get_leave_seq()   const { return leave_seq_         ; }
-    const ViewId& get_view_id()     const { return view_id_           ; }
-    seqno_t       get_safe_seq()    const { return safe_seq_          ; }
-    Range         get_im_range()    const { return im_range_          ; }
+    bool          operational() const { return operational_       ; }
+    bool          suspected()   const { return suspected_         ; }
+    bool          leaving()     const { return (leave_seq_ != -1) ; }
+    seqno_t       leave_seq()   const { return leave_seq_         ; }
+    const ViewId& view_id()     const { return view_id_           ; }
+    seqno_t       safe_seq()    const { return safe_seq_          ; }
+    Range         im_range()    const { return im_range_          ; }
 
     bool operator==(const MessageNode& cmp) const
     {
@@ -146,14 +146,14 @@ public:
      *
      * @return Version number
      */
-    uint8_t get_version() const { return version; }
+    uint8_t version() const { return version_; }
 
     /*!
      * Get type of the message
      *
      * @return Message type
      */
-    Type get_type() const { return type; }
+    Type type() const { return type_; }
 
     /*!
      * Check wheter message is of membership type
@@ -162,7 +162,7 @@ public:
      */
     bool is_membership() const
     {
-        return type == T_JOIN || type == T_INSTALL || type == T_LEAVE;
+        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE);
     }
 
     /*!
@@ -171,42 +171,42 @@ public:
      *
      * @return User type of the message.
      */
-    uint8_t get_user_type() const { return user_type; }
+    uint8_t user_type() const { return user_type_; }
 
     /*!
      * Get message order type.
      *
      * @return Order type of the message.
      */
-    Order get_order() const { return order; }
+    Order order() const { return order_; }
 
     /*!
      * Get sequence number associated to the message.
      *
      * @return Const reference to sequence number associated to the message.
      */
-    seqno_t get_seq() const { return seq; }
+    seqno_t seq() const { return seq_; }
 
     /*!
      * Get sequence numer range associated to the message.
      *
      * @return Sequence number range associated to the message.
      */
-    seqno_t get_seq_range() const { return seq_range; }
+    seqno_t seq_range() const { return seq_range_; }
 
     /*!
      * Get all-received-upto sequence number associated the the message.
      *
      * @return All-received-upto sequence number associated to the message.
      */
-    seqno_t get_aru_seq() const { return aru_seq; }
+    seqno_t aru_seq() const { return aru_seq_; }
 
     /*!
      * Get message flags.
      *
      * @return Message flags.
      */
-    uint8_t get_flags() const { return flags; }
+    uint8_t flags() const { return flags_; }
 
     /*!
      * Set message source
@@ -215,8 +215,8 @@ public:
      */
     void set_source(const UUID& uuid)
     {
-        source = uuid;
-        flags |= F_SOURCE;
+        source_ = uuid;
+        flags_ |= F_SOURCE;
     }
 
     /*!
@@ -224,7 +224,7 @@ public:
      *
      * @return Message source UUID.
      */
-    const UUID& get_source() const { return source; }
+    const UUID& source() const { return source_; }
 
     /*!
      * Get message source view id, view where the message was originated
@@ -232,23 +232,23 @@ public:
      *
      * @return Message source view id.
      */
-    const gcomm::ViewId& get_source_view_id() const { return source_view_id; }
+    const gcomm::ViewId& source_view_id() const { return source_view_id_; }
 
-    const gcomm::ViewId& get_install_view_id() const { return install_view_id; }
+    const gcomm::ViewId& install_view_id() const { return install_view_id_; }
 
     /*!
      * Get range UUID associated to the message.
      *
      * @return Range UUID associated to the message.
      */
-    const UUID& get_range_uuid() const { return range_uuid; }
+    const UUID& range_uuid() const { return range_uuid_; }
 
     /*!
      * Get range associated to the message.
      *
      * @return Range associated to the message.
      */
-    Range get_range() const { return range; }
+    Range range() const { return range_; }
 
     /*!
      * Get fifo sequence number associated to the message. This is
@@ -256,19 +256,19 @@ public:
      *
      * @return Fifo sequence number associated to the message.
      */
-    int64_t get_fifo_seq() const { return fifo_seq; }
+    int64_t fifo_seq() const { return fifo_seq_; }
 
     /*!
      * Get message node list.
      *
      * @return Const reference to message node list.
      */
-    const MessageNodeList& get_node_list() const { return node_list; }
+    const MessageNodeList& node_list() const { return node_list_; }
 
     /*!
      * Get timestamp associated to the message.
      */
-    gu::datetime::Date get_tstamp() const { return tstamp; }
+    gu::datetime::Date tstamp() const { return tstamp_; }
 
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
         throw(gu::Exception);
@@ -280,42 +280,42 @@ public:
      */
 
     Message(const Message& msg) :
-        version         (msg.version),
-        type            (msg.type),
-        user_type       (msg.user_type),
-        order           (msg.order),
-        seq             (msg.seq),
-        seq_range       (msg.seq_range),
-        aru_seq         (msg.aru_seq),
-        fifo_seq        (msg.fifo_seq),
-        flags           (msg.flags),
-        source          (msg.source),
-        source_view_id  (msg.source_view_id),
-        install_view_id (msg.install_view_id),
-        range_uuid      (msg.range_uuid),
-        range           (msg.range),
-        tstamp          (msg.tstamp),
-        node_list       (msg.node_list)
+        version_         (msg.version_),
+        type_            (msg.type_),
+        user_type_       (msg.user_type_),
+        order_           (msg.order_),
+        seq_             (msg.seq_),
+        seq_range_       (msg.seq_range_),
+        aru_seq_         (msg.aru_seq_),
+        fifo_seq_        (msg.fifo_seq_),
+        flags_           (msg.flags_),
+        source_          (msg.source_),
+        source_view_id_  (msg.source_view_id_),
+        install_view_id_ (msg.install_view_id_),
+        range_uuid_      (msg.range_uuid_),
+        range_           (msg.range_),
+        tstamp_          (msg.tstamp_),
+        node_list_       (msg.node_list_)
     { }
 
     Message& operator=(const Message& msg)
     {
-        version         = msg.version;
-        type            = msg.type;
-        user_type       = msg.user_type;
-        order           = msg.order;
-        seq             = msg.seq;
-        seq_range       = msg.seq_range;
-        aru_seq         = msg.aru_seq;
-        fifo_seq        = msg.fifo_seq;
-        flags           = msg.flags;
-        source          = msg.source;
-        source_view_id  = msg.source_view_id;
-        install_view_id = msg.install_view_id;
-        range_uuid      = msg.range_uuid;
-        range           = msg.range;
-        tstamp          = msg.tstamp;
-        node_list       = msg.node_list;
+        version_         = msg.version_;
+        type_            = msg.type_;
+        user_type_       = msg.user_type_;
+        order_           = msg.order_;
+        seq_             = msg.seq_;
+        seq_range_       = msg.seq_range_;
+        aru_seq_         = msg.aru_seq_;
+        fifo_seq_        = msg.fifo_seq_;
+        flags_           = msg.flags_;
+        source_          = msg.source_;
+        source_view_id_  = msg.source_view_id_;
+        install_view_id_ = msg.install_view_id_;
+        range_uuid_      = msg.range_uuid_;
+        range_           = msg.range_;
+        tstamp_          = msg.tstamp_;
+        node_list_       = msg.node_list_;
         return *this;
     }
 
@@ -323,37 +323,37 @@ public:
 
 
     /*! Default constructor */
-    Message(const uint8_t          version_         = 0,
-            const Type             type_            = T_NONE,
-            const UUID&            source_          = UUID::nil(),
-            const ViewId&          source_view_id_  = ViewId(),
-            const ViewId&          install_view_id_ = ViewId(),
-            const uint8_t          user_type_       = 0xff,
-            const Order            order_           = O_DROP,
-            const int64_t          fifo_seq_        = -1,
-            const seqno_t            seq_             = -1,
-            const seqno_t            seq_range_       = -1,
-            const seqno_t            aru_seq_         = -1,
-            const uint8_t          flags_           = 0,
-            const UUID&            range_uuid_      = UUID(),
-            const Range            range_           = Range(),
-            const MessageNodeList& node_list_       = MessageNodeList()) :
-        version         (version_),
-        type            (type_),
-        user_type       (user_type_),
-        order           (order_),
-        seq             (seq_),
-        seq_range       (seq_range_),
-        aru_seq         (aru_seq_),
-        fifo_seq        (fifo_seq_),
-        flags           (flags_),
-        source          (source_),
-        source_view_id  (source_view_id_),
-        install_view_id (install_view_id_),
-        range_uuid      (range_uuid_),
-        range           (range_),
-        tstamp          (gu::datetime::Date::now()),
-        node_list       (node_list_)
+    Message(const uint8_t          version         = 0,
+            const Type             type            = T_NONE,
+            const UUID&            source          = UUID::nil(),
+            const ViewId&          source_view_id  = ViewId(),
+            const ViewId&          install_view_id = ViewId(),
+            const uint8_t          user_type       = 0xff,
+            const Order            order           = O_DROP,
+            const int64_t          fifo_seq        = -1,
+            const seqno_t          seq             = -1,
+            const seqno_t          seq_range       = -1,
+            const seqno_t          aru_seq         = -1,
+            const uint8_t          flags           = 0,
+            const UUID&            range_uuid      = UUID(),
+            const Range            range           = Range(),
+            const MessageNodeList& node_list       = MessageNodeList()) :
+        version_         (version),
+        type_            (type),
+        user_type_       (user_type),
+        order_           (order),
+        seq_             (seq),
+        seq_range_       (seq_range),
+        aru_seq_         (aru_seq),
+        fifo_seq_        (fifo_seq),
+        flags_           (flags),
+        source_          (source),
+        source_view_id_  (source_view_id),
+        install_view_id_ (install_view_id),
+        range_uuid_      (range_uuid),
+        range_           (range),
+        tstamp_          (gu::datetime::Date::now()),
+        node_list_       (node_list)
     { }
 
 protected:
@@ -363,22 +363,22 @@ protected:
 
     size_t serial_size() const;
 
-    uint8_t            version;
-    Type               type;
-    uint8_t            user_type;
-    Order              order;
-    seqno_t              seq;
-    seqno_t              seq_range;
-    seqno_t              aru_seq;
-    int64_t            fifo_seq;
-    uint8_t            flags;
-    UUID               source;
-    ViewId             source_view_id;
-    ViewId             install_view_id;
-    UUID               range_uuid;
-    Range              range;
-    gu::datetime::Date tstamp;
-    MessageNodeList    node_list;
+    uint8_t            version_;
+    Type               type_;
+    uint8_t            user_type_;
+    Order              order_;
+    seqno_t            seq_;
+    seqno_t            seq_range_;
+    seqno_t            aru_seq_;
+    int64_t            fifo_seq_;
+    uint8_t            flags_;
+    UUID               source_;
+    ViewId             source_view_id_;
+    ViewId             install_view_id_;
+    UUID               range_uuid_;
+    Range              range_;
+    gu::datetime::Date tstamp_;
+    MessageNodeList    node_list_;
 
 
 };
@@ -389,12 +389,12 @@ protected:
 class gcomm::evs::UserMessage : public Message
 {
 public:
-    UserMessage(const int          version = -1,
+    UserMessage(const int          version        = -1,
                 const UUID&        source         = UUID::nil(),
                 const ViewId&      source_view_id = ViewId(),
-                const seqno_t        seq            = -1,
-                const seqno_t        aru_seq        = -1,
-                const seqno_t        seq_range      = 0,
+                const seqno_t      seq            = -1,
+                const seqno_t      aru_seq        = -1,
+                const seqno_t      seq_range      = 0,
                 const Order        order          = O_SAFE,
                 const int64_t      fifo_seq       = -1,
                 const uint8_t      user_type      = 0xff,
@@ -415,7 +415,7 @@ public:
                 Range())
     { }
 
-    void set_aru_seq(const seqno_t as) { aru_seq = as; }
+    void set_aru_seq(const seqno_t as) { aru_seq_ = as; }
 
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -439,9 +439,9 @@ public:
         len_      (gu::convert(len, uint16_t(0)))
     { }
 
-    int    get_flags() const { return flags_; }
-    size_t get_len()   const { return len_;   }
-    uint8_t get_user_type() const { return user_type_; }
+    int    flags() const { return flags_; }
+    size_t len()   const { return len_;   }
+    uint8_t user_type() const { return user_type_; }
 
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -461,7 +461,7 @@ private:
 
 inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const AggregateMessage& am)
 {
-    return (os << "{flags=" << am.get_flags() << ",len=" << am.get_len() << "}");
+    return (os << "{flags=" << am.flags() << ",len=" << am.len() << "}");
 }
 
 
@@ -641,13 +641,13 @@ public:
 
     void operator()(const MessageNodeList::value_type& vt) const
     {
-        const MessageNode& node(MessageNodeList::get_value(vt));
+        const MessageNode& node(MessageNodeList::value(vt));
         if ((view_id_                  == ViewId() ||
-             node.get_view_id()        == view_id_    ) &&
+             node.view_id()        == view_id_    ) &&
             ((operational_             == true          &&
               leaving_                 == true   ) ||
-             (node.get_operational() == operational_ &&
-              node.get_leaving()     == leaving_ ) ) )
+             (node.operational() == operational_ &&
+              node.leaving()     == leaving_ ) ) )
 
         {
             nl_.insert_unique(vt);
@@ -667,10 +667,10 @@ public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        gcomm_assert(MessageNodeList::get_value(a).get_view_id() ==
-                     MessageNodeList::get_value(b).get_view_id());
-        return (MessageNodeList::get_value(a).get_im_range().get_lu() <
-                MessageNodeList::get_value(b).get_im_range().get_lu());
+        gcomm_assert(MessageNodeList::value(a).view_id() ==
+                     MessageNodeList::value(b).view_id());
+        return (MessageNodeList::value(a).im_range().lu() <
+                MessageNodeList::value(b).im_range().lu());
     }
 };
 
@@ -680,10 +680,10 @@ public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        gcomm_assert(MessageNodeList::get_value(a).get_view_id() ==
-                     MessageNodeList::get_value(b).get_view_id());
-        return (MessageNodeList::get_value(a).get_im_range().get_hs() <
-                MessageNodeList::get_value(b).get_im_range().get_hs());
+        gcomm_assert(MessageNodeList::value(a).view_id() ==
+                     MessageNodeList::value(b).view_id());
+        return (MessageNodeList::value(a).im_range().hs() <
+                MessageNodeList::value(b).im_range().hs());
     }
 };
 

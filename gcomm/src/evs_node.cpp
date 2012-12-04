@@ -7,31 +7,29 @@
 
 #include <ostream>
 
-using namespace std;
-using namespace gu::datetime;
-using namespace gcomm::evs;
 
-ostream& gcomm::evs::operator<<(ostream& os, const Node& n)
+std::ostream&
+gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Node& n)
 {
     os << "evs::node{";
-    os << "operational=" << n.get_operational() << ",";
-    os << "suspected=" << n.get_suspected() << ",";
-    os << "installed=" << n.get_installed() << ",";
-    os << "fifo_seq=" << n.get_fifo_seq() << ",";
-    if (n.get_join_message() != 0)
+    os << "operational=" << n.operational() << ",";
+    os << "suspected=" << n.suspected() << ",";
+    os << "installed=" << n.installed() << ",";
+    os << "fifo_seq=" << n.fifo_seq() << ",";
+    if (n.join_message() != 0)
     {
-        os << "join_message=\n" << *n.get_join_message() << ",\n";
+        os << "join_message=\n" << *n.join_message() << ",\n";
     }
-    if (n.get_leave_message() != 0)
+    if (n.leave_message() != 0)
     {
-        os << "leave_message=\n" << *n.get_leave_message() << ",\n";
+        os << "leave_message=\n" << *n.leave_message() << ",\n";
     }
     os << "}";
     return os;
 }
 
 
-gcomm::evs::Node::Node(const Node& n) 
+gcomm::evs::Node::Node(const Node& n)
     :
     index_           (n.index_),
     operational_     (n.operational_),
@@ -39,9 +37,9 @@ gcomm::evs::Node::Node(const Node& n)
     inactive_        (n.inactive_),
     committed_       (n.committed_),
     installed_       (n.installed_),
-    join_message_    (n.join_message_ != 0 ? 
+    join_message_    (n.join_message_ != 0 ?
                       new JoinMessage(*n.join_message_) : 0),
-    leave_message_   (n.leave_message_ != 0 ? 
+    leave_message_   (n.leave_message_ != 0 ?
                       new LeaveMessage(*n.leave_message_) : 0),
     suspect_timeout_ (n.suspect_timeout_),
     inactive_timeout_(n.inactive_timeout_),
@@ -100,4 +98,3 @@ bool gcomm::evs::Node::is_inactive() const
 {
     return inactive_;
 }
-

@@ -27,25 +27,23 @@ class gcomm::UUID
 {
 public:
 
-    UUID() : uuid(GU_UUID_NIL) {}
+    UUID() : uuid_(GU_UUID_NIL) {}
 
-    UUID(const void* node, const size_t node_len) :
-        uuid()
+    UUID(const void* node, const size_t node_len) : uuid_()
     {
-        gu_uuid_generate(&uuid, node, node_len);
+        gu_uuid_generate(&uuid_, node, node_len);
     }
 
-    UUID(const int32_t idx) :
-        uuid()
+    UUID(const int32_t idx) : uuid_()
     {
         assert(idx > 0);
-        uuid = GU_UUID_NIL;
-        memcpy(&uuid, &idx, sizeof(idx));
+        uuid_ = GU_UUID_NIL;
+        memcpy(&uuid_, &idx, sizeof(idx));
     }
 
     static const UUID& nil()
     {
-        return uuid_nil;
+        return uuid_nil_;
     }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
@@ -55,7 +53,7 @@ public:
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
 
-        memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
+        memcpy(&uuid_, buf + offset, sizeof(gu_uuid_t));
 
         return offset + sizeof(gu_uuid_t);
     }
@@ -67,7 +65,7 @@ public:
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
 
-        memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
+        memcpy(buf + offset, &uuid_, sizeof(gu_uuid_t));
 
         return offset + sizeof(gu_uuid_t);
     }
@@ -77,52 +75,50 @@ public:
         return sizeof(gu_uuid_t);
     }
 
-    const gu_uuid_t* get_uuid_ptr() const
+    const gu_uuid_t* uuid_ptr() const
     {
-        return &uuid;
+        return &uuid_;
     }
 
     bool operator<(const UUID& cmp) const
     {
-        return (gu_uuid_compare(&uuid, &cmp.uuid) < 0);
+        return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
     }
 
     bool operator==(const UUID& cmp) const
     {
-        return (gu_uuid_compare(&uuid, &cmp.uuid) == 0);
+        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
     }
 
     bool older(const UUID& cmp) const
     {
-        return (gu_uuid_older(&uuid, &cmp.uuid) > 0);
+        return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
 
     std::ostream& to_stream(std::ostream& os) const
     {
         static const char buf[37] = { 0, };
-        const uint32_t* i = reinterpret_cast<const uint32_t*>(uuid.data);
+        const uint32_t* i = reinterpret_cast<const uint32_t*>(uuid_.data);
 
         if (i[0] != 0 &&
-            memcmp(i + 1, buf, sizeof(uuid) - sizeof(*i)) == 0)
+            memcmp(i + 1, buf, sizeof(uuid_) - sizeof(*i)) == 0)
         {
             // if all of UUID is contained in the first 4 bytes
             os << i[0]; // should this be converted to certain endianness?
         }
         else
         {
-            const uint16_t* s = reinterpret_cast<const uint16_t*>(uuid.data);
+            const uint16_t* s = reinterpret_cast<const uint16_t*>(uuid_.data);
 
-            using namespace std;
+            std::ios_base::fmtflags saved = os.flags();
 
-            ios_base::fmtflags saved = os.flags();
-
-            os << hex
-               << setfill('0') << setw(8) << gu_be32(i[0]) << '-'
-               << setfill('0') << setw(4) << gu_be16(s[2]) << '-'
-               << setfill('0') << setw(4) << gu_be16(s[3]) << '-'
-               << setfill('0') << setw(4) << gu_be16(s[4]) << '-'
-               << setfill('0') << setw(4) << gu_be16(s[5])
-               << setfill('0') << setw(8) << gu_be32(i[3]);
+            os << std::hex
+               << std::setfill('0') << std::setw(8) << gu_be32(i[0]) << '-'
+               << std::setfill('0') << std::setw(4) << gu_be16(s[2]) << '-'
+               << std::setfill('0') << std::setw(4) << gu_be16(s[3]) << '-'
+               << std::setfill('0') << std::setw(4) << gu_be16(s[4]) << '-'
+               << std::setfill('0') << std::setw(4) << gu_be16(s[5])
+               << std::setfill('0') << std::setw(8) << gu_be32(i[3]);
 
             os.flags(saved);
         }
@@ -140,9 +136,9 @@ public:
 
 private:
 
-    gu_uuid_t         uuid;
-    static const UUID uuid_nil;
-    UUID(gu_uuid_t uuid_) : uuid(uuid_) {}
+    gu_uuid_t         uuid_;
+    static const UUID uuid_nil_;
+    UUID(gu_uuid_t uuid) : uuid_(uuid) {}
 };
 
 

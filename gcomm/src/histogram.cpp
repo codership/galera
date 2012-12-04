@@ -14,19 +14,18 @@
 #include <limits>
 #include <vector>
 
-using namespace std;
-
-gcomm::Histogram::Histogram(const string& vals)
+gcomm::Histogram::Histogram(const std::string& vals)
     :
-    cnt()
+    cnt_()
 {
-    vector<string> varr = gu::strsplit(vals, ',');
+    std::vector<std::string> varr = gu::strsplit(vals, ',');
 
-    for (vector<string>::const_iterator i = varr.begin(); i != varr.end(); ++i)
+    for (std::vector<std::string>::const_iterator
+             i = varr.begin(); i != varr.end(); ++i)
     {
         double val;
 
-        istringstream is(*i);
+        std::istringstream is(*i);
         is >> val;
 
         if (is.fail())
@@ -34,13 +33,15 @@ gcomm::Histogram::Histogram(const string& vals)
             gu_throw_fatal << "Parse error";
         }
 
-        if (cnt.insert(make_pair(val, 0)).second == false)
+        if (cnt_.insert(std::make_pair(val, 0)).second == false)
         {
             gu_throw_fatal << "Failed to insert value: " << val;
         }
     }
 
-    if (cnt.insert(make_pair(numeric_limits<double>::max(), 0)).second == false)
+    if (cnt_.insert(
+            std::make_pair(
+                std::numeric_limits<double>::max(), 0)).second == false)
     {
         gu_throw_fatal << "Failed to insert numeric_limits<double>::max()";
     }
@@ -54,9 +55,9 @@ void gcomm::Histogram::insert(const double val)
         return;
     }
 
-    map<const double, long long>::iterator i = cnt.lower_bound(val);
+    std::map<double, long long>::iterator i = cnt_.lower_bound(val);
 
-    if (i == cnt.end())
+    if (i == cnt_.end())
     {
         gu_throw_fatal;
     }
@@ -66,31 +67,31 @@ void gcomm::Histogram::insert(const double val)
 
 void gcomm::Histogram::clear()
 {
-    for (map<const double, long long>::iterator i = cnt.begin();
-         i != cnt.end(); ++i)
+    for (std::map<double, long long>::iterator i = cnt_.begin();
+         i != cnt_.end(); ++i)
     {
         i->second = 0;
     }
 }
 
-ostream& gcomm::operator<<(ostream& os, const Histogram& hs)
+std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
 {
-    map<const double, long long>::const_iterator i, i_next;
+    std::map<double, long long>::const_iterator i, i_next;
 
     long long norm = 0;
-    for (i = hs.cnt.begin(); i != hs.cnt.end(); ++i)
+    for (i = hs.cnt_.begin(); i != hs.cnt_.end(); ++i)
     {
         norm += i->second;
     }
 
-    for (i = hs.cnt.begin(); i != hs.cnt.end(); i = i_next)
+    for (i = hs.cnt_.begin(); i != hs.cnt_.end(); i = i_next)
     {
         i_next = i;
         ++i_next;
-        if (i_next == hs.cnt.end())
+        if (i_next == hs.cnt_.end())
             break;
         os << i->first << " -> " << i_next->first << ": "
-           << 100.*double(i_next->second + (i == hs.cnt.begin() ? i->second : 0))/double(norm) << " ";
+           << 100.*double(i_next->second + (i == hs.cnt_.begin() ? i->second : 0))/double(norm) << " ";
     }
     os << "total: " << norm;
 

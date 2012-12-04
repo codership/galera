@@ -35,14 +35,14 @@ public:
     ~AsioProtonet();
     void event_loop(const gu::datetime::Period& p);
     void dispatch(const SocketId&,
-                  const gu::Datagram&,
+                  const Datagram&,
                   const ProtoUpMeta&);
     void interrupt();
     SocketPtr socket(const gu::URI&);
     gcomm::Acceptor* acceptor(const gu::URI&);
     void enter();
     void leave();
-    size_t get_mtu() const { return mtu_; }
+    size_t mtu() const { return mtu_; }
 
 #ifdef HAVE_ASIO_SSL_HPP
     std::string get_ssl_password() const;

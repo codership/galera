@@ -11,9 +11,6 @@
 #include <boost/bind.hpp>
 #include <boost/array.hpp>
 
-using namespace std;
-using namespace gu;
-
 
 static bool is_multicast(const asio::ip::udp::endpoint& ep)
 {
@@ -56,7 +53,7 @@ static void leave_group(asio::ip::udp::socket&   socket,
 
 
 
-gcomm::AsioUdpSocket::AsioUdpSocket(AsioProtonet& net, const URI& uri)
+gcomm::AsioUdpSocket::AsioUdpSocket(AsioProtonet& net, const gu::URI& uri)
     :
     Socket(uri),
     net_(net),
@@ -74,9 +71,9 @@ gcomm::AsioUdpSocket::~AsioUdpSocket()
 }
 
 
-void gcomm::AsioUdpSocket::connect(const URI& uri)
+void gcomm::AsioUdpSocket::connect(const gu::URI& uri)
 {
-    gcomm_assert(get_state() == S_CLOSED);
+    gcomm_assert(state() == S_CLOSED);
     Critical<AsioProtonet> crit(net_);
     asio::ip::udp::resolver resolver(net_.io_service_);
 
@@ -93,7 +90,7 @@ void gcomm::AsioUdpSocket::connect(const URI& uri)
     asio::ip::udp::socket::non_blocking_io cmd(true);
     socket_.io_control(cmd);
 
-    const string if_addr(
+    const std::string if_addr(
         unescape_addr(
             uri.get_option("socket.if_addr",
                            anyaddr(conn_i->endpoint().address()))));
@@ -104,17 +101,18 @@ void gcomm::AsioUdpSocket::connect(const URI& uri)
         join_group(socket_, conn_i->endpoint(), local_if);
         socket_.set_option(
             asio::ip::multicast::enable_loopback(
-                from_string<bool>(uri.get_option("socket.if_loop", "false"))));
+                gu::from_string<bool>(uri.get_option("socket.if_loop", "false"))));
         socket_.set_option(
             asio::ip::multicast::hops(
-                from_string<int>(uri.get_option("socket.mcast_ttl", "1"))));
+                gu::from_string<int>(uri.get_option("socket.mcast_ttl", "1"))));
         socket_.bind(*conn_i);
     }
     else
     {
         socket_.bind(
-            asio::ip::udp::endpoint(local_if,
-                              from_string<unsigned short>(uri.get_port())));
+            asio::ip::udp::endpoint(
+                local_if,
+                gu::from_string<unsigned short>(uri.get_port())));
     }
 
     async_receive();
@@ -124,7 +122,7 @@ void gcomm::AsioUdpSocket::connect(const URI& uri)
 void gcomm::AsioUdpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
-    if (get_state() != S_CLOSED)
+    if (state() != S_CLOSED)
     {
         if (is_multicast(target_ep_) == true)
         {
@@ -139,17 +137,17 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
     boost::array<asio::const_buffer, 3> cbs;
-    NetHeader hdr(dg.get_len(), net_.version_);
+    NetHeader hdr(dg.len(), net_.version_);
     if (net_.checksum_ == true)
     {
         hdr.set_crc32(crc32(dg));
     }
-    byte_t buf[NetHeader::serial_size_];
-    gu::serialize(hdr, buf, sizeof(buf), 0);
+    gu::byte_t buf[NetHeader::serial_size_];
+    serialize(hdr, buf, sizeof(buf), 0);
     cbs[0] = asio::const_buffer(buf, sizeof(buf));
-    cbs[1] = asio::const_buffer(dg.get_header() + dg.get_header_offset(),
-                          dg.get_header_len());
-    cbs[2] = asio::const_buffer(&dg.get_payload()[0], dg.get_payload().size());
+    cbs[1] = asio::const_buffer(dg.header() + dg.header_offset(),
+                          dg.header_len());
+    cbs[2] = asio::const_buffer(&dg.payload()[0], dg.payload().size());
     try
     {
         socket_.send_to(cbs, target_ep_);
@@ -178,9 +176,9 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
         NetHeader hdr;
         try
         {
-            gu::unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+            unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
         }
-        catch (Exception& e)
+        catch (gu::Exception& e)
         {
             log_warn << "hdr unserialize failed: " << e.get_errno();
             return;
@@ -193,10 +191,11 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
         }
         else
         {
-            Datagram dg(SharedBuffer(
-                            new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
-                                       &recv_buf_[0] + NetHeader::serial_size_
-                                       + hdr.len())));
+            Datagram dg(
+                gu::SharedBuffer(
+                    new gu::Buffer(&recv_buf_[0] + NetHeader::serial_size_,
+                                   &recv_buf_[0] + NetHeader::serial_size_
+                                   + hdr.len())));
             if (net_.checksum_ == true &&
                 ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
                  (hdr.has_crc32() == false && hdr.crc32() != 0)))
@@ -207,7 +206,7 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
             }
             else
             {
-                net_.dispatch(get_id(), dg, ProtoUpMeta());
+                net_.dispatch(id(), dg, ProtoUpMeta());
             }
         }
     }
@@ -231,21 +230,21 @@ void gcomm::AsioUdpSocket::async_receive()
 }
 
 
-size_t gcomm::AsioUdpSocket::get_mtu() const
+size_t gcomm::AsioUdpSocket::mtu() const
 {
     return (1 << 15);
 }
 
-string gcomm::AsioUdpSocket::get_local_addr() const
+std::string gcomm::AsioUdpSocket::local_addr() const
 {
     return uri_string(UDP_SCHEME,
                       escape_addr(socket_.local_endpoint().address()),
-                      to_string(socket_.local_endpoint().port()));
+                      gu::to_string(socket_.local_endpoint().port()));
 }
 
-string gcomm::AsioUdpSocket::get_remote_addr() const
+std::string gcomm::AsioUdpSocket::remote_addr() const
 {
     return uri_string(UDP_SCHEME,
                       escape_addr(socket_.remote_endpoint().address()),
-                      to_string(socket_.remote_endpoint().port()));
+                      gu::to_string(socket_.remote_endpoint().port()));
 }

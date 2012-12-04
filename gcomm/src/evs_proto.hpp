@@ -90,43 +90,43 @@ public:
     /*!
      * Default constructor.
      */
-    Proto(gu::Config& conf,
-          const UUID& my_uuid_,
+    Proto(gu::Config&    conf,
+          const UUID&    my_uuid,
           const gu::URI& uri = gu::URI("evs://"),
-          const size_t mtu_ = std::numeric_limits<size_t>::max());
+          const size_t   mtu = std::numeric_limits<size_t>::max());
     ~Proto();
 
-    const UUID& get_uuid() const { return my_uuid; }
+    const UUID& uuid() const { return my_uuid_; }
 
     std::string self_string() const
     {
         std::ostringstream os;
-        os << "evs::proto(" << get_uuid() << ", " << to_string(get_state())
-           << ", " << current_view.get_id() << ")";
+        os << "evs::proto(" << uuid() << ", " << to_string(state())
+           << ", " << current_view_.id() << ")";
         return os.str();
     }
 
-    State get_state() const { return state; }
+    State state() const { return state_; }
 
-    size_t get_known_size() const { return known.size(); }
+    size_t known_size() const { return known_.size(); }
 
-    bool is_output_empty() const { return output.empty(); }
+    bool is_output_empty() const { return output_.empty(); }
 
-    std::string get_stats() const;
+    std::string stats() const;
     void reset_stats();
 
     bool is_flow_control(const seqno_t, const seqno_t win) const;
-    int send_user(gu::Datagram&,
+    int send_user(Datagram&,
                   uint8_t,
                   Order,
                   seqno_t,
                   seqno_t,
                   size_t n_aggregated = 1);
-    size_t get_mtu() const { return mtu; }
+    size_t mtu() const { return mtu_; }
     size_t aggregate_len() const;
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
-    int send_delegate(gu::Datagram&);
+    int send_delegate(Datagram&);
     void send_gap(const UUID&, const ViewId&, const Range, bool commit = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
@@ -141,7 +141,6 @@ public:
     void retrans_user(const UUID&, const MessageNodeList&);
     void retrans_leaves(const MessageNodeList&);
 
-
     void set_inactive(const UUID&);
     void check_inactive();
     void cleanup_unoperational();
@@ -154,7 +153,7 @@ public:
     void deliver_finish(const InputMapMsg&);
     void deliver();
     void deliver_local(bool trans = false);
-    void deliver_causal(uint8_t user_type, seqno_t seqno, const gu::Datagram&);
+    void deliver_causal(uint8_t user_type, seqno_t seqno, const Datagram&);
     void validate_trans_msg(const UserMessage&);
     void deliver_trans();
     void deliver_reg_view();
@@ -197,10 +196,10 @@ private:
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,
-                     const gu::Datagram&);
+                     const Datagram&);
     void handle_delegate(const DelegateMessage&,
                          NodeMap::iterator,
-                         const gu::Datagram&);
+                         const Datagram&);
     void handle_gap(const GapMessage&, NodeMap::iterator);
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
@@ -208,13 +207,13 @@ private:
     void populate_node_list(MessageNodeList*) const;
 public:
     static size_t unserialize_message(const UUID&,
-                                      const gu::Datagram&,
+                                      const Datagram&,
                                       Message*);
     void handle_msg(const Message& msg,
-                    const gu::Datagram& dg = gu::Datagram());
+                    const Datagram& dg = Datagram());
     // Protolay
-    void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
-    int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm);
+    void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
+    int handle_down(Datagram& wb, const ProtoDownMeta& dm);
     void handle_stable_view(const View& view)
     {
         set_stable_view(view);
@@ -255,14 +254,14 @@ public:
     class TimerList :
         public  MultiMap<gu::datetime::Date, Timer> { };
 private:
-    TimerList timers;
+    TimerList timers_;
 public:
     // These need currently to be public for unit tests
     void handle_inactivity_timer();
     void handle_retrans_timer();
     void handle_install_timer();
     void handle_stats_timer();
-    gu::datetime::Date get_next_expiration(const Timer) const;
+    gu::datetime::Date next_expiration(const Timer) const;
     void reset_timers();
     gu::datetime::Date handle_timers();
 
@@ -298,67 +297,67 @@ public:
     };
 private:
 
-    int version;
+    int version_;
     static const int max_version_ = GCOMM_EVS_MAX_VERSION;
-    int debug_mask;
-    int info_mask;
-    gu::datetime::Date last_stats_report;
-    bool collect_stats;
-    Histogram hs_agreed;
-    Histogram hs_safe;
-    Histogram hs_local_causal;
-    long long int send_queue_s;
-    long long int n_send_queue_s;
-    std::vector<long long int> sent_msgs;
-    long long int retrans_msgs;
-    long long int recovered_msgs;
-    std::vector<long long int> recvd_msgs;
-    std::vector<long long int> delivered_msgs;
-    prof::Profile send_user_prof;
-    prof::Profile send_gap_prof;
-    prof::Profile send_join_prof;
-    prof::Profile send_install_prof;
-    prof::Profile send_leave_prof;
-    prof::Profile consistent_prof;
-    prof::Profile consensus_prof;
-    prof::Profile shift_to_prof;
-    prof::Profile input_map_prof;
-    prof::Profile delivery_prof;
-    bool delivering;
-    UUID my_uuid;
+    int debug_mask_;
+    int info_mask_;
+    gu::datetime::Date last_stats_report_;
+    bool collect_stats_;
+    Histogram hs_agreed_;
+    Histogram hs_safe_;
+    Histogram hs_local_causal_;
+    long long int send_queue_s_;
+    long long int n_send_queue_s_;
+    std::vector<long long int> sent_msgs_;
+    long long int retrans_msgs_;
+    long long int recovered_msgs_;
+    std::vector<long long int> recvd_msgs_;
+    std::vector<long long int> delivered_msgs_;
+    prof::Profile send_user_prof_;
+    prof::Profile send_gap_prof_;
+    prof::Profile send_join_prof_;
+    prof::Profile send_install_prof_;
+    prof::Profile send_leave_prof_;
+    prof::Profile consistent_prof_;
+    prof::Profile consensus_prof_;
+    prof::Profile shift_to_prof_;
+    prof::Profile input_map_prof_;
+    prof::Profile delivery_prof_;
+    bool delivering_;
+    UUID my_uuid_;
     //
     // Known instances
-    NodeMap known;
-    NodeMap::iterator self_i;
+    NodeMap known_;
+    NodeMap::iterator self_i_;
     //
-    gu::datetime::Period view_forget_timeout;
-    gu::datetime::Period inactive_timeout;
-    gu::datetime::Period suspect_timeout;
-    gu::datetime::Period inactive_check_period;
-    gu::datetime::Period retrans_period;
-    gu::datetime::Period install_timeout;
-    gu::datetime::Period join_retrans_period;
-    gu::datetime::Period stats_report_period;
-    gu::datetime::Period causal_keepalive_period;
+    gu::datetime::Period view_forget_timeout_;
+    gu::datetime::Period inactive_timeout_;
+    gu::datetime::Period suspect_timeout_;
+    gu::datetime::Period inactive_check_period_;
+    gu::datetime::Period retrans_period_;
+    gu::datetime::Period install_timeout_;
+    gu::datetime::Period join_retrans_period_;
+    gu::datetime::Period stats_report_period_;
+    gu::datetime::Period causal_keepalive_period_;
 
-    gu::datetime::Date last_inactive_check;
-    gu::datetime::Date last_causal_keepalive;
+    gu::datetime::Date last_inactive_check_;
+    gu::datetime::Date last_causal_keepalive_;
 
     // Current view id
     // ViewId current_view;
-    View current_view;
-    View previous_view;
-    std::list<std::pair<ViewId, gu::datetime::Date> > previous_views;
+    View current_view_;
+    View previous_view_;
+    std::list<std::pair<ViewId, gu::datetime::Date> > previous_views_;
 
     // Map containing received messages and aru/safe seqnos
-    InputMap* input_map;
+    InputMap* input_map_;
     // Helper container for local causal messages
     class CausalMessage
     {
     public:
         CausalMessage(uint8_t             user_type,
                       seqno_t             seqno,
-                      const gu::Datagram& datagram)
+                      const Datagram& datagram)
             :
             user_type_(user_type),
             seqno_    (seqno    ),
@@ -367,48 +366,47 @@ private:
         { }
         uint8_t             user_type() const { return user_type_; }
         seqno_t             seqno()     const { return seqno_    ; }
-        const gu::Datagram& datagram()  const { return datagram_ ; }
+        const Datagram& datagram()  const { return datagram_ ; }
         const gu::datetime::Date& tstamp()    const { return tstamp_   ; }
     private:
-        uint8_t      user_type_;
-        seqno_t      seqno_;
-        gu::Datagram datagram_;
-        gu::datetime::Date     tstamp_;
+        uint8_t            user_type_;
+        seqno_t            seqno_;
+        Datagram       datagram_;
+        gu::datetime::Date tstamp_;
     };
     // Queue containing local causal messages
     std::deque<CausalMessage> causal_queue_;
     // Consensus module
-    Consensus consensus;
+    Consensus consensus_;
     // Last received install message
-    InstallMessage* install_message;
+    InstallMessage* install_message_;
     // Install attempt counter
-    uint32_t attempt_seq;
+    uint32_t attempt_seq_;
     // Install timeout counting
-    int max_install_timeouts;
-    int install_timeout_count;
+    int max_install_timeouts_;
+    int install_timeout_count_;
     // Sequence number to maintain membership message FIFO order
-    int64_t fifo_seq;
+    int64_t fifo_seq_;
     // Last sent seq
-    seqno_t last_sent;
+    seqno_t last_sent_;
     // Protocol send window size
-    seqno_t send_window;
+    seqno_t send_window_;
     // User send window size
-    seqno_t user_send_window;
+    seqno_t user_send_window_;
     // Output message queue
-    std::deque<std::pair<gu::Datagram, ProtoDownMeta> > output;
+    std::deque<std::pair<Datagram, ProtoDownMeta> > output_;
     std::vector<gu::byte_t> send_buf_;
-    uint32_t max_output_size;
-    size_t mtu;
-    bool use_aggregate;
-    bool self_loopback;
-    State state;
-    int shift_to_rfcnt;
+    uint32_t max_output_size_;
+    size_t mtu_;
+    bool use_aggregate_;
+    bool self_loopback_;
+    State state_;
+    int shift_to_rfcnt_;
 
-
+    // non-copyable
     Proto(const Proto&);
     void operator=(const Proto&);
 };
-
 
 
 #endif // EVS_PROTO_HPP

@@ -21,12 +21,6 @@
 
 #include <fstream>
 
-using namespace std;
-using namespace std::rel_ops;
-using namespace gu;
-using namespace gu::datetime;
-
-
 #ifdef HAVE_ASIO_SSL_HPP
 
 namespace
@@ -75,7 +69,7 @@ namespace
 std::string gcomm::AsioProtonet::get_ssl_password() const
 {
     std::string   file(get_file(conf_, Conf::SocketSslPasswordFile));
-    std::ifstream ifs(file.c_str(), ios_base::in);
+    std::ifstream ifs(file.c_str(), std::ios_base::in);
     if (ifs.good() == false)
     {
         gu_throw_error(errno) << "could not open password file '" << file
@@ -94,7 +88,7 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     :
     gcomm::Protonet(conf, "asio", version),
     mutex_(),
-    poll_until_(Date::max()),
+    poll_until_(gu::datetime::Date::max()),
     io_service_(),
     timer_(io_service_),
 #ifdef HAVE_ASIO_SSL_HPP
@@ -198,7 +192,7 @@ void gcomm::AsioProtonet::leave()
     mutex_.unlock();
 }
 
-gcomm::SocketPtr gcomm::AsioProtonet::socket(const URI& uri)
+gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
 {
     if (uri.get_scheme() == "tcp" || uri.get_scheme() == "ssl")
     {
@@ -215,30 +209,31 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const URI& uri)
     }
 }
 
-gcomm::Acceptor* gcomm::AsioProtonet::acceptor(const URI& uri)
+gcomm::Acceptor* gcomm::AsioProtonet::acceptor(const gu::URI& uri)
 {
     return new AsioTcpAcceptor(*this, uri);
 }
 
 
 
-Period handle_timers_helper(gcomm::Protonet& pnet, const Period& period)
+gu::datetime::Period handle_timers_helper(gcomm::Protonet&            pnet,
+                                          const gu::datetime::Period& period)
 {
-    const Date now(Date::now());
-    const Date stop(now + period);
+    const gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Date stop(now + period);
 
-    const Date next_time(pnet.handle_timers());
-    const Period sleep_p(min(stop - now, next_time - now));
+    const gu::datetime::Date next_time(pnet.handle_timers());
+    const gu::datetime::Period sleep_p(std::min(stop - now, next_time - now));
     return (sleep_p < 0 ? 0 : sleep_p);
 }
 
 
-void gcomm::AsioProtonet::event_loop(const Period& period)
+void gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
 {
     io_service_.reset();
-    poll_until_ = Date::now() + period;
+    poll_until_ = gu::datetime::Date::now() + period;
 
-    const Period p(handle_timers_helper(*this, period));
+    const gu::datetime::Period p(handle_timers_helper(*this, period));
     timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
     timer_.async_wait(boost::bind(&AsioProtonet::handle_wait, this,
                                   asio::placeholders::error));
@@ -250,7 +245,7 @@ void gcomm::AsioProtonet::dispatch(const SocketId& id,
                                    const Datagram& dg,
                                    const ProtoUpMeta& um)
 {
-    for (deque<Protostack*>::iterator i = protos_.begin();
+    for (std::deque<Protostack*>::iterator i = protos_.begin();
          i != protos_.end(); ++i)
     {
         (*i)->dispatch(id, dg, um);
@@ -266,8 +261,9 @@ void gcomm::AsioProtonet::interrupt()
 
 void gcomm::AsioProtonet::handle_wait(const asio::error_code& ec)
 {
-    Date now(Date::now());
-    const Period p(handle_timers_helper(*this, poll_until_ - now));
+    gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Period p(handle_timers_helper(*this, poll_until_ - now));
+    using std::rel_ops::operator>=;
     if (ec == asio::error_code() && poll_until_ >= now)
     {
         timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));

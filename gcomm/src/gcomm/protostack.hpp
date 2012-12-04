@@ -8,7 +8,6 @@
 #include "gcomm/protolay.hpp"
 
 #include "gu_lock.hpp"
-#include "gu_datagram.hpp"
 
 #include <deque>
 
@@ -29,7 +28,7 @@ public:
     void push_proto(Protolay* p);
     void pop_proto(Protolay* p);
     gu::datetime::Date handle_timers();
-    void dispatch(const void* id, const gu::Datagram& dg,
+    void dispatch(const void* id, const Datagram& dg,
                   const ProtoUpMeta& um);
     bool set_param(const std::string&, const std::string&);
     void enter() { mutex_.lock(); }

@@ -90,8 +90,8 @@ START_TEST(test_message)
     jm.set_source(uuid1);
     check_serialization(jm, jm.serial_size(), JoinMessage());
 
-    InstallMessage im(0, uuid1, view_id, ViewId(V_REG, view_id.get_uuid(),
-                                                view_id.get_seq()), 8, 5, 27, node_list);
+    InstallMessage im(0, uuid1, view_id, ViewId(V_REG, view_id.uuid(),
+                                                view_id.seq()), 8, 5, 27, node_list);
     im.set_source(uuid1);
     check_serialization(im, im.serial_size(), InstallMessage());
 
@@ -134,13 +134,13 @@ START_TEST(test_input_map_insert)
     {
         InputMap::iterator i = im.find(0, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_source() == uuid1);
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMapMsgIndex::value(i).msg().source() == uuid1);
+        fail_unless(InputMapMsgIndex::value(i).msg().seq() == s);
 
         i = im.find(1, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_source() == uuid2);
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMapMsgIndex::value(i).msg().source() == uuid2);
+        fail_unless(InputMapMsgIndex::value(i).msg().seq() == s);
     }
 
 }
@@ -186,18 +186,18 @@ START_TEST(test_input_map_safety)
     im.reset(1);
 
     im.insert(index1, UserMessage(0, uuid1, view, 0));
-    fail_unless(im.get_aru_seq() == 0);
+    fail_unless(im.aru_seq() == 0);
     im.insert(index1, UserMessage(0, uuid1, view, 1));
-    fail_unless(im.get_aru_seq() == 1);
+    fail_unless(im.aru_seq() == 1);
     im.insert(index1, UserMessage(0, uuid1, view, 2));
-    fail_unless(im.get_aru_seq() == 2);
+    fail_unless(im.aru_seq() == 2);
     im.insert(index1, UserMessage(0, uuid1, view, 3));
-    fail_unless(im.get_aru_seq() == 3);
+    fail_unless(im.aru_seq() == 3);
     im.insert(index1, UserMessage(0, uuid1, view, 5));
-    fail_unless(im.get_aru_seq() == 3);
+    fail_unless(im.aru_seq() == 3);
 
     im.insert(index1, UserMessage(0, uuid1, view, 4));
-    fail_unless(im.get_aru_seq() == 5);
+    fail_unless(im.aru_seq() == 5);
 
     InputMap::iterator i = im.find(index1, 0);
     fail_unless(im.is_fifo(i) == true);
@@ -211,7 +211,7 @@ START_TEST(test_input_map_safety)
     fail_unless(im.is_safe(i) == true);
 
     im.insert(index1, UserMessage(0, uuid1, view, 7));
-    im.set_safe_seq(index1, im.get_aru_seq());
+    im.set_safe_seq(index1, im.aru_seq());
     i = im.find(index1, 7);
     fail_if(im.is_safe(i) == true);
 
@@ -278,7 +278,7 @@ START_TEST(test_input_map_overwrap)
             (void)im.insert(i, um);
             if ((seq + 5) % 10 == 0)
             {
-                last_safe = um.get_seq() - 3;
+                last_safe = um.seq() - 3;
                 im.set_safe_seq(i, last_safe);
                 for (InputMap::iterator ii = im.begin();
                      ii != im.end() && im.is_safe(ii) == true;
@@ -289,8 +289,8 @@ START_TEST(test_input_map_overwrap)
             }
             cnt++;
         }
-        gcomm_assert(im.get_aru_seq() == seq);
-        gcomm_assert(im.get_safe_seq() == last_safe);
+        gcomm_assert(im.aru_seq() == seq);
+        gcomm_assert(im.safe_seq() == last_safe);
     }
     Date stop(Date::now());
 
@@ -303,14 +303,14 @@ END_TEST
 class InputMapInserter
 {
 public:
-    InputMapInserter(InputMap& im_) : im(im_) { }
+    InputMapInserter(InputMap& im) : im_(im) { }
 
     void operator()(const pair<size_t, UserMessage>& p) const
     {
-        im.insert(p.first, p.second);
+        im_.insert(p.first, p.second);
     }
 private:
-    InputMap& im;
+    InputMap& im_;
 };
 
 START_TEST(test_input_map_random_insert)
@@ -348,24 +348,24 @@ START_TEST(test_input_map_random_insert)
     size_t n = 0;
     for (InputMap::iterator i = im.begin(); i != im.end(); ++i)
     {
-        const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
-        fail_unless(msg.get_msg() == msgs[n].second);
+        const InputMapMsg& msg(InputMapMsgIndex::value(i));
+        fail_unless(msg.msg() == msgs[n].second);
         fail_if(im.is_safe(i) == true);
         ++n;
     }
 
-    fail_unless(im.get_aru_seq() == n_seqnos - 1);
-    fail_unless(im.get_safe_seq() == -1);
+    fail_unless(im.aru_seq() == n_seqnos - 1);
+    fail_unless(im.safe_seq() == -1);
 
     for (size_t i = 0; i < n_uuids; ++i)
     {
-        fail_unless(im.get_range(i) ==
+        fail_unless(im.range(i) ==
                     Range(n_seqnos,
                           n_seqnos - 1));
 
         im.set_safe_seq(i, n_seqnos - 1);
     }
-    fail_unless(im.get_safe_seq() == n_seqnos - 1);
+    fail_unless(im.safe_seq() == n_seqnos - 1);
 
 }
 END_TEST
@@ -375,10 +375,10 @@ END_TEST
 
 static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 {
-    Datagram* rb = tp->get_out();
+    Datagram* rb = tp->out();
     if (rb != 0)
     {
-        gu_trace(Proto::unserialize_message(tp->get_uuid(), *rb, msg));
+        gu_trace(Proto::unserialize_message(tp->uuid(), *rb, msg));
         if (release == true)
         {
             delete rb;
@@ -399,42 +399,42 @@ static void single_join(DummyTransport* t, Proto* p)
 
     Datagram* rb = get_msg(t, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.get_type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::T_JOIN);
 
     // Install message is emitted at the end of JOIN handling
     // 'cause this is the only instance and is always consistent
     // with itself
     rb = get_msg(t, &im);
     fail_unless(rb != 0);
-    fail_unless(im.get_type() == Message::T_INSTALL);
+    fail_unless(im.type() == Message::T_INSTALL);
 
     // Handling INSTALL message emits three gap messages,
     // one for receiving install message (commit gap), one for
     // shift to install and one for shift to operational
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.get_type() == Message::T_GAP);
-    fail_unless((gm.get_flags() & Message::F_COMMIT) != 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) != 0);
 
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.get_type() == Message::T_GAP);
-    fail_unless((gm.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) == 0);
 
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.get_type() == Message::T_GAP);
-    fail_unless((gm.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) == 0);
 
     // State must have evolved JOIN -> S_GATHER -> S_INSTALL -> S_OPERATIONAL
-    fail_unless(p->get_state() == Proto::S_OPERATIONAL);
+    fail_unless(p->state() == Proto::S_OPERATIONAL);
 
     // Handle join message again, must stay in S_OPERATIONAL, must not
     // emit anything
     p->handle_msg(jm);
     rb = get_msg(t, &gm);
     fail_unless(rb == 0);
-    fail_unless(p->get_state() == Proto::S_OPERATIONAL);
+    fail_unless(p->state() == Proto::S_OPERATIONAL);
 
 }
 
@@ -478,61 +478,61 @@ static void double_join(DummyTransport* t1, Proto* p1,
 
     // Initial states check
     p2->shift_to(Proto::S_JOINING);
-    fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
-    fail_unless(p2->get_state() == Proto::S_JOINING);
+    fail_unless(p1->state() == Proto::S_OPERATIONAL);
+    fail_unless(p2->state() == Proto::S_JOINING);
 
     // Send join message, don't self handle immediately
     // Expected output: one join message
     p2->send_join(false);
-    fail_unless(p2->get_state() == Proto::S_JOINING);
+    fail_unless(p2->state() == Proto::S_JOINING);
     rb = get_msg(t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.get_type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::T_JOIN);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: shift to S_GATHER and one join message
     p1->handle_msg(jm);
-    fail_unless(p1->get_state() == Proto::S_GATHER);
+    fail_unless(p1->state() == Proto::S_GATHER);
     rb = get_msg(t1, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.get_type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::T_JOIN);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
 
     // Handle node 1's join on node 2
     // Expected output: shift to S_GATHER and one join message
     p2->handle_msg(jm);
-    fail_unless(p2->get_state() == Proto::S_GATHER);
+    fail_unless(p2->state() == Proto::S_GATHER);
     rb = get_msg(t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.get_type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::T_JOIN);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: Install and commit gap messages, state stays in S_GATHER
     p1->handle_msg(jm);
-    fail_unless(p1->get_state() == Proto::S_GATHER);
+    fail_unless(p1->state() == Proto::S_GATHER);
     rb = get_msg(t1, &im);
     fail_unless(rb != 0);
-    fail_unless(im.get_type() == Message::T_INSTALL);
+    fail_unless(im.type() == Message::T_INSTALL);
     rb = get_msg(t1, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.get_type() == Message::T_GAP);
-    fail_unless((gm.get_flags() & Message::F_COMMIT) != 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
 
     // Handle install message on node 2
     // Expected output: commit gap message and state stays in S_RECOVERY
     p2->handle_msg(im);
-    fail_unless(p2->get_state() == Proto::S_GATHER);
+    fail_unless(p2->state() == Proto::S_GATHER);
     rb = get_msg(t2, &gm2);
     fail_unless(rb != 0);
-    fail_unless(gm2.get_type() == Message::T_GAP);
-    fail_unless((gm2.get_flags() & Message::F_COMMIT) != 0);
+    fail_unless(gm2.type() == Message::T_GAP);
+    fail_unless((gm2.flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
@@ -540,22 +540,22 @@ static void double_join(DummyTransport* t1, Proto* p1,
     // Expected output: Both nodes shift to S_INSTALL,
     // both send gap messages
     p1->handle_msg(gm2);
-    fail_unless(p1->get_state() == Proto::S_INSTALL);
+    fail_unless(p1->state() == Proto::S_INSTALL);
     Message gm12;
     rb = get_msg(t1, &gm12);
     fail_unless(rb != 0);
-    fail_unless(gm12.get_type() == Message::T_GAP);
-    fail_unless((gm12.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(gm12.type() == Message::T_GAP);
+    fail_unless((gm12.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
 
     p2->handle_msg(gm);
-    fail_unless(p2->get_state() == Proto::S_INSTALL);
+    fail_unless(p2->state() == Proto::S_INSTALL);
     Message gm22;
     rb = get_msg(t2, &gm22);
     fail_unless(rb != 0);
-    fail_unless(gm22.get_type() == Message::T_GAP);
-    fail_unless((gm22.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(gm22.type() == Message::T_GAP);
+    fail_unless((gm22.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
@@ -563,20 +563,20 @@ static void double_join(DummyTransport* t1, Proto* p1,
     // and gap message
 
     p1->handle_msg(gm22);
-    fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
+    fail_unless(p1->state() == Proto::S_OPERATIONAL);
     rb = get_msg(t1, &msg);
     fail_unless(rb != 0);
-    fail_unless(msg.get_type() == Message::T_GAP);
-    fail_unless((msg.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(msg.type() == Message::T_GAP);
+    fail_unless((msg.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
 
     p2->handle_msg(gm12);
-    fail_unless(p2->get_state() == Proto::S_OPERATIONAL);
+    fail_unless(p2->state() == Proto::S_OPERATIONAL);
     rb = get_msg(t2, &msg);
     fail_unless(rb != 0);
-    fail_unless(msg.get_type() == Message::T_GAP);
-    fail_unless((msg.get_flags() & Message::F_COMMIT) == 0);
+    fail_unless(msg.type() == Message::T_GAP);
+    fail_unless((msg.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
@@ -662,7 +662,7 @@ static void set_cvi(vector<DummyNode*>& nvec, size_t i_begin, size_t i_end,
 {
     for (size_t i = i_begin; i <= i_end; ++i)
     {
-        nvec[i]->set_cvi(ViewId(V_REG, nvec[i_begin]->get_uuid(),
+        nvec[i]->set_cvi(ViewId(V_REG, nvec[i_begin]->uuid(),
                                 static_cast<uint32_t>(seq)));
     }
 }
@@ -674,7 +674,7 @@ public:
     ViewSeq() { }
     bool operator()(const C& a, const C& b) const
     {
-        return (a->get_trace().get_current_view_trace().get_view().get_id().get_seq() < b->get_trace().get_current_view_trace().get_view().get_id().get_seq());
+        return (a->trace().current_view_trace().view().id().seq() < b->trace().current_view_trace().view().id().seq());
     }
 };
 
@@ -684,7 +684,7 @@ static uint32_t get_max_view_seq(const std::vector<DummyNode*>& dnv,
     if (i == dnv.size()) return static_cast<uint32_t>(-1);
     return (*std::max_element(dnv.begin() + i,
                               dnv.begin() + j,
-                              ViewSeq<const DummyNode*>()))->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+                              ViewSeq<const DummyNode*>()))->trace().current_view_trace().view().id().seq();
 }
 
 
@@ -1231,7 +1231,7 @@ START_TEST(test_proto_stop_cont)
         {
             if (j != i)
             {
-                dn[j]->close(dn[i]->get_uuid());
+                dn[j]->close(dn[i]->uuid());
             }
         }
         set_cvi(dn, 0, n_nodes - 1, view_seq + 1);
@@ -1271,16 +1271,16 @@ START_TEST(test_proto_arbitrate)
     }
     uint32_t view_seq = n_nodes + 1;
 
-    dn[0]->close(dn[1]->get_uuid());
-    dn[1]->close(dn[0]->get_uuid());
-    dn[0]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq));
-    dn[2]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq));
-    dn[1]->set_cvi(ViewId(V_REG, dn[1]->get_uuid(), view_seq));
+    dn[0]->close(dn[1]->uuid());
+    dn[1]->close(dn[0]->uuid());
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq));
+    dn[2]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq));
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->uuid(), view_seq));
     gu_trace(prop.propagate_until_cvi(true));
 
-    dn[0]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq + 1));
-    dn[1]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq + 1));
-    dn[2]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq + 1));
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
+    dn[1]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
+    dn[2]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
     gu_trace(prop.propagate_until_cvi(true));
 
     gu_trace(check_trace(dn));
@@ -1315,15 +1315,15 @@ START_TEST(test_proto_split_two)
     }
     uint32_t view_seq = n_nodes + 1;
 
-    dn[0]->close(dn[1]->get_uuid());
-    dn[1]->close(dn[0]->get_uuid());
-    dn[0]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq));
-    dn[1]->set_cvi(ViewId(V_REG, dn[1]->get_uuid(), view_seq));
+    dn[0]->close(dn[1]->uuid());
+    dn[1]->close(dn[0]->uuid());
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq));
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->uuid(), view_seq));
 
     gu_trace(prop.propagate_until_cvi(true));
 
-    dn[0]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq + 1));
-    dn[1]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq + 1));
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
+    dn[1]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
     gu_trace(prop.propagate_until_cvi(true));
 
     gu_trace(check_trace(dn));

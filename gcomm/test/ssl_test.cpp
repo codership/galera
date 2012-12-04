@@ -41,20 +41,20 @@ public:
         return std::string(msg_.begin(), msg_.end());
     }
 
-    void handle_up(const void* id, const gu::Datagram& dg,
+    void handle_up(const void* id, const gcomm::Datagram& dg,
                    const gcomm::ProtoUpMeta& um)
     {
-        if (um.get_errno() != 0)
+        if (um.err_no() != 0)
         {
-            log_error << "socket failed: " << um.get_errno();
+            log_error << "socket failed: " << um.err_no();
             socket_->close();
             throw std::exception();
         }
         else
         {
-            assert(id == socket_->get_id());
-            msg_.insert(msg_.begin(), gcomm::get_begin(dg),
-                        gcomm::get_begin(dg) + gcomm::get_available(dg));
+            assert(id == socket_->id());
+            msg_.insert(msg_.begin(), gcomm::begin(dg),
+                        gcomm::begin(dg) + gcomm::available(dg));
         }
     }
 private:
@@ -96,14 +96,14 @@ public:
         listener_->listen(uri_);
     }
 
-    void handle_up(const void* id, const gu::Datagram& dg,
+    void handle_up(const void* id, const gcomm::Datagram& dg,
                    const gcomm::ProtoUpMeta& um)
     {
-        if (id == listener_->get_id())
+        if (id == listener_->id())
         {
             gcomm::SocketPtr socket(listener_->accept());
             if (smap_.insert(
-                    std::make_pair(socket->get_id(), socket)).second == false)
+                    std::make_pair(socket->id(), socket)).second == false)
             {
                 throw std::logic_error("duplicate socket entry");
             }
@@ -117,15 +117,15 @@ public:
         }
 
         gcomm::SocketPtr socket(si->second);
-        if (socket->get_state() == gcomm::Socket::S_CONNECTED)
+        if (socket->state() == gcomm::Socket::S_CONNECTED)
         {
-            gu::Datagram msg;
-            msg.get_payload().resize(msg_.size());
-            std::copy(msg_.begin(), msg_.end(), msg.get_payload().begin());
+            gcomm::Datagram msg;
+            msg.payload().resize(msg_.size());
+            std::copy(msg_.begin(), msg_.end(), msg.payload().begin());
             socket->send(msg);
         }
-        else if (socket->get_state() == gcomm::Socket::S_CLOSED ||
-                 socket->get_state() == gcomm::Socket::S_FAILED)
+        else if (socket->state() == gcomm::Socket::S_CLOSED ||
+                 socket->state() == gcomm::Socket::S_FAILED)
         {
             std::cerr << "socket " << id << " failed" << std::endl;
             socket->close();
@@ -133,7 +133,7 @@ public:
         }
         else
         {
-            std::cerr << "socket state: " << socket->get_state() << std::endl;
+            std::cerr << "socket state: " << socket->state() << std::endl;
         }
     }
 

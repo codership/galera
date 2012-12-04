@@ -31,28 +31,28 @@ namespace gcomm
     public:
 
 
-        ViewId(const ViewType type_    = V_NONE,
-               const UUID&    uuid_   = UUID::nil(),
-               const uint32_t seq_ = 0) :
-            type(type_),
-            uuid(uuid_),
-            seq(seq_)
+        ViewId(const ViewType type    = V_NONE,
+               const UUID&    uuid    = UUID::nil(),
+               const uint32_t seq     = 0) :
+            type_(type),
+            uuid_(uuid),
+            seq_ (seq)
         { }
 
-        ViewId(const ViewType type_,
+        ViewId(const ViewType type,
                const ViewId& vi) :
-            type(type_),
-            uuid(vi.get_uuid()),
-            seq(vi.get_seq())
+            type_(type),
+            uuid_(vi.uuid()),
+            seq_ (vi.seq())
         { }
 
         virtual ~ViewId() { }
 
-        ViewType    get_type() const { return type; }
+        ViewType    type() const { return type_; }
 
-        const UUID& get_uuid() const { return uuid; }
+        const UUID& uuid() const { return uuid_; }
 
-        uint32_t    get_seq()  const { return seq; }
+        uint32_t    seq()  const { return seq_; }
 
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
             throw (gu::Exception);
@@ -62,7 +62,7 @@ namespace gcomm
 
         static size_t serial_size()
         {
-            return UUID::serial_size() + sizeof(reinterpret_cast<ViewId*>(0)->seq);
+            return UUID::serial_size() + sizeof(reinterpret_cast<ViewId*>(0)->seq_);
         }
 
         bool operator<(const ViewId& cmp) const
@@ -71,15 +71,17 @@ namespace gcomm
             // 1) view seq less than
             // 2) uuid newer than
             // 3) type less than
-            return (seq < cmp.seq ||
-                    (seq == cmp.seq &&
-                     (cmp.uuid.older(uuid) ||
-                      (uuid == cmp.uuid && type < cmp.type) ) ) );
+            return (seq_ < cmp.seq_ ||
+                    (seq_ == cmp.seq_ &&
+                     (cmp.uuid_.older(uuid_) ||
+                      (uuid_ == cmp.uuid_ && type_ < cmp.type_) ) ) );
         }
 
         bool operator==(const ViewId& cmp) const
         {
-            return (seq == cmp.seq && type == cmp.type && uuid == cmp.uuid);
+            return (seq_  == cmp.seq_  &&
+                    type_ == cmp.type_ &&
+                    uuid_ == cmp.uuid_);
         }
 
         bool operator!=(const ViewId& cmp) const
@@ -88,9 +90,9 @@ namespace gcomm
         }
 
     private:
-        ViewType type;
-        UUID uuid; // uniquely identifies the sequence of group views (?)
-        uint32_t    seq;  // position in the sequence                        (?)
+        ViewType type_;
+        UUID     uuid_; // uniquely identifies the sequence of group views (?)
+        uint32_t seq_;  // position in the sequence                        (?)
     };
 
     std::ostream& operator<<(std::ostream&, const ViewId&);
@@ -115,21 +117,21 @@ namespace gcomm
     public:
 
         View() :
-            bootstrap   (false),
-            view_id     (V_NONE),
-            members     (),
-            joined      (),
-            left        (),
-            partitioned ()
+            bootstrap_   (false),
+            view_id_     (V_NONE),
+            members_     (),
+            joined_      (),
+            left_        (),
+            partitioned_ ()
         { }
 
-        View(const ViewId& view_id_, bool bootstrap_ = false) :
-            bootstrap   (bootstrap_),
-            view_id     (view_id_),
-            members     (),
-            joined      (),
-            left        (),
-            partitioned ()
+        View(const ViewId& view_id, bool bootstrap = false) :
+            bootstrap_   (bootstrap),
+            view_id_     (view_id),
+            members_     (),
+            joined_      (),
+            left_        (),
+            partitioned_ ()
         { }
 
         ~View() {}
@@ -143,32 +145,32 @@ namespace gcomm
         void add_left        (const UUID& pid, const std::string& name);
         void add_partitioned (const UUID& pid, const std::string& name);
 
-        const NodeList& get_members     () const;
-        const NodeList& get_joined      () const;
-        const NodeList& get_left        () const;
-        const NodeList& get_partitioned () const;
+        const NodeList& members     () const;
+        const NodeList& joined      () const;
+        const NodeList& left        () const;
+        const NodeList& partitioned () const;
 
-        NodeList& get_members() { return members; }
+        NodeList& members() { return members_; }
 
         bool is_member(const UUID& uuid) const
-        { return members.find(uuid) != members.end(); }
+        { return members_.find(uuid) != members_.end(); }
 
         bool is_joining(const UUID& uuid) const
-        { return joined.find(uuid) != joined.end(); }
+        { return joined_.find(uuid) != joined_.end(); }
 
         bool is_leaving(const UUID& uuid) const
-        { return left.find(uuid) != left.end(); }
+        { return left_.find(uuid) != left_.end(); }
 
         bool is_partitioning(const UUID& uuid) const
-        { return partitioned.find(uuid) != partitioned.end(); }
+        { return partitioned_.find(uuid) != partitioned_.end(); }
 
 
-        ViewType      get_type           () const;
-        const ViewId& get_id             () const;
-        const UUID&   get_representative () const;
+        ViewType      type           () const;
+        const ViewId& id             () const;
+        const UUID&   representative () const;
 
         bool is_empty() const;
-        bool is_bootstrap() const { return bootstrap; }
+        bool is_bootstrap() const { return bootstrap_; }
 
         size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
             throw (gu::Exception);
@@ -180,12 +182,12 @@ namespace gcomm
 
 
     private:
-        bool     bootstrap;   // Flag indicating if view was bootstrapped
-        ViewId   view_id;     // View identifier
-        NodeList members;     // List of members in view
-        NodeList joined;      // List of newly joined members in view
-        NodeList left;        // Fracefully left members from previous view
-        NodeList partitioned; // Partitioned members from previous view
+        bool     bootstrap_;   // Flag indicating if view was bootstrapped
+        ViewId   view_id_;     // View identifier
+        NodeList members_;     // List of members in view
+        NodeList joined_;      // List of newly joined members in view
+        NodeList left_;        // Fracefully left members from previous view
+        NodeList partitioned_; // Partitioned members from previous view
     };
 
     bool operator==(const gcomm::View&, const gcomm::View&);

@@ -76,14 +76,14 @@ START_TEST(test_view)
 
 
     ViewId vid;
-    fail_unless(vid.get_uuid() == UUID());
-    fail_unless(vid.get_seq() == 0);
+    fail_unless(vid.uuid() == UUID());
+    fail_unless(vid.seq() == 0);
 
     UUID uuid(0, 0);
 
     vid = ViewId(V_REG, uuid, 7);
-    fail_unless(vid.get_uuid() == uuid);
-    fail_unless(vid.get_seq() == 7);
+    fail_unless(vid.uuid() == uuid);
+    fail_unless(vid.seq() == 7);
 
     check_serialization(vid, UUID::serial_size() + sizeof(uint32_t), ViewId());
 

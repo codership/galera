@@ -6,14 +6,11 @@
 
 #include "gu_uri.hpp"
 
-using namespace std;
-using namespace std::rel_ops;
-using namespace gu;
-using namespace gcomm;
+using std::rel_ops::operator!=;
 
 void gcomm::gmcast::Proto:: set_state(State new_state)
 {
-    log_debug << "State change: " << to_string(state) << " -> "
+    log_debug << "State change: " << to_string(state_) << " -> "
               << to_string(new_state);
 
     static const bool allowed[][7] =
@@ -34,13 +31,13 @@ void gcomm::gmcast::Proto:: set_state(State new_state)
             { false,  false,  false,  false,  false,  false, false } // CLOSED
         };
 
-    if (!allowed[state][new_state])
+    if (!allowed[state_][new_state])
     {
-        gu_throw_fatal << "Invalid state change: " << to_string(state)
+        gu_throw_fatal << "Invalid state change: " << to_string(state_)
                           << " -> " << to_string(new_state);
     }
 
-    state = new_state;
+    state_ = new_state;
 }
 
 void gcomm::gmcast::Proto::send_msg(const Message& msg)
@@ -48,7 +45,7 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
     gu::Buffer buf;
     gu_trace(serialize(msg, buf));
     Datagram dg(buf);
-    int ret = tp->send(dg);
+    int ret = tp_->send(dg);
 
     // @todo: This can happen during congestion, figure out how to
     // avoid terminating connection with topology change messages.
@@ -61,8 +58,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 
 void gcomm::gmcast::Proto::send_handshake()
 {
-    handshake_uuid = UUID(0, 0);
-    Message hs (version, Message::T_HANDSHAKE, handshake_uuid, local_uuid);
+    handshake_uuid_ = UUID(0, 0);
+    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_, local_uuid_);
 
     send_msg(hs);
 
@@ -71,31 +68,31 @@ void gcomm::gmcast::Proto::send_handshake()
 
 void gcomm::gmcast::Proto::wait_handshake()
 {
-    if (get_state() != S_INIT)
-        gu_throw_fatal << "Invalid state: " << to_string(get_state());
+    if (state() != S_INIT)
+        gu_throw_fatal << "Invalid state: " << to_string(state());
 
     set_state(S_HANDSHAKE_WAIT);
 }
 
 void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
 {
-    if (get_state() != S_HANDSHAKE_WAIT)
-        gu_throw_fatal << "Invalid state: " << to_string(get_state());
+    if (state() != S_HANDSHAKE_WAIT)
+        gu_throw_fatal << "Invalid state: " << to_string(state());
 
-    if (hs.get_version() != version)
+    if (hs.version() != version_)
     {
-        log_warn << "incompatible protocol version: " << hs.get_version();
+        log_warn << "incompatible protocol version: " << hs.version();
         set_state(S_FAILED);
         return;
     }
-    handshake_uuid = hs.get_handshake_uuid();
-    remote_uuid = hs.get_source_uuid();
+    handshake_uuid_ = hs.handshake_uuid();
+    remote_uuid_ = hs.source_uuid();
 
-    Message hsr (version, Message::T_HANDSHAKE_RESPONSE,
-                 handshake_uuid,
-                 local_uuid,
-                 local_addr,
-                 group_name);
+    Message hsr (version_, Message::T_HANDSHAKE_RESPONSE,
+                 handshake_uuid_,
+                 local_uuid_,
+                 local_addr_,
+                 group_name_);
     send_msg(hsr);
 
     set_state(S_HANDSHAKE_RESPONSE_SENT);
@@ -103,40 +100,42 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
 
 void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
 {
-    if (get_state() != S_HANDSHAKE_SENT)
-        gu_throw_fatal << "Invalid state: " << to_string(get_state());
+    if (state() != S_HANDSHAKE_SENT)
+        gu_throw_fatal << "Invalid state: " << to_string(state());
 
-        const std::string& grp = hs.get_group_name();
+        const std::string& grp = hs.group_name();
 
         try
         {
-            if (grp != group_name)
+            if (grp != group_name_)
             {
-                log_info << "handshake failed, my group: '" << group_name
+                log_info << "handshake failed, my group: '" << group_name_
                          << "', peer group: '" << grp << "'";
-                Message failed(version, Message::T_HANDSHAKE_FAIL,
-                               handshake_uuid, local_uuid);
+                Message failed(version_, Message::T_HANDSHAKE_FAIL,
+                               handshake_uuid_, local_uuid_);
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
             }
-            remote_uuid = hs.get_source_uuid();
-            gu::URI remote_uri(tp->get_remote_addr());
-            remote_addr = uri_string(remote_uri.get_scheme(),
-                                     remote_uri.get_host(),
-                                     URI(hs.get_node_address()).get_port());
+            remote_uuid_ = hs.source_uuid();
+            gu::URI remote_uri(tp_->remote_addr());
+            remote_addr_ = uri_string(remote_uri.get_scheme(),
+                                      remote_uri.get_host(),
+                                      gu::URI(hs.node_address()).get_port());
 
-            propagate_remote = true;
-            Message ok(version, Message::T_HANDSHAKE_OK, handshake_uuid, local_uuid);
+            propagate_remote_ = true;
+            Message ok(version_, Message::T_HANDSHAKE_OK, handshake_uuid_,
+                       local_uuid_);
             send_msg(ok);
             set_state(S_OK);
         }
-        catch (exception& e)
+        catch (std::exception& e)
         {
             log_warn << "Parsing peer address '"
-                     << hs.get_node_address() << "' failed: " << e.what();
+                     << hs.node_address() << "' failed: " << e.what();
 
-            Message nok (version, Message::T_HANDSHAKE_FAIL, handshake_uuid, local_uuid);
+            Message nok (version_, Message::T_HANDSHAKE_FAIL, handshake_uuid_,
+                         local_uuid_);
 
             send_msg (nok);
             set_state(S_FAILED);
@@ -145,7 +144,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
 
 void gcomm::gmcast::Proto::handle_ok(const Message& hs)
 {
-    propagate_remote = true;
+    propagate_remote_ = true;
     set_state(S_OK);
 }
 
@@ -157,27 +156,27 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
 
 void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 {
-    const Message::NodeList& nl(msg.get_node_list());
+    const Message::NodeList& nl(msg.node_list());
 
     LinkMap new_map;
     for (Message::NodeList::const_iterator i = nl.begin(); i != nl.end(); ++i)
     {
-        new_map.insert(Link(Message::NodeList::get_key(i),
-                            Message::NodeList::get_value(i).get_addr(),
-                            Message::NodeList::get_value(i).get_mcast_addr()));
-        if (Message::NodeList::get_key(i) == get_remote_uuid()     &&
-            mcast_addr == "" &&
-            Message::NodeList::get_value(i).get_mcast_addr() != "")
+        new_map.insert(Link(Message::NodeList::key(i),
+                            Message::NodeList::value(i).addr(),
+                            Message::NodeList::value(i).mcast_addr()));
+        if (Message::NodeList::key(i) == remote_uuid()     &&
+            mcast_addr_ == "" &&
+            Message::NodeList::value(i).mcast_addr() != "")
         {
-            mcast_addr = Message::NodeList::get_value(i).get_mcast_addr();
+            mcast_addr_ = Message::NodeList::value(i).mcast_addr();
         }
     }
 
-    if (link_map != new_map)
+    if (link_map_ != new_map)
     {
-        changed = true;
+        changed_ = true;
     }
-    link_map = new_map;
+    link_map_ = new_map;
 }
 
 
@@ -186,16 +185,17 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
     Message::NodeList nl;
     for (LinkMap::const_iterator i = um.begin(); i != um.end(); ++i)
     {
-        if (LinkMap::get_key(i) == UUID::nil() ||
-            LinkMap::get_value(i).get_addr() == "")
+        if (LinkMap::key(i) == UUID::nil() ||
+            LinkMap::value(i).addr() == "")
             gu_throw_fatal << "nil uuid or empty address";
 
-        nl.insert_unique(make_pair(LinkMap::get_key(i),
-                                   Node(LinkMap::get_value(i).get_addr())));
+        nl.insert_unique(
+            std::make_pair(LinkMap::key(i),
+                           Node(LinkMap::value(i).addr())));
     }
 
-    Message msg(version, Message::T_TOPOLOGY_CHANGE, local_uuid,
-                group_name, nl);
+    Message msg(version_, Message::T_TOPOLOGY_CHANGE, local_uuid_,
+                group_name_, nl);
 
     send_msg(msg);
 }
@@ -204,7 +204,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
 void gcomm::gmcast::Proto::handle_message(const Message& msg)
 {
 
-    switch (msg.get_type())
+    switch (msg.type())
     {
     case Message::T_HANDSHAKE:
         handle_handshake(msg);
@@ -222,7 +222,7 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
         handle_topology_change(msg);
         break;
     default:
-        gu_throw_fatal << "invalid message type: " << msg.get_type();
+        gu_throw_fatal << "invalid message type: " << msg.type();
         throw;
     }
 }
