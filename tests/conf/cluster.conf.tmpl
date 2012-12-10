@@ -2,11 +2,6 @@
 # Cluster resources configuration.
 #
 
-# List of available nodes, preferably IP addresses.
-# If hostnames are used, /etc/hosts file should be up to date
-# on each network node.
-export CLUSTER_NODES=${CLUSTER_NODES:-"gw vs1 vs2"}
-
 # DBMS that will be used for tests
 export DBMS=${DBMS:-"MYSQL"}
 
@@ -20,11 +15,6 @@ export DBMS_TEST_PSWD=${DBMS_TEST_PSWD:-"testpass"}
 
 # DBMS schema to use for tests
 export DBMS_TEST_SCHEMA=${DBMS_TEST_SCHEMA:-"test"}
-
-# is this needed?
-## Base directory where MySQL is installed in. May also be 
-## symbolic link pointing to real directory
-#export MYSQL_BASE=${MYSQL_BASE:-"~/galera/mysql"}
 
 # Host for clients to connect to
 export DBMS_HOST=${DBMS_HOST:-"127.0.0.1"}
@@ -60,9 +50,14 @@ esac
 #
 # export GCOMM_EXTRA_PARAMS=${GCOMM_EXTRA_PARAMS:-"gmcast.mcast_addr=239.192.0.11"}
 
+# default replication port
 export GCS_PORT=4567
 
+# common part of my.cnf
 export COMMON_MY_CNF=$BASE_CONF/common_my.cnf
+
+# libglb.so location if not standard (/usr/lib|/usr/local/lib)
+#GLB_LIB=
 
 . $BASE_CONF/nodes.conf
 
