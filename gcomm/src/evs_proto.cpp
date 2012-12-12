@@ -2692,7 +2692,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             if (install_message_ != 0 &&
                 msg.source_view_id() == install_message_->install_view_id())
             {
-                assert(state == S_INSTALL);
+                assert(state() == S_INSTALL);
                 evs_log_debug(D_STATE) << " recovery user message "
                                        << msg;
 
