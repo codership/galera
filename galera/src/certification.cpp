@@ -248,6 +248,11 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
             trx_map_.begin()->second->global_seqno() - 1);
     }
 
+#ifndef NDEBUG
+    // to check that cleanup after cert failure returns cert_index_
+    // to original size
+    size_t prev_cert_index_size(cert_index_.size());
+#endif // NDEBUG
     // Scan over write sets
     while (offset < wscoll.size())
     {
@@ -354,6 +359,13 @@ cert_fail:
                 {
                     // kel was added to cert_index_ by this trx -
                     // remove from cert_index_ and fall through to delete
+                    if (ke->get_key().flags() != kel->get_key().flags())
+                    {
+                        // two copies of keys in key list, shared and exclusive,
+                        // skip the one which was not used to create key entry
+                        assert(key_list.find(ke) != key_list.end());
+                        continue;
+                    }
                     assert(ke->ref_full_trx() == 0);
                     assert(ke->ref_full_shared_trx() == 0);
                     assert(kel == ke);
@@ -381,6 +393,7 @@ cert_fail:
             assert(kel->ref_full_shared_trx() == 0);
             delete kel;
         }
+        assert(cert_index_.size() == prev_cert_index_size);
     }
 
     return TEST_FAILED;

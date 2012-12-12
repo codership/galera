@@ -512,6 +512,72 @@ START_TEST(test_cert_hierarchical_v2)
 END_TEST
 
 
+START_TEST(test_trac_726)
+{
+    log_info << "test_trac_726";
+    const int version(2);
+    gu::Config conf;
+    galera::Certification cert(conf);
+    wsrep_uuid_t uuid1 = {{1, }};
+    wsrep_uuid_t uuid2 = {{2, }};
+    cert.assign_initial_position(0, version);
+
+    mark_point();
+
+    wsrep_key_part_t key1 = {void_cast("1"), 1};
+    wsrep_key_part_t key2 = {void_cast("2"), 1};
+
+    {
+        TrxHandle* trx(new TrxHandle(version, uuid1, 0, 0, false));
+
+        trx->append_key(Key(version, &key1, 1, 0));
+        trx->set_last_seen_seqno(0);
+        trx->flush(0);
+
+        // serialize/unserialize to verify that ver1 trx is serializable
+        const galera::MappedBuffer& wc(trx->write_set_collection());
+        gu::Buffer buf(wc.size());
+        std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
+        trx->unref();
+        trx = new TrxHandle();
+        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+
+        trx->set_received(0, 1, 1);
+        Certification::TestResult result(cert.append_trx(trx));
+        fail_unless(result == Certification::TEST_OK);
+        cert.set_trx_committed(trx);
+        trx->unref();
+    }
+
+    {
+        TrxHandle* trx(new TrxHandle(version, uuid2, 0, 0, false));
+
+        trx->append_key(Key(version, &key2, 1, 0));
+        trx->append_key(Key(version, &key2, 1, Key::F_SHARED));
+        trx->append_key(Key(version, &key1, 1, 0));
+
+        trx->set_last_seen_seqno(0);
+        trx->flush(0);
+
+        // serialize/unserialize to verify that ver1 trx is serializable
+        const galera::MappedBuffer& wc(trx->write_set_collection());
+        gu::Buffer buf(wc.size());
+        std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
+        trx->unref();
+        trx = new TrxHandle();
+        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+
+        trx->set_received(0, 2, 2);
+        Certification::TestResult result(cert.append_trx(trx));
+        fail_unless(result == Certification::TEST_FAILED);
+        cert.set_trx_committed(trx);
+        trx->unref();
+    }
+}
+END_TEST
+
 Suite* write_set_suite()
 {
     Suite* s = suite_create("write_set");
@@ -545,6 +611,9 @@ Suite* write_set_suite()
     tcase_add_test(tc, test_cert_hierarchical_v2);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_trac_726");
+    tcase_add_test(tc, test_trac_726);
+    suite_add_tcase(s, tc);
 
     return s;
 }
