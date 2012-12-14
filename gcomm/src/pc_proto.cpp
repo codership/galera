@@ -579,12 +579,29 @@ void gcomm::pc::Proto::validate_state_msgs() const
                     // Msg source claims to come from prim view and this node
                     // is in prim. All message prim view states must be equal
                     // to local ones.
-                    gcomm_assert(msg_state == local_state)
-                        << self_id()
-                        << " node " << uuid
-                        << " prim state message and local states not consistent:"
-                        << " msg node "   << msg_state
-                        << " local state " << local_state;
+                    if (msg_state.weight() == -1)
+                    {
+                        // backwards compatibility, ignore weight in state check
+                        gcomm_assert(
+                            msg_state.prim() == local_state.prim()     &&
+                            msg_state.last_seq() == local_state.last_seq()  &&
+                            msg_state.last_prim() == local_state.last_prim() &&
+                            msg_state.to_seq()    == local_state.to_seq())
+                            << self_id()
+                            << " node " << uuid
+                            << " prim state message and local states not consistent:"
+                            << " msg node "   << msg_state
+                            << " local state " << local_state;
+                    }
+                    else
+                    {
+                        gcomm_assert(msg_state == local_state)
+                            << self_id()
+                            << " node " << uuid
+                            << " prim state message and local states not consistent:"
+                            << " msg node "   << msg_state
+                            << " local state " << local_state;
+                    }
                     gcomm_assert(msg_state.to_seq() == max_to_seq)
                         << self_id()
                         << " node " << uuid
@@ -845,10 +862,20 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
                  ++j)
             {
                 const UUID& sm_uuid(NodeMap::key(j));
-                if (instances_.find(sm_uuid) == instances_.end())
+                const Node& sm_node(NodeMap::value(j));
+                NodeMap::iterator local_node_i(instances_.find(sm_uuid));
+                Node& local_node(NodeMap::value(local_node_i));
+                if (local_node_i == instances_.end())
                 {
                     const Node& sm_state(NodeMap::value(j));
                     instances_.insert_unique(std::make_pair(sm_uuid, sm_state));
+                }
+                else if (local_node.weight() == -1 && sm_node.weight() != -1)
+                {
+                    // backwards compatibility: override weight for instances
+                    // which have been reported by old nodes but have weights
+                    // associated anyway
+                    local_node.set_weight(sm_node.weight());
                 }
             }
         }
@@ -906,13 +933,32 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
 
     const Node& m_state(NodeMap::value(mi));
 
-    if (m_state != NodeMap::value(self_i_))
+    if (m_state.weight() == -1)
     {
-        gu_throw_fatal << self_id()
-                       << "Install message self state does not match, "
-                       << "message state: " << m_state
-                       << ", local state: "
-                       << NodeMap::value(self_i_);
+        // backwards compatibility, ignore weight in state check
+        const Node& self_state(NodeMap::value(self_i_));
+        if ((m_state.prim()      == self_state.prim()     &&
+             m_state.last_seq()  == self_state.last_seq()  &&
+             m_state.last_prim() == self_state.last_prim() &&
+             m_state.to_seq()    == self_state.to_seq()) == false)
+        {
+            gu_throw_fatal << self_id()
+                           << "Install message self state does not match, "
+                           << "message state: " << m_state
+                           << ", local state: "
+                           << NodeMap::value(self_i_);
+        }
+    }
+    else
+    {
+        if (m_state != NodeMap::value(self_i_))
+        {
+            gu_throw_fatal << self_id()
+                           << "Install message self state does not match, "
+                           << "message state: " << m_state
+                           << ", local state: "
+                           << NodeMap::value(self_i_);
+        }
     }
 
     // Set TO seqno according to install message
