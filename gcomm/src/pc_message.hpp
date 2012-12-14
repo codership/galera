@@ -34,28 +34,36 @@ namespace gcomm
 class gcomm::pc::Node
 {
 public:
-    enum Flags { F_PRIM = 0x1 };
+    enum Flags
+    {
+        F_PRIM   = 0x1,
+        F_WEIGHT = 0x2
+    };
 
     Node(const bool     prim      = false,
          const uint32_t last_seq  = std::numeric_limits<uint32_t>::max(),
          const ViewId&  last_prim = ViewId(V_NON_PRIM),
-         const int64_t  to_seq    = -1)
+         const int64_t  to_seq    = -1,
+         const int      weight    = -1)
         :
         prim_      (prim     ),
         last_seq_  (last_seq ),
         last_prim_ (last_prim),
-        to_seq_    (to_seq   )
+        to_seq_    (to_seq   ),
+        weight_    (weight)
     { }
 
     void set_prim      (const bool val)          { prim_      = val      ; }
     void set_last_seq  (const uint32_t seq)      { last_seq_  = seq      ; }
     void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
     void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
+    void set_weight    (const int weight)        { weight_    = weight   ; }
 
     bool          prim()      const { return prim_     ; }
     uint32_t      last_seq()  const { return last_seq_ ; }
     const ViewId& last_prim() const { return last_prim_; }
     int64_t       to_seq()    const { return to_seq_   ; }
+    int           weight()    const { return weight_   ; }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
@@ -66,7 +74,14 @@ public:
         gu_trace (off = gu::unserialize4(buf, buflen, off, flags));
 
         prim_ = flags & F_PRIM;
-
+        if (flags & F_WEIGHT)
+        {
+            weight_ = flags >> 24;
+        }
+        else
+        {
+            weight_ = -1;
+        }
         gu_trace (off = gu::unserialize4(buf, buflen, off, last_seq_));
         gu_trace (off = last_prim_.unserialize(buf, buflen, off));
         gu_trace (off = gu::unserialize8(buf, buflen, off, to_seq_));
@@ -81,7 +96,11 @@ public:
         uint32_t flags = 0;
 
         flags |= prim_ ? F_PRIM : 0;
-
+        if (weight_ >= 0)
+        {
+            flags |= F_WEIGHT;
+            flags |= weight_ << 24;
+        }
         gu_trace (off = gu::serialize4(flags, buf, buflen, off));
         gu_trace (off = gu::serialize4(last_seq_, buf, buflen, off));
         gu_trace (off = last_prim_.serialize(buf, buflen, off));
@@ -103,20 +122,22 @@ public:
 
     bool operator==(const Node& cmp) const
     {
-        return prim()   == cmp.prim()      &&
-            last_seq()  == cmp.last_seq()  &&
-            last_prim() == cmp.last_prim() &&
-            to_seq()    == cmp.to_seq();
+        return (prim()   == cmp.prim()         &&
+                last_seq()  == cmp.last_seq()  &&
+                last_prim() == cmp.last_prim() &&
+                to_seq()    == cmp.to_seq()    &&
+                weight()    == cmp.weight() );
     }
 
     std::string to_string() const
     {
         std::ostringstream ret;
 
-        ret << "prim="        << prim_
+        ret << "prim="       << prim_
             << ",last_seq="  << last_seq_
             << ",last_prim=" << last_prim_
-            << ",to_seq="    << to_seq_;
+            << ",to_seq="    << to_seq_
+            << ",weight="    << weight_;
 
         return ret.str();
     }
@@ -127,6 +148,7 @@ private:
     uint32_t last_seq_;  // Last seen message seq from the node
     ViewId   last_prim_; // Last known prim comp view id for the node
     int64_t  to_seq_;    // Last known TO seq for the node
+    int      weight_;    // Node weight
 };
 
 
@@ -144,7 +166,11 @@ class gcomm::pc::Message
 public:
 
     enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
-    enum { F_CRC16 = 0x1, F_BOOTSTRAP = 0x2 };
+    enum
+    {
+        F_CRC16 = 0x1,
+        F_BOOTSTRAP = 0x2
+    };
 
     static const char* to_string(Type t)
     {

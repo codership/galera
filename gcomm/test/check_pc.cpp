@@ -34,17 +34,17 @@ START_TEST(test_pc_messages)
 
     sim.insert(std::make_pair(UUID(0,0),
                               pc::Node(true, 6,
-                                     ViewId(V_PRIM,
-                                            UUID(0, 0), 9),
-                                     42)));
+                                       ViewId(V_PRIM,
+                                              UUID(0, 0), 9),
+                                       42, -1)));
     sim.insert(std::make_pair(UUID(0,0),
                               pc::Node(false, 88, ViewId(V_PRIM,
-                                                       UUID(0, 0), 3),
-                                     472)));
+                                                         UUID(0, 0), 3),
+                                       472, 0)));
     sim.insert(std::make_pair(UUID(0,0),
                               pc::Node(true, 78, ViewId(V_PRIM,
-                                                      UUID(0, 0), 87),
-                                     52)));
+                                                        UUID(0, 0), 87),
+                                       52, 1)));
 
     size_t expt_size = 4 // hdr
         + 4              // seq
@@ -56,16 +56,16 @@ START_TEST(test_pc_messages)
 
     iim.insert(std::make_pair(UUID(0,0),
                               pc::Node(true, 6, ViewId(V_PRIM,
-                                                       UUID(0, 0), 9), 42)));
+                                                       UUID(0, 0), 9), 42, -1)));
     iim.insert(std::make_pair(UUID(0,0),
                               pc::Node(false, 88, ViewId(V_NON_PRIM,
-                                                         UUID(0, 0), 3), 472)));
+                                                         UUID(0, 0), 3), 472, 0)));
     iim.insert(std::make_pair(UUID(0,0),
                               pc::Node(true, 78, ViewId(V_PRIM,
-                                                        UUID(0, 0), 87), 52)));
+                                                        UUID(0, 0), 87), 52, 1)));
     iim.insert(std::make_pair(UUID(0,0),
                               pc::Node(false, 457, ViewId(V_NON_PRIM,
-                                                          UUID(0, 0), 37), 56)));
+                                                          UUID(0, 0), 37), 56, 0xff)));
 
     expt_size = 4 // hdr
         + 4              // seq
@@ -958,22 +958,23 @@ static gu::Config gu_conf;
 
 static DummyNode* create_dummy_node(size_t idx,
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT1H")
+                                    const string& retrans_period = "PT1H",
+                                    int weight = 1)
 {
     const string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
-
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsInstallTimeout + "=" + inactive_timeout;;
+        + Conf::EvsInstallTimeout + "=" + inactive_timeout + "&"
+        + Conf::PcWeight + "=" + gu::to_string(weight);
     list<Protolay*> protos;
     try
     {
         UUID uuid(static_cast<int32_t>(idx));
         protos.push_back(new DummyTransport(uuid, false));
         protos.push_back(new evs::Proto(gu_conf, uuid, conf));
-        protos.push_back(new Proto(gu_conf, uuid));
+        protos.push_back(new Proto(gu_conf, uuid, conf));
         return new DummyNode(gu_conf, idx, protos);
     }
     catch (...)
@@ -1852,6 +1853,37 @@ START_TEST(test_trac_622_638)
 }
 END_TEST
 
+START_TEST(test_weighted_quorum)
+{
+    log_info << "START (test_weighted_quorum)";
+    size_t n_nodes(3);
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
+    uint32_t view_seq = 0;
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1, inactive_timeout,
+                                       retrans_period, i));
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, ++view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    // split node 3 (weight 2) out, node 3 should remain in prim while
+    // nodes 1 and 2 (weights 0 + 1 = 1) should end up in non-prim
+    prop.split(1, 3);
+    prop.split(2, 3);
+    ++view_seq;
+    set_cvi(dn, 0, 1, view_seq, V_NON_PRIM);
+    set_cvi(dn, 2, 2, view_seq, V_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+}
+END_TEST
+
+
 
 Suite* pc_suite()
 {
@@ -1949,6 +1981,11 @@ Suite* pc_suite()
     tc = tcase_create("test_trac_622_638");
     tcase_add_test(tc, test_trac_622_638);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_weighted_quorum");
+    tcase_add_test(tc, test_weighted_quorum);
+    suite_add_tcase(s, tc);
+
 
     return s;
 }

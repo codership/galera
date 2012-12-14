@@ -345,18 +345,91 @@ void gcomm::pc::Proto::handle_first_trans(const View& view)
     shift_to(S_TRANS);
 }
 
+// Compute weighted sum of members in node list. If member cannot be found
+// from node_map its weight is assumed to be zero.
+static size_t weighted_sum(const gcomm::NodeList& node_list,
+                           const gcomm::pc::NodeMap& node_map)
+{
+    size_t sum(0);
+    for (gcomm::NodeList::const_iterator i(node_list.begin());
+         i != node_list.end(); ++i)
+    {
+        int weight(0);
+        gcomm::pc::NodeMap::const_iterator node_i(
+            node_map.find(gcomm::NodeList::key(i)));
+        if (node_i != node_map.end())
+        {
+            const gcomm::pc::Node& node(gcomm::pc::NodeMap::value(node_i));
+            gcomm_assert(node.weight() >= 0 &&
+                         node.weight() <= 0xff);
+            weight = node.weight();
+        }
+        else
+        {
+            weight = 0;
+        }
+        sum += weight;
+    }
+    return sum;
+}
+
+// Check if all members in node_list have weight associated. This is needed
+// to fall back to backwards compatibility mode during upgrade (all weights are
+// assumed to be one). See have_quorum() and have_split_brain() below.
+static bool have_weights(const gcomm::NodeList& node_list,
+                         const gcomm::pc::NodeMap& node_map)
+{
+    for (gcomm::NodeList::const_iterator i(node_list.begin());
+         i != node_list.end(); ++i)
+    {
+        gcomm::pc::NodeMap::const_iterator node_i(
+            node_map.find(gcomm::NodeList::key(i)));
+        if (node_i != node_map.end())
+        {
+            const gcomm::pc::Node& node(gcomm::pc::NodeMap::value(node_i));
+            if (node.weight() == -1)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 
 bool gcomm::pc::Proto::have_quorum(const View& view) const
 {
-    return (view.members().size()*2 + view.left().size() >
-            pc_view_.members().size());
+    if (have_weights(view.members(), instances_) &&
+        have_weights(view.left(), instances_)    &&
+        have_weights(pc_view_.members(), instances_))
+    {
+        return (weighted_sum(view.members(), instances_) * 2
+                + weighted_sum(view.left(), instances_) >
+                weighted_sum(pc_view_.members(), instances_));
+    }
+    else
+    {
+        return (view.members().size()*2 + view.left().size() >
+                pc_view_.members().size());
+    }
 }
 
 
 bool gcomm::pc::Proto::have_split_brain(const View& view) const
 {
-    return (view.members().size()*2 + view.left().size() ==
-            pc_view_.members().size());
+    if (have_weights(view.members(), instances_)  &&
+        have_weights(view.left(), instances_)     &&
+        have_weights(pc_view_.members(), instances_))
+    {
+        return (weighted_sum(view.members(), instances_) * 2
+                + weighted_sum(view.left(), instances_) ==
+                weighted_sum(pc_view_.members(), instances_));
+    }
+    else
+    {
+        return (view.members().size()*2 + view.left().size() ==
+                pc_view_.members().size());
+    }
 }
 
 
@@ -370,7 +443,7 @@ void gcomm::pc::Proto::handle_trans(const View& view)
               << "\n\n next view " << view
               << "\n\n pc view " << pc_view_;
 
-    if (!have_quorum(view))
+    if (have_quorum(view) == false)
     {
         if (closing_ == false && ignore_sb_ == true && have_split_brain(view))
         {
@@ -1128,7 +1201,8 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
              key == Conf::PcLinger ||
              key == Conf::PcNpvo ||
              key == Conf::PcWaitPrim ||
-             key == Conf::PcWaitPrimTimeout)
+             key == Conf::PcWaitPrimTimeout ||
+             key == Conf::PcWeight)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";

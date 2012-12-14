@@ -101,3 +101,4 @@ std::string const gcomm::Conf::PcBootstrap = PcScheme + Delim + "bootstrap";
 std::string const gcomm::Conf::PcWaitPrim = PcScheme + Delim + "wait_prim";
 std::string const gcomm::Conf::PcWaitPrimTimeout =
     PcScheme + Delim + "wait_prim_timeout";
+std::string const gcomm::Conf::PcWeight = PcScheme + Delim + "weight";

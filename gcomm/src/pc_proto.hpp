@@ -84,14 +84,20 @@ public:
         current_view_  (V_NONE),
         pc_view_       (V_NON_PRIM),
         views_         (),
-        mtu_           (std::numeric_limits<int32_t>::max())
+        mtu_           (std::numeric_limits<int32_t>::max()),
+        weight_        (check_range(Conf::PcWeight,
+                                    param<int>(conf, uri, Conf::PcWeight, "1"),
+                                    0, 0xff))
     {
         log_info << "PC version " << version_;
+        set_weight(weight_);
+
         conf.set(Conf::PcVersion,      gu::to_string(version_));
         conf.set(Conf::PcNpvo,         gu::to_string(npvo_));
         conf.set(Conf::PcIgnoreSb,     gu::to_string(ignore_sb_));
         conf.set(Conf::PcIgnoreQuorum, gu::to_string(ignore_quorum_));
         conf.set(Conf::PcChecksum,     gu::to_string(checksum_));
+        conf.set(Conf::PcWeight,       gu::to_string(weight_));
     }
 
     ~Proto() { }
@@ -125,6 +131,10 @@ public:
 
     void set_to_seq(const int64_t seq)
     { NodeMap::value(self_i_).set_to_seq(seq); }
+
+    void set_weight(int weight)
+    { NodeMap::value(self_i_).set_weight(weight); }
+
 
     class SMMap : public Map<const UUID, Message> { };
 
@@ -199,6 +209,7 @@ private:
     View              pc_view_;       // PC view
     std::list<View>   views_;         // List of seen views
     size_t            mtu_;           // Maximum transmission unit
+    int               weight_;        // Node weight in voting
 };
 
 

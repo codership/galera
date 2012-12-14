@@ -401,6 +401,11 @@ namespace gcomm
          */
         static std::string const PcWaitPrimTimeout;
 
+        /*!
+         * @brief Node weight in prim comp voting
+         */
+        static std::string const PcWeight;
+
     };
 
 
