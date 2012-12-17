@@ -25,6 +25,7 @@ extern "C"
 
 
 #include <galerautils.hpp>
+#include "gu_backtrace.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
 
@@ -435,6 +436,9 @@ void GCommConn::run()
         {
             log_error << "exception from gcomm, backend must be restarted:"
                       << e.what();
+            log_info << "attempting to get backtrace:";
+            Backtrace().print(std::cerr);
+
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
                       ProtoUpMeta(UUID::nil(),
@@ -450,6 +454,9 @@ void GCommConn::run()
         {
             log_error
                 << "unknow exception from gcomm, backend must be restarted";
+            log_info << "attempting to get backtrace:";
+            Backtrace().print(std::cerr);
+
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
                       ProtoUpMeta(UUID::nil(),
