@@ -200,7 +200,8 @@ extra_params()
     local node=$1
     local extra_params
     [ -z "$GCOMM_EXTRA_PARAMS" ] && extra_params="?" || extra_params="?${GCOMM_EXTRA_PARAMS}&"
-    echo "${extra_params}gmcast.listen_addr=tcp://${NODE_GCS_HOST[$node]}:${NODE_GCS_PORT[$node]}"
+#    echo "${extra_params}gmcast.listen_addr=tcp://${NODE_GCS_HOST[$node]}:${NODE_GCS_PORT[$node]}"
+    echo "${extra_params}gmcast.listen_addr=tcp://0.0.0.0:${NODE_GCS_PORT[$node]}"
 }
 
 # return GCS address at which node N should connect to group
