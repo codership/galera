@@ -98,7 +98,7 @@ namespace galera
 
         Key(int version) : version_(version), flags_(), keys_() { }
 
-        Key(int version, const wsrep_key_part_t* keys, size_t keys_len,
+        Key(int version, const wsrep_buf_t* keys, size_t keys_len,
             uint8_t flags)
             :
             version_(version),
@@ -118,9 +118,9 @@ namespace galera
                 for (size_t i(0); i < keys_len; ++i)
                 {
                     size_t const offset(keys_.size());
-                    size_t key_len(keys[i].buf_len);
+                    size_t key_len(keys[i].len);
                     const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
-                                               keys[i].buf));
+                                               keys[i].ptr));
 #ifndef GALERA_KEY_VLQ
                     if (gu_unlikely(key_len > 0xff)) key_len = 0xff;
                     keys_.reserve(offset + 1 + key_len);

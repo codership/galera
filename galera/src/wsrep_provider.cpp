@@ -417,22 +417,11 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
 
 
 extern "C"
-wsrep_status_t galera_append_query(wsrep_t*            gh,
-                                   wsrep_trx_handle_t* trx_handle,
-                                   const char*         query,
-                                   const time_t        timeval,
-                                   const uint32_t      randseed)
-{
-    log_warn << "galera_append_query() is deprecated";
-    return WSREP_CONN_FAIL;
-}
-
-
-extern "C"
 wsrep_status_t galera_append_key(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
-                                 const wsrep_key_t*  key,
-                                 size_t              key_len,
+                                 const wsrep_key_t*  keys,
+                                 long                keys_num,
+                                 bool                nocopy,
                                  bool                shared)
 {
     assert(gh != 0);
@@ -447,11 +436,11 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        for (size_t i(0); i < key_len; ++i)
+        for (int i(0); i < keys_num; ++i)
         {
             trx->append_key(galera::Key(repl->trx_proto_ver(),
-                                        key[i].key_parts,
-                                        key[i].key_parts_len,
+                                        keys[i].key_parts,
+                                        keys[i].key_parts_num,
                                         (shared == true ? galera::Key::F_SHARED : 0)));
         }
         retval = WSREP_OK;
@@ -476,7 +465,9 @@ extern "C"
 wsrep_status_t galera_append_data(wsrep_t*            wsrep,
                                   wsrep_trx_handle_t* trx_handle,
                                   const void*         data,
-                                  size_t              data_len)
+                                  size_t              data_len,
+                                  bool                nocopy,
+                                  bool                unordered)
 {
     return WSREP_NOT_IMPLEMENTED;
 }
@@ -539,10 +530,10 @@ wsrep_status_t galera_free_connection(wsrep_t*              gh,
 extern "C"
 wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
                                        wsrep_conn_id_t    conn_id,
-                                       const wsrep_key_t* key,
-                                       size_t             key_len,
-                                       const void*        query,
-                                       size_t             query_len,
+                                       const wsrep_key_t* keys,
+                                       long               keys_num,
+                                       const void*        action,
+                                       size_t             action_len,
                                        wsrep_seqno_t*     global_seqno)
 {
     assert(gh != 0);
@@ -558,13 +549,13 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
     try
     {
         TrxHandleLock lock(*trx);
-        for (size_t i(0); i < key_len; ++i)
+        for (int i(0); i < keys_num; ++i)
         {
             trx->append_key(Key(repl->trx_proto_ver(),
-                                key[i].key_parts,
-                                key[i].key_parts_len, 0));
+                                keys[i].key_parts,
+                                keys[i].key_parts_num, 0));
         }
-        trx->append_data(query, query_len);
+        trx->append_data(action, action_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
         retval = repl->replicate(trx);
@@ -635,6 +626,22 @@ wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
     }
 
     return retval;
+}
+
+
+extern "C"
+wsrep_status_t galera_encapsulate(wsrep_t*            gh,
+                                  const wsrep_buf_t*  events,
+                                  long                events_num,
+                                  wsrep_stream_t      type,
+                                  const wsrep_uuid_t* producer)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+//    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    return WSREP_NOT_IMPLEMENTED;
 }
 
 
@@ -815,7 +822,8 @@ wsrep_status_t galera_resync (wsrep_t* gh)
 extern "C"
 wsrep_status_t galera_lock (wsrep_t* gh,
                             const char* name,
-                            int64_t     owner,
+                            bool        shared,
+                            uint64_t    owner,
                             int64_t     timeout)
 {
     assert(gh != 0);
@@ -827,7 +835,7 @@ wsrep_status_t galera_lock (wsrep_t* gh,
 extern "C"
 wsrep_status_t galera_unlock (wsrep_t* gh,
                               const char* name,
-                              int64_t     owner)
+                              uint64_t    owner)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -838,7 +846,7 @@ wsrep_status_t galera_unlock (wsrep_t* gh,
 extern "C"
 bool galera_is_locked (wsrep_t* gh,
                        const char*   name,
-                       int64_t*      owner,
+                       uint64_t*     owner,
                        wsrep_uuid_t* node)
 {
     assert(gh != 0);
@@ -846,6 +854,12 @@ bool galera_is_locked (wsrep_t* gh,
     return false;
 }
 
+static const union
+{
+    char str[8];
+    uint64_t uint64;
+}
+    galera_id = { {'G','a','l','e','r','a', 0, 0 } };
 
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -861,13 +875,13 @@ static wsrep_t galera_str = {
     &galera_post_rollback,
     &galera_replay_trx,
     &galera_abort_pre_commit,
-    &galera_append_query,
     &galera_append_key,
     &galera_append_data,
     &galera_causal_read,
     &galera_free_connection,
     &galera_to_execute_start,
     &galera_to_execute_end,
+    &galera_encapsulate,
     &galera_sst_sent,
     &galera_sst_received,
     &galera_snapshot,
@@ -883,6 +897,7 @@ static wsrep_t galera_str = {
     "Galera",
     GALERA_VER"(r"GALERA_REV")",
     "Codership Oy <info@codership.com>",
+    galera_id.uint64,
     &galera_tear_down,
     NULL,
     NULL
