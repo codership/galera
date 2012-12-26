@@ -23,7 +23,9 @@
 #include "gcomm/map.hpp"
 #include "gcomm/datagram.hpp"
 
+#if defined(GALERA_USE_BOOST_POOL_ALLOC)
 #include <boost/pool/pool_alloc.hpp>
+#endif
 
 #include <vector>
 
@@ -94,7 +96,7 @@ private:
 };
 
 
-#if 1
+#if defined(GALERA_USE_BOOST_POOL_ALLOC)
 
 class DummyMutex
 {
@@ -113,7 +115,8 @@ class gcomm::evs::InputMapMsgIndex :
                             boost::default_user_allocator_new_delete,
                             DummyMutex> > >
 { };
-#else
+
+#else /* GALERA_USE_BOOST_POOL_ALLOC */
 
 class gcomm::evs::InputMapMsgIndex :
     public Map<InputMapMsgKey, InputMapMsg> { };
@@ -122,7 +125,7 @@ class gcomm::evs::InputMapMsgIndex :
 //                        std::less<InputMapMsgKey>,
 //                        boost::fast_pool_allocator<
 //                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
-#endif // 0
+#endif /* GALERA_USE_BOOST_POOL_ALLOC */
 
 /* Internal node representation */
 class gcomm::evs::InputMapNode
