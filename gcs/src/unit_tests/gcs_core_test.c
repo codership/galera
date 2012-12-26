@@ -476,7 +476,7 @@ START_TEST (gcs_core_test_own)
 {
 #undef ACT
 #define ACT act2
-    long     tout = 100; // 100 ms timeout
+    long     tout = 1000; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
     action_t act_s    = { ACT, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
     action_t act_r    = { NULL, NULL, -1, -1, -1, -1 };
@@ -625,7 +625,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    usleep (500000);
+    usleep (1000000);
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
@@ -659,5 +659,6 @@ Suite *gcs_core_suite(void)
   tcase_add_test  (tcase, gcs_core_test_api);
   tcase_add_test  (tcase, gcs_core_test_own);
 //  tcase_add_test  (tcase, gcs_core_test_foreign);
+  tcase_set_timeout(tcase, 60);
   return suite;
 }
