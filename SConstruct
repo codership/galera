@@ -30,12 +30,13 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
-    debug=n        debug build with optimization level n
-    arch=str       target architecture [i686|x86_64]
-    build_dir=dir  build directory, default: '.'
-    boost=[0|1]    disable or enable boost libraries
-    revno=XXXX     source code revision number
-    bpostatic=path a path to static libboost_program_options.a
+    debug=n          debug build with optimization level n
+    arch=str         target architecture [i686|x86_64]
+    build_dir=dir    build directory, default: '.'
+    boost=[0|1]      disable or enable boost libraries
+    boost_pool=[0|1] use or not use boost pool allocator
+    revno=XXXX       source code revision number
+    bpostatic=path   a path to static libboost_program_options.a
 ''')
 # bpostatic option added on Percona request
 
@@ -95,8 +96,9 @@ else:
     print 'Unsupported target architecture: ' + arch
     Exit(1)
 
-boost = int(ARGUMENTS.get('boost', 1))
-ssl   = int(ARGUMENTS.get('ssl', 1))
+boost      = int(ARGUMENTS.get('boost', 1))
+boost_pool = int(ARGUMENTS.get('boost_pool', 1))
+ssl        = int(ARGUMENTS.get('ssl', 1))
 
 GALERA_VER = ARGUMENTS.get('version', '3.0dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
@@ -254,11 +256,13 @@ if boost == 1:
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
     # Required boost headers/libraries
     #
-    if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
-        print 'Using boost pool alloc'
-        conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
-    else:
-        print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
+    if boost_pool == 1:
+        if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
+            print 'Using boost pool alloc'
+            conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
+        else:
+            print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
+            Exit(1)
 else:
     print 'Not using boost'
 
