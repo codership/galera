@@ -76,7 +76,10 @@ namespace galera
         ssize_t connect(const std::string& cluster_name,
                         const std::string& cluster_url)
         {
-            return gcs_open(conn_, cluster_name.c_str(), cluster_url.c_str());
+            if (cluster_url != "bootstrap")
+                return gcs_open(conn_,cluster_name.c_str(),cluster_url.c_str());
+            else
+                return gcs_open(conn_,cluster_name.c_str(),"gcomm://");
         }
 
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,

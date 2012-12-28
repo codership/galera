@@ -202,6 +202,7 @@ wsrep_recovery() {
   cmd="$@"
   wr_logfile=$(mktemp)
   echo "WSREP: Running position recovery"
+  set +e
   $cmd --log_error=$wr_logfile --wsrep-recover
   rp=$(grep "WSREP: Recovered position:" $wr_logfile)
   if [ -z "$rp" ]; then
@@ -218,6 +219,7 @@ wsrep_recovery() {
     wsrep_start_position_opt="--wsrep_start_position=$start_pos"
     echo "WSREP: Recovered position $start_pos"
   fi
+  set -e
   rm $wr_logfile
 }
 
@@ -280,6 +282,7 @@ galera_start()
     fi
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+    ulimit -n 4096 # This is normally allowed for non-privileged users
 
     if test $SKIP_RECOVERY = 0
     then
