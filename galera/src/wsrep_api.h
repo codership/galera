@@ -32,6 +32,15 @@ extern "C" {
 
 #define WSREP_INTERFACE_VERSION "24dev"
 
+/*! Empty backend spec */
+#define WSREP_NONE "none"
+
+/*!
+ *  A code to be passed in place of address to wsrep::connect() call when
+ *  new service instance must be initialized
+ */
+#define WSREP_BOOTSTRAP_CODE "bootstrap"
+
 /*!
  *  Certain provider capabilities application may need to know about
  */
@@ -54,9 +63,6 @@ extern "C" {
  *  Write set replication flags
  */
 #define WSREP_FLAG_PA_SAFE              ( 1ULL << 0 )
-
-/* Empty backend spec */
-#define WSREP_NONE "none"
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
 typedef uint64_t wsrep_conn_id_t; //!< application connection ID
