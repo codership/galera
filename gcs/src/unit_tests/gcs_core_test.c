@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -299,11 +299,11 @@ core_test_init ()
     fail_if (-EBADFD != ret, "Expected -EBADFD, got: %ld (%s)",
              ret, strerror(-ret));
 
-    ret = gcs_core_open (Core, "yadda-yadda", "owkmevc");
+    ret = gcs_core_open (Core, "yadda-yadda", "owkmevc", 1);
     fail_if (-EINVAL != ret, "Expected -EINVAL, got %ld (%s)",
              ret, strerror(-ret));
 
-    ret = gcs_core_open (Core, "yadda-yadda", "dummy://");
+    ret = gcs_core_open (Core, "yadda-yadda", "dummy://", 1);
     fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
              ret, strerror(-ret));
 

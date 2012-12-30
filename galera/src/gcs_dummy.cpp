@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
 //
 
 #include "gcs.hpp"
@@ -35,7 +35,7 @@ namespace galera
     }
 
     DummyGcs::DummyGcs()
-        : 
+        :
         gconf_         (0),
         gcache_        (0),
         mtx_           (),
@@ -72,8 +72,8 @@ namespace galera
     ssize_t
     DummyGcs::generate_cc (bool primary)
     {
-        cc_size_ = sizeof(gcs_act_conf_t) + 
-            primary * 
+        cc_size_ = sizeof(gcs_act_conf_t) +
+            primary *
             (my_name_.length() + incoming_.length() + GU_UUID_STR_LEN + 3);
 
         cc_ = ::malloc(cc_size_);
@@ -96,7 +96,7 @@ namespace galera
             cc->my_state = GCS_NODE_STATE_JOINED;
             cc->repl_proto_ver = repl_proto_ver_;
             cc->appl_proto_ver = appl_proto_ver_;
-            
+
             char* const str(cc->data);
             ssize_t offt(0);
             offt += gu_uuid_print (&uuid_, str, GU_UUID_STR_LEN+1) + 1;
@@ -117,7 +117,8 @@ namespace galera
 
     ssize_t
     DummyGcs::connect(const std::string& cluster_name,
-                      const std::string& cluster_url)
+                      const std::string& cluster_url,
+                      bool               bootstrap)
     {
         gu::Lock lock(mtx_);
 

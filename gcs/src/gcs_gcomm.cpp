@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -200,7 +200,7 @@ public:
         return 0;
     }
 
-    void connect(const string& channel)
+    void connect(const string& channel, bool const bootstrap)
     {
         if (tp_ != 0)
         {
@@ -211,26 +211,35 @@ public:
         tp_ = Transport::create(*net_, uri_);
         gcomm::connect(tp_, this);
 
-        string peer;
-        URI::AuthorityList::const_iterator i, i_next;
-        for (i = uri_.get_authority_list().begin();
-             i != uri_.get_authority_list().end(); ++i)
+        if (bootstrap)
         {
-            i_next = i;
-            ++i_next;
-            string host;
-            string port;
-            try { host = i->host(); } catch (NotSet&) { }
-            try { port = i->port(); } catch (NotSet&) { }
-            peer += host != "" ? host + ":" + port : "";
-            if (i_next != uri_.get_authority_list().end())
-            {
-                peer += ",";
-            }
+            log_info << "gcomm: bootstrapping new group '" << channel << '\'';
         }
-        log_info << "gcomm: connecting to group '" << channel
-                 << "', peer '" << peer << "'";
-        tp_->connect();
+        else
+        {
+            string peer;
+            URI::AuthorityList::const_iterator i, i_next;
+            for (i = uri_.get_authority_list().begin();
+                 i != uri_.get_authority_list().end(); ++i)
+            {
+                i_next = i;
+                ++i_next;
+                string host;
+                string port;
+                try { host = i->host(); } catch (NotSet&) { }
+                try { port = i->port(); } catch (NotSet&) { }
+                peer += host != "" ? host + ":" + port : "";
+                if (i_next != uri_.get_authority_list().end())
+                {
+                    peer += ",";
+                }
+            }
+            log_info << "gcomm: connecting to group '" << channel
+                     << "', peer '" << peer << "'";
+        }
+
+        tp_->connect(bootstrap);
+
         uuid_ = tp_->uuid();
 
         int err;
@@ -674,7 +683,7 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
-        conn.connect(channel);
+        conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
     {
@@ -807,9 +816,6 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
 }
 
 
-
-
-
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
     GCommConn* conn(0);
@@ -822,7 +828,7 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 
     try
     {
-        gu::URI uri(std::string("pc://") + socket);
+        gu::URI uri(std::string("pc://") + addr);
         gu::Config& conf(*reinterpret_cast<gu::Config*>(cnf));
         conn = new GCommConn(uri, conf);
     }

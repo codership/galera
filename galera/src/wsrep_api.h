@@ -32,6 +32,9 @@ extern "C" {
 
 #define WSREP_INTERFACE_VERSION "24dev"
 
+/*! Empty backend spec */
+#define WSREP_NONE "none"
+
 /*!
  *  Certain provider capabilities application may need to know about
  */
@@ -54,9 +57,6 @@ extern "C" {
  *  Write set replication flags
  */
 #define WSREP_FLAG_PA_SAFE              ( 1ULL << 0 )
-
-/* Empty backend spec */
-#define WSREP_NONE "none"
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
 typedef uint64_t wsrep_conn_id_t; //!< application connection ID
@@ -503,11 +503,16 @@ struct wsrep_ {
    * @param cluster_name unique symbolic cluster name
    * @param cluster_url  URL-like cluster address (backend://address)
    * @param state_donor  name of the node to be asked for state transfer.
+   * @param bootstrap    a flag to request initialization of a new wsrep
+   *                     service rather then a connection to the existing one.
+   *                     clister_url may still carry important initialization
+   *                     parameters, like backend spec and/or listen address.
    */
-    wsrep_status_t (*connect) (wsrep_t*    wsrep,
-                               const char* cluster_name,
-                               const char* cluster_url,
-                               const char* state_donor);
+    wsrep_status_t (*connect) (wsrep_t*     wsrep,
+                               const char*  cluster_name,
+                               const char*  cluster_url,
+                               const char*  state_donor,
+                               wsrep_bool_t bootstrap);
 
   /*!
    * @brief Closes connection to cluster.

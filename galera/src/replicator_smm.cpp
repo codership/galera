@@ -302,7 +302,8 @@ galera::ReplicatorSMM::~ReplicatorSMM()
 
 wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
                                               const std::string& cluster_url,
-                                              const std::string& state_donor)
+                                              const std::string& state_donor,
+                                              bool  const        bootstrap)
 {
     sst_donor_ = state_donor;
     service_thd_.reset();
@@ -323,7 +324,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     gcache_.reset();
 
     if (ret == WSREP_OK &&
-        (err = gcs_.connect(cluster_name, cluster_url)) != 0)
+        (err = gcs_.connect(cluster_name, cluster_url, bootstrap)) != 0)
     {
         log_error << "gcs connect failed: " << strerror(-err);
         ret = WSREP_NODE_FAIL;

@@ -202,6 +202,7 @@ wsrep_recovery() {
   cmd="$@"
   wr_logfile=$(mktemp)
   echo "WSREP: Running position recovery"
+  set +e
   $cmd --log_error=$wr_logfile --wsrep-recover
   rp=$(grep "WSREP: Recovered position:" $wr_logfile)
   if [ -z "$rp" ]; then
@@ -218,6 +219,7 @@ wsrep_recovery() {
     wsrep_start_position_opt="--wsrep_start_position=$start_pos"
     echo "WSREP: Recovered position $start_pos"
   fi
+  set -e
   rm $wr_logfile
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/transport.hpp"
@@ -65,7 +65,6 @@ gcomm::Transport::~Transport()
 gcomm::Transport*
 gcomm::Transport::create(Protonet& pnet, const gu::URI& uri)
 {
-
     const std::string& scheme = uri.get_scheme();
 
     if (scheme == Conf::GMCastScheme)
@@ -84,7 +83,8 @@ gcomm::Transport::create(Protonet& pnet, const gu::URI& uri)
 
 
 gcomm::Transport*
-gcomm::Transport::create(Protonet& pnet, const std::string& uri_str)
+gcomm::Transport::create(Protonet&          pnet,
+                         const std::string& uri_str)
 {
     return create(pnet, gu::URI(uri_str));
 }

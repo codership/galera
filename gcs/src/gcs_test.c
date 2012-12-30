@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -707,7 +707,9 @@ int main (int argc, char *argv[])
     if (!(gcache = gcache_create (gconf, ""))) goto out;
     if (!(gcs = gcs_create (gconf, gcache, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);
-    if ((err  = gcs_open   (gcs, channel, conf.backend))) goto out;
+    /* the following hack won't work if there is 0.0.0.0 in URL options */
+    bool bstrap = (NULL != strstr(conf.backend, "0.0.0.0"));
+    if ((err  = gcs_open   (gcs, channel, conf.backend, bstrap))) goto out;
     printf ("Connected\n");
 
     msg_len = 1300;

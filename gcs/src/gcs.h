@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -87,12 +87,14 @@ extern long gcs_init (gcs_conn_t   *conn,
  *                backend it can be "gcomm://localhost:4567", for dummy backend
  *                ADDRESS field is ignored.
  *                Currently supported backend types: "dummy", "vsbes", "gcomm"
+ * @param bootstrap bootstrap a new group
  *
  * @return negative error code, 0 in case of success.
  */
 extern long gcs_open  (gcs_conn_t *conn,
                        const char *channel,
-                       const char *url);
+                       const char *url,
+                       bool        bootstrap);
 
 /*! @brief Closes connection to group.
  *

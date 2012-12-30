@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -43,11 +43,19 @@ public:
 
     int                 err_no()        const;
 
-    virtual void connect() = 0;
+    virtual void connect(bool start_prim)
+    {
+        gu_throw_fatal << "connect(start_prim) not supported";
+    }
+    virtual void connect() // if not overloaded, will default to connect(bool)
+    {
+        connect(false);
+    }
     virtual void connect(const gu::URI& uri)
     {
         gu_throw_fatal << "connect(URI) not supported";
     }
+
     virtual void close(bool force = false) = 0;
     virtual void close(const UUID& uuid)
     {
@@ -81,6 +89,7 @@ public:
 
     static Transport* create(Protonet&, const std::string&);
     static Transport* create(Protonet&, const gu::URI&);
+
 protected:
     Transport (Protonet&, const gu::URI&);
     Protostack        pstack_;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1250,7 +1250,8 @@ static void *gcs_recv_thread (void *arg)
 }
 
 /* Opens connection to group */
-long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
+long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
+               bool const bootstrap)
 {
     long ret = 0;
 
@@ -1267,7 +1268,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 
     if (GCS_CONN_CLOSED == conn->state) {
 
-        if (!(ret = gcs_core_open (conn->core, channel, url))) {
+        if (!(ret = gcs_core_open (conn->core, channel, url, bootstrap))) {
 
             _reset_pkt_size(conn);
 
