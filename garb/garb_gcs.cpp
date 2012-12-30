@@ -1,4 +1,6 @@
-/* Copyright (C) 2011 Codership Oy <info@codership.com> */
+/*
+ * Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+ */
 
 #include "garb_gcs.hpp"
 
@@ -21,7 +23,7 @@ Gcs::Gcs (gu::Config&        gconf,
         gu_throw_fatal << "Failed to create GCS object";
     }
 
-    ssize_t ret = gcs_open (gcs_, group.c_str(), address.c_str());
+    ssize_t ret = gcs_open (gcs_, group.c_str(), address.c_str(), false);
 
     if (ret < 0)
     {

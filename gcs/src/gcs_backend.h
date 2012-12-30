@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -29,7 +29,7 @@ typedef struct gcs_backend      gcs_backend_t;
 /*! Allocates backend context and sets up the backend structure */
 #define GCS_BACKEND_CREATE_FN(fn)         \
 long fn (gcs_backend_t*     backend,      \
-         const char*  const socket,       \
+         const char*  const addr,         \
          gu_config_t* const cnf)
 
 /*! Deallocates backend context */
@@ -39,7 +39,8 @@ long fn (gcs_backend_t*    backend)
 /*! Puts backend handle into operating state */
 #define GCS_BACKEND_OPEN_FN(fn)           \
 long fn (gcs_backend_t*    backend,       \
-	 const char* const channel)
+         const char* const channel,       \
+         bool        const bootstrap)
 
 /*! Puts backend handle into non-operating state */
 #define GCS_BACKEND_CLOSE_FN(fn)          \
@@ -49,9 +50,9 @@ long fn (gcs_backend_t*    backend)
  * Send a message from the backend.
  *
  * @param backend
- *        a pointer to the backend handle 
+ *        a pointer to the backend handle
  * @param buf
- *        a buffer to copy the message to 
+ *        a buffer to copy the message to
  * @param len
  *        length of the supplied buffer
  * @param msg_type
@@ -63,17 +64,17 @@ long fn (gcs_backend_t*    backend)
  */
 #define GCS_BACKEND_SEND_FN(fn)           \
 long fn (gcs_backend_t* const backend,    \
-	 const void*    const buf,        \
-	 size_t         const len,        \
-	 gcs_msg_type_t const msg_type)
+         const void*    const buf,        \
+         size_t         const len,        \
+         gcs_msg_type_t const msg_type)
 
 /*!
  * Receive a message from the backend.
  *
  * @param backend
- *        a pointer to the backend object 
+ *        a pointer to the backend object
  * @param buf
- *        a buffer to copy the message to 
+ *        a buffer to copy the message to
  * @param len
  *        length of the supplied buffer
  * @param msg_type
@@ -176,7 +177,7 @@ struct gcs_backend
  */
 long
 gcs_backend_init (gcs_backend_t* bk,
-		  const char*    uri,
-		  gu_config_t*   cnf);
+                  const char*    uri,
+                  gu_config_t*   cnf);
 
 #endif /* _gcs_backend_h_ */

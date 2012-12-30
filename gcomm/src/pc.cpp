@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
 #include "pc.hpp"
@@ -61,25 +61,27 @@ std::string gcomm::PC::listen_addr() const
 }
 
 
-void gcomm::PC::connect()
+void gcomm::PC::connect(bool start_prim)
 {
-    bool start_prim(false);
-
     try
     {
-        start_prim = host_is_any (uri_.get_host());
+        // for backward compatibility with old approach: gcomm://0.0.0.0
+        start_prim = (start_prim || host_is_any (uri_.get_host()));
     }
     catch (gu::NotSet& ns)
     {
         start_prim = true;
     }
+
     const bool wait_prim(
         gu::from_string<bool>(
             uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
+
     const gu::datetime::Period wait_prim_timeout(
         gu::from_string<gu::datetime::Period>(
             uri_.get_option(Conf::PcWaitPrimTimeout,
                             Defaults::PcWaitPrimTimeout)));
+
     pstack_.push_proto(gmcast_);
     pstack_.push_proto(evs_);
     pstack_.push_proto(pc_);
@@ -156,33 +158,33 @@ void gcomm::PC::close(bool force)
     if (force == false)
     {
         log_debug << "PC/EVS Proto leaving";
-	pc_->close();
-	evs_->close();
+        pc_->close();
+        evs_->close();
 
         gu::datetime::Date wait_until(gu::datetime::Date::now() + linger_);
 
-	do
-	{
+        do
+        {
             pnet().event_loop(gu::datetime::Sec/2);
-	}
-	while (evs_->state()         != evs::Proto::S_CLOSED &&
-	       gu::datetime::Date::now() <  wait_until);
+        }
+        while (evs_->state()         != evs::Proto::S_CLOSED &&
+               gu::datetime::Date::now() <  wait_until);
 
-	if (evs_->state() != evs::Proto::S_CLOSED)
-	{
+        if (evs_->state() != evs::Proto::S_CLOSED)
+        {
             evs_->shift_to(evs::Proto::S_CLOSED);
-	}
+        }
 
-	if (pc_->state() != pc::Proto::S_CLOSED)
-	{
+        if (pc_->state() != pc::Proto::S_CLOSED)
+        {
             log_warn << "PCProto didn't reach closed state";
-	}
+        }
 
-	gmcast_->close();
+        gmcast_->close();
     }
     else
     {
-	log_info << "Forced PC close";
+        log_info << "Forced PC close";
     }
     pnet().erase(&pstack_);
     pstack_.pop_proto(this);

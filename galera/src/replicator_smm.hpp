@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -52,7 +52,8 @@ namespace galera
 
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,
-                               const std::string& state_donor);
+                               const std::string& state_donor,
+                               bool               bootstrap);
         wsrep_status_t close();
         wsrep_status_t async_recv(void* recv_ctx);
 

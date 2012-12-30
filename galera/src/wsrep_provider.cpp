@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #if defined(GALERA_MULTIMASTER)
@@ -133,10 +133,11 @@ char* galera_parameters_get (wsrep_t* gh)
 
 
 extern "C"
-wsrep_status_t galera_connect (wsrep_t*    gh,
-                               const char* cluster_name,
-                               const char* cluster_url,
-                               const char* state_donor)
+wsrep_status_t galera_connect (wsrep_t*     gh,
+                               const char*  cluster_name,
+                               const char*  cluster_url,
+                               const char*  state_donor,
+                               wsrep_bool_t bootstrap)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -146,7 +147,7 @@ wsrep_status_t galera_connect (wsrep_t*    gh,
     try
     {
         return repl->connect(cluster_name, cluster_url,
-                             state_donor ? state_donor : "");
+                             state_donor ? state_donor : "", bootstrap);
     }
     catch (std::exception& e)
     {

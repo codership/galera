@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -58,7 +58,8 @@ gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid);
 extern long
 gcs_core_open  (gcs_core_t* conn,
                 const char* channel,
-                const char* url);
+                const char* url,
+                bool        bootstrap);
 
 
 /*

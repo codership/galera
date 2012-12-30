@@ -36,12 +36,6 @@ extern "C" {
 #define WSREP_NONE "none"
 
 /*!
- *  A code to be passed in place of address to wsrep::connect() call when
- *  new service instance must be initialized
- */
-#define WSREP_BOOTSTRAP_CODE "bootstrap"
-
-/*!
  *  Certain provider capabilities application may need to know about
  */
 #define WSREP_CAP_MULTI_MASTER          ( 1ULL << 0 )
@@ -509,11 +503,16 @@ struct wsrep_ {
    * @param cluster_name unique symbolic cluster name
    * @param cluster_url  URL-like cluster address (backend://address)
    * @param state_donor  name of the node to be asked for state transfer.
+   * @param bootstrap    a flag to request initialization of a new wsrep
+   *                     service rather then a connection to the existing one.
+   *                     clister_url may still carry important initialization
+   *                     parameters, like backend spec and/or listen address.
    */
-    wsrep_status_t (*connect) (wsrep_t*    wsrep,
-                               const char* cluster_name,
-                               const char* cluster_url,
-                               const char* state_donor);
+    wsrep_status_t (*connect) (wsrep_t*     wsrep,
+                               const char*  cluster_name,
+                               const char*  cluster_url,
+                               const char*  state_donor,
+                               wsrep_bool_t bootstrap);
 
   /*!
    * @brief Closes connection to cluster.

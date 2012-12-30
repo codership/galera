@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_HPP
@@ -24,7 +24,8 @@ namespace galera
         GcsI() {}
         virtual ~GcsI() {}
         virtual ssize_t connect(const std::string& cluster_name,
-                                const std::string& cluster_url) = 0;
+                                const std::string& cluster_url,
+                                bool               bootstrap) = 0;
         virtual ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                              gcs_seqno_t seqno) = 0;
         virtual void    close() = 0;
@@ -74,12 +75,13 @@ namespace galera
         ~Gcs() { gcs_destroy(conn_); }
 
         ssize_t connect(const std::string& cluster_name,
-                        const std::string& cluster_url)
+                        const std::string& cluster_url,
+                        bool  const        bootstrap)
         {
-            if (cluster_url != WSREP_BOOTSTRAP_CODE)
-                return gcs_open(conn_,cluster_name.c_str(),cluster_url.c_str());
-            else
-                return gcs_open(conn_,cluster_name.c_str(),"gcomm://");
+            return gcs_open(conn_,
+                            cluster_name.c_str(),
+                            cluster_url.c_str(),
+                            bootstrap);
         }
 
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,
@@ -203,7 +205,8 @@ namespace galera
         ~DummyGcs();
 
         ssize_t connect(const std::string& cluster_name,
-                        const std::string& cluster_url);
+                        const std::string& cluster_url,
+                        bool               bootstrap);
 
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                      gcs_seqno_t seqno);

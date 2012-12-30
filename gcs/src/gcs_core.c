@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -166,7 +166,8 @@ gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid)
 long
 gcs_core_open (gcs_core_t* core,
                const char* channel,
-               const char* url)
+               const char* url,
+               bool const  bstrap)
 {
     long ret;
 
@@ -182,11 +183,11 @@ gcs_core_open (gcs_core_t* core,
     }
 
     gu_debug ("Initializing backend IO layer");
-    if (!(ret = gcs_backend_init (&core->backend, url, core->config))) {
+    if (!(ret = gcs_backend_init (&core->backend, url, core->config))){
 
         assert (NULL != core->backend.conn);
 
-        if (!(ret = core->backend.open (&core->backend, channel))) {
+        if (!(ret = core->backend.open (&core->backend, channel, bstrap))) {
             gcs_fifo_lite_open (core->fifo);
             core->state = CORE_NON_PRIMARY;
         }

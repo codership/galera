@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_REPLICATOR_HPP
@@ -43,7 +43,8 @@ namespace galera
         virtual ~Replicator() { }
         virtual wsrep_status_t connect(const std::string& cluster_name,
                                        const std::string& cluster_url,
-                                       const std::string& state_donor) = 0;
+                                       const std::string& state_donor,
+                                       bool               bootstrap) = 0;
         virtual wsrep_status_t close() = 0;
         virtual wsrep_status_t async_recv(void* recv_ctx) = 0;
 

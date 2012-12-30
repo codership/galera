@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
-/* 
+/*
  * Dummy backend implementation
  *
  */
@@ -36,9 +36,9 @@ dummy_msg_t;
 
 static inline dummy_msg_t*
 dummy_msg_create (gcs_msg_type_t const type,
-		  size_t         const len,
+                  size_t         const len,
                   long           const sender,
-		  const void*    const buf)
+                  const void*    const buf)
 {
     dummy_msg_t *msg = NULL;
 
@@ -49,7 +49,7 @@ dummy_msg_create (gcs_msg_type_t const type,
         msg->type       = type;
         msg->sender_idx = sender;
     }
-    
+
     return msg;
 }
 
@@ -58,7 +58,7 @@ dummy_msg_destroy (dummy_msg_t *msg)
 {
     if (msg)
     {
-	gu_free (msg);
+        gu_free (msg);
     }
     return 0;
 }
@@ -91,7 +91,7 @@ static
 GCS_BACKEND_DESTROY_FN(dummy_destroy)
 {
     dummy_t*      dummy = backend->conn;
-    
+
     if (!dummy || dummy->state != DUMMY_CLOSED) return -EBADFD;
 
 //    gu_debug ("Deallocating message queue (serializer)");
@@ -118,7 +118,7 @@ GCS_BACKEND_SEND_FN(dummy_send)
     else {
         static long send_error[DUMMY_PRIM] =
             { -EBADFD, -EBADFD, -ENOTCONN, -EAGAIN };
-	err = send_error[dummy->state];
+        err = send_error[dummy->state];
     }
 
     return err;
@@ -188,8 +188,8 @@ GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
     const long max_pkt_size = backend->conn->max_pkt_size;
 
     if (pkt_size > max_pkt_size) {
-	gu_warn ("Requested packet size: %d, maximum possible packet size: %d",
-		 pkt_size, max_pkt_size);
+        gu_warn ("Requested packet size: %d, maximum possible packet size: %d",
+                 pkt_size, max_pkt_size);
         return (max_pkt_size - backend->conn->hdr_size);
     }
 
@@ -209,10 +209,10 @@ GCS_BACKEND_OPEN_FN(dummy_open)
     }
 
     comp = gcs_comp_msg_new (true, false, 0, 1);
- 
+
     if (comp) {
-	ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555");
-	assert (0 == ret); // we have only one member, index = 0
+        ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555");
+        assert (0 == ret); // we have only one member, index = 0
 
         dummy->state = DUMMY_TRANS; // required by gcs_dummy_set_component()
         ret = gcs_dummy_set_component (backend, comp); // install new component
@@ -222,7 +222,7 @@ GCS_BACKEND_OPEN_FN(dummy_open)
                                         GCS_SENDER_NONE);
             if (ret > 0) ret = 0;
         }
-	gcs_comp_msg_delete (comp);
+        gcs_comp_msg_delete (comp);
     }
     gu_debug ("Opened backend connection: %d (%s)", ret, strerror(-ret));
     return ret;
@@ -234,7 +234,7 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
     long     ret   = -ENOMEM;
     dummy_t* dummy = backend->conn;
     gcs_comp_msg_t* comp;
-    
+
     if (!dummy) return -EBADFD;
 
     comp = gcs_comp_msg_leave ();
@@ -247,7 +247,7 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
         // after leave message. But caller should guarantee serial access.
         gu_fifo_close (dummy->gc_q);
         if (ret > 0) ret = 0;
-	gcs_comp_msg_delete (comp);
+        gcs_comp_msg_delete (comp);
     }
 
     dummy->state = DUMMY_CLOSED;
@@ -288,7 +288,7 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     dummy_t* dummy = NULL;
 
     if (!(dummy = GU_CALLOC(1, dummy_t)))
-	goto out0;
+        goto out0;
 
     dummy->state         = DUMMY_CLOSED;
     *(size_t*)(&dummy->max_pkt_size)  = (size_t) sysconf (_SC_PAGESIZE);
@@ -296,7 +296,7 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     *(size_t*)(&dummy->max_send_size) = dummy->max_pkt_size - dummy->hdr_size;
 
     if (!(dummy->gc_q = gu_fifo_create (1 << 16, sizeof(void*))))
-	goto out1;
+        goto out1;
 
     *backend      = dummy_backend; // set methods
     backend->conn = dummy;         // set data

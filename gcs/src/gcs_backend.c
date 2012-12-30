@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -59,8 +59,8 @@ backend_type_is (const char* uri, const char* type, const size_t len)
 
 long
 gcs_backend_init (gcs_backend_t* const bk,
-		  const char*    const uri,
-		  gu_config_t*   const conf)
+                  const char*    const uri,
+                  gu_config_t*   const conf)
 {
     char* sep;
 
