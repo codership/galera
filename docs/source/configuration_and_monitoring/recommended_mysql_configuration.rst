@@ -1,0 +1,4 @@
+Recommended MySQL configuration
+===============================
+
+TODO
