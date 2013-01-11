@@ -357,12 +357,16 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
                                  const void*         rbr_data,
                                  size_t              rbr_data_len,
                                  uint64_t            flags __attribute__((unused)) ,
-                                 wsrep_seqno_t*      global_seqno)
+                                 wsrep_trx_meta_t*   meta)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-    *global_seqno = WSREP_SEQNO_UNDEFINED;
+    if (meta != 0)
+    {
+        meta->gtid = WSREP_GTID_UNDEFINED;
+        meta->depends_on = WSREP_SEQNO_UNDEFINED;
+    }
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
@@ -393,8 +397,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
 
         if (retval == WSREP_OK)
         {
-            *global_seqno = trx->global_seqno();
-            retval = repl->pre_commit(trx);
+            retval = repl->pre_commit(trx, meta);
         }
 
         assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
@@ -476,7 +479,7 @@ wsrep_status_t galera_append_data(wsrep_t*            wsrep,
 
 extern "C"
 wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
-                                  wsrep_seqno_t* seqno)
+                                  wsrep_gtid_t*  gtid)
 {
     assert(wsrep != 0);
     assert(wsrep->ctx != 0);
@@ -485,7 +488,7 @@ wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
     wsrep_status_t retval;
     try
     {
-        retval = repl->causal_read(seqno);
+        retval = repl->causal_read(gtid);
     }
     catch (std::exception& e)
     {
@@ -535,7 +538,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
                                        long               keys_num,
                                        const void*        action,
                                        size_t             action_len,
-                                       wsrep_seqno_t*     global_seqno)
+                                       wsrep_trx_meta_t*  meta)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -564,11 +567,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
         assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
                (retval != WSREP_OK && trx->global_seqno() < 0));
 
-        *global_seqno = trx->global_seqno();
-
         if (retval == WSREP_OK)
         {
-            retval = repl->to_isolation_begin(trx);
+            retval = repl->to_isolation_begin(trx, meta);
         }
     }
     catch (std::exception& e)
@@ -586,7 +587,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
     {
         repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
 
-        if (*global_seqno < 0) // no seqno -> no index -> no automatic purging
+        if (trx->global_seqno() < 0) // no seqno -> no index -> no automatic purging
         {
             trx->unref(); // implicit destructor
         }
