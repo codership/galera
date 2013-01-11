@@ -71,14 +71,14 @@ namespace galera
 
         wsrep_status_t replicate(TrxHandle* trx);
         void abort_trx(TrxHandle* trx) throw (gu::Exception);
-        wsrep_status_t pre_commit(TrxHandle*  trx);
+        wsrep_status_t pre_commit(TrxHandle*  trx, wsrep_trx_meta_t*);
         wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
         wsrep_status_t post_commit(TrxHandle* trx);
         wsrep_status_t post_rollback(TrxHandle* trx);
 
-        wsrep_status_t causal_read(wsrep_seqno_t*);
-        wsrep_status_t to_isolation_begin(TrxHandle* trx);
+        wsrep_status_t causal_read(wsrep_gtid_t*);
+        wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*);
         wsrep_status_t to_isolation_end(TrxHandle* trx);
         wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
                                 wsrep_seqno_t seqno);

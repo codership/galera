@@ -119,6 +119,9 @@ typedef struct wsrep_uuid {
 /*! Undefined UUID */
 static const wsrep_uuid_t WSREP_UUID_UNDEFINED = {{0,}};
 
+/*! UUID string representation length, terminating '\0' not included */
+#define WSREP_UUID_STR_LEN 36
+
 /*!
  * Scan UUID from string
  * @return length of UUID string representation or negative error code
@@ -135,6 +138,48 @@ wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
 
 #define WSREP_MEMBER_NAME_LEN 32  //!< maximum logical member name length
 #define WSREP_INCOMING_LEN    256 //!< max Domain Name length + 0x00
+
+
+/*!
+ * Global transaction identifier
+ */
+typedef struct wsrep_gtid
+{
+    wsrep_uuid_t  uuid;  /*!< History UUID */
+    wsrep_seqno_t seqno; /*!< Sequence number */
+} wsrep_gtid_t;
+
+/*! Undefined GTID */
+static const wsrep_gtid_t WSREP_GTID_UNDEFINED = {{{0, }}, -1};
+
+/*! Minimum number of bytes guaranteed to store GTID string representation,
+ * terminating '\0' not included (36 + 1 + 20) */
+#define WSREP_GTID_STR_LEN 57
+
+
+/*!
+ * Scan GTID from string
+ * @return length of GTID string representation or negative error code
+ */
+extern ssize_t
+wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid);
+
+/*!
+ * Print GTID to string
+ * @return length of GTID string representation or negative error code
+ */
+extern ssize_t
+wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
+
+/*!
+ * Transaction meta data
+ */
+typedef struct wsrep_trx_meta
+{
+    wsrep_gtid_t  gtid;       /*!< Global transaction identifier */
+    wsrep_seqno_t depends_on; /*!< Sequence number part of the last transaction this transaction depends on */
+} wsrep_trx_meta_t;
+
 
 /*!
  * member status
@@ -237,17 +282,18 @@ typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
  * @param recv_ctx receiver context pointer provided by the application
  * @param data     data buffer containing the write set
  * @param size     data buffer size
- * @param seqno    global seqno part of the write set to be applied
+ * @param meta     transaction meta data of the write set to be applied
  *
  * @return success code:
  * @retval WSREP_OK
  * @retval WSREP_NOT_IMPLEMENTED appl. does not support the write set format
  * @retval WSREP_ERROR failed to apply the write set
  */
-typedef enum wsrep_status (*wsrep_apply_cb_t) (void*         recv_ctx,
-                                               const void*   data,
-                                               size_t        size,
-                                               wsrep_seqno_t seqno);
+typedef enum wsrep_status (*wsrep_apply_cb_t) (
+    void*                   recv_ctx,
+    const void*             data,
+    size_t                  size,
+    const wsrep_trx_meta_t* meta);
 
 /*!
  * @brief commit callback
@@ -255,16 +301,17 @@ typedef enum wsrep_status (*wsrep_apply_cb_t) (void*         recv_ctx,
  * This handler is called to commit the changes made by apply callback.
  *
  * @param recv_ctx receiver context pointer provided by the application
- * @param seqno    global seqno part of the write set to be committed
+ * @param meta     transaction meta data of the write set to be committed
  * @param commit   true - commit writeset, false - rollback writeset
  *
  * @return success code:
  * @retval WSREP_OK
  * @retval WSREP_ERROR call failed
  */
-typedef enum wsrep_status (*wsrep_commit_cb_t) (void*         recv_ctx,
-                                                wsrep_seqno_t seqno,
-                                                wsrep_bool_t  commit);
+typedef enum wsrep_status (*wsrep_commit_cb_t) (
+    void*                   recv_ctx,
+    const wsrep_trx_meta_t* meta,
+    wsrep_bool_t            commit);
 
 /*!
  * @brief unordered callback
@@ -549,7 +596,7 @@ struct wsrep_ {
    * @param app_data   application specific applying data
    * @param data_len   the size of the applying data
    * @param flags      fine tuning the replication WSREP_FLAG_*
-   * @param seqno      seqno part of the global transaction ID
+   * @param meta       transaction meta data
    *
    * @retval WSREP_OK         cluster-wide commit succeeded
    * @retval WSREP_TRX_FAIL   must rollback transaction
@@ -562,7 +609,7 @@ struct wsrep_ {
                                  const void*         app_data,
                                  size_t              data_len,
                                  uint64_t            flags,
-                                 wsrep_seqno_t*      seqno);
+                                 wsrep_trx_meta_t*   meta);
 
   /*!
    * @brief Releases resources after transaction commit.
@@ -681,9 +728,9 @@ struct wsrep_ {
    * causally before this call.
    *
    * @param wsrep this wsrep handle
-   * @param seqno location to store global transaction ID
+   * @param gtid location to store GTID
    */
-    wsrep_status_t (*causal_read)(wsrep_t* wsrep, wsrep_seqno_t* seqno);
+    wsrep_status_t (*causal_read)(wsrep_t* wsrep, wsrep_gtid_t* gtid);
 
   /*!
    * @brief Clears allocated connection context.
@@ -713,7 +760,7 @@ struct wsrep_ {
    * @param keys_num    lenght of the array of keys
    * @param action      action to be executed
    * @param action_len  action buffer size
-   * @param seqno       seqno part of the action ID
+   * @param meta        transaction meta data
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_CONN_FAIL  must close client connection
@@ -725,7 +772,7 @@ struct wsrep_ {
                                        long               keys_num,
                                        const void*        action,
                                        size_t             action_len,
-                                       wsrep_seqno_t*     seqno);
+                                       wsrep_trx_meta_t*  meta);
 
   /*!
    * @brief Ends the total order isolation section.

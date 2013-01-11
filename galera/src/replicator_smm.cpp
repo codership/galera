@@ -19,7 +19,8 @@ extern "C"
 static inline void
 apply_wscoll(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
-             const galera::TrxHandle& trx)
+             const galera::TrxHandle& trx,
+             const wsrep_trx_meta_t&  meta)
     throw (galera::ApplyException, gu::Exception)
 {
     const galera::MappedBuffer& wscoll(trx.write_set_collection());
@@ -34,7 +35,7 @@ apply_wscoll(void*                    recv_ctx,
         wsrep_status_t err = apply_cb (recv_ctx,
                                        &ws.get_data()[0],
                                        ws.get_data().size(),
-                                       trx.global_seqno());
+                                       &meta);
 
         if (gu_unlikely(err != WSREP_OK))
         {
@@ -62,12 +63,12 @@ static void
 apply_trx_ws(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
              wsrep_commit_cb_t        commit_cb,
-             const galera::TrxHandle& trx)
+             const galera::TrxHandle& trx,
+             const wsrep_trx_meta_t&  meta)
     throw (galera::ApplyException, gu::Exception)
 {
     static const size_t max_apply_attempts(10);
     size_t attempts(1);
-
     do
     {
         try
@@ -76,7 +77,7 @@ apply_trx_ws(void*                    recv_ctx,
             {
                 log_debug << "Executing TO isolated action: " << trx;
             }
-            gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
+            gu_trace(apply_wscoll(recv_ctx, apply_cb, trx, meta));
             if (trx.is_toi())
             {
                 log_debug << "Done executing TO isolated action: "
@@ -97,7 +98,7 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (WSREP_TRX_FAIL == err)
                 {
-                    int const rcode(commit_cb(recv_ctx,trx.global_seqno(),false));
+                    int const rcode(commit_cb(recv_ctx, &meta, false));
                     if (WSREP_OK != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
@@ -464,15 +465,17 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
 
     gu_trace(apply_monitor_.enter(ao));
     trx->set_state(TrxHandle::S_APPLYING);
-    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx));
+
+    wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
+                             trx->depends_seqno()};
+    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx, meta));
     // at this point any exception in apply_trx_ws() is fatal, not
     // catching anything.
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
         gu_trace(commit_monitor_.enter(co));
         trx->set_state(TrxHandle::S_COMMITTING);
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
-                                                true)))
+        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, &meta, true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
 
         commit_monitor_.leave(co);
@@ -481,8 +484,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     else
     {
         trx->set_state(TrxHandle::S_COMMITTING);
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, trx->global_seqno(),
-                                                true)))
+        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, &meta, true)))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
         trx->set_state(TrxHandle::S_COMMITTED);
     }
@@ -676,8 +678,15 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
+                                                 wsrep_trx_meta_t* meta)
 {
+    if (meta != 0)
+    {
+        meta->gtid.uuid  = state_uuid_;
+        meta->gtid.seqno = trx->global_seqno();
+        meta->depends_on = trx->depends_seqno();
+    }
     // State should not be checked here: If trx has been replicated,
     // it has to be certified and potentially applied. #528
     // if (state_() < S_JOINED) return WSREP_TRX_FAIL;
@@ -815,10 +824,11 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
         try
         {
-            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx));
+            wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
+                                     trx->depends_seqno()};
+            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx, meta));
 
-            if (gu_unlikely(WSREP_OK != commit_cb_(trx_ctx, trx->global_seqno(),
-                                                   true)))
+            if (gu_unlikely(WSREP_OK != commit_cb_(trx_ctx, &meta, true)))
                 gu_throw_fatal << "Commit failed. Trx: " << trx;
         }
         catch (gu::Exception& e)
@@ -893,7 +903,7 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
+wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
 {
     wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
 
@@ -923,7 +933,11 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
         {
             apply_monitor_.wait(cseq, wait_until);
         }
-        if (seqno != 0) *seqno = cseq;
+        if (gtid != 0)
+        {
+            gtid->uuid = state_uuid_;
+            gtid->seqno = cseq;
+        }
         ++causal_reads_;
         return WSREP_OK;
     }
@@ -935,8 +949,15 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
+                                                         wsrep_trx_meta_t* meta)
 {
+    if (meta != 0)
+    {
+        meta->gtid.uuid  = state_uuid_;
+        meta->gtid.seqno = trx->global_seqno();
+        meta->depends_on = trx->depends_seqno();
+    }
     assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->trx_id() == static_cast<wsrep_trx_id_t>(-1));
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
