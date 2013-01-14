@@ -34,14 +34,19 @@ galera::ServiceThd::thd_func (void* arg)
         {
             if (data.act_ & A_LAST_COMMITTED)
             {
-                ssize_t ret;
+                ssize_t const ret(st->gcs_.set_last_applied(data.last_committed_));
 
-                if ((ret = st->gcs_.set_last_applied(data.last_committed_)))
+                if (gu_unlikely(ret < 0))
                 {
                     log_warn << "Failed to report last committed "
                              << data.last_committed_ << ", " << ret
                              << " (" << strerror (-ret) << ')';
                     // @todo: figure out what to do in this case
+                }
+                else
+                {
+                    log_debug << "Reported last committed: "
+                              << data.last_committed_;
                 }
             }
         }

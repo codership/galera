@@ -41,9 +41,7 @@ static time_t stop = 0;
 
 static void *dbg_thr(void *arg)
 {
-    while (time(NULL) < stop) {
-	af();
-    }
+    while (time(NULL) < stop) { af(); }
     pthread_exit(NULL);
 }
 
@@ -55,7 +53,7 @@ START_TEST(gu_dbug_test)
 
     /* Log > /dev/null */
     GU_DBUG_FILE = fopen("/dev/null", "a+");
-    
+
     /* These should not produce output yet */
     af();
     af();
@@ -68,15 +66,12 @@ START_TEST(gu_dbug_test)
     af();
     af();
 
-
-
     /* Run few threads concurrently */
     stop = time(NULL) + 2;
     for (i = 0; i < N_THREADS; i++)
-	pthread_create(&th[i], NULL, &dbg_thr, NULL);
+        pthread_create(&th[i], NULL, &dbg_thr, NULL);
     for (i = 0; i < N_THREADS; i++)
-	pthread_join(th[i], NULL);
-    
+        pthread_join(th[i], NULL);
 }
 END_TEST
 
@@ -87,5 +82,6 @@ Suite *gu_dbug_suite(void)
 
   suite_add_tcase (s, tc);
   tcase_add_test  (tc, gu_dbug_test);
+  tcase_set_timeout(tc, 60);
   return s;
 }

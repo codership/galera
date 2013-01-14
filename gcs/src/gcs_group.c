@@ -198,6 +198,8 @@ group_redo_last_applied (gcs_group_t* group)
             last_applied = seqno;
             last_node    = n;
         }
+        // extra diagnostic, ignore
+        //else if (!count) { gu_warn("not counting %d", n); }
     }
 
     if (gu_likely (last_node >= 0)) {
@@ -618,7 +620,12 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         group_redo_last_applied (group);
 
-        if (old_val < group->last_applied) return group->last_applied;
+        if (old_val < group->last_applied) {
+            gu_debug ("New COMMIT CUT %lld after %lld from %d",
+                      (long long)group->last_applied,
+                      (long long)seqno, msg->sender_idx);
+            return group->last_applied;
+        }
     }
 
     return 0;
