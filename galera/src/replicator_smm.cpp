@@ -513,7 +513,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
-    trx->set_last_seen_seqno(co_mode_ != CommitOrder::BYPASS ? commit_monitor_.last_left() : apply_monitor_.last_left());
+    trx->set_last_seen_seqno(last_committed());
     trx->flush(0);
     trx->set_state(TrxHandle::S_REPLICATING);
 
@@ -1088,6 +1088,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     gu_trace(local_monitor_.enter(lo));
     cert_.purge_trxs_upto(seq);
     local_monitor_.leave(lo);
+    log_debug << "Got commit cut from GCS: " << seq;
 }
 
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)

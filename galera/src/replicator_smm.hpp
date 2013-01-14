@@ -151,10 +151,19 @@ namespace galera
         static const Defaults defaults;
         // both a list of parameters and a list of default values
 
-        inline void report_last_committed()
+        wsrep_seqno_t last_committed()
+        {
+            return co_mode_ != CommitOrder::BYPASS ?
+                   commit_monitor_.last_left() : apply_monitor_.last_left();
+        }
+
+        void report_last_committed()
         {
             if (gu_unlikely(cert_.index_purge_required()))
-                service_thd_.report_last_committed(apply_monitor_.last_left());
+            {
+                wsrep_seqno_t const purge_seqno(cert_.get_safe_to_discard_seqno());
+                service_thd_.report_last_committed(purge_seqno);
+            }
         }
 
         wsrep_status_t cert(TrxHandle* trx);

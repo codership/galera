@@ -253,7 +253,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
     // to original size
     size_t prev_cert_index_size(cert_index_.size());
 #endif // NDEBUG
-    // Scan over write sets
+    /* Scan over write sets */
     while (offset < wscoll.size())
     {
         WriteSet ws(trx->version());
@@ -411,12 +411,12 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
         return TEST_FAILED;
     }
 
-    if (trx->last_seen_seqno() < initial_position_ ||
-        trx->global_seqno() - trx->last_seen_seqno() > max_length_)
+    if (gu_unlikely(trx->last_seen_seqno() < initial_position_ ||
+                    trx->global_seqno() - trx->last_seen_seqno() > max_length_))
     {
         if (trx->last_seen_seqno() < initial_position_)
         {
-            log_debug << "last seen seqno below limit for trx " << *trx;
+            log_warn << "last seen seqno below limit for trx " << *trx;
         }
 
         if (trx->global_seqno() - trx->last_seen_seqno() > max_length_)
@@ -564,6 +564,13 @@ galera::Certification::append_trx(TrxHandle* trx)
                       << " trx seqno " << trx->global_seqno();
         }
 
+        if (gu_unlikely((trx->last_seen_seqno() + 1) < trx_map_.begin()->first))
+        {
+            /* See #733 - for now it is false positive */
+            cert_debug << "WARNING: last_seen_seqno is below certification index: "
+            << trx_map_.begin()->first << " > " << trx->last_seen_seqno();
+        }
+
         position_ = trx->global_seqno();
 
         if (gu_unlikely(!(position_ & max_length_check_) &&
@@ -583,6 +590,7 @@ galera::Certification::append_trx(TrxHandle* trx)
             }
             else
             {
+                cert_debug << "purging index up to " << trim_seqno;
                 purge_trxs_upto_(trim_seqno);
             }
         }
@@ -640,6 +648,7 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno_() const
 void galera::Certification::purge_trxs_upto_(wsrep_seqno_t seqno)
 {
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
+    cert_debug << "purging index up to " << lower_bound->first;
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (0 == ((trx_map_.size() + 1) % 10000))
