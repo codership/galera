@@ -213,7 +213,7 @@ Suite* saved_state_suite()
     tcase_add_test  (tc, test_basic);
     tcase_add_test  (tc, test_unsafe);
     tcase_add_test  (tc, test_corrupt);
-    tcase_set_timeout(tc, 60);
+    tcase_set_timeout(tc, 120);
     suite_add_tcase (s, tc);
 
     return s;
