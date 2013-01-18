@@ -21,7 +21,9 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const gu::URI& uri)
     send_q_      (),
     recv_buf_    (net_.mtu() + NetHeader::serial_size_),
     recv_offset_ (0),
-    state_       (S_CLOSED)
+    state_       (S_CLOSED),
+    local_addr_  (),
+    remote_addr_ ()
 {
     log_debug << "ctor for " << id();
 }
@@ -77,15 +79,31 @@ namespace
     {
         return SSL_COMP_get_name(SSL_get_current_compression(ssl));
     }
+
+
+    static std::string extra_error_info(const asio::error_code& ec)
+    {
+        std::ostringstream os;
+        if (ec.category() == asio::error::get_ssl_category())
+        {
+            char errstr[120] = {0, };
+            ERR_error_string_n(ec.value(), errstr, sizeof(errstr));
+            os << ec.value() << ": '" << errstr << "'";
+        }
+        return os.str();
+    }
+
 }
+
+
 
 void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
 {
     if (ec)
     {
         log_error << "handshake with remote endpoint "
-                  << remote_addr() << " failed: " << ec.message()
-                  << " (" << ec << ")"; ;
+                  << remote_addr() << " failed: " << ec << ": '" << ec.message()
+                  << "' ( " << extra_error_info(ec) << ")";
         FAILED_HANDLER(ec);
         return;
     }
@@ -124,6 +142,8 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
     }
     else
     {
+        assign_local_addr();
+        assign_remote_addr();
 #ifdef HAVE_ASIO_SSL_HPP
         if (ssl_socket_ != 0)
         {
@@ -212,6 +232,7 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
             << uri.to_string()
             << "', asio error '" << e.what() << "'";
     }
+
 }
 
 void gcomm::AsioTcpSocket::close()
@@ -244,6 +265,11 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     {
         log_debug << "write handler for " << id()
                   << " state " << state();
+        if (ec.category() == asio::error::get_ssl_category())
+        {
+            log_warn << "write_handler(): " << ec.message()
+                     << " (" << extra_error_info(ec) << ")";
+        }
         return;
     }
 
@@ -340,6 +366,11 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
 
     if (ec)
     {
+        if (ec.category() == asio::error::get_ssl_category())
+        {
+            log_warn << "read_handler(): " << ec.message() << " ("
+                     << extra_error_info(ec) << ")";
+        }
         FAILED_HANDLER(ec);
         return;
     }
@@ -432,6 +463,11 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     Critical<AsioProtonet> crit(net_);
     if (ec)
     {
+        if (ec.category() == asio::error::get_ssl_category())
+        {
+            log_warn << "read_completion_condition(): " << ec.message() << " ("
+                     << extra_error_info(ec) << ")";
+        }
         FAILED_HANDLER(ec);
         return 0;
     }
@@ -494,51 +530,12 @@ size_t gcomm::AsioTcpSocket::mtu() const
 
 std::string gcomm::AsioTcpSocket::local_addr() const
 {
-#ifdef HAVE_ASIO_SSL_HPP
-    if (ssl_socket_ != 0)
-    {
-        return uri_string(
-            SSL_SCHEME,
-            escape_addr(ssl_socket_->lowest_layer().local_endpoint().address()),
-            gu::to_string(ssl_socket_->lowest_layer().local_endpoint().port())
-            );
-    }
-    else
-    {
-#endif /* HAVE_ASIO_SSL_HPP */
-        return uri_string(
-            TCP_SCHEME,
-            escape_addr(socket_.local_endpoint().address()),
-            gu::to_string(socket_.local_endpoint().port())
-            );
-#ifdef HAVE_ASIO_SSL_HPP
-    }
-#endif /* HAVE_ASIO_SSL_HPP */
-
+    return local_addr_;
 }
 
 std::string gcomm::AsioTcpSocket::remote_addr() const
 {
-#ifdef HAVE_ASIO_SSL_HPP
-    if (ssl_socket_ != 0)
-    {
-        return uri_string(
-            SSL_SCHEME,
-            escape_addr(ssl_socket_->lowest_layer().remote_endpoint().address()),
-            gu::to_string(ssl_socket_->lowest_layer().remote_endpoint().port())
-            );
-    }
-    else
-    {
-#endif /* HAVE_ASIO_SSL_HPP */
-        return uri_string(
-            TCP_SCHEME,
-            escape_addr(socket_.remote_endpoint().address()),
-            gu::to_string(socket_.remote_endpoint().port())
-            );
-#ifdef HAVE_ASIO_SSL_HPP
-    }
-#endif /* HAVE_ASIO_SSL_HPP */
+    return remote_addr_;
 }
 
 
@@ -624,6 +621,59 @@ void gcomm::AsioTcpSocket::close_socket()
     catch (...) { }
 }
 
+void gcomm::AsioTcpSocket::assign_local_addr()
+{
+#ifdef HAVE_ASIO_SSL_HPP
+    if (ssl_socket_ != 0)
+    {
+        local_addr_ = gcomm::uri_string(
+            gcomm::SSL_SCHEME,
+            gcomm::escape_addr(
+                ssl_socket_->lowest_layer().local_endpoint().address()),
+            gu::to_string(
+                ssl_socket_->lowest_layer().local_endpoint().port())
+            );
+    }
+    else
+    {
+#endif /* HAVE_ASIO_SSL_HPP */
+        local_addr_ = gcomm::uri_string(
+            gcomm::TCP_SCHEME,
+            gcomm::escape_addr(socket_.local_endpoint().address()),
+            gu::to_string(socket_.local_endpoint().port())
+            );
+#ifdef HAVE_ASIO_SSL_HPP
+    }
+#endif /* HAVE_ASIO_SSL_HPP */
+}
+
+void gcomm::AsioTcpSocket::assign_remote_addr()
+{
+#ifdef HAVE_ASIO_SSL_HPP
+    if (ssl_socket_ != 0)
+    {
+        remote_addr_ = gcomm::uri_string(
+            gcomm::SSL_SCHEME,
+            gcomm::escape_addr(
+                ssl_socket_->lowest_layer().remote_endpoint().address()),
+            gu::to_string(
+                ssl_socket_->lowest_layer().remote_endpoint().port())
+            );
+    }
+    else
+    {
+#endif /* HAVE_ASIO_SSL_HPP */
+        remote_addr_ = uri_string(
+            gcomm::TCP_SCHEME,
+            gcomm::escape_addr(socket_.remote_endpoint().address()),
+            gu::to_string(socket_.remote_endpoint().port())
+            );
+#ifdef HAVE_ASIO_SSL_HPP
+    }
+#endif /* HAVE_ASIO_SSL_HPP */
+}
+
+
 
 gcomm::AsioTcpAcceptor::AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri)
     :
@@ -648,6 +698,8 @@ void gcomm::AsioTcpAcceptor::accept_handler(
     if (!error)
     {
         AsioTcpSocket* s(static_cast<AsioTcpSocket*>(socket.get()));
+        s->assign_local_addr();
+        s->assign_remote_addr();
 #ifdef HAVE_ASIO_SSL_HPP
         if (s->ssl_socket_ != 0)
         {
