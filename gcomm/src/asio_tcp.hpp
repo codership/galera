@@ -60,15 +60,24 @@ private:
     void write_one(const boost::array<asio::const_buffer, 2>& cbs);
     void close_socket();
 
+    // call to assign local/remote addresses at the point where it
+    // is known that underlying socket is live
+    void assign_local_addr();
+    void assign_remote_addr();
+
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
 #ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
 #endif // HAVE_ASIO_SSL_HPP
-    std::deque<Datagram>                  send_q_;
+    std::deque<Datagram>                      send_q_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;
     State                                     state_;
+    // Querying addresses from failed socket does not work,
+    // so need to maintain copy for diagnostics logging
+    std::string                               local_addr_;
+    std::string                               remote_addr_;
 };
 
 
