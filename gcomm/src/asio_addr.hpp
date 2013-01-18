@@ -12,43 +12,45 @@
 #include <string>
 #include <algorithm>
 
-static inline std::string escape_addr(const asio::ip::address& addr)
+namespace gcomm
 {
-    if (addr.is_v4())
+    static inline std::string escape_addr(const asio::ip::address& addr)
     {
-        return addr.to_v4().to_string();
+        if (addr.is_v4())
+        {
+            return addr.to_v4().to_string();
+        }
+        else
+        {
+            return "[" + addr.to_v6().to_string() + "]";
+        }
     }
-    else
+
+    static inline std::string unescape_addr(const std::string& addr)
     {
-        return "[" + addr.to_v6().to_string() + "]";
+        std::string ret(addr);
+        size_t pos(ret.find('['));
+        if (pos != std::string::npos) ret.erase(pos, 1);
+        pos = ret.find(']');
+        if (pos != std::string::npos) ret.erase(pos, 1);
+        return ret;
+    }
+
+
+    static inline std::string anyaddr(const asio::ip::address& addr)
+    {
+        if (addr.is_v4() == true)
+        {
+            return addr.to_v4().any().to_string();
+        }
+        else
+        {
+            return addr.to_v6().any().to_string();
+        }
+        gu_throw_fatal;
+        throw;
     }
 }
-
-static inline std::string unescape_addr(const std::string& addr)
-{
-    std::string ret(addr);
-    size_t pos(ret.find('['));
-    if (pos != std::string::npos) ret.erase(pos, 1);
-    pos = ret.find(']');
-    if (pos != std::string::npos) ret.erase(pos, 1);
-    return ret;
-}
-
-
-static inline std::string anyaddr(const asio::ip::address& addr)
-{
-    if (addr.is_v4() == true)
-    {
-        return addr.to_v4().any().to_string();
-    }
-    else
-    {
-        return addr.to_v6().any().to_string();
-    }
-    gu_throw_fatal;
-    throw;
-}
-
 
 template <class S>
 void set_fd_options(S& socket)
