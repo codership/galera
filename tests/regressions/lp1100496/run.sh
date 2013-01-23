@@ -146,6 +146,8 @@ run_test()
     $MYSQL --port=$port_1 -e 'SHOW PROCESSLIST'
     [ "$?" != "0" ] && echo "failed!" && exit 1
 
+
+    wait_sync $NODE_LIST
     $SCRIPTS/command.sh check
 }
 
