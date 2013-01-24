@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -168,9 +168,10 @@ struct gcs_recv_act
 
 struct gcs_repl_act
 {
-    struct gcs_action* action;
-    gu_mutex_t         wait_mutex;
-    gu_cond_t          wait_cond;
+    const struct gcs_buf* act_in;
+    struct gcs_action*    action;
+    gu_mutex_t            wait_mutex;
+    gu_cond_t             wait_cond;
 };
 
 /*! Releases resources associated with parameters */
@@ -1031,7 +1032,7 @@ _handle_timeout (gcs_conn_t* conn)
     bool ret;
     long long now = gu_time_calendar();
 
-    /* TODO: now the only point for timeout is flow control (#412), 
+    /* TODO: now the only point for timeout is flow control (#412),
      *       later we might need to handle more timers. */
     if (conn->timeout <= now) {
         ret = ((GCS_CONN_JOINER != conn->state) ||
@@ -1160,9 +1161,9 @@ static void *gcs_recv_thread (void *arg)
             this_act_id = conn->local_act_id++;
         }
 
-        if (NULL != rcvd.repl_buf                                       &&
+        if (NULL != rcvd.local                                          &&
             (repl_act_ptr = gcs_fifo_lite_get_head (conn->repl_q))      &&
-            (gu_likely ((*repl_act_ptr)->action->buf == rcvd.repl_buf)  ||
+            (gu_likely ((*repl_act_ptr)->act_in == rcvd.local)  ||
              /* at this point repl_q is locked and we need to unlock it and
               * return false to fall to the 'else' branch; unlikely case */
              (gcs_fifo_lite_release (conn->repl_q), false)))
@@ -1419,11 +1420,11 @@ long gcs_destroy (gcs_conn_t *conn)
 }
 
 /* Puts action in the send queue and returns */
-long gcs_send (gcs_conn_t*    const conn,
-               const void*    const act_buf,
-               size_t         const act_size,
-               gcs_act_type_t const act_type,
-               bool           const scheduled)
+long gcs_sendv (gcs_conn_t*           const conn,
+                const struct gcs_buf* const act_bufs,
+                size_t                const act_size,
+                gcs_act_type_t        const act_type,
+                bool                  const scheduled)
 {
     long ret = -ENOTCONN;
 
@@ -1436,7 +1437,7 @@ long gcs_send (gcs_conn_t*    const conn,
     if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
     {
         while ((GCS_CONN_OPEN >= conn->state) &&
-               (ret = gcs_core_send (conn->core, act_buf,
+               (ret = gcs_core_send (conn->core, act_bufs,
                                      act_size, act_type)) == -ERESTART);
         gcs_sm_leave (conn->sm);
         gu_cond_destroy (&tmp_cond);
@@ -1461,9 +1462,10 @@ gcs_seqno_t gcs_caused(gcs_conn_t* conn)
 }
 
 /* Puts action in the send queue and returns after it is replicated */
-long gcs_repl (gcs_conn_t*        conn,      //!<in
-               struct gcs_action* act,       //!<inout
-               bool               scheduled) //!<in
+long gcs_replv (gcs_conn_t*           const conn,      //!<in
+                const struct gcs_buf* const act_in,    //!<in
+                struct gcs_action*    const act,       //!<inout
+                bool                  const scheduled) //!<in
 {
     long ret;
 
@@ -1471,11 +1473,12 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
     assert (act->buf);
     assert (act->size > 0);
 
+    act->buf     = NULL;
     act->seqno_l = GCS_SEQNO_ILL;
     act->seqno_g = GCS_SEQNO_ILL;
 
     /* This is good - we don't have to do a copy because we wait */
-    struct gcs_repl_act repl_act = { .action = act };
+    struct gcs_repl_act repl_act = { .act_in = act_in, .action = act };
 
     gu_mutex_init (&repl_act.wait_mutex, NULL);
     gu_cond_init  (&repl_act.wait_cond,  NULL);
@@ -1510,7 +1513,7 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
                 gcs_fifo_lite_push_tail (conn->repl_q);
 
                 // Keep on trying until something else comes out
-                while ((ret = gcs_core_send (conn->core, act->buf, act->size,
+                while ((ret = gcs_core_send (conn->core, act_in, act->size,
                                              act->type)) == -ERESTART) {}
 
                 if (ret < 0) {

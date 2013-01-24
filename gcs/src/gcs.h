@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -158,32 +158,76 @@ gcs_act_type_t;
 /*! String representations of action types */
 extern const char* gcs_act_type_to_str(gcs_act_type_t);
 
+/*! this should be castable to struct iovec, but has better const safety */
+struct gcs_buf {
+    const void* ptr;
+    ssize_t     size;
+};
+
+/*! @brief Sends a vector of buffers as a single action to group and returns.
+ * A copy of action will be returned through gcs_recv() call, or discarded
+ * in case it is not delivered by group.
+ * For a better means to replicate an action see gcs_repl(). @see gcs_repl()
+ *
+ * @param conn group connection handle
+ * @param act_bufs   action buffer vector
+ * @param act_size   total action size (the sum of buffer sizes)
+ * @param act_type   action type
+ * @param scheduled  whether the call was scheduled by gcs_schedule()
+ * @return           negative error code, action size in case of success
+ * @retval -EINTR    thread was interrupted while waiting to enter the monitor
+ */
+extern long gcs_sendv (gcs_conn_t*           conn,
+                       const struct gcs_buf* act_bufs,
+                       size_t                act_size,
+                       gcs_act_type_t        act_type,
+                       bool                  scheduled);
+
+/*! A wrapper for single buffer communication */
+static inline long gcs_send (gcs_conn_t*    const conn,
+                             const void*    const act,
+                             size_t         const act_size,
+                             gcs_act_type_t const act_type,
+                             bool           const scheduled)
+{
+    struct gcs_buf const buf = { act, (ssize_t)act_size };
+    return gcs_sendv (conn, &buf, act_size, act_type, scheduled);
+}
+
+/*!*/
 struct gcs_action {
-    const void*    buf;
+    const void*    buf; /*! unlike input, output goes as a single buffer */
     ssize_t        size;
     gcs_seqno_t    seqno_g;
     gcs_seqno_t    seqno_l;
     gcs_act_type_t type;
 };
 
-/*! @brief Sends an action to group and returns.
- * A copy of action will be returned through gcs_recv() call, or discarded
- * in case it is not delivered by group.
- * For a better means to replicate an action see gcs_repl(). @see gcs_repl()
+/*! @brief Replicates a vector of buffers as a single action.
+ * Sends action to group and blocks until it is received. Upon return global
+ * and local IDs are set. Arguments are the same as in gcs_recv().
+ * @see gcs_recv()
  *
- * @param conn group connection handle
- * @param act_buf    action buffer
- * @param act_size   action size
- * @param act_type   action type
- * @param scheduled  whether the call was scheduled by gcs_schedule()
- * @return           negative error code, action size in case of success
- * @retval -EINTR    thread was interrupted while waiting to enter the monitor
+ * @param conn      group connection handle
+ * @param act_in    action buffer vector (total size is passed in action)
+ * @param action    action struct
+ * @param scheduled whether the call was preceded by gcs_schedule()
+ * @return          negative error code, action size in case of success
+ * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
  */
-extern long gcs_send (gcs_conn_t*    conn,
-                      const void*    act_buf,
-                      size_t         act_size,
-                      gcs_act_type_t act_type,
-                      bool           scheduled);
+extern long gcs_replv (gcs_conn_t*           conn,
+                       const struct gcs_buf* act_in,
+                       struct gcs_action*    action,
+                       bool                  scheduled);
+
+/*! A wrapper for single buffer communication */
+static inline long gcs_repl (gcs_conn_t*        const conn,
+                             struct gcs_action* const action,
+                             bool               const scheduled)
+{
+    struct gcs_buf const buf = { action->buf, action->size };
+    return gcs_replv (conn, &buf, action, scheduled);
+}
 
 /*! @brief Receives an action from group.
  * Blocks if no actions are available. Action buffer is allocated by GCS
@@ -201,21 +245,6 @@ extern long gcs_send (gcs_conn_t*    conn,
  */
 extern long gcs_recv (gcs_conn_t*        conn,
                       struct gcs_action* action);
-
-/*! @brief Replicates an action.
- * Sends action to group and blocks until it is received. Upon return global
- * and local IDs are set. Arguments are the same as in gcs_recv().
- * @see gcs_recv()
- *
- * @param conn      group connection handle
- * @param action    action object
- * @param scheduled whether the call was preceded by gcs_schedule()
- * @return          negative error code, action size in case of success
- * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
- */
-extern long gcs_repl (gcs_conn_t*        conn,
-                      struct gcs_action* action,
-                      bool               scheduled);
 
 /*!
  * @brief Schedules entry to CGS send monitor.
@@ -312,13 +341,13 @@ extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
 /* GCS Configuration */
 
 /*! sets the key to a given value
- * 
+ *
  * @return 0 in case of success, 1 if key not found or negative error code */
 extern long
 gcs_param_set (gcs_conn_t* conn, const char* key, const char *value);
 
 /*! returns the value of the key
- * 
+ *
  * @return NULL if key not found */
 extern const char*
 gcs_param_get (gcs_conn_t* conn, const char* key);

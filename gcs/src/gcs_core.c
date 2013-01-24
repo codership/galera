@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -7,9 +7,6 @@
  * Implementation of the generic communication layer.
  * See gcs_core.h
  */
-
-#include <string.h> // for mempcpy
-#include <errno.h>
 
 #define GCS_COMP_MSG_ACCESS
 
@@ -20,6 +17,9 @@
 #include "gcs_fifo_lite.h"
 #include "gcs_group.h"
 #include "gcs_gcache.h"
+
+#include <string.h> // for mempcpy
+#include <errno.h>
 
 const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = (1 << 16); // 65K - IP packet size
@@ -238,7 +238,7 @@ core_msg_send (gcs_core_t*    core,
     if (gu_unlikely(0 != gu_mutex_lock (&core->send_lock))) abort();
     {
         if (gu_likely((CORE_PRIMARY  == core->state) ||
-                      (CORE_EXCHANGE == core->state && GCS_MSG_STATE_MSG == 
+                      (CORE_EXCHANGE == core->state && GCS_MSG_STATE_MSG ==
                        msg_type))) {
 
             ret = core->backend.send (&core->backend, msg, msg_len, msg_type);
@@ -288,18 +288,17 @@ core_msg_send_retry (gcs_core_t*    core,
 }
 
 ssize_t
-gcs_core_send (gcs_core_t*      const conn,
-               const void*      const action,
-               size_t                 act_size,
-               gcs_act_type_t   const act_type)
+gcs_core_send (gcs_core_t*           const conn,
+               const struct gcs_buf* const action,
+               size_t                      act_size,
+               gcs_act_type_t        const act_type)
 {
-    const char*    act  = action;
     ssize_t        ret  = 0;
-    size_t         sent = 0;
+    ssize_t        sent = 0;
     gcs_act_frag_t frg;
-    size_t         send_size;
+    ssize_t        send_size;
     const unsigned char proto_ver = conn->proto_ver;
-    const size_t   hdr_size       = gcs_act_proto_hdr_size (proto_ver);
+    const ssize_t  hdr_size       = gcs_act_proto_hdr_size (proto_ver);
 
     core_act_t*    local_act;
 
@@ -320,26 +319,48 @@ gcs_core_send (gcs_core_t*      const conn,
     frg.proto_ver = proto_ver;
 
     if ((ret = gcs_act_proto_write (&frg, conn->send_buf, conn->send_buf_len)))
-	goto out;
+        goto out;
 
     if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
-        *local_act = (core_act_t){ conn->send_act_no, act, act_size };
+        *local_act = (core_act_t){ conn->send_act_no, action, act_size };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
         ret = core_error (conn->state);
         gu_error ("Failed to access core FIFO: %d (%s)", ret, strerror (-ret));
-	goto out;
+        goto out;
     }
 
+    int         idx  = 0;
+    const char* ptr  = action[idx].ptr;
+    size_t      left = action[idx].size;
+
     do {
-	const size_t chunk_size =
-	    act_size < frg.frag_len ? act_size : frg.frag_len;
+        const size_t chunk_size =
+            act_size < frg.frag_len ? act_size : frg.frag_len;
 
-	/* Here is the only time we have to cast frg.frag */
-	memcpy ((char*)frg.frag, act, chunk_size);
+        /* Here is the only time we have to cast frg.frag */
+        char* dst = (char*)frg.frag;
+        size_t to_copy = chunk_size;
 
-	send_size = hdr_size + chunk_size;
+        while (to_copy > 0) {        // gather action bufs into one
+            if (to_copy < left) {
+                memcpy (dst, ptr, to_copy);
+                ptr     += to_copy;
+                left    -= to_copy;
+                to_copy = 0;
+            }
+            else {
+                memcpy (dst, ptr, left);
+                dst     += left;
+                to_copy -= left;
+                idx++;
+                ptr  = action[idx].ptr;
+                left = action[idx].size;
+            }
+        }
+
+        send_size = hdr_size + chunk_size;
 
 #ifdef GCS_CORE_TESTING
         gu_lock_step_wait (&conn->ls); // pause after every fragment
@@ -354,18 +375,38 @@ gcs_core_send (gcs_core_t*      const conn,
 //                 conn->send_buf + hdr_size, chunk_size, ret, sent, act_size);
 #endif
 
-	if (gu_likely(ret > (ssize_t)hdr_size)) {
+        if (gu_likely(ret > hdr_size)) {
 
-            assert (ret <= (ssize_t)send_size);
+            assert (ret <= send_size);
 
-            ret -= hdr_size;
-
+            ret      -= hdr_size;
             sent     += ret;
-            act      += ret;
             act_size -= ret;
 
-            // adjust frag_len, don't copy more than we could send
-            frg.frag_len = ret;
+            if (gu_unlikely((size_t)ret < chunk_size)) {
+                /* Could not send all that was copied: */
+
+                /* 1. adjust frag_len, don't copy more than we could send */
+                frg.frag_len = ret;
+
+                /* 2. move ptr back to point at the first unsent byte */
+                size_t move_back = chunk_size - ret;
+                size_t ptrdiff   = ptr - (const char*)action[idx].ptr;
+                do {
+                    if (move_back <= ptrdiff) {
+                        ptr -= move_back;
+                        left = action[idx].size - ptrdiff + move_back;
+                        break;
+                    }
+                    else {
+                        assert (idx > 0);
+                        move_back -= ptrdiff;
+                        idx--;
+                        ptrdiff = action[idx].size;
+                        ptr = (const char*)action[idx].ptr + ptrdiff;
+                    }
+                } while (true);
+            }
         }
         else {
             if (ret >= 0) {
@@ -503,7 +544,7 @@ core_handle_act_msg (gcs_core_t*          core,
                 gcs_seqno_t sent_act_id;
 
                 if ((local_act = gcs_fifo_lite_get_head (core->fifo))){
-                    act->repl_buf    = local_act->action;
+                    act->local       = local_act->action;
                     act->act.buf_len = local_act->action_size;
                     sent_act_id      = local_act->sent_act_id;
                     gcs_fifo_lite_pop_head (core->fifo);
@@ -542,7 +583,12 @@ core_handle_act_msg (gcs_core_t*          core,
 #ifdef GCS_FOR_GARB
             /* ignoring state requests from other nodes (not allocated) */
             if (my_msg) {
-                act->act.buf = act->repl_buf;
+                if (act->act.buf_len != act->local[0].size) {
+                    gu_fatal ("Protocol violation: state request is fragmented."
+                              " Aborting.");
+                    abort();
+                }
+                act->act.buf = act->local[0].ptr;
 #endif
                 ret = gcs_group_handle_state_request (group, act);
                 assert (ret <= 0 || ret == act->act.buf_len);
@@ -974,7 +1020,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
     static struct gcs_act_rcvd zero_act = { .act = { .buf     = NULL,
                                                      .buf_len = 0,
                                                      .type    = GCS_ACT_ERROR },
-                                            .repl_buf   = NULL,
+                                            .local      = NULL,
                                             .id         = -1,   // GCS_SEQNO_ILL
                                             .sender_idx = -1 };
 

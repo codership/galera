@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -31,7 +31,7 @@
 #include <gcache.h>
 
 struct gcs_core;
-typedef struct gcs_core gcs_core_t; 
+typedef struct gcs_core gcs_core_t;
 
 /*
  * Allocates context resources  private to
@@ -96,10 +96,10 @@ gcs_core_destroy (gcs_core_t* conn);
  *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
-gcs_core_send (gcs_core_t*    core,
-               const void*    action,
-               size_t         act_size,
-               gcs_act_type_t act_type);
+gcs_core_send (gcs_core_t*           core,
+               const struct gcs_buf* act,
+               size_t                act_size,
+               gcs_act_type_t        act_type);
 
 /*
  * gcs_core_recv() blocks until some action is received from group.
