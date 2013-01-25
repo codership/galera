@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_HPP
@@ -50,6 +50,8 @@ namespace galera
 
         virtual char*   param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound) = 0;
+
+        virtual size_t  max_action_size() const = 0;
     };
 
     class Gcs : public GcsI
@@ -180,6 +182,8 @@ namespace galera
             gu_throw_error(ENOSYS) << "Not implemented: " << __FUNCTION__;
             return 0;
         }
+
+        size_t  max_action_size() const { return GCS_MAX_ACT_SIZE; }
 
     private:
 
@@ -316,6 +320,8 @@ namespace galera
         char* param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound)
         { return 0; }
+
+        size_t  max_action_size() const { return 0x7FFFFFFF; }
 
     private:
 

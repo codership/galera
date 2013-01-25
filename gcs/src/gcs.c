@@ -1426,6 +1426,8 @@ long gcs_sendv (gcs_conn_t*           const conn,
                 gcs_act_type_t        const act_type,
                 bool                  const scheduled)
 {
+    if (gu_unlikely(act_size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
+
     long ret = -ENOTCONN;
 
     /*! locking connection here to avoid race with gcs_close()
@@ -1467,6 +1469,8 @@ long gcs_replv (gcs_conn_t*           const conn,      //!<in
                 struct gcs_action*    const act,       //!<inout
                 bool                  const scheduled) //!<in
 {
+    if (gu_unlikely((size_t)act->size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
+
     long ret;
 
     assert (act);
