@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -34,6 +34,8 @@ static const gcs_seqno_t GCS_SEQNO_NIL   =  0;
 static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
 /*! @def @brief history UUID length */
 #define GCS_UUID_LEN 16
+/*! @def @brief maximum supported size of an action (2GB - 1) */
+#define GCS_MAX_ACT_SIZE 0x7FFFFFFF
 
 /*! Connection handle type */
 typedef struct gcs_conn gcs_conn_t;

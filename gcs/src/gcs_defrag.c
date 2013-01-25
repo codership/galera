@@ -98,8 +98,6 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
         /* new action */
         if (gu_likely(0 == frg->frag_no)) {
 
-            assert (frg->act_size > 0);
-
             df->size    = frg->act_size;
             df->sent_id = frg->act_id;
             df->reset   = false;

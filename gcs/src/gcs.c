@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1424,6 +1424,8 @@ long gcs_send (gcs_conn_t*    const conn,
                gcs_act_type_t const act_type,
                bool           const scheduled)
 {
+    if (gu_unlikely(act_size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
+
     long ret = -ENOTCONN;
 
     /*! locking connection here to avoid race with gcs_close()
@@ -1464,6 +1466,8 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
                struct gcs_action* act,       //!<inout
                bool               scheduled) //!<in
 {
+    if (gu_unlikely((size_t)act->size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
+
     long ret;
 
     assert (act);
