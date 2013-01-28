@@ -37,6 +37,36 @@ size_t galera::serial_size(const WriteSet& ws)
     return (gu::serial_size4(ws.keys_) + gu::serial_size4(ws.data_));
 }
 
+std::pair<size_t, size_t>
+galera::WriteSet::segment(const gu::byte_t* buf, size_t buf_len, size_t offset)
+{
+    uint32_t data_len;
+    offset = gu::unserialize4(buf, buf_len, offset, data_len);
+    if (offset + data_len > buf_len) gu_throw_error(EMSGSIZE);
+    return std::pair<size_t, size_t>(offset, data_len);
+}
+
+size_t galera::WriteSet::keys(const gu::byte_t* buf,
+                              size_t buf_len, size_t offset, int version,
+                              KeySequence& ks)
+{
+    std::pair<size_t, size_t> seg(segment(buf, buf_len, offset));
+    offset = seg.first;
+    const size_t seg_end(seg.first + seg.second);
+    assert(seg_end <= buf_len);
+
+    while (offset < seg_end)
+    {
+        Key key(version);
+        if ((offset = unserialize(buf, buf_len, offset, key)) == 0)
+        {
+            gu_throw_fatal << "failed to unserialize key";
+        }
+        ks.push_back(key);
+    }
+    assert(offset == seg_end);
+    return offset;
+}
 
 void galera::WriteSet::append_key(const Key& key)
 {

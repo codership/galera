@@ -231,8 +231,6 @@ galera::Certification::TestResult
 galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 {
     cert_debug << "BEGIN CERTIFICATION: " << *trx;
-    size_t offset(serial_size(*trx));
-    const MappedBuffer& wscoll(trx->write_set_collection());
     galera::TrxHandle::CertKeySet& key_list(trx->cert_keys_);
     long key_count(0);
     gu::Lock lock(mutex_);
@@ -254,16 +252,13 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
     size_t prev_cert_index_size(cert_index_.size());
 #endif // NDEBUG
     /* Scan over write sets */
-    while (offset < wscoll.size())
+    size_t offset(0);
+    const gu::byte_t* buf(trx->write_set_buffer().first);
+    const size_t buf_len(trx->write_set_buffer().second);
+    while (offset < buf_len)
     {
-        WriteSet ws(trx->version());
-        if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
-        {
-            gu_throw_fatal << "failed to unserialize write set";
-        }
-
         WriteSet::KeySequence rk;
-        ws.get_keys(rk);
+        offset = WriteSet::keys(buf, buf_len, offset, trx->version(), rk);
 
         // Scan over all keys
         for (WriteSet::KeySequence::const_iterator i(rk.begin());
@@ -277,6 +272,11 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
         }
 
         key_count += rk.size();
+
+        // Skip data part
+        std::pair<size_t, size_t> d(WriteSet::segment(buf, buf_len, offset));
+        offset = d.first + d.second;
+
     }
 
     trx->set_depends_seqno(std::max(trx->depends_seqno(), last_pa_unsafe_));
