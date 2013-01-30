@@ -47,7 +47,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 
         CertIndex::iterator ci(cert_index_.find(kel));
         assert(ci != cert_index_.end());
-        KeyEntry* const ke(ci->second);
+        KeyEntry* const ke(*ci);
 
         if (shared == false &&
             (ke->ref_trx() == trx || ke->ref_full_trx() == trx))
@@ -182,7 +182,7 @@ certify_v1to2(galera::TrxHandle*                            trx,
             if (store_keys)
             {
                 kep = new galera::KeyEntry(ke);
-                ci = cert_index.insert(std::make_pair(kep, kep)).first;
+                ci = cert_index.insert(kep).first;
                 cert_debug << "created new entry";
             }
         }
@@ -193,7 +193,7 @@ certify_v1to2(galera::TrxHandle*                            trx,
             // Note: For we skip certification for isolated trxs, only
             // cert index and key_list is populated.
             if ((trx->flags() & galera::TrxHandle::F_ISOLATION) == 0 &&
-                certify_and_depend_v1to2(ci->second, trx, full_key,
+                certify_and_depend_v1to2(*ci, trx, full_key,
                                          !shared_key, log_conflicts))
             {
                 return false;
@@ -202,9 +202,9 @@ certify_v1to2(galera::TrxHandle*                            trx,
             if (store_keys)
             {
                 if (gu_likely(
-                        true == ke.get_key().equal_all(ci->second->get_key())))
+                        true == ke.get_key().equal_all((*ci)->get_key())))
                 {
-                    kep = ci->second;
+                    kep = *ci;
                 }
                 else
                 {
@@ -294,7 +294,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
                                << kel->get_key() << "' from cert index";
             }
 
-            KeyEntry* const ke(ci->second);
+            KeyEntry* const ke(*ci);
             const bool full_key(i->second.first);
             const bool shared_key(i->second.second);
             bool keep(false);
@@ -352,7 +352,7 @@ cert_fail:
 
             if (ci != cert_index_.end())
             {
-                KeyEntry* ke(ci->second);
+                KeyEntry* ke(*ci);
 
                 if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
                 {
@@ -516,7 +516,7 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
     if (seqno >= position_)
     {
-        for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
         assert(cert_index_.size() == 0);
         trx_map_.clear();
     }
@@ -524,8 +524,9 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     {
         log_warn << "moving position backwards: " << position_ << " -> "
                  << seqno;
-        for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
-        for_each(trx_map_.begin(), trx_map_.end(),
+        std::for_each(cert_index_.begin(), cert_index_.end(),
+                      gu::DeleteObject());
+        std::for_each(trx_map_.begin(), trx_map_.end(),
                  Unref2nd<TrxMap::value_type>());
         cert_index_.clear();
         trx_map_.clear();
