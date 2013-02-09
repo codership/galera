@@ -18,7 +18,7 @@
 # use "rpmbuild --define 'version xxxx'" to define version
 %{!?version: %define version 0.1.x}
 %define release 1.rhel5
-%define copyright Copyright 2007-2011 Codership Oy. All rights reserved. Use is subject to license terms under GPLv3 license.
+%define copyright Copyright 2007-2013 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
@@ -27,7 +27,7 @@ Summary:       Galera: a synchronous multi-master wsrep provider (replication en
 Group:         System Environment/Libraries
 Version:       %{version}
 Release:       %{release}
-License:       GPLv3
+License:       GPLv2
 Source:        http://www.codership.com/downloads/download-mysqlgalera/
 URL:           http://www.codership.com/
 Packager:      Codership Oy
@@ -49,7 +49,7 @@ replication engine see http://www.codership.com.
 %{copyright}
 
 This software comes with ABSOLUTELY NO WARRANTY. This is free software,
-and you are welcome to modify and redistribute it under the GPLv3 license.
+and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
 #%setup -T -a 0 -c -n galera-%{version}

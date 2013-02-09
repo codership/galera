@@ -2,9 +2,10 @@ Codership Oy
 http://www.codership.com
 <info@codership.com>
 
-This is Galera - Codership's implementation of wsrep interface
-(https://launchpad.net/wsrep/). The software and other files in this directory
-unless otherwise noted are distributed under GPLv3, see COPYING for details.
+This is Galera replication - Codership's implementation of the write set 
+replication (wsrep) interface (https://launchpad.net/wsrep/). The software and 
+other files in this directory unless otherwise noted are distributed under 
+GPLv2, see COPYING for details.
 
 
 BUILDING - general
