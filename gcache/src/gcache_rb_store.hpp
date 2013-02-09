@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -8,9 +8,10 @@
 #define _gcache_rb_store_hpp_
 
 #include "gcache_memops.hpp"
-#include "gcache_fd.hpp"
-#include "gcache_mmap.hpp"
 #include "gcache_bh.hpp"
+
+#include "gu_fdesc.hpp"
+#include "gu_mmap.hpp"
 
 #include <string>
 #include <map>
@@ -41,9 +42,9 @@ namespace gcache
 
         ssize_t size      () const throw() { return size_cache_ ; }
 
-        ssize_t rb_size   () const throw() { return fd_.get_size(); }
+        ssize_t rb_size   () const throw() { return fd_.size(); }
 
-        const std::string& rb_name() const throw() { return fd_.get_name(); }
+        const std::string& rb_name() const throw() { return fd_.name(); }
 
         void  reset();
 
@@ -63,20 +64,20 @@ namespace gcache
         static ssize_t const PREAMBLE_LEN = 1024;
         static ssize_t const HEADER_LEN = 32;
 
-        FileDescriptor  fd_;
-        MMap            mmap_;
-        bool            open_;
-        char*     const preamble_; // ASCII text preamble
-        int64_t*  const header_;   // cache binary header
-        uint8_t*  const start_;    // start of cache area
-        uint8_t*  const end_;      // first byte after cache area
-        uint8_t*        first_;    // pointer to the first (oldest) buffer
-        uint8_t*        next_;     // pointer to the next free space
+        gu::FileDescriptor fd_;
+        gu::MMap           mmap_;
+        bool               open_;
+        char*        const preamble_; // ASCII text preamble
+        int64_t*     const header_;   // cache binary header
+        uint8_t*     const start_;    // start of cache area
+        uint8_t*     const end_;      // first byte after cache area
+        uint8_t*           first_;    // pointer to the first (oldest) buffer
+        uint8_t*           next_;     // pointer to the next free space
 
-        ssize_t   const size_cache_;
-        ssize_t         size_free_;
-        ssize_t         size_used_;
-        ssize_t         size_trail_;
+        ssize_t      const size_cache_;
+        ssize_t            size_free_;
+        ssize_t            size_used_;
+        ssize_t            size_trail_;
 
 //        long long       mallocs_;
 //        long long       reallocs_;

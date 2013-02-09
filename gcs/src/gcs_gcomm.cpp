@@ -443,7 +443,7 @@ void GCommConn::run()
         }
         catch (gu::Exception& e)
         {
-            log_error << "exception from gcomm, backend must be restarted:"
+            log_error << "exception from gcomm, backend must be restarted: "
                       << e.what();
             // Commented out due to Backtrace() not producing proper
             // backtraces.

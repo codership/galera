@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2013 Codership Oy <info@codership.com>
 
 /**
  * @file Functions to dump buffer contents in a readable form
@@ -6,7 +6,9 @@
  * $Id$
  */
 
-#include "gu_print_buf.h"
+#include "gu_hexdump.h"
+
+#include "gu_macros.h"
 
 #define GU_ASCII_0  0x30
 #define GU_ASCII_10 0x3a
@@ -15,40 +17,40 @@
 #define GU_ASCII_A_10 (GU_ASCII_A - GU_ASCII_10)
 #define GU_ASCII_a_10 (GU_ASCII_a - GU_ASCII_10)
 
-static inline int
+static GU_FORCE_INLINE int
 _hex_code (uint8_t const x)
 {
-    return (x + GU_ASCII_0 + (x > 9)*GU_ASCII_A_10);
+    return (x + GU_ASCII_0 + (x > 9)*GU_ASCII_a_10);
 }
 
-static inline void
+static GU_FORCE_INLINE void
 _write_byte_binary (char* const str, uint8_t const byte)
 {
     str[0] = _hex_code(byte >> 4);
     str[1] = _hex_code(byte & 0x0f);
 }
 
-#define GU_ASCII_ALPHA_START 0x20 /* ' ' */
-#define GU_ASCII_ALPHA_END   0x7e /* '~' */
-
-static inline void
+static GU_FORCE_INLINE void
 _write_byte_alpha (char* const str, uint8_t const byte)
 {
-    if (byte >= GU_ASCII_ALPHA_START && byte <= GU_ASCII_ALPHA_END)
-    {
-        str[0] = (char)byte;
-        str[1] = '.';
-    }
-    else
-    {
-        _write_byte_binary (str, byte);
-    }
+    str[0] = (char)byte;
+    str[1] = '.';
+}
+
+#define GU_ASCII_ALPHA_START    0x20 /* ' ' */
+#define GU_ASCII_ALPHA_END      0x7e /* '~' */
+#define GU_ASCII_ALPHA_INTERVAL (GU_ASCII_ALPHA_END - GU_ASCII_ALPHA_START)
+
+static GU_FORCE_INLINE bool
+_byte_is_alpha (uint8_t const byte)
+{
+    return (byte - GU_ASCII_ALPHA_START <= GU_ASCII_ALPHA_INTERVAL);
 }
 
 /*! Dumps contents of the binary buffer into a readable form */
 void
-gu_print_buf(const void* buf, ssize_t const buf_size,
-             char* str, ssize_t str_size, bool alpha)
+gu_hexdump(const void* buf, ssize_t const buf_size,
+           char* str, ssize_t str_size, bool alpha)
 {
     uint8_t* b = (uint8_t*)buf;
     ssize_t i;
@@ -57,7 +59,7 @@ gu_print_buf(const void* buf, ssize_t const buf_size,
 
     for (i = 0; i < buf_size && str_size > 1;)
     {
-        if (alpha)
+        if (alpha && _byte_is_alpha (b[i]))
             _write_byte_alpha  (str, b[i]);
         else
             _write_byte_binary (str, b[i]);
@@ -69,7 +71,7 @@ gu_print_buf(const void* buf, ssize_t const buf_size,
         if (0 == (i % 4) && str_size > 0 && i < buf_size)
         {
             /* insert space after every 4 bytes and newline after every 32 */
-            str[0] = (i % 32) ? ' ' : '\n';
+            str[0] = (i % GU_HEXDUMP_BYTES_PER_LINE) ? ' ' : '\n';
             str_size--;
             str++;
         }

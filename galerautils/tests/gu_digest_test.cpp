@@ -11,11 +11,12 @@
  * $Id$
  */
 
-#include "gu_hash_test.h"
+#include "../src/gu_digest.hpp"
 
-#include "../src/gu_hash.h"
-#include "../src/gu_log.h"
-#include "../src/gu_hexdump.h"
+#include "gu_digest_test.hpp"
+
+#include "../src/gu_hexdump.hpp"
+#include "../src/gu_logger.hpp"
 
 /* checks equivalence of two buffers, returns true if check fails and logs
  * buffer contents. */
@@ -24,19 +25,15 @@ check (const void* const exp, const void* const got, ssize_t size)
 {
     if (memcmp (exp, got, size))
     {
-        ssize_t str_size = size * 2.2 + 1;
-        char c[str_size], r[str_size];
-
-        gu_hexdump (exp, size, c, sizeof(c), false);
-        gu_hexdump (got, size, r, sizeof(r), false);
-
-        gu_info ("expected hash value:\n%s\nfound:\n%s\n", c, r);
+        log_info << "expected hash value:\n" << gu::Hexdump(exp, size)
+                 << "\nfound:\n" << gu::Hexdump(got, size) << "\n";
 
         return true;
     }
 
     return false;
 }
+
 
 static const char test_msg[2048] = { 0, };
 
@@ -55,27 +52,62 @@ static const uint8_t gu_hash32_check[4]  = { 0xFA,0x2C,0x78,0x67 };
 /* Tests partial hashing functions */
 START_TEST (gu_hash_test)
 {
-    gu_hash_t h;
+    gu::Hash hash_one;
 
-    gu_hash_init(&h);
-    gu_hash_append(&h, test_msg, GU_HASH_TEST_LENGTH);
+    hash_one.append(test_msg, GU_HASH_TEST_LENGTH);
 
-    uint8_t res128[16];
-    gu_hash_get128 (&h, res128);
-    fail_if (check (gu_hash128_check, res128, sizeof(res128)),
-             "gu_hash_get128() failed.");
+    uint8_t res128_one[16];
+    hash_one.gather(res128_one);
+    fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
+             "gu::Hash::gather() failed in single mode.");
 
-    uint64_t res64 = gu_hash_get64(&h);
+    hash_one.serialize_to(res128_one, sizeof(res128_one));
+    fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
+             "gu::Hash::serialize_to() failed in single mode.");
+
+    gu::Hash::digest(test_msg, GU_HASH_TEST_LENGTH, res128_one);
+    fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
+             "gu::Hash::digest() failed.");
+
+    gu::Hash hash_multi;
+
+    int off = 0;
+    hash_multi.append(test_msg, 16);
+
+    off += 16;
+    hash_multi.append(test_msg + off, 15);
+
+    off += 15;
+    hash_multi.append(test_msg + off, 7);
+
+    off += 7;
+    hash_multi.append(test_msg + off, 5);
+
+    off += 5;
+    fail_if (off != GU_HASH_TEST_LENGTH);
+
+    uint8_t res128_multi[16];
+    hash_multi.gather(res128_multi);
+    fail_if (check (gu_hash128_check, res128_multi, sizeof(res128_multi)),
+             "gu::Hash::gather() failed in multi mode.");
+
+    hash_multi.serialize_to(res128_multi, sizeof(res128_multi));
+    fail_if (check (gu_hash128_check, res128_multi, sizeof(res128_multi)),
+             "gu::Hash::serialize_to() failed in multi mode.");
+
+    uint64_t res64;
+    hash_multi.gather(res64);
     fail_if (gu_hash64(test_msg, GU_HASH_TEST_LENGTH) != res64);
     res64 = gu_le64(res64);
     fail_if (check (gu_hash64_check, &res64, sizeof(res64)),
-             "gu_hash_get64() failed.");
+             "gu::Hash::gather<uint64_t>() failed.");
 
-    uint32_t res32 = gu_hash_get32(&h);
+    uint32_t res32;
+    hash_one(res32);
     fail_if (gu_hash32(test_msg, GU_HASH_TEST_LENGTH) != res32);
     res32 = gu_le32(res32);
     fail_if (check (gu_hash32_check, &res32, sizeof(res32)),
-             "gu_hash_get32() failed.");
+             "gu::Hash::gather<uint32_t>() failed.");
 }
 END_TEST
 
@@ -123,59 +155,61 @@ START_TEST (gu_fast_hash_test)
 {
     uint8_t res128[16];
 
-    gu_fast_hash128 (test_msg, 0, res128);
-    fail_if (check (fast_hash128_check0, res128, sizeof(res128)));
+    gu::FastHash::digest (test_msg, 0,    res128);
+    fail_if (check (fast_hash128_check0,    res128, sizeof(res128)));
 
-    gu_fast_hash128 (test_msg, 511, res128);
-    fail_if (check (fast_hash128_check511, res128, sizeof(res128)));
+    gu::FastHash::digest (test_msg, 511,  res128);
+    fail_if (check (fast_hash128_check511,  res128, sizeof(res128)));
 
-    gu_fast_hash128 (test_msg, 512, res128);
-    fail_if (check (fast_hash128_check512, res128, sizeof(res128)));
+    gu::FastHash::digest (test_msg, 512,  res128);
+    fail_if (check (fast_hash128_check512,  res128, sizeof(res128)));
 
-    gu_fast_hash128 (test_msg, 2011, res128);
+    gu::FastHash::digest (test_msg, 2011, res128);
     fail_if (check (fast_hash128_check2011, res128, sizeof(res128)));
 
     uint64_t res64;
 
-    res64 = gu_fast_hash64 (test_msg, 0); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg, 0); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check0, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 15); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg,15); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check15, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 16); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg,16); res64 = gu_le64(res64);
     fail_if (check (fast_hash64_check16, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 511); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg,511); res64 =gu_le64(res64);
     fail_if (check (fast_hash64_check511, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 512); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg,512); res64 =gu_le64(res64);
     fail_if (check (fast_hash64_check512, &res64, sizeof(res64)));
 
-    res64 = gu_fast_hash64 (test_msg, 2011); res64 = gu_le64(res64);
+    res64 = gu::FastHash::digest<uint64_t>(test_msg,2011);res64 =gu_le64(res64);
     fail_if (check (fast_hash64_check2011, &res64, sizeof(res64)));
 
     uint32_t res32;
 
-    res32 = gu_fast_hash32 (test_msg, 0); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg, 0); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check0, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 31); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg,31); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check31, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 32); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg,32); res32 = gu_le32(res32);
     fail_if (check (fast_hash32_check32, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 511); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg,511); res32 =gu_le32(res32);
     fail_if (check (fast_hash32_check511, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 512); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg,512); res32 =gu_le32(res32);
     fail_if (check (fast_hash32_check512, &res32, sizeof(res32)));
 
-    res32 = gu_fast_hash32 (test_msg, 2011); res32 = gu_le32(res32);
+    res32 = gu::FastHash::digest<uint32_t>(test_msg,2011); res32=gu_le32(res32);
     fail_if (check (fast_hash32_check2011, &res32, sizeof(res32)));
 }
 END_TEST
+
+#if SKIP_TABLE_FUNCTIONS
 
 /* Tests table hash functions:
  * - for 64-bit platforms table hash should be identical to fast 64-bit hash,
@@ -236,15 +270,17 @@ END_TEST
 #  error "Unsupported word size"
 #endif
 
-Suite *gu_hash_suite(void)
+#endif // SKIP_TABLE_FUNCTIONS
+
+Suite *gu_digest_suite(void)
 {
-  Suite *s  = suite_create("Galera hash");
+  Suite *s  = suite_create("gu::Hash");
   TCase *tc = tcase_create("gu_hash");
 
   suite_add_tcase (s, tc);
   tcase_add_test  (tc, gu_hash_test);
   tcase_add_test  (tc, gu_fast_hash_test);
-  tcase_add_test  (tc, gu_table_hash_test);
+//  tcase_add_test  (tc, gu_table_hash_test);
 
   return s;
 }

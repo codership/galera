@@ -5,8 +5,8 @@
 //!
 // @file Variable-length quantity encoding for integers
 //
-// Unsigned integers: Implementation uses using unsigned LEB128, see for example
-// http://en.wikipedia.org/wiki/LEB128.
+// Unsigned integers: Implementation uses using unsigned LEB128,
+// see for example http://en.wikipedia.org/wiki/LEB128.
 //
 // Signed integers: TODO
 //
@@ -91,6 +91,14 @@ namespace gu
 
         return offset;
 #endif
+    }
+
+    template <typename UI>
+    inline size_t uleb128_encode(UI       value,
+                                 byte_t*  buf,
+                                 size_t   buflen)
+    {
+        return uleb128_encode(value, buf, buflen, 0);
     }
 
     //!
@@ -233,6 +241,14 @@ namespace gu
 
         return offset;
 #endif /* GU_VLQ_NEW */
+    }
+
+    template <typename UI>
+    inline size_t uleb128_decode(const byte_t* buf,
+                                 size_t        buflen,
+                                 UI&           value)
+    {
+        return uleb128_decode(buf, buflen, 0, value);
     }
 }
 
