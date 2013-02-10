@@ -11,6 +11,7 @@
 #include "gu_serialize.hpp"
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 #include "gu_vlq.hpp"
 
 #include <deque>

@@ -6,6 +6,8 @@ libgaleraxx_env = env.Clone()
 libgaleraxx_srcs = [
     'mapped_buffer.cpp',
     'write_set.cpp',
+#    'write_set_ng.cpp',
+    'data_set.cpp',
     'trx_handle.cpp',
     'key_entry.cpp',
     'wsdb.cpp',
