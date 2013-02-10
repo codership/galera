@@ -102,7 +102,7 @@ START_TEST (ver0)
     TestRecord rout0(128,  "abc0");
     TestRecord rout1(128,  "abc1");
     TestRecord rout2(128,  "012345");
-    TestRecord rout3(128,  "def");
+    TestRecord rout3(128,  "defghij");
     TestRecord rout4(3*MB, "klm");
     TestRecord rout5(1*MB, "qpr");
 
@@ -144,32 +144,31 @@ START_TEST (ver0)
     fail_if (3 != rset_out.page_count(),
              "Expected %d pages, found %zu", 3, rset_out.page_count());
 
-    // this should be allocated inside the current page
-    rset_out.append (rout3.buf(), rout3.serial_size());
+    //***** test partial record appending *****//
+    // this should be allocated inside the current page.
+    rset_out.append (rout3.buf(), 3);
+    fail_if (3 != rset_out.page_count());
+
+    // this should trigger a new page, since not stored
+    rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false, false);
     offset += rout3.serial_size();
     fail_if (rset_out.size() != offset);
 
-    fail_if (3 != rset_out.page_count());
+    fail_if (4 != rset_out.page_count());
 
     // this should trigger new page, because won't fit in the current page
     rset_out.append (rout4);
     offset += rout4.serial_size();
     fail_if (rset_out.size() != offset);
 
-    fail_if (4 != rset_out.page_count());
+    fail_if (5 != rset_out.page_count());
 
     // this should trigger new page, because 4MB RAM limit exceeded
     rset_out.append (rout5);
     offset += rout5.serial_size();
     fail_if (rset_out.size() != offset);
 
-    /* in total there should be 5 pages:
-     * 0) rout0
-     * 1) rout1
-     * 2) rout2
-     * 3) rout4
-     * 4) rout5 */
-    fail_if (5 != rset_out.page_count(),
+    fail_if (6 != rset_out.page_count(),
              "Expected %d pages, found %zu", 5, rset_out.page_count());
 
     fail_if (records.size() != size_t(rset_out.count()));
@@ -213,7 +212,7 @@ START_TEST (ver0)
         switch (i)
         {
         case 3:
-            k++; // 3rd page starts with 4th record
+            break; // 4th page is partial 4th record
         case 1:
         case 2:
             fail_if (::strcmp(str, records[k]->c_str()),
@@ -221,7 +220,7 @@ START_TEST (ver0)
                      i, str, records[k]->c_str());
         }
 
-        if (i == 1 || i == 3) {
+        if (i == 1 || i == 4) {
             fail_if (size != records[k]->serial_size(),
                      "Buffer %zu: appending size %zd, expected %zd",
                      i, size, records[k]->serial_size());

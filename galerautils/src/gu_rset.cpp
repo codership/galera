@@ -20,7 +20,7 @@
 namespace gu
 {
 
-ssize_t
+void
 RecordSetOutBase::post_alloc (bool const          new_page,
                               const byte_t* const ptr,
                               ssize_t const       size)
@@ -36,19 +36,15 @@ RecordSetOutBase::post_alloc (bool const          new_page,
     }
 
     size_ += size;
-
-    return size_;
 }
 
-ssize_t
+void
 RecordSetOutBase::post_append (bool const          new_page,
                                const byte_t* const ptr,
                                ssize_t const       size)
 {
     check_.append (ptr, size);
-    count_++;
-
-    return post_alloc (new_page, ptr, size);
+    post_alloc (new_page, ptr, size);
 }
 
 

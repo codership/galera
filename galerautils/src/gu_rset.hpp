@@ -85,7 +85,7 @@ protected:
                       ssize_t            max_size = 0x7fffffff);
 
     /*! return total size of a RecordSet */
-#if 1
+#if 0 // this has code duplication
     template <class R>
     ssize_t append_base (const R& record)
     {
@@ -104,12 +104,13 @@ protected:
         assert (ssize == size);
 
         prev_stored_ = true;
+        count++;
 
         return post_append (new_page, ptr, ssize);
     }
 
     ssize_t append_base (const void* const src, ssize_t const size,
-                         bool const store = true)
+                         bool const store = true, bool const new_record = true)
     {
         assert (src);
         assert (size);
@@ -130,11 +131,12 @@ protected:
         }
 
         prev_stored_ = store;
+        count_ += new_record;
 
         return post_append (new_page, ptr, size);
     }
 
-#else // OLD
+#else // OLD - the following has no code duplication
 
     /* this is to emulate partial specialization of function template through
      * overloading by parameter */
@@ -185,9 +187,11 @@ protected:
     }
 
     template <class R, bool has_ptr>
-    ssize_t append_base (const R& record, bool const store = true)
+    size_t append_base (const R& record,
+                        bool const store = true,
+                        bool const new_record = true)
     {
-        ssize_t const size(record.serial_size());
+        ssize_t const size (record.serial_size());
 
         if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
 
@@ -197,8 +201,11 @@ protected:
         process (record, ptr, new_page, size, store, HasPtr<has_ptr>());
 
         prev_stored_ = store;
+        count_ += new_record;
 
-        return post_append (new_page, ptr, size);
+        post_append (new_page, ptr, size);
+
+        return size;
     }
 
 #endif /* OLD */
@@ -210,11 +217,11 @@ private:
     std::vector<Buf> bufs_;
     bool             prev_stored_;
 
-    ssize_t
+    void
     post_alloc (bool const new_page, const byte_t* const ptr,
                 ssize_t const size);
 
-    ssize_t
+    void
     post_append (bool const new_page, const byte_t* const ptr,
                  ssize_t const size);
 
@@ -240,23 +247,25 @@ public:
 
     size_t append (const R& r)
     {
-//        return append_base<R, false> (r);
-        return append_base<R> (r);
+        return append_base<R, false> (r);
+//        return append_base<R> (r);
     }
 
     ssize_t append (const void* const src, ssize_t const size,
-                    bool const store = true)
+                    bool const store = true, bool const new_record = true)
     {
         assert (src);
         assert (size);
 
-//        BufWrap bw (src, size);
-//        return append_base<BufWrap, true> (bw, store);
-        return append_base (src, size, store);
+        BufWrap bw (src, size);
+        return append_base<BufWrap, true> (bw, store, new_record);
+//        return append_base (src, size, store);
     }
 
 private:
 
+    /* a wrapper class to represent ptr and size as a serializable object:
+     * simply defines serial_size(), ptr() and serialize_to() methods */
     class BufWrap
     {
         const byte_t* const ptr_;
@@ -270,6 +279,7 @@ private:
 
         size_t serial_size() const { return size_; }
         const byte_t* ptr()  const { return ptr_; }
+
         size_t serialize_to (byte_t* const dst, size_t) const
         {
             ::memcpy (dst, ptr_, size_);
