@@ -20,7 +20,7 @@
 #include "gu_macros.h"
 
 #define GU_VLQ_CHECKS
-//#define GU_VLQ_ALEX
+#define GU_VLQ_ALEX
 
 namespace gu
 {
@@ -148,7 +148,7 @@ namespace gu
             if (gu_unlikely(offset >= buflen || left_bits < 7))
                 uleb128_decode_checks (buf, buflen, offset, left_bits);
 #endif
-            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
+            value |= (UI(buf[offset] & 0x7f) << shift);
         }
 
         return offset + 1;
@@ -158,7 +158,7 @@ namespace gu
 
         while (true)
         {
-            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
+            value |= (UI(buf[offset] & 0x7f) << shift);
             if (gu_likely((buf[offset] & 0x80) == 0))
             {
                 // last byte

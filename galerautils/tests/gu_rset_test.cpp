@@ -247,14 +247,14 @@ START_TEST (ver0)
              << gu::Hexdump(in_buf.data(), 32, false) << '\n'
              << gu::Hexdump(in_buf.data(), 32, true);
 
-    gu::RecordSetIn const rset_in(in_buf.data(), in_buf.size());
+    gu::RecordSetIn<TestRecord> const rset_in(in_buf.data(), in_buf.size());
 
     fail_if (rset_in.size()  != rset_out.size());
     fail_if (rset_in.count() != rset_out.count());
 
     for (ssize_t i = 0; i < rset_in.count(); ++i)
     {
-        TestRecord const rin(rset_in.next<TestRecord>());
+        TestRecord const rin(rset_in.next());
         fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
                  i, records[i]->c_str(), rin.c_str());
     }

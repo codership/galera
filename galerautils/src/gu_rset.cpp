@@ -302,7 +302,7 @@ RecordSet::RecordSet (const byte_t* const ptr, ssize_t const size)
 {}
 
 void
-RecordSetIn::parse_header_v0 (size_t const size)
+RecordSetInBase::parse_header_v0 (size_t const size)
 {
     assert (size > 1);
 
@@ -362,9 +362,9 @@ RecordSetIn::parse_header_v0 (size_t const size)
     }
 }
 
-RecordSetIn::RecordSetIn (const byte_t* const ptr,
-                          size_t const        size,
-                          bool const          check_first)
+RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
+                                  size_t const        size,
+                                  bool const          check_first)
     :
     RecordSet   (ptr, size),
     head_       (ptr),

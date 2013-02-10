@@ -292,18 +292,20 @@ private:
 };
 
 /*! class to recover records from a buffer */
-class RecordSetIn : public RecordSet
+class RecordSetInBase : public RecordSet
 {
 public:
 
-    RecordSetIn (const byte_t* buf,   /* pointer to the beginning of buffer */
-                 size_t        size,  /* total size of buffer */
-                 bool          check_first = true); /* checksum now */
+    RecordSetInBase (const byte_t* buf,/* pointer to the beginning of buffer */
+                     size_t        size,             /* total size of buffer */
+                     bool          check_first = true);      /* checksum now */
 
     void rewind() const { next_ = begin_; }
 
+protected:
+
     template <class R>
-    void next(Buf& n) const
+    void next_base (Buf& n) const
     {
         n.ptr  = next_;
         n.size = R::serial_size(n.ptr, size_ - next_);
@@ -311,7 +313,7 @@ public:
     }
 
     template <class R>
-    R next() const
+    R next_base () const
     {
         R rec(head_ + next_, size_ - next_);
         next_ += rec.serial_size();
@@ -330,7 +332,7 @@ private:
     void parse_header_v0 (size_t size);
 
     /* shallow copies here - we're not allocating anything */
-    RecordSetIn (const RecordSetIn& r)
+    RecordSetInBase (const RecordSetInBase& r)
     :
     RecordSet   (r),
     head_       (r.head_),
@@ -339,7 +341,7 @@ private:
     next_       (r.next_)
     {}
 
-    RecordSetIn& operator= (const RecordSetIn r);
+    RecordSetInBase& operator= (const RecordSetInBase r);
 #if 0
     {
         std::swap(head_,        r.head_);
@@ -348,8 +350,23 @@ private:
         std::swap(next_,        r.next_);
     }
 #endif
+}; /* class RecordSetInBase */
 
-};
+template <class R>
+class RecordSetIn : public RecordSetInBase
+{
+public:
+
+    RecordSetIn (const byte_t* buf,/* pointer to the beginning of buffer */
+                 size_t        size,             /* total size of buffer */
+                 bool          check_first = true)       /* checksum now */
+        : RecordSetInBase (buf, size, check_first)
+    {}
+
+    void next (Buf& n) const { next_base<R> (n); }
+
+    R next () const { return next_base<R> (); }
+}; /* class RecordSetIn */
 
 } /* namespace gu */
 
