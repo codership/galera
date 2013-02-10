@@ -33,6 +33,7 @@ libgalerautilsxx_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
 
 # C++ part
 libgalerautilsxx_sources = [
+    'gu_vlq.cpp',
     'gu_datetime.cpp',
     'gu_exception.cpp',
     'gu_logger.cpp',
