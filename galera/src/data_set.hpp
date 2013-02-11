@@ -18,21 +18,16 @@ namespace galera
 
         enum Version
         {
-            VER0
+            EMPTY = 0,
+            VER1
         };
 
-        static Version const MAX_VER = VER0;
+        static Version const MAX_VER = VER1;
 
         static Version
         ws_to_ds_version (int ver)
         {
-            return VER0;
-        }
-
-        static gu::RecordSet::Version
-        ds_to_rs_version (Version ver)
-        {
-            return gu::RecordSet::VER0;
+            return VER1;
         }
 
         class RecordOut {};
@@ -80,8 +75,8 @@ namespace galera
             :
             RecordSetOut (
                 base_name,
-                gu::RecordSet::CHECK_MMH128,
-                DataSet::ds_to_rs_version(DataSet::ws_to_ds_version(version))
+                check_type      (DataSet::ws_to_ds_version(version)),
+                ds_to_rs_version(DataSet::ws_to_ds_version(version))
                 ),
             version_(DataSet::ws_to_ds_version(version))
         {}
@@ -109,6 +104,30 @@ namespace galera
 
         // depending on version we may pack data differently
         DataSet::Version version_;
+
+        static gu::RecordSet::CheckType
+        check_type (DataSet::Version ver)
+        {
+            switch (ver)
+            {
+            case DataSet::EMPTY: break; /* Can't create EMPTY DataSetOut */
+            case DataSet::VER1:  return gu::RecordSet::CHECK_MMH128;
+            }
+            throw;
+        }
+
+        static gu::RecordSet::Version
+        ds_to_rs_version (DataSet::Version ver)
+        {
+            switch (ver)
+            {
+            case DataSet::EMPTY: break; /* Can't create EMPTY DataSetOut */
+            case DataSet::VER1:  return gu::RecordSet::VER1;
+            }
+            throw;
+        }
+
+
     };
 
     class DataSetIn : public gu::RecordSetIn<DataSet::RecordIn>

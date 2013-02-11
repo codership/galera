@@ -116,7 +116,7 @@ START_TEST (ver0)
 
     gu::RecordSetOut<TestRecord> rset_out("gu_rset_test",
                               gu::RecordSet::CHECK_MMH64,
-                              gu::RecordSet::VER0);
+                              gu::RecordSet::VER1);
 
     size_t offset(rset_out.size());
 
@@ -258,6 +258,23 @@ START_TEST (ver0)
         fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
                  i, records[i]->c_str(), rin.c_str());
     }
+
+    /* Test checksum method: */
+    fail_if (rset_in.checksum());
+
+    /* Try some data corruption: swap a bit */
+    in_buf[3] ^= 1;
+    fail_unless (rset_in.checksum());
+}
+END_TEST
+
+START_TEST (empty)
+{
+    gu::RecordSetIn<TestRecord> const rset_in(0, 1);
+
+    fail_if (0 != rset_in.size());
+    fail_if (0 != rset_in.count());
+    fail_if (false != rset_in.checksum());
 }
 END_TEST
 
@@ -265,6 +282,7 @@ Suite* gu_rset_suite ()
 {
     TCase* t = tcase_create ("RecordSet");
     tcase_add_test (t, ver0);
+    tcase_add_test (t, empty);
     tcase_set_timeout(t, 60);
 
     Suite* s = suite_create ("gu::RecordSet");

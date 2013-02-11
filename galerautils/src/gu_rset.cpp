@@ -62,8 +62,8 @@ static int check_size (RecordSet::CheckType const ct)
     abort();
 }
 
-#define VER0_CRC_SIZE sizeof(uint32_t)
 
+#define VER1_CRC_SIZE sizeof(uint32_t)
 
 static int
 header_size_max_v0()
@@ -72,7 +72,7 @@ header_size_max_v0()
         1 + /* version + checksum type        */
         9 + /* max payload size in vlq format */
         9 + /* max record count in vlq format */
-        VER0_CRC_SIZE;  /* header checksum    */
+        VER1_CRC_SIZE;  /* header checksum    */
 }
 
 
@@ -81,11 +81,13 @@ RecordSetOutBase::header_size_max() const
 {
     switch (version_)
     {
-    case VER0:
+    case EMPTY: assert (0);
+        break;
+    case VER1:
         return header_size_max_v0();
     }
 
-    log_fatal << "Non-existing RecordSet::Version value: " << version_;
+    log_fatal << "Unsupported RecordSet::Version value: " << version_;
     abort();
 }
 
@@ -104,7 +106,7 @@ header_size_v0(ssize_t size, ssize_t const count)
         int new_hsize = 1 +      /* version + checksum type */
                         uleb128_size<size_t>(size) +  /* size  in vlq format */
                         uleb128_size<size_t>(count) + /* count in vlq format */
-                        VER0_CRC_SIZE;                /* header checksum */
+                        VER1_CRC_SIZE;                /* header checksum */
 
         assert (new_hsize <= hsize);
 
@@ -128,11 +130,13 @@ RecordSetOutBase::header_size() const
 {
     switch (version_)
     {
-    case 0:
+    case EMPTY: assert(0);
+        break;
+    case VER1:
         return header_size_v0 (size_, count_);
     }
 
-    log_fatal << "Non-existing RecordSet::Version value: " << version_;
+    log_fatal << "Unsupported RecordSet::Version value: " << version_;
     abort();
 }
 
@@ -167,13 +171,13 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
     *(reinterpret_cast<uint32_t*>(buf + off)) = htog(crc);
 //    log_debug << "writing header CRC: " << std::showbase << std::internal
 //              << std::hex << std::setfill('0') << std::setw(10) << crc;
-    off += VER0_CRC_SIZE;
+    off += VER1_CRC_SIZE;
 
     /* append payload checksum */
     if (check_type_ != CHECK_NONE)
     {
         assert (csize <= size - off);
-        // check_.append (buf + offset, off - offset);
+        check_.append (buf + hdr_offset, off - hdr_offset); /* append header */
         check_.serialize_to (buf + off, csize);
     }
 
@@ -208,8 +212,7 @@ RecordSet::RecordSet (Version ver, CheckType const ct)
     version_   (ver),
     check_type_(ct),
     size_      (0),
-    count_     (0),
-    check_     ()
+    count_     (0)
 {
     if (version_ > MAX_VER)
     {
@@ -226,6 +229,7 @@ RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
     RecordSet   (version, ct),
     max_size_   (max_size),
     alloc_      (base_name),
+    check_      (),
     bufs_       (),
     prev_stored_(true)
 {
@@ -252,15 +256,17 @@ header_version (const byte_t* buf, ssize_t const size)
 
     switch (ver)
     {
-    case 0:  return RecordSet::VER0;
+    case 0: assert(0); return RecordSet::EMPTY;
+    case 1: return RecordSet::VER1;
     }
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
     throw;
 }
 
+
 static inline RecordSet::CheckType
-ver0_check_type (const byte_t* buf, ssize_t const size)
+ver1_check_type (const byte_t* buf, ssize_t const size)
 {
     assert (size > 0);
 
@@ -278,6 +284,7 @@ ver0_check_type (const byte_t* buf, ssize_t const size)
     throw;
 }
 
+
 static inline RecordSet::CheckType
 header_check_type(RecordSet::Version ver, const byte_t* ptr, ssize_t const size)
 {
@@ -285,24 +292,27 @@ header_check_type(RecordSet::Version ver, const byte_t* ptr, ssize_t const size)
 
     switch (ver)
     {
-    case RecordSet::VER0: return ver0_check_type (ptr, size);
+    case RecordSet::EMPTY: assert(0); return RecordSet::CHECK_NONE;
+    case RecordSet::VER1:  return ver1_check_type (ptr, size);
     }
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
     throw;
 }
 
+
 RecordSet::RecordSet (const byte_t* const ptr, ssize_t const size)
     :
-    version_   (header_version (ptr, size)),
-    check_type_(header_check_type (version_, ptr, size)),
-    size_      (-1),
-    count_     (-1),
-    check_     ()
+    version_   ((ptr && size) ? header_version (ptr, size) : EMPTY),
+    check_type_(version_ != EMPTY ?
+                header_check_type (version_, ptr, size) : CHECK_NONE),
+    size_      (0),
+    count_     (0)
 {}
 
+
 void
-RecordSetInBase::parse_header_v0 (size_t const size)
+RecordSetInBase::parse_header_v1 (size_t const size)
 {
     assert (size > 1);
 
@@ -339,28 +349,45 @@ RecordSetInBase::parse_header_v0 (size_t const size)
             << "\ncomputed: " << crc_comp
             << "\nfound:    " << crc_orig << std::dec;
     }
-    off += VER0_CRC_SIZE;
+    off += VER1_CRC_SIZE;
 
+    /* checksum is between header and records */
+    begin_ = off + check_size(check_type_);
+}
+
+
+/* returns false if checksum matched and true if failed */
+bool
+RecordSetInBase::checksum() const
+{
     int const cs(check_size(check_type_));
 
-    begin_ = off + cs;
-
-    if (cs > 0 && check_first_) /* checksum records */
+    if (cs > 0) /* checksum records */
     {
-        check_.append (head_ + begin_, size_ - begin_); /* records */
+        Hash check;
 
-        std::vector<byte_t> checksum (cs, 0);
-        check_.serialize_to (checksum.data(), cs);
+        check.append (head_ + begin_, size_ - begin_); /* records */
+        check.append (head_, begin_ - cs);             /* header  */
 
-        if (gu_unlikely(memcmp (checksum.data(), head_ + off, cs)))
+        std::vector<byte_t> const result (cs, 0);
+        check.serialize_to (const_cast<byte_t*>(result.data()), cs);
+
+        const byte_t* const stored_checksum(head_ + begin_ - cs);
+
+        if (gu_unlikely(memcmp (result.data(), stored_checksum, cs)))
         {
-            gu_throw_error (EINVAL)
+            log_error
                 << "RecordSet checksum does not match:\n"
-                << "computed: "   << gu::Hexdump(head_ + off, cs)
-                << "\nfound:    " << gu::Hexdump(checksum.data(), cs);
+                << "stored:   "   << gu::Hexdump(stored_checksum, cs)
+                << "\ncomputed: " << gu::Hexdump(result.data(), cs);
+
+            return true;
         }
     }
+
+    return false;
 }
+
 
 RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
                                   size_t const        size,
@@ -368,13 +395,18 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
     :
     RecordSet   (ptr, size),
     head_       (ptr),
-    check_first_(check_first),
     begin_      (-1),
     next_       (begin_)
 {
     switch (version_)
     {
-    case VER0: parse_header_v0(size);
+    case EMPTY: return;
+    case VER1:  parse_header_v1(size);
+    }
+
+    if (check_first && checksum())
+    {
+        gu_throw_error (EINVAL) << "RecordSet checksum failed.";
     }
 
     next_ = begin_;

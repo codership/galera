@@ -28,10 +28,11 @@ public:
 
     enum Version
     {
-        VER0 = 0
+        EMPTY = 0,
+        VER1
     };
 
-    static Version const MAX_VER = VER0;
+    static Version const MAX_VER = VER1;
 
     enum CheckType
     {
@@ -54,7 +55,6 @@ protected:
 
     ssize_t size_;
     ssize_t count_;
-    Hash    check_;
 
     /* ctor for RecordSetOut */
     RecordSet (Version const version, CheckType const ct);
@@ -214,6 +214,7 @@ private:
 
     ssize_t const    max_size_;
     Allocator        alloc_;
+    Hash             check_;
     std::vector<Buf> bufs_;
     bool             prev_stored_;
 
@@ -302,6 +303,8 @@ public:
 
     void rewind() const { next_ = begin_; }
 
+    bool checksum() const;
+
 protected:
 
     template <class R>
@@ -323,20 +326,18 @@ protected:
 private:
 
     const byte_t* const head_;        /* pointer to header        */
-    bool const          check_first_; /* checksum on construction */
     ssize_t             begin_;       /* offset to first record   */
     ssize_t mutable     next_;        /* offset to next record    */
     /* size_ is offset past all records */
 
     /* takes total size of the supplied buffer */
-    void parse_header_v0 (size_t size);
+    void parse_header_v1 (size_t size);
 
     /* shallow copies here - we're not allocating anything */
     RecordSetInBase (const RecordSetInBase& r)
     :
     RecordSet   (r),
     head_       (r.head_),
-    check_first_(r.check_first_),
     begin_      (r.begin_),
     next_       (r.next_)
     {}
@@ -345,7 +346,6 @@ private:
 #if 0
     {
         std::swap(head_,        r.head_);
-        std::swap(check_first_, r.check_first_);
         std::swap(begin,        r.begin_);
         std::swap(next_,        r.next_);
     }
