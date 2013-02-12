@@ -15,7 +15,7 @@
 using namespace std;
 using namespace galera;
 
-typedef std::vector<galera::KeyPart> KeyPartSequence;
+typedef std::vector<galera::KeyPartOS> KeyPartSequence;
 
 
 START_TEST(test_key1)
@@ -37,7 +37,7 @@ START_TEST(test_key1)
         {k4, sizeof k4 }
     };
 
-    Key key(1, kiovec, 4, 0);
+    KeyOS key(1, kiovec, 4, 0);
     size_t expected_size(0);
 
 #ifndef GALERA_KEY_VLQ
@@ -62,7 +62,7 @@ START_TEST(test_key1)
 
     gu::Buffer buf(galera::serial_size(key));
     serialize(key, &buf[0], buf.size(), 0);
-    Key key2(1);
+    KeyOS key2(1);
     unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
@@ -88,7 +88,7 @@ START_TEST(test_key2)
         {k4, sizeof k4 }
     };
 
-    Key key(2, kiovec, 4, 0);
+    KeyOS key(2, kiovec, 4, 0);
     size_t expected_size(0);
 
     expected_size += 1; // flags
@@ -114,7 +114,7 @@ START_TEST(test_key2)
 
     gu::Buffer buf(serial_size(key));
     serialize(key, &buf[0], buf.size(), 0);
-    Key key2(2);
+    KeyOS key2(2);
     unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
@@ -138,9 +138,9 @@ START_TEST(test_write_set1)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(Key(1, key1, 2, 0));
+    ws.append_key(KeyOS(1, key1, 2, 0));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(Key(1, key2, 2, 0));
+    ws.append_key(KeyOS(1, key2, 2, 0));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
@@ -205,9 +205,9 @@ START_TEST(test_write_set2)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(Key(2, key1, 2, 0));
+    ws.append_key(KeyOS(2, key1, 2, 0));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(Key(2, key2, 2, 0));
+    ws.append_key(KeyOS(2, key2, 2, 0));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
@@ -362,7 +362,7 @@ START_TEST(test_cert_hierarchical_v1)
     {
         TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(1, wsi[i].key, wsi[i].iov_len, 0));
+        trx->append_key(KeyOS(1, wsi[i].key, wsi[i].iov_len, 0));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
@@ -481,8 +481,8 @@ START_TEST(test_cert_hierarchical_v2)
     {
         TrxHandle* trx(new TrxHandle(version, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(version, wsi[i].key, wsi[i].iov_len,
-                            (wsi[i].shared == true ? Key::F_SHARED : 0)));
+        trx->append_key(KeyOS(version, wsi[i].key, wsi[i].iov_len,
+                            (wsi[i].shared == true ? KeyOS::F_SHARED : 0)));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
@@ -530,7 +530,7 @@ START_TEST(test_trac_726)
     {
         TrxHandle* trx(new TrxHandle(version, uuid1, 0, 0, false));
 
-        trx->append_key(Key(version, &key1, 1, 0));
+        trx->append_key(KeyOS(version, &key1, 1, 0));
         trx->set_last_seen_seqno(0);
         trx->flush(0);
 
@@ -553,9 +553,9 @@ START_TEST(test_trac_726)
     {
         TrxHandle* trx(new TrxHandle(version, uuid2, 0, 0, false));
 
-        trx->append_key(Key(version, &key2, 1, 0));
-        trx->append_key(Key(version, &key2, 1, Key::F_SHARED));
-        trx->append_key(Key(version, &key1, 1, 0));
+        trx->append_key(KeyOS(version, &key2, 1, 0));
+        trx->append_key(KeyOS(version, &key2, 1, KeyOS::F_SHARED));
+        trx->append_key(KeyOS(version, &key1, 1, 0));
 
         trx->set_last_seen_seqno(0);
         trx->flush(0);

@@ -2,7 +2,7 @@
 // Copyright (C) 2012 Codership Oy <info@codership.com>
 //
 
-#include "key_entry.hpp"
+#include "key_entry_os.hpp"
 #include "trx_handle.hpp"
 
 namespace galera
@@ -11,7 +11,7 @@ namespace galera
 #ifndef NDEBUG
 
 void
-KeyEntry::assert_ref(TrxHandle* trx, bool full_key)
+KeyEntryOS::assert_ref(TrxHandle* trx, bool full_key)
 {
     assert(ref_trx_ == 0 ||
            ref_trx_->global_seqno() <= trx->global_seqno());
@@ -24,7 +24,7 @@ KeyEntry::assert_ref(TrxHandle* trx, bool full_key)
 }
 
 void
-KeyEntry::assert_unref(TrxHandle* trx)
+KeyEntryOS::assert_unref(TrxHandle* trx)
 {
     if (ref_full_trx_ != 0 && ref_trx_ == 0)
     {
@@ -37,7 +37,7 @@ KeyEntry::assert_unref(TrxHandle* trx)
 }
 
 void
-KeyEntry::assert_ref_shared(TrxHandle* trx, bool full_key)
+KeyEntryOS::assert_ref_shared(TrxHandle* trx, bool full_key)
 {
     assert(ref_shared_trx_ == 0 ||
            ref_shared_trx_->global_seqno() <= trx->global_seqno());
@@ -50,7 +50,7 @@ KeyEntry::assert_ref_shared(TrxHandle* trx, bool full_key)
 }
 
 void
-KeyEntry::assert_unref_shared(TrxHandle* trx)
+KeyEntryOS::assert_unref_shared(TrxHandle* trx)
 {
     if (ref_full_shared_trx_ != 0 && ref_shared_trx_ == 0)
     {

@@ -32,10 +32,10 @@ namespace galera
     }
 
 
-    class KeyPart
+    class KeyPartOS
     {
     public:
-        KeyPart(const gu::byte_t* buf, size_t buf_size)
+        KeyPartOS(const gu::byte_t* buf, size_t buf_size)
             :
             buf_(buf),
             buf_size_(buf_size)
@@ -61,7 +61,7 @@ namespace galera
             return buf_ + gu::uleb128_decode(buf_, buf_size_, 0, not_used);
         }
 #endif
-        bool operator==(const KeyPart& other) const
+        bool operator==(const KeyPartOS& other) const
         {
             return (other.buf_size_ == buf_size_ &&
                     memcmp(other.buf_, buf_, buf_size_) == 0);
@@ -72,7 +72,7 @@ namespace galera
     };
 
 
-    inline std::ostream& operator<<(std::ostream& os, const KeyPart& kp)
+    inline std::ostream& operator<<(std::ostream& os, const KeyPartOS& kp)
     {
         const std::ostream::fmtflags prev_flags(os.flags(std::ostream::hex));
         const char                   prev_fill(os.fill('0'));
@@ -89,7 +89,7 @@ namespace galera
     }
 
 
-    class Key
+    class KeyOS
     {
     public:
         enum
@@ -97,9 +97,9 @@ namespace galera
             F_SHARED = 0x1
         };
 
-        Key(int version) : version_(version), flags_(), keys_() { }
+        KeyOS(int version) : version_(version), flags_(), keys_() { }
 
-        Key(int version, const wsrep_buf_t* keys, size_t keys_len,
+        KeyOS(int version, const wsrep_buf_t* keys, size_t keys_len,
             uint8_t flags)
             :
             version_(version),
@@ -143,7 +143,7 @@ namespace galera
         }
 
         template <class Ci>
-        Key(int version, Ci begin, Ci end, uint8_t flags)
+        KeyOS(int version, Ci begin, Ci end, uint8_t flags)
             : version_(version), flags_(flags), keys_()
         {
 
@@ -180,7 +180,7 @@ namespace galera
                         << " bytes: " << i + key_len << '/' << keys_size;
                 }
 
-                KeyPart kp(&keys_[i], key_len);
+                KeyPartOS kp(&keys_[i], key_len);
                 ret.push_back(kp);
                 i += key_len;
             }
@@ -191,12 +191,12 @@ namespace galera
 
         uint8_t flags() const { return flags_; }
 
-        bool operator==(const Key& other) const
+        bool operator==(const KeyOS& other) const
         {
             return (keys_ == other.keys_);
         }
 
-        bool equal_all(const Key& other) const
+        bool equal_all(const KeyOS& other) const
         {
             return (version_ == other.version_ &&
                     flags_   == other.flags_   &&
@@ -219,16 +219,16 @@ namespace galera
         }
 
     private:
-        friend size_t serialize(const Key&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Key&);
-        friend size_t serial_size(const Key&);
-        friend std::ostream& operator<<(std::ostream& os, const Key& key);
+        friend size_t serialize(const KeyOS&, gu::byte_t*, size_t, size_t);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, KeyOS&);
+        friend size_t serial_size(const KeyOS&);
+        friend std::ostream& operator<<(std::ostream& os, const KeyOS& key);
         int        version_;
         uint8_t    flags_;
         gu::Buffer keys_;
     };
 
-    inline std::ostream& operator<<(std::ostream& os, const Key& key)
+    inline std::ostream& operator<<(std::ostream& os, const KeyOS& key)
     {
         std::ostream::fmtflags flags(os.flags());
         switch (key.version_)
@@ -238,9 +238,9 @@ namespace galera
             // Fall through
         case 1:
         {
-            std::deque<KeyPart> dq(key.key_parts<std::deque<KeyPart> >());
+            std::deque<KeyPartOS> dq(key.key_parts<std::deque<KeyPartOS> >());
             std::copy(dq.begin(), dq.end(),
-                      std::ostream_iterator<KeyPart>(os, " "));
+                      std::ostream_iterator<KeyPartOS>(os, " "));
             break;
         }
         default:
@@ -252,7 +252,7 @@ namespace galera
     }
 
 
-    inline size_t serialize(const Key& key, gu::byte_t* buf, size_t buflen,
+    inline size_t serialize(const KeyOS& key, gu::byte_t* buf, size_t buflen,
                             size_t offset)
     {
         switch (key.version_)
@@ -282,7 +282,7 @@ namespace galera
     }
 
     inline size_t unserialize(const gu::byte_t* buf, size_t buflen,
-                              size_t offset, Key& key)
+                              size_t offset, KeyOS& key)
     {
         switch (key.version_)
         {
@@ -309,7 +309,7 @@ namespace galera
         }
     }
 
-    inline size_t serial_size(const Key& key)
+    inline size_t serial_size(const KeyOS& key)
     {
         switch (key.version_)
         {

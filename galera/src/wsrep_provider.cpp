@@ -13,7 +13,7 @@
 
 #include <cassert>
 
-using galera::Key;
+using galera::KeyOS;
 using galera::WriteSet;
 using galera::TrxHandle;
 using galera::TrxHandleLock;
@@ -442,11 +442,11 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            galera::Key k(repl->trx_proto_ver(),
+            galera::KeyOS k(repl->trx_proto_ver(),
                           keys[i].key_parts,
                           keys[i].key_parts_num,
                           // std::min(key[i].key_parts_len, size_t(2)),
-                          (shared == true ? galera::Key::F_SHARED : 0));
+                          (shared == true ? galera::KeyOS::F_SHARED : 0));
             // log_info << k;
             trx->append_key(k);
         }
@@ -558,7 +558,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            trx->append_key(Key(repl->trx_proto_ver(),
+            trx->append_key(KeyOS(repl->trx_proto_ver(),
                                 keys[i].key_parts,
                                 keys[i].key_parts_num, 0));
         }

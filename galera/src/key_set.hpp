@@ -3,16 +3,16 @@
 //
 
 
-#ifndef GALERA_DATA_SET_HPP
-#define GALERA_DATA_SET_HPP
+#ifndef GALERA_KEY_SET_HPP
+#define GALERA_KEY_SET_HPP
 
 #include "gu_rset.hpp"
-#include "gu_vlq.hpp"
+//#include "gu_vlq.hpp"
 
 
 namespace galera
 {
-    class DataSet
+    class KeySet
     {
     public:
 
@@ -30,11 +30,8 @@ namespace galera
             return VER1;
         }
 
-        /*! Dummy class to instantiate DataSetOut */
         class RecordOut {};
 
-        /*! A class to instantiate DataSetIn: provides methods necessary to
-         *  iterate over the records serialized into single input buffer */
         class RecordIn
         {
         public:
@@ -47,7 +44,7 @@ namespace galera
                 return (payload_size + off);
             }
 
-            size_t serial_size () const { return off_ + size_; }
+            size_t serial_size () { return off_ + size_; }
 
             RecordIn (const gu::byte_t* buf, size_t size)
                 : size_(),
@@ -62,25 +59,26 @@ namespace galera
             ssize_t           size_;
             ssize_t const     off_;
             const gu::byte_t* buf_;
-
         }; /* class RecordIn */
 
-    }; /* class DataSet */
+    }; /* class KeySet */
 
 
-    class DataSetOut : public gu::RecordSetOut<DataSet::RecordOut>
+    class KeySetOut : public gu::RecordSetOut<KeySet::RecordOut>
     {
     public:
 
-        DataSetOut (const std::string& base_name,
+        class Record; /* some dummy template parameter */
+
+        KeySetOut (const std::string& base_name,
                     int                version)
             :
             RecordSetOut (
                 base_name,
-                check_type      (DataSet::ws_to_ds_version(version)),
-                ds_to_rs_version(DataSet::ws_to_ds_version(version))
+                check_type      (KeySet::ws_to_ds_version(version)),
+                ds_to_rs_version(KeySet::ws_to_ds_version(version))
                 ),
-            version_(DataSet::ws_to_ds_version(version))
+            version_(KeySet::ws_to_ds_version(version))
         {}
 
         size_t
@@ -95,48 +93,49 @@ namespace galera
             RecordSetOut::append (&serial_size, size_size, true);
             /* then record itself, don't count as a new record */
             RecordSetOut::append (src, size, store, false);
-            /* this will be deserialized using DataSet::RecordIn in DataSetIn */
 
             return size_size + size;
         }
 
-        DataSet::Version
-        version () const { return version_; }
+        KeySet::Version
+        version () { return version_; }
 
     private:
 
         // depending on version we may pack data differently
-        DataSet::Version version_;
+        KeySet::Version       version_;
+        gu::UnorderedSet<Key> added_;
 
         static gu::RecordSet::CheckType
-        check_type (DataSet::Version ver)
+        check_type (KeySet::Version ver)
         {
             switch (ver)
             {
-            case DataSet::EMPTY: break; /* Can't create EMPTY DataSetOut */
-            case DataSet::VER1:  return gu::RecordSet::CHECK_MMH128;
+            case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
+            case KeySet::VER1:  return gu::RecordSet::CHECK_MMH128;
             }
             throw;
         }
 
         static gu::RecordSet::Version
-        ds_to_rs_version (DataSet::Version ver)
+        ds_to_rs_version (KeySet::Version ver)
         {
             switch (ver)
             {
-            case DataSet::EMPTY: break; /* Can't create EMPTY DataSetOut */
-            case DataSet::VER1:  return gu::RecordSet::VER1;
+            case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
+            case KeySet::VER1:  return gu::RecordSet::VER1;
             }
             throw;
         }
+
+
     };
 
-
-    class DataSetIn : public gu::RecordSetIn<DataSet::RecordIn>
+    class KeySetIn : public gu::RecordSetIn<KeySet::RecordIn>
     {
     public:
 
-        DataSetIn (DataSet::Version ver, const gu::byte_t* buf, size_t size)
+        KeySetIn (KeySet::Version ver, const gu::byte_t* buf, size_t size)
             :
             RecordSetIn(buf, size),
             version_(ver)
@@ -146,10 +145,10 @@ namespace galera
 
     private:
 
-        DataSet::Version version_;
+        KeySet::Version version_;
 
-    }; /* class DataSetIn */
+    }; /* class KeySetIn */
 
 } /* namespace galera */
 
-#endif // GALERA_DATA_SET_HPP
+#endif // GALERA_KEY_SET_HPP

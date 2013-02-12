@@ -415,10 +415,10 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
 
     next_ = begin_;
 
-    assert (size_  > 0);
+    assert (size_  >  0);
     assert (count_ >= 0);
     assert (count_ <= size_);
-    assert (begin_ > 0);
+    assert (begin_ >  0);
     assert (begin_ <= size_);
     assert (next_  == begin_);
 }

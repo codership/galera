@@ -40,14 +40,14 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
          ++i)
     {
         // Unref all referenced and remove if was referenced by us
-        KeyEntry* const kel(i->first);
+        KeyEntryOS* const kel(i->first);
 
         const bool full_key(i->second.first);
         const bool shared(i->second.second);
 
         CertIndex::iterator ci(cert_index_.find(kel));
         assert(ci != cert_index_.end());
-        KeyEntry* const ke(*ci);
+        KeyEntryOS* const ke(*ci);
 
         if (shared == false &&
             (ke->ref_trx() == trx || ke->ref_full_trx() == trx))
@@ -76,7 +76,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 
 /*! for convenience returns true if conflict and false if not */
 static inline bool
-certify_and_depend_v1to2(const galera::KeyEntry* const match,
+certify_and_depend_v1to2(const galera::KeyEntryOS* const match,
                          galera::TrxHandle*      const trx,
                          bool                    const full_key,
                          bool                    const exclusive_key,
@@ -148,11 +148,11 @@ certify_and_depend_v1to2(const galera::KeyEntry* const match,
 static bool
 certify_v1to2(galera::TrxHandle*                            trx,
               galera::Certification::CertIndex&             cert_index,
-              const galera::Key&                            key,
+              const galera::KeyOS&                          key,
               galera::TrxHandle::CertKeySet&                key_list,
               bool const store_keys, bool const log_conflicts)
 {
-    typedef std::list<galera::KeyPart> KPS;
+    typedef std::list<galera::KeyPartOS> KPS;
 
     KPS key_parts(key.key_parts<KPS>());
     KPS::const_iterator begin(key_parts.begin()), end;
@@ -161,12 +161,12 @@ certify_v1to2(galera::TrxHandle*                            trx,
     {
         full_key = (end == key_parts.end());
         galera::Certification::CertIndex::iterator ci;
-        galera::KeyEntry ke(key.version(), begin, end, key.flags());
+        galera::KeyEntryOS ke(key.version(), begin, end, key.flags());
 
         cert_debug << "key: " << ke.get_key()
                    << " (" << (full_key == true ? "full" : "partial") << ")";
 
-        bool const shared_key(ke.get_key().flags() & galera::Key::F_SHARED);
+        bool const shared_key(ke.get_key().flags() & galera::KeyOS::F_SHARED);
 
         if (store_keys && (key_list.find(&ke) != key_list.end()))
         {
@@ -175,13 +175,13 @@ certify_v1to2(galera::TrxHandle*                            trx,
             continue;
         }
 
-        galera::KeyEntry* kep;
+        galera::KeyEntryOS* kep;
 
         if ((ci = cert_index.find(&ke)) == cert_index.end())
         {
             if (store_keys)
             {
-                kep = new galera::KeyEntry(ke);
+                kep = new galera::KeyEntryOS(ke);
                 ci = cert_index.insert(kep).first;
                 cert_debug << "created new entry";
             }
@@ -209,7 +209,7 @@ certify_v1to2(galera::TrxHandle*                            trx,
                 else
                 {
                     // duplicate with different flags - need to store a copy
-                    kep = new galera::KeyEntry(ke);
+                    kep = new galera::KeyEntryOS(ke);
                 }
             }
         }
@@ -262,7 +262,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
         offset = k.first;
         while (offset < k.first + k.second)
         {
-            Key key(trx->version());
+            KeyOS key(trx->version());
             offset = unserialize(buf, buf_len, offset, key);
             if (certify_v1to2(trx, cert_index_, key, key_list, store_keys,
                               log_conflicts_) == false)
@@ -285,7 +285,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
         for (TrxHandle::CertKeySet::iterator i(key_list.begin());
              i != key_list.end();)
         {
-            KeyEntry* const kel(i->first);
+            KeyEntryOS* const kel(i->first);
             CertIndex::const_iterator ci(cert_index_.find(kel));
 
             if (ci == cert_index_.end())
@@ -294,7 +294,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
                                << kel->get_key() << "' from cert index";
             }
 
-            KeyEntry* const ke(*ci);
+            KeyEntryOS* const ke(*ci);
             const bool full_key(i->second.first);
             const bool shared_key(i->second.second);
             bool keep(false);
@@ -345,14 +345,14 @@ cert_fail:
         for (TrxHandle::CertKeySet::iterator i(key_list.begin());
              i != key_list.end(); ++i)
         {
-            KeyEntry* const kel(i->first);
+            KeyEntryOS* const kel(i->first);
 
             // Clean up cert_index_ from entries which were added by this trx
             CertIndex::iterator ci(cert_index_.find(kel));
 
             if (ci != cert_index_.end())
             {
-                KeyEntry* ke(*ci);
+                KeyEntryOS* ke(*ci);
 
                 if (ke->ref_trx() == 0 && ke->ref_shared_trx() == 0)
                 {

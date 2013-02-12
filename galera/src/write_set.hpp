@@ -6,7 +6,7 @@
 #ifndef GALERA_WRITE_SET_HPP
 #define GALERA_WRITE_SET_HPP
 
-#include "key.hpp"
+#include "key_os.hpp"
 
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
@@ -23,7 +23,7 @@ namespace galera
     class WriteSet
     {
     public:
-        typedef std::deque<Key> KeySequence;
+        typedef std::deque<KeyOS> KeySequence;
 
         WriteSet(int version)
             :
@@ -36,7 +36,7 @@ namespace galera
         void set_version(int version) { version_ = version; }
         const gu::Buffer& get_data() const { return data_; }
 
-        void append_key(const Key&);
+        void append_key(const KeyOS&);
 
         void append_data(const void*data, size_t data_len)
         {

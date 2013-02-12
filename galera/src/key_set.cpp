@@ -1,44 +1,16 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2013 Codership Oy <info@codership.com>
 //
 
 
-#include "write_set.hpp"
+#include "key_set.hpp"
 
 #include "gu_serialize.hpp"
 #include "gu_logger.hpp"
 
 
-size_t galera::serialize(const WriteSet& ws,
-                         gu::byte_t*     buf,
-                         size_t          buf_len,
-                         size_t          offset)
-{
-    offset = gu::serialize4(ws.keys_, buf, buf_len, offset);
-    offset = gu::serialize4(ws.data_, buf, buf_len, offset);
-    return offset;
-}
-
-
-size_t galera::unserialize(const gu::byte_t* buf,
-                           size_t            buf_len,
-                           size_t            offset,
-                           WriteSet&         ws)
-{
-    ws.keys_.clear();
-    offset = gu::unserialize4(buf, buf_len, offset, ws.keys_);
-    offset = gu::unserialize4(buf, buf_len, offset, ws.data_);
-    return offset;
-}
-
-
-size_t galera::serial_size(const WriteSet& ws)
-{
-    return (gu::serial_size4(ws.keys_) + gu::serial_size4(ws.data_));
-}
-
 std::pair<size_t, size_t>
-galera::WriteSet::segment(const gu::byte_t* buf, size_t buf_len, size_t offset)
+galera::KeySetIn::segment(const gu::byte_t* buf, size_t buf_len, size_t offset)
 {
     uint32_t data_len;
     offset = gu::unserialize4(buf, buf_len, offset, data_len);
@@ -46,7 +18,7 @@ galera::WriteSet::segment(const gu::byte_t* buf, size_t buf_len, size_t offset)
     return std::pair<size_t, size_t>(offset, data_len);
 }
 
-size_t galera::WriteSet::keys(const gu::byte_t* buf,
+size_t galera::KeySetIn::keys(const gu::byte_t* buf,
                               size_t buf_len, size_t offset, int version,
                               KeySequence& ks)
 {
@@ -68,7 +40,7 @@ size_t galera::WriteSet::keys(const gu::byte_t* buf,
     return offset;
 }
 
-void galera::WriteSet::append_key(const KeyOS& key)
+void galera::KeySetOut::append_key(const KeyOS& key)
 {
     const size_t hash(key.hash());
 
@@ -92,7 +64,7 @@ void galera::WriteSet::append_key(const KeyOS& key)
 }
 
 
-void galera::WriteSet::get_keys(KeySequence& s) const
+void galera::KeySetIn::get_keys(KeySequence& s) const
 {
     size_t offset(0);
     while (offset < keys_.size())

@@ -2,19 +2,19 @@
 // Copyright (C) 2012 Codership Oy <info@codership.com>
 //
 
-#ifndef GALERA_KEY_ENTRY_HPP
-#define GALERA_KEY_ENTRY_HPP
+#ifndef GALERA_KEY_ENTRY_OS_HPP
+#define GALERA_KEY_ENTRY_OS_HPP
 
-#include "key.hpp"
+#include "key_os.hpp"
 
 namespace galera
 {
     class TrxHandle;
 
-    class KeyEntry
+    class KeyEntryOS
     {
     public:
-        KeyEntry(const Key& row_key)
+        KeyEntryOS(const KeyOS& row_key)
             :
             key_(row_key),
             ref_trx_(0),
@@ -24,7 +24,7 @@ namespace galera
         {}
 
         template <class Ci>
-        KeyEntry(int version, Ci begin, Ci end, uint8_t flags)
+        KeyEntryOS(int version, Ci begin, Ci end, uint8_t flags)
             :
             key_(version, begin, end, flags),
             ref_trx_(0),
@@ -33,7 +33,7 @@ namespace galera
             ref_full_shared_trx_(0)
         {}
 
-        KeyEntry(const KeyEntry& other)
+        KeyEntryOS(const KeyEntryOS& other)
             :
             key_(other.key_),
             ref_trx_(other.ref_trx_),
@@ -42,7 +42,7 @@ namespace galera
             ref_full_shared_trx_(other.ref_full_shared_trx_)
         {}
 
-        ~KeyEntry()
+        ~KeyEntryOS()
         {
             assert(ref_trx_ == 0);
             assert(ref_full_trx_ == 0);
@@ -50,8 +50,8 @@ namespace galera
             assert(ref_full_shared_trx_ == 0);
         }
 
-        const Key& get_key() const { return key_; }
-        const Key& get_key(int version) const { return key_; }
+        const KeyOS& get_key() const { return key_; }
+        const KeyOS& get_key(int version) const { return key_; }
 
         void ref(TrxHandle* trx, bool full_key)
         {
@@ -120,8 +120,8 @@ namespace galera
         }
 
     private:
-        void operator=(const KeyEntry&);
-        Key        key_;
+        void operator=(const KeyEntryOS&);
+        KeyOS      key_;
         TrxHandle* ref_trx_;
         TrxHandle* ref_full_trx_;
         TrxHandle* ref_shared_trx_;
@@ -138,7 +138,7 @@ namespace galera
     class KeyEntryPtrHash
     {
     public:
-        size_t operator()(const KeyEntry* const ke) const
+        size_t operator()(const KeyEntryOS* const ke) const
         {
             return ke->get_key().hash();
         }
@@ -147,7 +147,7 @@ namespace galera
     class KeyEntryPtrHashAll
     {
     public:
-        size_t operator()(const KeyEntry* const ke) const
+        size_t operator()(const KeyEntryOS* const ke) const
         {
             return ke->get_key().hash_with_flags();
         }
@@ -156,7 +156,7 @@ namespace galera
     class KeyEntryPtrEqual
     {
     public:
-        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
+        bool operator()(const KeyEntryOS* const left, const KeyEntryOS* const right)
             const
         {
             return left->get_key() == right->get_key();
@@ -166,7 +166,7 @@ namespace galera
     class KeyEntryPtrEqualAll
     {
     public:
-        bool operator()(const KeyEntry* const left, const KeyEntry* const right)
+        bool operator()(const KeyEntryOS* const left, const KeyEntryOS* const right)
             const
         {
             return left->get_key().equal_all(right->get_key());

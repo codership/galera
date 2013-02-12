@@ -9,7 +9,7 @@
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "fsm.hpp"
-#include "key_entry.hpp"
+#include "key_entry_os.hpp"
 
 #include "wsrep_api.h"
 #include "gu_mutex.hpp"
@@ -222,7 +222,7 @@ namespace galera
         void set_flags(int flags) { write_set_flags_ = flags; }
         int flags() const { return write_set_flags_; }
 
-        void append_key(const Key& key)
+        void append_key(const KeyOS& key)
         {
             if (key.version() != version_)
             {
@@ -385,7 +385,7 @@ namespace galera
         friend class Certification;
 //        typedef std::list<std::pair<KeyEntry*, std::pair<bool, bool> > > CertKeySet;
 public:
-        typedef gu::UnorderedMap<KeyEntry*,
+        typedef gu::UnorderedMap<KeyEntryOS*,
                                  std::pair<bool, bool>,
                                  KeyEntryPtrHash,
                                  KeyEntryPtrEqualAll> CertKeySet;

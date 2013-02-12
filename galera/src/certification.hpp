@@ -32,7 +32,7 @@ namespace galera
             static const std::string log_conflicts;
         };
 
-        typedef gu::UnorderedSet<KeyEntry*,
+        typedef gu::UnorderedSet<KeyEntryOS*,
                                  KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
     private:
         typedef std::multiset<wsrep_seqno_t>        DepsSet;
