@@ -55,6 +55,15 @@ namespace galera
 
         void clear() { keys_.clear(), key_refs_.clear(), data_.clear(); }
 
+        // Return offset to beginning of key or data segment and length
+        // of that segment
+        static std::pair<size_t, size_t>
+        segment(const gu::byte_t*, size_t, size_t);
+
+        // Scan key sequence from buffer, return offset from the beginning of
+        // buffer after scan.
+        static size_t keys(const gu::byte_t*, size_t, size_t, int, KeySequence&);
+
     private:
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
