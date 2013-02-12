@@ -17,6 +17,7 @@
 #include <cstring>
 #include <sstream>
 
+#include "gu_macros.h"
 #include "gu_exception.hpp"
 
 namespace gu
@@ -64,7 +65,7 @@ namespace gu
             err       (err_)
         {}
 
-        ~ThrowError () throw (Exception)
+        GU_NORETURN ~ThrowError () throw (Exception)
         {
             os << ": " << err << " (" << ::strerror(err) << ')';
 
@@ -89,7 +90,7 @@ namespace gu
             ThrowBase (file, func, line)
         {}
 
-        ~ThrowFatal () throw (Exception)
+        GU_NORETURN ~ThrowFatal () throw (Exception)
         {
             os << " (FATAL)";
 

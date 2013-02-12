@@ -15,8 +15,10 @@
 
 #include "gu_alloc.hpp"
 #include "gu_digest.hpp"
-#include "gu_throw.hpp"
-#include "gu_logger.hpp"
+
+#ifdef GU_RSET_CHECK_SIZE
+#  include "gu_throw.hpp"
+#endif
 
 #include <string>
 
@@ -81,8 +83,11 @@ protected:
     RecordSetOutBase (const std::string& base_name,     /* basename for on-disk
                                                          * allocator */
                       CheckType          ct,
-                      Version            version  = MAX_VER,
-                      ssize_t            max_size = 0x7fffffff);
+                      Version            version  = MAX_VER
+#ifdef GU_RSET_CHECK_SIZE
+                      ,ssize_t            max_size = 0x7fffffff
+#endif
+        );
 
     /*! return total size of a RecordSet */
 #if 0 // this has code duplication
@@ -91,7 +96,9 @@ protected:
     {
         ssize_t const size(record.serial_size());
 
+#ifdef GU_RSET_CHECK_SIZE
         if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
+#endif
 
         bool new_page;
 
@@ -115,7 +122,9 @@ protected:
         assert (src);
         assert (size);
 
+#ifdef GU_RSET_CHECK_SIZE
         if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
+#endif
 
         bool new_page(!store);
         const byte_t* ptr(reinterpret_cast<const byte_t*>(src));
@@ -193,7 +202,9 @@ protected:
     {
         ssize_t const size (record.serial_size());
 
+#ifdef GU_RSET_CHECK_SIZE
         if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
+#endif
 
         bool new_page;
         const byte_t* ptr;
@@ -212,7 +223,10 @@ protected:
 
 private:
 
+#ifdef GU_RSET_CHECK_SIZE
     ssize_t const    max_size_;
+#endif
+
     Allocator        alloc_;
     Hash             check_;
     std::vector<Buf> bufs_;
@@ -235,6 +249,8 @@ private:
 };
 
 
+/*! This is a small wrapper template for RecordSetOutBase to avoid templating
+ *  the whole thing instead of just the two append methods. */
 template <class R>
 class RecordSetOut : public RecordSetOutBase
 {
@@ -242,14 +258,21 @@ public:
 
     RecordSetOut (const std::string& base_name,
                   CheckType          ct,
-                  Version            version  = MAX_VER,
-                  ssize_t            max_size = 0x7fffffff)
-        : RecordSetOutBase (base_name, ct, version, max_size) {}
+                  Version            version  = MAX_VER
+#ifdef GU_RSET_CHECK_SIZE
+                  ,ssize_t           max_size = 0x7fffffff
+#endif
+        )
+        : RecordSetOutBase (base_name, ct, version
+#ifdef GU_RSET_CHECK_SIZE
+                            ,max_size
+#endif
+            ) {}
 
     size_t append (const R& r)
     {
         return append_base<R, false> (r);
-//        return append_base<R> (r);
+//        return append_base<R> (r); old append_base() method
     }
 
     ssize_t append (const void* const src, ssize_t const size,
@@ -260,13 +283,13 @@ public:
 
         BufWrap bw (src, size);
         return append_base<BufWrap, true> (bw, store, new_record);
-//        return append_base (src, size, store);
+//        return append_base (src, size, store); - old append_base() method
     }
 
 private:
 
-    /* a wrapper class to represent ptr and size as a serializable object:
-     * simply defines serial_size(), ptr() and serialize_to() methods */
+    /*! a wrapper class to represent ptr and size as a serializable object:
+     *  simply defines serial_size(), ptr() and serialize_to() methods */
     class BufWrap
     {
         const byte_t* const ptr_;
@@ -292,6 +315,7 @@ private:
     RecordSetOut& operator = (const RecordSetOut&);
 };
 
+
 /*! class to recover records from a buffer */
 class RecordSetInBase : public RecordSet
 {
@@ -310,17 +334,48 @@ protected:
     template <class R>
     void next_base (Buf& n) const
     {
-        n.ptr  = next_;
-        n.size = R::serial_size(n.ptr, size_ - next_);
-        next_ += n.size;
+        if (gu_likely (next_ < size_))
+        {
+            size_t const tmp_size(R::serial_size(n.ptr, size_ - next_));
+
+            /* sanity check */
+            if (gu_likely (next_ + tmp_size <= size_t(size_)))
+            {
+                n.ptr  = next_ + next_;
+                n.size = tmp_size;
+                next_ += tmp_size;
+                return;
+            }
+
+            throw_error (E_FAULT);
+        }
+
+        assert (next_ == size_);
+
+        throw_error (E_PERM);
     }
 
     template <class R>
     R next_base () const
     {
-        R rec(head_ + next_, size_ - next_);
-        next_ += rec.serial_size();
-        return rec;
+        if (gu_likely (next_ < size_))
+        {
+            R const      rec(head_ + next_, size_ - next_);
+            size_t const tmp_size(rec.serial_size());
+
+            /* sanity check */
+            if (gu_likely (next_ + tmp_size <= size_t(size_)))
+            {
+                next_ += tmp_size;
+                return rec;
+            }
+
+            throw_error (E_FAULT);
+        }
+
+        assert (next_ == size_);
+
+        throw_error (E_PERM);
     }
 
 private:
@@ -332,6 +387,14 @@ private:
 
     /* takes total size of the supplied buffer */
     void parse_header_v1 (size_t size);
+
+    enum Error
+    {
+        E_PERM,
+        E_FAULT
+    };
+
+    GU_NORETURN void throw_error (Error code) const;
 
     /* shallow copies here - we're not allocating anything */
     RecordSetInBase (const RecordSetInBase& r)
@@ -352,6 +415,9 @@ private:
 #endif
 }; /* class RecordSetInBase */
 
+
+/*! This is a small wrapper template for RecordSetInBase to avoid templating
+ *  the whole thing instead of just the two next methods. */
 template <class R>
 class RecordSetIn : public RecordSetInBase
 {
@@ -366,6 +432,7 @@ public:
     void next (Buf& n) const { next_base<R> (n); }
 
     R next () const { return next_base<R> (); }
+
 }; /* class RecordSetIn */
 
 } /* namespace gu */

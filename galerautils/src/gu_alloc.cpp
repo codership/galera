@@ -42,7 +42,6 @@ gu::Allocator::MemStore::my_new_page (size_t const size)
     }
 
     gu_throw_error (ENOMEM) << "out of memory in RAM pool";
-    throw;
 }
 
 

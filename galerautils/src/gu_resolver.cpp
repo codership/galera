@@ -127,7 +127,7 @@ bool gu::net::Sockaddr::is_multicast() const
     case AF_INET6:
         return IN6_IS_ADDR_MULTICAST(&reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
     default:
-        gu_throw_fatal; throw;
+        gu_throw_fatal;
     }
 }
 
@@ -141,7 +141,7 @@ bool gu::net::Sockaddr::is_anyaddr() const
     case AF_INET6:
         return IN6_IS_ADDR_UNSPECIFIED(&reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
     default:
-        gu_throw_fatal; throw;
+        gu_throw_fatal;
     }
 }
 
@@ -286,14 +286,14 @@ gu::net::MReq::MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr)
         gu_throw_fatal << "could not allocate memory";
     }
     memset(mreq_, 0, mreq_len_);
-    
+
     switch (mcast_addr.get_family())
     {
     case AF_INET:
     {
         struct ip_mreq* mr(reinterpret_cast<struct ip_mreq*>(mreq_));
         mr->imr_multiaddr.s_addr = *reinterpret_cast<const in_addr_t*>(mcast_addr.get_addr());
-        
+
         mr->imr_interface.s_addr = *reinterpret_cast<const in_addr_t*>(if_addr.get_addr());
         ipproto_             = IPPROTO_IP;
         add_membership_opt_  = IP_ADD_MEMBERSHIP;
@@ -334,7 +334,6 @@ const void* gu::net::MReq::get_multicast_if_value() const
     default:
         gu_throw_fatal << "get_multicast_if_value() not implemented for: "
                        << ipproto_;
-        throw;
     }
 }
 
@@ -349,7 +348,6 @@ int gu::net::MReq::get_multicast_if_value_size() const
     default:
         gu_throw_fatal << "get_multicast_if_value_size() not implemented for: "
                        << ipproto_;
-        throw;
     }
 }
 
@@ -441,7 +439,6 @@ std::string gu::net::Addrinfo::to_string() const
 
 
 
-
 /////////////////////////////////////////////////////////////////////////
 //                       Public methods
 /////////////////////////////////////////////////////////////////////////
@@ -502,6 +499,5 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
     catch (NotFound& nf)
     {
         gu_throw_error(EINVAL) << "invalid URI: " << uri.to_string();
-        throw;
     }
 }

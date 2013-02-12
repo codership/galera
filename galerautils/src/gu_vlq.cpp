@@ -39,7 +39,7 @@ namespace gu
             gu::byte_t mask(~((1 << avail_bits) - 1));
             if ((buf[offset] & mask) != 0)
             {
-                gu_throw_error(ERANGE)
+                gu_throw_error(EOVERFLOW)
                     << "read value not representable with avail bits: "
                     << avail_bits
                     << " mask: 0x"

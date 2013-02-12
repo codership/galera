@@ -115,8 +115,8 @@ START_TEST (ver0)
     records.push_back (&rout5);
 
     gu::RecordSetOut<TestRecord> rset_out("gu_rset_test",
-                              gu::RecordSet::CHECK_MMH64,
-                              gu::RecordSet::VER1);
+                                          gu::RecordSet::CHECK_MMH64,
+                                          gu::RecordSet::VER1);
 
     size_t offset(rset_out.size());
 

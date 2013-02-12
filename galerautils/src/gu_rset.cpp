@@ -14,6 +14,8 @@
 
 #include "gu_vlq.hpp"
 #include "gu_hexdump.hpp"
+#include "gu_throw.hpp"
+#include "gu_logger.hpp"
 
 #include <iomanip>
 
@@ -223,11 +225,16 @@ RecordSet::RecordSet (Version ver, CheckType const ct)
 
 RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
                                     CheckType const    ct,
-                                    Version const      version,
-                                    ssize_t const      max_size)
+                                    Version const      version
+#ifdef GU_RSET_CHECK_SIZE
+                                    ,ssize_t const     max_size
+#endif
+    )
 :
     RecordSet   (version, ct),
+#ifdef GU_RSET_CHECK_SIZE
     max_size_   (max_size),
+#endif
     alloc_      (base_name),
     check_      (),
     bufs_       (),
@@ -261,7 +268,6 @@ header_version (const byte_t* buf, ssize_t const size)
     }
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
-    throw;
 }
 
 
@@ -281,7 +287,6 @@ ver1_check_type (const byte_t* buf, ssize_t const size)
     }
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet checksum type: " << ct;
-    throw;
 }
 
 
@@ -297,7 +302,6 @@ header_check_type(RecordSet::Version ver, const byte_t* ptr, ssize_t const size)
     }
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
-    throw;
 }
 
 
@@ -417,6 +421,23 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
     assert (begin_ > 0);
     assert (begin_ <= size_);
     assert (next_  == begin_);
+}
+
+void
+RecordSetInBase::throw_error (Error code) const
+{
+    switch (code)
+    {
+    case E_PERM:
+        gu_throw_error (EPERM) << "Access beyond record set end.";
+
+    case E_FAULT:
+        gu_throw_error (EFAULT) << "Corrupted record set: record extends "
+                                << next_ << " beyond set boundary " << size_;
+    }
+
+    log_fatal << "Unknown error in RecordSetIn.";
+    abort();
 }
 
 } /* namespace gu */
