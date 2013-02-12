@@ -79,7 +79,8 @@ galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
 
     size_t offset(unserialize(buf, act.size, 0, *trx_));
 
-    trx_->append_write_set(buf + offset, act.size - offset);
+    // trx_->append_write_set(buf + offset, act.size - offset);
+    trx_->set_write_set_buffer(buf + offset, act.size - offset);
     trx_->set_received(act.buf, act.seqno_l, act.seqno_g);
     trx_->lock();
 }

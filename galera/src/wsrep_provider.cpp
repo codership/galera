@@ -442,10 +442,13 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            trx->append_key(galera::Key(repl->trx_proto_ver(),
-                                        keys[i].key_parts,
-                                        keys[i].key_parts_num,
-                                        (shared == true ? galera::Key::F_SHARED : 0)));
+            galera::Key k(repl->trx_proto_ver(),
+                          keys[i].key_parts,
+                          keys[i].key_parts_num,
+                          // std::min(key[i].key_parts_len, size_t(2)),
+                          (shared == true ? galera::Key::F_SHARED : 0));
+            // log_info << k;
+            trx->append_key(k);
         }
         retval = WSREP_OK;
     }

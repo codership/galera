@@ -158,6 +158,7 @@ namespace galera
             timestamp_         (gu_time_calendar()),
             mac_               (),
             annotation_        (),
+            write_set_buffer_  (0, 0),
             cert_keys_         ()
         { }
 
@@ -290,6 +291,33 @@ namespace galera
             return write_set_collection_;
         }
 
+        void set_write_set_buffer(const gu::byte_t* buf, size_t buf_len)
+        {
+            write_set_buffer_.first = buf;
+            write_set_buffer_.second = buf_len;
+        }
+
+        std::pair<const gu::byte_t*, size_t>
+        write_set_buffer() const
+        {
+            // If external write set buffer location not specified,
+            // return location from write_set_colletion_. This is still
+            // needed for unit tests and IST which don't use GCache
+            // storage.
+            if (write_set_buffer_.first == 0)
+            {
+                size_t off(serial_size(*this));
+                if (write_set_collection_.size() < off)
+                {
+                    gu_throw_fatal << "Write set buffer not populated";
+                }
+                return std::make_pair(&write_set_collection_[0] + off,
+                                      write_set_collection_.size() - off);
+            }
+            return write_set_buffer_;
+        }
+
+
         bool empty() const
         {
             return (write_set_.empty() == true &&
@@ -348,6 +376,9 @@ namespace galera
         int64_t                timestamp_;
         Mac                    mac_;
         gu::Buffer             annotation_;
+
+        // Write set buffer location if stored outside TrxHandle.
+        std::pair<const gu::byte_t*, size_t> write_set_buffer_;
 
         //
         friend class Wsdb;
