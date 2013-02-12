@@ -11,3 +11,8 @@ will be:
      http://www.codership.com/wiki/doku.php?id=info
      total order / gtid
      commit sequence
+
+.. toctree::
+   :numbered:
+
+   understanding/internals.rst

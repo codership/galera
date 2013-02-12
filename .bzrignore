@@ -49,6 +49,7 @@ config.h.in
 config.log
 config.status
 config.sub
+docs/build/*
 stamp-h
 stamp-h.in
 stamp-h1
