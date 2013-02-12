@@ -234,7 +234,7 @@ START_TEST(test_write_set2)
                 buf.size(), expected_size, serial_size(ws));
 
 
-    WriteSet ws2(0);
+    WriteSet ws2(2);
 
     size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
     fail_unless(ret == expected_size);
@@ -243,7 +243,7 @@ START_TEST(test_write_set2)
     ws.get_keys(rks);
 
     WriteSet::KeySequence rks2;
-    ws.get_keys(rks2);
+    ws2.get_keys(rks2);
 
     fail_unless(rks2 == rks);
 

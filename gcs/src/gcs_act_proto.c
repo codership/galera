@@ -62,7 +62,7 @@ gcs_act_proto_write (gcs_act_frag_t* frag, void* buf, size_t buf_len)
     if (buf_len      < PROTO_DATA_OFFSET) return -EMSGSIZE;
 #endif
 
-    assert (frag->act_size <= PROTO_ACT_SIZE_MAX);
+    // assert (frag->act_size <= PROTO_ACT_SIZE_MAX);
 
     ((uint64_t*)buf)[0] = gu_be64(frag->act_id);
     ((uint32_t*)buf)[2] = htogl  ((uint32_t)frag->act_size);

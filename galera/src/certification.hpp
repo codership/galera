@@ -32,18 +32,9 @@ namespace galera
             static const std::string log_conflicts;
         };
 
-        typedef gu::UnorderedMap<KeyEntry*, KeyEntry*,
+        typedef gu::UnorderedSet<KeyEntry*,
                                  KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
     private:
-        class DiscardRK
-        {
-        public:
-            void operator()(CertIndex::value_type& vt) const
-            {
-                delete vt.second;
-            }
-        };
-
         typedef std::multiset<wsrep_seqno_t>        DepsSet;
 
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;

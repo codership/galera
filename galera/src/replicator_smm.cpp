@@ -23,18 +23,23 @@ apply_wscoll(void*                    recv_ctx,
              const wsrep_trx_meta_t&  meta)
     throw (galera::ApplyException, gu::Exception)
 {
-    const galera::MappedBuffer& wscoll(trx.write_set_collection());
-    // skip over trx header
-    size_t offset(serial_size(trx));
-    galera::WriteSet ws(trx.version());
-
-    while (offset < wscoll.size())
+    const gu::byte_t* buf(trx.write_set_buffer().first);
+    const size_t buf_len(trx.write_set_buffer().second);
+    size_t offset(0);
+    while (offset < buf_len)
     {
-        offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
+        // Skip key segment
+        std::pair<size_t, size_t> k(
+            galera::WriteSet::segment(buf, buf_len, offset));
+        offset = k.first + k.second;
+        // Data part
+        std::pair<size_t, size_t> d(
+            galera::WriteSet::segment(buf, buf_len, offset));
+        offset = d.first + d.second;
 
         wsrep_status_t err = apply_cb (recv_ctx,
-                                       &ws.get_data()[0],
-                                       ws.get_data().size(),
+                                       buf + d.first,
+                                       d.second,
                                        &meta);
 
         if (gu_unlikely(err != WSREP_OK))
@@ -42,8 +47,8 @@ apply_wscoll(void*                    recv_ctx,
             const char* const err_str(galera::wsrep_status_str(err));
             std::ostringstream os;
 
-            os << "Failed to apply app buffer: " << &ws.get_data()[0]
-               << ", seqno: "<< trx.global_seqno() << ", status: " << err_str;
+            os << "Failed to apply app buffer: "
+               << "seqno: "<< trx.global_seqno() << ", status: " << err_str;
 
             galera::ApplyException ae(os.str(), err);
 
@@ -53,7 +58,7 @@ apply_wscoll(void*                    recv_ctx,
         }
     }
 
-    assert(offset == wscoll.size());
+    assert(offset == buf_len);
 
     return;
 }
