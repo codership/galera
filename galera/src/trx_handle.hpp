@@ -9,6 +9,7 @@
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "fsm.hpp"
+#include "key_data.hpp" // for append_key()
 #include "key_entry_os.hpp"
 
 #include "wsrep_api.h"
@@ -222,13 +223,14 @@ namespace galera
         void set_flags(int flags) { write_set_flags_ = flags; }
         int flags() const { return write_set_flags_; }
 
-        void append_key(const KeyOS& key)
+        void append_key(const KeyData& key)
         {
-            if (key.version() != version_)
+            /*! protection against protocol change during trx lifetime */
+            if (key.proto_ver != version_)
             {
                 gu_throw_error(EINVAL)
                     << "key version '"
-                    << key.version()
+                    << key.proto_ver
                     << "' does not match to trx version' "
                     << version_ << "'";
             }

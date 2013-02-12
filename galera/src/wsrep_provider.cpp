@@ -1,6 +1,8 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
+
+#include "key_data.hpp"
 
 #if defined(GALERA_MULTIMASTER)
 #include "replicator_smm.hpp"
@@ -12,6 +14,7 @@
 #include "wsrep_params.hpp"
 
 #include <cassert>
+
 
 using galera::KeyOS;
 using galera::WriteSet;
@@ -442,11 +445,13 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            galera::KeyOS k(repl->trx_proto_ver(),
-                          keys[i].key_parts,
-                          keys[i].key_parts_num,
-                          // std::min(key[i].key_parts_len, size_t(2)),
-                          (shared == true ? galera::KeyOS::F_SHARED : 0));
+            galera::KeyData k (repl->trx_proto_ver(),
+                               keys[i].key_parts,
+                               keys[i].key_parts_num,
+                               // std::min(key[i].key_parts_len, size_t(2)),
+//                              (shared == true ? galera::KeyOS::F_SHARED : 0)
+                               nocopy, shared
+                              );
             // log_info << k;
             trx->append_key(k);
         }
@@ -558,9 +563,10 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            trx->append_key(KeyOS(repl->trx_proto_ver(),
-                                keys[i].key_parts,
-                                keys[i].key_parts_num, 0));
+            galera::KeyData k(repl->trx_proto_ver(),
+                              keys[i].key_parts,
+                              keys[i].key_parts_num, false, false);
+            trx->append_key(k);
         }
         trx->append_data(action, action_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);

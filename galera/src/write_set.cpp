@@ -68,8 +68,14 @@ size_t galera::WriteSet::keys(const gu::byte_t* buf,
     return offset;
 }
 
-void galera::WriteSet::append_key(const KeyOS& key)
+void galera::WriteSet::append_key(const KeyData& kd)
 {
+    KeyOS key (kd.proto_ver,
+               kd.key_parts,
+               kd.key_parts_num,
+               (kd.shared == true ? galera::KeyOS::F_SHARED : 0)
+               );
+
     const size_t hash(key.hash());
 
     std::pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator>

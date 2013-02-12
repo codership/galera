@@ -25,7 +25,7 @@ static suite_creator_t suites[] =
     write_set_suite,
     trx_handle_suite,
     service_thd_suite,
-//    ist_suite,
+    ist_suite,
     saved_state_suite,
     0
 };

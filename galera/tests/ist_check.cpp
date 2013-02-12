@@ -218,6 +218,7 @@ static int select_trx_version(int protocol_version)
 
 static void test_ist_common(int version)
 {
+    using galera::KeyData;
     using galera::TrxHandle;
     using galera::KeyOS;
     int trx_version(select_trx_version(version));
@@ -239,7 +240,7 @@ static void test_ist_common(int version)
             {"key1", 4},
             {"key2", 4}
         };
-        trx->append_key(KeyOS(trx_version, key, 2, 0));
+        trx->append_key(KeyData(trx_version, key, 2, 0, 0));
         trx->append_data("bar", 3);
 
         size_t trx_size(serial_size(*trx));

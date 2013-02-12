@@ -57,7 +57,7 @@ namespace galera
 
         void set_version(int version) { version_ = version; }
 
-        void append_key(const KeyOS& k)
+        void append_key(const KeyData& k)
         {
             keys_.append(k);
         }
