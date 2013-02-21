@@ -1080,7 +1080,6 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
         log_info << "Dropping bootstrap install in TRANS state";
         return;
     }
-    log_info << "trans install";
 
     gcomm_assert(have_quorum(current_view_, pc_view_) == true);
 
@@ -1096,9 +1095,10 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
         }
     }
 
-    if (have_quorum(current_view_, new_pc_view) == false)
+    if (have_quorum(current_view_, new_pc_view) == false ||
+        pc_view_.type() == V_NON_PRIM)
     {
-        log_warn << "Trans install leads to non-prim";
+        log_info << "Trans install leads to non-prim";
         mark_non_prim();
         deliver_view();
         for (NodeMap::const_iterator i(msg.node_map().begin());
