@@ -37,16 +37,19 @@ public:
     enum Flags
     {
         F_PRIM   = 0x1,
-        F_WEIGHT = 0x2
+        F_WEIGHT = 0x2,
+        F_UN     = 0x4
     };
 
     Node(const bool     prim      = false,
+         const bool     un        = false,
          const uint32_t last_seq  = std::numeric_limits<uint32_t>::max(),
          const ViewId&  last_prim = ViewId(V_NON_PRIM),
          const int64_t  to_seq    = -1,
          const int      weight    = -1)
         :
         prim_      (prim     ),
+        un_        (un       ),
         last_seq_  (last_seq ),
         last_prim_ (last_prim),
         to_seq_    (to_seq   ),
@@ -54,12 +57,14 @@ public:
     { }
 
     void set_prim      (const bool val)          { prim_      = val      ; }
+    void set_un        (const bool un)           { un_        = un       ; }
     void set_last_seq  (const uint32_t seq)      { last_seq_  = seq      ; }
     void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
     void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
     void set_weight    (const int weight)        { weight_    = weight   ; }
 
     bool          prim()      const { return prim_     ; }
+    bool          un()        const { return un_       ; }
     uint32_t      last_seq()  const { return last_seq_ ; }
     const ViewId& last_prim() const { return last_prim_; }
     int64_t       to_seq()    const { return to_seq_   ; }
@@ -74,6 +79,7 @@ public:
         gu_trace (off = gu::unserialize4(buf, buflen, off, flags));
 
         prim_ = flags & F_PRIM;
+        un_   = flags & F_UN;
         if (flags & F_WEIGHT)
         {
             weight_ = flags >> 24;
@@ -96,6 +102,7 @@ public:
         uint32_t flags = 0;
 
         flags |= prim_ ? F_PRIM : 0;
+        flags |= un_   ? F_UN   : 0;
         if (weight_ >= 0)
         {
             flags |= F_WEIGHT;
@@ -123,6 +130,7 @@ public:
     bool operator==(const Node& cmp) const
     {
         return (prim()   == cmp.prim()         &&
+                un()     == cmp.un()           &&
                 last_seq()  == cmp.last_seq()  &&
                 last_prim() == cmp.last_prim() &&
                 to_seq()    == cmp.to_seq()    &&
@@ -134,6 +142,7 @@ public:
         std::ostringstream ret;
 
         ret << "prim="       << prim_
+            << ",un="        << un_
             << ",last_seq="  << last_seq_
             << ",last_prim=" << last_prim_
             << ",to_seq="    << to_seq_
@@ -145,6 +154,7 @@ public:
 private:
 
     bool     prim_;      // Is node in prim comp
+    bool     un_;        // The prim status of the node is unknown
     uint32_t last_seq_;  // Last seen message seq from the node
     ViewId   last_prim_; // Last known prim comp view id for the node
     int64_t  to_seq_;    // Last known TO seq for the node
