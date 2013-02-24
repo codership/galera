@@ -73,14 +73,14 @@ namespace galera
     public:
 
         DataSetOut (const std::string& base_name,
-                    int                version)
+                    DataSet::Version   version)
             :
             RecordSetOut (
                 base_name,
-                check_type      (DataSet::ws_to_ds_version(version)),
-                ds_to_rs_version(DataSet::ws_to_ds_version(version))
+                check_type      (version),
+                ds_to_rs_version(version)
                 ),
-            version_(DataSet::ws_to_ds_version(version))
+            version_(version)
         {}
 
         size_t
@@ -138,7 +138,7 @@ namespace galera
 
         DataSetIn (DataSet::Version ver, const gu::byte_t* buf, size_t size)
             :
-            RecordSetIn(buf, size),
+            RecordSetIn(buf, size, false),
             version_(ver)
         {}
 

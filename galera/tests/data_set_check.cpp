@@ -12,6 +12,8 @@
 
 #include <check.h>
 
+using namespace galera;
+
 class TestRecord
 {
 public:
@@ -97,9 +99,9 @@ START_TEST (ver0)
     size_t const MB = 1 << 20;
 
     TestRecord rout0(128,  "abc0");
-    TestRecord rout1(128,  "abc1");
-    TestRecord rout2(128,  "012345");
-    TestRecord rout3(128,  "defghij");
+    TestRecord rout1(127,  "abc1");
+    TestRecord rout2(126,  "012345");
+    TestRecord rout3(125,  "defghij");
     TestRecord rout4(3*MB, "klm");
     TestRecord rout5(1*MB, "qpr");
 
@@ -111,7 +113,7 @@ START_TEST (ver0)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    galera::DataSetOut dset_out("data_set_test", 3);
+    DataSetOut dset_out("data_set_test", DataSet::VER1);
 
     size_t offset(dset_out.size());
 

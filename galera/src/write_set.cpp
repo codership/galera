@@ -71,8 +71,8 @@ size_t galera::WriteSet::keys(const gu::byte_t* buf,
 void galera::WriteSet::append_key(const KeyData& kd)
 {
     KeyOS key (kd.proto_ver,
-               kd.key_parts,
-               kd.key_parts_num,
+               kd.parts,
+               kd.parts_num,
                (kd.shared == true ? galera::KeyOS::F_SHARED : 0)
                );
 

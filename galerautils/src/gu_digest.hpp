@@ -41,22 +41,8 @@ public:
     template <typename T> void
     append (const T& obj) { append (&obj, sizeof(obj)); }
 
-    int
-    gather (void* const out, ssize_t size) const
-    {
-        switch (size)
-        {
-        case 16: my_gather16 (out);
-            break;
-        case 8: *(reinterpret_cast<uint64_t*>(out)) = htog64 (my_gather8());
-            break;
-        case 4: *(reinterpret_cast<uint32_t*>(out)) = htog32 (my_gather4());
-            break;
-        default: size = my_gather (out, size);
-        }
-
-        return size;
-    }
+    template <size_t size> int
+    gather (void* const out) const { return my_gather (out, size); }
 
     template <typename T> int
     gather (T& out) const { return my_gather(&out, sizeof(T)); }
@@ -70,7 +56,7 @@ protected:
 
 private:
 
-    char const size_; // max digest size in bytes. cannot be more than 32
+    char size_; // max digest size in bytes. cannot be more than 32
 
     virtual void     my_append   (const void* in, size_t size) = 0;
 
@@ -86,7 +72,7 @@ private:
 
     ssize_t  my_serialize_to (void* buf, ssize_t size) const
     {
-        return gather (buf, size);
+        return my_gather (buf, size);
     }
 };
 
@@ -101,6 +87,21 @@ Digest::gather (uint32_t& out) const { out = my_gather4(); return sizeof(out); }
 
 template <> inline int
 Digest::gather (uint64_t& out) const { out = my_gather8(); return sizeof(out); }
+
+template <> inline int
+Digest::gather<16> (void* const out) const { my_gather16(out); return 16; }
+
+template <> inline int
+Digest::gather<8> (void* const out) const
+{
+    *(reinterpret_cast<uint64_t*>(out)) = htog64 (my_gather8()); return 8;
+}
+
+template <> inline int
+Digest::gather<4> (void* const out) const
+{
+    *(reinterpret_cast<uint32_t*>(out)) = htog32 (my_gather4()); return 4;
+}
 
 
 class MMH3 : public Digest

@@ -13,6 +13,7 @@ galera_check = env.Program(target='galera_check',
                            source=Split('''
                                galera_check.cpp
                                data_set_check.cpp
+                               key_set_check.cpp
                                write_set_check.cpp
                                trx_handle_check.cpp
                                service_thd_check.cpp

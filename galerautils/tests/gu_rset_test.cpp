@@ -99,10 +99,10 @@ START_TEST (ver0)
 
     // the choice of sizes below is based on default allocator memory page size
     // of 4MB. If it is changed, these need to be changed too.
-    TestRecord rout0(128,  "abc0");
-    TestRecord rout1(128,  "abc1");
-    TestRecord rout2(128,  "012345");
-    TestRecord rout3(128,  "defghij");
+    TestRecord rout0(120,  "abc0");
+    TestRecord rout1(121,  "abc1");
+    TestRecord rout2(122,  "012345");
+    TestRecord rout3(123,  "defghij");
     TestRecord rout4(3*MB, "klm");
     TestRecord rout5(1*MB, "qpr");
 
@@ -119,26 +119,30 @@ START_TEST (ver0)
                                           gu::RecordSet::VER1);
 
     size_t offset(rset_out.size());
+    ssize_t ret;
 
     fail_if (1 != rset_out.page_count());
 
     // this should be allocated inside current page
-    rset_out.append (rout0);
-    offset += rout1.serial_size();
+    ret = rset_out.append (rout0).second;
+    fail_if (ret != rout0.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (1 != rset_out.page_count());
 
     // this should trigger new page since not stored
-    rset_out.append (rout1.buf(), rout1.serial_size(), false);
-    offset += rout1.serial_size();
+    ret = rset_out.append (rout1.buf(), rout1.serial_size(), false).second;
+    fail_if (ret != rout1.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (2 != rset_out.page_count());
 
     // this should trigger new page since previous one was not stored
-    rset_out.append (rout2);
-    offset += rout2.serial_size();
+    ret = rset_out.append (rout2).second;
+    fail_if (ret != rout2.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (3 != rset_out.page_count(),
@@ -146,26 +150,30 @@ START_TEST (ver0)
 
     //***** test partial record appending *****//
     // this should be allocated inside the current page.
-    rset_out.append (rout3.buf(), 3);
+    ret = rset_out.append (rout3.buf(), 3).second;
     fail_if (3 != rset_out.page_count());
 
     // this should trigger a new page, since not stored
-    rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false, false);
-    offset += rout3.serial_size();
+    ret += rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false,
+                            false).second;
+    fail_if (ret != rout3.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (4 != rset_out.page_count());
 
     // this should trigger new page, because won't fit in the current page
-    rset_out.append (rout4);
-    offset += rout4.serial_size();
+    ret = rset_out.append (rout4).second;
+    fail_if (ret != rout4.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (5 != rset_out.page_count());
 
     // this should trigger new page, because 4MB RAM limit exceeded
-    rset_out.append (rout5);
-    offset += rout5.serial_size();
+    ret = rset_out.append (rout5).second;
+    fail_if (ret != rout5.serial_size());
+    offset += ret;
     fail_if (rset_out.size() != offset);
 
     fail_if (6 != rset_out.page_count(),

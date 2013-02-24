@@ -196,9 +196,10 @@ protected:
     }
 
     template <class R, bool has_ptr>
-    size_t append_base (const R& record,
-                        bool const store = true,
-                        bool const new_record = true)
+    std::pair<const byte_t*, size_t>
+    append_base (const R& record,
+                 bool const store = true,
+                 bool const new_record = true)
     {
         ssize_t const size (record.serial_size());
 
@@ -216,7 +217,7 @@ protected:
 
         post_append (new_page, ptr, size);
 
-        return size;
+        return std::pair<const byte_t*, size_t>(ptr, size);
     }
 
 #endif /* OLD */
@@ -269,14 +270,16 @@ public:
 #endif
             ) {}
 
-    size_t append (const R& r)
+    std::pair<const byte_t*, size_t>
+    append (const R& r)
     {
         return append_base<R, false> (r);
 //        return append_base<R> (r); old append_base() method
     }
 
-    ssize_t append (const void* const src, ssize_t const size,
-                    bool const store = true, bool const new_record = true)
+    std::pair<const byte_t*, size_t>
+    append (const void* const src, ssize_t const size,
+            bool const store = true, bool const new_record = true)
     {
         assert (src);
         assert (size);
@@ -302,7 +305,7 @@ private:
         {}
 
         size_t serial_size() const { return size_; }
-        const byte_t* ptr()  const { return ptr_; }
+        const byte_t* ptr()  const { return ptr_;  }
 
         size_t serialize_to (byte_t* const dst, size_t) const
         {

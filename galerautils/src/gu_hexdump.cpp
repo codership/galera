@@ -8,6 +8,7 @@
 #include "gu_hexdump.hpp"
 
 #include "gu_hexdump.h"
+#include "gu_logger.hpp"
 
 namespace gu {
 
