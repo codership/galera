@@ -180,12 +180,13 @@ private:
 
     bool requires_rtr() const;
     bool is_prim() const;
-    bool have_quorum(const View&) const;
+    bool have_quorum(const View&, const View&) const;
     bool have_split_brain(const View&) const;
     void validate_state_msgs() const;
     void cleanup_instances();
     void handle_state(const Message&, const UUID&);
     void handle_install(const Message&, const UUID&);
+    void handle_trans_install(const Message&, const UUID&);
     void handle_user(const Message&, const Datagram&,
                      const ProtoUpMeta&);
     void deliver_view(bool bootstrap = false);
