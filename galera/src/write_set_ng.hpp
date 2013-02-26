@@ -23,39 +23,33 @@
 //#include "gu_unordered.hpp"
 
 #include <vector>
-//#include <deque>
 #include <string>
 
-//#include <cstring>
 
 namespace galera
 {
     class WriteSetNG
     {
-    protected:
-        ~WriteSetNG() {}
     };
 
     class WriteSetOut
     {
     public:
-//        typedef std::deque<Key> KeySequence;
 
-        WriteSetOut (std::string& base_name,
-                     int version,
+        WriteSetOut (const std::string& base_name,
+                     int ver,
                      size_t max_size = 0x7fffffff)
             :
             version_(version),
-            keys_(base_name + "_keys", version_),
-            data_(base_name + "_data", version_),
-            unrd_(base_name + "_unrd", version_),
+            keys_(base_name + "_keys", ws_to_ks_version(ver)),
+            data_(base_name + "_data", ws_to_ds_version(ver)),
+            unrd_(base_name + "_unrd", ws_to_ds_version(ver)),
             left_(max_size - keys_.size() - data_.size() - unrd_.size()
                   - header_size(version_))
         {}
 
         ~WriteSetOut() {}
 
-        void set_version(int version) { version_ = version; }
 
         void append_key(const KeyData& k)
         {
@@ -64,12 +58,12 @@ namespace galera
 
         void append_data(const void*data, size_t data_len, bool store)
         {
-            data_.append(data, data_len, store = true);
+            data_.append(data, data_len, store);
         }
 
         void append_unordered(const void*data, size_t data_len, bool store)
         {
-            unrd_.append(data, data_len, store = true);
+            unrd_.append(data, data_len, store);
         }
 
         bool empty() const

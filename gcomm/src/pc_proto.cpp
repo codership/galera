@@ -397,20 +397,20 @@ static bool have_weights(const gcomm::NodeList& node_list,
 }
 
 
-bool gcomm::pc::Proto::have_quorum(const View& view) const
+bool gcomm::pc::Proto::have_quorum(const View& view, const View& pc_view) const
 {
     if (have_weights(view.members(), instances_) &&
         have_weights(view.left(), instances_)    &&
-        have_weights(pc_view_.members(), instances_))
+        have_weights(pc_view.members(), instances_))
     {
         return (weighted_sum(view.members(), instances_) * 2
                 + weighted_sum(view.left(), instances_) >
-                weighted_sum(pc_view_.members(), instances_));
+                weighted_sum(pc_view.members(), instances_));
     }
     else
     {
         return (view.members().size()*2 + view.left().size() >
-                pc_view_.members().size());
+                pc_view.members().size());
     }
 }
 
@@ -443,7 +443,7 @@ void gcomm::pc::Proto::handle_trans(const View& view)
               << "\n\n next view " << view
               << "\n\n pc view " << pc_view_;
 
-    if (have_quorum(view) == false)
+    if (have_quorum(view, pc_view_) == false)
     {
         if (closing_ == false && ignore_sb_ == true && have_split_brain(view))
         {
@@ -678,6 +678,15 @@ void gcomm::pc::Proto::cleanup_instances()
                       << " cleaning up instance " << uuid;
             instances_.erase(i);
         }
+        else
+        {
+            // Clear unknow status from nodes in current view here.
+            // New PC has been installed and if paritioning happens,
+            // we either know for sure that the other partitioned component ends
+            // up in non-prim, or in other case we have valid PC view to
+            // deal with in case of remerge.
+            NodeMap::value(i).set_un(false);
+        }
     }
 }
 
@@ -696,6 +705,7 @@ bool gcomm::pc::Proto::is_prim() const
 
         if (state.prim() == true)
         {
+            log_info << "Node " << SMMap::key(i) << " state prim";
             prim      = true;
             last_prim = state.last_prim();
             to_seq    = state.to_seq();
@@ -739,6 +749,30 @@ bool gcomm::pc::Proto::is_prim() const
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
+
+        // first determine if there are any nodes still in unknown state
+        std::set<UUID> un;
+        for (NodeMap::const_iterator i(instances_.begin());
+             i != instances_.end(); ++i)
+        {
+            if (NodeMap::value(i).un() == true &&
+                current_view_.members().find(NodeMap::key(i)) ==
+                current_view_.members().end())
+            {
+                un.insert(NodeMap::key(i));
+            }
+        }
+
+        if (un.empty() == false)
+        {
+            std::ostringstream oss;
+            std::copy(un.begin(), un.end(),
+                      std::ostream_iterator<UUID>(oss, " "));
+            log_info << "Nodes " << oss.str() << "are still in unknown state, "
+                     << "unable to rebootstrap new prim";
+            return false;
+        }
+
 
         MultiMap<ViewId, UUID> last_prim_uuids;
 
@@ -800,8 +834,10 @@ bool gcomm::pc::Proto::is_prim() const
         log_debug << self_id()
                   << " intersection size " << intersection.size()
                   << " greatest view size " << greatest_view.size();
+
         if (intersection.size() == greatest_view.size())
         {
+            log_info << "re-bootstrapping prim from partitioned components";
             prim = true;
         }
     }
@@ -864,18 +900,27 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
                 const UUID& sm_uuid(NodeMap::key(j));
                 const Node& sm_node(NodeMap::value(j));
                 NodeMap::iterator local_node_i(instances_.find(sm_uuid));
-                Node& local_node(NodeMap::value(local_node_i));
                 if (local_node_i == instances_.end())
                 {
                     const Node& sm_state(NodeMap::value(j));
                     instances_.insert_unique(std::make_pair(sm_uuid, sm_state));
                 }
-                else if (local_node.weight() == -1 && sm_node.weight() != -1)
+                else
                 {
-                    // backwards compatibility: override weight for instances
-                    // which have been reported by old nodes but have weights
-                    // associated anyway
-                    local_node.set_weight(sm_node.weight());
+                    Node& local_node(NodeMap::value(local_node_i));
+                    if (local_node.weight() == -1 && sm_node.weight() != -1)
+                    {
+                        // backwards compatibility: override weight for
+                        // instances which have been reported by old nodes
+                        // but have weights associated anyway
+                        local_node.set_weight(sm_node.weight());
+                    }
+                    if (sm_node.un() == true)
+                    {
+                        // set local instance status to unknown if any of the
+                        // state messages has it marked unknown
+                        local_node.set_un(true);
+                    }
                 }
             }
         }
@@ -908,6 +953,12 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 
 void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
 {
+    if (state() == S_TRANS)
+    {
+        handle_trans_install(msg, source);
+        return;
+    }
+
     gcomm_assert(msg.type() == Message::T_INSTALL);
     gcomm_assert(state() == S_INSTALL || state() == S_NON_PRIM);
 
@@ -1007,6 +1058,69 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
     cleanup_instances();
 }
 
+// When delivering install message in trans view quorum has to be re-evaluated
+// as the partitioned component may have installed prim view due to higher
+// weight. To do this, we construct pc view that would have been installed
+// if install message was delivered in reg view and make quorum computation
+// against it.
+//
+// It is not actually known if partitioned component installed new PC, so
+// we mark partitioned nodes states as unknown. This is to provide deterministic
+// way to prevent automatic rebootstrapping of PC if some of the seen nodes
+// is in unknown state.
+void
+gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
+{
+    gcomm_assert(msg.type() == Message::T_INSTALL);
+    gcomm_assert(state() == S_TRANS);
+    gcomm_assert(current_view_.type() == V_TRANS);
+
+    if ((msg.flags() & Message::F_BOOTSTRAP) != 0)
+    {
+        log_info << "Dropping bootstrap install in TRANS state";
+        return;
+    }
+
+    gcomm_assert(have_quorum(current_view_, pc_view_) == true);
+
+    View new_pc_view(ViewId(V_PRIM, current_view_.id()));
+    for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
+         ++i)
+    {
+        const UUID& uuid(NodeMap::key(i));
+        NodeMap::const_iterator ni(msg.node_map().find(uuid));
+        if (ni != msg.node_map().end())
+        {
+            new_pc_view.add_member(uuid);
+        }
+    }
+
+    if (have_quorum(current_view_, new_pc_view) == false ||
+        pc_view_.type() == V_NON_PRIM)
+    {
+        log_info << "Trans install leads to non-prim";
+        mark_non_prim();
+        deliver_view();
+        for (NodeMap::const_iterator i(msg.node_map().begin());
+             i != msg.node_map().end(); ++i)
+        {
+            if (current_view_.members().find(NodeMap::key(i)) ==
+                current_view_.members().end())
+            {
+                NodeMap::iterator local_i(instances_.find(NodeMap::key(i)));
+                if (local_i == instances_.end())
+                {
+                    log_warn << "Node " << NodeMap::key(i)
+                             << " not found from instances";
+                }
+                else
+                {
+                    NodeMap::value(local_i).set_un(true);
+                }
+            }
+        }
+    }
+}
 
 void gcomm::pc::Proto::handle_user(const Message& msg, const Datagram& dg,
                                    const ProtoUpMeta& um)
@@ -1079,7 +1193,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
         {  FAIL,   FAIL,    DROP,     ACCEPT  },  // PRIM
 
-        {  FAIL,   DROP,    DROP,     ACCEPT  },  // TRANS
+        {  FAIL,   DROP,    ACCEPT,   ACCEPT  },  // TRANS
 
         {  FAIL,   ACCEPT,  ACCEPT,   ACCEPT  }   // NON-PRIM
     };

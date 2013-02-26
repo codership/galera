@@ -176,7 +176,7 @@ KeySetOut::KeyPart::print (std::ostream& os) const
     os << " / " << gu::Hexdump(value_, size_, true);
 }
 
-void
+size_t
 KeySetOut::append (const KeyData& kd)
 {
     int i(0);
@@ -199,7 +199,7 @@ KeySetOut::append (const KeyData& kd)
         {
             assert (prev_.size() == (i + 1U));
             log_info << "Returning after matching exclusive key: " << prev_[i];
-            return;
+            return 0;
         }
 
         if (kd.parts_num == i) /* leaf */
@@ -208,7 +208,7 @@ KeySetOut::append (const KeyData& kd)
             if (kd.shared)
             {
                 log_info << "Returning after matching all " << i << " parts";
-                return;
+                return 0;
             }
             else /* need to add exclusive copy of the key */
                 --i;
@@ -222,6 +222,7 @@ KeySetOut::append (const KeyData& kd)
 
     /* create parts that didn't match previous key and add to the set
      * of previously added keys. */
+    size_t const old_size (size());
     int j(0);
     for (; i < kd.parts_num; ++i, ++j)
     {
@@ -242,9 +243,9 @@ KeySetOut::append (const KeyData& kd)
             assert (i + 1 == kd.parts_num);
             /* There is very small probability that child part thows DUPLICATE
              * even after parent was added as a new key. It does not matter:
-             * no resources allocated in memory. */
-            log_info << "Returning after throwing a DUPLICATE. Part: " << i;
-            return;
+             * a duplicate will be a duplicate in certification as well. */
+            log_info << "Returning after catching a DUPLICATE. Part: " << i;
+            goto out;
         }
 
         parent = &new_[j];
@@ -267,6 +268,8 @@ KeySetOut::append (const KeyData& kd)
         {
             prev_[k].acquire();
         }
+out:
+    return size() - old_size;
 }
 
 #if 0

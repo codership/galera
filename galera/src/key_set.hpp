@@ -428,7 +428,7 @@ public:
 
     ~KeySetOut () {}
 
-    void
+    size_t
     append (const KeyData& kd);
 
     KeySet::Version
