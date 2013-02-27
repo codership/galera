@@ -83,7 +83,8 @@ createdb()
 
 cleandb()
 { 
-    $MYSQL -e "
+    PORT=$1
+    $MYSQL --port $PORT -e "
         DROP TABLE IF EXISTS test.lp1019473;"
 }
 
@@ -115,7 +116,7 @@ wait
 
 ../../scripts/command.sh check
 
-cleandb
+cleandb $PORT_0
 
 echo
 echo "Done!"
@@ -124,46 +125,4 @@ echo
 ../../scripts/command.sh stop
 
 exit 0
-
-
-
-
-
-
-
-
-
-
-run_test()
-{
-    local charset=$1
-
-    echo
-    echo "##    Testing character set: $charset"
-    echo
-
-    createdb $charset
-
-    for i in 10 20 30 40 50 60; do
-	echo
-	echo "populating database, ${i}K rows..."
-	populate $i
-
-	echo "testing..."
-	run_deletes
-	
-	check_cluster $INITIAL_SIZE
-    done
-
-    echo
-    echo "##    Consistency checks"
-    echo
-
-    $MYSQL --port=$port_0 -e 'SHOW PROCESSLIST'
-    echo
-    $MYSQL --port=$port_1 -e 'SHOW PROCESSLIST'
-    [ "$?" != "0" ] && echo "failed!" && exit 1
-
-    $SCRIPTS/command.sh check
-}
 
