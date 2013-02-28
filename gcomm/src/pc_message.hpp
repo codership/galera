@@ -179,7 +179,8 @@ public:
     enum
     {
         F_CRC16 = 0x1,
-        F_BOOTSTRAP = 0x2
+        F_BOOTSTRAP = 0x2,
+        F_WEIGHT_CHANGE = 0x4
     };
 
     static const char* to_string(Type t)
@@ -243,6 +244,8 @@ public:
     NodeMap&       node_map()       { return node_map_; }
 
     const Node&    node(const UUID& uuid) const
+    { return NodeMap::value(node_map_.find_checked(uuid)); }
+    Node& node(const UUID& uuid)
     { return NodeMap::value(node_map_.find_checked(uuid)); }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)

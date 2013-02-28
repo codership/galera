@@ -150,8 +150,9 @@ void gcomm::pc::Proto::send_state()
     }
 }
 
-void gcomm::pc::Proto::send_install(bool bootstrap)
+void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
 {
+    gcomm_assert(bootstrap == false || weight == -1);
     log_debug << self_id() << " send install";
 
     InstallMessage pci(version_);
@@ -176,6 +177,13 @@ void gcomm::pc::Proto::send_install(bool bootstrap)
     {
         pci.flags(pci.flags() | InstallMessage::F_BOOTSTRAP);
         log_debug << self_id() << " sending PC bootstrap message " << pci;
+    }
+    else if (weight != -1)
+    {
+        pci.flags(pci.flags() | InstallMessage::F_WEIGHT_CHANGE);
+        Node& self(pci.node(uuid()));
+        self.set_weight(weight);
+        log_info << self_id() << " sending PC weight change message " << pci;
     }
     else
     {
@@ -915,6 +923,14 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
                         // but have weights associated anyway
                         local_node.set_weight(sm_node.weight());
                     }
+                    else if (local_node.weight() != sm_node.weight() &&
+                             SMMap::key(i) == NodeMap::key(local_node_i))
+                    {
+                        log_warn << self_id()
+                                 << "overriding reported weight for "
+                                 << NodeMap::key(local_node_i);
+                        local_node.set_weight(sm_node.weight());
+                    }
                     if (sm_node.un() == true)
                     {
                         // set local instance status to unknown if any of the
@@ -953,7 +969,25 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 
 void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
 {
-    if (state() == S_TRANS)
+    if (state() == S_PRIM)
+    {
+        if ((msg.flags() & Message::F_WEIGHT_CHANGE) == 0)
+        {
+            log_warn << "non weight changing install in S_PRIM: " << msg;
+        }
+        else
+        {
+            NodeMap::iterator local_i(instances_.find(source));
+            const Node& msg_n(msg.node(source));
+            log_info << self_id() << " changing node " << source
+                     << " weight (reg) " << NodeMap::value(local_i).weight()
+                     << " -> " << msg_n.weight();
+            NodeMap::value(local_i).set_weight(msg_n.weight());
+
+        }
+        return;
+    }
+    else if (state() == S_TRANS)
     {
         handle_trans_install(msg, source);
         return;
@@ -1058,6 +1092,19 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
     cleanup_instances();
 }
 
+namespace
+{
+    class ViewUUIDLT
+    {
+    public:
+        bool operator()(const gcomm::NodeList::value_type& a,
+                        const gcomm::NodeList::value_type& b) const
+        {
+            return (a.first == b.first);
+        }
+    };
+}
+
 // When delivering install message in trans view quorum has to be re-evaluated
 // as the partitioned component may have installed prim view due to higher
 // weight. To do this, we construct pc view that would have been installed
@@ -1083,39 +1130,94 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
 
     gcomm_assert(have_quorum(current_view_, pc_view_) == true);
 
-    View new_pc_view(ViewId(V_PRIM, current_view_.id()));
-    for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
-         ++i)
+    if ((msg.flags() & Message::F_WEIGHT_CHANGE) != 0)
     {
-        const UUID& uuid(NodeMap::key(i));
-        NodeMap::const_iterator ni(msg.node_map().find(uuid));
-        if (ni != msg.node_map().end())
+        if (std::includes(pc_view_.members().begin(),
+                          pc_view_.members().end(),
+                          current_view_.members().begin(),
+                          current_view_.members().end(), ViewUUIDLT()) == false)
         {
-            new_pc_view.add_member(uuid);
+            // Weight changing install message delivered in trans view
+            // and previous pc view has partitioned.
+            //
+            // Need to be very conservative here: We don't know what happened to
+            // weight change message in partitioned component, so it may not be
+            // safe to do quorum calculation. Shift to non-prim and
+            // wait until partitioned component comes back (or prim is
+            // rebootstrapped).
+            log_info << "Weight changing trans install leads to non-prim";
+            mark_non_prim();
+            deliver_view();
+            for (NodeMap::const_iterator i(msg.node_map().begin());
+                 i != msg.node_map().end(); ++i)
+            {
+                if (current_view_.members().find(NodeMap::key(i)) ==
+                    current_view_.members().end())
+                {
+                    NodeMap::iterator local_i(instances_.find(NodeMap::key(i)));
+                    if (local_i == instances_.end())
+                    {
+                        log_warn << "Node " << NodeMap::key(i)
+                                 << " not found from instances";
+                    }
+                    else
+                    {
+                        if (NodeMap::key(i) == source)
+                        {
+                            NodeMap::value(local_i).set_weight(
+                                NodeMap::value(i).weight());
+                        }
+                        NodeMap::value(local_i).set_un(true);
+                    }
+                }
+            }
+        }
+        else
+        {
+            NodeMap::iterator local_i(instances_.find(source));
+            const Node& msg_n(msg.node(source));
+            log_info << self_id() << " changing node " << source
+                     << " weight (trans) " << NodeMap::value(local_i).weight()
+                     << " -> " << msg_n.weight();
+            NodeMap::value(local_i).set_weight(msg_n.weight());
         }
     }
-
-    if (have_quorum(current_view_, new_pc_view) == false ||
-        pc_view_.type() == V_NON_PRIM)
+    else
     {
-        log_info << "Trans install leads to non-prim";
-        mark_non_prim();
-        deliver_view();
-        for (NodeMap::const_iterator i(msg.node_map().begin());
-             i != msg.node_map().end(); ++i)
+        View new_pc_view(ViewId(V_PRIM, current_view_.id()));
+        for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
+             ++i)
         {
-            if (current_view_.members().find(NodeMap::key(i)) ==
-                current_view_.members().end())
+            const UUID& uuid(NodeMap::key(i));
+            NodeMap::const_iterator ni(msg.node_map().find(uuid));
+            if (ni != msg.node_map().end())
             {
-                NodeMap::iterator local_i(instances_.find(NodeMap::key(i)));
-                if (local_i == instances_.end())
+                new_pc_view.add_member(uuid);
+            }
+        }
+
+        if (have_quorum(current_view_, new_pc_view) == false ||
+            pc_view_.type() == V_NON_PRIM)
+        {
+            log_info << "Trans install leads to non-prim";
+            mark_non_prim();
+            deliver_view();
+            for (NodeMap::const_iterator i(msg.node_map().begin());
+                 i != msg.node_map().end(); ++i)
+            {
+                if (current_view_.members().find(NodeMap::key(i)) ==
+                    current_view_.members().end())
                 {
-                    log_warn << "Node " << NodeMap::key(i)
-                             << " not found from instances";
-                }
-                else
-                {
-                    NodeMap::value(local_i).set_un(true);
+                    NodeMap::iterator local_i(instances_.find(NodeMap::key(i)));
+                    if (local_i == instances_.end())
+                    {
+                        log_warn << "Node " << NodeMap::key(i)
+                                 << " not found from instances";
+                    }
+                    else
+                    {
+                        NodeMap::value(local_i).set_un(true);
+                    }
                 }
             }
         }
@@ -1191,7 +1293,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
         {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL
 
-        {  FAIL,   FAIL,    DROP,     ACCEPT  },  // PRIM
+        {  FAIL,   FAIL,    ACCEPT,     ACCEPT  },  // PRIM
 
         {  FAIL,   DROP,    ACCEPT,   ACCEPT  },  // TRANS
 
@@ -1355,6 +1457,26 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
             send_install(true);
         }
         return true;
+    }
+    else if (key == gcomm::Conf::PcWeight)
+    {
+        if (state() != S_PRIM)
+        {
+            gu_throw_error(EAGAIN)
+                << "can't change weightm: state not S_PRIM, retry again";
+        }
+        else
+        {
+            int w(gu::from_string<int>(value));
+            if (w < 0 || w > 255)
+            {
+                gu_throw_error(ERANGE) << "value " << w << " for '" << key
+                                       << "' out of range";
+            }
+            weight_ = w;
+            send_install(false, weight_);
+            return true;
+        }
     }
     else if (key == Conf::PcChecksum ||
              key == Conf::PcAnnounceTimeout ||
