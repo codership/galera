@@ -1140,11 +1140,15 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
             // Weight changing install message delivered in trans view
             // and previous pc view has partitioned.
             //
-            // Need to be very conservative here: We don't know what happened to
+            // Need to be very conservative: We don't know what happened to
             // weight change message in partitioned component, so it may not be
             // safe to do quorum calculation. Shift to non-prim and
             // wait until partitioned component comes back (or prim is
             // rebootstrapped).
+            //
+            // It would be possible to do more fine grained decisions
+            // based on the source of the message, but to keep things simple
+            // always go to non-prim, this is very cornerish case after all.
             log_info << "Weight changing trans install leads to non-prim";
             mark_non_prim();
             deliver_view();
