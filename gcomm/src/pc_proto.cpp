@@ -1132,10 +1132,10 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
 
     if ((msg.flags() & Message::F_WEIGHT_CHANGE) != 0)
     {
-        if (std::includes(pc_view_.members().begin(),
-                          pc_view_.members().end(),
-                          current_view_.members().begin(),
-                          current_view_.members().end(), ViewUUIDLT()) == false)
+        if (std::includes(current_view_.members().begin(),
+                          current_view_.members().end(),
+                          pc_view_.members().begin(),
+                          pc_view_.members().end(), ViewUUIDLT()) == false)
         {
             // Weight changing install message delivered in trans view
             // and previous pc view has partitioned.

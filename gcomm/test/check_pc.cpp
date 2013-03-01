@@ -301,6 +301,97 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     fail_unless(pu2->pc()->state() == Proto::S_PRIM);
 }
 
+// Form PC for three instances.
+static void triple_boot(PCUser* pu1, PCUser* pu2, PCUser* pu3)
+{
+    fail_unless(pu1->uuid() < pu2->uuid() && pu2->uuid() < pu3->uuid());
+
+    // trans views
+    {
+        View tr12(ViewId(V_TRANS, pu1->pc()->current_view().id()));
+        tr12.add_member(pu1->uuid(), "");
+        tr12.add_member(pu2->uuid(), "");
+
+        ProtoUpMeta trum12(UUID::nil(), ViewId(), &tr12);
+        pu1->pc()->handle_up(0, Datagram(), trum12);
+        pu2->pc()->handle_up(0, Datagram(), trum12);
+
+        fail_unless(pu1->pc()->state() == Proto::S_TRANS);
+        fail_unless(pu2->pc()->state() == Proto::S_TRANS);
+
+        pu3->pc()->connect(false);
+        View tr3(ViewId(V_TRANS, pu3->uuid(), 0));
+        tr3.add_member(pu3->uuid(), "");
+        ProtoUpMeta trum3(UUID::nil(), ViewId(), &tr3);
+        pu3->pc()->handle_up(0, Datagram(), trum3);
+
+        fail_unless(pu3->pc()->state() == Proto::S_TRANS);
+    }
+
+    // reg view
+    {
+        View reg(
+            ViewId(V_REG,
+                   pu1->uuid(), pu1->pc()->current_view().id().seq() + 1));
+        reg.add_member(pu1->uuid(), "");
+        reg.add_member(pu2->uuid(), "");
+        reg.add_member(pu3->uuid(), "");
+
+        ProtoUpMeta pum(UUID::nil(), ViewId(), &reg);
+        pu1->pc()->handle_up(0, Datagram(), pum);
+        pu2->pc()->handle_up(0, Datagram(), pum);
+        pu3->pc()->handle_up(0, Datagram(), pum);
+
+        fail_unless(pu1->pc()->state() == Proto::S_STATES_EXCH);
+        fail_unless(pu2->pc()->state() == Proto::S_STATES_EXCH);
+        fail_unless(pu3->pc()->state() == Proto::S_STATES_EXCH);
+
+    }
+
+    // states exch
+    {
+        Datagram* dg(pu1->tp()->out());
+        fail_unless(dg != 0);
+        pu1->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        pu2->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        pu3->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        delete dg;
+
+        dg = pu2->tp()->out();
+        fail_unless(dg != 0);
+        pu1->pc()->handle_up(0, *dg, ProtoUpMeta(pu2->uuid()));
+        pu2->pc()->handle_up(0, *dg, ProtoUpMeta(pu2->uuid()));
+        pu3->pc()->handle_up(0, *dg, ProtoUpMeta(pu2->uuid()));
+        delete dg;
+
+        dg = pu3->tp()->out();
+        fail_unless(dg != 0);
+        pu1->pc()->handle_up(0, *dg, ProtoUpMeta(pu3->uuid()));
+        pu2->pc()->handle_up(0, *dg, ProtoUpMeta(pu3->uuid()));
+        pu3->pc()->handle_up(0, *dg, ProtoUpMeta(pu3->uuid()));
+        delete dg;
+
+        fail_unless(pu1->pc()->state() == Proto::S_INSTALL);
+        fail_unless(pu2->pc()->state() == Proto::S_INSTALL);
+        fail_unless(pu3->pc()->state() == Proto::S_INSTALL);
+    }
+
+    // install
+    {
+        Datagram* dg(pu1->tp()->out());
+        fail_unless(dg != 0);
+        pu1->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        pu2->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        pu3->pc()->handle_up(0, *dg, ProtoUpMeta(pu1->uuid()));
+        delete dg;
+
+        fail_unless(pu1->pc()->state() == Proto::S_PRIM);
+        fail_unless(pu2->pc()->state() == Proto::S_PRIM);
+        fail_unless(pu3->pc()->state() == Proto::S_PRIM);
+    }
+}
+
+
 START_TEST(test_pc_view_changes_double)
 {
     log_info << "START (test_pc_view_changes_double)";
@@ -2229,6 +2320,132 @@ START_TEST(test_weighted_partitioning_2)
 END_TEST
 
 
+//
+// - Nodes 1-3 started with equal weights
+// - Weight for node 1 is changed to 3
+// - Group splits to (1), (2, 3)
+// - Weigh changing message is delivered in reg view in (1) and in
+//   trans in (2, 3)
+// - Expected outcome: 1 stays in prim, 2 and 3 end up in non-prim
+//
+START_TEST(test_weight_change_partitioning_1)
+{
+    log_info << "START (test_weight_change_partitioning_1)";
+    gu::Config conf1;
+    conf1.set("pc.weight", "1");
+    UUID uuid1(1);
+    ProtoUpMeta pum1(uuid1);
+    Proto pc1(conf1, uuid1);
+    DummyTransport tp1;
+    PCUser pu1(conf1, uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+
+    gu::Config conf2;
+    conf2.set("pc.weight", "1");
+    UUID uuid2(2);
+    ProtoUpMeta pum2(uuid2);
+    Proto pc2(conf2, uuid2);
+    DummyTransport tp2;
+    PCUser pu2(conf2, uuid2, &tp2, &pc2);
+
+    double_boot(&pu1, &pu2);
+
+    gu::Config conf3;
+    conf3.set("pc.weight", "1");
+    UUID uuid3(3);
+    ProtoUpMeta pum3(uuid3);
+    Proto pc3(conf3, uuid3);
+    DummyTransport tp3;
+    PCUser pu3(conf3, uuid3, &tp3, &pc3);
+
+    triple_boot(&pu1, &pu2, &pu3);
+
+    // weight change
+    {
+        pu1.pc()->set_param("pc.weight", "3");
+        Datagram* install_dg(pu1.tp()->out());
+        fail_unless(install_dg != 0);
+
+        // node 1 handle weight change install, proceed to singleton prim
+        pu1.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
+
+        View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+        tr1.add_member(pu1.uuid(), "");
+        tr1.add_partitioned(pu2.uuid(), "");
+        tr1.add_partitioned(pu3.uuid(), "");
+
+        pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        fail_unless(pu1.pc()->state() == Proto::S_TRANS);
+
+        View reg1(ViewId(V_REG, pu1.uuid(),
+                         pu1.pc()->current_view().id().seq() + 1));
+        reg1.add_member(pu1.uuid(), "");
+        pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        fail_unless(pu1.pc()->state() == Proto::S_STATES_EXCH);
+
+        Datagram* dg(pu1.tp()->out());
+        fail_unless(dg != 0);
+        pu1.pc()->handle_up(0, *dg, ProtoUpMeta(pu1.uuid()));
+        delete dg;
+        fail_unless(pu1.pc()->state() == Proto::S_INSTALL);
+
+        dg = pu1.tp()->out();
+        fail_unless(dg != 0);
+        pu1.pc()->handle_up(0, *dg, ProtoUpMeta(pu1.uuid()));
+        delete dg;
+        fail_unless(pu1.pc()->state() == Proto::S_PRIM);
+
+        // nodes 2 and 3 go to trans, handle install
+        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        tr23.add_member(pu2.uuid(), "");
+        tr23.add_member(pu3.uuid(), "");
+        tr23.add_partitioned(pu1.uuid(), "");
+
+        pu2.pc()->handle_up(0, Datagram(),
+                            ProtoUpMeta(UUID::nil(), ViewId(), &tr23));
+        pu3.pc()->handle_up(0, Datagram(),
+                            ProtoUpMeta(UUID::nil(), ViewId(), &tr23));
+        fail_unless(pu2.pc()->state() == Proto::S_TRANS);
+        fail_unless(pu3.pc()->state() == Proto::S_TRANS);
+
+        pu2.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
+        pu3.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
+
+        View reg23(ViewId(V_REG, pu2.uuid(),
+                          pu2.pc()->current_view().id().seq() + 1));
+        reg23.add_member(pu2.uuid());
+        reg23.add_member(pu3.uuid());
+
+        pu2.pc()->handle_up(0, Datagram(),
+                            ProtoUpMeta(UUID::nil(), ViewId(), &reg23));
+        pu3.pc()->handle_up(0, Datagram(),
+                            ProtoUpMeta(UUID::nil(), ViewId(), &reg23));
+        fail_unless(pu2.pc()->state() == Proto::S_STATES_EXCH);
+        fail_unless(pu3.pc()->state() == Proto::S_STATES_EXCH);
+
+        dg = pu2.tp()->out();
+        fail_unless(dg != 0);
+        pu2.pc()->handle_up(0, *dg, ProtoUpMeta(pu2.uuid()));
+        pu3.pc()->handle_up(0, *dg, ProtoUpMeta(pu2.uuid()));
+        delete dg;
+
+        dg = pu3.tp()->out();
+        fail_unless(dg != 0);
+        pu2.pc()->handle_up(0, *dg, ProtoUpMeta(pu3.uuid()));
+        pu3.pc()->handle_up(0, *dg, ProtoUpMeta(pu3.uuid()));
+        delete dg;
+
+        fail_unless(pu2.pc()->state() == Proto::S_NON_PRIM);
+        fail_unless(pu3.pc()->state() == Proto::S_NON_PRIM);
+
+        delete install_dg;
+    }
+
+}
+END_TEST
+
+
+
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
@@ -2336,6 +2553,11 @@ Suite* pc_suite()
 
     tc = tcase_create("test_weighted_partitioning_2");
     tcase_add_test(tc, test_weighted_partitioning_2);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_weight_change_partitioning_1");
+    tcase_add_test(tc, test_weight_change_partitioning_1);
     suite_add_tcase(s, tc);
 
 
