@@ -1100,7 +1100,7 @@ namespace
         bool operator()(const gcomm::NodeList::value_type& a,
                         const gcomm::NodeList::value_type& b) const
         {
-            return (a.first == b.first);
+            return (a.first < b.first);
         }
     };
 }
@@ -1132,8 +1132,12 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
 
     if ((msg.flags() & Message::F_WEIGHT_CHANGE) != 0)
     {
-        if (std::includes(current_view_.members().begin(),
-                          current_view_.members().end(),
+        NodeList nl;
+        nl.insert(current_view_.members().begin(), current_view_.members().end());
+        nl.insert(current_view_.left().begin(), current_view_.left().end());
+
+        if (std::includes(nl.begin(),
+                          nl.end(),
                           pc_view_.members().begin(),
                           pc_view_.members().end(), ViewUUIDLT()) == false)
         {
