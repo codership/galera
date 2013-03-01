@@ -983,7 +983,10 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
                      << " weight (reg) " << NodeMap::value(local_i).weight()
                      << " -> " << msg_n.weight();
             NodeMap::value(local_i).set_weight(msg_n.weight());
-
+            if (source == uuid())
+            {
+                conf_.set(gcomm::Conf::PcWeight, gu::to_string(msg_n.weight()));
+            }
         }
         return;
     }
@@ -1174,6 +1177,12 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
                         {
                             NodeMap::value(local_i).set_weight(
                                 NodeMap::value(i).weight());
+                            if (source == uuid())
+                            {
+                                conf_.set(gcomm::Conf::PcWeight,
+                                          gu::to_string(NodeMap::value(i).weight()));
+                            }
+
                         }
                         NodeMap::value(local_i).set_un(true);
                     }
@@ -1188,6 +1197,10 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
                      << " weight (trans) " << NodeMap::value(local_i).weight()
                      << " -> " << msg_n.weight();
             NodeMap::value(local_i).set_weight(msg_n.weight());
+            if (source == uuid())
+            {
+                conf_.set(gcomm::Conf::PcWeight, gu::to_string(msg_n.weight()));
+            }
         }
     }
     else
@@ -1491,8 +1504,7 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
              key == Conf::PcLinger ||
              key == Conf::PcNpvo ||
              key == Conf::PcWaitPrim ||
-             key == Conf::PcWaitPrimTimeout ||
-             key == Conf::PcWeight)
+             key == Conf::PcWaitPrimTimeout)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";
