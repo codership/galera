@@ -51,6 +51,8 @@ echo "starting node0, node1..."
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
+
+LD_PRELOAD=$GLB_PRELOAD \
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host ${NODE_INCOMING_HOST[0]} \
         --port ${NODE_INCOMING_PORT[0]} --users 1 --duration 300 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
@@ -60,6 +62,7 @@ declare -r sqlgen1_pid=$!
 
 sleep 0.2
 
+# this connects strictly to one node so no libglb preloading
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host ${NODE_INCOMING_HOST[1]} \
         --port ${NODE_INCOMING_PORT[1]} --users 1 --duration 300 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
@@ -72,7 +75,7 @@ for i in {1..150}; do
 
   sleep 0.5;
 done
-  
+
 echo "waiting sqlgens ($sqlgen1_pid $sqlgen2_pid) to complete"
 wait
 
