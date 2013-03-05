@@ -218,6 +218,12 @@ namespace gcomm
             return MapBase<K, V, C>::map_.insert(p);
         }
 
+        template <class InputIterator>
+        void insert(InputIterator first, InputIterator last)
+        {
+            MapBase<K, V, C>::map_.insert(first, last);
+        }
+
         iterator insert_unique(const typename MapBase<K, V, C>::value_type& p)
         {
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map_.insert(p);
