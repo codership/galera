@@ -45,9 +45,11 @@ SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
 round=0
 while test $round -lt $ROUNDS
 do
+    LD_PRELOAD=$GLB_PRELOAD \
     $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
-        --port $DBMS_PORT --users $DBMS_CLIENTS --duration $DURATION \
-    --stat-interval 30 --rows 1000 --ac-frac 10 --rollbacks 0.1 --alters 1
+            --port $DBMS_PORT --users $DBMS_CLIENTS --duration $DURATION \
+            --stat-interval 30 --rows 1000 --ac-frac 10 --rollbacks 0.1 \
+            --alters 1
 
     echo "checking consistency"
     check || (sleep 5 && check)

@@ -35,7 +35,7 @@ else
         args="$args --host $ii"
     done
     args="$args --port $MYSQL_PORT $@"
-    $BASE_DIR/sqlgen $args >> $SQLGEN_LOG 2>&1
+    LD_PRELOAD=$GLB_PRELOAD $BASE_DIR/sqlgen $args >> $SQLGEN_LOG 2>&1
     ok $? "sqlgen"
 fi
 
