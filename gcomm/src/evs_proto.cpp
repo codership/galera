@@ -173,7 +173,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     use_aggregate_(param<bool>(conf, uri, Conf::EvsUseAggregate, "true")),
     self_loopback_(false),
     state_(S_CLOSED),
-    shift_to_rfcnt_(0)
+    shift_to_rfcnt_(0),
+    pending_leave_(false)
 {
     log_info << "EVS version " << version_;
 
@@ -2718,6 +2719,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                         profile_enter(shift_to_prof_);
                         gu_trace(shift_to(S_OPERATIONAL));
                         profile_leave(shift_to_prof_);
+                        if (pending_leave_ == true)
+                        {
+                            close();
+                        }
                     }
                     else
                     {
@@ -2934,6 +2939,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             profile_enter(shift_to_prof_);
             gu_trace(shift_to(S_OPERATIONAL));
             profile_leave(shift_to_prof_);
+            if (pending_leave_ == true)
+            {
+                close();
+            }
         }
         return;
     }
