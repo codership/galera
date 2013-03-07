@@ -201,7 +201,7 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     pc_        (0),
     closed_    (true),
     linger_    (param<gu::datetime::Period>(
-                    conf_, uri, Conf::PcLinger, "PT2S")),
+                    conf_, uri, Conf::PcLinger, "PT20S")),
     announce_timeout_(param<gu::datetime::Period>(
                           conf_, uri, Conf::PcAnnounceTimeout,
                           Defaults::PcAnnounceTimeout))
