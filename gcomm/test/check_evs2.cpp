@@ -1472,6 +1472,62 @@ START_TEST(test_trac_552)
 END_TEST
 
 
+START_TEST(test_trac_607)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (trac_607)";
+
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+    dn[0]->set_cvi(V_REG);
+    dn[0]->close();
+
+    while (reinterpret_cast<const Proto*>(dn[1]->protos().back())->state() != Proto::S_INSTALL)
+    {
+        prop.propagate_n(1);
+    }
+
+    // this used to cause exception:
+    // Forbidden state transition: INSTALL -> LEAVING (FATAL)
+    dn[1]->close();
+
+    // expected behavior:
+    // dn[1], dn[2] reach S_OPERATIONAL and then dn[1] leaves gracefully
+    set_cvi(dn, 1, n_nodes - 1, max_view_seq + 1);
+
+    gu_trace(prop.propagate_until_cvi(true));
+    max_view_seq = get_max_view_seq(dn, 0, n_nodes);
+    dn[1]->set_cvi(V_REG);
+    set_cvi(dn, 2, 2, max_view_seq + 1);
+
+    gu_trace(prop.propagate_until_cvi(true));
+
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
 
 Suite* evs2_suite()
 {
@@ -1604,6 +1660,11 @@ Suite* evs2_suite()
 
         tc = tcase_create("test_trac_552");
         tcase_add_test(tc, test_trac_552);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_trac_607");
+        tcase_add_test(tc, test_trac_607);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
     }
