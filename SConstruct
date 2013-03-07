@@ -93,8 +93,8 @@ elif sysname == 'sunos':
     compile_arch = ''
     link_arch    = ''
 else:
-    print 'Unsupported target architecture: ' + arch
-    Exit(1)
+    compile_arch = ''
+    link_arch    = ''
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 1))
