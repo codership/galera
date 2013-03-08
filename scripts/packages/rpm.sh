@@ -46,9 +46,9 @@ $(which rpmbuild) --clean --define "_topdir $RPM_TOP_DIR" \
                   --define "release $RELEASE" \
                   -bb --short-circuit -bi $GALERA_SPEC
 
-ARCH=$(uname -m)
+RPM_ARCH=$(uname -m | sed s/i686/i386/)
 
-mv $RPM_TOP_DIR/RPMS/$ARCH/galera-*.rpm ./
+mv $RPM_TOP_DIR/RPMS/$RPM_ARCH/galera-*.rpm ./
 
 rm -rf $RPM_TOP_DIR
 

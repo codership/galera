@@ -216,7 +216,8 @@ get_arch()
 
 build_packages()
 {
-    pushd $build_base/scripts/packages
+    local PKG_DIR=$build_base/scripts/packages
+    pushd $PKG_DIR
 
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
@@ -248,6 +249,9 @@ build_packages()
     local RET=$?
 
     set -e
+
+    popd
+    mv -f $PKG_DIR/*.rpm $PKG_DIR/*.deb ./
 
     return $RET
 }
