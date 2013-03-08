@@ -17,8 +17,8 @@
 %define name galera
 # use "rpmbuild --define 'version xxxx'" to define version
 %{!?version: %define version 0.1.x}
-%define release 1.rhel5
-%define copyright Copyright 2007-2011 Codership Oy. All rights reserved. Use is subject to license terms under GPLv3 license.
+%{!?release: %define release 1}
+%define copyright Copyright 2007-2013 Codership Oy. All rights reserved. Use is subject to license terms under GPLv3 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
