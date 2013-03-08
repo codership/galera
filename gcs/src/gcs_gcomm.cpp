@@ -36,7 +36,6 @@ extern "C"
 #endif // PROFILE_GCS_GCOMM
 #include "profile.hpp"
 
-#include <boost/pool/pool_alloc.hpp>
 #include <deque>
 
 using namespace std;
@@ -67,6 +66,24 @@ private:
     ProtoUpMeta um_;
 };
 
+#if defined(GALERA_USE_BOOST_POOL_ALLOC)
+
+#include <boost/pool/pool_alloc.hpp>
+
+typedef deque<RecvBufData,
+              boost::fast_pool_allocator<
+                  RecvBufData,
+                  boost::default_user_allocator_new_delete,
+                  boost::details::pool::null_mutex
+                  >
+              >
+#else
+
+typedef deque<RecvBufData>
+
+#endif /* GALERA_USE_BOOST_POOL_ALLOC */
+
+RecvBufQueue;
 
 class RecvBuf
 {
@@ -124,19 +141,9 @@ public:
 
 private:
 
-    class DummyMutex
-    {
-    public:
-        void lock()   {}
-        void unlock() {}
-    };
-
     Mutex mutex_;
     Cond cond_;
-    deque<RecvBufData,
-          boost::fast_pool_allocator<
-              RecvBufData,
-              boost::default_user_allocator_new_delete, DummyMutex> > queue_;
+    RecvBufQueue queue_;
     bool waiting_;
 };
 

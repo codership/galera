@@ -260,6 +260,9 @@ if boost == 1:
         if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
             print 'Using boost pool alloc'
             conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
+            # due to a bug in boost >= 1.50 we need to link with boost_system
+            # - should be a noop with older boost.
+            conf.env.Append(LIBS=['boost_system'])
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)
