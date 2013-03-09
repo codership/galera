@@ -271,7 +271,12 @@ parse_arguments() {
       --syslog-tag=*) syslog_tag="$val" ;;
       --timezone=*) TZ="$val"; export TZ; ;;
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
-
+      --wsrep[-_]provider=*)
+        if test -n "$val" && test "$val" != "none"
+        then
+          wsrep_restart=1
+        fi
+        ;;
       --help) usage ;;
 
       *)
@@ -822,6 +827,9 @@ max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
 
+# maximum number of wsrep restarts
+max_wsrep_restarts=0
+
 while true
 do
   rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
@@ -904,8 +912,19 @@ do
       I=`expr $I + 1`
     done
   fi
-  log_notice "WSREP: sleeping 15 seconds before restart"
-  sleep 15
+
+  fi [ -n "$wsrep_restart" ]
+  then
+    if [ $wsrep_restart -le $max_wsrep_restarts ]
+    then
+      wsrep_restart=`expr $wsrep_restart + 1`
+      log_notice "WSREP: sleeping 15 seconds before restart"
+      sleep 15
+    else
+      log_notice "WSREP: not restarting wsrep node automatically"
+      break
+    fi
+  fi
   log_notice "mysqld restarted"
 done
 
