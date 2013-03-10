@@ -641,6 +641,15 @@ static DummyNode* create_dummy_node(size_t idx,
     }
 }
 
+namespace
+{
+    gcomm::evs::Proto* evs_from_dummy(DummyNode* dn)
+    {
+        return reinterpret_cast<Proto*>(dn->protos().back());
+    }
+}
+
+
 static void join_node(PropagationMatrix* p,
                       DummyNode* n, bool first = false)
 {
@@ -1503,7 +1512,7 @@ START_TEST(test_trac_607)
     dn[0]->set_cvi(V_REG);
     dn[0]->close();
 
-    while (reinterpret_cast<const Proto*>(dn[1]->protos().back())->state() != Proto::S_INSTALL)
+    while (evs_from_dummy(dn[1])->state() != Proto::S_INSTALL)
     {
         prop.propagate_n(1);
     }
@@ -1522,6 +1531,71 @@ START_TEST(test_trac_607)
     set_cvi(dn, 2, 2, max_view_seq + 1);
 
     gu_trace(prop.propagate_until_cvi(true));
+
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
+START_TEST(test_trac_724)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (trac_724)";
+    init_rand();
+
+    const size_t n_nodes(2);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    // Slightly asymmetric settings and evs.use_aggregate=false to
+    // allow completion window to grow over 0xff.
+    Proto* evs0(evs_from_dummy(dn[0]));
+    bool ret(evs0->set_param("evs.use_aggregate", "false"));
+    fail_unless(ret == true);
+    ret = evs0->set_param("evs.send_window", "1024");
+    fail_unless(ret == true);
+    ret = evs0->set_param("evs.user_send_window", "515");
+
+    Proto* evs1(evs_from_dummy(dn[1]));
+    ret = evs1->set_param("evs.use_aggregate", "false");
+    fail_unless(ret == true);
+    ret = evs1->set_param("evs.send_window", "1024");
+    fail_unless(ret == true);
+    ret = evs1->set_param("evs.user_send_window", "512");
+
+    prop.set_loss(1, 2, 0.);
+
+    for (size_t i(0); i < 256; ++i)
+    {
+        dn[0]->send();
+        dn[0]->send();
+        dn[1]->send();
+        gu_trace(prop.propagate_until_empty());
+    }
+    dn[0]->send();
+    prop.set_loss(1, 2, 1.);
+
+    dn[0]->send();
+    gu_trace(prop.propagate_until_empty());
 
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObject());
@@ -1667,6 +1741,12 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_trac_607);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_trac_724");
+        tcase_add_test(tc, test_trac_724);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
     }
     return s;
 }
