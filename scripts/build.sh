@@ -251,8 +251,12 @@ build_packages()
     set -e
 
     popd
-    mv -f $PKG_DIR/*.rpm $PKG_DIR/*.deb ./
-
+    if [ $DEBIAN -ne 0 ]
+    then
+        mv -f $PKG_DIR/$ARCH/*.deb ./
+    else
+        mv -f $PKG_DIR/$ARCH/*.rpm ./
+    fi
     return $RET
 }
 

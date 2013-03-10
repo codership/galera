@@ -913,7 +913,7 @@ do
     done
   fi
 
-  fi [ -n "$wsrep_restart" ]
+  if [ -n "$wsrep_restart" ]
   then
     if [ $wsrep_restart -le $max_wsrep_restarts ]
     then
