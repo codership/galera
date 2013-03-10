@@ -193,9 +193,9 @@ wsrep_recover_position() {
 
   $mysqld_cmd --log_error=$wr_logfile --wsrep-recover
 
-  local rp=$(grep "WSREP: Recovered position:" $wr_logfile)
+  local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
   if [ -z "$rp" ]; then
-    local skipped=$(grep WSREP $wr_logfile | grep "skipping position recovery")
+    local skipped="$(grep WSREP $wr_logfile | grep 'skipping position recovery')"
     if [ -z "$skipped" ]; then
       log_error "WSREP: Failed to recover position: " `cat $wr_logfile`;
       ret=1
@@ -203,8 +203,8 @@ wsrep_recover_position() {
       log_notice "WSREP: Position recovery skipped"
     fi
   else
-    local start_pos=$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
-        | sed 's/^[ \t]*//')
+    local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+        | sed 's/^[ \t]*//')"
     log_notice "WSREP: Recovered position $start_pos"
     wsrep_start_position_opt="--wsrep_start_position=$start_pos"
   fi
@@ -839,7 +839,7 @@ do
   # this sets wsrep_start_position_opt
   wsrep_recover_position "$cmd"
 
-  [ $? -ne 0 ] && exit -1 #
+  [ $? -ne 0 ] && exit 1 #
 
   [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
 
