@@ -23,12 +23,7 @@
 #include "gcomm/map.hpp"
 #include "gcomm/datagram.hpp"
 
-#if defined(GALERA_USE_BOOST_POOL_ALLOC)
-#include <boost/pool/pool_alloc.hpp>
-#endif
-
 #include <vector>
-
 
 
 namespace gcomm
@@ -48,6 +43,7 @@ namespace gcomm
         class InputMap;
     }
 }
+
 
 /* Internal msg representation */
 class gcomm::InputMapMsgKey
@@ -70,7 +66,6 @@ private:
     size_t       const index_;
     evs::seqno_t const seq_;
 };
-
 
 
 /* Internal message representation */
@@ -98,12 +93,7 @@ private:
 
 #if defined(GALERA_USE_BOOST_POOL_ALLOC)
 
-class DummyMutex
-{
-public:
-    void lock() { }
-    void unlock() {}
-};
+#include <boost/pool/pool_alloc.hpp>
 
 class gcomm::evs::InputMapMsgIndex :
     public Map<InputMapMsgKey, InputMapMsg,
@@ -113,18 +103,18 @@ class gcomm::evs::InputMapMsgIndex :
                         boost::fast_pool_allocator<
                             std::pair<const InputMapMsgKey, InputMapMsg>,
                             boost::default_user_allocator_new_delete,
-                            DummyMutex> > >
-{ };
+                            boost::details::pool::null_mutex
+                            >
+                        >
+               >
+{};
 
 #else /* GALERA_USE_BOOST_POOL_ALLOC */
 
 class gcomm::evs::InputMapMsgIndex :
-    public Map<InputMapMsgKey, InputMapMsg> { };
-//               std::map<InputMapMsgKey,
-//                        InputMapMsg,
-//                        std::less<InputMapMsgKey>,
-//                        boost::fast_pool_allocator<
-//                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
+    public Map<InputMapMsgKey, InputMapMsg>
+{};
+
 #endif /* GALERA_USE_BOOST_POOL_ALLOC */
 
 /* Internal node representation */
