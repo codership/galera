@@ -216,7 +216,8 @@ get_arch()
 
 build_packages()
 {
-    pushd $build_base/scripts/packages
+    local PKG_DIR=$build_base/scripts/packages
+    pushd $PKG_DIR
 
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
@@ -249,6 +250,13 @@ build_packages()
 
     set -e
 
+    popd
+    if [ $DEBIAN -ne 0 ]
+    then
+        mv -f $PKG_DIR/$ARCH/*.deb ./
+    else
+        mv -f $PKG_DIR/$ARCH/*.rpm ./
+    fi
     return $RET
 }
 
