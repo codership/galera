@@ -142,6 +142,7 @@ namespace gcomm
 
         int               version_;
         static const int  max_version_ = GCOMM_GMCAST_MAX_VERSION;
+        uint8_t           segment_;
         UUID              my_uuid_;
         bool              use_ssl_;
         std::string       group_name_;
@@ -159,8 +160,10 @@ namespace gcomm
         bool              isolate_;
 
         gmcast::ProtoMap*  proto_map_;
-        std::list<Socket*> mcast_tree_;
 
+        typedef std::vector<Socket*> Segment;
+        typedef std::map<uint8_t, Segment> SegmentMap;
+        SegmentMap segment_map_;
         gu::datetime::Period time_wait_;
         gu::datetime::Period check_period_;
         gu::datetime::Period peer_timeout_;

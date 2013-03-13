@@ -59,7 +59,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 void gcomm::gmcast::Proto::send_handshake()
 {
     handshake_uuid_ = UUID(0, 0);
-    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_, local_uuid_);
+    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_, local_uuid_,
+                local_segment_);
 
     send_msg(hs);
 
@@ -87,12 +88,14 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
     }
     handshake_uuid_ = hs.handshake_uuid();
     remote_uuid_ = hs.source_uuid();
+    remote_segment_ = hs.segment_id();
 
     Message hsr (version_, Message::T_HANDSHAKE_RESPONSE,
                  handshake_uuid_,
                  local_uuid_,
                  local_addr_,
-                 group_name_);
+                 group_name_,
+                 local_segment_);
     send_msg(hsr);
 
     set_state(S_HANDSHAKE_RESPONSE_SENT);
@@ -112,12 +115,13 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 log_info << "handshake failed, my group: '" << group_name_
                          << "', peer group: '" << grp << "'";
                 Message failed(version_, Message::T_HANDSHAKE_FAIL,
-                               handshake_uuid_, local_uuid_);
+                               handshake_uuid_, local_uuid_, local_segment_);
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
             }
             remote_uuid_ = hs.source_uuid();
+            remote_segment_ = hs.segment_id();
             gu::URI remote_uri(tp_->remote_addr());
             remote_addr_ = uri_string(remote_uri.get_scheme(),
                                       remote_uri.get_host(),
@@ -125,7 +129,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
 
             propagate_remote_ = true;
             Message ok(version_, Message::T_HANDSHAKE_OK, handshake_uuid_,
-                       local_uuid_);
+                       local_uuid_, local_segment_);
             send_msg(ok);
             set_state(S_OK);
         }
@@ -135,7 +139,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                      << hs.node_address() << "' failed: " << e.what();
 
             Message nok (version_, Message::T_HANDSHAKE_FAIL, handshake_uuid_,
-                         local_uuid_);
+                         local_uuid_, local_segment_);
 
             send_msg (nok);
             set_state(S_FAILED);

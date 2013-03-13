@@ -52,28 +52,30 @@ std::string const gcomm::Conf::GMCastPeerAddr =
     GMCastScheme + Delim + "peer_addr";
 std::string const gcomm::Conf::GMCastIsolate =
     GMCastScheme + Delim + "isolate";
+std::string const gcomm::Conf::GMCastSegment =
+    GMCastScheme + Delim + "segment";
 
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
-std::string const gcomm::Conf::EvsVersion = 
+std::string const gcomm::Conf::EvsVersion =
     EvsScheme + Delim + "version";
-std::string const gcomm::Conf::EvsViewForgetTimeout = 
+std::string const gcomm::Conf::EvsViewForgetTimeout =
     EvsScheme + Delim + "view_forget_timeout";
-std::string const gcomm::Conf::EvsInactiveTimeout = 
+std::string const gcomm::Conf::EvsInactiveTimeout =
     EvsScheme + Delim + "inactive_timeout";
 std::string const gcomm::Conf::EvsSuspectTimeout =
     EvsScheme + Delim + "suspect_timeout";
-std::string const gcomm::Conf::EvsInactiveCheckPeriod = 
+std::string const gcomm::Conf::EvsInactiveCheckPeriod =
     EvsScheme + Delim + "inactive_check_period";
 std::string const gcomm::Conf::EvsInstallTimeout =
     EvsScheme + Delim + "install_timeout";
-std::string const gcomm::Conf::EvsKeepalivePeriod = 
+std::string const gcomm::Conf::EvsKeepalivePeriod =
     EvsScheme + Delim + "keepalive_period";
 std::string const gcomm::Conf::EvsJoinRetransPeriod =
     EvsScheme + Delim + "join_retrans_period";
 std::string const gcomm::Conf::EvsStatsReportPeriod =
     EvsScheme + Delim + "stats_report_period";
-std::string const gcomm::Conf::EvsDebugLogMask = 
+std::string const gcomm::Conf::EvsDebugLogMask =
     EvsScheme + Delim + "debug_log_mask";
 std::string const gcomm::Conf::EvsInfoLogMask =
     EvsScheme + Delim + "info_log_mask";

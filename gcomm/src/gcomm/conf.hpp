@@ -188,6 +188,12 @@ namespace gcomm
         static std::string const GMCastIsolate;
 
         /*!
+         * @brief Segment identifier for segmentation.
+         */
+        static std::string const GMCastSegment;
+
+
+        /*!
          * @brief EVS scheme for transport URI ("evs")
          */
         static std::string const EvsScheme;
