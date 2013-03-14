@@ -99,8 +99,10 @@ public:
     void handle_ok(const Message& hs);
     void handle_failed(const Message& hs);
     void handle_topology_change(const Message& msg);
+    void handle_keepalive(const Message& msg);
     void send_topology_change(LinkMap& um);
     void handle_message(const Message& msg);
+    void send_keepalive();
 
     const gcomm::UUID& handshake_uuid() const { return handshake_uuid_; }
     const gcomm::UUID& local_uuid() const { return local_uuid_; }

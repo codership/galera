@@ -975,8 +975,19 @@ void gcomm::GMCast::check_liveness()
         }
         else if (p->state() == Proto::S_OK)
         {
-            // log_info << "live proto " << *p;
-            live_uuids.insert(p->remote_uuid());
+            if (p->tstamp() + peer_timeout_*2/3 < now)
+            {
+                p->send_keepalive();
+            }
+
+            if (p->state() == Proto::S_FAILED)
+            {
+                handle_failed(p);
+            }
+            else
+            {
+                live_uuids.insert(p->remote_uuid());
+            }
         }
         i = i_next;
     }
@@ -1177,8 +1188,8 @@ void gcomm::GMCast::handle_up(const void*        id,
 
             if (msg.type() >= Message::T_USER_BASE)
             {
-                if ((msg.flags() & Message::F_RELAY) ||
-                    (msg.flags() & Message::F_SEGMENT_RELAY))
+                if (msg.flags() &
+                    (Message::F_RELAY | Message::F_SEGMENT_RELAY))
                 {
                     relay(msg,
                           Datagram(dg, dg.offset() + msg.serial_size()),
