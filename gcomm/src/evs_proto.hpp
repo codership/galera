@@ -226,8 +226,20 @@ public:
 
     void close()
     {
-        gu_trace(shift_to(S_LEAVING));
-        gu_trace(send_leave());
+        // shifting to S_LEAVING from S_INSTALL is troublesome,
+        // instead of that raise a boolean flag to indicate that
+        // shifting to S_LEAVING should be done once S_OPERATIONAL
+        // is reached
+        if (state() != S_INSTALL)
+        {
+            gu_trace(shift_to(S_LEAVING));
+            gu_trace(send_leave());
+            pending_leave_ = false;
+        }
+        else
+        {
+            pending_leave_ = true;
+        }
     }
 
     void close(const UUID& uuid)
@@ -402,6 +414,7 @@ private:
     bool self_loopback_;
     State state_;
     int shift_to_rfcnt_;
+    bool pending_leave_;
 
     // non-copyable
     Proto(const Proto&);

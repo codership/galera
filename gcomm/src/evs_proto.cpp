@@ -173,7 +173,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     use_aggregate_(param<bool>(conf, uri, Conf::EvsUseAggregate, "true")),
     self_loopback_(false),
     state_(S_CLOSED),
-    shift_to_rfcnt_(0)
+    shift_to_rfcnt_(0),
+    pending_leave_(false)
 {
     log_info << "EVS version " << version_;
 
@@ -350,9 +351,14 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         reset_timers();
         return true;
     }
+    else if (key == Conf::EvsUseAggregate)
+    {
+        use_aggregate_ = gu::from_string<bool>(val);
+        conf_.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate_));
+        return true;
+    }
     else if (key == Conf::EvsViewForgetTimeout ||
-             key == Conf::EvsInactiveCheckPeriod ||
-             key == Conf::EvsUseAggregate)
+             key == Conf::EvsInactiveCheckPeriod)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";
@@ -1105,7 +1111,7 @@ bool gcomm::evs::Proto::is_flow_control(const seqno_t seq, const seqno_t win) co
 {
     gcomm_assert(seq != -1 && win != -1);
 
-    const seqno_t base(input_map_->aru_seq());
+    const seqno_t base(input_map_->safe_seq());
     if (seq > base + win)
     {
         return true;
@@ -1138,10 +1144,16 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         return EAGAIN;
     }
 
-    seqno_t seq_range(up_to_seqno == -1 ? 0 : up_to_seqno - seq);
+    // seq_range max 0xff because of Message seq_range_ field limitation
+    seqno_t seq_range(
+        std::min(up_to_seqno == -1 ? 0 : up_to_seqno - seq,
+                 evs::seqno_t(0xff)));
     seqno_t last_msg_seq(seq + seq_range);
     uint8_t flags;
 
+    // If output queue wont contain messages after this patch,
+    // up_to_seqno is given (msg completion) or flow contol would kick in
+    // at next batch, don't set F_MSG_MORE.
     if (output_.size() <= n_aggregated ||
         up_to_seqno != -1 ||
         (win != -1 && is_flow_control(last_msg_seq + 1, win) == true))
@@ -1157,6 +1169,8 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         flags |= Message::F_AGGREGATE;
     }
 
+    // Maximize seq range in the case next message batch won't be sent
+    // immediately.
     if ((flags & Message::F_MSG_MORE) == 0 && up_to_seqno == -1)
     {
         seq_range = input_map_->max_hs() - seq;
@@ -1169,11 +1183,7 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         }
     }
 
-    if (seq_range > 0xff)
-    {
-        log_warn << "readjusting seq range " << seq_range << " to 255";
-        seq_range = 0xff;
-    }
+    gcomm_assert(last_msg_seq >= seq && last_msg_seq - seq <= 0xff);
     gcomm_assert(seq_range >= 0 && seq_range <= 0xff);
 
     UserMessage msg(version_,
@@ -2718,6 +2728,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                         profile_enter(shift_to_prof_);
                         gu_trace(shift_to(S_OPERATIONAL));
                         profile_leave(shift_to_prof_);
+                        if (pending_leave_ == true)
+                        {
+                            close();
+                        }
                     }
                     else
                     {
@@ -2934,6 +2948,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             profile_enter(shift_to_prof_);
             gu_trace(shift_to(S_OPERATIONAL));
             profile_leave(shift_to_prof_);
+            if (pending_leave_ == true)
+            {
+                close();
+            }
         }
         return;
     }

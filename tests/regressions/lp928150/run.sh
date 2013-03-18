@@ -37,10 +37,11 @@ restart
 echo "starting load for $DURATION" seconds
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
 
+LD_PRELOAD=$GLB_PRELOAD \
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
-    --port $DBMS_PORT --users $DBMS_CLIENTS --duration $DURATION \
-    --stat-interval 30 --sess-min 999999 --sess-max 999999 \
-    --rollbacks 0.1 --ac-frac 100
+        --port $DBMS_PORT --users $DBMS_CLIENTS --duration $DURATION \
+        --stat-interval 30 --sess-min 999999 --sess-max 999999 \
+        --rollbacks 0.1 --ac-frac 100
 
 echo "checking consistency"
 check

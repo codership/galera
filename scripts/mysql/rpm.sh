@@ -169,6 +169,7 @@ RPMBUILD()
                        --define "optflags $RPM_OPT_FLAGS") || \
     WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
                        --define='distro_specific 1' \
+                       --define='runselftest 0' \
                        --define='mysql_packager Codership Oy <info@codership.com>')
 
 $(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \

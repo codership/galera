@@ -7,7 +7,9 @@ run() {
     local CMD=$@
     local rcode
     echo "RUNNING: $CMD" >> $OUTPUT
-    $CMD > /tmp/run_test.out ; rcode=$? ; cat /tmp/run_test.out | tee -a $OUTPUT
+    LD_PRELOAD=$PRELOAD $CMD > /tmp/run_test.out
+    rcode=$?
+    cat /tmp/run_test.out | tee -a $OUTPUT
     return $rcode
 }
 
@@ -24,7 +26,7 @@ load_db() {
                   --mysql-host=$host --mysql-port=$port \
                   --mysql-db=test \
                   cleanup
-                  
+
     run $SYSBENCH --test=oltp --db-driver=mysql \
                   --mysql-user=$user --mysql-password=$password \
                   --mysql-host=$host --mysql-port=$port  \
@@ -49,6 +51,7 @@ run_load() {
 
     log "running against $hosts $port with $users"
 
+    PRELOAD=$GLB_PRELOAD \
     run $SYSBENCH --test=oltp --db-driver=mysql \
                   --mysql-user=$user --mysql-password=$password \
                   --mysql-host=$hosts --mysql-port=$port  \
@@ -88,16 +91,16 @@ test_galera() {
         load_db $primary_node 3306
         sleep 5
 
-       # run load against pen or use sqlgen multihost for LB        
+       # run load against pen or use sqlgen multihost for LB
         if [ $load_balancer = "pen" ] ;  then
             run "killall pen"
             echo "pen -r 3307 $cluster" >> $OUTPUT
             pen -r 3307 $cluster
-            
+
             run_load 3307 $gra_users "127.0.0.1"
 
         else
-            run_load 3306 $gra_users $cluster    
+            run_load 3306 $gra_users $cluster
         fi
 
         # consistency check

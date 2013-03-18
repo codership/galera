@@ -72,14 +72,14 @@ deadlock_test()
     local port=$1
     echo "running AC updates for $port..."
     for (( i=1; i<=$ROUNDS; i++ )); do
-	$MYSQL --port=$port -e "
+    $MYSQL --port=$port -e "
           UPDATE test.comm00 SET z=99 WHERE p=0; 
         " 2>&1
-	ret=$?
-	if [ "$ret" != "0" ]; then
-	    echo "DEADLOCK ERROR";
-	    SUCCESS=1;
-	fi
+        ret=$?
+        if [ "$ret" != "0" ]; then
+            echo "DEADLOCK ERROR";
+            SUCCESS=1;
+        fi
     done
     echo "... Deadlock test over"
 }
@@ -89,14 +89,14 @@ non_effective_update()
     local port=$1
     echo "running AC updates for $port..."
     for (( i=1; i<=$ROUNDS; i++ )); do
-	$MYSQL --port=$port -e "
+        $MYSQL --port=$port -e "
           UPDATE test.comm00 SET z=z WHERE p=0; 
         " 2>&1
-	ret=$?
-	if [ "$ret" != "0" ]; then
-	    echo "DEADLOCK ERROR FOR NON-EFFECTIVE UPDATE";
-	    exit_code=1;
-	fi
+        ret=$?
+        if [ "$ret" != "0" ]; then
+            echo "DEADLOCK ERROR FOR NON-EFFECTIVE UPDATE";
+            exit_code=1;
+        fi
     done
     echo "... Non effective update test over"
 }
@@ -110,7 +110,7 @@ run_test()
     echo "Starting sqlgen..."
 
     sqlgen_load $port_1 &
-    
+
     echo "sqlgen $sqlgen_pid"
     sleep 3
 
@@ -147,15 +147,15 @@ run_test()
 
     if test "$cs0" != "$cs1"
     then
-	echo "Consistency check failed"
-	echo "$check0 $cs0"
-	echo "$check1 $cs1"
-	exit 1
+        echo "Consistency check failed"
+        echo "$check0 $cs0"
+        echo "$check1 $cs1"
+        exit 1
     fi
     if test $? != 0
     then
-	echo "Consistency check failed"
-	exit 1
+        echo "Consistency check failed"
+        exit 1
     fi
 
     eval $cleanup

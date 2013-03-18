@@ -415,7 +415,14 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     {
         if (trx->last_seen_seqno() < initial_position_)
         {
-            log_warn << "last seen seqno below limit for trx " << *trx;
+            if (cert_index_.empty() == false)
+            {
+                log_warn << "last seen seqno below limit for trx " << *trx;
+            }
+            else
+            {
+                log_debug << "last seen seqno below limit for trx " << *trx;
+            }
         }
 
         if (trx->global_seqno() - trx->last_seen_seqno() > max_length_)
