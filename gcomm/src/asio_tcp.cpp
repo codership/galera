@@ -133,56 +133,53 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
 {
     Critical<AsioProtonet> crit(net_);
 
-    log_debug << "connect handler " << id() << " " << ec;
-
-    if (ec)
+    try
     {
-        FAILED_HANDLER(ec);
-        return;
-    }
-    else
-    {
-        assign_local_addr();
-        assign_remote_addr();
-#ifdef HAVE_ASIO_SSL_HPP
-        if (ssl_socket_ != 0)
+        if (ec)
         {
-            ssl_socket_->lowest_layer().set_option(
-                asio::ip::tcp::no_delay(true));
-            set_fd_options(ssl_socket_->lowest_layer());
-            log_debug << "socket " << id() << " connected, remote endpoint "
-                      << remote_addr() << " local endpoint "
-                      << local_addr();
-            try
+            FAILED_HANDLER(ec);
+            return;
+        }
+        else
+        {
+            assign_local_addr();
+            assign_remote_addr();
+#ifdef HAVE_ASIO_SSL_HPP
+            if (ssl_socket_ != 0)
             {
+                ssl_socket_->lowest_layer().set_option(
+                    asio::ip::tcp::no_delay(true));
+                set_fd_options(ssl_socket_->lowest_layer());
+                log_debug << "socket " << id() << " connected, remote endpoint "
+                          << remote_addr() << " local endpoint "
+                          << local_addr();
                 ssl_socket_->async_handshake(
                     asio::ssl::stream<asio::ip::tcp::socket>::client,
                     boost::bind(&AsioTcpSocket::handshake_handler,
                                 shared_from_this(),
                                 asio::placeholders::error)
-                );
+                    );
             }
-            catch (asio::system_error& e)
+            else
             {
-                FAILED_HANDLER(e.code());
-                return;
-            }
-        }
-        else
-        {
 #endif /* HAVE_ASIO_SSL_HPP */
-            socket_.set_option(asio::ip::tcp::no_delay(true));
-            set_fd_options(socket_);
-            log_debug << "socket " << id() << " connected, remote endpoint "
-                      << remote_addr() << " local endpoint "
-                      << local_addr();
-            state_ = S_CONNECTED;
-            net_.dispatch(id(), Datagram(), ProtoUpMeta(ec.value()));
-            async_receive();
+                socket_.set_option(asio::ip::tcp::no_delay(true));
+                set_fd_options(socket_);
+                log_debug << "socket " << id() << " connected, remote endpoint "
+                          << remote_addr() << " local endpoint "
+                          << local_addr();
+                state_ = S_CONNECTED;
+                net_.dispatch(id(), Datagram(), ProtoUpMeta(ec.value()));
+                async_receive();
 
 #ifdef HAVE_ASIO_SSL_HPP
-        }
+            }
 #endif /* HAVE_ASIO_SSL_HPP */
+        }
+    }
+    catch (asio::system_error& e)
+    {
+        FAILED_HANDLER(e.code());
     }
 }
 
@@ -232,7 +229,6 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
             << uri.to_string()
             << "', asio error '" << e.what() << "'";
     }
-
 }
 
 void gcomm::AsioTcpSocket::close()
