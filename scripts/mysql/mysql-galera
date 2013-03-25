@@ -133,7 +133,7 @@ EOF
 # Checks if a process with a given PID is still running
 find_pid()
 {
-    ps axc | grep mysqld | grep -w ^\ *$1 > /dev/null
+    ps ax | grep mysqld | grep -w ^\ *$1 > /dev/null
 }
 
 get_status()
@@ -413,7 +413,7 @@ galera_stop()
             echo -n "Removing stale PID file $MYSQL_PID... "
         fi
 
-        rm -rf $MYSQL_PID
+        rm -f $MYSQL_PID
         echo "Done"
     else
         echo "PID file not found: $MYSQL_PID"
