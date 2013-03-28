@@ -330,7 +330,7 @@ public:
 
     void rewind() const { next_ = begin_; }
 
-    bool checksum() const;
+    void checksum() const; // throws if checksum fails
 
 protected:
 

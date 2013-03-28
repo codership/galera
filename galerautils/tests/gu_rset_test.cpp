@@ -268,11 +268,22 @@ START_TEST (ver0)
     }
 
     /* Test checksum method: */
-    fail_if (rset_in.checksum());
+    try {
+        rset_in.checksum();
+    }
+    catch (std::exception& e)
+    {
+        fail("%s", e.what());
+    }
 
     /* Try some data corruption: swap a bit */
     in_buf[3] ^= 1;
-    fail_unless (rset_in.checksum());
+
+    try {
+        rset_in.checksum();
+        fail("checksum() didn't throw on corrupted set");
+    }
+    catch (std::exception& e) {}
 }
 END_TEST
 
@@ -282,7 +293,14 @@ START_TEST (empty)
 
     fail_if (0 != rset_in.size());
     fail_if (0 != rset_in.count());
-    fail_if (false != rset_in.checksum());
+
+    try {
+        rset_in.checksum();
+    }
+    catch (std::exception& e)
+    {
+        fail("%s", e.what());
+    }
 }
 END_TEST
 

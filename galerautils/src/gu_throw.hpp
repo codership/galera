@@ -65,7 +65,7 @@ namespace gu
             err       (err_)
         {}
 
-        GU_NORETURN ~ThrowError () throw (Exception)
+        ~ThrowError() throw (Exception) GU_NORETURN
         {
             os << ": " << err << " (" << ::strerror(err) << ')';
 
@@ -90,7 +90,7 @@ namespace gu
             ThrowBase (file, func, line)
         {}
 
-        GU_NORETURN ~ThrowFatal () throw (Exception)
+        ~ThrowFatal () throw (Exception) GU_NORETURN
         {
             os << " (FATAL)";
 

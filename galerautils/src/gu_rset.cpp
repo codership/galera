@@ -95,7 +95,7 @@ RecordSetOutBase::header_size_max() const
 
 
 static int
-header_size_v0(ssize_t size, ssize_t const count)
+header_size_v1(ssize_t size, ssize_t const count)
 {
     int hsize = header_size_max_v0();
 
@@ -135,7 +135,7 @@ RecordSetOutBase::header_size() const
     case EMPTY: assert(0);
         break;
     case VER1:
-        return header_size_v0 (size_, count_);
+        return header_size_v1 (size_, count_);
     }
 
     log_fatal << "Unsupported RecordSet::Version value: " << version_;
@@ -361,7 +361,7 @@ RecordSetInBase::parse_header_v1 (size_t const size)
 
 
 /* returns false if checksum matched and true if failed */
-bool
+void
 RecordSetInBase::checksum() const
 {
     int const cs(check_size(check_type_));
@@ -380,16 +380,12 @@ RecordSetInBase::checksum() const
 
         if (gu_unlikely(memcmp (result.data(), stored_checksum, cs)))
         {
-            log_error
-                << "RecordSet checksum does not match:\n"
-                << "stored:   "   << gu::Hexdump(stored_checksum, cs)
-                << "\ncomputed: " << gu::Hexdump(result.data(), cs);
-
-            return true;
+            gu_throw_error(EINVAL)
+                << "RecordSet checksum does not match:"
+                << "\ncomputed: " << gu::Hexdump(result.data(), cs)
+                << "\nfound:    " << gu::Hexdump(stored_checksum, cs);
         }
     }
-
-    return false;
 }
 
 
@@ -408,10 +404,7 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
     case VER1:  parse_header_v1(size);
     }
 
-    if (check_first && checksum())
-    {
-        gu_throw_error (EINVAL) << "RecordSet checksum failed.";
-    }
+    if (check_first) checksum();
 
     next_ = begin_;
 

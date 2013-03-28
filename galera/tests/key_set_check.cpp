@@ -257,7 +257,15 @@ START_TEST (ver0)
              "Received keys: %zu, expected: %zu", ksi.count(), kso.count());
     fail_if (ksi.size() != kso.size(),
              "Received size: %zu, expected: %zu", ksi.size(), kso.size());
-    fail_if (ksi.checksum());
+
+    try
+    {
+        ksi.checksum();
+    }
+    catch (std::exception& e)
+    {
+        fail("%s", e.what());
+    }
 
     for (int i(0); i < ksi.count(); ++i)
     {
