@@ -24,12 +24,6 @@ namespace galera
 
         static Version const MAX_VER = VER1;
 
-        static Version
-        ws_to_ds_version (int ver)
-        {
-            return VER1;
-        }
-
         /*! Dummy class to instantiate DataSetOut */
         class RecordOut {};
 

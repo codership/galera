@@ -1,6 +1,6 @@
 /* Copyright (C) 2013 Codership Oy <info@codership.com>
  *
- * $Id: gu_rset_test.cpp 2957 2013-02-10 17:25:08Z alex $
+ * $Id$
  */
 
 #undef NDEBUG

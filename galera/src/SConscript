@@ -8,7 +8,7 @@ libgaleraxx_srcs = [
     'write_set.cpp',
     'data_set.cpp',
     'key_set.cpp',
-#    'write_set_ng.cpp',
+    'write_set_ng.cpp',
     'trx_handle.cpp',
     'key_entry_os.cpp',
     'wsdb.cpp',

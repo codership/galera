@@ -32,12 +32,6 @@ public:
 
     static Version const MAX_VER = FLAT8A;
 
-    static Version
-    ws_to_ks_version (int ver)
-    {
-        return FLAT8A;
-    }
-
     class Key
     {
     public:
