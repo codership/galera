@@ -276,11 +276,33 @@ START_TEST (ver0)
         fail("%s", e.what());
     }
 
+    gu::RecordSetIn<TestRecord> rset_in_empty;
+    fail_if (rset_in_empty.size()  != 0);
+    fail_if (rset_in_empty.count() != 0);
+
+    try {
+        TestRecord const rin(rset_in_empty.next());
+        fail ("next() succeeded on an empty writeset");
+    }
+    catch (gu::Exception& e) {
+        fail_if (e.get_errno() != EPERM);
+    }
+
+    rset_in_empty.init(in_buf.data(), in_buf.size(), true);
+    fail_if (rset_in_empty.size()  != rset_out.size());
+    fail_if (rset_in_empty.count() != rset_out.count());
+
     /* Try some data corruption: swap a bit */
-    in_buf[3] ^= 1;
+    in_buf[10] ^= 1;
 
     try {
         rset_in.checksum();
+        fail("checksum() didn't throw on corrupted set");
+    }
+    catch (std::exception& e) {}
+
+    try {
+        rset_in_empty.checksum();
         fail("checksum() didn't throw on corrupted set");
     }
     catch (std::exception& e) {}
@@ -289,7 +311,7 @@ END_TEST
 
 START_TEST (empty)
 {
-    gu::RecordSetIn<TestRecord> const rset_in(0, 1);
+    gu::RecordSetIn<TestRecord> const rset_in(0, 0);
 
     fail_if (0 != rset_in.size());
     fail_if (0 != rset_in.count());

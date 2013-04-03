@@ -304,7 +304,7 @@ header_check_type(RecordSet::Version ver, const byte_t* ptr, ssize_t const size)
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
 }
 
-
+#if REMOVE
 RecordSet::RecordSet (const byte_t* const ptr, ssize_t const size)
     :
     version_   ((ptr && size) ? header_version (ptr, size) : EMPTY),
@@ -313,7 +313,22 @@ RecordSet::RecordSet (const byte_t* const ptr, ssize_t const size)
     size_      (0),
     count_     (0)
 {}
+#endif // REMOVE
 
+void
+RecordSet::init (const byte_t* const ptr, ssize_t const size)
+{
+    assert (EMPTY == version_);
+    assert (size >= 0);
+    assert (NULL != ptr || 0 == size);
+    assert (NULL == ptr || 0 != size);
+
+    if (gu_likely ((ptr && size)))
+    {
+        version_    = header_version (ptr, size);
+        check_type_ = header_check_type (version_, ptr, size);
+    }
+}
 
 void
 RecordSetInBase::parse_header_v1 (size_t const size)
@@ -388,10 +403,10 @@ RecordSetInBase::checksum() const
     }
 }
 
-
+#if REMOVE
 RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
                                   size_t const        size,
-                                  bool const          check_first)
+                                  bool const          check_now)
     :
     RecordSet   (ptr, size),
     head_       (ptr),
@@ -404,7 +419,49 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
     case VER1:  parse_header_v1(size);
     }
 
-    if (check_first) checksum();
+    if (check_now) checksum();
+
+    next_ = begin_;
+
+    assert (size_  >  0);
+    assert (count_ >= 0);
+    assert (count_ <= size_);
+    assert (begin_ >  0);
+    assert (begin_ <= size_);
+    assert (next_  == begin_);
+}
+#else
+RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
+                                  size_t const        size,
+                                  bool const          check_now)
+    :
+    RecordSet   (),
+    head_       (NULL),
+    begin_      (0),
+    next_       (begin_)
+{
+    init (ptr, size, check_now);
+}
+#endif // REMOVE
+
+void
+RecordSetInBase::init (const byte_t* const ptr,
+                       size_t const        size,
+                       bool const          check_now)
+{
+    assert (EMPTY == version_);
+
+    RecordSet::init (ptr, size);
+
+    head_ = ptr;
+
+    switch (version_)
+    {
+    case EMPTY: return;
+    case VER1:  parse_header_v1(size);
+    }
+
+    if (check_now) checksum();
 
     next_ = begin_;
 

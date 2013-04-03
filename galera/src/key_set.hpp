@@ -479,6 +479,14 @@ public:
         version_(ver)
     {}
 
+    KeySetIn () : RecordSetIn(), version_(KeySet::EMPTY) {}
+
+    void init (KeySet::Version ver, const gu::byte_t* buf, size_t size)
+    {
+        RecordSetIn::init(buf, size, false);
+        version_ = ver;
+    }
+
     KeySet::KeyPart const
     next () const { return RecordSetIn::next(); }
 

@@ -52,8 +52,8 @@ public:
 
 protected:
 
-    Version const   version_;
-    CheckType const check_type_;
+    Version   version_;
+    CheckType check_type_;
 
     ssize_t size_;
     ssize_t count_;
@@ -62,7 +62,14 @@ protected:
     RecordSet (Version const version, CheckType const ct);
 
     /* ctor for RecordSetIn */
+#if REMOVE
     RecordSet (const byte_t* buf, ssize_t size);
+#else
+    RecordSet ()
+        : version_(EMPTY), check_type_(CHECK_NONE), size_(0), count_(0) {}
+#endif
+
+    void init (const byte_t* buf, ssize_t size);
 
     virtual ~RecordSet() {}
 };
@@ -326,7 +333,13 @@ public:
 
     RecordSetInBase (const byte_t* buf,/* pointer to the beginning of buffer */
                      size_t        size,             /* total size of buffer */
-                     bool          check_first = true);      /* checksum now */
+                     bool          check_now = true);        /* checksum now */
+
+    /* this is a "delayed constructor", for the object created empty */
+    void init (const byte_t* buf,      /* pointer to the beginning of buffer */
+               size_t        size,                   /* total size of buffer */
+               bool          check_now = true);              /* checksum now */
+
 
     void rewind() const { next_ = begin_; }
 
@@ -383,10 +396,10 @@ protected:
 
 private:
 
-    const byte_t* const head_;        /* pointer to header        */
-    ssize_t             begin_;       /* offset to first record   */
-    ssize_t mutable     next_;        /* offset to next record    */
-    /* size_ is offset past all records */
+    const byte_t*   head_;        /* pointer to header        */
+    ssize_t         begin_;       /* offset to first record   */
+    ssize_t mutable next_;        /* offset to next record    */
+    /* size_ from parent class is offset past all records */
 
     /* takes total size of the supplied buffer */
     void parse_header_v1 (size_t size);
@@ -431,6 +444,8 @@ public:
                  bool          check_first = true)       /* checksum now */
         : RecordSetInBase (buf, size, check_first)
     {}
+
+    RecordSetIn () : RecordSetInBase (NULL, 0, false) {}
 
     void next (Buf& n) const { next_base<R> (n); }
 

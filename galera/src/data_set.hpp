@@ -136,6 +136,14 @@ namespace galera
             version_(ver)
         {}
 
+        DataSetIn () : RecordSetIn(), version_(DataSet::EMPTY) {}
+
+        void init (DataSet::Version ver, const gu::byte_t* buf, size_t size)
+        {
+            RecordSetIn::init(buf, size, false);
+            version_ = ver;
+        }
+
         gu::Buf next () const { return RecordSetIn::next().buf(); }
 
     private:

@@ -178,6 +178,34 @@ START_TEST (ver0)
     {
         KeySet::KeyPart kp(ksi.next());
     }
+
+    KeySetIn ksi_empty;
+
+    fail_if (ksi_empty.count() != 0,
+             "Received keys: %zu, expected: %zu", ksi_empty.count(), 0);
+    fail_if (ksi_empty.size() != 0,
+             "Received size: %zu, expected: %zu", ksi_empty.size(), 0);
+
+    ksi_empty.init (kso.version(), in.data(), in.size());
+
+    fail_if (ksi_empty.count() != kso.count(),
+             "Received keys: %zu, expected: %zu", ksi_empty.count(), kso.count());
+    fail_if (ksi_empty.size() != kso.size(),
+             "Received size: %zu, expected: %zu", ksi_empty.size(), kso.size());
+
+    try
+    {
+        ksi_empty.checksum();
+    }
+    catch (std::exception& e)
+    {
+        fail("%s", e.what());
+    }
+
+    for (int i(0); i < ksi_empty.count(); ++i)
+    {
+        KeySet::KeyPart kp(ksi_empty.next());
+    }
 }
 END_TEST
 

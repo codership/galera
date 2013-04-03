@@ -202,6 +202,20 @@ START_TEST (ver0)
         fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
                  i, records[i]->c_str(), rin.c_str());
     }
+
+    galera::DataSetIn dset_in_empty;
+    dset_in_empty.init(dset_out.version(), in_buf.data(), in_buf.size());
+
+    fail_if (dset_in_empty.size()  != dset_out.size());
+    fail_if (dset_in_empty.count() != dset_out.count());
+
+    for (ssize_t i = 0; i < dset_in_empty.count(); ++i)
+    {
+        gu::Buf data = dset_in_empty.next();
+        TestRecord const rin(data.ptr, data.size);
+        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
+                 i, records[i]->c_str(), rin.c_str());
+    }
 }
 END_TEST
 
