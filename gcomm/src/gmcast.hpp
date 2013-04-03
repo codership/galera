@@ -164,6 +164,8 @@ namespace gcomm
         typedef std::vector<Socket*> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;
         SegmentMap segment_map_;
+        // self index in local segment when ordered by UUID
+        size_t self_index_;
         gu::datetime::Period time_wait_;
         gu::datetime::Period check_period_;
         gu::datetime::Period peer_timeout_;

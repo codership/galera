@@ -76,7 +76,8 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     relaying_     (false),
     isolate_      (false),
     proto_map_    (new ProtoMap()),
-    segment_map_   (),
+    segment_map_  (),
+    self_index_   (std::numeric_limits<size_t>::max()),
     time_wait_    (param<gu::datetime::Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period_ ("PT0.5S"),
     peer_timeout_ (param<gu::datetime::Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
@@ -192,7 +193,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait_));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl_));
     conf_.set(Conf::GMCastPeerTimeout, gu::to_string(peer_timeout_));
-
+    // conf_.set(Conf::GMCastSegment, gu::to_string(segment_));
 }
 
 gcomm::GMCast::~GMCast()
@@ -843,6 +844,7 @@ void gcomm::GMCast::update_addresses()
         local_segment.push_back(mcast_.get());
     }
 
+    self_index_ = 0;
     for (ProtoMap::const_iterator i(proto_map_->begin()); i != proto_map_->end();
          ++i)
     {
@@ -857,6 +859,10 @@ void gcomm::GMCast::update_addresses()
                  p.mcast_addr() != mcast_addr_))
             {
                 local_segment.push_back(p.socket().get());
+                if (p.remote_uuid() < uuid())
+                {
+                    ++self_index_;
+                }
             }
         }
         else
@@ -868,6 +874,7 @@ void gcomm::GMCast::update_addresses()
             }
         }
     }
+    log_debug << self_string() << " self index: " << self_index_;
     log_debug << self_string() << " --- mcast tree end ---";
 }
 
@@ -1043,6 +1050,16 @@ gu::datetime::Date gcomm::GMCast::handle_timers()
 }
 
 
+void send(gcomm::Socket* s, gcomm::Datagram& dg)
+{
+    int err;
+    if ((err = s->send(dg)) != 0)
+    {
+        log_debug << "failed to send to " << s->remote_addr()
+                  << ": (" << err << ") " << strerror(err);
+    }
+}
+
 void gcomm::GMCast::relay(const Message& msg,
                           const Datagram& dg,
                           const void* exclude_id)
@@ -1071,7 +1088,8 @@ void gcomm::GMCast::relay(const Message& msg,
                 if (segment_id != segment_ && segment_id != msg.segment_id())
                 {
                     Segment& segment(i->second);
-                    segment.front()->send(relay_dg);
+                    send(segment[(self_index_ + segment_id) % segment.size()],
+                         relay_dg);
                 }
             }
             gu_trace(pop_header(relay_msg, relay_dg));
@@ -1083,7 +1101,7 @@ void gcomm::GMCast::relay(const Message& msg,
         gu_trace(push_header(relay_msg, relay_dg));
         for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
         {
-            (*i)->send(relay_dg);
+            send(*i, relay_dg);
         }
         gu_trace(pop_header(relay_msg, relay_dg));
     }
@@ -1095,11 +1113,9 @@ void gcomm::GMCast::relay(const Message& msg,
         Segment& segment(segment_map_[segment_]);
         for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
         {
-            int err;
-            if ((*i)->id() != exclude_id &&
-                (err = (*i)->send(relay_dg)) != 0)
+            if ((*i)->id() != exclude_id)
             {
-                log_debug << "transport: " << ::strerror(err);
+                send(*i, relay_dg);
             }
         }
         gu_trace(pop_header(relay_msg, relay_dg));
@@ -1277,11 +1293,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
                 msg.set_flags(msg.flags() | Message::F_RELAY);
             }
             gu_trace(push_header(msg, dg));
-            if (segment.front()->send(dg) != 0)
-            {
-                log_debug << "error sending to "
-                          << segment.front()->remote_addr();
-            }
+            send(segment[(self_index_ + segment_id) % segment.size()], dg);
             gu_trace(pop_header(msg, dg));
         }
         else
@@ -1305,11 +1317,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
                     msg.set_flags(msg.flags() | Message::F_RELAY);
                     gu_trace(push_header(msg, dg));
                 }
-                int err;
-                if ((err = (*i)->send(dg)) != 0)
-                {
-                    log_debug << "transport: " << ::strerror(err);
-                }
+                send(*i, dg);
                 if (relay_idx == idx)
                 {
                     gu_trace(pop_header(msg, dg));
