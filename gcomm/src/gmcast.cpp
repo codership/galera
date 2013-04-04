@@ -193,7 +193,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait_));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl_));
     conf_.set(Conf::GMCastPeerTimeout, gu::to_string(peer_timeout_));
-    // conf_.set(Conf::GMCastSegment, gu::to_string(segment_));
+    conf_.set(Conf::GMCastSegment, gu::to_string<int>(segment_));
 }
 
 gcomm::GMCast::~GMCast()
