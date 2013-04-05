@@ -77,23 +77,31 @@ function test_run
     for ii in 3 6 9
     do
     (
-        for node in `seq 1 $ii`
-        do
-            if [ $segmentation != 0 ]
-            then
-                echo "wsrep_provider_options=\"gmcast.segment=$((($node - 1) % 3 + 1))\"" \
-                    > $TEST_BASE/conf/my.cnf.$node
-            else
-                echo "wsrep_provider_options=\"gmcast.segment=0\"" \
-                    > $TEST_BASE/conf/my.cnf.$node
-            fi
-        done
-
         cp $TEST_BASE/conf/nodes.conf.$ii $TEST_BASE/conf/nodes.conf
         . $TEST_BASE/conf/main.conf
 
+        MYSQL="mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD"
+
         $TEST_BASE/scripts/command.sh install $PKG
         $TEST_BASE/scripts/command.sh restart
+
+        for node in `seq 0 $(($ii - 1))`
+        do
+            provider_options="evs.send_window=16; evs.user_send_window=8; "
+            if [ $segmentation != 0 ]
+            then
+                provider_options="$provider_options gmcast.segment=$(($node % 3 + 1))"
+            else
+                provider_options="$provider_options gmcast.segment=0"
+            fi
+            echo $MYSQL -h${NODE_INCOMING_HOST[$node]} \
+                -P${NODE_INCOMING_PORT[$node]} \
+                -e "SET GLOBAL wsrep_provider_options='$provider_options'"
+
+            $MYSQL -h${NODE_INCOMING_HOST[$node]} \
+                -P${NODE_INCOMING_PORT[$node]} \
+                -e "SET GLOBAL wsrep_provider_options='$provider_options'"
+        done
 
         # create table which will easily fit in memory
         SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}

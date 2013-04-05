@@ -52,7 +52,9 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     version_(check_range(Conf::GMCastVersion,
                          param<int>(conf_, uri, Conf::GMCastVersion, "0"),
                          0, max_version_ + 1)),
-    segment_ (param<int>(conf_, uri, Conf::GMCastSegment, "0")),
+    segment_ (check_range(Conf::GMCastSegment,
+                          param<int>(conf_, uri, Conf::GMCastSegment, "0"),
+                          0, 255)),
     my_uuid_      (0, 0),
     use_ssl_      (param<bool>(conf_, uri, Conf::SocketUseSsl, "false")),
     // @todo: technically group name should be in path component
@@ -1524,6 +1526,24 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
             }
             segment_map_.clear();
         }
+        return true;
+    }
+    else if (key == Conf::GMCastSegment)
+    {
+        segment_ = check_range(Conf::GMCastSegment,
+                               gu::from_string<int>(val), 0, 255);
+        // Delete all entries in proto map and let peers to re-establish
+        // connections. New segment ID will be distributed on reconnect.
+        ProtoMap::iterator pi, pi_next;
+        for (pi = proto_map_->begin(); pi != proto_map_->end(); pi = pi_next)
+        {
+            pi_next = pi, ++pi_next;
+            Proto* rp = ProtoMap::value(pi);
+            delete rp;
+            proto_map_->erase(pi);
+        }
+        segment_map_.clear();
+        conf_.set(Conf::GMCastSegment, gu::to_string<int>(segment_));
         return true;
     }
     else if (key == Conf::GMCastGroup ||
