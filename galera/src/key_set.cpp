@@ -80,7 +80,7 @@ KeySet::KeyPart::print_annotation(std::ostream& os, const gu::byte_t* buf)
     }
 }
 
-static const char* ver_str[KeySet::MAX_VER + 1] =
+static const char* ver_str[KeySet::MAX_VERSION + 1] =
 {
     "EMPTY", "FLAT16", "FLAT16A", "FLAT8", "FLAT8A"
 };

@@ -22,7 +22,15 @@ namespace galera
             VER1
         };
 
-        static Version const MAX_VER = VER1;
+        static Version const MAX_VERSION = VER1;
+
+        static Version version (unsigned int ver)
+        {
+            if (gu_likely (ver <= MAX_VERSION))
+                return static_cast<Version>(ver);
+
+            gu_throw_error (EINVAL) << "Unrecognized DataSet version: " << ver;
+        }
 
         /*! Dummy class to instantiate DataSetOut */
         class RecordOut {};
@@ -95,7 +103,7 @@ namespace galera
         }
 
         DataSet::Version
-        version () const { return version_; }
+        version () const { return count() ? version_ : DataSet::EMPTY; }
 
     private:
 

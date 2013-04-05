@@ -30,7 +30,14 @@ public:
 //      TREE8      /*  8-byte hash + full serialized key */
     };
 
-    static Version const MAX_VER = FLAT8A;
+    static Version const MAX_VERSION = FLAT8A;
+
+    static Version version (unsigned int ver)
+    {
+        if (gu_likely (ver <= MAX_VERSION)) return static_cast<Version>(ver);
+
+        gu_throw_error (EINVAL) << "Unrecognized KeySet version: " << ver;
+    }
 
     class Key
     {
@@ -426,7 +433,7 @@ public:
     append (const KeyData& kd);
 
     KeySet::Version
-    version () { return version_; }
+    version () { return count() ? version_ : KeySet::EMPTY; }
 
 private:
 

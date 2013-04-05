@@ -34,7 +34,7 @@ public:
         VER1
     };
 
-    static Version const MAX_VER = VER1;
+    static Version const MAX_VERSION = VER1;
 
     enum CheckType
     {
@@ -90,7 +90,7 @@ protected:
     RecordSetOutBase (const std::string& base_name,     /* basename for on-disk
                                                          * allocator */
                       CheckType          ct,
-                      Version            version  = MAX_VER
+                      Version            version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
                       ,ssize_t            max_size = 0x7fffffff
 #endif
@@ -266,7 +266,7 @@ public:
 
     RecordSetOut (const std::string& base_name,
                   CheckType          ct,
-                  Version            version  = MAX_VER
+                  Version            version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
                   ,ssize_t           max_size = 0x7fffffff
 #endif

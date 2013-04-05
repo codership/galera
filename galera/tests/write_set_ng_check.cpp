@@ -15,9 +15,9 @@
 
 using namespace galera;
 
-START_TEST (ver0_basic)
+START_TEST (ver3_basic)
 {
-    WriteSetNG::Version const ws_ver(WriteSetNG::VER0);
+    WriteSetNG::Version const ws_ver(WriteSetNG::VER3);
     KeySet::Version const     tk_ver(WriteSetNG::ws_to_ks_version(ws_ver));
 
     WriteSetOut wso ("", ws_ver);
@@ -157,7 +157,7 @@ END_TEST
 Suite* write_set_ng_suite ()
 {
     TCase* t = tcase_create ("WriteSet");
-    tcase_add_test (t, ver0_basic);
+    tcase_add_test (t, ver3_basic);
     tcase_set_timeout(t, 60);
 
     Suite* s = suite_create ("WriteSet");

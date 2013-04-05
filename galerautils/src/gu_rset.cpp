@@ -216,7 +216,7 @@ RecordSet::RecordSet (Version ver, CheckType const ct)
     size_      (0),
     count_     (0)
 {
-    if (version_ > MAX_VER)
+    if (gu_unlikely(uint(version_) > MAX_VERSION))
     {
         gu_throw_error (EPROTO) << "Unsupported header version: " << version_;
     }
@@ -254,18 +254,15 @@ RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
 static inline RecordSet::Version
 header_version (const byte_t* buf, ssize_t const size)
 {
-    if (gu_unlikely (size < 1))
-    {
-        gu_throw_error (EINVAL) << "Buffer too short: " << size;
-    }
+    assert (NULL != buf);
+    assert (size > 0);
 
-    int ver = (buf[0] & 0xf0) >> 4;
+    uint const ver((buf[0] & 0xf0) >> 4);
 
-    switch (ver)
-    {
-    case 0: assert(0); return RecordSet::EMPTY;
-    case 1: return RecordSet::VER1;
-    }
+    assert (ver > 0);
+
+    if (gu_likely(ver <= RecordSet::MAX_VERSION))
+        return static_cast<RecordSet::Version>(ver);
 
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
 }
