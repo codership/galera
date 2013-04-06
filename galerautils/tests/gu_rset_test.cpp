@@ -276,6 +276,20 @@ START_TEST (ver0)
         fail("%s", e.what());
     }
 
+    /* test buf() method */
+    gu::RecordSetIn<TestRecord> const rset_in_buf(rset_in.buf().ptr,
+                                                  rset_in.buf().size);
+    fail_if(rset_in.count() != rset_in_buf.count());
+    fail_if(rset_in.size()  != rset_in_buf.size());
+    fail_if (rset_in.buf().ptr != rset_in_buf.buf().ptr);
+    for (ssize_t i = 0; i < rset_in_buf.count(); ++i)
+    {
+        TestRecord const rin(rset_in_buf.next());
+        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
+                 i, records[i]->c_str(), rin.c_str());
+    }
+
+    /* test empty RecordSetIn creation with subsequent initialization */
     gu::RecordSetIn<TestRecord> rset_in_empty;
     fail_if (rset_in_empty.size()  != 0);
     fail_if (rset_in_empty.count() != 0);

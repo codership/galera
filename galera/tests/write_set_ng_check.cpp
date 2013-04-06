@@ -118,6 +118,8 @@ START_TEST (ver3_basic)
         fail("%s", e.what());
     }
 
+    mark_point();
+
     try /* this is to test checksum after set_seqno() */
     {
         WriteSetIn wsi(in_buf);
@@ -132,7 +134,43 @@ START_TEST (ver3_basic)
         fail_if (e.get_errno() != EINVAL);
     }
 
+    mark_point();
+
+    try /* this is to test reassembly after gather() */
+    {
+        WriteSetIn tmp_wsi(in_buf);
+        std::vector<gu::Buf> out;
+
+        mark_point();
+        tmp_wsi.gather(out, false, false);
+
+        /* concatenate all out buffers */
+        std::vector<gu::byte_t> in;
+        in.reserve(out_size);
+        for (size_t i(0); i < out.size(); ++i)
+        {
+            in.insert (in.end(), out[i].ptr, out[i].ptr + out[i].size);
+        }
+
+        gu::Buf tmp_buf = { in.data(), static_cast<ssize_t>(in.size()) };
+
+        WriteSetIn wsi(tmp_buf);
+        wsi.verify_checksum();
+        fail_unless(wsi.certified());
+        fail_if (wsi.pa_range() != pa_range);
+        fail_if (wsi.seqno()    != seqno);
+        fail_if (wsi.keyset().count()  != 0);
+        fail_if (wsi.dataset().count() == 0);
+        fail_if (wsi.unrdset().count() != 0);
+    }
+    catch (gu::Exception& e)
+    {
+        fail_if (e.get_errno() != EINVAL);
+    }
+
     in[in.size() - 1] ^= 1; // corrupted the last byte (payload)
+
+    mark_point();
 
     try /* this is to test payload corruption */
     {

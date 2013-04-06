@@ -345,6 +345,11 @@ public:
 
     void checksum() const; // throws if checksum fails
 
+    gu::Buf buf() const
+    {
+        gu::Buf ret = { head_, size_ }; return ret;
+    }
+
 protected:
 
     template <class R>

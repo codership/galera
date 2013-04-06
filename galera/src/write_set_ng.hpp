@@ -36,16 +36,6 @@ namespace galera
 
         static Version const MAX_VERSION = VER3;
 
-        static KeySet::Version ws_to_ks_version (Version ver)
-        {
-            return KeySet::FLAT8A;
-        }
-
-        static DataSet::Version ws_to_ds_version (Version ver)
-        {
-            return DataSet::VER1;
-        }
-
         class Header
         {
         public:
@@ -65,7 +55,7 @@ namespace galera
                 return version(hdr[0]);
             }
 
-            static size_t size (Version ver)
+            static int size (Version ver)
             {
                 switch (ver)
                 {
@@ -78,7 +68,12 @@ namespace galera
 
 
             /* This is for WriteSetOut */
-            Header () : checksum_(), buf_() { buf_.ptr = NULL; buf_.size = 0; }
+            explicit
+            Header (Version ver) : checksum_(), buf_(), local_()
+            {
+                buf_.ptr  = &local_[0];
+                buf_.size = size(ver);
+            }
 
             size_t init (Version          ver,
                          KeySet::Version  kver,
@@ -86,15 +81,18 @@ namespace galera
                          DataSet::Version uver,
                          uint16_t         flags);
 
-            void   free () { delete[] buf_.ptr; }
             /* records last_seen, timestamp and CRC before replication */
             void set_last_seen (const wsrep_seqno_t& ls);
 
             /* This is for WriteSetIn */
-            Header (const gu::Buf& buf) : checksum_(buf), buf_(buf) {}
+            explicit
+            Header (const gu::Buf& buf) : checksum_(buf), buf_(buf), local_()
+            {
+                buf_.size = size();
+            }
 
-            Version       version()   const { return version(buf_.ptr); }
-            size_t        size()      const { return size(version()); }
+            Version version() const { return version(buf_.ptr); }
+            int     size()    const { return size(version());   }
 
             KeySet::Version keyset_ver() const
             {
@@ -164,6 +162,8 @@ namespace galera
             /* to set seqno and parallel applying range after certification */
             void set_seqno(const wsrep_seqno_t& seqno, int pa_range);
 
+            gu::Buf copy(bool include_keys, bool include_unrd);
+
         private:
 
             static int const V3_HEADER_VER  = 0;
@@ -199,6 +199,8 @@ namespace galera
 
             static Offsets const V3;
 
+            static int const MAX_HEADER_SIZE = V3_SIZE;
+
             class Checksum
             {
             public:
@@ -208,13 +210,14 @@ namespace galera
 
             gu::Buf buf_;
 
+            gu::byte_t local_[MAX_HEADER_SIZE];
+
             wsrep_seqno_t seqno_priv() const
             {
                 return gu::gtoh(
                     *(reinterpret_cast<const uint64_t*>(buf_.ptr +V3_LAST_SEEN))
                     );
             }
-
         };
     };
 
@@ -232,7 +235,7 @@ namespace galera
                      size_t              max_size = WriteSetNG::MAX_SIZE)
             :
             ver_   (ver),
-            header_(),
+            header_(ver_),
             keys_  (base_name + "_keys", kver),
             data_  (base_name + "_data", dver),
             unrd_  (base_name + "_unrd", uver),
@@ -240,8 +243,6 @@ namespace galera
                     - WriteSetNG::Header::size(ver_)),
             flags_ (flags)
         {}
-
-        ~WriteSetOut() { header_.free(); }
 
         void append_key(const KeyData& k)
         {
@@ -357,9 +358,6 @@ namespace galera
                 /* checksum was performed in a parallel thread */
                 pthread_join (check_thr_, NULL);
             }
-//            delete keys_;
-//            delete data_;
-//            delete unrd_;
         }
 
         uint16_t      flags()     const { return header_.flags();     }
@@ -392,13 +390,13 @@ namespace galera
             header_.set_seqno (seqno, pa_range);
         }
 
+        size_t gather(std::vector<gu::Buf>& out,
+                      bool include_keys, bool include_unrd);
+
     private:
 
         WriteSetNG::Header header_;
         ssize_t const      size_;
-//        const KeySetIn*    keys_;
-//        const DataSetIn*   data_;
-//        const DataSetIn*   unrd_;
         KeySetIn           keys_;
         DataSetIn          data_;
         DataSetIn          unrd_;

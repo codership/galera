@@ -59,7 +59,7 @@ WriteSetNG::Header::init (Version const          ver,
     assert (uint(kver) <= KeySet::MAX_VERSION);
     assert (uint(dver) <= DataSet::MAX_VERSION);
     assert (uint(uver) <= DataSet::MAX_VERSION);
-
+#if 0
     size_t hsize = size(ver);
 
     try
@@ -79,8 +79,16 @@ WriteSetNG::Header::init (Version const          ver,
     {
         gu_throw_error (ENOMEM) << "Could not allocate " << hsize << " bytes.";
     }
+#else
 
-    return hsize;
+    local_[V3_HEADER_VER] = ver;
+    local_[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
+
+    *(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS))    = gu::htog(flags);
+    *(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE)) = 0;
+#endif
+
+    return buf_.size;
 }
 
 
@@ -128,6 +136,30 @@ WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
 }
 
 
+gu::Buf
+WriteSetNG::Header::copy(bool const include_keys, bool const include_unrd)
+{
+    assert (buf_.ptr != &local_[0]);
+    assert (size_t(size()) <= sizeof(local_));
+
+    gu::byte_t* const ptr(&local_[0]);
+
+    ::memcpy (ptr, buf_.ptr, size());
+
+    gu::byte_t const mask(0x0c | (0xf0 * include_keys) | (0x03 * include_unrd));
+
+    ptr[V3_KEYSET_VER] &= mask; // zero up versions of non-included sets
+
+    uint32_t* crc = reinterpret_cast<uint32_t*>(ptr + V3_CRC);
+    uint32_t tmp;
+    gu::CRC::digest(ptr, reinterpret_cast<gu::byte_t*>(crc) - ptr, tmp);
+    *crc = gu::htog<uint32_t>(tmp);
+
+    gu::Buf ret = { ptr, size() };
+    return ret;
+}
+
+
 WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
 {
     assert (buf.size > 0);
@@ -157,6 +189,7 @@ WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
     gu_throw_error (EMSGSIZE) << "Buffer size " << buf.size
                               << " shorter than header size " << hsize;
 }
+
 
 void
 WriteSetIn::checksum()
@@ -210,6 +243,49 @@ WriteSetIn::checksum()
         log_error << "Non-standard exception in WriteSet::checksum()";
     }
 }
+
+
+size_t
+WriteSetIn::gather(std::vector<gu::Buf>& out,
+                   bool include_keys, bool include_unrd)
+{
+    if (include_keys && include_unrd)
+    {
+        gu::Buf buf(header_());
+        buf.size = size_;
+        out.push_back(buf);
+        return size_;
+    }
+    else
+    {
+        out.reserve(out.size() + 4);
+
+        gu::Buf buf(header_.copy(include_keys, include_unrd));
+        out.push_back(buf);
+        size_t ret(buf.size);
+
+        if (include_keys)
+        {
+            buf = keys_.buf();
+            out.push_back(buf);
+            ret += buf.size;
+        }
+
+        buf = data_.buf();
+        out.push_back (buf);
+        ret += buf.size;
+
+        if (include_unrd)
+        {
+            buf = unrd_.buf();
+            out.push_back(buf);
+            ret += buf.size;
+        }
+
+        return ret;
+    }
+}
+
 
 } /* namespace galera */
 
