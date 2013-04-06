@@ -241,7 +241,7 @@ KeySetOut::append (const KeyData& kd)
         catch (KeyPart::DUPLICATE& e)
         {
             assert (i + 1 == kd.parts_num);
-            /* There is very small probability that child part thows DUPLICATE
+            /* There is a very small probability that child part thows DUPLICATE
              * even after parent was added as a new key. It does not matter:
              * a duplicate will be a duplicate in certification as well. */
             log_info << "Returning after catching a DUPLICATE. Part: " << i;

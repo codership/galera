@@ -222,18 +222,23 @@ namespace galera
     {
     public:
 
+        explicit
         WriteSetOut (const std::string&  base_name,
-                     WriteSetNG::Version ver      = WriteSetNG::VER3,
+                     uint16_t            flags    = 0,
+                     WriteSetNG::Version ver      = WriteSetNG::MAX_VERSION,
+                     KeySet::Version     kver     = KeySet::MAX_VERSION,
+                     DataSet::Version    dver     = DataSet::MAX_VERSION,
+                     DataSet::Version    uver     = DataSet::MAX_VERSION,
                      size_t              max_size = WriteSetNG::MAX_SIZE)
             :
             ver_   (ver),
             header_(),
-            keys_  (base_name + "_keys", WriteSetNG::ws_to_ks_version(ver)),
-            data_  (base_name + "_data", WriteSetNG::ws_to_ds_version(ver)),
-            unrd_  (base_name + "_unrd", WriteSetNG::ws_to_ds_version(ver)),
+            keys_  (base_name + "_keys", kver),
+            data_  (base_name + "_data", dver),
+            unrd_  (base_name + "_unrd", uver),
             left_  (max_size - keys_.size() - data_.size() - unrd_.size()
                     - WriteSetNG::Header::size(ver_)),
-            flags_ (0)
+            flags_ (flags)
         {}
 
         ~WriteSetOut() { header_.free(); }
@@ -252,6 +257,8 @@ namespace galera
         {
             left_ -= unrd_.append(data, data_len, store);
         }
+
+        void set_flags(uint16_t flags) { flags_ |= flags; }
 
         bool is_empty() const
         {
@@ -311,9 +318,9 @@ namespace galera
         WriteSetIn (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
             : header_(buf),
               size_  (buf.size),
-              keys_  (NULL),
-              data_  (NULL),
-              unrd_  (NULL),
+              keys_  (),
+              data_  (),
+              unrd_  (),
               check_thr_(),
               check_ (false)
         {
@@ -323,9 +330,8 @@ namespace galera
 
             assert (psize >= 0);
 
-            if (header_.has_keys())
-                keys_ = new KeySetIn (WriteSetNG::ws_to_ks_version(ver),
-                                      pptr, psize);
+            KeySet::Version const kver(header_.keyset_ver());
+            if (kver != KeySet::EMPTY) gu_trace(keys_.init (kver, pptr, psize));
 
             if (gu_likely(size_ < st))
             {
@@ -351,21 +357,25 @@ namespace galera
                 /* checksum was performed in a parallel thread */
                 pthread_join (check_thr_, NULL);
             }
-            delete keys_;
-            delete data_;
-            delete unrd_;
+//            delete keys_;
+//            delete data_;
+//            delete unrd_;
         }
 
+        uint16_t      flags()     const { return header_.flags();     }
+        int           pa_range()  const { return header_.pa_range();  }
+        bool          certified() const { return header_.pa_range();  }
         wsrep_seqno_t last_seen() const { return header_.last_seen(); }
+        wsrep_seqno_t seqno()     const { return header_.seqno();     }
         long long     timestamp() const { return header_.timestamp(); }
 
-        const KeySetIn*  keyset()  const { return keys_; }
-        const DataSetIn* dataset() const { return data_; }
-        const DataSetIn* unrdset() const { return unrd_; }
+        const KeySetIn&  keyset()  const { return keys_; }
+        const DataSetIn& dataset() const { return data_; }
+        const DataSetIn& unrdset() const { return unrd_; }
 
         /* This should be called right after certification verdict is obtained
          * and before it is finalized. */
-        void verify_checksum()
+        void verify_checksum() const
         {
             if (gu_unlikely(false == check_))
             {
@@ -375,66 +385,31 @@ namespace galera
             }
         }
 
+        void set_seqno(const wsrep_seqno_t& seqno, int pa_range)
+        {
+            assert (seqno > 0);
+            assert (pa_range > 0);
+            header_.set_seqno (seqno, pa_range);
+        }
+
     private:
 
         WriteSetNG::Header header_;
         ssize_t const      size_;
-        const KeySetIn*    keys_;
-        const DataSetIn*   data_;
-        const DataSetIn*   unrd_;
+//        const KeySetIn*    keys_;
+//        const DataSetIn*   data_;
+//        const DataSetIn*   unrd_;
+        KeySetIn           keys_;
+        DataSetIn          data_;
+        DataSetIn          unrd_;
         pthread_t          check_thr_;
         bool               check_;
 
         static size_t const SIZE_THRESHOLD = 1 << 20; /* 1Mb */
 
-        void checksum () // throws if checksum fails.
-        {
-            WriteSetNG::Version const ver  (header_.version());
-            bool const                unrd (header_.has_unrd());
-            const gu::byte_t*         pptr (header_.payload());
-            ssize_t                   psize(size_ - header_.size());
+        void checksum (); /* checksums writeset, stores result in check_ */
 
-            assert (psize >= 0);
-
-            try
-            {
-                if (keys_)
-                {
-                    gu_trace(keys_->checksum());
-                    psize -= keys_->size();
-                    assert (psize >= 0);
-                    pptr  += keys_->size();
-                }
-
-                DataSet::Version const dv(WriteSetNG::ws_to_ds_version(ver));
-
-                data_ = new DataSetIn (dv, pptr, psize);
-                gu_trace(data_->checksum());
-                psize -= data_->size();
-                assert (psize >= 0);
-                pptr  += data_->size();
-
-                if (unrd)
-                {
-                    unrd_ = new DataSetIn (dv, pptr, psize);
-                    gu_trace(unrd_->checksum());
-                    psize -= unrd_->size();
-                    assert (psize == 0);
-                }
-
-                check_ = true;
-            }
-            catch (std::exception& e)
-            {
-                log_error << e.what();
-            }
-            catch (...)
-            {
-                log_error << "Non-standard exception in WriteSet::checksum()";
-            }
-        }
-
-        void checksum_fin()
+        void checksum_fin() const
         {
             if (gu_unlikely(!check_))
             {

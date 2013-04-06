@@ -158,5 +158,58 @@ WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
                               << " shorter than header size " << hsize;
 }
 
+void
+WriteSetIn::checksum()
+{
+    const gu::byte_t*         pptr (header_.payload());
+    ssize_t                   psize(size_ - header_.size());
+
+    assert (psize >= 0);
+
+    try
+    {
+        if (keys_.size() > 0)
+        {
+            gu_trace(keys_.checksum());
+            psize -= keys_.size();
+            assert (psize >= 0);
+            pptr  += keys_.size();
+        }
+
+        DataSet::Version const dver(header_.dataset_ver());
+
+        if (gu_likely(dver != DataSet::EMPTY))
+        {
+            gu_trace(data_.init(dver, pptr, psize));
+            gu_trace(data_.checksum());
+            psize -= data_.size();
+            assert (psize >= 0);
+        }
+
+        DataSet::Version const uver(header_.unrdset_ver());
+
+        if (uver != DataSet::EMPTY)
+        {
+            pptr  += data_.size();
+            gu_trace(unrd_.init(uver, pptr, psize));
+            gu_trace(unrd_.checksum());
+#ifndef NDEBUG
+            psize -= unrd_.size();
+            assert (psize == 0);
+#endif
+        }
+
+        check_ = true;
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+    }
+    catch (...)
+    {
+        log_error << "Non-standard exception in WriteSet::checksum()";
+    }
+}
+
 } /* namespace galera */
 

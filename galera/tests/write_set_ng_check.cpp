@@ -17,19 +17,19 @@ using namespace galera;
 
 START_TEST (ver3_basic)
 {
-    WriteSetNG::Version const ws_ver(WriteSetNG::VER3);
-    KeySet::Version const     tk_ver(WriteSetNG::ws_to_ks_version(ws_ver));
+    uint16_t const flag1(0xabcd);
 
-    WriteSetOut wso ("", ws_ver);
+    WriteSetOut wso ("ver3_basic", flag1, WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 
-    TestKey tk0(tk_ver, SHARED, true, "a0");
+    TestKey tk0(KeySet::MAX_VERSION, SHARED, true, "a0");
     wso.append_key(tk0());
     fail_if (wso.is_empty());
 
     uint64_t const data_out_volatile(0xaabbccdd);
     uint32_t const data_out_persistent(0xffeeddcc);
+    uint16_t const flag2(0x1234);
 
     {
         uint64_t const d(data_out_volatile);
@@ -37,6 +37,9 @@ START_TEST (ver3_basic)
     }
 
     wso.append_data (&data_out_persistent, sizeof(data_out_persistent), false);
+    wso.set_flags (flag2);
+
+    uint16_t const flags(flag1 | flag2);
 
     std::vector<gu::Buf> out;
     size_t const out_size(wso.gather(out));
@@ -44,6 +47,9 @@ START_TEST (ver3_basic)
     log_info << "Gather size: " << out_size << ", buf count: " << out.size();
 
     wsrep_seqno_t const last_seen(1);
+    wsrep_seqno_t const seqno(2);
+    int const           pa_range(seqno - last_seen);
+
     wso.set_last_seen(last_seen);
 
     /* concatenate all out buffers */
@@ -67,46 +73,63 @@ START_TEST (ver3_basic)
         wsrep_seqno_t const ls(wsi.last_seen());
         fail_if (ls != last_seen, "Found last seen: %lld, expected: %lld",
                  ls, last_seen);
+        fail_if (wsi.flags() != flags);
         fail_if (0 == wsi.timestamp());
 
         mark_point();
-        const KeySetIn* const ksi(wsi.keyset());
-        fail_if (NULL == ksi);
-        fail_if (ksi->count() != 1);
+        const KeySetIn& ksi(wsi.keyset());
+        fail_if (ksi.count() != 1);
 
         mark_point();
-        for (int i(0); i < ksi->count(); ++i)
+        for (int i(0); i < ksi.count(); ++i)
         {
-            KeySet::KeyPart kp(ksi->next());
+            KeySet::KeyPart kp(ksi.next());
         }
 
         mark_point();
         wsi.verify_checksum();
 
-        mark_point();
-        const DataSetIn* const dsi(wsi.dataset());
-        fail_if (NULL == dsi);
-        fail_if (dsi->count() != 2);
+        wsi.set_seqno (seqno, pa_range);
+        fail_unless(wsi.certified());
 
         mark_point();
-        gu::Buf const d1(dsi->next());
+        const DataSetIn& dsi(wsi.dataset());
+        fail_if (dsi.count() != 2);
+
+        mark_point();
+        gu::Buf const d1(dsi.next());
         fail_if (d1.size != sizeof(data_out_volatile));
         fail_if (*(reinterpret_cast<const uint64_t*>(d1.ptr)) !=
                  data_out_volatile);
 
         mark_point();
-        gu::Buf const d2(dsi->next());
+        gu::Buf const d2(dsi.next());
         fail_if (d2.size != sizeof(data_out_persistent));
         fail_if (*(reinterpret_cast<const uint32_t*>(d2.ptr)) !=
                  data_out_persistent);
 
         mark_point();
-        const DataSetIn* const usi(wsi.unrdset());
-        fail_if (NULL != usi);
+        const DataSetIn& usi(wsi.unrdset());
+        fail_if (usi.count() != 0);
+        fail_if (usi.size()  != 0);
     }
     catch (std::exception& e)
     {
         fail("%s", e.what());
+    }
+
+    try /* this is to test checksum after set_seqno() */
+    {
+        WriteSetIn wsi(in_buf);
+        mark_point();
+        wsi.verify_checksum();
+        fail_unless(wsi.certified());
+        fail_if (wsi.pa_range() != pa_range);
+        fail_if (wsi.seqno()    != seqno);
+    }
+    catch (gu::Exception& e)
+    {
+        fail_if (e.get_errno() != EINVAL);
     }
 
     in[in.size() - 1] ^= 1; // corrupted the last byte (payload)
