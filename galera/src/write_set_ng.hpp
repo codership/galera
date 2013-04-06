@@ -91,6 +91,11 @@ namespace galera
                 buf_.size = size();
             }
 
+            Header () : checksum_(), buf_(), local_()
+            {
+                buf_.ptr = NULL; buf_.size = 0;
+            }
+
             Version version() const { return version(buf_.ptr); }
             int     size()    const { return size(version());   }
 
@@ -166,6 +171,23 @@ namespace galera
 
         private:
 
+            class Checksum
+            {
+            public:
+                typedef uint64_t type_t;
+
+                /* produce value corrected for endianness */
+                static void
+                compute (const gu::byte_t* ptr, size_t size, type_t& value)
+                {
+                    gu::CRC::digest (ptr, size, value);
+                    value = gu::htog<type_t>(value);
+                }
+
+                Checksum () {}
+                Checksum (const gu::Buf& buf);
+            };
+
             static int const V3_HEADER_VER  = 0;
             static int const V3_KEYSET_VER  = V3_HEADER_VER + sizeof(uint8_t);
             // data and unordered sets share the same byte with keyset version
@@ -178,7 +200,7 @@ namespace galera
             // seqno takes place of last seen
             static int const V3_TIMESTAMP   = V3_LAST_SEEN   + sizeof(uint64_t);
             static int const V3_CRC         = V3_TIMESTAMP   + sizeof(uint64_t);
-            static int const V3_SIZE        = V3_CRC         + sizeof(uint32_t);
+            static int const V3_SIZE        = V3_CRC  + sizeof(Checksum::type_t);
 
             struct Offsets
             {
@@ -201,15 +223,8 @@ namespace galera
 
             static int const MAX_HEADER_SIZE = V3_SIZE;
 
-            class Checksum
-            {
-            public:
-                Checksum () {}
-                Checksum (const gu::Buf& buf);
-            } checksum_;
-
-            gu::Buf buf_;
-
+            Checksum   checksum_;
+            gu::Buf    buf_;
             gu::byte_t local_[MAX_HEADER_SIZE];
 
             wsrep_seqno_t seqno_priv() const
@@ -217,6 +232,13 @@ namespace galera
                 return gu::gtoh(
                     *(reinterpret_cast<const uint64_t*>(buf_.ptr +V3_LAST_SEEN))
                     );
+            }
+
+            static void update_checksum(gu::byte_t* const ptr, size_t size)
+            {
+                Checksum::type_t cval;
+                Checksum::compute (ptr, size, cval);
+                *reinterpret_cast<Checksum::type_t*>(ptr + size) = cval;
             }
         };
     };
@@ -350,6 +372,16 @@ namespace galera
                 }
             }
         }
+
+        WriteSetIn ()
+            : header_(),
+              size_  (0),
+              keys_  (),
+              data_  (),
+              unrd_  (),
+              check_thr_(),
+              check_ (false)
+        {}
 
         ~WriteSetIn ()
         {

@@ -102,14 +102,11 @@ WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& ls)
     gu::byte_t* ptr     = const_cast<gu::byte_t*>(buf_.ptr);
     uint64_t* last_seen = reinterpret_cast<uint64_t*>(ptr + V3_LAST_SEEN);
     uint64_t* timestamp = reinterpret_cast<uint64_t*>(ptr + V3_TIMESTAMP);
-    uint32_t* crc       = reinterpret_cast<uint32_t*>(ptr + V3_CRC);
 
     *last_seen = gu::htog<uint64_t>(ls);
     *timestamp = gu::htog<uint64_t>(gu_time_monotonic());
 
-    uint32_t tmp;
-    gu::CRC::digest(ptr, reinterpret_cast<gu::byte_t*>(crc) - ptr, tmp);
-    *crc = gu::htog<uint32_t>(tmp);
+    update_checksum (ptr, V3_CRC);
 }
 
 
@@ -125,14 +122,11 @@ WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
     gu::byte_t* ptr = const_cast<gu::byte_t*>(buf_.ptr);
     uint32_t* pr    = reinterpret_cast<uint32_t*>(ptr + V3_PA_RANGE);
     uint64_t* sq    = reinterpret_cast<uint64_t*>(ptr + V3_SEQNO);
-    uint32_t* crc   = reinterpret_cast<uint32_t*>(ptr + V3_CRC);
 
     *pr = gu::htog<uint32_t>(pa_range);
     *sq = gu::htog<uint64_t>(seqno);
 
-    uint32_t tmp;
-    gu::CRC::digest(ptr, reinterpret_cast<gu::byte_t*>(crc) - ptr, tmp);
-    *crc = gu::htog<uint32_t>(tmp);
+    update_checksum (ptr, V3_CRC);
 }
 
 
@@ -150,10 +144,7 @@ WriteSetNG::Header::copy(bool const include_keys, bool const include_unrd)
 
     ptr[V3_KEYSET_VER] &= mask; // zero up versions of non-included sets
 
-    uint32_t* crc = reinterpret_cast<uint32_t*>(ptr + V3_CRC);
-    uint32_t tmp;
-    gu::CRC::digest(ptr, reinterpret_cast<gu::byte_t*>(crc) - ptr, tmp);
-    *crc = gu::htog<uint32_t>(tmp);
+    update_checksum (ptr, V3_CRC);
 
     gu::Buf ret = { ptr, size() };
     return ret;
@@ -167,23 +158,27 @@ WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
     Version const ver   (Header::version(buf.ptr[0]));
     ssize_t const hsize (Header::size(ver));
 
-    uint32_t check, hcheck;
+    type_t check, hcheck;
 
     if (gu_likely (buf.size >= hsize))
     {
         switch (ver)
         {
         case VER3:
-            size_t const hhsize(hsize - sizeof(uint32_t));
-            gu::CRC::digest (buf.ptr, hhsize, check);
+            size_t const hhsize(hsize - sizeof(check));
+            compute (buf.ptr, hhsize, check);
 
-            hcheck = *(reinterpret_cast<const uint32_t*>(buf.ptr + hhsize));
+            hcheck = *(reinterpret_cast<const type_t*>(buf.ptr + hhsize));
 
-            if (gu_likely(gu::htog(check) == hcheck)) return;
+            if (gu_likely(check == hcheck)) return;
         }
 
         gu_throw_error (EINVAL) << "Header checksum mismatch: computed "
-                                << gu::htog(check) << ", found " << hcheck;
+                                << std::hex << std::setfill('0')
+                                << std::setw(sizeof(check) << 1)
+                                << check << ", found "
+                                << std::setw(sizeof(hcheck) << 1)
+                                << hcheck;
     }
 
     gu_throw_error (EMSGSIZE) << "Buffer size " << buf.size
