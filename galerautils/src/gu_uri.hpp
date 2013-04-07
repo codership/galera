@@ -52,8 +52,9 @@ namespace gu
              * @brief Get "user" part of authority
              *
              * @return user substring
+             * @throws NotSet
              */
-            const std::string& user() const throw (NotSet)
+            const std::string& user() const
             {
                 return user_.str();
             }
@@ -62,8 +63,9 @@ namespace gu
              * @brief Get "host" part of authority
              *
              * @return host substring
+             * @throws NotSet
              */
-            const std::string& host() const throw (NotSet)
+            const std::string& host() const
             {
                 return host_.str();
             }
@@ -72,8 +74,9 @@ namespace gu
              * @brief Get "port" part of authority
              *
              * @return port
+             * @throws NotSet
              */
-            const std::string& port() const throw (NotSet)
+            const std::string& port() const
             {
                 return port_.str();
             }
@@ -94,8 +97,9 @@ namespace gu
          *               else use a default one
          * @throws std::invalid_argument if URI is not valid
          * @throws std::logic_error in case of internal error
+         * @throws NotSet
          */
-        URI (const std::string&, bool strict = true) throw (Exception);
+        URI (const std::string&, bool strict = true);
 
         /*!
          * @brief Get URI string
@@ -111,8 +115,9 @@ namespace gu
          * @brief Get URI scheme
          *
          * @return URI scheme (always set)
+         * @throws NotSet
          */
-        const std::string& get_scheme() const throw (NotSet)
+        const std::string& get_scheme() const
         {
             return scheme_.str();
         }
@@ -121,15 +126,17 @@ namespace gu
          * @brief Get URI authority component
          *
          * @return URI authority substring
+         * @throws NotSet
          */
-        std::string get_authority() const throw (NotSet);
+        std::string get_authority() const;
 
         /*!
          * @brief Get "user" part of the first entry in authority list
          *
          * @return User substring
+         * @throws NotSet
          */
-        const std::string& get_user() const throw (NotSet)
+        const std::string& get_user() const
         {
             if (authority_.empty())
                 throw NotSet();
@@ -140,8 +147,9 @@ namespace gu
          * @brief Get "host" part of the first entry in authority list
          *
          * @return Host substring
+         * @throws NotSet
          */
-        const std::string& get_host() const throw (NotSet)
+        const std::string& get_host() const
         {
             if (authority_.empty())
                 throw NotSet();
@@ -152,8 +160,9 @@ namespace gu
          * @brief Get "port" part of the first entry in authority list
          *
          * @return Port substring
+         * @throws NotSet
          */
-        const std::string& get_port() const throw (NotSet)
+        const std::string& get_port() const
         {
             if (authority_.empty())
                 throw NotSet();
@@ -175,7 +184,7 @@ namespace gu
          *
          * @return URI path (always set)
          */
-        const std::string& get_path() const throw()
+        const std::string& get_path() const
         {
             return path_.str();
         }
@@ -184,8 +193,9 @@ namespace gu
          * @brief Get URI path
          *
          * @return URI path
+         * @throws NotSet
          */
-        const std::string& get_fragment() const throw(NotSet)
+        const std::string& get_fragment() const
         {
             return fragment_.str();
         }
@@ -209,10 +219,10 @@ namespace gu
         const URIQueryList& get_query_list() const { return query_list_; }
 
         /*!
-         * @brief return opton by name
+         * @brief return opton by name,
+         * @throws NotFound
          */
-        const std::string& get_option(const std::string&) const
-            throw (NotFound);
+        const std::string& get_option(const std::string&) const;
 
         const std::string& get_option(const std::string& opt,
                                       const std::string& def) const
@@ -222,7 +232,7 @@ namespace gu
         }
 
     private:
-        bool         modified_;
+        bool          modified_;
         mutable std::string  str_; /*! URI string */
 
         RegEx::Match  scheme_;    /*! URI scheme part */
@@ -234,14 +244,15 @@ namespace gu
         /*!
          * @brief Parse URI from str
          */
-        void parse (const std::string& s, bool strict) throw (Exception);
+        void parse (const std::string& s, bool strict);
 
         /*!
          * @brief Recompose URI in str
          */
         void recompose() const;
 
-        std::string get_authority(const Authority&) const throw (NotSet);
+        /*! @throws NotSet */
+        std::string get_authority(const Authority&) const;
 
         static const char* const uri_regex_; /*! regexp string to parse URI */
         static RegEx const regex_;           /*! URI regexp parser */

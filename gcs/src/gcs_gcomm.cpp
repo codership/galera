@@ -111,7 +111,7 @@ public:
         if (waiting_ == true) { cond_.signal(); }
     }
 
-    const RecvBufData& front(const Date& timeout) throw (Exception)
+    const RecvBufData& front(const Date& timeout)
     {
         Lock lock(mutex_);
 
@@ -532,7 +532,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 
 
 static void fill_cmp_msg(const View& view, const UUID& my_uuid,
-                         gcs_comp_msg_t* cm) throw (gu::Exception)
+                         gcs_comp_msg_t* cm)
 {
     size_t n(0);
 

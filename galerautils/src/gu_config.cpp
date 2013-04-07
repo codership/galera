@@ -19,7 +19,6 @@ const char gu::Config::ESCAPE        = '\\'; // escape symbol
 
 void
 gu::Config::parse (param_map_t& pmap, const std::string& params)
-    throw (Exception)
 {
     if (0 == params[0]) return;
 
@@ -69,15 +68,14 @@ gu::Config::parse (param_map_t& pmap, const std::string& params)
         else if (kvv.size() > 1)
         {
             gu_throw_error(EINVAL) << "Empty key at '" << pv[i]
-                                << "' in parameter list.";
+                                   << "' in parameter list.";
         }
     }
 }
 
-gu::Config::Config() throw () : params_() {}
+gu::Config::Config() : params_() {}
 
-gu::Config::Config (const std::string& params) throw (gu::Exception)
-    : params_()
+gu::Config::Config (const std::string& params) : params_()
 {
     Config::parse (params_, params);
 }
@@ -120,7 +118,7 @@ gu::Config::set_longlong (const std::string& key, long long val)
 void
 gu::Config::check_conversion (const char* str,
                               const char* endptr,
-                              const char* type) throw (Exception)
+                              const char* type)
 {
     if (endptr == str || endptr[0] != '\0')
     {
@@ -130,7 +128,7 @@ gu::Config::check_conversion (const char* str,
 }
 
 char
-gu::Config::overflow_char(long long ret) throw (Exception)
+gu::Config::overflow_char(long long ret)
 {
     if (ret >= CHAR_MIN && ret <= CHAR_MAX) return ret;
 
@@ -140,7 +138,7 @@ gu::Config::overflow_char(long long ret) throw (Exception)
 }
 
 short
-gu::Config::overflow_short(long long ret) throw (Exception)
+gu::Config::overflow_short(long long ret)
 {
     if (ret >= SHRT_MIN && ret <= SHRT_MAX) return ret;
 
@@ -150,7 +148,7 @@ gu::Config::overflow_short(long long ret) throw (Exception)
 }
 
 int
-gu::Config::overflow_int(long long ret) throw (Exception)
+gu::Config::overflow_int(long long ret)
 {
     if (ret >= INT_MIN && ret <= INT_MAX) return ret;
 

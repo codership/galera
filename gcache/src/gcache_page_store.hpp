@@ -26,21 +26,21 @@ namespace gcache
 
         ~PageStore ();
 
-        void* malloc  (ssize_t size) throw (gu::Exception);
+        void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr)  throw();
+        void  free    (const void* ptr);
 
-        void* realloc (void* ptr, ssize_t size) throw (gu::Exception);
+        void* realloc (void* ptr, ssize_t size);
 
-        void  discard (BufferHeader* bh) throw() {};
+        void  discard (BufferHeader* bh) {};
 
-        void  reset() throw (gu::Exception);
+        void  reset();
 
-        ssize_t count() const throw() { return count_; } // for unit tests
+        ssize_t count() const { return count_; } // for unit tests
 
-        void  set_page_size (ssize_t size) throw () { page_size_ = size; }
+        void  set_page_size (ssize_t size) { page_size_ = size; }
 
-        void  set_keep_size (ssize_t size) throw () { keep_size_ = size; }
+        void  set_keep_size (ssize_t size) { keep_size_ = size; }
 
     private:
 
@@ -57,15 +57,15 @@ namespace gcache
         pthread_t         delete_thr_;
 #endif /* GCACHE_DETACH_THREAD */
 
-        void new_page    (ssize_t size) throw (gu::Exception);
+        void new_page    (ssize_t size);
 
         // returns true if a page could be deleted
-        bool delete_page () throw (gu::Exception);
+        bool delete_page ();
 
         // cleans up extra pages.
-        void cleanup     () throw (gu::Exception);
+        void cleanup     ();
 
-        void* malloc_new (ssize_t size) throw ();
+        void* malloc_new (ssize_t size) ;
 
         void
         free_page_ptr (Page* page, const void* ptr)

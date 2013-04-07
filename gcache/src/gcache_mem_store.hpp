@@ -24,14 +24,14 @@ namespace gcache
 
     public:
 
-        MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr) throw ()
+        MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr)
             : max_size_ (max_size),
               size_     (0),
               allocd_   (),
               seqno2ptr_(seqno2ptr)
         {}
 
-        void reset () throw ()
+        void reset ()
         {
             for (std::set<void*>::iterator buf(allocd_.begin());
                  buf != allocd_.end(); ++buf)
@@ -45,7 +45,7 @@ namespace gcache
 
         ~MemStore () { reset(); }
 
-        void* malloc  (ssize_t size) throw ()
+        void* malloc  (ssize_t size)
         {
             if (size > max_size_ || have_free_space(size) == false) return 0;
 
@@ -72,7 +72,7 @@ namespace gcache
             return 0;
         }
 
-        void  free (const void* ptr)  throw()
+        void  free (const void* ptr)
         {
             if (gu_likely (0 != ptr))
             {
@@ -88,7 +88,7 @@ namespace gcache
             }
         }
 
-        void* realloc (void* ptr, ssize_t size) throw ()
+        void* realloc (void* ptr, ssize_t size)
         {
             BufferHeader* bh(0);
             ssize_t old_size(0);
@@ -126,7 +126,7 @@ namespace gcache
             return 0;
         }
 
-        void discard (BufferHeader* bh) throw ()
+        void discard (BufferHeader* bh)
         {
             assert (BH_is_released(bh));
 
@@ -135,16 +135,16 @@ namespace gcache
             allocd_.erase(bh);
         }
 
-        void set_max_size (ssize_t size) throw() { max_size_ = size; }
+        void set_max_size (ssize_t size) { max_size_ = size; }
 
         void seqno_reset();
 
         // for unit tests only
-        ssize_t _allocd () const throw() { return size_; }
+        ssize_t _allocd () const { return size_; }
 
     private:
 
-        bool have_free_space (ssize_t size) throw();
+        bool have_free_space (ssize_t size);
 
         ssize_t         max_size_;
         ssize_t         size_;

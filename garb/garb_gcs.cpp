@@ -10,7 +10,7 @@ static int const APPL_PROTO_VER(127);
 
 Gcs::Gcs (gu::Config&        gconf,
           const std::string& address,
-          const std::string& group) throw (gu::Exception)
+          const std::string& group)
 :
     closed_ (true),
     gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf), NULL,
@@ -44,7 +44,7 @@ Gcs::~Gcs ()
 }
 
 void
-Gcs::recv (gcs_action& act) throw (gu::Exception)
+Gcs::recv (gcs_action& act)
 {
 again:
     ssize_t ret = gcs_recv(gcs_, &act);
@@ -65,7 +65,7 @@ again:
 
 void
 Gcs::request_state_transfer (const std::string& request,
-                             const std::string& donor) throw (gu::Exception)
+                             const std::string& donor)
 {
     gcs_seqno_t order;
 
@@ -116,7 +116,7 @@ Gcs::request_state_transfer (const std::string& request,
 }
 
 void
-Gcs::join (gcs_seqno_t seqno) throw (gu::Exception)
+Gcs::join (gcs_seqno_t seqno)
 {
     ssize_t ret = gcs_join (gcs_, seqno);
 
@@ -129,7 +129,7 @@ Gcs::join (gcs_seqno_t seqno) throw (gu::Exception)
 }
 
 void
-Gcs::set_last_applied (gcs_seqno_t seqno) throw()
+Gcs::set_last_applied (gcs_seqno_t seqno)
 {
     (void) gcs_set_last_applied(gcs_, seqno);
 }

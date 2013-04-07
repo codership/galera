@@ -8,7 +8,7 @@ namespace gcache
 {
 
 bool
-MemStore::have_free_space (ssize_t size) throw()
+MemStore::have_free_space (ssize_t size)
 {
     while ((size_ + size > max_size_) && !seqno2ptr_.empty())
     {

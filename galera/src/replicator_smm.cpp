@@ -20,7 +20,6 @@ static inline void
 apply_wscoll(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
              const galera::TrxHandle& trx)
-    throw (galera::ApplyException, gu::Exception)
 {
     const gu::byte_t* buf(trx.write_set_buffer().first);
     const size_t buf_len(trx.write_set_buffer().second);
@@ -67,7 +66,6 @@ apply_trx_ws(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
              wsrep_commit_cb_t        commit_cb,
              const galera::TrxHandle& trx)
-    throw (galera::ApplyException, gu::Exception)
 {
     static const size_t max_apply_attempts(10);
     size_t attempts(1);
@@ -454,7 +452,6 @@ void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
 
 
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
-    throw (ApplyException, gu::Exception)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
@@ -609,7 +606,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 }
 
 void
-galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
+galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
 {
     assert(trx != 0);
     assert(trx->is_local() == true);
@@ -1038,7 +1035,6 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 
 
 void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
-    throw (ApplyException, gu::Exception)
 {
     assert(recv_ctx != 0);
     assert(trx != 0);
@@ -1083,7 +1079,6 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
 
 void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
                                                wsrep_seqno_t seqno_l)
-    throw (gu::Exception)
 {
     assert(seq > 0);
     assert(seqno_l > 0);
@@ -1169,7 +1164,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                                            int                      repl_proto,
                                            State                    next_state,
                                            wsrep_seqno_t            seqno_l)
-    throw (gu::Exception)
 {
     assert(seqno_l > -1);
 
@@ -1324,7 +1318,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
 void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_j,
                                          wsrep_seqno_t seqno_l)
-    throw (gu::Exception)
 {
     LocalOrder lo(seqno_l);
 
@@ -1353,7 +1346,6 @@ void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_j,
 
 
 void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
-    throw (gu::Exception)
 {
     LocalOrder lo(seqno_l);
 
@@ -1370,7 +1362,7 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
     local_monitor_.leave(lo);
 }
 
-wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
+wsrep_seqno_t galera::ReplicatorSMM::pause()
 {
     gu_trace(local_monitor_.lock());
 
@@ -1392,14 +1384,14 @@ wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
     return ret;
 }
 
-void galera::ReplicatorSMM::resume() throw ()
+void galera::ReplicatorSMM::resume()
 {
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
     local_monitor_.unlock();
     log_info << "Provider resumed.";
 }
 
-void galera::ReplicatorSMM::desync() throw (gu::Exception)
+void galera::ReplicatorSMM::desync()
 {
     wsrep_seqno_t seqno_l;
 
@@ -1437,7 +1429,7 @@ void galera::ReplicatorSMM::desync() throw (gu::Exception)
     }
 }
 
-void galera::ReplicatorSMM::resync() throw (gu::Exception)
+void galera::ReplicatorSMM::resync()
 {
     gcs_.join(commit_monitor_.last_left());
 }
@@ -1596,7 +1588,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 }
 
 void
-galera::ReplicatorSMM::abort() throw()
+galera::ReplicatorSMM::abort()
 {
     gcs_.close();
     gu_abort();

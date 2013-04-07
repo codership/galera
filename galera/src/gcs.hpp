@@ -39,16 +39,16 @@ namespace galera
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
                                                gcs_seqno_t* seqno_l) = 0;
-        virtual ssize_t desync(gcs_seqno_t* seqno_l) throw () = 0;
-        virtual void    join(gcs_seqno_t seqno) throw (gu::Exception) = 0;
+        virtual ssize_t desync(gcs_seqno_t* seqno_l) = 0;
+        virtual void    join(gcs_seqno_t seqno) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
 
+        /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
-                                   const std::string& value)
-            throw (gu::Exception, gu::NotFound) = 0;
+                                   const std::string& value) = 0;
 
-        virtual char*   param_get (const std::string& key) const
-            throw (gu::Exception, gu::NotFound) = 0;
+        /*! @throws NotFound */
+        virtual char*   param_get (const std::string& key) const = 0;
 
         virtual size_t  max_action_size() const = 0;
     };
@@ -138,12 +138,12 @@ namespace galera
                                               sst_donor.c_str(), seqno_l);
         }
 
-        ssize_t desync (gcs_seqno_t* seqno_l) throw ()
+        ssize_t desync (gcs_seqno_t* seqno_l)
         {
             return gcs_desync(conn_, seqno_l);
         }
 
-        void join (gcs_seqno_t seqno) throw (gu::Exception)
+        void join (gcs_seqno_t seqno)
         {
             long const err(gcs_join(conn_, seqno));
 
@@ -159,7 +159,6 @@ namespace galera
         }
 
         void param_set (const std::string& key, const std::string& value)
-            throw (gu::Exception, gu::NotFound)
         {
             long ret = gcs_param_set (conn_, key.c_str(), value.c_str());
 
@@ -175,7 +174,6 @@ namespace galera
         }
 
         char* param_get (const std::string& key) const
-            throw (gu::Exception, gu::NotFound)
         {
             gu_throw_error(ENOSYS) << "Not implemented: " << __FUNCTION__;
             return 0;
@@ -294,13 +292,13 @@ namespace galera
             return -ENOSYS;
         }
 
-        ssize_t desync (gcs_seqno_t* seqno_l) throw ()
+        ssize_t desync (gcs_seqno_t* seqno_l)
         {
             *seqno_l = GCS_SEQNO_ILL;
             return -ENOTCONN;
         }
 
-        void join(gcs_seqno_t seqno) throw (gu::Exception)
+        void join(gcs_seqno_t seqno)
         {
             gu_throw_error(ENOTCONN);
         }
@@ -311,12 +309,9 @@ namespace galera
         }
 
         void  param_set (const std::string& key, const std::string& value)
-            throw (gu::Exception, gu::NotFound)
         {}
 
-        char* param_get (const std::string& key) const
-            throw (gu::Exception, gu::NotFound)
-        { return 0; }
+        char* param_get (const std::string& key) const { return 0; }
 
         size_t  max_action_size() const { return 0x7FFFFFFF; }
 

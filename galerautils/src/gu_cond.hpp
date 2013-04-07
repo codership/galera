@@ -28,16 +28,16 @@ namespace gu
 
     public:
 
-        Cond () throw() : cond(), ref_count(0)
+        Cond () : cond(), ref_count(0)
         {
-	    pthread_cond_init (&cond, NULL);
-	}
+            pthread_cond_init (&cond, NULL);
+        }
 
         ~Cond ()
         {
-	    register int ret;
+            register int ret;
             while (EBUSY == (ret = pthread_cond_destroy(&cond)))
-		{ usleep (100); }
+                { usleep (100); }
             if (gu_unlikely(ret != 0))
                 throw Exception("pthread_cond_destroy() failed", ret);
         }
