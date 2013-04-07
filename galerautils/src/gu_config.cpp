@@ -134,7 +134,6 @@ gu::Config::overflow_char(long long ret)
 
     gu_throw_error(ERANGE) << "Value " << ret
                            << " too large for requested type (char).";
-    throw;
 }
 
 short
@@ -144,7 +143,6 @@ gu::Config::overflow_short(long long ret)
 
     gu_throw_error(ERANGE) << "Value " << ret
                            << " too large for requested type (short).";
-    throw;
 }
 
 int
@@ -154,7 +152,6 @@ gu::Config::overflow_int(long long ret)
 
     gu_throw_error(ERANGE) << "Value " << ret
                            << " too large for requested type (int).";
-    throw;
 }
 
 std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)

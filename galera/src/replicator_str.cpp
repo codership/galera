@@ -499,18 +499,19 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             free (ist_req);
             return ret;
         }
-        break;
         default:
             gu_throw_fatal << "Unsupported STR protocol: " << str_proto_ver_;
         }
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_fatal << "State request preparation failed, aborting: " << e.what();
-        abort();
     }
-
-    throw;
+    catch (...)
+    {
+        log_fatal << "State request preparation failed, aborting: unknown exception";
+    }
+    abort();
 }
 
 static bool

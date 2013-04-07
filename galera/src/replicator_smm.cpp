@@ -154,7 +154,6 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
     }
 
     gu_throw_fatal << "invalid state " << static_cast<int>(state);
-    throw;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -675,7 +674,6 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
         break;
     default:
         gu_throw_fatal << "invalid state " << trx->state();
-        throw;
     }
 }
 

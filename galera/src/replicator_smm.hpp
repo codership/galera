@@ -166,7 +166,7 @@ namespace galera
         void update_incoming_list (const wsrep_view_info_t& v);
 
         /* aborts/exits the program in a clean way */
-        void abort();
+        void abort() GU_NORETURN;
 
         class LocalOrder
         {
@@ -250,7 +250,6 @@ namespace galera
                 default:
                     gu_throw_error(EINVAL)
                         << "invalid value " << str << " for commit order mode";
-                    throw;
                 }
                 return static_cast<Mode>(ret);
             }
@@ -272,7 +271,6 @@ namespace galera
                 case BYPASS:
                     gu_throw_fatal
                         << "commit order condition called in bypass mode";
-                    throw;
                 case OOOC:
                     return true;
                 case LOCAL_OOOC:
@@ -282,7 +280,6 @@ namespace galera
                     return (last_left + 1 == trx_.global_seqno());
                 }
                 gu_throw_fatal << "invalid commit mode value " << mode_;
-                throw;
             }
         private:
             CommitOrder(const CommitOrder&);

@@ -107,7 +107,6 @@ namespace gcomm
         default:
             gu_throw_error(EPROTO) << "invalid protocol version "
                                    << hdr.version();
-            throw; // keep compiler happy
         }
 
         return offset;

@@ -223,6 +223,5 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
         break;
     default:
         gu_throw_fatal << "invalid message type: " << msg.type();
-        throw;
     }
 }

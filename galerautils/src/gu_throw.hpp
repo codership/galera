@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  *
- * $Id$
+ * $Id: gu_throw.hpp 3032 2013-04-06 20:29:33Z alex $
  */
 
 /*!
@@ -17,19 +17,14 @@
 #include <cstring>
 #include <sstream>
 
+#include "gu_macros.h"
 #include "gu_exception.hpp"
 
 namespace gu
 {
-    /*! Abstract base class */
+    /*! "base" class */
     class ThrowBase
     {
-    public:
-
-        virtual ~ThrowBase () {}
-
-        std::ostringstream& msg () throw() { return os; }
-
     protected:
 
         const char* const  file;
@@ -37,7 +32,7 @@ namespace gu
         int         const  line;
         std::ostringstream os;
 
-        ThrowBase (const char* file_, const char* func_, int line_) throw()
+        ThrowBase (const char* file_, const char* func_, int line_)
             :
             file (file_),
             func (func_),
@@ -49,55 +44,68 @@ namespace gu
 
         ThrowBase (const ThrowBase&);
         ThrowBase& operator= (const ThrowBase&);
+
+        friend class ThrowError;
+        friend class ThrowFatal;
     };
 
-    /* final*/ class ThrowError : public ThrowBase
+    /* final*/ class ThrowError //: public ThrowBase
     {
     public:
 
         ThrowError (const char* file_,
                     const char* func_,
                     int         line_,
-                    int         err_ = Exception::E_UNSPEC) throw()
+                    int         err_ = Exception::E_UNSPEC)
             :
-            ThrowBase (file_, func_, line_),
-            err       (err_)
+            base (file_, func_, line_),
+            err  (err_)
         {}
 
-        ~ThrowError () throw (Exception)
+        ~ThrowError() GU_NORETURN
         {
-            os << ": " << err << " (" << ::strerror(err) << ')';
+            base.os << ": " << err << " (" << ::strerror(err) << ')';
 
-            Exception e(os.str(), err);
+            Exception e(base.os.str(), err);
 
-            e.trace (file, func, line);
+            e.trace (base.file, base.func, base.line);
 
             throw e;
         }
+
+        std::ostringstream& msg () { return base.os; }
 
     private:
 
+        ThrowBase base;
         int const err;
     };
 
-    /* final*/ class ThrowFatal : public ThrowBase
+    /* final*/ class ThrowFatal //: public ThrowBase
     {
     public:
 
-        ThrowFatal (const char* file, const char* func, int line) throw()
+        ThrowFatal (const char* file, const char* func, int line)
             :
-            ThrowBase (file, func, line)
+            base (file, func, line)
         {}
 
-        ~ThrowFatal () throw (Exception)
+        ~ThrowFatal () GU_NORETURN
         {
-            os << " (FATAL)";
+            base.os << " (FATAL)";
 
-            Exception e(os.str(), Exception::E_NOTRECOVERABLE);
+            Exception e(base.os.str(), Exception::E_NOTRECOVERABLE);
 
-            e.trace (file, func, line);
+            e.trace (base.file, base.func, base.line);
+
             throw e;
         }
+
+        std::ostringstream& msg () { return base.os; }
+
+    private:
+
+        ThrowBase base;
     };
 }
 
