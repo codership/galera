@@ -10,7 +10,6 @@ namespace galera {
 
 bool
 ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
-    throw (gu::Exception)
 {
     if (view_info.state_gap)
     {
@@ -100,9 +99,8 @@ class StateRequest_v1 : public ReplicatorSMM::StateRequest
 public:
     static std::string const MAGIC;
     StateRequest_v1 (const void* sst_req, ssize_t sst_req_len,
-                     const void* ist_req, ssize_t ist_req_len)
-        throw (gu::Exception);
-    StateRequest_v1 (const void* str, ssize_t str_len) throw (gu::Exception); 
+                     const void* ist_req, ssize_t ist_req_len);
+    StateRequest_v1 (const void* str, ssize_t str_len);
     ~StateRequest_v1 () { if (own_ && req_) free (req_); }
     virtual const void* req     () const { return req_; }
     virtual ssize_t     len     () const { return len_; }
@@ -147,7 +145,7 @@ StateRequest_v1::MAGIC("STRv1");
 
 StateRequest_v1::StateRequest_v1 (
     const void* const sst_req, ssize_t const sst_req_len,
-    const void* const ist_req, ssize_t const ist_req_len) throw (gu::Exception)
+    const void* const ist_req, ssize_t const ist_req_len)
     :
     len_(MAGIC.length() + 1 +
          sizeof(uint32_t) + sst_req_len +
@@ -189,7 +187,6 @@ StateRequest_v1::StateRequest_v1 (
 
 // takes ownership over str buffer
 StateRequest_v1::StateRequest_v1 (const void* str, ssize_t str_len)
-    throw (gu::Exception)
 :
     len_(str_len),
     req_(reinterpret_cast<char*>(const_cast<void*>(str))),
@@ -226,7 +223,6 @@ StateRequest_v1::StateRequest_v1 (const void* str, ssize_t str_len)
 
 static ReplicatorSMM::StateRequest*
 read_state_request (const void* const req, size_t const req_len)
-    throw (gu::Exception)
 {
     const char* const str(reinterpret_cast<const char*>(req));
 
@@ -300,7 +296,6 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       size_t      req_size,
                                       wsrep_seqno_t const seqno_l,
                                       wsrep_seqno_t const donor_seq)
-    throw (gu::Exception)
 {
     assert(recv_ctx != 0);
     assert(seqno_l > -1);
@@ -435,7 +430,6 @@ void
 ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 const wsrep_uuid_t& group_uuid,
                                 wsrep_seqno_t const group_seqno)
-    throw (gu::Exception)
 {
     if (state_uuid_ != group_uuid)
     {
@@ -476,7 +470,6 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
                                       ssize_t     const   sst_req_len,
                                       const wsrep_uuid_t& group_uuid,
                                       wsrep_seqno_t const group_seqno)
-    throw()
 {
     try
     {
@@ -506,18 +499,19 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             free (ist_req);
             return ret;
         }
-        break;
         default:
             gu_throw_fatal << "Unsupported STR protocol: " << str_proto_ver_;
         }
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_fatal << "State request preparation failed, aborting: " << e.what();
-        abort();
     }
-
-    throw;
+    catch (...)
+    {
+        log_fatal << "State request preparation failed, aborting: unknown exception";
+    }
+    abort();
 }
 
 static bool
@@ -531,7 +525,6 @@ void
 ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
                                    wsrep_seqno_t const       group_seqno,
                                    const StateRequest* const req)
-    throw ()
 {
     long ret;
     long tries = 0;
@@ -626,7 +619,6 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                        wsrep_seqno_t const group_seqno,
                                        const void*   const sst_req,
                                        ssize_t       const sst_req_len)
-    throw()
 {
     assert(sst_req_len >= 0);
 

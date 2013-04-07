@@ -81,7 +81,6 @@ public:
         case S_OPERATIONAL: return "OPERATIONAL";
         default:
             gu_throw_fatal << "Invalid state";
-            throw;
         }
     }
 

@@ -67,7 +67,6 @@ namespace gcomm
         ViewTrace(const View& view) : view_(view), msgs_() { }
 
         void insert_msg(const TraceMsg& msg)
-            throw (gu::Exception)
         {
             switch (view_.type())
             {

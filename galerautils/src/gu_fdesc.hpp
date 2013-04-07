@@ -21,21 +21,21 @@ public:
 
     /* open existing file */
     FileDescriptor (const std::string& fname,
-                    bool               sync  = true) throw (Exception);
+                    bool               sync  = true);
 
     /* (re)create file */
     FileDescriptor (const std::string& fname,
                     size_t             length,
                     bool               allocate = true,
-                    bool               sync     = true) throw (Exception);
+                    bool               sync     = true);
 
     virtual ~FileDescriptor ();
 
-    int                get()   const throw() { return fd_;   }
-    const std::string& name()  const throw() { return name_; }
-    off_t              size()  const throw() { return size_; }
+    int                get()   const { return fd_;   }
+    const std::string& name()  const { return name_; }
+    off_t              size()  const { return size_; }
 
-    void               flush() const throw (Exception);
+    void               flush() const;
 
     void               unlink() const { ::unlink (name_.c_str()); }
 
@@ -46,11 +46,11 @@ private:
     off_t       const size_;
     bool        const sync_; // sync on close
 
-    bool write_byte (off_t offset)    throw (Exception);
-    void write_file (off_t start = 0) throw (Exception);
-    void prealloc   (off_t start = 0) throw (Exception);
+    bool write_byte (off_t offset);
+    void write_file (off_t start = 0);
+    void prealloc   (off_t start = 0);
 
-    void constructor_common() throw (Exception);
+    void constructor_common();
 
     FileDescriptor (const FileDescriptor&);
     FileDescriptor& operator = (const FileDescriptor);

@@ -41,7 +41,6 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
         return (os << "ROLLED_BACK");
     }
     gu_throw_fatal << "invalid state " << static_cast<int>(s);
-    throw;
 }
 
 
@@ -213,7 +212,6 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT);
-            throw;
         }
         return offset;
     }

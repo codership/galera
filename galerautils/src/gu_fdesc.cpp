@@ -33,7 +33,6 @@ namespace gu
 
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     bool const          sync)
-        throw (Exception)
         : name_(fname),
           fd_  (open (name_.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
           size_(lseek (fd_, 0, SEEK_END)),
@@ -46,7 +45,6 @@ namespace gu
                                     size_t const       size,
                                     bool   const       allocate,
                                     bool   const       sync)
-        throw (Exception)
         : name_(fname),
           fd_  (open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
           size_(size),
@@ -85,7 +83,7 @@ namespace gu
     }
 
     void
-    FileDescriptor::constructor_common() throw (Exception)
+    FileDescriptor::constructor_common()
     {
         if (fd_ < 0) {
             gu_throw_error(errno) << "Failed to open file '" + name_ + '\'';
@@ -125,7 +123,7 @@ namespace gu
     }
 
     void
-    FileDescriptor::flush () const throw (Exception)
+    FileDescriptor::flush () const
     {
         log_debug << "Flushing file '" << name_ << "'";
 
@@ -137,7 +135,7 @@ namespace gu
     }
 
     bool
-    FileDescriptor::write_byte (off_t offset) throw (gu::Exception)
+    FileDescriptor::write_byte (off_t offset)
     {
         byte_t const byte (0);
 
@@ -152,7 +150,7 @@ namespace gu
 
     /*! prealloc() fallback */
     void
-    FileDescriptor::write_file (off_t const start) throw (gu::Exception)
+    FileDescriptor::write_file (off_t const start)
     {
         off_t const page_size (sysconf (_SC_PAGE_SIZE));
 
@@ -178,7 +176,7 @@ namespace gu
     }
 
     void
-    FileDescriptor::prealloc(off_t const start) throw (Exception)
+    FileDescriptor::prealloc(off_t const start)
     {
         off_t const diff (size_ - start);
 

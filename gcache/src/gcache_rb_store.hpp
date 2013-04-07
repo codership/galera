@@ -24,27 +24,26 @@ namespace gcache
     public:
 
         RingBuffer (const std::string& name, ssize_t size,
-                    std::map<int64_t, const void*>& seqno2ptr)
-            throw (gu::Exception);
+                    std::map<int64_t, const void*>& seqno2ptr);
 
         ~RingBuffer ();
 
-        void* malloc  (ssize_t size) throw ();
+        void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr)  throw();
+        void  free    (const void* ptr);
 
-        void* realloc (void* ptr, ssize_t size) throw ();
+        void* realloc (void* ptr, ssize_t size);
 
-        void  discard (BufferHeader* bh) throw ()
+        void  discard (BufferHeader* bh)
         {
             size_free_ += bh->size;
         }
 
-        ssize_t size      () const throw() { return size_cache_ ; }
+        ssize_t size      () const { return size_cache_; }
 
-        ssize_t rb_size   () const throw() { return fd_.size(); }
+        ssize_t rb_size   () const { return fd_.size(); }
 
-        const std::string& rb_name() const throw() { return fd_.name(); }
+        const std::string& rb_name() const { return fd_.name(); }
 
         void  reset();
 

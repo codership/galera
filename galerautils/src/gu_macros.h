@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2013 Codership Oy <info@codership.com>
 
 /**
  * @file Miscellaneous macros

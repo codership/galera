@@ -58,7 +58,6 @@ namespace gu
         }
 
         inline void wait (const Cond& cond, const datetime::Date& date)
-            throw (Exception)
         {
             timespec ts;
 

@@ -21,12 +21,12 @@ namespace gcache
     {
     public:
 
-        Page (const std::string& name, ssize_t size) throw (gu::Exception);
+        Page (const std::string& name, ssize_t size);
         ~Page () {}
 
-        void* malloc  (ssize_t size) throw();
+        void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr)  throw()
+        void  free    (const void* ptr)
         {
             assert (ptr > mmap_.ptr);
             assert (ptr <= (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size));
@@ -35,21 +35,21 @@ namespace gcache
             BH_release (ptr2BH(ptr));
         }
 
-        void* realloc (void* ptr, ssize_t size) throw ();
+        void* realloc (void* ptr, ssize_t size);
 
-        void discard (BufferHeader* ptr) throw() {}
+        void discard (BufferHeader* ptr) {}
 
-        ssize_t used () const throw() { return used_; }
+        ssize_t used () const { return used_; }
 
-        ssize_t size () const throw() /* total page size */
+        ssize_t size () const /* total page size */
         { return mmap_.size - sizeof(BufferHeader); }
 
-        const std::string& name() const throw() { return fd_.name(); }
+        const std::string& name() const { return fd_.name(); }
 
-        void reset () throw ();
+        void reset ();
 
         /* Drop filesystem cache on the file */
-        void drop_fs_cache() const throw();
+        void drop_fs_cache() const;
 
     private:
 

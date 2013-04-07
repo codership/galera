@@ -88,10 +88,8 @@ public:
                 im_range_    == cmp.im_range_);
     }
 
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
-    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
     static size_t serial_size();
 private:
     enum
@@ -131,16 +129,16 @@ public:
 
 
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
-    static const uint8_t F_RETRANS   = 0x2; /*!< Message is resent upon request    */
+    static const uint8_t F_RETRANS  = 0x2; /*!< Message is resent upon request    */
 
     /*!
      * @brief Message source has been set explicitly via set_source()
      */
     static const uint8_t F_SOURCE   = 0x4;
 
-    static const uint8_t F_AGGREGATE = 0x8; /*!< Message contains aggregated payload */
-    static const uint8_t F_COMMIT    = 0x10;
-    static const uint8_t F_BC        = 0x20; /*!< Message was sent in backward compatibility mode */
+    static const uint8_t F_AGGREGATE= 0x8; /*!< Message contains aggregated payload */
+    static const uint8_t F_COMMIT   = 0x10;
+    static const uint8_t F_BC       = 0x20;/*!< Message was sent in backward compatibility mode */
     /*!
      * Get version of the message
      *
@@ -270,8 +268,7 @@ public:
      */
     gu::datetime::Date tstamp() const { return tstamp_; }
 
-    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
-        throw(gu::Exception);
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
 
     bool operator==(const Message& cmp) const;
 
@@ -358,8 +355,7 @@ public:
 
 protected:
 
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
 
     size_t serial_size() const;
 
@@ -417,11 +413,9 @@ public:
 
     void set_aru_seq(const seqno_t as) { aru_seq_ = as; }
 
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 
 };
@@ -443,10 +437,8 @@ public:
     size_t len()   const { return len_;   }
     uint8_t user_type() const { return user_type_; }
 
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
-    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
     size_t serial_size() const;
     bool operator==(const AggregateMessage& cmp) const
     {
@@ -481,11 +473,9 @@ public:
                 O_UNRELIABLE,
                 fifo_seq)
     { }
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 };
 
@@ -516,11 +506,9 @@ public:
                 range_uuid,
                 range)
     { }
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 };
 
@@ -550,11 +538,9 @@ public:
                 Range(),
                 node_list)
     { }
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 };
 
@@ -585,11 +571,9 @@ public:
                 Range(),
                 node_list)
     { }
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 };
 
@@ -616,11 +600,9 @@ public:
                 aru_seq,
                 flags)
     { }
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-        throw(gu::Exception);
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
-                       bool skip_header = false)
-        throw(gu::Exception);
+                       bool skip_header = false);
     size_t serial_size() const;
 };
 

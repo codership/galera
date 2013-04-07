@@ -65,7 +65,7 @@ namespace gcomm
 
         Transport* accept()
         {
-            gu_throw_fatal << "gmcast transport accept not implemented"; throw;
+            gu_throw_fatal << "gmcast transport accept not implemented";
         }
 
         size_t mtu() const

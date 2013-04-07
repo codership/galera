@@ -63,8 +63,11 @@ WriteSetNG::Header::init (Version const          ver,
     local_[V3_HEADER_VER] = ver;
     local_[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
 
-    *(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS))    = gu::htog(flags);
-    *(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE)) = 0;
+    uint16_t* const fl(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS));
+    uint32_t* const pa(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE));
+
+    *fl = gu::htog(flags);
+    *pa = 0;
 
     return buf_.size;
 }

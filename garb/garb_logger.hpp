@@ -9,8 +9,8 @@
 
 namespace garb
 {
-    extern void set_logfile (const std::string& fname) throw (gu::Exception);
-    extern void set_syslog  () throw ();
+    extern void set_logfile (const std::string& fname);
+    extern void set_syslog  ();
 } /* namespace garb */
 
 #endif /* _GARB_LOGGER_HPP_ */

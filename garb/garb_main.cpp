@@ -15,7 +15,7 @@ namespace garb
 {
 
 void
-become_daemon () throw (gu::Exception)
+become_daemon ()
 {
     if (pid_t pid = fork())
     {

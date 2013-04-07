@@ -22,7 +22,7 @@ check_size (ssize_t size)
 }
 
 void
-gcache::Page::reset () throw ()
+gcache::Page::reset ()
 {
     if (gu_unlikely (used_ > 0))
     {
@@ -36,7 +36,7 @@ gcache::Page::reset () throw ()
 }
 
 void
-gcache::Page::drop_fs_cache() const throw()
+gcache::Page::drop_fs_cache() const
 {
     mmap_.dont_need();
 
@@ -49,7 +49,7 @@ gcache::Page::drop_fs_cache() const throw()
     }
 }
 
-gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
+gcache::Page::Page (const std::string& name, ssize_t size)
     :
     fd_   (name, check_size(size), false, false),
     mmap_ (fd_),
@@ -63,7 +63,7 @@ gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
 }
 
 void*
-gcache::Page::malloc (ssize_t size) throw ()
+gcache::Page::malloc (ssize_t size)
 {
     if (size <= space_)
     {
@@ -101,7 +101,7 @@ gcache::Page::malloc (ssize_t size) throw ()
 }
 
 void*
-gcache::Page::realloc (void* ptr, ssize_t size) throw ()
+gcache::Page::realloc (void* ptr, ssize_t size)
 {
     BufferHeader* bh(ptr2BH(ptr));
 

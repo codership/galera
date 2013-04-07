@@ -18,7 +18,7 @@ signal_handler (int signum)
 }
 
 
-RecvLoop::RecvLoop (const Config& config) throw (gu::Exception)
+RecvLoop::RecvLoop (const Config& config)
     :
     config_(config),
     gconf_ (config_.options()),
@@ -48,7 +48,7 @@ RecvLoop::RecvLoop (const Config& config) throw (gu::Exception)
 }
 
 void
-RecvLoop::loop() throw (gu::Exception)
+RecvLoop::loop()
 {
     while (1)
     {

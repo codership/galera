@@ -36,12 +36,12 @@ public:
     typedef std::map <std::string, std::string> param_map_t;
 
     static void
-    parse (param_map_t& list, const std::string& params) throw (Exception);
+    parse (param_map_t& list, const std::string& params);
 
     /*! Convert string configuration values to other types.
      *  General template for integers, specialized templates follow below. */
     template <typename T> static inline T
-    from_config (const std::string& value) throw (Exception)
+    from_config (const std::string& value)
     {
         const char* str    = value.c_str();
         long long   ret;
@@ -59,36 +59,37 @@ public:
         return ret;
     }
 
-    Config () throw();
-    Config (const std::string& params) throw (Exception);
+    Config ();
+    Config (const std::string& params);
 
     bool
-    has (const std::string& key) const throw ()
+    has (const std::string& key) const
     {
         return (params_.find(key) != params_.end());
     }
 
     void
-    set (const std::string& key, const std::string& value) throw ()
+    set (const std::string& key, const std::string& value)
     {
         params_[key] = value;
     }
 
     void
-    set (const std::string& key, const char* value) throw ()
+    set (const std::string& key, const char* value)
     {
         params_[key] = value;
     }
 
     /* General template for integer types */
     template <typename T> void
-    set (const std::string& key, T val) throw ()
+    set (const std::string& key, T val)
     {
         set_longlong (key, val);
     }
 
+    /*! @throws NotFound */
     const std::string&
-    get (const std::string& key) const throw (NotFound)
+    get (const std::string& key) const
     {
         param_map_t::const_iterator i = params_.find(key);
         if (i == params_.end()) throw NotFound();
@@ -96,41 +97,41 @@ public:
     }
 
     const std::string&
-    get (const std::string& key, const std::string& def) const throw (Exception)
+    get (const std::string& key, const std::string& def) const
     {
         try               { return get(key); }
         catch (NotFound&) { return def     ; }
     }
 
+    /*! @throws NotFound */
     template <typename T> inline T
-    get (const std::string& key) const throw (NotFound, Exception)
+    get (const std::string& key) const
     {
         return from_config <T> (get(key));
     }
 
     template <typename T> inline T
-    get(const std::string& key, const T& def) const throw (Exception)
+    get(const std::string& key, const T& def) const
     {
         try { return get<T>(key); }
         catch (NotFound&) { return def; }
     }
 
-    const param_map_t& params () const throw() { return params_; }
+    const param_map_t& params () const { return params_; }
 
 private:
 
     static void
-    check_conversion (const char* ptr, const char* endptr, const char* type)
-        throw (Exception);
+    check_conversion (const char* ptr, const char* endptr, const char* type);
 
     static char
-    overflow_char(long long ret) throw (Exception);
+    overflow_char(long long ret);
 
     static short
-    overflow_short(long long ret) throw (Exception);
+    overflow_short(long long ret);
 
     static int
-    overflow_int(long long ret) throw (Exception);
+    overflow_int(long long ret);
 
     void set_longlong (const std::string& key, long long value);
 
@@ -148,7 +149,7 @@ namespace gu
     /*! Specialized templates for "funny" types */
 
     template <> inline double
-    Config::from_config (const std::string& value) throw (Exception)
+    Config::from_config (const std::string& value)
     {
         const char* str    = value.c_str();
         double      ret;
@@ -160,7 +161,7 @@ namespace gu
     }
 
     template <> inline bool
-    Config::from_config (const std::string& value) throw (Exception)
+    Config::from_config (const std::string& value)
     {
         const char* str    = value.c_str();
         bool        ret;
@@ -172,7 +173,7 @@ namespace gu
     }
 
     template <> inline void*
-    Config::from_config (const std::string& value) throw (Exception)
+    Config::from_config (const std::string& value)
     {
         const char* str    = value.c_str();
         void*       ret;
@@ -184,19 +185,19 @@ namespace gu
     }
 
     template <> inline void
-    Config::set (const std::string& key, const void* value) throw ()
+    Config::set (const std::string& key, const void* value)
     {
         set (key, to_string<const void*>(value));
     }
 
     template <> inline void
-    Config::set (const std::string& key, double val) throw ()
+    Config::set (const std::string& key, double val)
     {
         set (key, to_string<double>(val));
     }
 
     template <> inline void
-    Config::set (const std::string& key, bool val) throw ()
+    Config::set (const std::string& key, bool val)
     {
         const char* val_str(val ? "YES" : "NO"); // YES/NO is most generic
         set (key, val_str);

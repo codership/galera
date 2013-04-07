@@ -8,7 +8,7 @@
 
 namespace garb
 {
-    void set_logfile (const std::string& fname) throw (gu::Exception)
+    void set_logfile (const std::string& fname)
     {
         FILE* log_file = fopen (fname.c_str(), "a");
 
@@ -21,7 +21,7 @@ namespace garb
         gu_conf_set_log_file (log_file);
     }
 
-    static void log_to_syslog (int level, const char* msg) throw()
+    static void log_to_syslog (int level, const char* msg)
     {
         int p = LOG_NOTICE;
 
@@ -37,7 +37,7 @@ namespace garb
         syslog (p | LOG_DAEMON, "%s", msg);
     }
 
-    void set_syslog () throw ()
+    void set_syslog ()
     {
         openlog ("garbd", LOG_PID, LOG_DAEMON);
         gu_conf_set_log_callback (log_to_syslog);

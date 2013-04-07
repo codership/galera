@@ -204,7 +204,6 @@ public:
 
     size_t serialize(gu::byte_t* buf, const size_t buflen,
                      const size_t offset) const
-        throw (gu::Exception)
     {
         size_t off;
 
@@ -237,7 +236,6 @@ public:
     }
 
     size_t read_v0(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t off;
         gu::byte_t t;
@@ -256,7 +254,6 @@ public:
         default:
             gu_throw_error(EINVAL) << "invalid message type "
                                    << static_cast<int>(type_);
-            throw;
         }
         gu_trace (off = gu::unserialize1(buf, buflen, off, flags_));
         gu_trace (off = gu::unserialize1(buf, buflen, off, segment_id_));
@@ -286,7 +283,6 @@ public:
     }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t off;
 
@@ -297,7 +293,6 @@ public:
             gu_trace (return read_v0(buf, buflen, off));
         default:
             gu_throw_error(EPROTONOSUPPORT) << "Unsupported/unrecognized gmcast protocol version: " << version_;
-            throw;
         }
     }
 
