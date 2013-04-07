@@ -6,7 +6,6 @@
 
 void
 wsrep_set_params (galera::Replicator& repl, const char* params)
-    throw (gu::Exception)
 {
     if (!params) return;
 

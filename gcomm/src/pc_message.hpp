@@ -71,7 +71,6 @@ public:
     int           weight()    const { return weight_   ; }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t   off = offset;
         uint32_t flags;
@@ -96,7 +95,6 @@ public:
     }
 
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
-        throw (gu::Exception)
     {
         size_t   off   = offset;
         uint32_t flags = 0;
@@ -249,7 +247,6 @@ public:
     { return NodeMap::value(node_map_.find_checked(uuid)); }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t   off;
         uint32_t b;
@@ -281,7 +278,6 @@ public:
     }
 
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
-        throw (gu::Exception)
     {
         size_t   off;
         uint32_t b;

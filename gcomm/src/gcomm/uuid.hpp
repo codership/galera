@@ -47,7 +47,6 @@ public:
     }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
@@ -59,7 +58,6 @@ public:
     }
 
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
-        throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "

@@ -191,7 +191,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     ifc.ifc_len = 16*sizeof(struct ifreq);
     std::vector<struct ifreq> ifr(16);
     ifc.ifc_req = &ifr[0];
-    
+
     int fd(socket(AF_INET, SOCK_DGRAM, 0));
     int err;
     if (fd == -1)

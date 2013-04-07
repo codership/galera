@@ -22,19 +22,18 @@ namespace gcomm
     class String
     {
     public:
+
         String(const std::string& str = "") : str_(str)
         {
             if (str_.size() > str_size_)
             {
                 gu_throw_error(EMSGSIZE);
             }
-
         }
 
         virtual ~String() { }
 
-        size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)
-            const throw(gu::Exception)
+        size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         {
             if (buflen < offset + str_size_)
             {
@@ -49,7 +48,6 @@ namespace gcomm
         }
 
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
-            throw(gu::Exception)
         {
             if (buflen < offset + str_size_)
             {

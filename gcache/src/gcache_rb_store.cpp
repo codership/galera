@@ -37,7 +37,6 @@ namespace gcache
 
     RingBuffer::RingBuffer (const std::string& name, ssize_t size,
                             std::map<int64_t, const void*> & seqno2ptr)
-        throw (gu::Exception)
     :
         fd_        (name, check_size(size)),
         mmap_      (fd_),
@@ -183,7 +182,7 @@ namespace gcache
     }
 
     void* 
-    RingBuffer::malloc (ssize_t size) throw ()
+    RingBuffer::malloc (ssize_t size)
     {
         // We can reliably allocate continuous buffer which is 1/2
         // of a total cache space. So compare to half the space
@@ -200,7 +199,7 @@ namespace gcache
     }
 
     void
-    RingBuffer::free (const void* ptr) throw ()
+    RingBuffer::free (const void* ptr)
     {
         if (gu_likely(NULL != ptr))
         {
@@ -216,7 +215,7 @@ namespace gcache
     }
 
     void*
-    RingBuffer::realloc (void* ptr, ssize_t size) throw ()
+    RingBuffer::realloc (void* ptr, ssize_t size)
     {
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space

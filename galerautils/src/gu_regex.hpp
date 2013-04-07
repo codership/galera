@@ -57,7 +57,8 @@ namespace gu
             Match()                     : value(),  set(false) {}
             Match(const std::string& s) : value(s), set(true)  {}
 
-            const std::string& str() const throw(NotSet)
+            // throws NotSet
+            const std::string& str() const
             {
                 if (set) return value;
 

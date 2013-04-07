@@ -32,7 +32,6 @@ namespace gcache
 
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     bool               sync_)
-        throw (gu::Exception)
         : value (open (fname.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
           name  (fname),
           size  (lseek (value, 0, SEEK_END)),
@@ -45,7 +44,6 @@ namespace gcache
                                     size_t             length,
                                     bool               allocate,
                                     bool               sync_)
-        throw (gu::Exception)
         : value (open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
           name  (fname),
           size  (length),
@@ -84,7 +82,7 @@ namespace gcache
     }
 
     void
-    FileDescriptor::constructor_common() throw (gu::Exception)
+    FileDescriptor::constructor_common()
     {
         if (value < 0) {
             gu_throw_error(errno) << "Failed to open file '" + name + '\'';
@@ -124,7 +122,7 @@ namespace gcache
     }
 
     void
-    FileDescriptor::flush () const throw (gu::Exception)
+    FileDescriptor::flush () const
     {
         log_debug << "Flushing file '" << name << "'";
 
@@ -136,7 +134,7 @@ namespace gcache
     }
 
     bool
-    FileDescriptor::write_byte (off_t offset) throw (gu::Exception)
+    FileDescriptor::write_byte (off_t offset)
     {
         unsigned char const byte (0);
 
@@ -151,7 +149,7 @@ namespace gcache
 
     /*! prealloc() fallback */
     void
-    FileDescriptor::write_file (off_t const start) throw (gu::Exception)
+    FileDescriptor::write_file (off_t const start)
     {
         off_t const page_size (sysconf (_SC_PAGE_SIZE));
 
@@ -177,7 +175,7 @@ namespace gcache
     }
 
     void
-    FileDescriptor::prealloc(off_t const start) throw (gu::Exception)
+    FileDescriptor::prealloc(off_t const start)
     {
         off_t const diff (size - start);
 

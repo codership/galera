@@ -55,10 +55,11 @@ inline std::string to_string<double>(const double& x,
     return out.str();
 }
 
-/*! Generic from_string() template. Default base is decimal */
+/*! Generic from_string() template. Default base is decimal.
+ * @throws NotFound */
 template <typename T> inline T
 from_string(const std::string& s,
-            std::ios_base& (*f)(std::ios_base&) = std::dec) throw(NotFound)
+            std::ios_base& (*f)(std::ios_base&) = std::dec)
 {
     std::istringstream iss(s);
     T                  ret;
@@ -83,10 +84,10 @@ from_string<std::string>(const std::string& s,
     return s;
 }
 
-/*! Specialized template for reading pointers. Default base is hex */
+/*! Specialized template for reading pointers. Default base is hex.
+ * @throws NotFound */
 template <> inline void* from_string<void*>(const std::string& s,
                                             std::ios_base& (*f)(std::ios_base&))
-    throw(NotFound)
 {
     std::istringstream iss(s);
     void*              ret;
@@ -97,19 +98,18 @@ template <> inline void* from_string<void*>(const std::string& s,
 }
 
 extern "C" const char* gu_str2bool (const char* str, bool*   bl);
-//extern bool _to_bool (const std::string& s) throw (NotFound);
+//extern bool _to_bool (const std::string& s);
 
-/*! Specialized template for reading bool. Tries both 1|0 and true|false */
+/*! Specialized template for reading bool. Tries both 1|0 and true|false
+ * @throws NotFound */
 template <> inline bool from_string<bool> (const std::string& s,
                                            std::ios_base& (*f)(std::ios_base&))
-    throw(NotFound)
 {
     const char* const str(s.c_str());
     bool ret;
     const char* endptr(gu_str2bool(str, &ret));
     if (endptr == 0 || *endptr != '\0') throw NotFound();
     return ret;
-//    return _to_bool(s);
 }
 
 /*!

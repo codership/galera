@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -66,11 +66,10 @@ namespace galera
         void discard_local_conn_trx(wsrep_conn_id_t conn_id);
         void discard_local_conn(wsrep_conn_id_t conn_id);
 
-        void apply_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException, gu::Exception);
+        void apply_trx(void* recv_ctx, TrxHandle* trx);
 
         wsrep_status_t replicate(TrxHandle* trx);
-        void abort_trx(TrxHandle* trx) throw (gu::Exception);
+        void abort_trx(TrxHandle* trx) ;
         wsrep_status_t pre_commit(TrxHandle*  trx, wsrep_trx_meta_t*);
         wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
@@ -86,47 +85,40 @@ namespace galera
                                     wsrep_seqno_t       seqno,
                                     const void*         state,
                                     size_t              state_len);
-        void process_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException, gu::Exception);
-        void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l)
-            throw (gu::Exception);
+
+        void process_trx(void* recv_ctx, TrxHandle* trx);
+        void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
         void process_conf_change(void* recv_ctx,
                                  const wsrep_view_info_t& view,
                                  int repl_proto,
                                  State next_state,
-                                 wsrep_seqno_t seqno_l)
-            throw (gu::Exception);
+                                 wsrep_seqno_t seqno_l);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
-                               wsrep_seqno_t donor_seq)
-            throw (gu::Exception);
-        void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l)
-            throw (gu::Exception);
-        void process_sync(wsrep_seqno_t seqno_l)
-            throw (gu::Exception);
+                               wsrep_seqno_t donor_seq);
+        void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l);
+        void process_sync(wsrep_seqno_t seqno_l);
 
         const struct wsrep_stats_var* stats_get()  const;
         static void                   stats_free(struct wsrep_stats_var*);
 
-        // helper function
+        /*! @throws NotFound */
         void           set_param (const std::string& key,
-                                  const std::string& value)
-            throw (gu::Exception);
+                                  const std::string& value);
 
+        /*! @throws NotFound */
         void           param_set (const std::string& key,
-                                  const std::string& value)
-            throw (gu::Exception, gu::NotFound);
+                                  const std::string& value);
 
-        std::string    param_get (const std::string& key) const
-            throw (gu::Exception, gu::NotFound);
+        std::string    param_get (const std::string& key) const;
 
         const gu::Config& params() const { return config_; }
 
-        wsrep_seqno_t pause()  throw (gu::Exception);
-        void          resume() throw ();
+        wsrep_seqno_t pause();
+        void          resume();
 
-        void          desync() throw (gu::Exception);
-        void          resync() throw (gu::Exception);
+        void          desync();
+        void          resync();
 
     private:
 
@@ -174,7 +166,7 @@ namespace galera
         void update_incoming_list (const wsrep_view_info_t& v);
 
         /* aborts/exits the program in a clean way */
-        void abort() throw();
+        void abort();
 
         class LocalOrder
         {
@@ -350,33 +342,28 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
-        bool state_transfer_required(const wsrep_view_info_t& view_info)
-            throw (gu::Exception);
+        bool state_transfer_required(const wsrep_view_info_t& view_info);
 
         void prepare_for_IST (void*& req, ssize_t& req_len,
                               const wsrep_uuid_t& group_uuid,
-                              wsrep_seqno_t       group_seqno)
-            throw (gu::Exception);
+                              wsrep_seqno_t       group_seqno);
 
         void recv_IST(void* recv_ctx);
 
         StateRequest* prepare_state_request (const void* sst_req,
                                              ssize_t     sst_req_len,
                                              const wsrep_uuid_t& group_uuid,
-                                             wsrep_seqno_t       group_seqno)
-            throw ();
+                                             wsrep_seqno_t       group_seqno);
 
         void send_state_request (const wsrep_uuid_t& group_uuid,
                                  wsrep_seqno_t       group_seqno,
-                                 const StateRequest* req)
-            throw ();
+                                 const StateRequest* req);
 
         void request_state_transfer (void* recv_ctx,
                                      const wsrep_uuid_t& group_uuid,
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
-                                     ssize_t             sst_req_len)
-            throw ();
+                                     ssize_t             sst_req_len);
 
         class Logger
         {

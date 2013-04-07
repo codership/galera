@@ -38,7 +38,6 @@ std::ostream& gu::datetime::operator<<(std::ostream& os, const Period& p)
 }
 
 void gu::datetime::Date::parse(const std::string& str)
-    throw (gu::Exception)
 {
     if (str == "")
     {
@@ -69,7 +68,6 @@ enum
 gu::RegEx const gu::datetime::Period::regex(period_regex);
 
 void gu::datetime::Period::parse(const std::string& str)
-    throw (gu::Exception)
 {
     std::vector<RegEx::Match> parts = regex.match(str, GU_NUM_PARTS);
 
