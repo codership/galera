@@ -684,7 +684,6 @@ gu::datetime::Date gcomm::evs::Proto::next_expiration(const Timer t) const
         return (now + stats_report_period_);
     }
     gu_throw_fatal;
-    throw;
 }
 
 

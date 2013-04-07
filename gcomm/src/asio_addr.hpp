@@ -48,7 +48,6 @@ namespace gcomm
             return addr.to_v6().any().to_string();
         }
         gu_throw_fatal;
-        throw;
     }
 }
 
