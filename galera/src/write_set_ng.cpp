@@ -59,34 +59,12 @@ WriteSetNG::Header::init (Version const          ver,
     assert (uint(kver) <= KeySet::MAX_VERSION);
     assert (uint(dver) <= DataSet::MAX_VERSION);
     assert (uint(uver) <= DataSet::MAX_VERSION);
-#if 0
-    size_t hsize = size(ver);
-
-    try
-    {
-        gu::byte_t* hptr = new gu::byte_t[hsize];
-
-        hptr[V3_HEADER_VER] = ver;
-        hptr[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
-
-        *(reinterpret_cast<uint16_t*>(hptr + V3_FLAGS))    = gu::htog(flags);
-        *(reinterpret_cast<uint32_t*>(hptr + V3_PA_RANGE)) = 0;
-
-        buf_.ptr  = hptr;
-        buf_.size = hsize;
-    }
-    catch (std::bad_alloc& e)
-    {
-        gu_throw_error (ENOMEM) << "Could not allocate " << hsize << " bytes.";
-    }
-#else
 
     local_[V3_HEADER_VER] = ver;
     local_[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
 
     *(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS))    = gu::htog(flags);
     *(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE)) = 0;
-#endif
 
     return buf_.size;
 }
@@ -151,24 +129,27 @@ WriteSetNG::Header::copy(bool const include_keys, bool const include_unrd)
 }
 
 
-WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
+void
+WriteSetNG::Header::Checksum::verify (const gu::byte_t* const ptr,
+                                      ssize_t const           size)
 {
-    assert (buf.size > 0);
+    assert (size > 0);
 
-    Version const ver   (Header::version(buf.ptr[0]));
+    Version const ver   (Header::version(ptr[0]));
     ssize_t const hsize (Header::size(ver));
 
-    type_t check, hcheck;
-
-    if (gu_likely (buf.size >= hsize))
+    if (gu_likely (size >= hsize))
     {
+        type_t check, hcheck;
+
         switch (ver)
         {
         case VER3:
             size_t const hhsize(hsize - sizeof(check));
-            compute (buf.ptr, hhsize, check);
 
-            hcheck = *(reinterpret_cast<const type_t*>(buf.ptr + hhsize));
+            compute (ptr, hhsize, check);
+
+            hcheck = *(reinterpret_cast<const type_t*>(ptr + hhsize));
 
             if (gu_likely(check == hcheck)) return;
         }
@@ -181,8 +162,38 @@ WriteSetNG::Header::Checksum::Checksum(const gu::Buf& buf)
                                 << hcheck;
     }
 
-    gu_throw_error (EMSGSIZE) << "Buffer size " << buf.size
+    gu_throw_error (EMSGSIZE) << "Buffer size " << size
                               << " shorter than header size " << hsize;
+}
+
+
+void
+WriteSetIn::init (ssize_t const st)
+{
+    WriteSetNG::Version const ver  (header_.version());
+    const gu::byte_t*         pptr (header_.payload());
+    ssize_t                   psize(size_ - header_.size(ver));
+
+    assert (psize >= 0);
+
+    KeySet::Version const kver(header_.keyset_ver());
+    if (kver != KeySet::EMPTY) gu_trace(keys_.init (kver, pptr, psize));
+
+    if (gu_likely(size_ < st))
+    {
+        checksum();
+        checksum_fin();
+    }
+    else
+    {
+        int err = pthread_create (&check_thr_, NULL,
+                                  checksum_thread, this);
+
+        if (gu_unlikely(err != 0))
+        {
+            gu_throw_error(err) << "Starting checksum thread failed";
+        }
+    }
 }
 
 

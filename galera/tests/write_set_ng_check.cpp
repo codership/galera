@@ -136,7 +136,7 @@ START_TEST (ver3_basic)
 
     mark_point();
 
-    try /* this is to test reassembly after gather() */
+    try /* this is to test reassembly after gather() + late initialization */
     {
         WriteSetIn tmp_wsi(in_buf);
         std::vector<gu::Buf> out;
@@ -154,7 +154,8 @@ START_TEST (ver3_basic)
 
         gu::Buf tmp_buf = { in.data(), static_cast<ssize_t>(in.size()) };
 
-        WriteSetIn wsi(tmp_buf);
+        WriteSetIn wsi;      // first - create an empty writeset
+        wsi.read_buf(tmp_buf); // next  - initialize from buffer
         wsi.verify_checksum();
         fail_unless(wsi.certified());
         fail_if (wsi.pa_range() != pa_range);

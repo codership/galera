@@ -88,7 +88,7 @@ namespace galera
             explicit
             Header (const gu::Buf& buf) : checksum_(buf), buf_(buf), local_()
             {
-                buf_.size = size();
+                buf_.size = size(version());
             }
 
             Header () : checksum_(), buf_(), local_()
@@ -96,8 +96,16 @@ namespace galera
                 buf_.ptr = NULL; buf_.size = 0;
             }
 
+            /* for late WriteSetIn initialization */
+            void read_buf (const gu::Buf& buf)
+            {
+                Checksum::verify(buf.ptr, buf.size);
+                buf_.ptr  = buf.ptr;
+                buf_.size = size(version());
+            }
+
             Version version() const { return version(buf_.ptr); }
-            int     size()    const { return size(version());   }
+            int     size()    const { return buf_.size;   }
 
             KeySet::Version keyset_ver() const
             {
@@ -184,8 +192,14 @@ namespace galera
                     value = gu::htog<type_t>(value);
                 }
 
+                static void
+                verify (const gu::byte_t* ptr, ssize_t size);
+
                 Checksum () {}
-                Checksum (const gu::Buf& buf);
+                Checksum (const gu::Buf& buf)
+                {
+                    verify (buf.ptr, buf.size);
+                }
             };
 
             static int const V3_HEADER_VER  = 0;
@@ -347,30 +361,7 @@ namespace galera
               check_thr_(),
               check_ (false)
         {
-            WriteSetNG::Version const ver  (header_.version());
-            const gu::byte_t*         pptr (header_.payload());
-            ssize_t                   psize(size_ - header_.size(ver));
-
-            assert (psize >= 0);
-
-            KeySet::Version const kver(header_.keyset_ver());
-            if (kver != KeySet::EMPTY) gu_trace(keys_.init (kver, pptr, psize));
-
-            if (gu_likely(size_ < st))
-            {
-                checksum();
-                checksum_fin();
-            }
-            else
-            {
-                int err = pthread_create (&check_thr_, NULL,
-                                          checksum_thread, this);
-
-                if (gu_unlikely(err != 0))
-                {
-                    gu_throw_error(err) << "Starting checksum thread failed";
-                }
-            }
+            init (st);
         }
 
         WriteSetIn ()
@@ -382,6 +373,17 @@ namespace galera
               check_thr_(),
               check_ (false)
         {}
+
+        /* WriteSetIn(buf) == WriteSetIn() + read_buf(buf) */
+        void read_buf (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
+        {
+            assert (0 == size_);
+            assert (false == check_);
+
+            header_.read_buf (buf);
+            size_ = buf.size;
+            init (st);
+        }
 
         ~WriteSetIn ()
         {
@@ -428,7 +430,7 @@ namespace galera
     private:
 
         WriteSetNG::Header header_;
-        ssize_t const      size_;
+        ssize_t            size_;
         KeySetIn           keys_;
         DataSetIn          data_;
         DataSetIn          unrd_;
@@ -453,6 +455,9 @@ namespace galera
             ws->checksum();
             return NULL;
         }
+
+        /* late initialization after default constructor */
+        void init (ssize_t size_threshold);
 
         WriteSetIn (const WriteSetIn&);
         WriteSetIn& operator=(WriteSetIn);
