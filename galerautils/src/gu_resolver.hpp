@@ -115,7 +115,7 @@ public:
         case AF_INET6:
             return reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_port;
         default:
-            gu_throw_fatal; throw;
+            gu_throw_fatal;
         }
     }
 
@@ -137,7 +137,6 @@ public:
             return &reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr;
         default:
             gu_throw_fatal  << "invalid address family: " << sa_->sa_family;
-            throw;
         }
     }
 
@@ -150,7 +149,7 @@ public:
         case AF_INET6:
             return sizeof(reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
         default:
-            gu_throw_fatal; throw;
+            gu_throw_fatal;
         }
     }
 
@@ -193,7 +192,6 @@ public:
             break;
         default:
             gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family;
-            throw;
         }
         return ret;
     }

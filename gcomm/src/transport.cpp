@@ -13,19 +13,16 @@
 const gcomm::UUID& gcomm::Transport::uuid() const
 {
     gu_throw_fatal << "UUID not supported by " + uri_.get_scheme();
-    throw;
 }
 
 std::string gcomm::Transport::local_addr() const
 {
     gu_throw_fatal << "get local url not supported";
-    throw;
 }
 
 std::string gcomm::Transport::remote_addr() const
 {
     gu_throw_fatal << "get remote url not supported";
-    throw;
 }
 
 
@@ -42,7 +39,6 @@ void gcomm::Transport::listen()
 gcomm::Transport* gcomm::Transport::accept()
 {
     gu_throw_fatal << "not supported";
-    throw;
 }
 
 
@@ -78,8 +74,6 @@ gcomm::Transport::create(Protonet& pnet, const gu::URI& uri)
     }
 
     gu_throw_fatal << "scheme '" << uri.get_scheme() << "' not supported";
-
-    throw; // to make compiler happy
 }
 
 

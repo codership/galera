@@ -254,7 +254,6 @@ public:
         default:
             gu_throw_error(EINVAL) << "invalid message type "
                                    << static_cast<int>(type_);
-            throw;
         }
         gu_trace (off = gu::unserialize1(buf, buflen, off, flags_));
         gu_trace (off = gu::unserialize1(buf, buflen, off, segment_id_));
@@ -294,7 +293,6 @@ public:
             gu_trace (return read_v0(buf, buflen, off));
         default:
             gu_throw_error(EPROTONOSUPPORT) << "Unsupported/unrecognized gmcast protocol version: " << version_;
-            throw;
         }
     }
 

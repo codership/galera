@@ -98,7 +98,6 @@ public:
     State state() const
     {
         gu_throw_fatal << "TODO:";
-        throw;
     }
 
     SocketId id() const { return &acceptor_; }

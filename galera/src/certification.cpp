@@ -444,7 +444,6 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     default:
         gu_throw_fatal << "certification test for version "
                        << version_ << " not implemented";
-        throw;
     }
 
     if (store_keys == true && res == TEST_OK)
@@ -518,7 +517,6 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     default:
         gu_throw_fatal << "certification/trx version "
                        << version << " not supported";
-        throw;
     }
 
     if (seqno >= position_)

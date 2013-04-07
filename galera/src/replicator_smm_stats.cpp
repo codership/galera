@@ -37,7 +37,6 @@ static wsrep_member_status_t state2stats(galera::ReplicatorSMM::State state)
     }
 
     gu_throw_fatal << "invalid state " << state;
-    throw;
 }
 
 // @todo: should be protected static member of the parent class
@@ -69,7 +68,6 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
     }
 
     gu_throw_fatal << "invalid state " << state;
-    throw;
 }
 
 typedef enum status_vars

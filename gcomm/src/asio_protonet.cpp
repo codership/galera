@@ -205,7 +205,6 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
     else
     {
         gu_throw_fatal << "scheme '" << uri.get_scheme() << "' not implemented";
-        throw;
     }
 }
 

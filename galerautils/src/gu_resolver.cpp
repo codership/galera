@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2013 Codership Oy <info@codership.com>
 
 #include "gu_resolver.hpp"
 #include "gu_logger.hpp"
@@ -127,7 +127,7 @@ bool gu::net::Sockaddr::is_multicast() const
     case AF_INET6:
         return IN6_IS_ADDR_MULTICAST(&reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
     default:
-        gu_throw_fatal; throw;
+        gu_throw_fatal;
     }
 }
 
@@ -141,7 +141,7 @@ bool gu::net::Sockaddr::is_anyaddr() const
     case AF_INET6:
         return IN6_IS_ADDR_UNSPECIFIED(&reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
     default:
-        gu_throw_fatal; throw;
+        gu_throw_fatal;
     }
 }
 
@@ -334,7 +334,6 @@ const void* gu::net::MReq::get_multicast_if_value() const
     default:
         gu_throw_fatal << "get_multicast_if_value() not implemented for: "
                        << ipproto_;
-        throw;
     }
 }
 
@@ -349,7 +348,6 @@ int gu::net::MReq::get_multicast_if_value_size() const
     default:
         gu_throw_fatal << "get_multicast_if_value_size() not implemented for: "
                        << ipproto_;
-        throw;
     }
 }
 
@@ -502,6 +500,5 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
     catch (NotFound& nf)
     {
         gu_throw_error(EINVAL) << "invalid URI: " << uri.to_string();
-        throw;
     }
 }

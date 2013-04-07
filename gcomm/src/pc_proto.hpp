@@ -55,7 +55,7 @@ public:
         case S_PRIM:        return "PRIM";
         case S_NON_PRIM:    return "NON_PRIM";
         default:
-            gu_throw_fatal << "Invalid state"; throw;
+            gu_throw_fatal << "Invalid state";
         }
     }
 

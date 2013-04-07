@@ -339,8 +339,7 @@ public:
 private:
     int handle_down(Datagram& dg, const ProtoDownMeta& dm)
     {
-	gu_throw_fatal << "Toplay handle_down() called";
-	throw;
+        gu_throw_fatal << "Toplay handle_down() called";
     }
 };
 
@@ -351,7 +350,7 @@ public:
 private:
     void handle_up(const void* id, const Datagram&, const ProtoUpMeta& um)
     {
-	gu_throw_fatal << "Bottomlay handle_up() called";
+        gu_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 

@@ -137,7 +137,6 @@ namespace galera
                 break;
             default:
                 gu_throw_fatal << "unsupported key version: " << version_;
-                throw;
             }
         }
 
@@ -244,7 +243,6 @@ namespace galera
         }
         default:
             gu_throw_fatal << "unsupported key version: " << key.version_;
-            throw;
         }
         os.flags(flags);
         return os;
@@ -304,7 +302,6 @@ namespace galera
         default:
             gu_throw_error(EPROTONOSUPPORT) << "unsupported key version: "
                                             << key.version_;
-            throw;
         }
     }
 

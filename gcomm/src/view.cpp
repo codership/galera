@@ -49,7 +49,7 @@ static std::string to_string(const gcomm::ViewType type)
     case gcomm::V_PRIM:     return "PRIM";
     default:
         return "UNKNOWN";
-        // gcomm_throw_fatal << "Invalid type value"; throw;
+        // gcomm_throw_fatal << "Invalid type value";
     }
 }
 

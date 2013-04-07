@@ -81,8 +81,7 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
         return new AsioProtonet(conf, version);
 #else
 #error "No protonet backends defined"
-#endif // HAVE_ASIO_HPP
+#endif /* HAVE_ASIO_HPP */
     gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
                    << "' not supported";
-    throw;
 }

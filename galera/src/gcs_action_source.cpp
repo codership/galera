@@ -63,7 +63,6 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
         return galera::Replicator::S_DONOR;
     default:
         gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
-        throw;
     }
 }
 
