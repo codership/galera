@@ -102,7 +102,7 @@ namespace galera
             }
         }
 
-        void enter(C& obj) throw (gu::Exception)
+        void enter(C& obj)
         {
             const wsrep_seqno_t obj_seqno(obj.seqno());
             const size_t        idx(indexof(obj_seqno));

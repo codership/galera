@@ -42,9 +42,9 @@ namespace gcache
         void reset();
 
         /* Memory allocation functions */
-        void* malloc  (ssize_t size) throw (gu::Exception);
-        void  free    (const void* ptr) throw ();
-        void* realloc (void* ptr, ssize_t size) throw (gu::Exception);
+        void* malloc  (ssize_t size);
+        void  free    (const void* ptr);
+        void* realloc (void* ptr, ssize_t size);
 
         /* Seqno related functions */
 
@@ -70,18 +70,18 @@ namespace gcache
 #endif
         /*!
          * Move lock to a given seqno.
-         * Throw gu::NotFound if seqno is not in the cache.
+         * @throws gu::NotFound if seqno is not in the cache.
          */
-        void    seqno_lock (int64_t const seqno_g) throw (gu::NotFound);
+        void    seqno_lock (int64_t const seqno_g);
 
         /*!          DEPRECATED
          * Get pointer to buffer identified by seqno.
          * Moves lock to the given seqno.
+         * @throws NotFound
          */
         const void* seqno_get_ptr (int64_t  seqno_g,
                                    int64_t& seqno_d,
-                                   ssize_t& size)
-            throw (gu::NotFound);
+                                   ssize_t& size);
 
         class Buffer
         {
@@ -140,17 +140,16 @@ namespace gcache
          */
         void seqno_release ();
 
-        void
-        param_set (const std::string& key, const std::string& val)
-            throw (gu::Exception, gu::NotFound);
+        /*! @throws NotFound */
+        void param_set (const std::string& key, const std::string& val);
 
         static size_t const PREAMBLE_LEN;
 
     private:
 
-        void discard (BufferHeader*) throw() {}
+        void discard (BufferHeader*) {}
 
-        void free_common (BufferHeader*bh) throw()
+        void free_common (BufferHeader*bh)
         {
             void* const ptr(bh + 1);
 
@@ -183,7 +182,7 @@ namespace gcache
         class Params
         {
         public:
-            Params(gu::Config&, const std::string&) throw (gu::Exception);
+            Params(gu::Config&, const std::string&);
             std::string const rb_name;
             std::string const dir_name;
             ssize_t           mem_size;

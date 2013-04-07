@@ -20,19 +20,19 @@ namespace gcache
         virtual ~MemOps() {}
 
         virtual void*
-        malloc  (ssize_t size) throw (gu::Exception) = 0;
+        malloc  (ssize_t size)            = 0;
 
         virtual void
-        free    (const void* ptr)   throw () = 0;
+        free    (const void* ptr)         = 0;
 
         virtual void*
-        realloc (void* ptr, ssize_t size) throw (gu::Exception) = 0;
+        realloc (void* ptr, ssize_t size) = 0;
 
         virtual void
-        discard (BufferHeader* bh) throw() = 0;
+        discard (BufferHeader* bh)        = 0;
 
         virtual void
-        reset   () = 0;
+        reset   ()                        = 0;
     };
 }
 

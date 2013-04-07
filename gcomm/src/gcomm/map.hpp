@@ -103,7 +103,6 @@ namespace gcomm
         size_t serialize(gu::byte_t* const buf,
                          size_t  const buflen,
                          size_t        offset) const
-            throw (gu::Exception)
         {
             gu_trace(offset = gu::serialize4(
                          static_cast<uint32_t>(size()), buf, buflen, offset));
@@ -118,7 +117,6 @@ namespace gcomm
         size_t unserialize(const gu::byte_t* buf,
                            size_t const  buflen,
                            size_t        offset)
-            throw (gu::Exception)
         {
             uint32_t len;
             // Clear map in case this object is reused

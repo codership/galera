@@ -204,7 +204,6 @@ public:
 
     size_t serialize(gu::byte_t* buf, const size_t buflen,
                      const size_t offset) const
-        throw (gu::Exception)
     {
         size_t off;
 
@@ -237,7 +236,6 @@ public:
     }
 
     size_t read_v0(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t off;
         gu::byte_t t;
@@ -286,7 +284,6 @@ public:
     }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-        throw (gu::Exception)
     {
         size_t off;
 

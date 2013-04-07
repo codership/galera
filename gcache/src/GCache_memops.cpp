@@ -32,7 +32,7 @@ namespace gcache
     }
 
     void* 
-    GCache::malloc (ssize_t size) throw (gu::Exception)
+    GCache::malloc (ssize_t size)
     {
         size += sizeof(BufferHeader);
 
@@ -54,7 +54,7 @@ namespace gcache
     }
 
     void
-    GCache::free (const void* ptr) throw ()
+    GCache::free (const void* ptr)
     {
         if (gu_likely(0 != ptr))
         {
@@ -71,7 +71,7 @@ namespace gcache
 
     // this will crash if ptr == 0
     void*
-    GCache::realloc (void* ptr, ssize_t size) throw (gu::Exception)
+    GCache::realloc (void* ptr, ssize_t size)
     {
         size += sizeof(BufferHeader);
 

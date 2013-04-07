@@ -66,7 +66,6 @@ galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
 void
 galera::ReplicatorSMM::set_param (const std::string& key,
                                   const std::string& value)
-    throw (gu::Exception)
 {
     if (key == Param::commit_order)
     {
@@ -99,7 +98,6 @@ galera::ReplicatorSMM::set_param (const std::string& key,
 void
 galera::ReplicatorSMM::param_set (const std::string& key,
                                   const std::string& value)
-    throw (gu::Exception, gu::NotFound)
 {
     try
     {
@@ -141,7 +139,6 @@ galera::ReplicatorSMM::param_set (const std::string& key,
 
 std::string
 galera::ReplicatorSMM::param_get (const std::string& key) const
-    throw (gu::Exception, gu::NotFound)
 {
     return config_.get(key);
 }

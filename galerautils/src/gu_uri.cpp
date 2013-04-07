@@ -26,7 +26,7 @@ using std::multimap;
 static void parse_authority (const string&     auth,
                              gu::RegEx::Match& user,
                              gu::RegEx::Match& host,
-                             gu::RegEx::Match& port) throw (gu::Exception)
+                             gu::RegEx::Match& port)
 {
     size_t pos1, pos2;
 
@@ -100,7 +100,7 @@ static gu::URIQueryList extract_query_list(const string& s,
     return ret;
 }
 
-gu::URI::URI(const string& uri_str, bool const strict) throw (gu::Exception)
+gu::URI::URI(const string& uri_str, bool const strict)
     :
     modified_  (true), // recompose to normalize on the first call to_string()
     str_       (uri_str),
@@ -133,7 +133,6 @@ gu::RegEx const gu::URI::regex_(uri_regex_);
 static string const UNSET_SCHEME("unset://");
 
 void gu::URI::parse (const string& uri_str, bool const strict)
-    throw (gu::Exception)
 {
     log_debug << "URI: " << uri_str;
 
@@ -199,7 +198,6 @@ void gu::URI::parse (const string& uri_str, bool const strict)
 
 
 std::string gu::URI::get_authority(const gu::URI::Authority& authority) const
-    throw (NotSet)
 {
 
     const RegEx::Match& user(authority.user_);
@@ -233,10 +231,9 @@ std::string gu::URI::get_authority(const gu::URI::Authority& authority) const
     }
 
     return auth;
-
 }
 
-string gu::URI::get_authority() const throw (NotSet)
+string gu::URI::get_authority() const
 {
     if (authority_.empty()) return "";
     return get_authority(authority_.front());
@@ -328,7 +325,6 @@ void gu::URI::set_query_param(const string& key, const string& val,
 
 
 const std::string& gu::URI::get_option (const std::string& name) const
-    throw (gu::NotFound)
 {
     gu::URIQueryList::const_iterator i = query_list_.find(name);
 

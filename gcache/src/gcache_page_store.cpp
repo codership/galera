@@ -71,7 +71,7 @@ remove_file (void* __restrict__ arg)
 }
 
 bool
-gcache::PageStore::delete_page () throw (gu::Exception)
+gcache::PageStore::delete_page ()
 {
     Page* const page = pages_.front();
 
@@ -108,7 +108,7 @@ gcache::PageStore::delete_page () throw (gu::Exception)
  * can be locked in the middle for a while. Leaving it like that for simplicity
  * for now. */
 inline void
-gcache::PageStore::cleanup () throw (gu::Exception)
+gcache::PageStore::cleanup ()
 {
     while (total_size_   > keep_size_ &&
            pages_.size() > keep_page_ &&
@@ -117,13 +117,13 @@ gcache::PageStore::cleanup () throw (gu::Exception)
 }
 
 void
-gcache::PageStore::reset () throw (gu::Exception)
+gcache::PageStore::reset ()
 {
     while (pages_.size() > 0 && delete_page()) {};
 }
 
 inline void
-gcache::PageStore::new_page (ssize_t size) throw (gu::Exception)
+gcache::PageStore::new_page (ssize_t size)
 {
     Page* const page = new Page (make_page_name (base_name_, count_), size);
 
@@ -195,7 +195,7 @@ gcache::PageStore::~PageStore ()
 }
 
 inline void*
-gcache::PageStore::malloc_new (ssize_t size) throw ()
+gcache::PageStore::malloc_new (ssize_t size)
 {
     void* ret = 0;
 
@@ -216,7 +216,7 @@ gcache::PageStore::malloc_new (ssize_t size) throw ()
 }
 
 void*
-gcache::PageStore::malloc (ssize_t size) throw (gu::Exception)
+gcache::PageStore::malloc (ssize_t size)
 {
     if (gu_likely (0 != current_))
     {
@@ -231,7 +231,7 @@ gcache::PageStore::malloc (ssize_t size) throw (gu::Exception)
 }
 
 void
-gcache::PageStore::free (const void* ptr) throw ()
+gcache::PageStore::free (const void* ptr)
 {
     Page* page = static_cast<Page*>((ptr2BH(ptr))->ctx);
 
@@ -240,7 +240,6 @@ gcache::PageStore::free (const void* ptr) throw ()
 
 void*
 gcache::PageStore::realloc (void* ptr, ssize_t size)
-    throw (gu::Exception)
 {
     void* ret = 0;
 

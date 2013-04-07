@@ -30,16 +30,16 @@ namespace gu {
 #endif
         };
 
-        Exception (const std::string& msg_, int err_ = E_UNSPEC) throw()
+        Exception (const std::string& msg_, int err_ = E_UNSPEC)
             : msg (msg_),
               err (err_)
         {}
 
-        virtual ~Exception () throw() {}
+        virtual ~Exception    () throw() {}
 
         const char* what      () const throw() { return msg.c_str(); }
 
-        int         get_errno () const throw() { return err; }
+        int         get_errno () const { return err; }
 
         void        trace (const char* file, const char* func, int line);
 

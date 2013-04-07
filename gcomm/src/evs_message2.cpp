@@ -49,7 +49,6 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Message& msg)
 size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
                                           size_t      const buflen,
                                           size_t            offset) const
-    throw(gu::Exception)
 {
     uint8_t b =
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) |
@@ -68,7 +67,6 @@ size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
 size_t gcomm::evs::MessageNode::unserialize(const gu::byte_t* const buf,
                                             size_t            const buflen,
                                             size_t                  offset)
-    throw(gu::Exception)
 {
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
@@ -125,7 +123,6 @@ bool gcomm::evs::Message::operator==(const Message& cmp) const
 size_t gcomm::evs::Message::serialize(gu::byte_t* const buf,
                                       size_t      const buflen,
                                       size_t            offset) const
-    throw(gu::Exception)
 {
 
     uint8_t b = static_cast<uint8_t>(version_ | (type_ << 2) | (order_ << 5));
@@ -146,7 +143,6 @@ size_t gcomm::evs::Message::serialize(gu::byte_t* const buf,
 size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
                                         size_t            const buflen,
                                         size_t                  offset)
-    throw(gu::Exception)
 {
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
@@ -207,7 +203,6 @@ size_t gcomm::evs::Message::serial_size() const
 size_t gcomm::evs::UserMessage::serialize(gu::byte_t* const buf,
                                           size_t      const buflen,
                                           size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize1(user_type_, buf, buflen, offset));
@@ -226,7 +221,6 @@ size_t gcomm::evs::UserMessage::unserialize(const gu::byte_t* const buf,
                                             size_t            const buflen,
                                             size_t                  offset,
                                             bool                    skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {
@@ -263,7 +257,6 @@ size_t gcomm::evs::UserMessage::serial_size() const
 size_t gcomm::evs::AggregateMessage::serialize(gu::byte_t* const buf,
                                                size_t      const buflen,
                                                size_t            offset) const
-    throw (gu::Exception)
 {
     gu_trace(offset = gu::serialize1(flags_, buf, buflen, offset));
     gu_trace(offset = gu::serialize1(user_type_, buf, buflen, offset));
@@ -275,7 +268,6 @@ size_t gcomm::evs::AggregateMessage::serialize(gu::byte_t* const buf,
 size_t gcomm::evs::AggregateMessage::unserialize(const gu::byte_t* const buf,
                                                  size_t            const buflen,
                                                  size_t                  offset)
-    throw (gu::Exception)
 {
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, flags_));
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, user_type_));
@@ -293,7 +285,6 @@ size_t gcomm::evs::AggregateMessage::serial_size() const
 size_t gcomm::evs::DelegateMessage::serialize(gu::byte_t* const buf,
                                               size_t      const buflen,
                                               size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     return offset;
@@ -303,7 +294,6 @@ size_t gcomm::evs::DelegateMessage::unserialize(const gu::byte_t* const buf,
                                                 size_t            const buflen,
                                                 size_t                  offset,
                                                 bool                    skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {
@@ -322,7 +312,6 @@ size_t gcomm::evs::DelegateMessage::serial_size() const
 size_t gcomm::evs::GapMessage::serialize(gu::byte_t* const buf,
                                          size_t      const buflen,
                                          size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize8(seq_, buf, buflen, offset));
@@ -336,7 +325,6 @@ size_t gcomm::evs::GapMessage::unserialize(const gu::byte_t* const buf,
                                            size_t            const buflen,
                                            size_t                  offset,
                                            bool                    skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {
@@ -360,7 +348,6 @@ size_t gcomm::evs::GapMessage::serial_size() const
 size_t gcomm::evs::JoinMessage::serialize(gu::byte_t* const buf,
                                           size_t      const buflen,
                                           size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize8(seq_, buf, buflen, offset));
@@ -373,7 +360,6 @@ size_t gcomm::evs::JoinMessage::unserialize(const gu::byte_t* const buf,
                                             size_t            const buflen,
                                             size_t                  offset,
                                             bool                    skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {
@@ -396,7 +382,6 @@ size_t gcomm::evs::JoinMessage::serial_size() const
 size_t gcomm::evs::InstallMessage::serialize(gu::byte_t* const buf,
                                              size_t      const buflen,
                                              size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize8(seq_, buf, buflen, offset));
@@ -410,7 +395,6 @@ size_t gcomm::evs::InstallMessage::unserialize(const gu::byte_t* const buf,
                                                size_t            const buflen,
                                                size_t                  offset,
                                                bool skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {
@@ -436,7 +420,6 @@ size_t gcomm::evs::InstallMessage::serial_size() const
 size_t gcomm::evs::LeaveMessage::serialize(gu::byte_t* const buf,
                                            size_t      const buflen,
                                            size_t            offset) const
-    throw(gu::Exception)
 {
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize8(seq_, buf, buflen, offset));
@@ -448,7 +431,6 @@ size_t gcomm::evs::LeaveMessage::unserialize(const gu::byte_t* const buf,
                                              size_t            const buflen,
                                              size_t                  offset,
                                              bool skip_header)
-    throw(gu::Exception)
 {
     if (skip_header == false)
     {

@@ -186,8 +186,7 @@ public:
      * @throws FatalException if node was not found or sequence number
      *         was not in the allowed range
      */
-    void  set_safe_seq(const size_t uuid, const seqno_t seq)
-        throw (gu::Exception);
+    void  set_safe_seq(const size_t uuid, const seqno_t seq);
 
     /*!
      * Get current value of safe_seq for node.
@@ -199,7 +198,6 @@ public:
      * @throws FatalException if node was not found
      */
     seqno_t safe_seq(const size_t uuid) const
-        throw (gu::Exception)
     {
         return node_index_->at(uuid).safe_seq();
     }
@@ -214,16 +212,13 @@ public:
      * @throws FatalException if node was not found
      */
     Range range   (const size_t uuid) const
-        throw (gu::Exception)
     {
         return node_index_->at(uuid).range();
     }
 
-    seqno_t min_hs() const
-        throw (gu::Exception);
+    seqno_t min_hs() const;
 
-    seqno_t max_hs() const
-        throw (gu::Exception);
+    seqno_t max_hs() const;
 
     /*!
      * Get iterator to the beginning of the input map
@@ -245,7 +240,6 @@ public:
      * @return True or false
      */
     bool is_safe  (iterator i) const
-        throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::key(i).seq());
         return (seq <= safe_seq_);
@@ -257,7 +251,6 @@ public:
      * @return True or false
      */
     bool is_agreed(iterator i) const
-        throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::key(i).seq());
         return (seq <= aru_seq_);
@@ -269,7 +262,6 @@ public:
      * @return True or false
      */
     bool is_fifo  (iterator i) const
-        throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::key(i).seq());
         const InputMapNode& node((*node_index_)[
@@ -311,8 +303,7 @@ public:
      *         number is out of allowed range
      */
     Range insert(const size_t uuid, const UserMessage& msg,
-                 const Datagram& dg = Datagram())
-        throw (gu::Exception);
+                 const Datagram& dg = Datagram());
 
     /*!
      * Erase message pointed by iterator. Note that message may still
@@ -323,8 +314,7 @@ public:
      *
      * @throws FatalException if iterator is not valid
      */
-    void erase(iterator i)
-        throw (gu::Exception);
+    void erase(iterator i);
 
     /*!
      * Find message.
@@ -336,8 +326,7 @@ public:
      *
      * @throws FatalException if node was not found
      */
-    iterator find(const size_t uuid, const seqno_t seq) const
-        throw (gu::Exception);
+    iterator find(const size_t uuid, const seqno_t seq) const;
 
     /*!
      * Recover message.
@@ -349,22 +338,20 @@ public:
      *
      * @throws FatalException if node or message was not found
      */
-    iterator recover(const size_t uuid, const seqno_t seq) const
-        throw (gu::Exception);
+    iterator recover(const size_t uuid, const seqno_t seq) const;
 
     /*!
      *
      */
-    void reset(const size_t, const seqno_t = 256)
-        throw (gu::Exception);
+    void reset(const size_t, const seqno_t = 256);
 
     /*!
      * Clear input map state.
      */
     void clear();
 
-
 private:
+
     friend std::ostream& operator<<(std::ostream&, const InputMap&);
     /* Non-copyable */
     InputMap(const InputMap&);
@@ -373,14 +360,12 @@ private:
     /*!
      * Update aru_seq value to represent current state.
      */
-    void update_aru()
-        throw (gu::Exception);
+    void update_aru();
 
     /*!
      * Clean up recovery index. All messages up to safe_seq are removed.
      */
-    void cleanup_recovery_index()
-        throw (gu::Exception);
+    void cleanup_recovery_index();
 
     seqno_t            window_;
     seqno_t            safe_seq_;       /*!< Safe seqno              */

@@ -24,7 +24,7 @@ namespace gu
      * @return      value cast to TO
      */
     template <typename FROM, typename TO> inline
-    TO convert (const FROM& from, const TO& to) throw (Exception)
+    TO convert (const FROM& from, const TO& to)
     {
         if (gu_unlikely(from > std::numeric_limits<TO>::max() ||
                         from < std::numeric_limits<TO>::min()))
@@ -43,7 +43,6 @@ namespace gu
 
     template <> inline
     long long convert (const unsigned long long& from, const long long& to)
-        throw (Exception)
     {
         if (gu_unlikely(from > static_cast<unsigned long long>
                         (std::numeric_limits<long long>::max())))
@@ -58,7 +57,6 @@ namespace gu
     template <> inline
     unsigned long long convert (const long long& from,
                                 const unsigned long long& to)
-        throw (Exception)
     {
         if (gu_unlikely(from < 0))
         {
@@ -71,7 +69,6 @@ namespace gu
 
     template <> inline
     long convert (const unsigned long& from, const long& to)
-        throw (Exception)
     {
         if (gu_unlikely(from > static_cast<unsigned long>
                         (std::numeric_limits<long>::max())))
@@ -85,7 +82,6 @@ namespace gu
 
     template <> inline
     unsigned long convert (const long& from, const unsigned long& to)
-        throw (Exception)
     {
         if (gu_unlikely(from < 0))
         {
@@ -98,7 +94,6 @@ namespace gu
 
     template <> inline
     int convert (const unsigned int& from, const int& to)
-        throw (Exception)
     {
         if (gu_unlikely(from > static_cast<unsigned int>
                         (std::numeric_limits<int>::max())))
@@ -112,7 +107,6 @@ namespace gu
 
     template <> inline
     unsigned int convert (const int& from, const unsigned int& to)
-        throw (Exception)
     {
         if (gu_unlikely(from < 0))
         {

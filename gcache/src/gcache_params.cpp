@@ -18,7 +18,6 @@ static const ssize_t     GCACHE_DEFAULT_KEEP_PAGES_SIZE(0);
 
 static const std::string&
 name_value (gu::Config& cfg, const std::string& data_dir)
-    throw ()
 {
     std::string dir("");
 
@@ -55,7 +54,6 @@ name_value (gu::Config& cfg, const std::string& data_dir)
 
 static ssize_t
 size_value (gu::Config& cfg, const std::string& key, ssize_t def)
-    throw (gu::Exception)
 {
     try
     {
@@ -70,7 +68,6 @@ size_value (gu::Config& cfg, const std::string& key, ssize_t def)
 }
 
 gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
-    throw (gu::Exception)
     :
     rb_name   (name_value (cfg, data_dir)),
     dir_name  (cfg.get(GCACHE_PARAMS_DIR)),
@@ -86,7 +83,6 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
 
 void
 gcache::GCache::param_set (const std::string& key, const std::string& val)
-    throw (gu::Exception, gu::NotFound)
 {
     if (key == GCACHE_PARAMS_RB_NAME)
     {

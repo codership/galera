@@ -116,9 +116,9 @@ namespace gcache
 
     /*!
      * Move lock to a given seqno. Throw gu::NotFound if seqno is not in cache.
+     * @throws NotFound
      */
     void GCache::seqno_lock (int64_t const seqno_g)
-        throw (gu::NotFound)
     {
         gu::Lock lock(mtx);
 
@@ -134,11 +134,11 @@ namespace gcache
     /*!
      * Get pointer to buffer identified by seqno.
      * Moves lock to the given seqno.
+     * @throws NotFound
      */
     const void* GCache::seqno_get_ptr (int64_t const seqno_g,
                                        int64_t&      seqno_d,
                                        ssize_t&      size)
-        throw (gu::NotFound)
     {
         const void* ptr(0);
 

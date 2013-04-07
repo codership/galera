@@ -96,7 +96,7 @@ namespace gu
             /*!
              * @brief Parse period string.
              */
-            void parse(const std::string&) throw (gu::Exception);
+            void parse(const std::string&);
 
             long long nsecs;
         };
@@ -188,7 +188,7 @@ namespace gu
              * @brief Parse date from string.
              * @todo Not implemented yet
              */
-            void parse(const std::string& str_) throw (gu::Exception);
+            void parse(const std::string& str_);
         };
 
         /*!
