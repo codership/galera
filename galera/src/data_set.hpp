@@ -70,6 +70,11 @@ namespace galera
     }; /* class DataSet */
 
 
+#if defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
     class DataSetOut : public gu::RecordSetOut<DataSet::RecordOut>
     {
     public:
@@ -159,6 +164,10 @@ namespace galera
         DataSet::Version version_;
 
     }; /* class DataSetIn */
+
+#if defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
 
 } /* namespace galera */
 

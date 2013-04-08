@@ -214,7 +214,7 @@ namespace galera
             // seqno takes place of last seen
             static int const V3_TIMESTAMP   = V3_LAST_SEEN   + sizeof(uint64_t);
             static int const V3_CRC         = V3_TIMESTAMP   + sizeof(uint64_t);
-            static int const V3_SIZE        = V3_CRC  + sizeof(Checksum::type_t);
+            static int const V3_SIZE        = V3_CRC + sizeof(Checksum::type_t);
 
             struct Offsets
             {

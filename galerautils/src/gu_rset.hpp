@@ -71,8 +71,14 @@ protected:
 
     void init (const byte_t* buf, ssize_t size);
 
-    virtual ~RecordSet() {}
+    ~RecordSet() {}
 };
+
+
+#if defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#endif
 
 /*! class to store records in buffer(s) to send out */
 class RecordSetOutBase : public RecordSet
@@ -457,6 +463,10 @@ public:
     R next () const { return next_base<R> (); }
 
 }; /* class RecordSetIn */
+
+#if defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
 
 } /* namespace gu */
 

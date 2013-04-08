@@ -16,7 +16,6 @@
 #include <cerrno>
 #include <cstring>
 #include <sstream>
-#include <iomanip>
 
 #include "gu_macros.h"
 #include "gu_exception.hpp"

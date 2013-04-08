@@ -9,6 +9,8 @@
 
 #include <boost/static_assert.hpp>
 
+#include <iomanip>
+
 namespace galera
 {
 
@@ -143,7 +145,7 @@ WriteSetNG::Header::Checksum::verify (const gu::byte_t* const ptr,
 
     if (gu_likely (size >= hsize))
     {
-        type_t check, hcheck;
+        type_t check(0), hcheck(0);
 
         switch (ver)
         {

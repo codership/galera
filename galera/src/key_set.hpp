@@ -286,6 +286,11 @@ operator << (std::ostream& os, const KeySet::KeyPart& kp)
 }
 
 
+#if defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
 class KeySetOut : public gu::RecordSetOut<KeySet::KeyPart>
 {
 public:
@@ -468,6 +473,7 @@ private:
 
 }; /* class KeySetOut */
 
+
 inline std::ostream&
 operator << (std::ostream& os, const KeySetOut::KeyPart& kp)
 {
@@ -502,6 +508,10 @@ private:
     KeySet::Version version_;
 
 }; /* class KeySetIn */
+
+#if defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
 
 } /* namespace galera */
 
