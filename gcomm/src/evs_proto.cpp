@@ -2055,7 +2055,7 @@ void gcomm::evs::Proto::handle_up(const void* cid,
 
         default:
             log_fatal << "exception caused by message: " << msg;
-            log_fatal << " state after handling message: " << *this;
+            std::cerr << " state after handling message: " << *this;
             throw;
         }
     }
