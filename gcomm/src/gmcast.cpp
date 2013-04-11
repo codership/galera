@@ -1528,31 +1528,14 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
         }
         return true;
     }
-    else if (key == Conf::GMCastSegment)
-    {
-        segment_ = check_range(Conf::GMCastSegment,
-                               gu::from_string<int>(val), 0, 255);
-        // Delete all entries in proto map and let peers to re-establish
-        // connections. New segment ID will be distributed on reconnect.
-        ProtoMap::iterator pi, pi_next;
-        for (pi = proto_map_->begin(); pi != proto_map_->end(); pi = pi_next)
-        {
-            pi_next = pi, ++pi_next;
-            Proto* rp = ProtoMap::value(pi);
-            delete rp;
-            proto_map_->erase(pi);
-        }
-        segment_map_.clear();
-        conf_.set(Conf::GMCastSegment, gu::to_string<int>(segment_));
-        return true;
-    }
     else if (key == Conf::GMCastGroup ||
              key == Conf::GMCastListenAddr ||
              key == Conf::GMCastMCastAddr ||
              key == Conf::GMCastMCastPort ||
              key == Conf::GMCastMCastTTL ||
              key == Conf::GMCastTimeWait ||
-             key == Conf::GMCastPeerTimeout)
+             key == Conf::GMCastPeerTimeout ||
+             key == Conf::GMCastSegment)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";

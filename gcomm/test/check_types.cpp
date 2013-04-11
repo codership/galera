@@ -85,53 +85,16 @@ START_TEST(test_view)
     fail_unless(vid.uuid() == uuid);
     fail_unless(vid.seq() == 7);
 
-    check_serialization(vid, UUID::serial_size() + sizeof(uint32_t), ViewId());
 
     NodeList nl;
 
     for (size_t i = 0; i < 7; ++i)
     {
-        nl.insert(make_pair(UUID(0, 0), Node()));
+        nl.insert(make_pair(UUID(0, 0), Node(0)));
     }
 
     fail_unless(nl.size() == 7);
-    check_serialization(nl, 4 + 7*(UUID::serial_size() 
-                                   + Node::serial_size()), NodeList());
 
-    View v(ViewId(V_TRANS, vid));
-
-    for (size_t i = 0; i < 10; ++i)
-    {
-        UUID uuid(0, 0);
-        string name("n" + gu::to_string(i));
-        if (i < 3)
-        {
-            v.add_joined(uuid, name);
-        }
-        if (i < 7)
-        {
-            v.add_member(uuid, name);
-        }
-        else if (i < 9)
-        {
-            v.add_left(uuid, name);
-        }
-        else
-        {
-            v.add_partitioned(uuid, name);
-        }
-
-    }
-
-    check_serialization(v, 
-                        /* view id */
-                        + ViewId::serial_size() 
-                        /* 4 times node list length */
-                        + 4*4 
-                        /* 10 nodes which of 3 twice */
-                        + (10 + 3)*(UUID::serial_size() 
-                                    + Node::serial_size()),
-                        View());
 }
 END_TEST
 

@@ -44,7 +44,8 @@ gcomm::evs::Node::Node(const Node& n)
     suspect_timeout_ (n.suspect_timeout_),
     inactive_timeout_(n.inactive_timeout_),
     tstamp_          (n.tstamp_),
-    fifo_seq_        (n.fifo_seq_)
+    fifo_seq_        (n.fifo_seq_),
+    segment_         (n.segment_)
 { }
 
 

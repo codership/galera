@@ -336,6 +336,7 @@ private:
     prof::Profile delivery_prof_;
     bool delivering_;
     UUID my_uuid_;
+    SegmentId segment_;
     //
     // Known instances
     NodeMap known_;

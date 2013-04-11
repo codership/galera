@@ -72,6 +72,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     delivery_prof_     ("delivery"),
     delivering_(false),
     my_uuid_(my_uuid),
+    segment_(0),
     known_(),
     self_i_(),
     view_forget_timeout_(
@@ -207,7 +208,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
 
     NodeMap::value(self_i_).set_index(0);
     input_map_->reset(1);
-    current_view_.add_member(my_uuid_, "");
+    current_view_.add_member(my_uuid_, segment_);
     if (mtu_ != std::numeric_limits<size_t>::max())
     {
         send_buf_.reserve(mtu_);
@@ -911,11 +912,11 @@ void gcomm::evs::Proto::deliver_reg_view()
     {
         if (NodeMap::value(i).installed() == true)
         {
-            view.add_member(NodeMap::key(i), "");
+            view.add_member(NodeMap::key(i), NodeMap::value(i).segment());
             if (prev_view.members().find(NodeMap::key(i)) ==
                 prev_view.members().end())
             {
-                view.add_joined(NodeMap::key(i), "");
+                view.add_joined(NodeMap::key(i), NodeMap::value(i).segment());
             }
         }
         else if (NodeMap::value(i).installed() == false)
@@ -926,11 +927,12 @@ void gcomm::evs::Proto::deliver_reg_view()
             {
                 if (MessageNodeList::value(inst_i).leaving() == true)
                 {
-                    view.add_left(NodeMap::key(i), "");
+                    view.add_left(NodeMap::key(i), NodeMap::value(i).segment());
                 }
                 else
                 {
-                    view.add_partitioned(NodeMap::key(i), "");
+                    view.add_partitioned(NodeMap::key(i),
+                                         NodeMap::value(i).segment());
                 }
             }
             gcomm_assert(NodeMap::key(i) != uuid());
@@ -968,7 +970,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
             (local == true ||
              MessageNodeList::value(install_message_->node_list().find_checked(uuid)).view_id() == current_view_.id()))
         {
-            view.add_member(NodeMap::key(i), "");
+            view.add_member(NodeMap::key(i), NodeMap::value(i).segment());
         }
         else if (inst.installed() == false)
         {
@@ -980,16 +982,19 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                 {
                     if (MessageNodeList::value(inst_i).leaving())
                     {
-                        view.add_left(NodeMap::key(i), "");
+                        view.add_left(NodeMap::key(i),
+                                      NodeMap::value(i).segment());
                     }
                     else
                     {
-                        view.add_partitioned(NodeMap::key(i), "");
+                        view.add_partitioned(NodeMap::key(i),
+                                             NodeMap::value(i).segment());
                     }
                 }
                 else if (current_view_.is_member(NodeMap::key(i)) == true)
                 {
-                    view.add_partitioned(NodeMap::key(i), "");
+                    view.add_partitioned(NodeMap::key(i),
+                                         NodeMap::value(i).segment());
                 }
             }
             else
@@ -998,7 +1003,8 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                 // for leaving node anyway and it is not guaranteed if
                 // the others get the leave message, so it is not safe
                 // to assume then as left.
-                view.add_partitioned(NodeMap::key(i), "");
+                view.add_partitioned(NodeMap::key(i),
+                                     NodeMap::value(i).segment());
             }
         }
         else
@@ -2307,7 +2313,8 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         {
             if (NodeMap::value(i).installed() == true)
             {
-                gu_trace(current_view_.add_member(NodeMap::key(i), ""));
+                gu_trace(current_view_.add_member(NodeMap::key(i),
+                                                  NodeMap::value(i).segment()));
                 NodeMap::value(i).set_index(idx++);
             }
             else

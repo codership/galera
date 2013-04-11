@@ -215,7 +215,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
         if (current_view_.members().find(NodeMap::key(i)) ==
             current_view_.members().end())
         {
-            v.add_partitioned(NodeMap::key(i), "");
+            v.add_partitioned(NodeMap::key(i), 0);
         }
     }
 
@@ -234,11 +234,12 @@ void gcomm::pc::Proto::mark_non_prim()
     {
         const UUID& uuid(NodeMap::key(i));
         Node& inst(NodeMap::value(i));
-        if (current_view_.members().find(uuid) !=
+        NodeList::const_iterator nli;
+        if ((nli = current_view_.members().find(uuid)) !=
             current_view_.members().end())
         {
             inst.set_prim(false);
-            pc_view_.add_member(uuid, "");
+            pc_view_.add_member(uuid, NodeList::value(nli).segment());
         }
     }
 
@@ -290,14 +291,15 @@ void gcomm::pc::Proto::shift_to(const State s)
         {
             const UUID& uuid(NodeMap::key(i));
             Node& inst(NodeMap::value(i));
-            if (current_view_.members().find(uuid) !=
+            NodeList::const_iterator nli;
+            if ((nli = current_view_.members().find(uuid)) !=
                 current_view_.members().end())
             {
                 inst.set_prim(true);
                 inst.set_last_prim(ViewId(V_PRIM, current_view_.id()));
                 inst.set_last_seq(0);
                 inst.set_to_seq(to_seq());
-                pc_view_.add_member(uuid, "");
+                pc_view_.add_member(uuid, NodeList::value(nli).segment());
             }
             else
             {
@@ -1213,7 +1215,7 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
             NodeMap::const_iterator ni(msg.node_map().find(uuid));
             if (ni != msg.node_map().end())
             {
-                new_pc_view.add_member(uuid);
+                new_pc_view.add_member(uuid, 0);
             }
         }
 
