@@ -61,8 +61,8 @@ namespace gu
     template <typename TO, typename FROM>
     inline size_t
     __private_serialize(const FROM& f,
-                           byte_t* const buf, size_t const buflen, size_t const offset)
-        throw (Exception)
+                        byte_t* const buf, size_t const buflen, size_t const offset)
+
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
         BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
@@ -77,8 +77,7 @@ namespace gu
     template <typename FROM, typename TO>
     inline size_t
     __private_unserialize(const byte_t* const buf, size_t const buflen, size_t const offset,
-                             TO& t)
-        throw (Exception)
+                          TO& t)
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
         BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
@@ -94,7 +93,6 @@ namespace gu
                                       byte_t* const buf,
                                       size_t  const buflen,
                                       size_t  const offset)
-        throw (Exception)
     {
         return __private_serialize<uint8_t>(t, buf, buflen, offset);
     }
@@ -104,7 +102,6 @@ namespace gu
                                         size_t const buflen,
                                         size_t const offset,
                                         T& t)
-        throw (Exception)
     {
         return __private_unserialize<uint8_t>(buf, buflen, offset, t);
     }
@@ -114,7 +111,6 @@ namespace gu
                                       byte_t* const buf,
                                       size_t  const buflen,
                                       size_t  const offset)
-        throw (Exception)
     {
         return __private_serialize<uint16_t>(t, buf, buflen, offset);
     }
@@ -124,7 +120,6 @@ namespace gu
                                         size_t const buflen,
                                         size_t const offset,
                                         T& t)
-        throw (Exception)
     {
         return __private_unserialize<uint16_t>(buf, buflen, offset, t);
     }
@@ -134,7 +129,6 @@ namespace gu
                                       byte_t* const buf,
                                       size_t  const buflen,
                                       size_t  const offset)
-        throw (Exception)
     {
         return __private_serialize<uint32_t>(t, buf, buflen, offset);
     }
@@ -144,7 +138,6 @@ namespace gu
                                         size_t const buflen,
                                         size_t const offset,
                                         T& t)
-        throw (Exception)
     {
         return __private_unserialize<uint32_t>(buf, buflen, offset, t);
     }
@@ -154,7 +147,6 @@ namespace gu
                                       byte_t* const buf,
                                       size_t  const buflen,
                                       size_t  const offset)
-        throw (Exception)
     {
         return __private_serialize<uint64_t>(t, buf, buflen, offset);
     }
@@ -164,7 +156,6 @@ namespace gu
                                         size_t const buflen,
                                         size_t const offset,
                                         T& t)
-        throw (Exception)
     {
         return __private_unserialize<uint64_t>(buf, buflen, offset, t);
     }

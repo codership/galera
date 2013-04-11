@@ -258,7 +258,7 @@ _cluster_up()
             "vsbes") $cmd "-g 'vsbes://$VSBES_ADDRESS'" "$@" 0 ;;
             esac
         else
-            $cmd "-g $(gcs_address $node)" "$@" $node &
+            $cmd "-g $(gcs_address $node)" "$@" $node
         fi
     done
     wait_jobs

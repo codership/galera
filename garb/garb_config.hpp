@@ -17,17 +17,17 @@ public:
 
     static std::string const DEFAULT_SST; // default (empty) SST request
 
-    Config (int argc, char* argv[]) throw (gu::Exception);
+    Config (int argc, char* argv[]);
     ~Config () {}
 
-    bool               daemon()  const throw() { return daemon_ ; }
-    const std::string& address() const throw() { return address_; }
-    const std::string& group()   const throw() { return group_  ; }
-    const std::string& sst()     const throw() { return sst_    ; }
-    const std::string& donor()   const throw() { return donor_  ; }
-    const std::string& options() const throw() { return options_; }
-    const std::string& cfg()     const throw() { return cfg_    ; }
-    const std::string& log()     const throw() { return log_    ; }
+    bool               daemon()  const { return daemon_ ; }
+    const std::string& address() const { return address_; }
+    const std::string& group()   const { return group_  ; }
+    const std::string& sst()     const { return sst_    ; }
+    const std::string& donor()   const { return donor_  ; }
+    const std::string& options() const { return options_; }
+    const std::string& cfg()     const { return cfg_    ; }
+    const std::string& log()     const { return log_    ; }
 
 private:
 

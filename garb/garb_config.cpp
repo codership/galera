@@ -16,7 +16,7 @@ namespace garb
 
     std::string const Config::DEFAULT_SST(WSREP_STATE_TRANSFER_TRIVIAL);
 
-Config::Config (int argc, char* argv[]) throw (gu::Exception)
+Config::Config (int argc, char* argv[])
     : daemon_  (false),
       address_ (),
       group_   ("my_test_cluster"),

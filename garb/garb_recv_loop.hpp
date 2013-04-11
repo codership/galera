@@ -17,13 +17,13 @@ class RecvLoop
 {
 public:
 
-    RecvLoop (const Config&) throw (gu::Exception);
+    RecvLoop (const Config&);
 
     ~RecvLoop () {}
 
 private:
 
-    void loop() throw (gu::Exception);
+    void loop();
 
     const Config& config_;
     gu::Config    gconf_;

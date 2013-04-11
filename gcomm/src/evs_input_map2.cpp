@@ -95,9 +95,13 @@ std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMap& im)
     return (os << "evs::input_map: {"
             << "aru_seq="        << im.aru_seq()   << ","
             << "safe_seq="       << im.safe_seq()  << ","
-            << "node_index="     << *im.node_index_     << ","
+            << "node_index="     << *im.node_index_
+#ifndef NDEBUG
+            << ","
             << "msg_index="      << *im.msg_index_      << ","
-            << "recovery_index=" << *im.recovery_index_ << "}");
+            << "recovery_index=" << *im.recovery_index_
+#endif // !NDEBUG
+            << "}");
 }
 
 
@@ -139,7 +143,6 @@ gcomm::evs::InputMap::~InputMap()
 
 
 void gcomm::evs::InputMap::reset(const size_t nodes, const seqno_t window)
-    throw (gu::Exception)
 {
     gcomm_assert(msg_index_->empty()                           == true &&
                  recovery_index_->empty()                      == true &&
@@ -157,11 +160,7 @@ void gcomm::evs::InputMap::reset(const size_t nodes, const seqno_t window)
 }
 
 
-
-
-
 gcomm::evs::seqno_t gcomm::evs::InputMap::min_hs() const
-    throw (gu::Exception)
 {
     seqno_t ret;
     gcomm_assert(node_index_->empty() == false);
@@ -173,7 +172,6 @@ gcomm::evs::seqno_t gcomm::evs::InputMap::min_hs() const
 
 
 gcomm::evs::seqno_t gcomm::evs::InputMap::max_hs() const
-    throw (gu::Exception)
 {
     seqno_t ret;
     gcomm_assert(node_index_->empty() == false);
@@ -185,7 +183,6 @@ gcomm::evs::seqno_t gcomm::evs::InputMap::max_hs() const
 
 
 void gcomm::evs::InputMap::set_safe_seq(const size_t uuid, const seqno_t seq)
-    throw (gu::Exception)
 {
     gcomm_assert(seq != -1);
     // @note This assertion does not necessarily hold. Some other
@@ -242,7 +239,6 @@ gcomm::evs::Range
 gcomm::evs::InputMap::insert(const size_t uuid,
                              const UserMessage& msg,
                              const Datagram& rb)
-    throw (gu::Exception)
 {
     Range range;
 
@@ -343,7 +339,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 
 
 void gcomm::evs::InputMap::erase(iterator i)
-    throw (gu::Exception)
 {
     const UserMessage& msg(InputMapMsgIndex::value(i).msg());
     --n_msgs_[msg.order()];
@@ -354,7 +349,6 @@ void gcomm::evs::InputMap::erase(iterator i)
 
 gcomm::evs::InputMap::iterator
 gcomm::evs::InputMap::find(const size_t uuid, const seqno_t seq) const
-    throw (gu::Exception)
 {
     iterator ret;
     const InputMapNode& node(node_index_->at(uuid));
@@ -366,7 +360,6 @@ gcomm::evs::InputMap::find(const size_t uuid, const seqno_t seq) const
 
 gcomm::evs::InputMap::iterator
 gcomm::evs::InputMap::recover(const size_t uuid, const seqno_t seq) const
-    throw (gu::Exception)
 {
     iterator ret;
     const InputMapNode& node(node_index_->at(uuid));
@@ -385,7 +378,6 @@ gcomm::evs::InputMap::recover(const size_t uuid, const seqno_t seq) const
 
 
 inline void gcomm::evs::InputMap::update_aru()
-    throw (gu::Exception)
 {
     InputMapNodeIndex::const_iterator min =
         min_element(node_index_->begin(), node_index_->end(), NodeIndexLUCmpOp());
@@ -398,7 +390,6 @@ inline void gcomm::evs::InputMap::update_aru()
 
 
 void gcomm::evs::InputMap::cleanup_recovery_index()
-    throw (gu::Exception)
 {
     gcomm_assert(node_index_->size() > 0);
     InputMapMsgIndex::iterator i = recovery_index_->lower_bound(

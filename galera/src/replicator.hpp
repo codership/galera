@@ -64,7 +64,7 @@ namespace galera
         virtual wsrep_status_t post_commit(TrxHandle* trx) = 0;
         virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx) = 0;
-        virtual void abort_trx(TrxHandle* trx) throw (gu::Exception) = 0;
+        virtual void abort_trx(TrxHandle* trx) = 0;
         virtual wsrep_status_t causal_read(wsrep_gtid_t*) = 0;
         virtual wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;
@@ -76,44 +76,39 @@ namespace galera
                                             size_t              state_len) = 0;
 
         // action source interface
-        virtual void process_trx(void* recv_ctx, TrxHandle* trx)
-            throw (ApplyException, gu::Exception) = 0;
+        virtual void process_trx(void* recv_ctx, TrxHandle* trx) = 0;
         virtual void process_commit_cut(wsrep_seqno_t seq,
-                                        wsrep_seqno_t seqno_l)
-            throw (gu::Exception) = 0;
+                                        wsrep_seqno_t seqno_l) = 0;
         virtual void process_conf_change(void*                    recv_ctx,
                                          const wsrep_view_info_t& view_info,
                                          int                      repl_proto,
                                          State                    next_state,
-                                         wsrep_seqno_t            seqno_l)
-            throw (gu::Exception) = 0;
+                                         wsrep_seqno_t            seqno_l) = 0;
         virtual void process_state_req(void* recv_ctx, const void* req,
                                        size_t req_size,
                                        wsrep_seqno_t seqno_l,
-                                       wsrep_seqno_t donor_seq)
-            throw (gu::Exception) = 0;
-        virtual void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l)
-            throw (gu::Exception) = 0;
+                                       wsrep_seqno_t donor_seq) = 0;
+        virtual void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l) = 0;
         virtual void process_sync(wsrep_seqno_t seqno_l) = 0;
 
         virtual const struct wsrep_stats_var* stats_get()  const = 0;
         // static void stats_free(struct wsrep_stats_var*) must be declared in
         // the child class
 
+        /*! @throws NotFound */
         virtual void        param_set (const std::string& key,
-                                       const std::string& value)
-            throw (gu::Exception, gu::NotFound) = 0;
+                                       const std::string& value) = 0;
 
-        virtual std::string param_get (const std::string& key) const
-            throw (gu::Exception, gu::NotFound) = 0;
+        /*! @throws NotFound */
+        virtual std::string param_get (const std::string& key) const = 0;
 
         virtual const gu::Config& params() const = 0;
 
-        virtual wsrep_seqno_t pause()  throw (gu::Exception) = 0;
-        virtual void          resume() throw () = 0;
+        virtual wsrep_seqno_t pause()  = 0;
+        virtual void          resume() = 0;
 
-        virtual void          desync() throw (gu::Exception) = 0;
-        virtual void          resync() throw (gu::Exception) = 0;
+        virtual void          desync() = 0;
+        virtual void          resync() = 0;
     };
 }
 

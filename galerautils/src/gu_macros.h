@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2013 Codership Oy <info@codership.com>
 
 /**
  * @file Miscellaneous macros
@@ -14,6 +14,7 @@
  */
 
 #if defined(_MSC_VER)
+#  define GU_NORETURN      __declspec(noreturn)
 #  define GU_INLINE        __forceinline
 #  define GU_FORCE_INLINE  __forceinline
 #  define GU_UNUSED
@@ -22,6 +23,7 @@
 #  define GU_LONG_LONG(x)  (x)
 #  define GU_ULONG_LONG(x) (x)
 #else   /* !defined(_MSC_VER) */
+#  define GU_NORETURN      __attribute__((noreturn))
 #  define GU_INLINE        inline
 #  define GU_FORCE_INLINE  inline __attribute__((always_inline))
 #  define GU_UNUSED        __attribute__((unused))

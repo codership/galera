@@ -282,7 +282,6 @@ namespace galera
                     {
                     case Ctrl::C_EOF:
                         gu_throw_error(EINTR);
-                        throw;
                     default:
                         gu_throw_error(EPROTO) << "unexpected ctrl code: " <<
                             msg.ctrl();
@@ -291,7 +290,6 @@ namespace galera
                 default:
                     gu_throw_error(EPROTO)
                         << "unexpected message type: " << msg.type();
-                    throw;
                 }
                 if (msg.version() != version_)
                 {
@@ -327,11 +325,13 @@ namespace galera
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
+
                 (void)unserialize(&buf[0], buf.size(), 0, msg);
 
                 log_debug << "handshake response msg: " << msg.version()
                           << " " << msg.type()
                           << " " << msg.len();
+
                 switch (msg.type())
                 {
                 case Message::T_HANDSHAKE_RESPONSE:
@@ -341,16 +341,13 @@ namespace galera
                     {
                     case Ctrl::C_EOF:
                         gu_throw_error(EINTR) << "interrupted by ctrl";
-                        throw;
                     default:
                         gu_throw_error(EPROTO) << "unexpected ctrl code: "
                                                << msg.ctrl();
-                        throw;
                     }
                 default:
                     gu_throw_error(EINVAL) << "unexpected message type: "
                                            << msg.type();
-                    throw;
                 }
             }
 
@@ -387,7 +384,6 @@ namespace galera
                 default:
                     gu_throw_error(EPROTO) << "unexpected message type: "
                                            << msg.type();
-                    throw;
                 }
                 return msg.ctrl();
             }
@@ -549,21 +545,17 @@ namespace galera
                         {
                             gu_throw_error(EPROTO)
                                 << "unexpected ctrl code: " << msg.ctrl();
-                            throw;
                         }
                         else
                         {
                             gu_throw_error(-msg.ctrl()) << "peer reported error";
-                            throw;
                         }
                     }
                 default:
                     gu_throw_error(EPROTO) << "unexpected message type: "
                                            << msg.type();
-                    throw;
                 }
                 gu_throw_fatal;
-                throw;
             }
 
         private:

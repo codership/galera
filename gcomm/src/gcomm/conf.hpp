@@ -423,7 +423,6 @@ namespace gcomm
                                         const T* default_value = 0,
                                         const T* min_value = 0,
                                         const T* max_value = 0)
-        throw (gu::Exception)
     {
         T ret;
         try

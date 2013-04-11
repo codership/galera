@@ -823,7 +823,6 @@ std::string gcomm::AsioTcpAcceptor::listen_addr() const
         gu_throw_error(e.code().value())
             << "failed to read listen addr "
             << "', asio error '" << e.what() << "'";
-        throw;
     }
 }
 

@@ -13,7 +13,7 @@
 namespace gu {
 
 bool
-_to_bool (const std::string& s) throw(NotFound)
+_to_bool (const std::string& s)
 {
     std::istringstream iss(s);
     bool               ret;

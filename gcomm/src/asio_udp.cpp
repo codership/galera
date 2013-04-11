@@ -23,7 +23,6 @@ static bool is_multicast(const asio::ip::udp::endpoint& ep)
         return ep.address().to_v6().is_multicast();
     }
     gu_throw_fatal;
-    throw;
 }
 
 static void join_group(asio::ip::udp::socket& socket,

@@ -13,7 +13,6 @@
 size_t gcomm::ViewId::unserialize(const gu::byte_t* buf,
                                   const size_t buflen,
                                   const size_t offset)
-    throw (gu::Exception)
 {
     size_t off;
 
@@ -27,8 +26,7 @@ size_t gcomm::ViewId::unserialize(const gu::byte_t* buf,
 
 size_t gcomm::ViewId::serialize(gu::byte_t* buf,
                                 const size_t buflen,
-                                const size_t offset)
-    const throw (gu::Exception)
+                                const size_t offset) const
 {
     size_t off;
 
@@ -51,7 +49,7 @@ static std::string to_string(const gcomm::ViewType type)
     case gcomm::V_PRIM:     return "PRIM";
     default:
         return "UNKNOWN";
-        // gcomm_throw_fatal << "Invalid type value"; throw;
+        // gcomm_throw_fatal << "Invalid type value";
     }
 }
 
@@ -156,7 +154,6 @@ bool gcomm::operator==(const gcomm::View& a, const gcomm::View& b)
 
 size_t gcomm::View::unserialize(const gu::byte_t* buf, const size_t buflen,
                                 size_t offset)
-    throw (gu::Exception)
 {
     gu_trace (offset = view_id_.unserialize    (buf, buflen, offset));
     gu_trace (offset = members_.unserialize    (buf, buflen, offset));
@@ -169,7 +166,6 @@ size_t gcomm::View::unserialize(const gu::byte_t* buf, const size_t buflen,
 
 size_t gcomm::View::serialize(gu::byte_t* buf, const size_t buflen,
                               size_t offset) const
-    throw (gu::Exception)
 {
     gu_trace (offset = view_id_.serialize    (buf, buflen, offset));
     gu_trace (offset = members_.serialize    (buf, buflen, offset));
