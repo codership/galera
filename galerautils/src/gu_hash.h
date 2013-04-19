@@ -105,7 +105,7 @@ gu_fast_hash64 (const void* const msg, size_t const len)
 #define GU_SHORT32_LIMIT  32
 #define GU_MEDIUM32_LIMIT 512
 
-static GU_INLINE uint64_t
+static GU_INLINE uint32_t
 gu_fast_hash32 (const void* const msg, size_t const len)
 {
     if (len < GU_SHORT32_LIMIT)

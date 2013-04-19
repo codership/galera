@@ -12,7 +12,7 @@
 #ifndef _gu_uuid_h_
 #define _gu_uuid_h_
 
-#include <stdint.h>
+#include "gu_types.h"
 
 #ifdef __cplusplus
 extern "C" {
