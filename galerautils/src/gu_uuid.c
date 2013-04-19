@@ -130,8 +130,8 @@ gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
                 UUID_NODE_LEN : node_len);
     } else {
         uuid_fill_node (&uuid->data[10], UUID_NODE_LEN);
+        uuid->data[10] |= 0x02; /* mark as "locally administered" */
     }
-    uuid->data[10] |= 0x02; /* mark as "locally administered" */
 
     return;
 }
