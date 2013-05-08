@@ -44,6 +44,7 @@ namespace gcomm
         bool set_param(const std::string& key, const std::string& val);
         // Transport interface
         const UUID& uuid() const { return my_uuid_; }
+        SegmentId segment() const { return segment_; }
         void connect();
         void connect(const gu::URI&);
         void close(bool force = false);

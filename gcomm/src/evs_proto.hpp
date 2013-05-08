@@ -91,6 +91,7 @@ public:
      */
     Proto(gu::Config&    conf,
           const UUID&    my_uuid,
+          SegmentId      segment,
           const gu::URI& uri = gu::URI("evs://"),
           const size_t   mtu = std::numeric_limits<size_t>::max());
     ~Proto();

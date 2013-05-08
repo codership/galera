@@ -205,7 +205,7 @@ START_TEST(test_pc_view_changes_single)
     log_info << "START (test_pc_view_changes_single)";
     gu::Config conf;
     UUID uuid1(0, 0);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -398,14 +398,14 @@ START_TEST(test_pc_view_changes_double)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
 
@@ -467,14 +467,14 @@ START_TEST(test_pc_view_changes_reverse)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
 
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
 
@@ -491,14 +491,14 @@ START_TEST(test_pc_state1)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
 
@@ -629,14 +629,14 @@ START_TEST(test_pc_state2)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
 
@@ -751,14 +751,14 @@ START_TEST(test_pc_state3)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
 
@@ -875,14 +875,14 @@ START_TEST(test_pc_conflicting_prims)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2);
+    Proto pc2(conf, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
@@ -948,14 +948,14 @@ START_TEST(test_pc_conflicting_prims_npvo)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1, URI("pc://?pc.npvo=true"));
+    Proto pc1(conf, uuid1, 0, URI("pc://?pc.npvo=true"));
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf, uuid2, URI("pc://?pc.npvo=true"));
+    Proto pc2(conf, uuid2, 0, URI("pc://?pc.npvo=true"));
     DummyTransport tp2;
     PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
@@ -1064,8 +1064,8 @@ static DummyNode* create_dummy_node(size_t idx,
     {
         UUID uuid(static_cast<int32_t>(idx));
         protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new evs::Proto(gu_conf, uuid, conf));
-        protos.push_back(new Proto(gu_conf, uuid, conf));
+        protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
+        protos.push_back(new Proto(gu_conf, uuid, 0, conf));
         return new DummyNode(gu_conf, idx, protos);
     }
     catch (...)
@@ -1420,7 +1420,7 @@ START_TEST(test_trac_191)
     log_info << "START (test_trac_191)";
     gu::Config conf;
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
-    Proto p(conf, uuid4);
+    Proto p(conf, uuid4, 0);
     DummyTransport tp(uuid4, true);
     // gcomm::connect(&tp, &p);
     PCUser pu(conf, uuid4, &tp, &p);
@@ -1466,7 +1466,7 @@ START_TEST(test_trac_413)
         TN(gu::Config conf, const UUID& uuid)
             :
             Toplay(conf),
-            p_(conf, uuid),
+            p_(conf, uuid, 0),
             tp_(uuid, true)
         {
             gcomm::connect(&tp_, &p_);
@@ -1641,7 +1641,7 @@ START_TEST(test_fifo_violation)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -1674,7 +1674,7 @@ START_TEST(test_checksum)
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf, uuid1);
+    Proto pc1(conf, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -1997,7 +1997,7 @@ START_TEST(test_weighted_partitioning_1)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
     single_boot(&pu3);
@@ -2006,7 +2006,7 @@ START_TEST(test_weighted_partitioning_1)
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2016,7 +2016,7 @@ START_TEST(test_weighted_partitioning_1)
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
 
@@ -2151,7 +2151,7 @@ START_TEST(test_weighted_partitioning_2)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
     single_boot(&pu3);
@@ -2160,7 +2160,7 @@ START_TEST(test_weighted_partitioning_2)
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2170,7 +2170,7 @@ START_TEST(test_weighted_partitioning_2)
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
 
@@ -2335,7 +2335,7 @@ START_TEST(test_weight_change_partitioning_1)
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -2344,7 +2344,7 @@ START_TEST(test_weight_change_partitioning_1)
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2354,7 +2354,7 @@ START_TEST(test_weight_change_partitioning_1)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
 
@@ -2460,7 +2460,7 @@ START_TEST(test_weight_change_partitioning_2)
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -2469,7 +2469,7 @@ START_TEST(test_weight_change_partitioning_2)
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2479,7 +2479,7 @@ START_TEST(test_weight_change_partitioning_2)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
 
@@ -2575,7 +2575,7 @@ START_TEST(test_weight_change_joining)
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -2584,7 +2584,7 @@ START_TEST(test_weight_change_joining)
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2594,7 +2594,7 @@ START_TEST(test_weight_change_joining)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
 
@@ -2710,7 +2710,7 @@ START_TEST(test_weight_change_leaving)
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(conf1, uuid1);
+    Proto pc1(conf1, uuid1, 0);
     DummyTransport tp1;
     PCUser pu1(conf1, uuid1, &tp1, &pc1);
     single_boot(&pu1);
@@ -2719,7 +2719,7 @@ START_TEST(test_weight_change_leaving)
     conf2.set("pc.weight", "2");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(conf2, uuid2);
+    Proto pc2(conf2, uuid2, 0);
     DummyTransport tp2;
     PCUser pu2(conf2, uuid2, &tp2, &pc2);
 
@@ -2729,7 +2729,7 @@ START_TEST(test_weight_change_leaving)
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
-    Proto pc3(conf3, uuid3);
+    Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
 

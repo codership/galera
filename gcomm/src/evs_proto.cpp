@@ -38,6 +38,7 @@ using namespace std::rel_ops;
 
 gcomm::evs::Proto::Proto(gu::Config&    conf,
                          const UUID&    my_uuid,
+                         SegmentId      segment,
                          const gu::URI& uri,
                          const size_t   mtu)
     :
@@ -72,7 +73,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     delivery_prof_     ("delivery"),
     delivering_(false),
     my_uuid_(my_uuid),
-    segment_(0),
+    segment_(segment),
     known_(),
     self_i_(),
     view_forget_timeout_(
@@ -1414,6 +1415,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const MessageNode& mn(MessageNodeList::value(jm->node_list().find_checked(node_uuid)));
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    node.segment(),
                                     -1,
                                     jm->source_view_id(),
                                     (nsv == current_view_.id() ?
@@ -1428,6 +1430,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const ViewId& nsv(lm->source_view_id());
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    node.segment(),
                                     lm->seq(),
                                     nsv,
                                     (nsv == current_view_.id() ?
@@ -1441,6 +1444,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             {
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    node.segment(),
                                     -1,
                                     current_view_.id(),
                                     input_map_->safe_seq(node.index()),
@@ -1451,6 +1455,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         {
             mnode = MessageNode(true,
                                 false,
+                                node.segment(),
                                 -1,
                                 current_view_.id(),
                                 input_map_->safe_seq(node.index()),

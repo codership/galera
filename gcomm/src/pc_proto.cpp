@@ -206,16 +206,17 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
 {
     View v(pc_view_.id(), bootstrap);
 
-    v.add_members(current_view_.members().begin(),
-                  current_view_.members().end());
-
     for (NodeMap::const_iterator i = instances_.begin();
          i != instances_.end(); ++i)
     {
         if (current_view_.members().find(NodeMap::key(i)) ==
             current_view_.members().end())
         {
-            v.add_partitioned(NodeMap::key(i), 0);
+            v.add_partitioned(NodeMap::key(i), NodeMap::value(i).segment());
+        }
+        else
+        {
+            v.add_member(NodeMap::key(i), NodeMap::value(i).segment());
         }
     }
 
@@ -234,12 +235,10 @@ void gcomm::pc::Proto::mark_non_prim()
     {
         const UUID& uuid(NodeMap::key(i));
         Node& inst(NodeMap::value(i));
-        NodeList::const_iterator nli;
-        if ((nli = current_view_.members().find(uuid)) !=
-            current_view_.members().end())
+        if (current_view_.members().find(uuid) != current_view_.members().end())
         {
             inst.set_prim(false);
-            pc_view_.add_member(uuid, NodeList::value(nli).segment());
+            pc_view_.add_member(uuid, inst.segment());
         }
     }
 
@@ -299,7 +298,7 @@ void gcomm::pc::Proto::shift_to(const State s)
                 inst.set_last_prim(ViewId(V_PRIM, current_view_.id()));
                 inst.set_last_seq(0);
                 inst.set_to_seq(to_seq());
-                pc_view_.add_member(uuid, NodeList::value(nli).segment());
+                pc_view_.add_member(uuid, inst.segment());
             }
             else
             {

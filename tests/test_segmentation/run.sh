@@ -82,10 +82,8 @@ function test_run
 
         MYSQL="mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD"
 
-        $TEST_BASE/scripts/command.sh install $PKG
-        $TEST_BASE/scripts/command.sh restart
 
-        for node in `seq 0 $(($ii - 1))`
+        for node in `seq 1 $ii`
         do
             provider_options="evs.send_window=16; evs.user_send_window=8; "
             if [ $segmentation != 0 ]
@@ -94,52 +92,52 @@ function test_run
             else
                 provider_options="$provider_options gmcast.segment=0"
             fi
-            echo $MYSQL -h${NODE_INCOMING_HOST[$node]} \
-                -P${NODE_INCOMING_PORT[$node]} \
-                -e "SET GLOBAL wsrep_provider_options='$provider_options'"
-
-            $MYSQL -h${NODE_INCOMING_HOST[$node]} \
-                -P${NODE_INCOMING_PORT[$node]} \
-                -e "SET GLOBAL wsrep_provider_options='$provider_options'"
+            echo "wsrep_provider_options='"$provider_options"'" \
+                > $TEST_BASE/conf/my.cnf.$node
         done
 
-        # create table which will easily fit in memory
-        SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
-        LD_PRELOAD=$GLB_PRELOAD \
-            $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
-            --host $DBMS_HOST \
-            --port $DBMS_PORT --users $DBMS_CLIENTS --duration 0 \
-            --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
-            --rollbacks 0.1 --ac-frac 100 --create 1 --tables 1 --rows 1000
+        $TEST_BASE/scripts/command.sh install $PKG
+        $TEST_BASE/scripts/command.sh restart
+
+        SKIP_LOAD=1
+        if test $SKIP_LOAD == 0
+        then
+         # create table which will easily fit in memory
+            SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
+            LD_PRELOAD=$GLB_PRELOAD \
+                $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
+                --host $DBMS_HOST \
+                --port $DBMS_PORT --users $DBMS_CLIENTS --duration 0 \
+                --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
+                --rollbacks 0.1 --ac-frac 100 --create 1 --tables 1 --rows 1000
 
         # warm up for a minute
-        LD_PRELOAD=$GLB_PRELOAD \
-            $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
-            --host $DBMS_HOST \
-            --port $DBMS_PORT --users $DBMS_CLIENTS --duration 60 \
-            --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
-            --rollbacks 0.1 --ac-frac 100 --create 0 --tables 1 --rows 1000 \
-            --users $(($ii * 3))
+            LD_PRELOAD=$GLB_PRELOAD \
+                $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
+                --host $DBMS_HOST \
+                --port $DBMS_PORT --users $DBMS_CLIENTS --duration 60 \
+                --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
+                --rollbacks 0.1 --ac-frac 100 --create 0 --tables 1 --rows 1000 \
+                --users $(($ii * 3))
 
         # real run
-        pre_stats=`get_stats`
-        sqlgen_stats=`LD_PRELOAD=$GLB_PRELOAD \
-            $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
-            --host $DBMS_HOST \
-            --port $DBMS_PORT --users $DBMS_CLIENTS --duration 300 \
-            --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
-            --rollbacks 0.1 --ac-frac 100 --create 0 --tables 1 --rows 1000 \
-            --updates 100 --inserts 0 --selects 0 \
-            --users $(($ii * $USERS_PER_NODE)) | tail -n 1`
+            pre_stats=`get_stats`
+            sqlgen_stats=`LD_PRELOAD=$GLB_PRELOAD \
+                $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD \
+                --host $DBMS_HOST \
+                --port $DBMS_PORT --users $DBMS_CLIENTS --duration 300 \
+                --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
+                --rollbacks 0.1 --ac-frac 100 --create 0 --tables 1 --rows 1000 \
+                --updates 100 --inserts 0 --selects 0 \
+                --users $(($ii * $USERS_PER_NODE)) | tail -n 1`
 
-        echo "$sqlgen_stats"
-        sqlgen_stats=`echo $sqlgen_stats | awk '{print $4;}'`
-        post_stats=`get_stats`
-
+            echo "$sqlgen_stats"
+            sqlgen_stats=`echo $sqlgen_stats | awk '{print $4;}'`
+            post_stats=`get_stats`
+            echo "$ii $sqlgen_stats $(($post_stats - $pre_stats)) $((($post_stats - $pre_stats)/$sqlgen_stats))" >> $out
+        fi
 
         $TEST_BASE/scripts/command.sh stop
-
-        echo "$ii $sqlgen_stats $(($post_stats - $pre_stats)) $((($post_stats - $pre_stats)/$sqlgen_stats))" >> $out
     )
     done
 }
