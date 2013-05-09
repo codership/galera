@@ -1,12 +1,10 @@
 #!/bin/bash -e
 #
+# WARNING: This script overwrites files under $TEST_BASE/conf (form of
+# my.cnf.<number>),
+#
 # Script to measure inter-segment network traffic with and without
 # segmentation.
-#
-# Original use of this script used the setup with three virtual machines
-# test1, test2, test3 with dedicated interface eth1 for group communication.
-# Test iterated over 3, 6 and 9 node setups described with corresponding
-# node.conf.[3,6,9] files under $TEST_BASE/conf directory.
 #
 # Each test iteration involves installing demo package, starting the cluster,
 # creating database with single table of 1000 rows, 1 min warmup stage
@@ -99,7 +97,7 @@ function test_run
         $TEST_BASE/scripts/command.sh install $PKG
         $TEST_BASE/scripts/command.sh restart
 
-        SKIP_LOAD=1
+        SKIP_LOAD=0
         if test $SKIP_LOAD == 0
         then
          # create table which will easily fit in memory
