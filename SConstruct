@@ -99,6 +99,8 @@ else:
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
+tests      = int(ARGUMENTS.get('tests', 1))
+strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 GALERA_VER = ARGUMENTS.get('version', '3.0dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
@@ -113,10 +115,10 @@ Export('LIBBOOST_PROGRAM_OPTIONS_A')
 # Set up and export default build environment
 #
 
-env = DefaultEnvironment()
+env = Environment(ENV = {'PATH' : os.environ['PATH'], 'HOME' : os.environ['HOME']})
 
 # Set up environment for ccache and distcc
-env['ENV']['HOME']          = os.environ['HOME']
+# env['ENV']['HOME']          = os.environ['HOME']
 #env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
 #env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
 
@@ -131,11 +133,18 @@ link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
 
+# Initialize CPPFLAGS and LIBPATH from environment to get user preferences
+env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
+env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
+
 # Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd' or sysname == 'sunos':
     env.Append(LIBPATH  = ['/usr/local/lib'])
-    env.Append(CPPFLAGS = ' -I/usr/local/include')
+    env.Append(CPPFLAGS = ' -I/usr/local/include ')
+if sysname == 'sunos':
+   env.Replace(SHLINKFLAGS = '-shared ')
 
+# print env.Dump()
 #
 # Set up build and link paths
 # 
@@ -293,10 +302,12 @@ if ssl == 1:
         Exit(1)
 
 # these will be used only with our softaware
-conf.env.Append(CCFLAGS  = ' -pedantic')
-conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+if strict_build_flags == 1:
+   conf.env.Append(CCFLAGS  = ' -pedantic')
+   conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
+Export('env')
 
 #
 # Set up and export environment for check unit tests
@@ -333,8 +344,15 @@ def builder_unit_test(target, source, env):
         open(str(target[0]),'w').write("PASSED\n")
     else:
         return 1
+
+def builder_unit_test_dummy(target, source, env):
+    return 0
+
 # Create a builder for tests
-bld = Builder(action = builder_unit_test)
+if tests == 1:
+    bld = Builder(action = builder_unit_test)
+else:
+    bld = Builder(action = builder_unit_test_dummy) 
 check_env.Append(BUILDERS = {'Test' :  bld})
 
 Export('check_env')

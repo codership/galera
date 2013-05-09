@@ -75,7 +75,7 @@ namespace gcache
     void
     MMap::dont_need() const
     {
-        if (madvise(reinterpret_cast<char*>(ptr), size, MADV_DONTNEED))
+        if (posix_madvise(reinterpret_cast<char*>(ptr), size, MADV_DONTNEED))
         {
             log_warn << "Failed to set MADV_DONTNEED on " << ptr << ": "
                      << errno << " (" << strerror(errno) << ')';
