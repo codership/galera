@@ -9,6 +9,14 @@
  *
  */
 
+#include "gu_uuid.h"
+#include "gu_byteswap.h"
+#include "gu_log.h"
+#include "gu_assert.h"
+#include "gu_mutex.h"
+#include "gu_time.h"
+#include "gu_rand.h"
+
 #include <stdlib.h>   // for rand_r()
 #include <string.h>   // for memcmp()
 #include <stdio.h>    // for fopen() et al
@@ -16,13 +24,6 @@
 #include <unistd.h>   // for getpid()
 #include <errno.h>    // for errno
 #include <stddef.h>
-
-#include "gu_byteswap.h"
-#include "gu_log.h"
-#include "gu_assert.h"
-#include "gu_mutex.h"
-#include "gu_time.h"
-#include "gu_uuid.h"
 
 const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
@@ -86,19 +87,8 @@ uuid_urand_node (uint8_t* node, size_t node_len)
 static void
 uuid_rand_node (uint8_t* node, size_t node_len)
 {
-    uint64_t pid    = (uint64_t) getpid();
-    uint64_t addr1  = (uint64_t)(ptrdiff_t)node;
-    uint64_t addr2  = (uint64_t)(ptrdiff_t)&addr1;
-    uint64_t seed64 = pid ^ addr1 ^ addr2;
-    struct timeval time;
-    unsigned int   seed;
-    size_t         i;
-
-    gettimeofday (&time, NULL);
-    /* use both high and low part of struct timeval and seed64 to
-     * construct the final rand_r() seed */
-    seed = (((uint32_t)time.tv_sec) ^ ((uint32_t)time.tv_usec) ^
-           ((uint32_t)seed64)      ^ ((uint32_t)(seed64 >> 32)));
+    unsigned int seed = gu_rand_seed_int (gu_time_calendar(), node, getpid());
+    size_t       i;
 
     for (i = 0; i < node_len; i++) {
         uint32_t r = (uint32_t) rand_r (&seed);
@@ -107,7 +97,7 @@ uuid_rand_node (uint8_t* node, size_t node_len)
     }
 }
 
-static void
+static inline void
 uuid_fill_node (uint8_t* node, size_t node_len)
 {
     if (uuid_urand_node (node, node_len)) {
@@ -118,16 +108,13 @@ uuid_fill_node (uint8_t* node, size_t node_len)
 void
 gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
 {
-    uint32_t*  uuid32 = (uint32_t*) uuid->data;
-    uint16_t*  uuid16 = (uint16_t*) uuid->data;
-    uint64_t   uuid_time;
-    uint16_t   clock_seq = 0; // for possible future use
-
     assert (NULL != uuid);
     assert (NULL == node || 0 != node_len);
 
-    /* system time */
-    uuid_time = uuid_get_time ();
+    uint32_t*  uuid32 = (uint32_t*) uuid->data;
+    uint16_t*  uuid16 = (uint16_t*) uuid->data;
+    uint64_t   uuid_time = uuid_get_time ();
+    uint16_t   clock_seq = gu_rand_seed_int (uuid_time, &GU_UUID_NIL, getpid());
 
     /* time_low */
     uuid32[0] = gu_be32 (uuid_time & 0xFFFFFFFF);
@@ -136,18 +123,20 @@ gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
     /* time_high_and_version */
     uuid16[3] = gu_be16 (((uuid_time >> 48) & 0x0FFF) | (1 << 12));
     /* clock_seq_and_reserved */
-    uuid16[4] = gu_be16 ((clock_seq & 0x3FFF) | 0x0800);
+    uuid16[4] = gu_be16 ((clock_seq & 0x3FFF) | 0x8000);
     /* node */
     if (NULL != node && 0 != node_len) {
         memcpy (&uuid->data[10], node, node_len > UUID_NODE_LEN ?
                 UUID_NODE_LEN : node_len);
     } else {
         uuid_fill_node (&uuid->data[10], UUID_NODE_LEN);
+        uuid->data[10] |= 0x02; /* mark as "locally administered" */
     }
+
     return;
 }
 
-/** 
+/**
  * Compare two UUIDs
  * @return -1, 0, 1 if left is respectively less, equal or greater than right
  */
