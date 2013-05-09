@@ -1,4 +1,4 @@
-env = DefaultEnvironment()
+Import('env')
 
 libgalerautils_env = env.Clone()
 
