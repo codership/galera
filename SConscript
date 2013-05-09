@@ -5,7 +5,7 @@ SConscript(['galerautils/SConscript',
             'galera/SConscript',
             'garb/SConscript'])
 
-env = DefaultEnvironment()
+Import('env')
 
 libmmgalera_objs = env['LIBGALERA_OBJS']
 libmmgalera_objs.extend(env['LIBMMGALERA_OBJS'])

@@ -1,5 +1,5 @@
 
-env = DefaultEnvironment()
+Import('env')
 
 libgaleraxx_env = env.Clone()
 

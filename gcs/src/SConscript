@@ -1,6 +1,6 @@
 #
 
-env = DefaultEnvironment()
+Import('env')
 
 # Clone environment as we need to tune compilation flags
 libgcs_env = env.Clone()
