@@ -223,8 +223,9 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     }
     evs::UserMessage evsum;
     evs_ = new evs::Proto(pnet().conf(),
-                          uuid, uri_, gmcast_->mtu() - 2*evsum.serial_size());
-    pc_  = new pc::Proto (pnet().conf(), uuid, uri_);
+                          uuid, gmcast_->segment(),
+                          uri_, gmcast_->mtu() - 2*evsum.serial_size());
+    pc_  = new pc::Proto (pnet().conf(), uuid, gmcast_->segment(), uri_);
 
     conf_.set(Conf::PcLinger, gu::to_string(linger_));
 }

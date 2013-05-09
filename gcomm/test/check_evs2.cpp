@@ -83,7 +83,7 @@ START_TEST(test_message)
 
     MessageNodeList node_list;
     node_list.insert(make_pair(uuid1, MessageNode()));
-    node_list.insert(make_pair(UUID(2), MessageNode(true, false, 1,
+    node_list.insert(make_pair(UUID(2), MessageNode(true, false, 254, 1,
                                                     ViewId(V_REG), 5,
                                                     Range(7, 8))));
     JoinMessage jm(0, uuid1, view_id, 8, 5, 27, node_list);
@@ -457,7 +457,7 @@ START_TEST(test_proto_single_join)
     UUID uuid(1);
     DummyTransport t(uuid);
     DummyUser u(conf);
-    Proto p(conf, uuid);
+    Proto p(conf, uuid, 0);
     gcomm::connect(&t, &p);
     gcomm::connect(&p, &u);
     single_join(&t, &p);
@@ -590,7 +590,7 @@ START_TEST(test_proto_double_join)
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
     DummyUser u1(conf), u2(conf);
-    Proto p1(conf, uuid1), p2(conf, uuid2);
+    Proto p1(conf, uuid1, 0), p2(conf, uuid2, 0);
 
     gcomm::connect(&t1, &p1);
     gcomm::connect(&p1, &u1);
@@ -631,7 +631,7 @@ static DummyNode* create_dummy_node(size_t idx,
     {
         UUID uuid(static_cast<int32_t>(idx));
         protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new Proto(gu_conf, uuid, conf));
+        protos.push_back(new Proto(gu_conf, uuid, 0, conf));
         return new DummyNode(gu_conf, idx, protos);
     }
     catch (...)

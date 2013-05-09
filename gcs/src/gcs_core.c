@@ -302,7 +302,7 @@ gcs_core_send (gcs_core_t*           const conn,
 
     core_act_t*    local_act;
 
-    assert (act != NULL);
+    assert (action != NULL);
     assert (act_size > 0);
 
     /*
@@ -548,7 +548,7 @@ core_handle_act_msg (gcs_core_t*          core,
                     act->act.buf_len = local_act->action_size;
                     sent_act_id      = local_act->sent_act_id;
                     gcs_fifo_lite_pop_head (core->fifo);
-                    assert (NULL != act->repl_buf);
+                    /* assert (NULL != act->repl_buf); */
 
                     /* NOTE! local_act cannot be used after this point */
                     /* sanity check */

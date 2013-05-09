@@ -68,12 +68,15 @@ public:
            const std::string& remote_addr,
            const std::string& mcast_addr,
            const gcomm::UUID& local_uuid,
+           uint8_t            local_segment,
            const std::string& group_name)
         :
         version_(v),
         handshake_uuid_   (),
         local_uuid_       (local_uuid),
         remote_uuid_      (),
+        local_segment_    (local_segment),
+        remote_segment_   (0),
         local_addr_       (local_addr),
         remote_addr_      (remote_addr),
         mcast_addr_       (mcast_addr),
@@ -96,12 +99,15 @@ public:
     void handle_ok(const Message& hs);
     void handle_failed(const Message& hs);
     void handle_topology_change(const Message& msg);
+    void handle_keepalive(const Message& msg);
     void send_topology_change(LinkMap& um);
     void handle_message(const Message& msg);
+    void send_keepalive();
 
     const gcomm::UUID& handshake_uuid() const { return handshake_uuid_; }
     const gcomm::UUID& local_uuid() const { return local_uuid_; }
     const gcomm::UUID& remote_uuid() const { return remote_uuid_; }
+    uint8_t remote_segment() const { return remote_segment_; }
 
     SocketPtr socket() const { return tp_; }
 
@@ -127,6 +133,8 @@ private:
     gcomm::UUID       handshake_uuid_;
     gcomm::UUID       local_uuid_;  // @todo: do we need it here?
     gcomm::UUID       remote_uuid_;
+    uint8_t           local_segment_;
+    uint8_t           remote_segment_;
     std::string       local_addr_;
     std::string       remote_addr_;
     std::string       mcast_addr_;
@@ -145,6 +153,8 @@ inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
     os << "v="  << p.version_ << ","
        << "lu=" << p.local_uuid_ << ","
        << "ru=" << p.remote_uuid_ << ","
+       << "ls=" << static_cast<int>(p.local_segment_) << ","
+       << "rs=" << static_cast<int>(p.remote_segment_) << ","
        << "la=" << p.local_addr_ << ","
        << "ra=" << p.remote_addr_ << ","
        << "mc=" << p.mcast_addr_ << ","

@@ -44,6 +44,7 @@ namespace gcomm
         bool set_param(const std::string& key, const std::string& val);
         // Transport interface
         const UUID& uuid() const { return my_uuid_; }
+        SegmentId segment() const { return segment_; }
         void connect();
         void connect(const gu::URI&);
         void close(bool force = false);
@@ -142,6 +143,7 @@ namespace gcomm
 
         int               version_;
         static const int  max_version_ = GCOMM_GMCAST_MAX_VERSION;
+        uint8_t           segment_;
         UUID              my_uuid_;
         bool              use_ssl_;
         std::string       group_name_;
@@ -159,8 +161,12 @@ namespace gcomm
         bool              isolate_;
 
         gmcast::ProtoMap*  proto_map_;
-        std::list<Socket*> mcast_tree_;
 
+        typedef std::vector<Socket*> Segment;
+        typedef std::map<uint8_t, Segment> SegmentMap;
+        SegmentMap segment_map_;
+        // self index in local segment when ordered by UUID
+        size_t self_index_;
         gu::datetime::Period time_wait_;
         gu::datetime::Period check_period_;
         gu::datetime::Period peer_timeout_;

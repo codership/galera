@@ -95,16 +95,22 @@ namespace gcomm
 
     std::ostream& operator<<(std::ostream&, const ViewId&);
 
-    class Node : public String<16>
+    typedef uint8_t SegmentId;
+
+    class Node
     {
     public:
-        Node(const std::string& name = "") : String<16>(name) { }
+        Node(SegmentId segment) : segment_(segment)
+        { }
+        SegmentId segment() const { return segment_; }
         bool operator==(const Node& cmp) const { return true; }
+    private:
+        SegmentId segment_;
     };
 
     inline std::ostream& operator<<(std::ostream& os, const Node& n)
     {
-        return (os << "");
+        return (os << static_cast<int>(n.segment()) );
     }
 
 
@@ -134,14 +140,14 @@ namespace gcomm
 
         ~View() {}
 
-        void add_member  (const UUID& pid, const std::string& name = "");
+        void add_member  (const UUID& pid, SegmentId segment);
 
         void add_members (NodeList::const_iterator begin,
                           NodeList::const_iterator end);
 
-        void add_joined      (const UUID& pid, const std::string& name);
-        void add_left        (const UUID& pid, const std::string& name);
-        void add_partitioned (const UUID& pid, const std::string& name);
+        void add_joined      (const UUID& pid, SegmentId segment);
+        void add_left        (const UUID& pid, SegmentId segment);
+        void add_partitioned (const UUID& pid, SegmentId segment);
 
         const NodeList& members     () const;
         const NodeList& joined      () const;
@@ -169,13 +175,6 @@ namespace gcomm
 
         bool is_empty() const;
         bool is_bootstrap() const { return bootstrap_; }
-
-        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
-
-        size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
-
-        size_t serial_size() const;
-
 
     private:
         bool     bootstrap_;   // Flag indicating if view was bootstrapped

@@ -29,7 +29,11 @@ public:
         F_NODE_ADDRESS   = 1 << 2,
         F_NODE_LIST      = 1 << 3,
         F_HANDSHAKE_UUID = 1 << 4,
-        F_RELAY          = 1 << 5
+        // relay message to all peers in the same segment (excluding source)
+        // and to all other segments except source segment
+        F_RELAY          = 1 << 5,
+        // relay message to all peers in the same segment
+        F_SEGMENT_RELAY  = 1 << 6
     };
 
     enum Type
@@ -37,9 +41,10 @@ public:
         T_INVALID            = 0,
         T_HANDSHAKE          = 1,
         T_HANDSHAKE_RESPONSE = 2,
-        T_HANDSHAKE_OK       = 3,
-        T_HANDSHAKE_FAIL     = 4,
+        T_OK                 = 3,
+        T_FAIL               = 4,
         T_TOPOLOGY_CHANGE    = 5,
+        T_KEEPALIVE          = 6,
         /* Leave room for future use */
         T_USER_BASE          = 8,
         T_MAX                = 255
@@ -74,7 +79,7 @@ public:
             "HANDSHAKE_OK",
             "HANDSHAKE_FAIL",
             "TOPOLOGY_CHANGE",
-            "RESERVED_6",
+            "KEEPALIVE",
             "RESERVED_7",
             "USER_BASE"
             };
@@ -110,38 +115,61 @@ public:
         node_list_      ()
     {}
 
-    /* Ctor for handshake, handshake ok and handshake fail */
+    /* Ctor for handshake */
     Message (int v,
              const Type  type,
              const UUID& handshake_uuid,
-             const UUID& source_uuid)
+             const UUID& source_uuid,
+             uint8_t     segment_id)
         :
         version_        (v),
         type_           (type),
         flags_          (F_HANDSHAKE_UUID),
-        segment_id_     (0),
+        segment_id_     (segment_id),
         handshake_uuid_ (handshake_uuid),
         source_uuid_    (source_uuid),
         node_address_   (),
         group_name_     (),
         node_list_      ()
     {
-        if (type_ != T_HANDSHAKE && type_ != T_HANDSHAKE_OK &&
-            type_ != T_HANDSHAKE_FAIL)
+        if (type_ != T_HANDSHAKE)
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
-                              << " in handshake constructor";
+                           << " in handshake constructor";
     }
+
+    /* ok, fail and keepalive */
+    Message (int v,
+             const Type  type,
+             const UUID& source_uuid,
+             uint8_t     segment_id)
+        :
+        version_        (v),
+        type_           (type),
+        flags_          (),
+        segment_id_     (segment_id),
+        handshake_uuid_ (),
+        source_uuid_    (source_uuid),
+        node_address_   (),
+        group_name_     (),
+        node_list_      ()
+    {
+        if (type_ != T_OK && type_ != T_FAIL && type_ != T_KEEPALIVE)
+            gu_throw_fatal << "Invalid message type " << type_to_string(type_)
+                              << " in ok/fail/keepalive constructor";
+    }
+
 
     /* Ctor for user message */
     Message (int v,
              const Type    type,
              const UUID&   source_uuid,
-             const int     ttl)
+             const int     ttl,
+             uint8_t       segment)
         :
         version_        (v),
         type_           (type),
         flags_          (0),
-        segment_id_     (0),
+        segment_id_     (segment),
         handshake_uuid_ (),
         source_uuid_    (source_uuid),
         node_address_   (),
@@ -159,12 +187,13 @@ public:
              const gcomm::UUID& handshake_uuid,
              const gcomm::UUID& source_uuid,
              const std::string& node_address,
-             const std::string& group_name)
+             const std::string& group_name,
+             uint8_t            segment_id)
         :
         version_        (v),
         type_           (type),
         flags_          (F_GROUP_NAME | F_NODE_ADDRESS | F_HANDSHAKE_UUID),
-        segment_id_     (0),
+        segment_id_     (segment_id),
         handshake_uuid_ (handshake_uuid),
         source_uuid_    (source_uuid),
         node_address_   (node_address),
@@ -246,9 +275,10 @@ public:
         {
         case T_HANDSHAKE:
         case T_HANDSHAKE_RESPONSE:
-        case T_HANDSHAKE_OK:
-        case T_HANDSHAKE_FAIL:
+        case T_OK:
+        case T_FAIL:
         case T_TOPOLOGY_CHANGE:
+        case T_KEEPALIVE:
         case T_USER_BASE:
             break;
         default:
@@ -315,6 +345,7 @@ public:
 
     void set_flags(uint8_t f) { flags_ = f; }
     uint8_t flags()   const { return flags_;   }
+    uint8_t segment_id() const { return segment_id_; }
 
     const UUID& handshake_uuid() const { return handshake_uuid_; }
 
