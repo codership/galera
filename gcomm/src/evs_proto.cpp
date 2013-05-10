@@ -759,7 +759,8 @@ void gcomm::evs::Proto::check_inactive()
     if (last_inactive_check_ + inactive_check_period_*3 < now)
     {
         log_warn << "last inactive check more than " << inactive_check_period_*3
-                 << " ago, skipping check";
+                 << " ago (" << (now - last_inactive_check_)
+                 << "), skipping check";
         last_inactive_check_ = now;
         return;
     }
