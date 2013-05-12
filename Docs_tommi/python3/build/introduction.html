@@ -1,0 +1,239 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>1.1. Introduction &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="1. Galera Technical Description" href="technicaldescription.html" />
+    <link rel="next" title="1.2. Galera Cluster Deployment Variants" href="deploymentvariants.html" />
+    <link rel="prev" title="1. Galera Technical Description" href="technicaldescription.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="deploymentvariants.html" title="1.2. Galera Cluster Deployment Variants"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="technicaldescription.html" title="1. Galera Technical Description"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" accesskey="U">1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="introduction">
+<h1>1.1. Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p id="id1">Database replication refers to the frequent copying of data
+from one node, that is, a database on one server, to a node on
+another server. A database replication system is, in other words,
+a distributed database in which all nodes share the same level
+of information. This system is also know as a database cluster.</p>
+<p>The database client (such as a Web browser or a computer
+application) does not see the database replication system in any
+way, but experiences close to native <abbr title="DataBase Management System">DBMS</abbr>
+behavior.</p>
+<div class="section" id="replication-methods">
+<h2>1.1.1. Replication Methods<a class="headerlink" href="#replication-methods" title="Permalink to this headline">¶</a></h2>
+<p id="id2">Many database management systems replicate databases. The most
+common replication method is to create a master/slaves relationship
+between the original data set (master) and its copies (slaves).
+The master logs the updates to the data, and propagates the logs
+through a network to the slaves. The slaves, for their part, send a
+message indicating that they have received the update successfully.
+Once the master receives these messages from the slaves, it can send
+subsequent updates to the slaves. This approach is know as
+asynchronous replication, as there is a delay between the application
+of changes on the master node and the propagation of changes to
+the slave nodes.</p>
+<p>Asynchronous replication is depicted in the figure below:</p>
+<div class="figure">
+<img alt="_images/asynchronousreplication.png" src="_images/asynchronousreplication.png" />
+<p class="caption"><em>Asynchronous Replication</em></p>
+</div>
+<p>Another common replication method is to create a multi-master replication
+system, where updates can be submitted to any database node, and
+then propagated through a network to other database nodes. In other
+words, all database nodes act as masters, and no logs or update
+success indications are sent. This approach is know as synchronous
+replication, as there is no delay between the application of changes
+on the nodes.</p>
+<p>Synchronous replication is depicted in the figure below:</p>
+<div class="figure">
+<img alt="_images/synchronousreplication.png" src="_images/synchronousreplication.png" />
+<p class="caption"><em>Synchronous Replication</em></p>
+</div>
+</div>
+<div class="section" id="eager-and-lazy-replication">
+<h2>1.1.2. Eager and Lazy Replication<a class="headerlink" href="#eager-and-lazy-replication" title="Permalink to this headline">¶</a></h2>
+<p id="id3">From a more technical perspective, asynchronous and synchronous
+replication protocols differ in the way they propagate database
+transactions to other nodes in the database cluster:</p>
+<ul class="simple">
+<li>Synchronous replication uses an approach known as eager
+replication. In eager replication, the nodes keep all
+replicas synchronized by updating all replicas in a
+single transaction. In other words, when a transaction
+commits, all nodes have the same value.</li>
+<li>Asynchronous replication uses an approach known as lazy
+replication. In lazy replication, the master database
+asynchronously propagates replica updates to other
+nodes after the replicating transaction commits.
+In other words, when a transaction commits, nodes can
+have different values at least for a short while.</li>
+</ul>
+<p>Theoretically, synchronous replication has several advantages
+over asynchronous replication:</p>
+<ul class="simple">
+<li>Synchronous replication is always highly available, as:<ul>
+<li>There is no data loss when one of the nodes crashes</li>
+<li>Data replicas are always consistent</li>
+</ul>
+</li>
+<li>Transactions can be executed on all nodes in parallel</li>
+<li>Synchronous replication can guarantee causality across
+the whole cluster. For example, a <tt class="docutils literal"><span class="pre">SELECT</span> <span class="pre">S</span></tt> issued after
+transaction <tt class="docutils literal"><span class="pre">T</span></tt> will always see the effects of the
+transaction even if it were executed on another node.</li>
+</ul>
+<p>Traditionally, eager replication protocols coordinated nodes
+one operation at a time, using <em>2-phase commit</em> or distributed
+locking. In a system with <em>x</em> nodes and <em>y</em> operations, a
+throughtput of <em>z</em> transactions per second requires
+<em>x</em> × <em>y</em> × <em>z</em> messages per second. When
+the number of nodes increases, transaction response times,
+conflict probability and deadlock rates grow exponentially.
+This has led to a situation where asynchronous replication
+remains the dominant means for database performance scalability
+and availability. Widely adopted open-source databases such as
+MySQL or PostgreSQL only offer asynchronous replication
+solutions.</p>
+</div>
+<div class="section" id="solving-the-issues-in-syncronous-replication">
+<h2>1.1.3. Solving the Issues in Syncronous Replication<a class="headerlink" href="#solving-the-issues-in-syncronous-replication" title="Permalink to this headline">¶</a></h2>
+<p id="id4">To solve the problems in the traditional synchronous replication
+systems and approaches, researchers all around the world have,
+in the last couple of years, suggested alternative approaches
+to synchronous database replication. In addition to theory,
+prototype implementations have shown a lot of promise. The most
+important improvements these studies have brought about are:</p>
+<ul class="simple">
+<li><strong>Group communication</strong>—Group communication is a high
+level abstraction that defines patterns for the communication
+of database nodes to guarantee the consistency of replicated data.</li>
+<li><strong>Write sets</strong>—Write sets budle database writes into a single
+<em>writeset</em> message, thus avoiding the coordination of nodes
+one operation at a time.</li>
+<li><strong>Database State Machine</strong>—In the Database State
+Machine, read-only transactions are processed locally on a
+database site, and update transactions are first executed
+locally on a database site (on shadow copies), and then
+broadcast as a read set to the other database sites for
+certification and possibly commit.</li>
+<li><strong>Transaction Re-ordering</strong>—Transaction re-ordering
+means that we reorder the transactions before they are
+committed and broadcast to the other database sites.
+Reordering increases the number of transactions that
+successfully pass the certification test.</li>
+</ul>
+<p>Galera&#8217;s certification based replication builds on these approaches.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">1.1. Introduction</a><ul>
+<li><a class="reference internal" href="#replication-methods">1.1.1. Replication Methods</a></li>
+<li><a class="reference internal" href="#eager-and-lazy-replication">1.1.2. Eager and Lazy Replication</a></li>
+<li><a class="reference internal" href="#solving-the-issues-in-syncronous-replication">1.1.3. Solving the Issues in Syncronous Replication</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="technicaldescription.html"
+                        title="previous chapter">1. Galera Technical Description</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="deploymentvariants.html"
+                        title="next chapter">1.2. Galera Cluster Deployment Variants</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/introduction.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="deploymentvariants.html" title="1.2. Galera Cluster Deployment Variants"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="technicaldescription.html" title="1. Galera Technical Description"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" >1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

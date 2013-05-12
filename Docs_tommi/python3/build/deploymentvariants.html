@@ -1,0 +1,260 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>1.2. Galera Cluster Deployment Variants &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="1. Galera Technical Description" href="technicaldescription.html" />
+    <link rel="next" title="1.3. Galera Replication Architecture" href="architecture.html" />
+    <link rel="prev" title="1.1. Introduction" href="introduction.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="architecture.html" title="1.3. Galera Replication Architecture"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="introduction.html" title="1.1. Introduction"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" accesskey="U">1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="galera-cluster-deployment-variants">
+<h1>1.2. Galera Cluster Deployment Variants<a class="headerlink" href="#galera-cluster-deployment-variants" title="Permalink to this headline">¶</a></h1>
+<p id="id1">Galera cluster consists of nodes. We recommend that you
+have at least three nodes in your cluster. Each cluster
+node is a regular MySQL server and you convert your
+existing MySQL server into a node and use that server
+as the cluster base.</p>
+<p>Due to its synchronous multi-master qualities, Galera
+cluster can be seen as a single server listening at many
+interfaces. To give you an idea of what Galera is capable
+of, we will consider a typical N-tier application and
+discuss different benefits and drawbacks of deploying
+Galera cluster in that context.</p>
+<div class="section" id="no-clustering">
+<h2>1.2.1. No Clustering<a class="headerlink" href="#no-clustering" title="Permalink to this headline">¶</a></h2>
+<p>The figure below depicts an N-tier application cluster without
+clustering. Since the upper tiers are usually stateless, you can
+start up as many instances as necessary without any concern for
+synchronization; the instances store their data in the data tier.</p>
+<p>This is a simple and easy-to-manage solution. However, the
+<abbr title="Database Management System">DBMS</abbr> server at the data tier
+is a <abbr title="Single Point Of Failure">SPoF</abbr> and a performance
+bottleneck.</p>
+<div class="figure">
+<img alt="_images/galerausecases0.png" src="_images/galerausecases0.png" />
+<p class="caption"><em>No Clustering</em></p>
+</div>
+</div>
+<div class="section" id="whole-stack-cluster">
+<h2>1.2.2. Whole Stack Cluster<a class="headerlink" href="#whole-stack-cluster" title="Permalink to this headline">¶</a></h2>
+<p>The figure below depicts an N-tier application cluster using
+whole stack clustering, where each stack has a dedicated
+database server.</p>
+<div class="figure">
+<img alt="_images/galerausecases1.png" src="_images/galerausecases1.png" />
+<p class="caption"><em>Whole Stack Cluster</em></p>
+</div>
+<p>This is a simple and easy-to-manage solution, especially if you
+can install the whole stack in one physical machine. Due to the
+direct connection from the application tier to the
+<abbr title="Database Management System">DBMS</abbr>, the solution has
+low latencies.</p>
+<p>Whole stack clustering has the following drawbacks:</p>
+<ul class="simple">
+<li><abbr title="Database Management System">DBMS</abbr> failure fails
+the whole stack.</li>
+<li>Inefficient resource usage:<ul>
+<li>Having a dedicated database server for each application
+stack is overuse.</li>
+<li>Poor resource consolidation. One server with a 7Gb buffer
+pool is much faster than two servers with 4Gb buffer pools.</li>
+</ul>
+</li>
+<li>Increased unproductive overhead: each server duplicates the work of others.</li>
+<li>Increased rollback rate due to cluster-wide conflicts.</li>
+<li>Inflexibility. There is no way to limit the number of master nodes,
+or perform intelligent load-balancing.</li>
+</ul>
+<p>Despite a long list of drawbacks, this setup can be usable
+for several applications.</p>
+</div>
+<div class="section" id="dbms-tier-cluster">
+<h2>1.2.3. DBMS-tier Cluster<a class="headerlink" href="#dbms-tier-cluster" title="Permalink to this headline">¶</a></h2>
+<p>To address the shortcomings of the whole stack cluster scheme,
+we can cluster the data tier separately and present it to the
+application as a single virtual server. The figure below depicts
+this solution.</p>
+<div class="figure">
+<img alt="_images/galerausecases2.png" src="_images/galerausecases2.png" />
+<p class="caption"><em>DBMS-tier Cluster</em></p>
+</div>
+<p>In this solution, the failure of one node does not affect the
+rest of the cluster. Furthermore, resources are consolidated
+better and the setup is flexible: nodes can be assigned different
+roles by using intelligent load balancing.</p>
+<p>DBMS-tier clustering has the following drawbacks:</p>
+<ul class="simple">
+<li>The structure is complex. A load balancer is involved and it
+must be backed up in case of failures. This typically means
+that you must have two more servers and a failover solutions
+between them.</li>
+<li>Management is more complex. The load balancer must be
+configured and reconfigured, when a <abbr title="Database Management System">DBMS</abbr>
+node is added to or removed from the cluster.</li>
+<li>Connections to the <abbr title="Database Management System">DBMS</abbr>
+servers are not direct. If you place a proxy between the application
+and the server, you end up with increased latencies for each query.
+This can easily become a performance bottleneck (load-balancing
+servers should be very powerful).</li>
+<li>An attempt to spread this setup over several datacenters may
+cancel resource consolidation benefits, as each datacenter will
+have to have at least two <abbr title="Database Management System">DBMS</abbr> servers.</li>
+</ul>
+<div class="section" id="dbms-tier-cluster-with-distributed-load-balancing">
+<h3>1.2.3.1. DBMS-tier Cluster with Distributed Load Balancing<a class="headerlink" href="#dbms-tier-cluster-with-distributed-load-balancing" title="Permalink to this headline">¶</a></h3>
+<p>We can improve the DBMS-tier cluster by placing a dedicated load
+balancer on each application server. The figure below depicts
+this solution.</p>
+<div class="figure">
+<img alt="_images/galerausecases3.png" src="_images/galerausecases3.png" />
+<p class="caption"><em>DBMS-tier Cluster with Distributed Load Balancing</em></p>
+</div>
+<p>In DBMS-tier cluster with distributed load balancing the load
+balancer is no longer a single point of failure. Furthermore,
+the load balancer scales with the application cluster and is
+unlikely to become a bottlenecks. Finally, the client-server
+communication latencies are lower.</p>
+<p>DBMS-tier clustering with distributed load balancing has
+the following drawbacks:</p>
+<ul class="simple">
+<li>There are N load balancers to manage and reconfigure when
+the database cluster configuration changes.</li>
+</ul>
+</div>
+<div class="section" id="aggregated-stack-cluster">
+<h3>1.2.3.2. Aggregated Stack Cluster<a class="headerlink" href="#aggregated-stack-cluster" title="Permalink to this headline">¶</a></h3>
+<p>We can also create a hybrid setup where we can aggregate several
+application stacks to use a single <abbr title="Database Management System">DBMS</abbr>
+server. The figure below depicts
+this solution.</p>
+<div class="figure">
+<img alt="_images/galerausecases4.png" src="_images/galerausecases4.png" />
+<p class="caption"><em>DBMS-tier Cluster with Distributed Load Balancing</em></p>
+</div>
+<p>This solution improves the resource utilization of the whole
+stack cluster and still maintains its relative simplicity and
+direct DBMS connections benefits. This is how a DBMS-tier cluster
+with distributed load balancing would look like, if we only use
+one <abbr title="Database Management System">DBMS</abbr> node per datacenter.
+This can be a good setup for sites, which are not very big, but
+still are hosted at more than one datacenter.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">1.2. Galera Cluster Deployment Variants</a><ul>
+<li><a class="reference internal" href="#no-clustering">1.2.1. No Clustering</a></li>
+<li><a class="reference internal" href="#whole-stack-cluster">1.2.2. Whole Stack Cluster</a></li>
+<li><a class="reference internal" href="#dbms-tier-cluster">1.2.3. DBMS-tier Cluster</a><ul>
+<li><a class="reference internal" href="#dbms-tier-cluster-with-distributed-load-balancing">1.2.3.1. DBMS-tier Cluster with Distributed Load Balancing</a></li>
+<li><a class="reference internal" href="#aggregated-stack-cluster">1.2.3.2. Aggregated Stack Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="introduction.html"
+                        title="previous chapter">1.1. Introduction</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="architecture.html"
+                        title="next chapter">1.3. Galera Replication Architecture</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/deploymentvariants.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="architecture.html" title="1.3. Galera Replication Architecture"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="introduction.html" title="1.1. Introduction"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" >1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

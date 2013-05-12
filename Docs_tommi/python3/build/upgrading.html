@@ -1,0 +1,264 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>3.6. Upgrading Galera Cluster &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="3. Administration Guide" href="userguide.html" />
+    <link rel="next" title="4. Reference" href="reference.html" />
+    <link rel="prev" title="3.5. Firewall Settings" href="firewallsettings.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="reference.html" title="4. Reference"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="firewallsettings.html" title="3.5. Firewall Settings"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" accesskey="U">3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="upgrading-galera-cluster">
+<h1>3.6. Upgrading Galera Cluster<a class="headerlink" href="#upgrading-galera-cluster" title="Permalink to this headline">¶</a></h1>
+<p id="id1">This chapter describes three different ways to upgrade Galera cluster
+software.</p>
+<div class="section" id="rolling-upgrade">
+<h2>3.6.1. Rolling Upgrade<a class="headerlink" href="#rolling-upgrade" title="Permalink to this headline">¶</a></h2>
+<p id="id2">You can carry out a rolling upgrade on a Galera cluster by applying
+the following steps on each cluster node:</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Transfer all clients connections from the node
+to be upgraded to the another nodes for the time
+of migration.</p>
+</div>
+<ol class="arabic simple">
+<li>Shutdown the node</li>
+<li>Upgrade the software</li>
+<li>Retart the node</li>
+<li>Wait until the node gets synchronized with the cluster</li>
+</ol>
+<div class="admonition tip">
+<p class="first admonition-title">Tip</p>
+<p class="last">If the upgraded node has been or will be part of a
+weighted quorum, set the initial node weight to zero.
+In this way, it can be guaranteed that if the joining
+node fails before it gets synchronized, it does not
+have effect in the quorum computation that follows.</p>
+</div>
+<p>The main advantage of a rolling upgrade is that if something goes
+wrong with the upgrade, the other nodes are still operational and
+you have time to troubleshoot the problem.</p>
+<p>However, rolling upgrade has some issues which deserve consideration:</p>
+<ul class="simple">
+<li>Upgrading an individual node can take some time, during
+which the cluster operates at a lower capacity:<ul>
+<li>Unless incremental state transfer is used, the node resorts to
+full state snapshot transfer, which can take a long time depending
+on the database size and state transfer method.</li>
+<li>During that time, the node will accumulate a very long catch-up
+replication event queue, which it will have to replay to get
+synchronized with the cluster. At the same time, the cluster
+adds more and more events to the queue.</li>
+</ul>
+</li>
+<li>Unless xtrabackup or rsync+LVM state transfer methods are used,
+the state snapshot donor node will be also blocked for the duration
+of the state transfer. Xtrabackup or rsync+LVM state transfer do not
+block the donor, but may slow it down. In practice, the cluster will
+lack 2 nodes for the duration of state transfer and 1 node for the
+duration of the catch-up phase.</li>
+<li>If there are few nodes in the cluster and it operates close to
+its maximum capacity, taking out 2 nodes can lead to a situation
+where the cluster cannot serve all requests, or execution times
+may increase, making the service less available.</li>
+<li>If there are several nodes in the cluster, it would take a long
+time to upgrade the whole cluster.</li>
+<li>Depending on the load balancing mechanism, you may have to instruct
+the load balancer not to direct requests to the joining and donating
+nodes.</li>
+<li>Every time a new node is joining a cluster, cluster performance
+drops until the node buffer pool warms up. Parallel applying helps
+in this.</li>
+</ul>
+</div>
+<div class="section" id="bulk-upgrade">
+<h2>3.6.2. Bulk Upgrade<a class="headerlink" href="#bulk-upgrade" title="Permalink to this headline">¶</a></h2>
+<p id="id3">A bulk upgrade upgrades all nodes in an idle cluster to avoid
+time-consuming state transfers. Bulk upgrade produces a short
+but complete service outage. You can carry out a bulk upgrade
+on a Galera cluster as follows:</p>
+<ol class="arabic simple">
+<li>Stop all load on the cluster</li>
+<li>Shut down all the nodes</li>
+<li>Upgrade software</li>
+<li>Restart the nodes. The nodes will merge to the cluster without state transfers, in a matter of seconds.</li>
+<li>Resume the load on the cluster</li>
+</ol>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">You can carry out steps 2-3-4 on all nodes in parallel,
+therefore reducing the service outage time to virtually
+the time needed for a single server restart.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Always use this method for a two-node cluster upgrade, as
+the rolling upgrade would result in a much longer service
+outage.</p>
+</div>
+<p>The main advantage of the bulk upgrade is that, for huge databases, it
+is faster and results in better availability than the rolling upgrade.
+The main drawback of the bulk upgrade is that it relies on the upgrade
+and the restart will be quick. However shutting down an InnoDB may take
+up a few minutes (as it flushes dirty pages), and if something goes wrong
+during the upgrade, there is hardly any time to troubleshoot and fix the
+problem. Therefore, do not upgrade all nodes at once, but try it first
+on a single node.</p>
+</div>
+<div class="section" id="provider-only-upgrade">
+<h2>3.6.3. Provider-only Upgrade<a class="headerlink" href="#provider-only-upgrade" title="Permalink to this headline">¶</a></h2>
+<p id="id4">If only a Galera provider upgrade is required, the bulk upgrade can
+be further optimized to only take a few seconds. The following is an
+example for a 64-bit CentOS (or RHEL):</p>
+<ol class="arabic simple">
+<li>Issue the commands below on every node:</li>
+</ol>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># rpm -e galera</span>
+<span class="c"># rpm -i &lt;new galera rpm&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>Stop all load on the cluster</li>
+<li>Issue the commands below on every node:</li>
+</ol>
+<div class="highlight-python"><pre>mysql&gt; SET GLOBAL wsrep_provider='none';
+mysql&gt; SET GLOBAL wsrep_provider='/usr/lib64/galera/libgalera_smm.so';</pre>
+</div>
+<ol class="arabic simple" start="4">
+<li>Issue the command below on node 1 (or any node):</li>
+</ol>
+<div class="highlight-python"><pre>mysql&gt; SET GLOBAL wsrep_cluster_address='gcomm://'</pre>
+</div>
+<ol class="arabic simple" start="5">
+<li>Issue the command below on the other nodes:</li>
+</ol>
+<div class="highlight-python"><pre>mysql&gt; SET GLOBAL wsrep_cluster_address='gcomm://node1'</pre>
+</div>
+<ol class="arabic simple" start="6">
+<li>Resume the load on the cluster</li>
+</ol>
+<p>Reloading the provider and connecting to the cluster takes
+typically less than 10 seconds; there is virtually no service
+outage.</p>
+<div class="admonition important">
+<p class="first admonition-title">Important</p>
+<p class="last">In the provider-only upgrade, the warmed up
+InnoDB buffer pool is fully preserved and the
+cluster will continue to operate at full speed
+as soon as the load is resumed.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.6. Upgrading Galera Cluster</a><ul>
+<li><a class="reference internal" href="#rolling-upgrade">3.6.1. Rolling Upgrade</a></li>
+<li><a class="reference internal" href="#bulk-upgrade">3.6.2. Bulk Upgrade</a></li>
+<li><a class="reference internal" href="#provider-only-upgrade">3.6.3. Provider-only Upgrade</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="firewallsettings.html"
+                        title="previous chapter">3.5. Firewall Settings</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="reference.html"
+                        title="next chapter">4. Reference</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/upgrading.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="reference.html" title="4. Reference"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="firewallsettings.html" title="3.5. Firewall Settings"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" >3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

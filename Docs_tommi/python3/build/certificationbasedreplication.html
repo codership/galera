@@ -1,0 +1,169 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>1.4. Certification Based Replication &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="1. Galera Technical Description" href="technicaldescription.html" />
+    <link rel="next" title="1.5. State Snapshot Transfer" href="statetransfer.html" />
+    <link rel="prev" title="1.3. Galera Replication Architecture" href="architecture.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="statetransfer.html" title="1.5. State Snapshot Transfer"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="architecture.html" title="1.3. Galera Replication Architecture"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" accesskey="U">1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="certification-based-replication">
+<h1>1.4. Certification Based Replication<a class="headerlink" href="#certification-based-replication" title="Permalink to this headline">¶</a></h1>
+<p id="id1">Certification based replication uses group communication and
+transaction ordering techniques to achieve synchronous replication.
+Transactions execute optimistically in a single node (or replica)
+and, at commit time, run a coordinated certification process to
+enforce global consistency. Global coordination is achieved with
+the help of a broadcast service, that establishes a global total
+order among concurrent transactions.</p>
+<p>Pre-requisites for certification based replication:</p>
+<ul class="simple">
+<li>The database is transactional (that is, it can rollback
+uncommitted changes).</li>
+<li>Each replication event changes the database atomically
+(that is, the series of database operations either all
+occur, or nothing occurs).</li>
+<li>Replicated events are globally ordered (that is, applied
+on all instances in the same order).</li>
+</ul>
+<p>Certification based replication is described in the software
+sequence diagram below:</p>
+<div class="figure">
+<img alt="_images/certificationbasedreplication.png" src="_images/certificationbasedreplication.png" />
+<p class="caption"><em>Certification Based Replication</em></p>
+</div>
+<p>The main idea is that a transaction is executed conventionally
+until the commit point, under the assumption that there will be
+no conflict. This is called optimistic execution. When the client
+issues a <tt class="docutils literal"><span class="pre">COMMIT</span></tt> command (but before the actual commit has happened),
+all changes made to the database by the transaction and the
+primary keys of changed rows are collected into a writeset.
+This writeset is then replicated to the rest of the nodes.
+After that, the writeset undergoes a deterministic certification
+test (using the collected primary keys) on each node (including
+the writeset originator node) which determines if the writeset
+can be applied or not.</p>
+<p>If the certification test fails, the writeset is dropped and
+the original transaction is rolled back. If the test succeeds,
+the transaction is committed and the writeset is applied on
+the rest of the nodes.</p>
+<p>The certification test implemented in Galera depends on the
+global ordering of transactions. Each transaction is assigned
+a global ordinal sequence number during replication. Thus, when
+a transaction reaches the commit point, it is known what was the
+sequence number of the last transaction it did not conflict with.
+The interval between those two numbers is an uncertainty land:
+transactions in this interval have not seen the effects of
+each other. Therefore, all transactions in this interval are
+checked for primary key conflicts with the transaction in
+question. The certification test fails if a conflict is
+detected.</p>
+<p>Since the procedure is deterministic and all replicas receive
+transactions in the same order, all nodes reach the same decision
+about the outcome of the transaction. The node that started the
+transaction can then notify the client application if the
+transaction has been committed or not.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="architecture.html"
+                        title="previous chapter">1.3. Galera Replication Architecture</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="statetransfer.html"
+                        title="next chapter">1.5. State Snapshot Transfer</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/certificationbasedreplication.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="statetransfer.html" title="1.5. State Snapshot Transfer"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="architecture.html" title="1.3. Galera Replication Architecture"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" >1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,132 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>3.5. Firewall Settings &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="3. Administration Guide" href="userguide.html" />
+    <link rel="next" title="3.6. Upgrading Galera Cluster" href="upgrading.html" />
+    <link rel="prev" title="3.4. Enabling SSL" href="ssl.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="upgrading.html" title="3.6. Upgrading Galera Cluster"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="ssl.html" title="3.4. Enabling SSL"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" accesskey="U">3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="firewall-settings">
+<h1>3.5. Firewall Settings<a class="headerlink" href="#firewall-settings" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="id1"></span><span class="target" id="index-0"></span><span class="target" id="index-1"></span><p id="index-2">Galera uses <em>iptables</em> as the firewall between database nodes.
+In short, the <em>iptables</em> utility controls the network packet
+filtering code in the Linux kernel.</p>
+<p>By default a Galera node requires ports 3306 and 4567 to be
+open for connections from the other nodes in the
+<abbr title="Local Area Network">LAN</abbr>. See below for an example
+<em>iptables</em> configuration:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># iptables -A INPUT -i eth0 -p tcp -m tcp --source 192.168.0.1/24 --dport 3306 -j ACCEPT</span>
+<span class="c"># iptables -A INPUT -i eth0 -p tcp -m tcp --source 192.168.0.1/24 --dport 4567 -j ACCEPT</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The IP addresses in the example are for demonstration purposes only.
+Use the real values from your nodes and netmask in your <em>iptables</em>
+configuration.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="ssl.html"
+                        title="previous chapter">3.4. Enabling SSL</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="upgrading.html"
+                        title="next chapter">3.6. Upgrading Galera Cluster</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/firewallsettings.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="upgrading.html" title="3.6. Upgrading Galera Cluster"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="ssl.html" title="3.4. Enabling SSL"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" >3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

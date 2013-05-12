@@ -1,0 +1,146 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>2.1. Galera Replication &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="2. Getting Started" href="gettingstarted.html" />
+    <link rel="next" title="2.2. Downloading and Installing MariaDB Galera Cluster" href="installationmariadb.html" />
+    <link rel="prev" title="2. Getting Started" href="gettingstarted.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="installationmariadb.html" title="2.2. Downloading and Installing MariaDB Galera Cluster"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="gettingstarted.html" title="2. Getting Started"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="gettingstarted.html" accesskey="U">2. Getting Started</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="galera-replication">
+<h1>2.1. Galera Replication<a class="headerlink" href="#galera-replication" title="Permalink to this headline">¶</a></h1>
+<p id="id1">Galera Replication is a synchronous multi-master replication
+plug-in for MySQL and MariaDB. Galera Replication features are,
+for example:</p>
+<ul class="simple">
+<li>Unconstrained parallel applying, also known as parallel
+replication</li>
+<li>Multicast replication</li>
+<li>Automatic node provisioning</li>
+</ul>
+<p>The primary focus of Galera Replication is data consistency:
+the transactions are either applied on every node, or not at
+all. In short, Galera Replication keeps databases synchronized
+provided that they were properly configured and synchronized
+at the beginning.</p>
+<p>Galera Replication differs from the regular MySQL Replication
+by, for example, addressing a number of issues including write
+conflicts when writing on multiple masters, replication lag
+and slaves being out of sync with the master.</p>
+<p>See below for an example of a typical Galera Replication
+cluster:</p>
+<div class="figure">
+<img alt="_images/galerausecases1.png" src="_images/galerausecases1.png" />
+<p class="caption"><em>Galera Replication Cluster</em></p>
+</div>
+<p>Applications can write to any node in a Galera Replication
+cluster, and transaction commits (RBR events) are then
+applied on all servers, through certification-based replication.</p>
+<p>Certification-based replication is an alternative approach to
+synchronous database replication using group communication
+and transaction ordering techniques.</p>
+<p>A minimal Galera cluster consists of three nodes.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="gettingstarted.html"
+                        title="previous chapter">2. Getting Started</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="installationmariadb.html"
+                        title="next chapter">2.2. Downloading and Installing MariaDB Galera Cluster</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/galerareplication.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="installationmariadb.html" title="2.2. Downloading and Installing MariaDB Galera Cluster"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="gettingstarted.html" title="2. Getting Started"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="gettingstarted.html" >2. Getting Started</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

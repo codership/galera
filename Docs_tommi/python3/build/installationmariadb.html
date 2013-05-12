@@ -1,0 +1,176 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>2.2. Downloading and Installing MariaDB Galera Cluster &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="2. Getting Started" href="gettingstarted.html" />
+    <link rel="next" title="2.3. Downloading and Installing Galera Cluster on MySQL" href="installationmysql.html" />
+    <link rel="prev" title="2.1. Galera Replication" href="galerareplication.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="installationmysql.html" title="2.3. Downloading and Installing Galera Cluster on MySQL"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="galerareplication.html" title="2.1. Galera Replication"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="gettingstarted.html" accesskey="U">2. Getting Started</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="downloading-and-installing-mariadb-galera-cluster">
+<h1>2.2. Downloading and Installing MariaDB Galera Cluster<a class="headerlink" href="#downloading-and-installing-mariadb-galera-cluster" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="id1"></span><p id="index-0">If you have decided to install Galera on a MariaDB Cluster,
+proceed as follows:</p>
+<ol class="arabic simple">
+<li>Download the MariaDB Galera Cluster
+(<a class="reference external" href="http://downloads.mariadb.org/mariadb-galera">http://downloads.mariadb.org/mariadb-galera</a>).</li>
+<li>Download the Galera wsrep provider
+(<a class="reference external" href="https://launchpad.net/galera/+download">https://launchpad.net/galera/+download</a>).</li>
+<li>Extract the downloaded packages.</li>
+<li>Install the downloaded packages.</li>
+</ol>
+<div class="section" id="installing-by-using-apt-get">
+<h2>2.2.1. Installing by using apt-get<a class="headerlink" href="#installing-by-using-apt-get" title="Permalink to this headline">¶</a></h2>
+<p>If you prefer to install by using <em>apt-get</em>, ensure that you have
+defined the correct source repository for you operating system.
+The Galera cluster software package is included in the MariaDB
+repositories to make installation easier.</p>
+<p>To install, open a terminal window and issue the command below:</p>
+<div class="highlight-python"><pre>$ sudo apt-get install mariadb-galera-server galera</pre>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If the server already has the <em>mariadb-server</em> package
+installed, it will be automatically removed prior to
+installing <em>mariadb-galera-server</em>.</p>
+</div>
+</div>
+<div class="section" id="installing-by-using-yum">
+<h2>2.2.2. Installing by using yum<a class="headerlink" href="#installing-by-using-yum" title="Permalink to this headline">¶</a></h2>
+<p>If you prefer to install by using <em>yum</em>, ensure that you have
+defined the correct source repository for you operating system.
+The Galera cluster software package is included in the MariaDB
+repositories to make installation easier.</p>
+<p>To install, open a terminal window and issue the command below:</p>
+<div class="highlight-python"><pre>$ sudo yum install MariaDB-Galera-server MariaDB-client galera</pre>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If you do not have the <em>MariaDB GPG Signing key</em>
+installed, YUM will prompt you to install it after
+downloading the packages (but before installing them).</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If the server already has the <em>MariaDB-server</em>
+package installed, you might need to remove it prior
+to installing <em>MariaDB-Galera-server</em> (with the
+<tt class="docutils literal"><span class="pre">sudo</span> <span class="pre">yum</span> <span class="pre">remove</span> <span class="pre">MariaDB-server</span></tt> command). No
+databases are removed when the <em>MariaDB-server</em>
+package is removed, but as with any upgrade, it
+is best to have backups.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">2.2. Downloading and Installing MariaDB Galera Cluster</a><ul>
+<li><a class="reference internal" href="#installing-by-using-apt-get">2.2.1. Installing by using apt-get</a></li>
+<li><a class="reference internal" href="#installing-by-using-yum">2.2.2. Installing by using yum</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="galerareplication.html"
+                        title="previous chapter">2.1. Galera Replication</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="installationmysql.html"
+                        title="next chapter">2.3. Downloading and Installing Galera Cluster on MySQL</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/installationmariadb.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="installationmysql.html" title="2.3. Downloading and Installing Galera Cluster on MySQL"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="galerareplication.html" title="2.1. Galera Replication"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="gettingstarted.html" >2. Getting Started</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+===============
+ Galera Replication
+===============
+
+Galera Replication is a synchronous multi-master replication
+plug-in for MySQL and MariaDB. It differs from the regular
+MySQL Replication by, for example, addressing a number of
+issues including write conflicts when writing on multiple
+masters, replication lag and slaves being out of sync with the
+master.
+
+See below for an example of a typical Galera Replication
+cluster:
+
+.. figure:: images/galerausecases1.png
+
+   *Galera Replication Cluster*
+
+Applications can write to any node in a Galera Replication
+cluster, and transaction commits (RBR events) are then
+applied on all servers, through certification-based replication.
+
+Certification-based replication is an alternative approach to
+synchronous database replication using group communication
+and transaction ordering techniques.
+
+A minimal Galera cluster consists of three nodes.

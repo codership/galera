@@ -1,0 +1,211 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>1.9. Schema Upgrades &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="1. Galera Technical Description" href="technicaldescription.html" />
+    <link rel="next" title="1.10. Automatic Recovery from Failures" href="recovery.html" />
+    <link rel="prev" title="1.8. Weighted Quorum" href="weightedquorum.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="recovery.html" title="1.10. Automatic Recovery from Failures"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="weightedquorum.html" title="1.8. Weighted Quorum"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" accesskey="U">1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="schema-upgrades">
+<h1>1.9. Schema Upgrades<a class="headerlink" href="#schema-upgrades" title="Permalink to this headline">¶</a></h1>
+<p id="id1">A schema upgrade refers to any <abbr title="Data Definition Language">DDL</abbr>
+statement run for the database. <abbr title="Data Definition Language">DDL</abbr>
+statements change the database structure and are non-transactional.</p>
+<p><abbr title="Data Definition Language">DDL</abbr> statements are processed in
+two different methods in Galera. These methods are described in the
+chapters below.</p>
+<div class="section" id="total-order-isolation">
+<h2>1.9.1. Total Order Isolation<a class="headerlink" href="#total-order-isolation" title="Permalink to this headline">¶</a></h2>
+<p id="id2">By default, <abbr title="Data Definition Language">DDL</abbr>
+statements are processed by using the Total Order Isolation
+(TOI) method. In TOI, the query is replicated to the nodes in a statement
+form before executing on master. The query waits for all preceding transactions
+to commit and then gets executed in isolation on all nodes simultaneously.
+When using the TOI method, the cluster has a part of the database locked for
+the duration of the <abbr title="Data Definition Language">DDL</abbr>
+processing (in other words, the cluster behaves like
+a single server).</p>
+<p>The isolation can take place at the following levels:</p>
+<ol class="arabic simple">
+<li>At the server level, where no other transactions can be
+applied concurrently (for <tt class="docutils literal"><span class="pre">CREATE</span> <span class="pre">SCHEMA</span></tt>, <tt class="docutils literal"><span class="pre">GRANT</span></tt> and
+similar queries).</li>
+<li>At the schema level, where no transaction accessing the
+schema can be applied concurrently (for <tt class="docutils literal"><span class="pre">CREATE</span> <span class="pre">TABLE</span></tt>
+and similar queries).</li>
+<li>At the table level, where no transaction accessing the
+table can be applied concurrently (for <tt class="docutils literal"><span class="pre">ALTER</span> <span class="pre">TABLE</span></tt>
+and similar queries).</li>
+</ol>
+<p>TOI queries have several particularities  that must been taken
+into consideration:</p>
+<ul>
+<li><p class="first">From the perspective of certification:</p>
+<blockquote>
+<div><ul class="simple">
+<li>TOI transactions never conflict with preceding transactions,
+since they are only executed after all preceding transactions
+were committed. Hence, their certification interval is of zero
+length. This means that TOI transactions will never fail
+certification and are guaranteed to be executed.</li>
+<li>Certification takes place on a resource level. For example,
+for server-level isolation this means any transaction that
+has a TOI query in its certification interval will fail
+certification.</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p class="first">The system replicates the TOI query before execution and there
+is no way to know whether it succeeds or fails. Thus, error checking
+on TOI queries is switched off.</p>
+</li>
+<li><p class="first">The method is simple, predictable and guarantees data consistency.</p>
+</li>
+<li><p class="first">The disadvantage is that the cluster behaves like a single server,
+potentially preventing high-availability for the duration of
+<abbr title="Data Definition Language">DDL</abbr> execution.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="rolling-schema-upgrade">
+<h2>1.9.2. Rolling Schema Upgrade<a class="headerlink" href="#rolling-schema-upgrade" title="Permalink to this headline">¶</a></h2>
+<p id="id3">As of <em>wsrep</em> patch 5.5.17-22.3, you can choose whether to use the
+traditional total order isolation method or the rolling schema upgrade
+method. You can choose the rolling schema upgrade method by using the
+global parameter <tt class="docutils literal"><span class="pre">wsrep_OSU_method</span></tt>.</p>
+<p>The rolling schema upgrade is a <abbr title="Data Definition Language">DDL</abbr>
+processing method, where the <abbr title="Data Definition Language">DDL</abbr>
+will only be processed locally at the node. The node is desynchronized
+from the cluster for the duration of the <abbr title="Data Definition Language">DDL</abbr>
+processing in a way that it does not block the rest of the nodes.
+When the <abbr title="Data Definition Language">DDL</abbr> processing is complete,
+the node applies the delayed replication events and synchronizes back
+with the cluster.</p>
+<p>To upgrade a schema cluster-wide, the <abbr title="Data Definition Language">DDL</abbr>
+must be manually executed at each node in turn. When the rolling schema
+upgrade proceeds, a part of the cluster will have the old schema structure
+and a part of the cluster will have the new schema structure.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">While the rolling schema upgrade has the advantage of
+blocking only one node at a time, it is potentially unsafe,
+and may fail if the new and old schema definitions are
+incompatible at the replication event level. Execute
+operations such as <tt class="docutils literal"><span class="pre">CREATE</span> <span class="pre">ATBLE</span></tt> and <tt class="docutils literal"><span class="pre">DROP</span> <span class="pre">TABLE</span></tt>
+in TOI.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">1.9. Schema Upgrades</a><ul>
+<li><a class="reference internal" href="#total-order-isolation">1.9.1. Total Order Isolation</a></li>
+<li><a class="reference internal" href="#rolling-schema-upgrade">1.9.2. Rolling Schema Upgrade</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="weightedquorum.html"
+                        title="previous chapter">1.8. Weighted Quorum</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="recovery.html"
+                        title="next chapter">1.10. Automatic Recovery from Failures</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/schemaupgrades.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="recovery.html" title="1.10. Automatic Recovery from Failures"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="weightedquorum.html" title="1.8. Weighted Quorum"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" >1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

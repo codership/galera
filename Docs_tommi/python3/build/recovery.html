@@ -1,0 +1,244 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>1.10. Automatic Recovery from Failures &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="1. Galera Technical Description" href="technicaldescription.html" />
+    <link rel="next" title="2. Getting Started" href="gettingstarted.html" />
+    <link rel="prev" title="1.9. Schema Upgrades" href="schemaupgrades.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="gettingstarted.html" title="2. Getting Started"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="schemaupgrades.html" title="1.9. Schema Upgrades"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" accesskey="U">1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="automatic-recovery-from-failures">
+<h1>1.10. Automatic Recovery from Failures<a class="headerlink" href="#automatic-recovery-from-failures" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="single-node-failure">
+<span id="recovery-from-failures"></span><h2>1.10.1. Single Node Failure<a class="headerlink" href="#single-node-failure" title="Permalink to this headline">¶</a></h2>
+<p id="id1">A single Galera cluster node can fail to operate for a variety
+of reasons, such as:</p>
+<ul class="simple">
+<li>A hardware failure</li>
+<li>A software crash</li>
+<li>Loss of network connectivity</li>
+</ul>
+<p>All of these causes are generalized behind the concept of a node
+failure.</p>
+<div class="section" id="single-node-failure-detection">
+<h3>1.10.1.1. Single Node Failure Detection<a class="headerlink" href="#single-node-failure-detection" title="Permalink to this headline">¶</a></h3>
+<p>The only sign of a node failure is a loss of connection to the
+node process as seen by another node. The node is considered failed
+when it is no longer a member of the cluster primary component, that
+is, when the members of the primary component no longer see it.
+From the perspective of the failed node (unless it has crashed
+itself), it has lost connection to the primary component.</p>
+<p>Third-party node monitoring tools, such as ping/Heartbeat/Pacemaker,
+may be grossly off in their estimates on the node failure, as they
+do not participate in the Galera group communication and are not
+aware of the primary component. Monitor the Galera node status
+only by polling the <tt class="docutils literal"><span class="pre">wsrep_local_state</span></tt> status variable or use
+a notification script. For more information, see chapter
+<a class="reference internal" href="monitoringthecluster.html#id1"><em>Monitoring the Cluster</em></a>.</p>
+<p>Node connection liveness is determined from the last time a network
+packet was received from the node. This is checked every
+<tt class="docutils literal"><span class="pre">evs.inactive_check_period</span></tt>. If the node has no messages to send
+for more than <tt class="docutils literal"><span class="pre">evs.keepalive_period</span></tt>, it will emit heartbeat beacons
+instead. If no packets were received from the node for the
+<tt class="docutils literal"><span class="pre">evs.suspect_timeout</span></tt>, the node is declared suspected. When all
+members of the component see the node as suspected, it is pronounced
+inactive (failed). If no messages were received from the node for
+more than <tt class="docutils literal"><span class="pre">evs.inactive_timeout</span></tt>, it is pronounced inactive
+regardless of the consensus. The component stays non-operational
+until all members agree on the membership. If the members cannot
+reach consensus on the liveness of a node, the network is too
+unstable for the cluster to operate.</p>
+<p>The relation between the option values is:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">evs</span><span class="o">.</span><span class="n">keepalive_period</span> <span class="o">&lt;=</span> <span class="n">evs</span><span class="o">.</span><span class="n">inactive_check_period</span> <span class="o">&lt;=</span> <span class="n">evs</span><span class="o">.</span><span class="n">suspect_timeout</span> <span class="o">&lt;=</span> <span class="n">evs</span><span class="o">.</span><span class="n">inactive_timeout</span> <span class="o">&lt;=</span> <span class="n">evs</span><span class="o">.</span><span class="n">consensus_timeout</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">An unresponsive node, which fails to send messages or
+heartbeat beacons on time due to, for example, heavy
+swapping, may also be pronounced failed. Thus it will not
+lock the operation of the rest of the cluster. If such
+behaviour is undesirable, increase the timeouts.</p>
+</div>
+</div>
+<div class="section" id="trade-off-between-availability-and-partition-tolerance">
+<h3>1.10.1.2. Trade-Off Between Availability and Partition Tolerance<a class="headerlink" href="#trade-off-between-availability-and-partition-tolerance" title="Permalink to this headline">¶</a></h3>
+<p>Within the <a class="reference external" href="http://en.wikipedia.org/wiki/CAP_theorem">CAP theorem</a>, Galera emphasizes data safety and
+consistency, which leads to a trade-off between cluster availability
+and partition tolerance. To be more specific, in unstable networks
+(such as <abbr title="Wide Area Network">WAN</abbr>) low
+<tt class="docutils literal"><span class="pre">evs.suspect_timeout</span></tt>/<tt class="docutils literal"><span class="pre">evs.inactive_timeout</span></tt> values may result
+in false node failure detections, whereas higher values will result
+in longer availability outages in the case of a real node failure.
+Essentially, the <tt class="docutils literal"><span class="pre">evs.suspect_timeout</span></tt> defines the minimum time
+needed to detect a failed node, during which the cluster will be
+unavailable due to the consistency constraint.</p>
+</div>
+<div class="section" id="recovery-from-a-single-node-failure">
+<h3>1.10.1.3. Recovery from a Single Node Failure<a class="headerlink" href="#recovery-from-a-single-node-failure" title="Permalink to this headline">¶</a></h3>
+<p>If one of the nodes in the cluster fails, the other nodes will
+continue to operate as usual. When the failed node comes up again,
+it automatically synchronizes with the other nodes before it is
+allowed back into the cluster. No data is lost when a node fails.</p>
+<p>See chapter
+<a class="reference internal" href="nodeprovisioning.html#id1"><em>Node Provisioning and Recovery</em></a>
+for more information on manual node recover.</p>
+</div>
+</div>
+<div class="section" id="primary-component">
+<h2>1.10.2. Primary Component<a class="headerlink" href="#primary-component" title="Permalink to this headline">¶</a></h2>
+<p id="id2">In addition to single node failures, the cluster may be split into
+several components due to network failure. A component is a set of
+nodes, which are connected to each other, but not to nodes in other
+components.</p>
+<p>In such a situation, only one of the components can continue to
+modify the database state to avoid history divergence. This component
+is called the Primary Pomponent (PC). In normal operation, the Galera
+cluster is a PC. When cluster partitioning happens, Galera invokes a
+special quorum algorithm to select a PC that guarantees that there
+is no more than one primary component in the cluster.</p>
+</div>
+<div class="section" id="split-brain">
+<h2>1.10.3. Split-brain<a class="headerlink" href="#split-brain" title="Permalink to this headline">¶</a></h2>
+<p id="id3">A split-brain situation is a cluster failure where database nodes
+in the cluster begin to operate autonomously from each other.
+Data can get irreparably corrupted as two different database nodes
+update the data independently.</p>
+<p>Like any quorum-based system, the Galera cluster is subject to the
+split-brain condition when the quorum algorithm fails to select a
+primary component. This can happen, for example, in a cluster without
+the backup switch if the main switch fails. However, the most likely
+split-brain situation is when a single node fails in a two-node cluster.
+Thus it is strongly advised that the minimum Galera cluster
+configuration is three nodes.</p>
+</div>
+<div class="section" id="state-transfer-failure">
+<h2>1.10.4. State Transfer Failure<a class="headerlink" href="#state-transfer-failure" title="Permalink to this headline">¶</a></h2>
+<p id="id4">A failure in state transfer renders the receiving node unusable.
+If a state transfer failure is detected, the receiving node will
+abort.</p>
+<p>Restarting the node after a mysqldump failure may require manual
+restoring of the administrative tables. The rsync method does not
+have this issue, since it does not need the server to be in
+operational state.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">1.10. Automatic Recovery from Failures</a><ul>
+<li><a class="reference internal" href="#single-node-failure">1.10.1. Single Node Failure</a><ul>
+<li><a class="reference internal" href="#single-node-failure-detection">1.10.1.1. Single Node Failure Detection</a></li>
+<li><a class="reference internal" href="#trade-off-between-availability-and-partition-tolerance">1.10.1.2. Trade-Off Between Availability and Partition Tolerance</a></li>
+<li><a class="reference internal" href="#recovery-from-a-single-node-failure">1.10.1.3. Recovery from a Single Node Failure</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#primary-component">1.10.2. Primary Component</a></li>
+<li><a class="reference internal" href="#split-brain">1.10.3. Split-brain</a></li>
+<li><a class="reference internal" href="#state-transfer-failure">1.10.4. State Transfer Failure</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="schemaupgrades.html"
+                        title="previous chapter">1.9. Schema Upgrades</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="gettingstarted.html"
+                        title="next chapter">2. Getting Started</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/recovery.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="gettingstarted.html" title="2. Getting Started"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="schemaupgrades.html" title="1.9. Schema Upgrades"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="technicaldescription.html" >1. Galera Technical Description</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

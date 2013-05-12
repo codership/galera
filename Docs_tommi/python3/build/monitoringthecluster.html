@@ -1,0 +1,280 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>3.3. Monitoring the Cluster &mdash; galera 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="galera 1.0.1 documentation" href="index.html" />
+    <link rel="up" title="3. Administration Guide" href="userguide.html" />
+    <link rel="next" title="3.4. Enabling SSL" href="ssl.html" />
+    <link rel="prev" title="3.2. Resetting the Quorum" href="quorumreset.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="ssl.html" title="3.4. Enabling SSL"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quorumreset.html" title="3.2. Resetting the Quorum"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" accesskey="U">3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="monitoring-the-cluster">
+<h1>3.3. Monitoring the Cluster<a class="headerlink" href="#monitoring-the-cluster" title="Permalink to this headline">¶</a></h1>
+<p id="id1">You can monitor <em>wsrep</em>-related status variables in the Galera
+cluster by using the standard <em>wsrep</em> queries. As all <em>wsrep</em>-related
+status variables are prefixed with <em>wsrep</em>, you can query them all by
+using the command below:</p>
+<div class="highlight-python"><pre>mysql&gt; SHOW VARIABLES LIKE 'wsrep_%';</pre>
+</div>
+<p>You can also define the notification command <tt class="docutils literal"><span class="pre">wsrep_notify_cmd</span></tt>
+to be invoked when the cluster membership or node status changes.
+This command can also communicate the event to a monitoring agent.
+For more information on the <tt class="docutils literal"><span class="pre">wsrep_notify_cmd</span></tt> command, see chapter
+<a class="reference internal" href="galeraparameters.html#id2"><em>Status Variables</em></a>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Status variables and variables in the chapters below are
+differential and reset on every <tt class="docutils literal"><span class="pre">SHOW</span> <span class="pre">STATUS</span></tt> command.
+To view the value for the current moment, execute two
+<tt class="docutils literal"><span class="pre">SHOW</span> <span class="pre">STATUS</span></tt> commandson the node with an interval of
+~1 minute. The output of the last invocation will correspond
+to the current moment.</p>
+</div>
+<div class="section" id="checking-the-cluster-integrity">
+<h2>3.3.1. Checking the Cluster Integrity<a class="headerlink" href="#checking-the-cluster-integrity" title="Permalink to this headline">¶</a></h2>
+<p id="id2">When checking the cluster integrity, the first thing you want to know
+is whether the node belongs to the right cluster. You can check this
+by checking the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_cluster_state_uuid</span>
+</pre></div>
+</div>
+<p>This variable value must be the same on all cluster nodes. The nodes
+with different <tt class="docutils literal"><span class="pre">wsrep_cluster_state_uuid</span></tt> values are not connected
+to the cluster.</p>
+<p>Once you have checked whether the node belongs to the right cluster,
+you want to check  whether the node belongs to the same component.
+You can check this by checking the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_cluster_conf_id</span>
+</pre></div>
+</div>
+<p>This variable value must be the same on all cluster nodes. If the nodes
+have <tt class="docutils literal"><span class="pre">different</span> <span class="pre">wsrep_cluster_conf_id</span></tt> values, they are partitioned.
+This is a temporary condition and should be resolved when network
+connectivity between the nodes is restored.</p>
+<p>You can also view the number of nodes in the cluster by checking the
+value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_cluster_size</span>
+</pre></div>
+</div>
+<p>If the shown number of nodes is equal to the expected number of nodes,
+all cluster nodes are connected. You can check this variable on one
+node only.</p>
+<p>Finally, check the primary status of the cluster component to which
+the node is connected to:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_cluster_status</span>
+</pre></div>
+</div>
+<p>If this variable value differs from <em>Primary</em>, there is a partition
+in the cluster and this component is currently unoperational (due to
+multiple membership changes and the loss of quorum). A split-brain
+condition is also possible.</p>
+<p>If no other node in the cluster is connected to the primary component
+(that is, all nodes belong to the same component, which is a
+non-primary component) the cluster must be manually rebootstrapped.
+If this is the case,</p>
+<ol class="arabic simple">
+<li>Shut down all nodes.</li>
+<li>Restart all nodes starting with the most advanced node. To find
+out the most advanced node, check the <tt class="docutils literal"><span class="pre">wsrep_last_committed</span></tt>
+status variable.</li>
+</ol>
+<p>This situation is very unlikely. If, however, there is another primary
+cluster component, there is a loss of connectivity between the nodes.
+Troubleshoot the problem and restore connectivity. After restoration,
+the nodes from the non-primary component will automatically reconnect
+and resynchronize themselves with the primary component.</p>
+</div>
+<div class="section" id="checking-the-node-status">
+<h2>3.3.2. Checking the Node Status<a class="headerlink" href="#checking-the-node-status" title="Permalink to this headline">¶</a></h2>
+<p id="id3">When checking the node status, the first thing you want to know
+is whether the node is ready to accept SQL load. You can check this
+by checking the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_ready</span>
+</pre></div>
+</div>
+<p>If the value is <em>true</em>, the node can accept SQL load. If not, check
+the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_connected</span>
+</pre></div>
+</div>
+<p>If the value is <em>OFF</em>, the node has not yet connected to any of the
+cluster components. This may be due to misconfiguration
+(for example, the configuration contains an invalid
+<tt class="docutils literal"><span class="pre">wsrep_cluster_address</span></tt> and/or <tt class="docutils literal"><span class="pre">wsrep_cluster_name</span></tt>).
+Check the error log for proper diagnostics.</p>
+<p>If the node is connected but <tt class="docutils literal"><span class="pre">wsrep_ready</span></tt> = <em>OFF</em>,  check
+the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_local_state_comment</span>
+</pre></div>
+</div>
+<p>In a primary component, the variable value is typically
+<em>Joining</em>, <em>Waiting for SST</em>, <em>Joined</em>, <em>Synced</em> or <em>Donor</em>.
+If <tt class="docutils literal"><span class="pre">wsrep_ready</span></tt> = <em>OFF</em> and the state comment is <em>Joining</em>,
+<em>Waiting for SST</em> or <em>Joined</em>, the node is still syncing with
+the cluster.</p>
+<p>In a non-primary component, the node state comment should be
+<em>Initialized</em>. Any other states are transient and momentary.</p>
+</div>
+<div class="section" id="checking-the-replication-health">
+<h2>3.3.3. Checking the Replication Health<a class="headerlink" href="#checking-the-replication-health" title="Permalink to this headline">¶</a></h2>
+<p id="id4">When checking the replication health, the first thing you want to know
+is how much slave lag is slowing down the cluster. You can check this
+by checking the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_flow_control_paused</span>
+</pre></div>
+</div>
+<p>If variable value range is from 0.0 to 1.0 and it indicates the fraction
+of time the replication was paused since last the <tt class="docutils literal"><span class="pre">SHOW</span> <span class="pre">STATUS</span></tt> command.
+Value 1.0 refers to a complete stop. This value should be as close to 0.0
+as possible. The main way to improve the value is to increase the
+<tt class="docutils literal"><span class="pre">wsrep_slave_threads</span></tt> value and to exclude the slow nodes out of
+cluster.</p>
+<p>The optimal value for the <tt class="docutils literal"><span class="pre">wsrep_slave_threads</span></tt>, for its part, is
+suggested by the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_cert_deps_distance</span>
+</pre></div>
+</div>
+<p>This variable indicates how many transactions may be applied in parallel
+on average. There is no reason to assign the <tt class="docutils literal"><span class="pre">wsrep_slave_threads</span></tt>
+value much higher than this. This value can also be quite high, even in
+the hundreds. Use common sense and discretion when you define the value
+of <tt class="docutils literal"><span class="pre">wsrep_slave_threads</span></tt>.</p>
+</div>
+<div class="section" id="determining-the-slowest-cluster-node">
+<h2>3.3.4. Determining the Slowest Cluster Node<a class="headerlink" href="#determining-the-slowest-cluster-node" title="Permalink to this headline">¶</a></h2>
+<p id="id5">The slowest cluster node will have the highest values for the
+following variables:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_flow_control_sent</span>
+</pre></div>
+</div>
+<p>and:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_local_recv_queue_avg</span>
+</pre></div>
+</div>
+<p>The lower the values are the better.</p>
+</div>
+<div class="section" id="detecting-slow-network-issues">
+<h2>3.3.5. Detecting Slow Network Issues<a class="headerlink" href="#detecting-slow-network-issues" title="Permalink to this headline">¶</a></h2>
+<p id="id6">If you have a slow network, check the value of the variable below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">wsrep_local_send_queue_avg</span>
+</pre></div>
+</div>
+<p>If the variable value is high, the network link can be the bottleneck.
+If this is the case, the cause can be at any layer, from the physical
+layer to the operating system configuration.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.3. Monitoring the Cluster</a><ul>
+<li><a class="reference internal" href="#checking-the-cluster-integrity">3.3.1. Checking the Cluster Integrity</a></li>
+<li><a class="reference internal" href="#checking-the-node-status">3.3.2. Checking the Node Status</a></li>
+<li><a class="reference internal" href="#checking-the-replication-health">3.3.3. Checking the Replication Health</a></li>
+<li><a class="reference internal" href="#determining-the-slowest-cluster-node">3.3.4. Determining the Slowest Cluster Node</a></li>
+<li><a class="reference internal" href="#detecting-slow-network-issues">3.3.5. Detecting Slow Network Issues</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="quorumreset.html"
+                        title="previous chapter">3.2. Resetting the Quorum</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="ssl.html"
+                        title="next chapter">3.4. Enabling SSL</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/monitoringthecluster.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="ssl.html" title="3.4. Enabling SSL"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quorumreset.html" title="3.2. Resetting the Quorum"
+             >previous</a> |</li>
+        <li><a href="index.html">galera 1.0.1 documentation</a> &raquo;</li>
+          <li><a href="userguide.html" >3. Administration Guide</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Tommi Takkunen-Lauri.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>
