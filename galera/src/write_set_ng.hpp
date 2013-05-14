@@ -359,7 +359,7 @@ namespace galera
               data_  (),
               unrd_  (),
               check_thr_(),
-              check_ (false)
+              check_ (st <= 0) /* st <= 0 means no checksumming is performed */
         {
             init (st);
         }
@@ -382,6 +382,7 @@ namespace galera
 
             header_.read_buf (buf);
             size_ = buf.size;
+            check_ = (st <= 0);
             init (st);
         }
 
@@ -424,6 +425,8 @@ namespace galera
             header_.set_seqno (seqno, pa_range);
         }
 
+        /* can return pointer to internal storage: out can be used only
+         * within object scope. */
         size_t gather(std::vector<gu::Buf>& out,
                       bool include_keys, bool include_unrd);
 

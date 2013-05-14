@@ -61,9 +61,11 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
         return galera::Replicator::S_SYNCED;
     case GCS_NODE_STATE_DONOR:
         return galera::Replicator::S_DONOR;
-    default:
-        gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    case GCS_NODE_STATE_MAX:;
     }
+
+    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    GU_DEBUG_NORETURN;
 }
 
 
@@ -76,7 +78,7 @@ galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
 
     const gu::byte_t* const buf = reinterpret_cast<const gu::byte_t*>(act.buf);
 
-    size_t offset(unserialize(buf, act.size, 0, *trx_));
+    size_t offset(trx_->unserialize(buf, act.size, 0));
 
     // trx_->append_write_set(buf + offset, act.size - offset);
     trx_->set_write_set_buffer(buf + offset, act.size - offset);

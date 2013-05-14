@@ -189,7 +189,8 @@ WriteSetIn::init (ssize_t const st)
         checksum();
         checksum_fin();
     }
-    else
+    else if (st > 0) // st <= 0 means no checksumming (except for header) is
+                     // performed.
     {
         int err = pthread_create (&check_thr_, NULL,
                                   checksum_thread, this);

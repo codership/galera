@@ -377,7 +377,7 @@ namespace galera
         }
             set_defaults_; // sets missing parameters to default values
 
-        static const int       MAX_PROTO_VER = 4;
+        static const int       MAX_PROTO_VER = 5;
         /*
          * |------------------------------------------------------
          * | protocol_version_ | trx_proto_ver_ | str_proto_ver_ |
@@ -386,6 +386,7 @@ namespace galera
          * |                 2 |              1 |              1 |
          * |                 3 |              2 |              1 |
          * |                 4 |              2 |              1 |
+         * |                 5 |              3 |              1 |
          * -------------------------------------------------------
          */
 

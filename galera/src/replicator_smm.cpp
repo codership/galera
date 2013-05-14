@@ -1128,6 +1128,10 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         trx_proto_ver_ = 2;
         str_proto_ver_ = 1;
         break;
+    case 5:
+        trx_proto_ver_ = 3;
+        str_proto_ver_ = 1;
+        break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "
             "version: " << proto_ver << ". Can't continue.";

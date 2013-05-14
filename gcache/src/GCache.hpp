@@ -9,7 +9,8 @@
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
 
-#include <galerautils.hpp>
+//#include <galerautils.hpp>
+#include "gu_types.hpp"
 
 #include <string>
 #include <iostream>
@@ -88,39 +89,45 @@ namespace gcache
         public:
 
             Buffer() : ptr_(), size_(), seqno_g_(), seqno_d_() { }
+
             Buffer (const Buffer& other)
                 :
-                ptr_(other.ptr_),
-                size_(other.size_),
+                ptr_    (other.ptr_),
+                size_   (other.size_),
                 seqno_g_(other.seqno_g_),
                 seqno_d_(other.seqno_d_)
             { }
+
             Buffer& operator= (const Buffer& other)
             {
-                ptr_ = other.ptr_;
-                size_ = other.size_;
+                ptr_     = other.ptr_;
+                size_    = other.size_;
                 seqno_g_ = other.seqno_g_;
                 seqno_d_ = other.seqno_d_;
                 return *this;
             }
-            const void* ptr()     const { return ptr_;     }
-            ssize_t     size()    const { return size_;    }
-            int64_t     seqno_g() const { return seqno_g_; }
-            int64_t     seqno_d() const { return seqno_d_; }
+
+            const gu::byte_t* ptr()     const { return ptr_;     }
+            ssize_t           size()    const { return size_;    }
+            int64_t           seqno_g() const { return seqno_g_; }
+            int64_t           seqno_d() const { return seqno_d_; }
 
         protected:
 
-            void set_ptr   (const void* p) { ptr_ = p; }
+            void set_ptr   (const void* p)
+            {
+                ptr_ = reinterpret_cast<const gu::byte_t*>(p);
+            }
 
             void set_other (ssize_t s, int64_t g, int64_t d)
             { size_ = s; seqno_g_ = g; seqno_d_ = d; }
 
         private:
 
-            const void* ptr_;
-            ssize_t     size_;
-            int64_t     seqno_g_;
-            int64_t     seqno_d_;
+            const gu::byte_t* ptr_;
+            ssize_t           size_;
+            int64_t           seqno_g_;
+            int64_t           seqno_d_;
 
             friend class GCache;
         };

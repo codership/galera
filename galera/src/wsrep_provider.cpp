@@ -359,7 +359,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  const void*         rbr_data,
                                  size_t              rbr_data_len,
-                                 uint64_t            flags __attribute__((unused)) ,
+                                 uint64_t            flags,
                                  wsrep_trx_meta_t*   meta)
 {
     assert(gh != 0);
@@ -387,7 +387,8 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
     {
         TrxHandleLock lock(*trx);
         trx->set_conn_id(conn_id);
-        trx->append_data(rbr_data, rbr_data_len);
+        /* rbr_data should clearly persist over pre_commit() call */
+        trx->append_data(rbr_data, rbr_data_len, false);
         trx->set_flags(
             TrxHandle::F_COMMIT |
             ((flags & WSREP_FLAG_PA_SAFE) ? 0 : TrxHandle::F_PA_UNSAFE)
@@ -568,7 +569,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
                               keys[i].key_parts_num, false, false);
             trx->append_key(k);
         }
-        trx->append_data(action, action_len);
+        trx->append_data(action, action_len, false);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
         retval = repl->replicate(trx);

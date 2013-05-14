@@ -156,6 +156,99 @@ size_t galera::serial_size(const TrxHandle::Mac& mac)
 }
 
 
+size_t
+galera::TrxHandle::serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
+{
+    uint32_t hdr((version_ << 24) | (write_set_flags_ & 0xff));
+    offset = gu::serialize4(hdr, buf, buflen, offset);
+    offset = galera::serialize(source_id_, buf, buflen, offset);
+    offset = gu::serialize8(conn_id_, buf, buflen, offset);
+    offset = gu::serialize8(trx_id_, buf, buflen, offset);
+    offset = gu::serialize8(last_seen_seqno_, buf, buflen, offset);
+    offset = gu::serialize8(timestamp_, buf, buflen, offset);
+    if (has_annotation())
+    {
+        offset = gu::serialize4(annotation_, buf, buflen, offset);
+    }
+    if (has_mac())
+    {
+        offset = galera::serialize(mac_, buf, buflen, offset);
+    }
+    return offset;
+}
+
+
+size_t
+galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
+                               size_t offset)
+{
+    uint32_t hdr;
+
+    try
+    {
+        offset = gu::unserialize4(buf, buflen, offset, hdr);
+        write_set_flags_ = hdr & 0xff;
+        version_ = hdr >> 24;
+        write_set_.set_version(version_);
+
+        switch (version_)
+        {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            offset = galera::unserialize(buf, buflen, offset, source_id_);
+            offset = gu::unserialize8(buf, buflen, offset, conn_id_);
+            offset = gu::unserialize8(buf, buflen, offset, trx_id_);
+            offset = gu::unserialize8(buf, buflen, offset, last_seen_seqno_);
+            offset = gu::unserialize8(buf, buflen, offset, timestamp_);
+
+            if (has_annotation())
+            {
+                offset = gu::unserialize4(buf, buflen, offset, annotation_);
+            }
+            if (has_mac())
+            {
+                offset = galera::unserialize(buf, buflen, offset, mac_);
+            }
+            break;
+        default:
+            gu_throw_error(EPROTONOSUPPORT);
+        }
+        return offset;
+    }
+    catch (gu::Exception& e)
+    {
+        GU_TRACE(e);
+
+        log_fatal << "Writeset deserialization failed: " << e.what()
+                  << std::endl << "WS flags:      " << write_set_flags_
+                  << std::endl << "Trx proto:     " << version_
+                  << std::endl << "Trx source:    " << source_id_
+                  << std::endl << "Trx conn_id:   " << conn_id_
+                  << std::endl << "Trx trx_id:    " << trx_id_
+                  << std::endl << "Trx last_seen: " << last_seen_seqno_;
+
+        throw;
+    }
+}
+
+
+size_t
+galera::TrxHandle::serial_size() const
+{
+    return (4 // hdr
+            + galera::serial_size(source_id_)
+            + 8 // serial_size(trx.conn_id_)
+            + 8 // serial_size(trx.trx_id_)
+            + 8 // serial_size(trx.last_seen_seqno_)
+            + 8 // serial_size(trx.timestamp_)
+            + (has_annotation() ? gu::serial_size4(annotation_) : 0)
+            + (has_mac() ? galera::serial_size(mac_) : 0));
+}
+
+
+#if 0 // REMOVE
 size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
                          size_t buflen, size_t offset)
 {
@@ -245,3 +338,4 @@ size_t galera::serial_size(const TrxHandle& trx)
             + (trx.has_mac() ? serial_size(trx.mac_) : 0));
 }
 
+#endif // REMOVE

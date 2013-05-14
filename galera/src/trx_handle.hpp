@@ -11,12 +11,14 @@
 #include "fsm.hpp"
 #include "key_data.hpp" // for append_key()
 #include "key_entry_os.hpp"
+#include "write_set_ng.hpp"
 
 #include "wsrep_api.h"
 #include "gu_mutex.hpp"
 #include "gu_atomic.hpp"
 #include "gu_datetime.hpp"
 #include "gu_unordered.hpp"
+#include "gu_utils.hpp"
 
 #include <set>
 
@@ -25,7 +27,12 @@ namespace galera
 
 //    class KeyEntry; // Forward declaration
 
-    static const std::string working_dir = "/tmp";
+    static std::string const working_dir = "/tmp";
+
+    // this is an overall replicator-level protocol version which employs new
+    // writeset format. See replicator_smm.hpp. Note that writeset version is 3.
+    static int const NEW_WRITE_SET_PROTO_VER = 5;
+    static int const WS_NG_VERSION = 3; /* new WS version to be used */
 
     class TrxHandle
     {
@@ -151,6 +158,9 @@ namespace galera
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
             write_set_         (version),
+            write_set_out_     (working_dir + '/' + gu::to_string(trx_id,
+                                                                  std::hex)),
+            write_set_in_      (),
             write_set_flags_   (0),
             certified_         (false),
             committed_         (false),
@@ -234,14 +244,28 @@ namespace galera
                     << "' does not match to trx version' "
                     << version_ << "'";
             }
-            write_set_.append_key(key);
+
+            if (gu_likely (version_ >= WS_NG_VERSION))
+            {
+                write_set_out_.append_key(key);
+            }
+            else
+            {
+                write_set_.append_key(key);
+            }
         }
 
-        void append_data(const void* data, const size_t data_len)
+        void append_data(const void* data, const size_t data_len, bool store)
         {
-            write_set_.append_data(data, data_len);
+            if (gu_likely (version_ >= WS_NG_VERSION))
+            {
+                write_set_out_.append_data(data, data_len, store);
+            }
+            else
+            {
+                write_set_.append_data(data, data_len);
+            }
         }
-
 
         static const size_t max_annotation_size_ = (1 << 16);
 
@@ -258,22 +282,26 @@ namespace galera
 
         size_t prepare_write_set_collection()
         {
+            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
+
             size_t offset;
             if (write_set_collection_.empty() == true)
             {
-                offset = serial_size(*this);
+                offset = serial_size();
                 write_set_collection_.resize(offset);
             }
             else
             {
                 offset = write_set_collection_.size();
             }
-            (void)serialize(*this, &write_set_collection_[0], offset, 0);
+            (void)serialize(&write_set_collection_[0], offset, 0);
             return offset;
         }
 
         void append_write_set(const void* data, size_t data_len)
         {
+            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
+
             const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + data_len);
             std::copy(reinterpret_cast<const gu::byte_t*>(data),
@@ -283,9 +311,12 @@ namespace galera
 
         void append_write_set(const gu::Buffer& ws)
         {
+            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
+
             const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + ws.size());
-            std::copy(ws.begin(), ws.end(), &write_set_collection_[0] + offset);
+            std::copy(ws.begin(), ws.end(),
+                      &write_set_collection_[0] + offset);
         }
 
         const MappedBuffer& write_set_collection() const
@@ -308,7 +339,7 @@ namespace galera
             // storage.
             if (write_set_buffer_.first == 0)
             {
-                size_t off(serial_size(*this));
+                size_t off(serial_size());
                 if (write_set_collection_.size() < off)
                 {
                     gu_throw_fatal << "Write set buffer not populated";
@@ -322,17 +353,26 @@ namespace galera
 
         bool empty() const
         {
-            return (write_set_.empty() == true &&
-                    write_set_collection_.size() <= serial_size(*this));
+            if (gu_likely (version_ >= WS_NG_VERSION))
+            {
+                return write_set_out_.is_empty();
+            }
+            else
+            {
+                return (write_set_.empty() == true &&
+                        write_set_collection_.size() <= serial_size());
+            }
         }
 
         void flush(size_t mem_limit)
         {
+            if (gu_likely (version_ >= WS_NG_VERSION)) return;
+
             if (write_set_.get_key_buf().size() + write_set_.get_data().size()
                 > mem_limit || mem_limit == 0)
             {
-                gu::Buffer buf(serial_size(write_set_));
-                (void)serialize(write_set_, &buf[0], buf.size(), 0);
+                gu::Buffer buf(serial_size());
+                (void)serialize(&buf[0], buf.size(), 0);
                 append_write_set(buf);
                 write_set_.clear();
             }
@@ -340,6 +380,8 @@ namespace galera
 
         void clear()
         {
+            if (gu_likely (version_ >= WS_NG_VERSION)) return;
+
             write_set_.clear();
             write_set_collection_.clear();
         }
@@ -370,6 +412,8 @@ namespace galera
         wsrep_seqno_t          depends_seqno_;
         gu::Atomic<size_t>     refcnt_;
         WriteSet               write_set_;
+        WriteSetOut            write_set_out_;
+        WriteSetIn             write_set_in_;
         int                    write_set_flags_;
         bool                   certified_;
         bool                   committed_;
@@ -391,23 +435,28 @@ public:
                                  std::pair<bool, bool>,
                                  KeyEntryPtrHash,
                                  KeyEntryPtrEqualAll> CertKeySet;
+
+        size_t serial_size() const;
+        size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;
+        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
+
 private:
         CertKeySet cert_keys_;
 
-        friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
-                                size_t buflen, size_t offset);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
-        friend size_t serial_size(const TrxHandle&);
+// REMOVE        friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
+//                                size_t buflen, size_t offset);
+//        friend size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
+//        friend size_t serial_size(const TrxHandle&);
 
         friend std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
     };
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
 
-    size_t serialize(const TrxHandle&, gu::byte_t* buf,
-                     size_t buflen, size_t offset);
-    size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
-    size_t serial_size(const TrxHandle&);
+// REMOVE    size_t serialize(const TrxHandle&, gu::byte_t* buf,
+//                     size_t buflen, size_t offset);
+//    size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
+//    size_t serial_size(const TrxHandle&);
 
     class TrxHandleLock
     {

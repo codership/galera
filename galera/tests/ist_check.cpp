@@ -32,10 +32,10 @@ START_TEST(test_ist_message)
 #endif
 #endif /* 0 */
 
-    gu::Buffer buf(serial_size(m3));
-    serialize(m3, &buf[0], buf.size(), 0);
+    gu::Buffer buf(m3.serial_size());
+    m3.serialize(&buf[0], buf.size(), 0);
     Message mu3(3);
-    unserialize(&buf[0], buf.size(), 0, mu3);
+    mu3.unserialize(&buf[0], buf.size(), 0);
 
     fail_unless(mu3.version() == 3);
     fail_unless(mu3.type()    == Message::T_HANDSHAKE);
@@ -44,14 +44,14 @@ START_TEST(test_ist_message)
     fail_unless(mu3.len()     == 1001);
 
     Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
-    fail_unless(serial_size(m4) == 12);
+    fail_unless(m4.serial_size() == 12);
 
     buf.clear();
-    buf.resize(serial_size(m4));
-    serialize(m4, &buf[0], buf.size(), 0);
+    buf.resize(m4.serial_size());
+    m4.serialize(&buf[0], buf.size(), 0);
 
     Message mu4(4);
-    unserialize(&buf[0], buf.size(), 0, mu4);
+    mu4.unserialize(&buf[0], buf.size(), 0);
     fail_unless(mu4.version() == 4);
     fail_unless(mu4.type()    == Message::T_HANDSHAKE);
     fail_unless(mu4.flags()   == 0x2);
@@ -241,7 +241,7 @@ static void test_ist_common(int version)
             {"key2", 4}
         };
         trx->append_key(KeyData(trx_version, key, 2, 0, 0));
-        trx->append_data("bar", 3);
+        trx->append_data("bar", 3, true);
 
         size_t trx_size(serial_size(*trx));
         gu::byte_t* ptr(reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size)));
