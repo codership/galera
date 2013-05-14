@@ -1,5 +1,5 @@
 
-env = DefaultEnvironment()
+Import('env')
 
 gcache_env = env.Clone()
 

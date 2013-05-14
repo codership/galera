@@ -1,4 +1,4 @@
-env = DefaultEnvironment()
+Import('env')
 
 libgalerautils_env = env.Clone()
 
@@ -12,6 +12,7 @@ libgalerautils_sources = [
     'gu_mem.c',
     'gu_mmh3.c',
     'gu_spooky.c',
+    'gu_rand.c',
     'gu_mutex.c',
     'gu_hexdump.c',
     'gu_to.c',

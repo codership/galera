@@ -140,36 +140,36 @@ START_TEST(test_serialization)
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
     TrxHandle* trx(new TrxHandle(0, uuid, 4567, 8910, true));
 
-    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
+    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
-    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8 + 2);
+    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
     trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
-    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
+    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->append_annotation(reinterpret_cast<const gu::byte_t*>("foobar"),
                            strlen("foobar"));
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
+    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
     trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
-    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
+    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     TrxHandle* trx2(new TrxHandle());
 
-    std::vector<gu::byte_t> buf(serial_size(*trx));
-    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
-    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+    std::vector<gu::byte_t> buf(trx->serial_size());
+    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
-    buf.resize(serial_size(*trx));
-    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
-    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+    buf.resize(trx->serial_size());
+    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
 
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    buf.resize(serial_size(*trx));
-    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
-    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
-    fail_unless(serial_size(*trx2) == serial_size(*trx));
+    buf.resize(trx->serial_size());
+    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    fail_unless(trx2->serial_size() == trx->serial_size());
 
     trx2->unref();
     trx->unref();

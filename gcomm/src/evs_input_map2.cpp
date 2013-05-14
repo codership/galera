@@ -95,9 +95,13 @@ std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMap& im)
     return (os << "evs::input_map: {"
             << "aru_seq="        << im.aru_seq()   << ","
             << "safe_seq="       << im.safe_seq()  << ","
-            << "node_index="     << *im.node_index_     << ","
+            << "node_index="     << *im.node_index_
+#ifndef NDEBUG
+            << ","
             << "msg_index="      << *im.msg_index_      << ","
-            << "recovery_index=" << *im.recovery_index_ << "}");
+            << "recovery_index=" << *im.recovery_index_
+#endif // !NDEBUG
+            << "}");
 }
 
 

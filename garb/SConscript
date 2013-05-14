@@ -1,8 +1,9 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-env = DefaultEnvironment().Clone()
+Import('env')
 
-conf = Configure(env)
+garb_env = env.Clone()
+conf = Configure(garb_env)
 
 if not conf.CheckLibWithHeader(libs=['boost_program_options'],
                                header='boost/program_options.hpp',
@@ -11,10 +12,10 @@ if not conf.CheckLibWithHeader(libs=['boost_program_options'],
     print 'Error: boost_program_options not found'
     Exit (1)
 
-env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
-env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
-env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
-env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
+garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+garb_env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
+garb_env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
 
 #bpo_static = '/usr/lib/libboost_program_options.a'
 #bpo_local_static = '/usr/local/lib/libboost_program_options.a'
@@ -37,18 +38,18 @@ if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
                     LIBBOOST_PROGRAM_OPTIONS_A = '/usr/lib64/libboost_program_options.a'
 
 if os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-    env.Append(LIBS=File(LIBBOOST_PROGRAM_OPTIONS_A))
+    garb_env.Append(LIBS=File(LIBBOOST_PROGRAM_OPTIONS_A))
 else:
     # as a last resort try shared library
-    env.Append(LIBS=['boost_program_options'])
+    garb_env.Append(LIBS=['boost_program_options'])
 
 # special environment for garb_config.cpp
-conf_env = env.Clone()
+conf_env = garb_env.Clone()
 Import('GALERA_VER', 'GALERA_REV')
 conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
 conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
 
-garb = env.Program(target = 'garbd',
+garb = garb_env.Program(target = 'garbd',
                    source = Split('''
                                   garb_logger.cpp
                                   garb_gcs.cpp

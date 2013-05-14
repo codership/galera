@@ -243,9 +243,9 @@ static void test_ist_common(int version)
         trx->append_key(KeyData(trx_version, key, 2, 0, 0));
         trx->append_data("bar", 3, true);
 
-        size_t trx_size(serial_size(*trx));
+        size_t trx_size(trx->serial_size());
         gu::byte_t* ptr(reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size)));
-        serialize(*trx, ptr, trx_size, 0);
+        trx->serialize(ptr, trx_size, 0);
         gcache->seqno_assign(ptr, i, i - 1, false);
         trx->unref();
     }

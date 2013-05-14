@@ -1,6 +1,6 @@
 #
 
-env = DefaultEnvironment()
+Import('env')
 
 libgcomm_sources = [
     'conf.cpp',

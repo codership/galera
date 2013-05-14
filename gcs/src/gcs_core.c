@@ -548,6 +548,7 @@ core_handle_act_msg (gcs_core_t*          core,
                     act->act.buf_len = local_act->action_size;
                     sent_act_id      = local_act->sent_act_id;
                     gcs_fifo_lite_pop_head (core->fifo);
+
                     assert (NULL != act->local);
 
                     /* NOTE! local_act cannot be used after this point */

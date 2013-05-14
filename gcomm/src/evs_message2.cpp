@@ -54,8 +54,7 @@ size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) |
                              (suspected_   == true ? F_SUSPECTED   : 0));
     gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
-    uint8_t pad(0);
-    gu_trace(offset = gu::serialize1(pad, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(segment_, buf, buflen, offset));
     gu_trace(offset = gu::serialize8(leave_seq_, buf, buflen, offset));
     gu_trace(offset = view_id_.serialize(buf, buflen, offset));
     gu_trace(offset = gu::serialize8(safe_seq_, buf, buflen, offset));
@@ -77,12 +76,7 @@ size_t gcomm::evs::MessageNode::unserialize(const gu::byte_t* const buf,
     operational_ = b & F_OPERATIONAL;
     suspected_   = b & F_SUSPECTED;
 
-    uint8_t pad(0);
-    gu_trace(offset = gu::unserialize1(buf, buflen, offset, pad));
-    if (pad != 0)
-    {
-        gu_throw_error(EINVAL) << "invalid pad" << pad;
-    }
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, segment_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, leave_seq_));
     gu_trace(offset = view_id_.unserialize(buf, buflen, offset));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, safe_seq_));

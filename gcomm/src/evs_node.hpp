@@ -48,7 +48,8 @@ public:
         suspect_timeout_ (suspect_timeout),
         inactive_timeout_(inactive_timeout),
         tstamp_          (gu::datetime::Date::now()),
-        fifo_seq_        (-1)
+        fifo_seq_        (-1),
+        segment_         (0)
     {}
 
     Node(const Node& n);
@@ -89,6 +90,7 @@ public:
 
     void set_fifo_seq(const int64_t seq) { fifo_seq_ = seq; }
     int64_t fifo_seq() const { return fifo_seq_; }
+    SegmentId segment() const { return segment_; }
 
     bool is_inactive() const;
     bool is_suspected() const;
@@ -129,6 +131,7 @@ private:
     gu::datetime::Date tstamp_;
     //
     int64_t fifo_seq_;
+    SegmentId segment_;
 };
 
 class gcomm::evs::NodeMap : public Map<UUID, Node> { };

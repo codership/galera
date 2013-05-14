@@ -48,12 +48,14 @@ class gcomm::evs::MessageNode
 public:
     MessageNode(const bool    operational  = false,
                 const bool    suspected    = false,
+                const SegmentId segment    = 0,
                 const seqno_t leave_seq    = -1,
                 const ViewId& view_id      = ViewId(V_REG),
                 const seqno_t safe_seq     = -1,
                 const Range   im_range     = Range()) :
         operational_(operational),
         suspected_  (suspected  ),
+        segment_    (segment    ),
         leave_seq_  (leave_seq  ),
         view_id_    (view_id    ),
         safe_seq_   (safe_seq   ),
@@ -64,6 +66,7 @@ public:
         :
         operational_ (mn.operational_),
         suspected_   (mn.suspected_  ),
+        segment_     (mn.segment_    ),
         leave_seq_   (mn.leave_seq_  ),
         view_id_     (mn.view_id_    ),
         safe_seq_    (mn.safe_seq_   ),
@@ -77,6 +80,7 @@ public:
     const ViewId& view_id()     const { return view_id_           ; }
     seqno_t       safe_seq()    const { return safe_seq_          ; }
     Range         im_range()    const { return im_range_          ; }
+    SegmentId     segment()     const { return segment_           ; }
 
     bool operator==(const MessageNode& cmp) const
     {
@@ -97,12 +101,13 @@ private:
         F_OPERATIONAL = 1 << 0,
         F_SUSPECTED   = 1 << 1
     };
-    bool     operational_;     // Is operational
-    bool     suspected_;
-    seqno_t  leave_seq_;
-    ViewId   view_id_;         // Current view as seen by source of this message
-    seqno_t  safe_seq_;        // Safe seq as seen...
-    Range    im_range_;        // Input map range as seen...
+    bool      operational_;  // Is operational
+    bool      suspected_;
+    SegmentId segment_;
+    seqno_t   leave_seq_;
+    ViewId    view_id_;       // Current view as seen by source of this message
+    seqno_t   safe_seq_;      // Safe seq as seen...
+    Range     im_range_;      // Input map range as seen...
 };
 
 class gcomm::evs::MessageNodeList :

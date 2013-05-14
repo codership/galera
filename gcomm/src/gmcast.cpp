@@ -52,6 +52,9 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     version_(check_range(Conf::GMCastVersion,
                          param<int>(conf_, uri, Conf::GMCastVersion, "0"),
                          0, max_version_ + 1)),
+    segment_ (check_range(Conf::GMCastSegment,
+                          param<int>(conf_, uri, Conf::GMCastSegment, "0"),
+                          0, 255)),
     my_uuid_      (0, 0),
     use_ssl_      (param<bool>(conf_, uri, Conf::SocketUseSsl, "false")),
     // @todo: technically group name should be in path component
@@ -75,7 +78,8 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     relaying_     (false),
     isolate_      (false),
     proto_map_    (new ProtoMap()),
-    mcast_tree_   (),
+    segment_map_  (),
+    self_index_   (std::numeric_limits<size_t>::max()),
     time_wait_    (param<gu::datetime::Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period_ ("PT0.5S"),
     peer_timeout_ (param<gu::datetime::Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
@@ -191,7 +195,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait_));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl_));
     conf_.set(Conf::GMCastPeerTimeout, gu::to_string(peer_timeout_));
-
+    conf_.set(Conf::GMCastSegment, gu::to_string<int>(segment_));
 }
 
 gcomm::GMCast::~GMCast()
@@ -325,7 +329,7 @@ void gcomm::GMCast::close(bool force)
     delete listener_;
     listener_ = 0;
 
-    mcast_tree_.clear();
+    segment_map_.clear();
     for (ProtoMap::iterator
              i = proto_map_->begin(); i != proto_map_->end(); ++i)
     {
@@ -363,7 +367,9 @@ void gcomm::GMCast::gmcast_accept()
         version_, tp,
         listener_->listen_addr() /* listen_addr */,
         "", mcast_addr_,
-        uuid(), group_name_);
+        uuid(),
+        segment_,
+        group_name_);
     std::pair<ProtoMap::iterator, bool> ret =
         proto_map_->insert(std::make_pair(tp->id(), peer));
 
@@ -417,6 +423,7 @@ void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
         remote_addr,
         mcast_addr_,
         uuid(),
+        segment_,
         group_name_);
 
     std::pair<ProtoMap::iterator, bool> ret =
@@ -829,30 +836,47 @@ void gcomm::GMCast::update_addresses()
 
     // Build multicast tree
     log_debug << self_string() << " --- mcast tree begin ---";
-    mcast_tree_.clear();
+    segment_map_.clear();
+
+    Segment& local_segment(segment_map_[segment_]);
 
     if (mcast_ != 0)
     {
         log_debug << mcast_addr_;
-        mcast_tree_.push_back(mcast_.get());
+        local_segment.push_back(mcast_.get());
     }
 
+    self_index_ = 0;
     for (ProtoMap::const_iterator i(proto_map_->begin()); i != proto_map_->end();
          ++i)
     {
         const Proto& p(*ProtoMap::value(i));
 
-        log_debug << "Proto: " << p.state() << " " << p.remote_addr()
-                  << " " << p.mcast_addr();
+        log_debug << "Proto: " << p;
 
-        if (p.state() == Proto::S_OK &&
-            (p.mcast_addr() == "" ||
-             p.mcast_addr() != mcast_addr_))
+        if (p.remote_segment() == segment_)
         {
-            log_debug << p.remote_addr();
-            mcast_tree_.push_back(p.socket().get());
+            if (p.state() == Proto::S_OK &&
+                (p.mcast_addr() == "" ||
+                 p.mcast_addr() != mcast_addr_))
+            {
+                local_segment.push_back(p.socket().get());
+                if (p.remote_uuid() < uuid())
+                {
+                    ++self_index_;
+                }
+            }
+        }
+        else
+        {
+            if (p.state() == Proto::S_OK)
+            {
+                Segment& remote_segment(segment_map_[p.remote_segment()]);
+                remote_segment.push_back(p.socket().get());
+            }
         }
     }
+    log_debug << self_string() << " self index: " << self_index_;
     log_debug << self_string() << " --- mcast tree end ---";
 }
 
@@ -960,8 +984,19 @@ void gcomm::GMCast::check_liveness()
         }
         else if (p->state() == Proto::S_OK)
         {
-            // log_info << "live proto " << *p;
-            live_uuids.insert(p->remote_uuid());
+            if (p->tstamp() + peer_timeout_*2/3 < now)
+            {
+                p->send_keepalive();
+            }
+
+            if (p->state() == Proto::S_FAILED)
+            {
+                handle_failed(p);
+            }
+            else
+            {
+                live_uuids.insert(p->remote_uuid());
+            }
         }
         i = i_next;
     }
@@ -1017,23 +1052,75 @@ gu::datetime::Date gcomm::GMCast::handle_timers()
 }
 
 
-void gcomm::GMCast::relay(const Message& msg, const Datagram& dg,
+void send(gcomm::Socket* s, gcomm::Datagram& dg)
+{
+    int err;
+    if ((err = s->send(dg)) != 0)
+    {
+        log_debug << "failed to send to " << s->remote_addr()
+                  << ": (" << err << ") " << strerror(err);
+    }
+}
+
+void gcomm::GMCast::relay(const Message& msg,
+                          const Datagram& dg,
                           const void* exclude_id)
 {
-    Message relay_msg(msg);
-    relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
     Datagram relay_dg(dg);
     relay_dg.normalize();
-    gu_trace(push_header(relay_msg, relay_dg));
-    for (std::list<Socket*>::iterator i(mcast_tree_.begin());
-         i != mcast_tree_.end(); ++i)
+    Message relay_msg(msg);
+
+    if (msg.flags() & Message::F_SEGMENT_RELAY)
     {
-        int err;
-        if ((*i)->id() != exclude_id &&
-            (err = (*i)->send(relay_dg)) != 0)
+        if (msg.segment_id() == segment_)
         {
-            log_debug << "transport: " << ::strerror(err);
+            log_warn << "message with F_SEGMENT_RELAY from own segment, "
+                     << "source " << msg.source_uuid();
         }
+
+        if (msg.flags() & Message::F_RELAY)
+        {
+            // Relay message to other segments, excluding source segment
+            relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
+            gu_trace(push_header(relay_msg, relay_dg));
+            for (SegmentMap::iterator i(segment_map_.begin());
+                 i != segment_map_.end(); ++i)
+            {
+                uint8_t segment_id(i->first);
+                if (segment_id != segment_ && segment_id != msg.segment_id())
+                {
+                    Segment& segment(i->second);
+                    send(segment[(self_index_ + segment_id) % segment.size()],
+                         relay_dg);
+                }
+            }
+            gu_trace(pop_header(relay_msg, relay_dg));
+        }
+        relay_msg.set_flags(relay_msg.flags() & ~Message::F_SEGMENT_RELAY);
+
+        // Relay to local segment
+        Segment& segment(segment_map_[segment_]);
+        gu_trace(push_header(relay_msg, relay_dg));
+        for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
+        {
+            send(*i, relay_dg);
+        }
+        gu_trace(pop_header(relay_msg, relay_dg));
+    }
+    else
+    {
+        relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
+        // Relay to local segment
+        gu_trace(push_header(relay_msg, relay_dg));
+        Segment& segment(segment_map_[segment_]);
+        for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
+        {
+            if ((*i)->id() != exclude_id)
+            {
+                send(*i, relay_dg);
+            }
+        }
+        gu_trace(pop_header(relay_msg, relay_dg));
     }
 }
 
@@ -1119,7 +1206,8 @@ void gcomm::GMCast::handle_up(const void*        id,
 
             if (msg.type() >= Message::T_USER_BASE)
             {
-                if (msg.flags() & Message::F_RELAY)
+                if (msg.flags() &
+                    (Message::F_RELAY | Message::F_SEGMENT_RELAY))
                 {
                     relay(msg,
                           Datagram(dg, dg.offset() + msg.serial_size()),
@@ -1188,42 +1276,60 @@ void gcomm::GMCast::handle_up(const void*        id,
     }
 }
 
+
 int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    Message msg(version_, Message::T_USER_BASE, uuid(), 1);
+    Message msg(version_, Message::T_USER_BASE, uuid(), 1, segment_);
 
-    gu_trace(push_header(msg, dg));
-
-    size_t relay_idx(mcast_tree_.size());
-    if (relaying_ == true && relay_idx > 0)
+    for (SegmentMap::iterator si(segment_map_.begin());
+         si != segment_map_.end(); ++si)
     {
-        relay_idx = rand() % relay_idx;
-    }
+        uint8_t segment_id(si->first);
+        Segment& segment(si->second);
 
-    size_t idx(0);
-    for (std::list<Socket*>::iterator i(mcast_tree_.begin());
-         i != mcast_tree_.end(); ++i, ++idx)
-    {
-        if (relay_idx == idx)
+        if (segment_id != segment_)
         {
-            gu_trace(pop_header(msg, dg));
-            msg.set_flags(msg.flags() | Message::F_RELAY);
+            msg.set_flags(msg.flags() | Message::F_SEGMENT_RELAY);
+            if (relaying_ == true)
+            {
+                msg.set_flags(msg.flags() | Message::F_RELAY);
+            }
             gu_trace(push_header(msg, dg));
-        }
-        int err;
-        if ((err = (*i)->send(dg)) != 0)
-        {
-            log_debug << "transport: " << ::strerror(err);
-        }
-        if (relay_idx == idx)
-        {
+            send(segment[(self_index_ + segment_id) % segment.size()], dg);
             gu_trace(pop_header(msg, dg));
-            msg.set_flags(msg.flags() & ~Message::F_RELAY);
+        }
+        else
+        {
+            msg.set_flags(msg.flags() & ~Message::F_SEGMENT_RELAY);
             gu_trace(push_header(msg, dg));
+
+            size_t relay_idx(segment.size());
+            if (relaying_ == true && relay_idx > 0)
+            {
+                relay_idx = rand() % relay_idx;
+            }
+
+            size_t idx(0);
+            for (Segment::iterator i(segment.begin());
+                 i != segment.end(); ++i, ++idx)
+            {
+                if (relay_idx == idx)
+                {
+                    gu_trace(pop_header(msg, dg));
+                    msg.set_flags(msg.flags() | Message::F_RELAY);
+                    gu_trace(push_header(msg, dg));
+                }
+                send(*i, dg);
+                if (relay_idx == idx)
+                {
+                    gu_trace(pop_header(msg, dg));
+                    msg.set_flags(msg.flags() & ~Message::F_RELAY);
+                    gu_trace(push_header(msg, dg));
+                }
+            }
+            gu_trace(pop_header(msg, dg));
         }
     }
-
-    gu_trace(pop_header(msg, dg));
 
     return 0;
 }
@@ -1418,7 +1524,7 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
                 delete rp;
                 proto_map_->erase(pi);
             }
-            mcast_tree_.clear();
+            segment_map_.clear();
         }
         return true;
     }
@@ -1428,7 +1534,8 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
              key == Conf::GMCastMCastPort ||
              key == Conf::GMCastMCastTTL ||
              key == Conf::GMCastTimeWait ||
-             key == Conf::GMCastPeerTimeout)
+             key == Conf::GMCastPeerTimeout ||
+             key == Conf::GMCastSegment)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";

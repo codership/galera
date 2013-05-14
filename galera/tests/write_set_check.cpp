@@ -373,7 +373,7 @@ START_TEST(test_cert_hierarchical_v1)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -493,7 +493,7 @@ START_TEST(test_cert_hierarchical_v2)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -540,7 +540,7 @@ START_TEST(test_trac_726)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, 1, 1);
@@ -566,7 +566,7 @@ START_TEST(test_trac_726)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, 2, 2);

@@ -46,14 +46,16 @@ public:
          const uint32_t last_seq  = std::numeric_limits<uint32_t>::max(),
          const ViewId&  last_prim = ViewId(V_NON_PRIM),
          const int64_t  to_seq    = -1,
-         const int      weight    = -1)
+         const int      weight    = -1,
+         const SegmentId segment = 0)
         :
         prim_      (prim     ),
         un_        (un       ),
         last_seq_  (last_seq ),
         last_prim_ (last_prim),
         to_seq_    (to_seq   ),
-        weight_    (weight)
+        weight_    (weight),
+        segment_   (segment)
     { }
 
     void set_prim      (const bool val)          { prim_      = val      ; }
@@ -62,6 +64,7 @@ public:
     void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
     void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
     void set_weight    (const int weight)        { weight_    = weight   ; }
+    void set_segment   (const SegmentId segment) { segment_   = segment  ; }
 
     bool          prim()      const { return prim_     ; }
     bool          un()        const { return un_       ; }
@@ -69,6 +72,7 @@ public:
     const ViewId& last_prim() const { return last_prim_; }
     int64_t       to_seq()    const { return to_seq_   ; }
     int           weight()    const { return weight_   ; }
+    SegmentId     segment()   const { return segment_  ; }
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
     {
@@ -87,6 +91,7 @@ public:
         {
             weight_ = -1;
         }
+        segment_ = (flags >> 16) & 0xff;
         gu_trace (off = gu::unserialize4(buf, buflen, off, last_seq_));
         gu_trace (off = last_prim_.unserialize(buf, buflen, off));
         gu_trace (off = gu::unserialize8(buf, buflen, off, to_seq_));
@@ -106,6 +111,7 @@ public:
             flags |= F_WEIGHT;
             flags |= weight_ << 24;
         }
+        flags |= static_cast<uint32_t>(segment_) << 16;
         gu_trace (off = gu::serialize4(flags, buf, buflen, off));
         gu_trace (off = gu::serialize4(last_seq_, buf, buflen, off));
         gu_trace (off = last_prim_.serialize(buf, buflen, off));
@@ -132,7 +138,8 @@ public:
                 last_seq()  == cmp.last_seq()  &&
                 last_prim() == cmp.last_prim() &&
                 to_seq()    == cmp.to_seq()    &&
-                weight()    == cmp.weight() );
+                weight()    == cmp.weight()    &&
+                segment()   == cmp.segment()     );
     }
 
     std::string to_string() const
@@ -144,19 +151,21 @@ public:
             << ",last_seq="  << last_seq_
             << ",last_prim=" << last_prim_
             << ",to_seq="    << to_seq_
-            << ",weight="    << weight_;
+            << ",weight="    << weight_
+            << ",segment="   << static_cast<int>(segment_);
 
         return ret.str();
     }
 
 private:
 
-    bool     prim_;      // Is node in prim comp
-    bool     un_;        // The prim status of the node is unknown
-    uint32_t last_seq_;  // Last seen message seq from the node
-    ViewId   last_prim_; // Last known prim comp view id for the node
-    int64_t  to_seq_;    // Last known TO seq for the node
-    int      weight_;    // Node weight
+    bool      prim_;      // Is node in prim comp
+    bool      un_;        // The prim status of the node is unknown
+    uint32_t  last_seq_;  // Last seen message seq from the node
+    ViewId    last_prim_; // Last known prim comp view id for the node
+    int64_t   to_seq_;    // Last known TO seq for the node
+    int       weight_;    // Node weight
+    SegmentId segment_;
 };
 
 

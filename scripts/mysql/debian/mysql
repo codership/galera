@@ -99,7 +99,11 @@ mysqld_status() {
 # main()
 #
 
-case "${1:-''}" in
+cmd=${1:-''}
+[ $# -ge 1 ] && shift
+other_args="$*"
+
+case "$cmd" in
   'start')
 	sanity_checks;
 	# Start daemon
@@ -121,7 +125,7 @@ case "${1:-''}" in
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS"
 
 	    # Start MySQL!.
-	    /usr/bin/mysqld_safe $WSREP_OPTS > /dev/null 2>&1 &
+	    /usr/bin/mysqld_safe $WSREP_OPTS $other_args > /dev/null 2>&1 &
 
 	    # 6s was reported in #352070 to be too few when using ndbcluster
 	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
@@ -174,7 +178,7 @@ case "${1:-''}" in
 
   'restart')
 	set +e; $SELF stop; set -e
-	$SELF start 
+	$SELF start $other_args
 	;;
 
   'reload'|'force-reload')
