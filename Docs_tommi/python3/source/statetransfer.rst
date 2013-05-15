@@ -278,7 +278,7 @@ more details.
 
 ------------------------------------
  Scriptable State Snapshot Transfer
--------------------------------------
+------------------------------------
 .. _`Scriptable State Snapshot Transfer`:
 
 Galera has an interface to customize state snapshot transfer through
@@ -299,22 +299,22 @@ Common Parameters
 
 These parameters are always passed to any state transfer script:
 
-– ``role``
-– ``address``
-– ``auth``
-– ``datadir``
-– ``defaults-file``
-– ``parent``
+- ``role``
+- ``address``
+- ``auth``
+- ``datadir``
+- ``defaults-file``
+- ``parent``
 
 Donor-specific Parameters
 ==========================
 
 These parameters are passed to the state transfer script by the state transfer process:
 
-– ``socket`` |---| The local server (donor) socket for
+- ``socket`` |---| The local server (donor) socket for
   communications, if is required.
-– ``gtid`` |---| The global transaction ID in format: ``<uuid>:<seqno>``.
-– ``bypass`` |---| This parameter specifies whether the actual data
+- ``gtid`` |---| The global transaction ID in format: ``<uuid>:<seqno>``.
+- ``bypass`` |---| This parameter specifies whether the actual data
   transfer should be skipped and only the GTID should be passed to
   the receiving server (to go straight to incremental state transfer).
 
@@ -323,12 +323,12 @@ mysqldump-specific Parameters
 
 These parameters are only passed to the ``wsrep_sst_mysqldump``:
 
-– ``user`` |---| The MySQL user to connect to both remote and local
+- ``user`` |---| The MySQL user to connect to both remote and local
   servers. The user must be the same on both servers.
-– ``password`` |---| MySQL user password.
-– ``host`` |---| The remote server (receiver) host address.
-– ``port`` |---| The remote server (receiver) port.
-– ``local-port`` |---| The local server (donor) port.
+- ``password`` |---| MySQL user password.
+- ``host`` |---| The remote server (receiver) host address.
+- ``port`` |---| The remote server (receiver) port.
+- ``local-port`` |---| The local server (donor) port.
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:
