@@ -16,7 +16,7 @@ proceed as follows:
 4. Install the downloaded packages.
 
 -----------------------------
- Installing by using apt-get
+ Installing by Using apt-get
 -----------------------------
 
 If you prefer to install by using *apt-get*, ensure that you have
@@ -35,7 +35,7 @@ To install, open a terminal window and issue the command below:
           installing *mariadb-galera-server*.
 
 -------------------------
- Installing by using yum
+ Installing by Using yum
 -------------------------
 
 If you prefer to install by using *yum*, ensure that you have

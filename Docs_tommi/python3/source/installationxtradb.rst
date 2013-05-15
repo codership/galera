@@ -14,7 +14,7 @@ proceed as follows:
 3. Install the downloaded package.
 
 ------------------------------
- Installing by using apt-get
+ Installing by Using apt-get
 ------------------------------
 
 If you prefer to install by using *apt-get*, ensure that you have
@@ -31,7 +31,7 @@ To install, open a terminal window and issue the command below:
 .. note:: Replace the package name with the version you want to install.
 
 ----------------------------
- Installing by using yum
+ Installing by Using yum
 ----------------------------
 
 If you prefer to install by using *yum*, ensure that you have

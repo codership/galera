@@ -7,10 +7,17 @@
  Galera documentation
 =====================
 
-Welcome to Galera documentation!
-==================================
+This is the official documentation for *Galera Cluster*.
+The cocumentation covers the following *Galera Cluster*
+implementations:
 
-Contents:
+- Galera Cluster for MySQL
+- Percona XtraDB Cluster
+- MariaDB Galera Cluster
+
+
+Contents
+========
 
 .. toctree::
    :maxdepth: 2
@@ -21,8 +28,6 @@ Contents:
    userguide
    reference
 
-
-
 Indices and tables
 ==================
 
@@ -31,8 +36,9 @@ Indices and tables
 
 Trademarks
 ==========
-*"MySQL"* is a registered trademark of Oracle Corporation. 
-*"Percona XtraDB Cluster"* and *"Percona Server"* are 
-registered trademarks of Percona LLC. *"MariaDB"* and 
-*"MariaDB Galera Cluster"* are registered trademarks of 
-Monty Program Ab.
+
+- *"MySQL"* is a registered trademark of Oracle Corporation. 
+- *"Percona XtraDB Cluster"* and *"Percona Server"* are 
+  registered trademarks of Percona LLC. *"MariaDB"* and 
+- *"MariaDB Galera Cluster"* are registered trademarks of 
+  Monty Program Ab.
