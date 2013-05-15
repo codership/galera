@@ -29,8 +29,10 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`search`
 
-.. [#fn_trademarks] *"MySQL"* is a registered trademark of Oracle Corporation. 
-                    *"Percona XtraDB Cluster"* and *"Percona Server"* are 
-                    registered trademarks of Percona LLC. *"MariaDB"* and 
-                    *"MariaDB Galera Cluster"* are registered trademarks of 
-                    Monty Program Ab.
+Trademarks
+==========
+*"MySQL"* is a registered trademark of Oracle Corporation. 
+*"Percona XtraDB Cluster"* and *"Percona Server"* are 
+registered trademarks of Percona LLC. *"MariaDB"* and 
+*"MariaDB Galera Cluster"* are registered trademarks of 
+Monty Program Ab.
