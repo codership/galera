@@ -1603,6 +1603,66 @@ START_TEST(test_trac_724)
 END_TEST
 
 
+START_TEST(test_trac_760)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (trac_760)";
+    init_rand();
+
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(send_n(dn[i], 2));
+
+    }
+    gu_trace(prop.propagate_until_empty());
+
+
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+    gu_trace(send_n(dn[0], 1));
+    gu_trace(send_n(dn[1], 1));
+    // gu_trace(send_n(dn[2], 1));
+
+    set_cvi(dn, 0, 1, max_view_seq + 1);
+    dn[2]->set_cvi(V_REG);
+    dn[2]->close();
+
+    Proto* evs0(evs_from_dummy(dn[0]));
+    Proto* evs1(evs_from_dummy(dn[1]));
+    while (evs1->state() != Proto::S_GATHER && evs0->state() != Proto::S_GATHER)
+    {
+        gu_trace(prop.propagate_n(1));
+    }
+    dn[1]->close();
+
+    gu_trace(prop.propagate_until_cvi(true));
+
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -1748,5 +1808,12 @@ Suite* evs2_suite()
         suite_add_tcase(s, tc);
 
     }
+
+    tc = tcase_create("test_trac_760");
+    tcase_add_test(tc, test_trac_760);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+
+
     return s;
 }

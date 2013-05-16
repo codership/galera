@@ -229,7 +229,13 @@ public:
         // instead of that raise a boolean flag to indicate that
         // shifting to S_LEAVING should be done once S_OPERATIONAL
         // is reached
-        if (state() != S_INSTALL)
+        //
+        // #760 - pending leave should be done also from S_GATHER,
+        // changing state to S_LEAVING resets timers and may prevent
+        // remaining nodes to reach new group until install timer
+        // times out
+        log_debug << self_string() << " closing in state " << state();
+        if (state() != S_GATHER && state() != S_INSTALL)
         {
             gu_trace(shift_to(S_LEAVING));
             gu_trace(send_leave());
