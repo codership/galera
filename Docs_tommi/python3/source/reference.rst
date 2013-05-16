@@ -14,4 +14,5 @@ Contents:
    :numbered:
 
    galeraparameters
-   
+   mysqlwsrepoptions
+   galerastatusvariables

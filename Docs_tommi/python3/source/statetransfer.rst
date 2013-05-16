@@ -279,7 +279,7 @@ more details.
 ------------------------------------
  Scriptable State Snapshot Transfer
 ------------------------------------
-.. _`Scriptable State Snapshot Transfer`:
+.. _`SSST`:
 
 Galera has an interface to customize state snapshot transfer through
 an external script. The script assumes that the storage engine

@@ -14,8 +14,8 @@ Contents:
    :numbered:
 
    galerareplication
-   installationmariadb
    installationmysql
+   installationmariadb
    installationxtradb
    configuration
    createcluster

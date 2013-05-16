@@ -23,3 +23,4 @@ Contents:
    weightedquorum
    schemaupgrades
    recovery
+   limitations

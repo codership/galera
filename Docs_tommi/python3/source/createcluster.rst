@@ -3,19 +3,64 @@
 =====================
 .. _`Creating a Cluster`:
 
-To create and bootstrap a new cluster, you must set up the group
-communication structure for the cluster nodes. Proceed as follows:
+This chapter describes how to create a cluster with three nodes.
+We use host names *host1*, *host2* and *host3* in the command
+examples.
+
+------------------
+ Before You Start
+------------------
+.. _`Before You Start`:
+
+Before you start, ensure that you have:
+
+- Three database hosts with Galera installed.
+- No firewalls between the hosts.
+- *Selinux* or *apparmor* disabled or running in permissive mode.
+
+
+------------------------------------------------------
+ Creating a MySQL Client Connection Between the Nodes
+------------------------------------------------------
+ .. _`Creating a MySQL Client Connection Between the Nodes`:
+ 
+After the MySQL and Galera installations, the MySQL servers are
+running as three independent databases. They are not connected
+to each other as a cluster. Furthermore, the Galera Cluster
+library is not loaded in the configuration.
+
+To connect the MySQL servers to each other as a cluster, you
+must create MySQL client connections between the nodes. In
+this way, the nodes can carry out state snapshot transfers
+with each other.
+
+In this example, you use the default state snapshot transfer
+method, that is, *mysqldump*. Grant root privileges in the
+MySQL user database on all nodes to allow this, as follows:
+
+::
+
+    mysql GRANT ALL ON . TO 'root'@'host1‘; GRANT ALL ON . TO 'root'@'host2‘; GRANT ALL ON . TO 'root'@'host3‘; exit
+
+------------------------------------
+ Starting the First Cluster Node
+------------------------------------
+
+To create and bootstrap the first cluster node, you must set up
+the group communication structure for the cluster nodes. Proceed
+as follows:
 
 1. Power up the servers that will join the cluster. Do not
    start the *mysqld* servers yet.
-2. Define an empty cluster address URL for the first *mysqld*
-   server. Specify this :abbr:`URL (Uniform Resource Locator)`
-   either in the *my.cnf* configuration
-   file or by issuing the command below:
-
-   ``$ mysqld --wsrep_cluster_address=gcomm://``
+2. Define the wsrep provider and an empty cluster address URL
+   for the first *mysqld* server. Specify this
+   :abbr:`URL (Uniform Resource Locator)` in the *my.cnf*
+   configuration file as follows::
    
-   This command implies to the starting *mysqld* server that
+      wsrep_provider="/usr/lib/libgalera_smm.so"
+      wsrep_cluster_address="gcomm://"
+
+   These entries imply to the starting *mysqld* server that
    there is no existing cluster to connect to, and the server
    will create a new history :abbr:`UUID (Universally Unique Identifier)`.
    
@@ -24,8 +69,32 @@ communication structure for the cluster nodes. Proceed as follows:
                 to an existing one.
 
 3. Start the first *mysqld* server with an empty cluster
-   address URL.
-4. To add the second node to the cluster, see
+   address URL:
+   
+     ``/etc/init.d/mysql start``
+   
+4. Check that the startup succeeded and that the changes are
+   applied::
+   
+     mysql -e "SHOW VARIABLES LIKE 'wsrep_cluster_address'"
+
+     +-----------------------+----------+
+     | Variable_name         | Value    |
+     +-----------------------+----------+
+     | wsrep_cluster_address | gcomm:// |
+     +-----------------------+----------+
+   
+5. Immediately after startup, open the *my.cnf* configuration file
+   in a text editor and change the value of ``wsrep_cluster_address``
+   to point to the other two nodes:
+   
+     ``wsrep_cluster_address="host2,host3"``
+   
+   .. note:: Do not restart MySQL at this point.
+   
+   .. note:: You can also use :abbr:`IP (Internet protocol)` addresses.
+   
+6. To add the second and third node to the cluster, see
    chapter `Adding Nodes to a Cluster`_ below.
 
 -----------------------------
@@ -39,13 +108,14 @@ To add a new node to an existing cluster, proceed as follows:
 
 1. Power up the server that will join the cluster. Do not
    start the *mysqld* server yet.
-2. Define a :abbr:`URL (Uniform Resource Locator)` address to
-   one of the existing cluster nodes for the new node by issuing
-   the command below:
+2. Define the wsrep provider and the host names for the other
+   *mysqld* servers in the cluster. Specify these parameters
+   in the *my.cnf* configuration file as follows::
 
-   ``$ mysqld --wsrep_cluster_address=gcomm://192.168.0.1``
+      wsrep_provider="/usr/lib/libgalera_smm.so"
+      *wsrep_cluster_address="host1,host3"*
 
-   .. note:: You can also use :abbr:`DNS (Domain Name System)` addresses.
+   .. note:: You can also use :abbr:`IP (Internet protocol)` addresses.
 
    This command implies to the starting *mysqld* server that
    there an existing cluster to connect to.
@@ -53,10 +123,21 @@ To add a new node to an existing cluster, proceed as follows:
    initial node weight to zero. In this way, it can be guaranteed
    that if the joining node fails before it gets synchronized,
    it does not have effect in the quorum computation that follows. 
-4. Start the *mysqld* server.
-5. The new node connects to the defined cluster member. It will
+4. Start the *mysqld* server:
+
+   ``/etc/init.d/mysql start``
+
+5. The new node connects to the defined cluster members. It will
    automatically retrieve the cluster map and reconnect to the
-   rest of the nodes, if any.
+   rest of the nodes.
+
+Carry out the procedure above the *node3*. The only difference is
+that you must define host *host1* and *host2* for it in step 2
+as follows::
+
+    wsrep_provider="/usr/lib/libgalera_smm.so"
+    *wsrep_cluster_address="host1,host2"*
+   
 
 As soon as all cluster members agree on the membership, state
 exchange will be initiated. In state exchange, the new node is
@@ -64,3 +145,68 @@ informed of the cluster state. If the node state differs from
 the cluster state (which is normally the case), the new node
 requests for a state snapshot from the cluster and installs
 it. After this, the new node is ready for use.
+
+--------------------------------
+ Testing That the Cluster Works
+--------------------------------
+.. _`Testing That the Cluster Works`:
+
+You can test that the cluster actually works as follows:
+
+1. Connect to MySQL on any node:
+
+::
+
+   mysql
+
+2. Verify that all nodes have connected to each other by checking
+   the following status variables:
+
+::
+
+   show status like 'wsrep_%';
+
+   +----------------------------+--------------------------------------+
+   | Variable_name              | Value                                |
+   +----------------------------+--------------------------------------+
+   ...
+   | wsrep_local_state_comment  | Synced (6)                           |
+   | wsrep_cluster_size         | 3                                    |
+   | wsrep_ready                | ON                                   |
+   +----------------------------+--------------------------------------+
+
+   In the example above:
+   - The ``wsrep_local_state_comment`` value *Synced* indicates that
+     the node is connected to the cluster and operational.
+   - The ``wsrep_cluster_size`` value *3* indicates that there are
+     three nodes in the cluster.
+   - The ``wsrep_ready`` value *ON* indicates that this node is connected
+     to the cluster and able to handle transactions.
+
+3. Create a test table and insert data. On *host1*, open a MySQL prompt
+   and issue commands:
+
+::
+
+   CREATE DATABASE galeratest;
+   use galeratest
+   CREATE TABLE t (id INT PRIMARY KEY auto_increment, msg TEXT);
+   INSERT INTO t (msg) VALUES ("Hello my dear cluster");
+   INSERT INTO t (msg) VALUES ("Hello again");
+
+4. Check that the data was replicated correctly. On *host2*, open
+   a MySQL prompt and issue commands:
+
+::
+
+   use galeratest
+   SELECT * FROM t;
+
+   +----+-----------------------+
+   | id | msg                   |
+   +----+-----------------------+
+   |  3 | Hello my dear cluster |
+   |  6 | Hello again           |
+   +----+-----------------------+
+
+5. The results above indicate that the cluster works.
