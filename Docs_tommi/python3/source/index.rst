@@ -8,7 +8,7 @@
 =====================
 
 This is the official documentation for *Galera Cluster*.
-The cocumentation covers the following *Galera Cluster*
+The documentation covers the following *Galera Cluster*
 implementations:
 
 - Galera Cluster for MySQL
