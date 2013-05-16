@@ -6,9 +6,9 @@
 As of version 0.8 Galera accepts parameters as semicolon-separated
 key value pair lists, such as ``key1 = value1; key2 = value2``.
 In this way, you can configure an arbitrary number of Galera parameters
-in one call. A key consists of parameter group and parameter name:
+in one call. A key consists of parameter group and parameter name::
 
-``<group>.<name>``
+  <group>.<name>
 
 Where ``<group>`` roughly corresponds to some Galera module.
 
@@ -53,7 +53,7 @@ Table legend:
 | ``gmcast.mcast_addr``                 |                       | If set, UDP multicast will be used for replication,|
 |                                       |                       | for example::                                      |
 |                                       |                       |                                                    |
-|                                       |                       |   ``gmcast.mcast_addr=239.192.0.11``               |
+|                                       |                       |   gmcast.mcast_addr=239.192.0.11                   |
 |                                       |                       |                                                    |
 |                                       |                       | The value must be the same on all nodes.           |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -88,7 +88,7 @@ Table legend:
 |                                       |                       | - *0x2* |---| extra state change info              |
 |                                       |                       | - *0x4* |---| statistics                           |
 |                                       |                       | - *0x8* |---| profiling (only in builds with       |
-|                                       |                       |         profiling enabled)                         |
+|                                       |                       |   profiling enabled)                               |
 |                                       |                       |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.install_timeout`` **(R)**       | *PT15S*               | Timeout on waiting for install message             |
@@ -191,15 +191,15 @@ Table legend:
 |                                       |                       | which replication rate will be throttled.          |
 |                                       |                       |                                                    |
 |                                       |                       | The degree of throttling is a linear function of   |
-|                                       |                       | recv queue size and goes from 1.0 (“full rate”)    |
+|                                       |                       | recv queue size and goes from 1.0 (*full rate*)    |
 |                                       |                       | at ``gcs.recv_q_soft_limit`` to                    |
 |                                       |                       | ``gcs.max_throttle`` at ``gcs.recv_q_hard_limit``  |
-|                                       |                       | Note that “full rate”, as estimated between 0 and  |
+|                                       |                       | Note that *full rate*, as estimated between 0 and  |
 |                                       |                       | ``gcs.recv_q_soft_limit`` is a very imprecise      |
 |                                       |                       | estimate of a regular replication rate.            |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcs.sync_donor``                    | *NO*                  | Should the rest of the cluster keep in sync with   |
-|                                       |                       | the donor? “Yes” means that if the donor is        |
+|                                       |                       | the donor? *Yes* means that if the donor is        |
 |                                       |                       | blocked by state transfer, the whole cluster       |
 |                                       |                       | is blocked with it.                                |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -210,14 +210,14 @@ Table legend:
 | ``replicator.commit_order``           | *3*                   | Whether to allow Out-Of-Order committing (improves |
 |                                       |                       | parallel applying performance). Possible settings: |
 |                                       |                       |                                                    |
-|                                       |                       | - 0 – BYPASS: all commit order monitoring is       |
+|                                       |                       | - 0 |---| BYPASS: all commit order monitoring is   |
 |                                       |                       |   switched off (useful for measuring performance   |
 |                                       |                       |   penalty)                                         |
-|                                       |                       | - 1 – OOOC: allow out of order committing for all  |
-|                                       |                       |   transactions                                     |
-|                                       |                       | - 2 – LOCAL_OOOC: allow out of order committing    |
-|                                       |                       |   only for local transactions                      |
-|                                       |                       | - 3 – NO_OOOC: no out of order committing is       |
+|                                       |                       | - 1 |---| OOOC: allow out of order committing for  |
+|                                       |                       |   all transactions                                 |
+|                                       |                       | - 2 |---| LOCAL_OOOC: allow out of order           |
+|                                       |                       |   committing only for local transactions           |
+|                                       |                       | - 3 |---| NO_OOOC: no out of order committing is   |
 |                                       |                       |   allowed (strict total order committing)          |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``replicator.causal_read_timeout``    | *PT30S*               | Sometimes causal reads need to timeout.            |
@@ -232,7 +232,7 @@ Table legend:
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcache.page_size``                  | *128Mb*               | Size of the page files in page storage. The limit  |
 |                                       |                       | on overall page storage is the size of the disk.   |
-|                                       |                       |  Pages are prefixed by ``gcache.page``.            |
+|                                       |                       | Pages are prefixed by ``gcache.page``.             |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcache.keep_pages_size``            | *0*                   | Total size of the page storage pages to keep for   |
 |                                       |                       | caching purposes. If only page storage is enabled, |

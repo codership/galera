@@ -64,7 +64,7 @@ into consideration:
 ---------------------------------
  Rolling Schema Upgrade
 ---------------------------------
-.. _`RSU`:
+.. _`Rolling Schema Upgrade`:
 
 As of *wsrep* patch 5.5.17-22.3, you can choose whether to use the
 traditional total order isolation method or the rolling schema upgrade

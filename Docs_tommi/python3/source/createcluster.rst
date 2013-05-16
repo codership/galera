@@ -40,7 +40,11 @@ MySQL user database on all nodes to allow this, as follows:
 
 ::
 
-    mysql GRANT ALL ON . TO 'root'@'host1‘; GRANT ALL ON . TO 'root'@'host2‘; GRANT ALL ON . TO 'root'@'host3‘; exit
+    mysql
+    GRANT ALL ON *.* TO 'root'@'host1';
+    GRANT ALL ON *.* TO 'root'@'host2';
+    GRANT ALL ON *.* TO 'root'@'host3';
+    exit
 
 ------------------------------------
  Starting the First Cluster Node

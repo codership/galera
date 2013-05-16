@@ -14,7 +14,7 @@ You can also define the notification command ``wsrep_notify_cmd``
 to be invoked when the cluster membership or node status changes.
 This command can also communicate the event to a monitoring agent.
 For more information on the ``wsrep_notify_cmd`` command, see chapter 
-:ref:`Status Variables <Status Variables>`.
+:ref:`Galera Parameters <Galera Parameters>`.
 
 .. note:: Status variables and variables in the chapters below are
           differential and reset on every ``SHOW STATUS`` command.
