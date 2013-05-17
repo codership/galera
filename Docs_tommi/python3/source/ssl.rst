@@ -18,14 +18,22 @@ for the cluster, for example, by the following command::
           way to update the cluster without complete shutdown. Thus, use a
           large value for the the ``-days`` parameter.
 
-Copy this certificate/key pair to all of the nodes and take it to use
-by specifying the following Galera options::
+Copy this certificate/key pair to the */etc/mysql* directory on all of the
+nodes. Copy the files over a secure channel between the nodes.
+
+Take the certificate/key pair to use by specifying the following Galera options::
 
     socket.ssl_cert = <path_to_cert_file>; socket.ssl_key = <path_to_key_file>
 
 Other SSL configuration parameters include ``socket.ssl_compression`` and
 ``socket.ssl_cipher``. See :ref:`Galera Parameters <Galera Parameters>`
 for details.
+
+.. note:: You cannot use a mixed cluster where some nodes have SSL and
+          some do not. We recommend configuring SSL when you are setting
+          up a new cluster. If you must add SSL support on a production
+          system, you must rebootstrap the cluster and accept a brief
+          outage.
 
 .. warning:: Galera SSL support only covers Galera communication. Since state
              snapshot transfer happens outside of Galera, protect it separately.

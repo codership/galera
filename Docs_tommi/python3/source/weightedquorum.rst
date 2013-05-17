@@ -16,7 +16,7 @@ The cluster size determines the required votes to achieve quorum.
 A quorum vote is carried out when a node does not respond
 and is suspected to no longer be part of the cluster. This no
 response timeout is defined by the ``evs.suspect_timeout`` setting
-in the wsrep_provider_options (default 5 sec).
+in the ``wsrep_provider_options`` (default 5 sec).
 
 If a node is determined to be disconnected, the remaining nodes
 cast a quorum vote. If a majority from the total nodes connected

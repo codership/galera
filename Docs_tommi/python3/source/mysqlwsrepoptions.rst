@@ -78,6 +78,7 @@ by (L).
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+
 | ``wsrep_max_ws_size``                | *1G*                      | Maximum allowed writeset size. Currently it limits the                          |
 |                                      |                           | supported size of transactions and ``LOAD DATA`` statements.                    |
+|                                      |                           | The maximum allowed allowed writeset size that you can set is 2G.               |
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+
 | ``wsrep_node_address``               | *<address>[:port]*        | An option to explicitly specify the network address of the                      |
 |                                      |                           | node if autoguessing for some reason does not produce                           |

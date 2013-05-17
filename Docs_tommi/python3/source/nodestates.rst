@@ -1,20 +1,30 @@
 =============
- Node States
+ Flow Control
 =============
-.. _`Node States`:
+.. _`Flow Control`:
+
+Flow control allows a cluster node to instruct the other nodes
+in the cluster when it needs to pause replication and when it is
+ready to continue replication. This prevents any node in the
+cluster from lagging too far behind the others in applying
+replication.
+
+Read also this percona article:
+http://www.mysqlperformanceblog.com/2013/05/02/galera-flow-control-in-percona-xtradb-cluster-for-mysql/
 
 This chapter describes the flow control of node states and the
 possible node state changes. 
 
 ---------------
- Flow Control
+ Node States
 ---------------
-.. _`Flow Control`:
+.. _`Node States`:
 
 To ensure temporal synchrony and consistency (as opposed
 to logical which is provided by virtual synchrony), Galera
 implements several forms of flow control, depending on the
-node state.
+node state. The node states are descibed in the chapters
+below.
 
 ``OPEN`` and ``PRIMARY``
 =========================
