@@ -255,8 +255,7 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
         goto repl_q_failed;
     }
 
-    size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
-        sizeof(struct gcs_recv_act) / 4;
+    size_t recv_q_len = GU_AVPHYS_SIZE / sizeof(struct gcs_recv_act) / 4;
 
     gu_debug ("Requesting recv queue len: %zu", recv_q_len);
     conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
