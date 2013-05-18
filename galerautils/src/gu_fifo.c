@@ -58,21 +58,20 @@ struct gu_fifo
 /* Don't make rows less than 1K */
 #define GCS_FIFO_MIN_ROW_POWER 10
 
+typedef unsigned long long ull;
+
 /* constructor */
 gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 {
-    size_t row_pwr    = GCS_FIFO_MIN_ROW_POWER;
-    size_t row_len    = 1 << row_pwr;
-    size_t row_size   = row_len * item_size;
-    size_t array_pwr  = 1; // need at least 2 rows for alteration
-    size_t array_len  = 1 << array_pwr;
-    size_t array_size = array_len * sizeof(void*);
-    size_t mem_limit  = GU_PHYS_PAGES * GU_PAGE_SIZE;
-    size_t alloc_size = 0;
-    gu_fifo_t *ret    = NULL;
+    int row_pwr    = GCS_FIFO_MIN_ROW_POWER;
+    ull row_len    = 1 << row_pwr;
+    ull row_size   = row_len * item_size;
+    int array_pwr  = 1; // need at least 2 rows for alteration
+    ull array_len  = 1 << array_pwr;
+    ull array_size = array_len * sizeof(void*);
+    gu_fifo_t *ret = NULL;
 
     if (length > 0 && item_size > 0) {
-        size_t max_size;
         /* find the best ratio of width and height:
          * the size of a row array must be equal to that of the row */
         while (array_len * row_len < length) {
@@ -88,21 +87,36 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
             }
         }
 
-        max_size = array_len * row_size + array_size + sizeof(gu_fifo_t);
-        if (max_size > mem_limit) {
-            gu_error ("Resulting FIFO size %zu exceeds physical memory "
-                      "limit %zu", max_size, mem_limit);
-            return NULL;
-        }
-        if ((array_len * row_len) > (size_t)GU_LONG_MAX) {
-            gu_error ("Resulting queue length %zu exceeds max allowed %zu",
-                      array_len * row_len, (size_t)GU_LONG_MAX);
+        ull alloc_size = array_size + sizeof (gu_fifo_t);
+
+        if (alloc_size > (size_t)-1) {
+            gu_error ("Initial FIFO size %llu exceeds size_t range %zu",
+                      alloc_size, (size_t)-1);
             return NULL;
         }
 
-        alloc_size = sizeof (gu_fifo_t) + array_size;
+        ull max_size = array_len * row_size + alloc_size;
 
-        gu_debug ("Creating FIFO buffer of %zu elements of size %zu, "
+        if (max_size > (size_t)-1) {
+            gu_error ("Maximum FIFO size %llu exceeds size_t range %zu",
+                      max_size, (size_t)-1);
+            return NULL;
+        }
+
+        if (max_size > GU_AVPHYS_SIZE) {
+            gu_error ("Maximum FIFO size %llu exceeds available memory "
+                      "limit %llu", max_size, GU_AVPHYS_SIZE);
+            return NULL;
+        }
+
+        if ((array_len * row_len) > (ull)GU_LONG_MAX) {
+            gu_error ("Resulting queue length %llu exceeds max allowed %ld",
+                      array_len * row_len, GU_LONG_MAX);
+            return NULL;
+        }
+
+
+        gu_debug ("Creating FIFO buffer of %llu elements of size %llu, "
                   "memory min used: %zu, max used: %zu",
                   array_len * row_len, item_size, alloc_size,
                   alloc_size + array_len*row_size);

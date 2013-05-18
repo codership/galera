@@ -14,6 +14,7 @@
 #define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
 #define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
 #define GU_AVPHYS_PAGES (sysconf (_SC_AVPHYS_PAGES))
+#define GU_AVPHYS_SIZE  (((unsigned long long)GU_AVPHYS_PAGES)*GU_PAGE_SIZE)
 
 #include <limits.h>
 #define GU_ULONG_MAX      ULONG_MAX
