@@ -17,5 +17,6 @@ Contents:
    installationmysql
    installationmariadb
    installationxtradb
+   installationec2
    configuration
    createcluster
