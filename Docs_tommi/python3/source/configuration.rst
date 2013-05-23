@@ -63,13 +63,23 @@ This is usually all that is needed for clustering.
 You must give values to the settings below:
 
 - ``query_cache_size=0`` |---| This value disables the query cache.
-- ``binlog_format=ROW`` |---| This variable sets the binary logging format.
+  The query cache is disabled as, in the typical high concurrency
+  environments, InnoDB scalability outstrips the query cache.
+  It is not recommended to enable the query cache.
+- ``binlog_format=ROW`` |---| This variable sets the binary logging
+  format to use row-level replication as opposed to statement-level
+  replication. Do not change this value, as it affects performance
+  and consistency. As a side effect to using this value, binlog, if
+  turned on, can be ROW only.
 - ``default_storage_engine=InnoDB`` |---| InnoDB is a high-reliability
   and high-performance storage engine for MySQL. Starting with MySQL
   5.5, it is the default MySQL storage engine.
 - ``innodb_autoinc_lock_mode=2`` |---| This variable sets the lock mode
   to use for generating auto-increment values. Value 2 sets the interleaved
-  lock mode. See also chapter `Setting Parallel CPU Threads`_
+  lock mode. Without this parameter, ``INSERT``s into tables with an
+  ``AUTO_INCREMENT`` column may fail. Lock modes 0 and 1 can cause
+  unresolved deadlocks and make the system unresponsive.
+  See also chapter `Setting Parallel CPU Threads`_
 
    .. note:: If you use Galera provider version 2.0 or higher,
              set ``innodb_doublewrite`` to 1 (default).

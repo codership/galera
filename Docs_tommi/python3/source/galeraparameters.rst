@@ -202,6 +202,14 @@ Table legend:
 |                                       |                       | the donor? *Yes* means that if the donor is        |
 |                                       |                       | blocked by state transfer, the whole cluster       |
 |                                       |                       | is blocked with it.                                |
+|                                       |                       |                                                    |
+|                                       |                       | If you choose to use value *YES*, it is            |
+|                                       |                       | theoretically possible that the donor node cannot  |
+|                                       |                       | keep up with the rest of the cluster due to the    |
+|                                       |                       | extra load from the SST. If the node lags behind,  |
+|                                       |                       | it may send flow control messages stalling the     |
+|                                       |                       | whole cluster. However, you can monitor this using |
+|                                       |                       | the ``wsrep_flow_control_paused`` status variable. |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``ist.recv_addr``                     |                       | As of 2.0. Address to listen for Incremental State |
 |                                       |                       | Transfer. By default this is the                   |

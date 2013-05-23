@@ -65,6 +65,9 @@ column from the left. The values are:
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
 | ``wsrep_flow_control_paused``         | G | *0.184353*                 | The fraction of time since the last status query that          |
 |                                       |   |                            | replication was paused due to flow control.                    |
+|                                       |   |                            |                                                                |
+|                                       |   |                            | In other words, how much the slave lag is slowing down         |
+|                                       |   |                            | the cluster.                                                   |
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
 | ``wsrep_flow_control_sent``           | G | *7*                        | Number of ``FC_PAUSE`` events sent since the last status       |
 |                                       |   |                            | query.                                                         |

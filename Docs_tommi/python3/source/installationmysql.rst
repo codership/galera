@@ -104,7 +104,7 @@ Install also the following additional packages (if not yet installed):
 - *MySQL-client-community* for connecting to the server and for the
   *mysqldump*-based SST.
 - *rsync* for the *rsync*-based SST
-- *xtrabackup* and *nc* for the *xtrabackup*-based SST.
+- *xtrabackup* and *nc* (*netcat*) for the *xtrabackup*-based SST.
 
 -----------------------
 Upgrading System Tables
