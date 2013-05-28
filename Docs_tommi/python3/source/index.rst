@@ -52,6 +52,6 @@ interest not expressly granted is reserved to Codership.
 
 - *"MySQL"* is a registered trademark of Oracle Corporation. 
 - *"Percona XtraDB Cluster"* and *"Percona Server"* are 
-  registered trademarks of Percona LLC. *"MariaDB"* and 
-- *"MariaDB Galera Cluster"* are registered trademarks of 
+  registered trademarks of Percona LLC.  
+- *"MariaDB"* and *"MariaDB Galera Cluster"* are registered trademarks of 
   Monty Program Ab.
