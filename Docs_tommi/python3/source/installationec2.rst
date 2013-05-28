@@ -35,19 +35,19 @@ Proceed as follows:
 4. Generate the deployment package. Open a browser and go to
    http://www.severalnines.com/galera-configurator/. Proceed as follows:
    
-       - On page 1, “General Settings”, specify the cloud provider
+       - On page 1, General Settings, specify the cloud provider
 	     (Amazon EC2), the number of instances, mysql root password,
 		 and OS user (root)
-       - On page 2, “Storage”, specify the EC2 instance RAM size, the
+       - On page 2, Storage, specify the EC2 instance RAM size, the
 	     planned database size, and the number of cores.
-       - On page 3, “Individual Nodes”:
+       - On page 3, Individual Nodes:
 	   
 	       - For the ClusterControl server, specify the local IP
-		     address and the absolute path to the keypair set up
-			 in step 3 (in this case **/root/keypair**).
-           - For *Galera Cluster* servers, specify the local IP
-		     addresses and the desirable location of the data directory
-			 (RightScale images mount the local storage under **/mnt**).
+                 address and the absolute path to the keypair set up
+                 in step 3 (in this case **/root/keypair**).
+               - For *Galera Cluster* servers, specify the local IP
+                 addresses and the desirable location of the data directory
+                 (RightScale images mount the local storage under **/mnt**).
 
    When you have entered the required information, you will be sent a
    tarball contaning the deployment scripts and a personal HTTP link
