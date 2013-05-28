@@ -16,3 +16,4 @@ Contents:
    galeraparameters
    mysqlwsrepoptions
    galerastatusvariables
+   galeraurl
