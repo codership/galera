@@ -4,8 +4,8 @@
 .. _`Galera Replication`:
 
 Galera Replication is a synchronous multi-master replication
-plug-in for MySQL and MariaDB. Galera Replication features are,
-for example:
+plug-in for MySQL, MariaDB and Percona XtraDB cluster. Galera
+Replication features are, for example:
 
 - Unconstrained parallel applying, also known as parallel
   replication

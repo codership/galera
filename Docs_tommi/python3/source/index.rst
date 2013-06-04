@@ -3,18 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-=====================
- Galera documentation
-=====================
+==========================
+ Galera Cluster for MySQL
+==========================
 
-This is the official documentation for *Galera Cluster*.
-The documentation covers the following *Galera Cluster*
-implementations:
-
-- Galera Cluster for MySQL
-- Percona XtraDB Cluster
-- MariaDB Galera Cluster
-
+This is the official documentation for *Galera Cluster for MySQL*.
 
 Contents
 ========
@@ -23,6 +16,7 @@ Contents
    :maxdepth: 2
    :numbered:
 
+   overview
    technicaldescription
    gettingstarted
    userguide

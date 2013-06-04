@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 ===============================
- Galera Technical Description
+ Technical Description
 ===============================
 
 Contents:
@@ -23,4 +23,3 @@ Contents:
    weightedquorum
    schemaupgrades
    recovery
-   limitations

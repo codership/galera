@@ -1,7 +1,7 @@
 ====================================
- Galera Replication Architecture
+ Replication API
 ====================================
-.. _`Galera Replication Architecture`:
+.. _`Replication API`:
 
 As we learned in the introduction, synchronous replication
 uses eager replication, where the nodes keep all other nodes
@@ -46,18 +46,8 @@ in more detail in the chapters below:
 
 .. figure:: images/galeralibrary.png
 
-   *Galera Replication Architecture*
+   *Replication API*
 
-
------------------------------
- Database Management System
------------------------------
-.. _`Database Management System`:
-
-Galera supports the following database management systems:
-
-- MySQL
-- MariaDB
 
 ---------------
  wsrep API

@@ -1,7 +1,7 @@
-===============
- Introduction
-===============
-.. _`Introduction`:
+======================
+ Replication Variants
+======================
+.. _`Replication Variants`:
 
 Database replication refers to the frequent copying of data
 from one node, that is, a database on one server, to a node on
@@ -76,12 +76,15 @@ transactions to other nodes in the database cluster:
 Theoretically, synchronous replication has several advantages
 over asynchronous replication:
 
-- Synchronous replication is always highly available, as:
+- Synchronous replication provides highly available clusters
+  and guarantees 24/7 service availability, as:
 
   - There is no data loss when one of the nodes crashes
   - Data replicas are always consistent
+  - There are no complex, time-consuming failovers
   
 - Transactions can be executed on all nodes in parallel
+  to increase performance.
 
 - Synchronous replication can guarantee causality across
   the whole cluster. For example, a ``SELECT S`` issued after

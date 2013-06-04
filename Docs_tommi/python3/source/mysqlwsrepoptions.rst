@@ -3,6 +3,10 @@
 ======================
 .. _`MySQL wsrep Options`:
 
+.. index::
+   single: Drupal
+
+
 These are MySQL system variables introduced by *wsrep*
 patch v0.8. All variables are global except where marked
 by (L).
@@ -47,12 +51,12 @@ by (L).
 |                                      |                           | the node to startup alone, thus initializing a new cluster                      |
 |                                      |                           | (that the other nodes can join to).                                             |
 |                                      |                           |                                                                                 |
-|                                      |                           | Note! Never use an                                                              |
-|                                      |                           | empty *gcomm://* string in my.cnf. If a node restarts, that                     |
+|                                      |                           | **Note!** Never use an                                                          |
+|                                      |                           | empty ``gcomm://`` string in *my.cnf*. If a node restarts, that                 |
 |                                      |                           | will cause the node to not join back to the cluster that it                     |
 |                                      |                           | was part of, rather it will initialize a new one node cluster                   |
 |                                      |                           | and cause a split brain. To bootstrap a cluster, you should only                |
-|                                      |                           | pass the *gcomm://* string on the command line, such as::                       |
+|                                      |                           | pass the ``gcomm://`` string on the command line, such as::                     |
 |                                      |                           |                                                                                 |
 |                                      |                           |   service mysql start --wsrep-cluster-address="gcomm://"                        |
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+
@@ -69,11 +73,11 @@ by (L).
 |                                      |                           | Sometimes this parameter may help to get old applications working in            |
 |                                      |                           | a multi-master setup.                                                           |
 |                                      |                           |                                                                                 |
-|                                      |                           | Note that loading a large database dump with LOCK statements can result in      |
+|                                      |                           | **Note!** Loading a large database dump with ``LOCK`` statements can result in  |
 |                                      |                           | abnormally large transactions and cause an out-of-memory condition.             |
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+
-| ``wsrep_data_home_dir``              | *<mysql_real_data_home>*  | A directory where the wsrep provider will store its files.                      |
-|                                      |                           | *Galera Cluster* uses this parameter to store its internal state.               |
+| ``wsrep_data_home_dir``              | *<mysql_real_data_home>*  | A directory where the wsrep provider will store its files. *Galera Cluster*     |
+|                                      |                           | *for MySQL* uses this parameter to store its internal state.                    |
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+
 | ``wsrep_dbug_option``                |                           | A debug option to be passed to the provider.                                    |
 +--------------------------------------+---------------------------+---------------------------------------------------------------------------------+

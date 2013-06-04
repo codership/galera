@@ -1,9 +1,9 @@
-=============
- Limitations
-=============
-.. _`Limitations`:
+====================================================
+ Differences to a Standalone MySQL Server
+====================================================
+.. _`Differences to Standalone MySQL Server`:
 
-Galera has the following limitations:
+Galera has the following differences to a standalone MySQL server:
 
 - Replication only works with the InnoDB storage engine. Any writes to tables
   of other types, including system (mysql.*) tables are not replicated. However,
@@ -42,6 +42,6 @@ Galera has the following limitations:
   writing the to same rows and committing in separate cluster nodes, and only one
   of the them can successfully commit. The failing one will be aborted.
   
-  For cluster level aborts, *Galera Cluster* gives back a deadlock error::
+  For cluster level aborts, *Galera Cluster for MySQL* gives back a deadlock error::
   
      code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK))

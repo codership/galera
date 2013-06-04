@@ -1,10 +1,9 @@
-=============================
- Upgrading Galera Cluster
-=============================
-.. _`Upgrading Galera Cluster`:
+====================================
+ Upgrading Galera Cluster for MySQL
+====================================
+.. _`Upgrading Galera Cluster for MySQL`:
 
-This chapter describes three different ways to upgrade Galera cluster
-software. 
+This chapter describes three different ways to upgrade *Galera Cluster for MySQL*. 
 
 ---------------
 Rolling Upgrade

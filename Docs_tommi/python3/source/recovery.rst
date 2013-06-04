@@ -1,7 +1,7 @@
 ==================================
- Automatic Recovery from Failures
+ Node Failure and Recovery
 ==================================
-.. _`Recovery from Failures`:
+.. _`Node Failure and Recovery`:
 
 --------------------
  Single Node Failure
@@ -87,28 +87,6 @@ allowed back into the cluster. No data is lost when a node fails.
 See chapter
 :ref:`Node Provisioning and Recovery <Node Provisioning and Recovery>`
 for more information on manual node recover.
-
--------------------
- Primary Component
--------------------
-.. _`Primary Component`:
-
-In addition to single node failures, the cluster may be split into
-several components due to network failure. A component is a set of
-nodes, which are connected to each other, but not to nodes in other
-components. 
-
-.. A component is not formed until all nodes agree on the component
-   membership. If consensus cannot be reached before a configurable
-   timeout, the network is considered too unstable for replication.
-   *What happens in this case? The entire cluster fails?*
-
-In such a situation, only one of the components can continue to
-modify the database state to avoid history divergence. This component
-is called the Primary Pomponent (PC). In normal operation, the Galera
-cluster is a PC. When cluster partitioning happens, Galera invokes a
-special quorum algorithm to select a PC that guarantees that there
-is no more than one primary component in the cluster.
 
 ---------------
  Split-brain

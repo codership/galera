@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 =================
- Getting Started
+ Overview
 =================
 
 Contents:
@@ -13,8 +13,6 @@ Contents:
    :maxdepth: 2
    :numbered:
 
-   galerareplication
-   prerequisites
-   installationmysql
-   configuration
-   createcluster
+    versioninginformation
+    thirdpartygaleraimplementations
+    cloudinstallation

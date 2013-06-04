@@ -1,14 +1,14 @@
 ======================================================
- Downloading and Installing Galera Cluster on MySQL
+ Installing Galera Cluster for MySQL
 ======================================================
-.. _`Downloading and Installing Galera Cluster on MySQL`:
+.. _`Downloading and Installing Galera Cluster for MySQL`:
 .. index::
-   pair: Installation; Galera Cluster on MySQL
+   pair: Installation; Galera Cluster for MySQL
 
-If you have decided to install Galera on a MySQL Cluster,
+If you want to install *Galera Cluster for MySQL*,
 proceed as follows:
 
-1. Download the Galera Cluster as a binary package for your
+1. Download the *Galera Cluster for MySQL* as a binary package for your
    Linux distribution from (https://launchpad.net/codership-mysql/+download).
 2. Verify the download using the MD5 sum that Launchpad generates.
 3. Follow the Linux distribution specific instructions in the
@@ -17,11 +17,11 @@ proceed as follows:
 .. note:: In the examples below, MySQL authentication options
           are omitted for brevity.
 
----------------------------------------------------------------------
-Installing Galera Cluster on Debian and Debian-derived Distributions
----------------------------------------------------------------------
+-------------------------------------------------------------------------------
+Installing Galera Cluster for MySQL on Debian and Debian-derived Distributions
+-------------------------------------------------------------------------------
 
-This chapter describes how to install Galera Cluster on Debian
+This chapter describes how to install *Galera Cluster for MySQL* on Debian
 and Debian-derived distributions.
 
 Before You Start
@@ -56,11 +56,11 @@ Install the *mysql-wsrep* package as follows::
 
     $ sudo dpkg -i <mysql-server-wsrep DEB>
 
-------------------------------------------------------------------------
-Installing Galera Cluster on CentOS and Similar RPM-based Distributions
-------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+Installing Galera Cluster for MySQL on CentOS and Similar RPM-based Distributions
+----------------------------------------------------------------------------------
 
-This chapter describes how to install Galera Cluster on CentOS and
+This chapter describes how to install *Galera Cluster for MySQL* on CentOS and
 similar RPM-based distributions.
 
 Before You Start
@@ -119,93 +119,3 @@ system tables as follows:
 See the MySQL documentation in case of errors. The errors are
 usually uncritical and can be ignored unless specific functionality
 is needed.
-
-=============================
-Configuring the Installation
-=============================
-
-Unless you are upgrading an already installed *mysql-wsrep*
-package, you must configure the installation to prepare the
-server for operation.
-
---------------------
-Configuration Files
---------------------
-
-Edit the *my.cnf* configuration file as follows:
-
-- Make sure that the system-wide *my.cnf* file does not bind *mysqld*
-  to 127.0.0.1. To be more specific, if you have the following line
-  in the [mysqld] section, comment it out::
-
-      #bind-address = 127.0.0.1
-
-- Make sure that the system-wide *my.cnf* file contains the line below::
-  
-    !includedir /etc/mysql/conf.d/
-
-Edit the */etc/mysql/conf.d/wsrep.cnf* configuration file as follows:
-
-- Set the *wsrep_provider* option by specifying a path to the galera 
-  provider library. If you do not have a provider, leave it as it is.
-- When a new node joins the cluster, it will have to receive a state
-  snapshot from one of the peers. This requires a privileged MySQL
-  account with access from the rest of the cluster. Set the *mysql*
-  login/password pair for SST, for example, as follows::
-
-      wsrep_sst_auth=wsrep_sst:wspass
-
----------------------
-Database Privileges
----------------------
-
-Restart the MySQL server and connect to it as root to grant privileges
-to the SST account. Furthermore, empty users confuse MySQL authentication
-matching rules. Delete them::
-
-    $ mysql -e "SET wsrep_on=OFF; DELETE FROM mysql.user WHERE user='';"
-    $ mysql -e "SET wsrep_on=OFF; GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'";
-
-------------------
-Firewall Settings
-------------------
-
-The *MySQL-wsrep* server must be accessible from other cluster members through
-its client listening socket and through the wsrep provider socket. See your
-distribution and wsrep provider documentation for details. For example, on
-CentOS you could use these settings::
-
-    # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 3306 -j ACCEPT
-    # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 4567 -j ACCEPT
-
-If there is a NAT firewall between the nodes, configure it to allow
-direct connections between the nodes (for example, through port forwarding).
-
---------
-SELinux
---------
-
-If you have SELinux enabled, it may block *mysqld* from carrying out the
-required operations. Disable SELinux or configure it to allow *mysqld*
-to run external programs and open listen sockets at unprivileged ports
-(that is, things that an unprivileged user can do). See SELinux
-documentation for more information.
-
-To disable SELinux, proceed as follows:
-
-1) run *setenforce 0* as root.
-2) set ``SELINUX=permissive`` in  */etc/selinux/config*
-
----------
-AppArmor
----------
-
-AppArmor is always included in Ubuntu. It may prevent *mysqld* from
-opening additional ports or run scripts. See AppArmor documentation
-for more information on its configuration.
-
-To disable AppArmor, proceed as follows::
-
-    $ cd /etc/apparmor.d/disable/
-    $ sudo ln -s /etc/apparmor.d/usr.sbin.mysqld
-    $ sudo service apparmor restart

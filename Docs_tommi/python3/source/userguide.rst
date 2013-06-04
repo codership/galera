@@ -18,4 +18,6 @@ Contents:
    monitoringthecluster
    ssl
    firewallsettings
+   limitations
    upgrading
+   configurationtips
