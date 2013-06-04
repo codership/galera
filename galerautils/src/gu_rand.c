@@ -29,7 +29,13 @@ typedef struct gu_rse gu_rse_t;
 long int
 gu_rand_seed_long (long long time, const void* heap_ptr, pid_t pid)
 {
-    gu_rse_t rse = { time, heap_ptr, &time, pid };
+    gu_rse_t rse;
+    memset(&rse, 0, sizeof(rse));
+    rse.time = time;
+    rse.heap_ptr = heap_ptr;
+    rse.stack_ptr = &time;
+    rse.pid = pid;
+    // = { time, heap_ptr, &time, pid };
     return gu_fast_hash64_medium (&rse, sizeof(rse));
 }
 

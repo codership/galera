@@ -30,10 +30,10 @@ struct GCommSuite
 };
 
 static GCommSuite suites[] = {
-    {"util", util_suite},
-    {"types", types_suite},
-    {"gmcast", gmcast_suite},
-    {"evs2", evs2_suite},
+//    {"util", util_suite},
+//    {"types", types_suite},
+    //   {"gmcast", gmcast_suite},
+    // {"evs2", evs2_suite},
     {"pc", pc_suite},
     {"", 0}
 };
@@ -65,9 +65,10 @@ int main(int argc, char* argv[])
 
     if (::getenv("CHECK_GCOMM_DEBUG"))
     {
-        gu_log_max_level = GU_LOG_DEBUG;
-        //gu::Logger::enable_debug(true);
+        gu_conf_debug_on();
     }
+    gu_conf_self_tstamp_on();
+
 
     log_info << "check_gcomm, start tests";
     if (::getenv("CHECK_GCOMM_SUITES"))

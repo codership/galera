@@ -481,7 +481,26 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     {
         log_debug << self_id() << " quorum ok";
     }
+
     current_view_ = view;
+
+    // #762 - clear prim status from instances not found from current view,
+    // they should end up in non-prim via trans view they deliver next
+    if (prim() == true)
+    {
+        for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
+             ++i)
+        {
+            if (current_view_.partitioned().find(NodeMap::key(i))
+                != current_view_.partitioned().end())
+            {
+                log_info << self_id() << " marking partitioned "
+                         << NodeMap::key(i) << " non-prim";
+                NodeMap::value(i).set_prim(false);
+            }
+        }
+    }
+
     shift_to(S_TRANS);
 }
 
@@ -578,6 +597,9 @@ void gcomm::pc::Proto::validate_state_msgs() const
             const UUID& uuid(NodeMap::key(si));
             const Node& msg_state(NodeMap::value(si));
             const Node& local_state(NodeMap::value(instances_.find_checked(uuid)));
+            log_info << self_id() << " prim: " << prim() << " msg source: "
+                     << msg_source_uuid << " msg source state prim: "
+                     << msg_source_state.prim();
             if (prim()                  == true &&
                 msg_source_state.prim() == true &&
                 msg_state.prim()        == true)
@@ -1125,6 +1147,7 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
     gcomm_assert(state() == S_TRANS);
     gcomm_assert(current_view_.type() == V_TRANS);
 
+    log_info << "trans install";
     if ((msg.flags() & Message::F_BOOTSTRAP) != 0)
     {
         log_info << "Dropping bootstrap install in TRANS state";
@@ -1335,6 +1358,8 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
                  << " in state " << to_string(state());
         return;
     }
+
+    // log_info << self_id() << " " << state() << ": " << msg.to_string();
 
     switch (msg_type)
     {

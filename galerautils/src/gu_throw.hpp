@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  *
- * $Id: gu_throw.hpp 3032 2013-04-06 20:29:33Z alex $
+ * $Id$
  */
 
 /*!
