@@ -694,37 +694,46 @@ void gcomm::AsioTcpAcceptor::accept_handler(
     if (!error)
     {
         AsioTcpSocket* s(static_cast<AsioTcpSocket*>(socket.get()));
-        s->assign_local_addr();
-        s->assign_remote_addr();
+        try
+        {
+            s->assign_local_addr();
+            s->assign_remote_addr();
 #ifdef HAVE_ASIO_SSL_HPP
-        if (s->ssl_socket_ != 0)
-        {
-            s->ssl_socket_->lowest_layer().set_option(
-                asio::ip::tcp::no_delay(true));
-            set_fd_options(s->ssl_socket_->lowest_layer());
-            log_debug << "socket "
-                      << s->id() << " connected, remote endpoint "
-                      << s->remote_addr() << " local endpoint "
-                      << s->local_addr();
-            s->ssl_socket_->async_handshake(
-                asio::ssl::stream<asio::ip::tcp::socket>::server,
-                boost::bind(&AsioTcpSocket::handshake_handler,
-                            s->shared_from_this(),
-                            asio::placeholders::error));
-            s->state_ = Socket::S_CONNECTING;
-        }
-        else
-        {
+            if (s->ssl_socket_ != 0)
+            {
+                s->ssl_socket_->lowest_layer().set_option(
+                    asio::ip::tcp::no_delay(true));
+                set_fd_options(s->ssl_socket_->lowest_layer());
+                log_debug << "socket "
+                          << s->id() << " connected, remote endpoint "
+                          << s->remote_addr() << " local endpoint "
+                          << s->local_addr();
+                s->ssl_socket_->async_handshake(
+                    asio::ssl::stream<asio::ip::tcp::socket>::server,
+                    boost::bind(&AsioTcpSocket::handshake_handler,
+                                s->shared_from_this(),
+                                asio::placeholders::error));
+                s->state_ = Socket::S_CONNECTING;
+            }
+            else
+            {
 #endif /* HAVE_ASIO_SSL_HP */
-            s->socket_.set_option(asio::ip::tcp::no_delay(true));
-            set_fd_options(s->socket_);
-            s->state_ = Socket::S_CONNECTED;
+                s->socket_.set_option(asio::ip::tcp::no_delay(true));
+                set_fd_options(s->socket_);
+                s->state_ = Socket::S_CONNECTED;
 #ifdef HAVE_ASIO_SSL_HPP
-        }
+            }
 #endif /* HAVE_ASIO_SSL_HPP */
-        accepted_socket_ = socket;
-        log_debug << "accepted socket " << socket->id();
-        net_.dispatch(id(), Datagram(), ProtoUpMeta(error.value()));
+            accepted_socket_ = socket;
+            log_debug << "accepted socket " << socket->id();
+            net_.dispatch(id(), Datagram(), ProtoUpMeta(error.value()));
+        }
+        catch (asio::system_error& e)
+        {
+            // socket object should be freed automatically when it
+            // goes out of scope
+            log_debug << "accept failed: " << e.what();
+        }
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri_));
 #ifdef HAVE_ASIO_SSL_HPP
         if (uri_.get_scheme() == SSL_SCHEME)
