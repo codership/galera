@@ -54,31 +54,17 @@ To create and bootstrap the first cluster node, you must set up
 the group communication structure for the cluster nodes. Proceed
 as follows:
 
-1. Power up the servers that will join the cluster. Do not
-   start the *mysqld* servers yet.
-2. Define the wsrep provider and an empty cluster address URL
-   for the first *mysqld* server. Specify this
-   :abbr:`URL (Uniform Resource Locator)` in the *my.cnf*
-   configuration file as follows::
-   
-      wsrep_provider="/usr/lib/libgalera_smm.so"
-      wsrep_cluster_address="gcomm://"
-
-   These entries imply to the starting *mysqld* server that
-   there is no existing cluster to connect to, and the server
-   will create a new history :abbr:`UUID (Universally Unique Identifier)`.
+1. Power up the servers that will join the cluster.
+2. Start the first *mysqld* server with an empty cluster
+   address URL::
+ 
+     /etc/init.d/mysql start --wsrep-cluster-address="gcomm://"
    
    .. warning:: Only use an empty *gcomm* address when you want to
                 create a new cluster. Never use it when you want to reconnect
                 to an existing one.
 
-3. Start the first *mysqld* server with an empty cluster
-   address URL:
-   
-     ``/etc/init.d/mysql start``
-   
-4. Check that the startup succeeded and that the changes are
-   applied::
+3. Check that the startup succeeded::
    
      mysql -e "SHOW VARIABLES LIKE 'wsrep_cluster_address'"
 
@@ -88,17 +74,17 @@ as follows:
      | wsrep_cluster_address | gcomm:// |
      +-----------------------+----------+
    
-5. Immediately after startup, open the *my.cnf* configuration file
+4. Immediately after startup, open the *my.cnf* configuration file
    in a text editor and change the value of ``wsrep_cluster_address``
-   to point to the other two nodes:
+   to point to the other two nodes::
    
-     ``wsrep_cluster_address="host2,host3"``
+     wsrep_cluster_address="host2,host3"
    
    .. note:: Do not restart MySQL at this point.
    
    .. note:: You can also use :abbr:`IP (Internet protocol)` addresses.
    
-6. To add the second and third node to the cluster, see
+5. To add the second and third node to the cluster, see
    chapter `Adding Nodes to a Cluster`_ below.
 
 -----------------------------
@@ -117,7 +103,7 @@ To add a new node to an existing cluster, proceed as follows:
    in the *my.cnf* configuration file as follows::
 
       wsrep_provider="/usr/lib/libgalera_smm.so"
-      *wsrep_cluster_address="host1,host3"*
+      wsrep_cluster_address="host1,host3"
 
    .. note:: You can also use :abbr:`IP (Internet protocol)` addresses.
 
@@ -151,9 +137,9 @@ requests for a state snapshot from the cluster and installs
 it. After this, the new node is ready for use.
 
 --------------------------------
- Testing That the Cluster Works
+ Testing that the Cluster Works
 --------------------------------
-.. _`Testing That the Cluster Works`:
+.. _`Testing that the Cluster Works`:
 
 You can test that the cluster actually works as follows:
 
@@ -168,18 +154,19 @@ You can test that the cluster actually works as follows:
 
 ::
 
-   show status like 'wsrep_%';
+       show status like 'wsrep_%';
 
-   +----------------------------+--------------------------------------+
-   | Variable_name              | Value                                |
-   +----------------------------+--------------------------------------+
-   ...
-   | wsrep_local_state_comment  | Synced (6)                           |
-   | wsrep_cluster_size         | 3                                    |
-   | wsrep_ready                | ON                                   |
-   +----------------------------+--------------------------------------+
+       +----------------------------+--------------------------------------+
+       | Variable_name              | Value                                |
+       +----------------------------+--------------------------------------+
+       ...
+       | wsrep_local_state_comment  | Synced (6)                           |
+       | wsrep_cluster_size         | 3                                    |
+       | wsrep_ready                | ON                                   |
+       +----------------------------+--------------------------------------+
 
    In the example above:
+   
    - The ``wsrep_local_state_comment`` value *Synced* indicates that
      the node is connected to the cluster and operational.
    - The ``wsrep_cluster_size`` value *3* indicates that there are

@@ -23,6 +23,10 @@ For more information on the ``wsrep_notify_cmd`` command, see chapter
           ~1 minute. The output of the last invocation will correspond
           to the current moment.
 
+.. note:: You can also use *Nagios* for monitoring *Galera Cluster for MySQL*.
+
+          For more information, see http://www.fromdual.com/galera-cluster-nagios-plugin-en.
+
 ---------------------------------
  Checking the Cluster Integrity
 ---------------------------------
@@ -148,22 +152,6 @@ on average. There is no reason to assign the ``wsrep_slave_threads``
 value much higher than this. This value can also be quite high, even in
 the hundreds. Use common sense and discretion when you define the value
 of ``wsrep_slave_threads``.
-
----------------------------------------
- Determining the Slowest Cluster Node
----------------------------------------
-.. _`Determining the Slowest Cluster Node`:
-
-The slowest cluster node will have the highest values for the
-following variables::
-
-    wsrep_flow_control_sent
-
-and::
-
-    wsrep_local_recv_queue_avg
-
-The lower the values are the better.
 
 ---------------------------------
  Detecting Slow Network Issues

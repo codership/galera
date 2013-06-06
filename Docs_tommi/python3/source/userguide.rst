@@ -10,9 +10,8 @@
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   :numbered:
 
+   deploymentvariants
    nodeprovisioning
    quorumreset
    monitoringthecluster
@@ -20,4 +19,9 @@ Contents:
    firewallsettings
    limitations
    upgrading
+   schemaupgrades
+   performance
+   backingupthecluster
+   arbitrator
+   faq
    configurationtips

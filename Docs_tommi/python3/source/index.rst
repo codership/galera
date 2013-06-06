@@ -20,6 +20,7 @@ Contents
    technicaldescription
    gettingstarted
    userguide
+   troubleshooting
    reference
 
 Indices and tables

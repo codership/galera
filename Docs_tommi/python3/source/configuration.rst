@@ -39,12 +39,11 @@ Edit the *my.cnf* configuration file as follows:
 
 Edit the */etc/mysql/conf.d/wsrep.cnf* configuration file as follows:
 
-- Set the *wsrep_provider* option by specifying a path to the galera 
-  provider library. If you do not have a provider, leave it as it is.
 - When a new node joins the cluster, it will have to receive a state
   snapshot from one of the peers. This requires a privileged MySQL
   account with access from the rest of the cluster. Set the *mysql*
-  login/password pair for SST, for example, as follows::
+  login/password pair for SST in the */etc/mysql/conf.d/wsrep.cnf*
+  configuration file as follows::
 
       wsrep_sst_auth=wsrep_sst:wspass
 
@@ -170,7 +169,6 @@ You must give values to the settings below:
   lock mode. Without this parameter, ``INSERT``s into tables with an
   ``AUTO_INCREMENT`` column may fail. Lock modes 0 and 1 can cause
   unresolved deadlocks and make the system unresponsive.
-  See also chapter `Setting Parallel CPU Threads`_
 
    .. note:: If you use Galera provider version 2.0 or higher,
              set ``innodb_doublewrite`` to 1 (default).

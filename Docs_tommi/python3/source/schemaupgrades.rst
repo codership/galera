@@ -11,6 +11,9 @@ statements change the database structure and are non-transactional.
 two different methods in Galera. These methods are described in the
 chapters below.
 
+.. note:: See also the ``pt-online-schema-change`` command in Percona
+          Toolkit for MySQL: http://www.percona.com/software/percona-toolkit.
+
 ---------------------------------
  Total Order Isolation
 ---------------------------------

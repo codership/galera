@@ -8,24 +8,27 @@
 If you want to install *Galera Cluster for MySQL*,
 proceed as follows:
 
-1. Download the *Galera Cluster for MySQL* as a binary package for your
+1. Download the write set replication patches for MySQL as a binary package for your
    Linux distribution from (https://launchpad.net/codership-mysql/+download).
-2. Verify the download using the MD5 sum that Launchpad generates.
-3. Follow the Linux distribution specific instructions in the
+2. Download *Galera*, a generic synchronous multi-master
+   replication plugin for transactional applications from
+   (https://launchpad.net/galera).
+3. Verify the downloads using the MD5 sums that Launchpad generates.
+4. Follow the Linux distribution specific instructions in the
    chapters below.
 
 .. note:: In the examples below, MySQL authentication options
           are omitted for brevity.
 
--------------------------------------------------------------------------------
-Installing Galera Cluster for MySQL on Debian and Debian-derived Distributions
--------------------------------------------------------------------------------
+.. note:: If you want to create a more sophisticated setup right at the
+          beginning, see chapter :ref:`Configuring Galera Cluster for MySQL <Configuring Galera Cluster for MySQL>`.
+
+---------------------------------------------------------------
+Installing Galera Cluster for MySQL on DEB-based Distributions
+---------------------------------------------------------------
 
 This chapter describes how to install *Galera Cluster for MySQL* on Debian
-and Debian-derived distributions.
-
-Before You Start
-================
+and Debian-derived distributions. 
 
 Upgrade from *mysql-server-5.0* to *mysql-wsrep* is not supported.
 Upgrade to *mysql-server-5.1*.
@@ -50,45 +53,55 @@ Lenny proceeds as follows::
     $ sudo apt-get install psmisc
     $ sudo apt-get -t lenny-backports install mysql-client-5.1
 
-Installation
-=============
-Install the *mysql-wsrep* package as follows::
+To install *Galera Cluster for MySQL*, proceed as follows::
 
-    $ sudo dpkg -i <mysql-server-wsrep DEB>
+1. Install the write set replication patches:
 
-----------------------------------------------------------------------------------
-Installing Galera Cluster for MySQL on CentOS and Similar RPM-based Distributions
-----------------------------------------------------------------------------------
+   ``$ sudo dpkg -i <mysql-server-wsrep DEB>``
+
+2. Configure the write set replication patches to use the
+   Galera plugin as a wsrep provider:
+   
+   ``wsrep_provider=/usr/lib/galera/libgalera_smm.so``
+
+3. Start the MySQL server.
+
+
+---------------------------------------------------------------
+Installing Galera Cluster for MySQL on RPM-based Distributions
+---------------------------------------------------------------
 
 This chapter describes how to install *Galera Cluster for MySQL* on CentOS and
 similar RPM-based distributions.
 
-Before You Start
-================
-
 If you are migrating from an existing MySQL installation, there are two optins:
 
 - If you're already using official MySQL-server-community 5.1.x RPM from
-  Oracle::
+  Oracle:
 
-     # rpm -e mysql-server
+     ``# rpm -e mysql-server``
 
 - If you are upgrading from the stock *mysql-5.0.77* on CentOS:
 
-     1. Make sure that the following packages are not installed::
+     1. Make sure that the following packages are not installed:
      
-	      # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-bench
+        ``# rpm --nodeps --allmatches -e mysql-server mysql-test mysql-bench``
 
      2. Install the official *MySQL-shared-compat-5.1.x* from
         http://dev.mysql.com/downloads/mysql/5.1.html
 
+To install *Galera Cluster for MySQL*, proceed as follows::
 
-Installation
-=============
+1. Install the write set replication patches:
 
-Install the *mysql-wsrep* package as follows::
+   ``# rpm -Uvh <MySQL-server-wsrep RPM>``
 
-   # rpm -Uvh <MySQL-server-wsrep RPM>
+2. Configure the write set replication patches to use the
+   Galera plugin as a wsrep provider:
+   
+   ``wsrep_provider=/usr/lib64/galera/libgalera_smm.so``
+
+3. Start the MySQL server.
 
 .. note:: If the installation fails due to missing dependencies,
           install the missing packages (for example, *yum install perl-DBI*)
@@ -100,7 +113,6 @@ Installing Additional Packages
 
 Install also the following additional packages (if not yet installed):
 
-- *galera*, a multi-master replication provider, https://launchpad.net/galera.
 - *MySQL-client-community* for connecting to the server and for the
   *mysqldump*-based SST.
 - *rsync* for the *rsync*-based SST

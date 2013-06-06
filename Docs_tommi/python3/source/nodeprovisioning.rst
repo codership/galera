@@ -1,3 +1,14 @@
+.. raw:: html
+
+    <style> .red {color:red} </style>
+
+.. raw:: html
+
+    <style> .green {color:green} </style>
+
+.. role:: red
+.. role:: green
+
 ================================
  Node Provisioning and Recovery
 ================================

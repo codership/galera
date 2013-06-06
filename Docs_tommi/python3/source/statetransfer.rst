@@ -30,7 +30,7 @@ State Snapshot Transfer (SST) refers to a full data copy from
 one cluster node (donor) to the joining node (joiner). 
 SST is used when a new node joins the cluster. To get synchronized
 with the cluster, the new node has to transfer data from a node
-that is already part of the cluster. In Galera Replication, you
+that is already part of the cluster. In :term:`Galera Replication`, you
 can choose from two conceptually different ways to transfer a
 state from one MySQL server to another:
 
@@ -62,7 +62,7 @@ state from one MySQL server to another:
   through a scriptable SST interface.
 
 For more information, see chapter
-`Comparison of State Snapshot Transfer Methods`_.
+:ref:`Comparison of State Snapshot Transfer Methods <Comparison of State Snapshot Transfer Methods>`.
   
 You can configure the state snapshot transfer method
 with the ``wsrep_sst_method`` variable. For example::

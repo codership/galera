@@ -10,11 +10,10 @@
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   :numbered:
 
    galerareplication
    prerequisites
    installationmysql
+   cloudinstallation
    configuration
    createcluster

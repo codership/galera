@@ -20,6 +20,8 @@ cluster is a PC. When cluster partitioning happens, Galera invokes a
 special quorum algorithm to select a PC that guarantees that there
 is no more than one primary component in the cluster.
 
+See also chapter :ref:`Galera Arbitrator <Galera Arbitrator>`.
+
 -------------------
  Weighted Quorum
 -------------------
@@ -54,7 +56,10 @@ in a two-node cluster. The failure of one node will cause the
 remaining node to go non-Primary. Furthermore, a cluster with an
 even number of nodes has a risk of a split brain condition; if
 network connectivity is lost between the two partitions, neither
-partition would retain quorum, and both would go to Non-Primary.
+partition would retain quorum, and both would go to non-Primary,
+as depicted in the figure below.
+
+.. figure:: images/splitbrain.png
 
 For automatic failover, use at least three nodes. The same applies
 on other infrastructure levels. For example:
@@ -63,42 +68,6 @@ on other infrastructure levels. For example:
 - A cluster spanning switches should be spread across at least 3 switches
 - A cluster spanning networks should be spread across at least 3 networks
 - A cluster spanning data centers should spread across at least 3 data centers
-
--------------------
-Galera Arbitrator
--------------------
-If the expense of adding, for example, a third datacenter is too high,
-you can use the Galera arbitrator. An arbitrator is a member of the
-cluster which participates in voting, but not it actual replication.
-
-The Galera arbitrator servers two purposes:
-
-- It helps to avoid split-brain situations by acting as an odd
-  node in a cluster that is spread only across two nodes.
-- It can request a consistent application state snapshot.
-
-Galera arbitrator it is a separate daemon called *garbd*. As a Galera
-cluster member, the arbitrator accepts all Galera parameters except those
-prefixed as ``replicator.``.
-
-The Galera arbitrator is depicted in the figure below:
-
-.. figure:: images/arbitrator.png
-
-   *Galera Arbitrator*
-
-In the figure above, if one of the data centers fails or loses
-WAN connection, the node that sees the arbitrator (and therefore
-sees clients) will continue operation.
-
-.. note:: *garbd* must see all replication traffic although it does not
-          store it anywhere. Placing the arbitrator in a location with
-          poor connectivity to the rest of the cluster may lead to poor
-          cluster performance.
-
-Arbitrator failure does not affect cluster operation and a new
-instance can be reattached to the cluster at any time. There can be
-several arbitrators in the cluster.
 
 -------------------
 Quorum Calculation

@@ -10,7 +10,7 @@ In other words, when a transaction commits, all nodes have the
 same value. This takes place by using writeset replication
 over group communication.
 
-The Galera replication architecture software entities are 
+The :term:`Galera Replication` architecture software entities are 
 
 - *DBMS* |---| A Database Management System (DBMS), such as MySQL.
 - *wsrep API* |---| The wsrep API defines the interface and the
@@ -22,20 +22,7 @@ The Galera replication architecture software entities are
     provider available to *wsrep hooks*. 
 
 - *Galera plugin* |---| The Galera plugin implements the 
-  synchronous replication between the datavase nodes. The
-  Galera plugin consists of:
-
-  - *Galera wsrep provider* implements the wsrep API for the Galera
-    plugin.
-  - *Certification layer* |---| The certification layer prepares
-    the write sets and performs the certification.
-  - *Replication layer* |---| The replication layer manages the
-    replication protocol and provides the total ordering
-    capability.
-  - *Group communication framework* |---| The group communication
-    framework provides a plugin architecture for various group
-    communication systems.
-
+  synchronous replication between the database nodes.
 - *Group communication plugins* |---| Galera can use various
   group communication systems. We have used, for example,
   Spread (http://www.spread.org/) and our own implementations,
@@ -44,7 +31,7 @@ The Galera replication architecture software entities are
 The entities above are depicted in the figure below and explained
 in more detail in the chapters below:
 
-.. figure:: images/galeralibrary.png
+.. figure:: images/replicationapi.png
 
    *Replication API*
 
@@ -111,49 +98,23 @@ In a human-readable format, the GTID might look like this::
 ---------------
 .. _`Galera Plugin`:
 
-The Galera plugin components are described in the chapters below.
+ The Galera plugin consists of:
 
-Galera wsrep Provider
-=====================
-
-*Galera wsrep provider* implements the *wsrep API* within the Galera plugin.
-
-Certification Layer
-===================
-
-The certification layer prepares the write sets. The write
-sets can carry original :abbr:`SQL (Structured Query Language)`
-statements or, for best performance,
-row based replication events (available in MySQL 5.1 and onwards).
-
-Furthermore, the certification layer performs certification
-by comparing keys in the write sets. By comparing the keys,
-the Galera certification algorithm detects possible conflicts
-and can roll back victim transactions, if any. This improves
-the efficiency of multi-master replication.
-
-The certification layer guarantees that all cluster nodes can
-concurrently modify the same table and still stay consistent.
-As a result, no master failovers are required and there is no
-single point of failure in the cluster.
-
-Replication Layer
-==================
-
-The replication layer manages the replication protocol and
-provides the total ordering capability, that is, defines the
-order of committing transactions in the cluster.
-
-The replication layer lets the actual SQL statement processing
-happen uninterrupted, resembling the native MySQL method. This
-makes client interaction with the cluster fast and, for the
-application, the Galera cluster appears like any native MySQL
-server. The only difference is commit processing, where a certain
-delay is caused by synchronization with the cluster.
+  - *Galera wsrep provider* implements the wsrep API for the Galera
+    plugin.
+  - *Certification layer* |---| The certification layer prepares
+    the write sets and performs the certification.
+  - *Replication layer* |---| The replication layer manages the
+    replication protocol and provides the total ordering
+    capability.
+  - *Group communication framework* |---| The group communication
+    framework provides a plugin architecture for various group
+    communication systems.
 
 
-Group Communication Framework
-==============================
+------------------------------
+ Group Communication Plugins
+------------------------------
 
 The group communication framework provides a plugin
 architecture for various group communication systems.
