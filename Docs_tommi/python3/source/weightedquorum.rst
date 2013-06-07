@@ -15,7 +15,7 @@ components.
 
 In such a situation, only one of the components can continue to
 modify the database state to avoid history divergence. This component
-is called the Primary Pomponent (PC). In normal operation, the Galera
+is called the Primary Component (PC). In normal operation, the Galera
 cluster is a PC. When cluster partitioning happens, Galera invokes a
 special quorum algorithm to select a PC that guarantees that there
 is no more than one primary component in the cluster.
@@ -90,7 +90,7 @@ Where:
 
 In other words, the quorum is preserved if (and only if) the sum
 weight of the nodes in a new component strictly exceeds half of
-that of the preceding primary component, minus the nodes which left
+that of the preceding :term:`Primary Component`, minus the nodes which left
 gracefully.
 
 Node weight can be customized by using the ``pc.weight`` Galera

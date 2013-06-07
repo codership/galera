@@ -3,6 +3,9 @@
 ==========================
 .. _`Monitoring the Cluster`:
 
+.. index::
+   pair: Parameters; wsrep_notify_cmd
+
 You can monitor *wsrep*-related status variables in the Galera
 cluster by using the standard *wsrep* queries. As all *wsrep*-related
 status variables are prefixed with *wsrep*, you can query them all by
@@ -14,7 +17,7 @@ You can also define the notification command ``wsrep_notify_cmd``
 to be invoked when the cluster membership or node status changes.
 This command can also communicate the event to a monitoring agent.
 For more information on the ``wsrep_notify_cmd`` command, see chapter 
-:ref:`Galera Parameters <Galera Parameters>`.
+:ref:`wsrep_notify_cmd <wsrep_notify_cmd>`.
 
 .. note:: Status variables and variables in the chapters below are
           differential and reset on every ``SHOW STATUS`` command.
@@ -72,7 +75,7 @@ in the cluster and this component is currently unoperational (due to
 multiple membership changes and the loss of quorum). A split-brain
 condition is also possible. 
 
-If no other node in the cluster is connected to the primary component
+If no other node in the cluster is connected to the :term:`Primary Component`
 (that is, all nodes belong to the same component, which is a
 non-primary component) the cluster must be manually rebootstrapped.
 If this is the case,
@@ -92,6 +95,9 @@ and resynchronize themselves with the primary component.
  Checking the Node Status
 ---------------------------------
 .. _`Checking the Node Status`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_address
 
 When checking the node status, the first thing you want to know
 is whether the node is ready to accept SQL load. You can check this

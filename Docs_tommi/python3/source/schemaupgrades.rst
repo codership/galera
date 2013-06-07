@@ -69,6 +69,9 @@ into consideration:
 ---------------------------------
 .. _`Rolling Schema Upgrade`:
 
+.. index::
+   pair: Parameters; wsrep_OSU_method
+
 As of *wsrep* patch 5.5.17-22.3, you can choose whether to use the
 traditional total order isolation method or the rolling schema upgrade
 method. You can choose the rolling schema upgrade method by using the

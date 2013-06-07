@@ -8,14 +8,14 @@ regular MySQL backups, using a backup script. Since all the
 cluster nodes are identical, backing up one node backs up
 the entire cluster.
 
-However, such backups will have no *global transaction ID*
+However, such backups will have no :term:`Global Transaction ID`s
 associated with them. You can use these backups to recover
 data, but they cannot be used to recover a Galera node to a
 well-defined state. Furthermore, the backup procedure may
 block the clusteroperation for the duration of backup, in
 the case of a blocking backup.
 
-You can associate a *global transaction ID* with the backup
+You can associate a :term:`Global Transaction ID` with the backup
 and avoid cluster stalling by carrying out the backup in the
 same manner as a state snapshot transfer between the nodes.
 For that:
@@ -27,7 +27,7 @@ For that:
 
 For example, the command below will cause the chosen donor
 node to the ``run wsrep_sst_backup`` script and pass the
-corresponding *global transaction ID* to it::
+corresponding :term:`Global Transaction ID` to it::
 
     /usr/bin/garbd --address gcomm://<donor node address>?gmcast.listen_addr=tcp://0.0.0.0:4444 --group <wsrep_cluster_name> --donor <wsrep_node_name on donor> --sst backup
 

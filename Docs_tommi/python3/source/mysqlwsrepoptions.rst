@@ -115,8 +115,8 @@ by (L).
 | ``wsrep_on`` **(L)**               | *ON*                     | Use wsrep replication. When switched off, no changes made in    |
 |                                    |                          | this session will be replicated.                                |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_OSU_method``               | *TOI*                    | Online schema upgrade method (MySQL >= 5.5.17). See also        |
-|                                    |                          | :ref:`Schema Upgrades <Schema Upgrades>`.                       |
+| :ref:`wsrep_OSU_method             | *TOI*                    | Online schema upgrade method (MySQL >= 5.5.17). See also        |
+| <wsrep_OSU_method>`                |                          | :ref:`Schema Upgrades <Schema Upgrades>`.                       |
 |                                    |                          |                                                                 |
 |                                    |                          | Online Schema Upgrade (OSU) can be performed with two           |
 |                                    |                          | alternative methods:                                            |
@@ -218,12 +218,57 @@ by (L).
 |                                    |                          | in 0.8.                                                         |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 
+
+
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_cluster_address
+-------------------------------
+.. _`wsrep_cluster_address`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_address
+
+Galera takes addresses in the URL format::
+
+    <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
+
+For example::
+
+    gcomm://192.168.0.1:4567?gmcast.listen_addr=0.0.0.0:5678 
+
+Changing this variable in runtime will cause the node to
+close connection to the current cluster (if any), and
+reconnect to the new address. (However, doing this at
+runtime may not be possible for all SST methods.) As of
+Galera 23.2.2, it is possible to provide a comma separated
+list of other nodes in the cluster as follows::
+
+    gcomm://node1:port1,node2:port2,...[?option1=value1&...]
+
+Using the string *gcomm://* without any address will cause
+the node to startup alone, thus initializing a new cluste
+(that the other nodes can join to).
+
+.. note: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts,
+         that will cause the node to not join back to the cluster that it
+         was part of, rather it will initialize a new one node cluster
+         and cause a split brain. To bootstrap a cluster, you should
+         only pass the ``gcomm://`` string on the command line, such as:
+         
+         ``service mysql start --wsrep-cluster-address="gcomm://"``
+
+
 .. rst-class:: html-toggle
 
 -------------------------------
  wsrep_notify_cmd
 -------------------------------
 .. _`wsrep_notify_cmd`:
+
+.. index::
+   pair: Parameters; wsrep_notify_cmd
 
 This command is run whenever the cluster membership or state
 of this node changes. This option can be used to (re)configure
@@ -233,7 +278,7 @@ one or more of the following options:
 --status <status str>        The status of this node. The possible statuses are:
 
                              - *Undefined* |---| The node has just started up 
-                               and is not connected to any primary component
+                               and is not connected to any :term:`Primary Component`
                              - *Joiner* |---| The node is connected to a primary
                                component and now is receiving state snapshot.
                              - *Donor* |---| The node is connected to primary
@@ -265,41 +310,37 @@ to view an example script that updates two tables
 on the local node with changes taking place at the
 cluster.
 
+
 .. rst-class:: html-toggle
 
 -------------------------------
- wsrep_cluster_address
+ wsrep_OSU_method
 -------------------------------
-.. _`wsrep_cluster_address`:
+.. _`wsrep_OSU_method`:
 
-Galera takes addresses in the URL format::
+.. index::
+   pair: Parameters; wsrep_OSU_method
 
-    <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
+Online schema upgrade method (MySQL >= 5.5.17). See also
+:ref:`Schema Upgrades <Schema Upgrades>`.
 
-For example::
+Online Schema Upgrade (OSU) can be performed with two
+alternative methods:
 
-    gcomm://192.168.0.1:4567?gmcast.listen_addr=0.0.0.0:5678 
-
-Changing this variable in runtime will cause the node to
-close connection to the current cluster (if any), and
-reconnect to the new address. (However, doing this at
-runtime may not be possible for all SST methods.) As of
-Galera 23.2.2, it is possible to provide a comma separated
-list of other nodes in the cluster as follows::
-
-    gcomm://node1:port1,node2:port2,...[?option1=value1&...]
-
-Using the string *gcomm://* without any address will cause
-the node to startup alone, thus initializing a new cluste
-(that the other nodes can join to).
-
-.. note: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts,
-         that will cause the node to not join back to the cluster that it
-         was part of, rather it will initialize a new one node cluster
-         and cause a split brain. To bootstrap a cluster, you should
-         only pass the ``gcomm://`` string on the command line, such as:
-         
-         ``service mysql start --wsrep-cluster-address="gcomm://"``
+- *Total Order Isolation* (TOI) runs the DDL statement in all
+  cluster nodes in the same total order sequence, locking the
+  affected table for the duration of the operation. This may
+  result in the whole cluster being blocked for the duration
+  of the operation.
+- *Rolling Schema Upgrade* (RSU) executes the DDL statement
+  only locally, thus blocking one cluster
+  node only. During the DDL processing, the node is
+  not replicating and may be unable to process replication
+  events (due to a table lock). Once the DDL operation is
+  complete, the node will catch up and sync with the cluster
+  to become fully operational again. The DDL statement or its
+  effects are not replicated; the user is responsible for
+  manually performing this operation on each of the nodes.
 
 
 .. |---|   unicode:: U+2014 .. EM DASH

@@ -233,7 +233,7 @@ where:
       connect the node to an existing cluster, or
     - A comma-separated list of possible cluster members. It is
       assumed that the list members can belong to no more than
-      one primary component. Or
+      one :term:`Primary Component`. Or
     - An empty string, if you want this node to be the first in
       a new cluster (that is, there are no pre-existing nodes to
       connect to).

@@ -15,7 +15,7 @@
 .. _`Node Provisioning and Recovery`:
 
 The state of new and failed nodes differs from the state of
-the primary component and needs to be synchronized. As a result,
+the :term:`Primary Component` and needs to be synchronized. As a result,
 new node provisioning and failed node recovery are essentially
 the same process of joining the node to the cluster
 :abbr:`PC (Primary Component)`.

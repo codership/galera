@@ -23,7 +23,7 @@ Single Node Failure Detection
 
 The only sign of a node failure is a loss of connection to the
 node process as seen by another node. The node is considered failed
-when it is no longer a member of the cluster primary component, that
+when it is no longer a member of the cluster :term:`Primary Component`, that
 is, when the members of the primary component no longer see it.
 From the perspective of the failed node (unless it has crashed
 itself), it has lost connection to the primary component.

@@ -3,6 +3,9 @@
 ======================================
 .. _`Configuring Galera Cluster for MySQL`:
 
+.. index::
+   pair: Parameters; wsrep_cluster_address
+
 This chapter presents the mandatory and recommended settings
 for *Galera Cluster for MySQL* installation and use. It may
 be possible to start the cluster after

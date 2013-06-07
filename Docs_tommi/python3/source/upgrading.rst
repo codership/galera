@@ -103,6 +103,9 @@ Provider-only Upgrade
 ---------------------
 .. _`Provider-only Upgrade`:
 
+.. index::
+   pair: Parameters; wsrep_cluster_address
+
 If only a Galera provider upgrade is required, the bulk upgrade can
 be further optimized to only take a few seconds. The following is an
 example for a 64-bit CentOS (or RHEL):

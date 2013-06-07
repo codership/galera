@@ -5,7 +5,7 @@
 
 In the case of a network failure, failure of more than half
 of the cluster nodes, or a split-brain situation, your node(s)
-may no longer deem that they are part of the primary component
+may no longer deem that they are part of the :term:`Primary Component`
 of the cluster. In other words, they suspect that there is
 another primary component in the cluster which they have no
 connection to.

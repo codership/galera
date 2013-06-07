@@ -185,7 +185,7 @@ These parameters are passed to the state transfer script by the state transfer p
 
 - ``socket`` |---| The local server (donor) socket for
   communications, if is required.
-- ``gtid`` |---| The global transaction ID in format: ``<uuid>:<seqno>``.
+- ``gtid`` |---| The :term:`Global Transaction ID` in format: ``<uuid>:<seqno>``.
 - ``bypass`` |---| This parameter specifies whether the actual data
   transfer should be skipped and only the GTID should be passed to
   the receiving server (to go straight to incremental state transfer).

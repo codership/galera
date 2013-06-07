@@ -136,7 +136,7 @@ state changes as depicted in the figure below:
 
 In the figure:
 
-1. The node establishes a connection to a *primary component*.
+1. The node establishes a connection to a :term:`Primary Component`.
 2. The state *transfer request* of the node succeeds. The node
    starts to cache the write sets.
 3. The node receives a state snapshot. Now it has all cluster

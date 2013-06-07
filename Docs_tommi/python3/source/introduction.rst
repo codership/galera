@@ -1,7 +1,7 @@
 ======================
- Replication Variants
+ Database Replication
 ======================
-.. _`Replication Variants`:
+.. _`Database Replication`:
 
 Database replication refers to the frequent copying of data
 from one node, that is, a database on one server, to a node on
@@ -15,9 +15,9 @@ way, but experiences close to native :abbr:`DBMS (DataBase Management System)`
 behavior.
 
 ---------------------
- Replication Methods
+ Masters and Slaves
 ---------------------
-.. _`Replication Methods`:
+.. _`Masters and Slaves`:
 
 Many database management systems replicate databases. The most
 common replication method is to create a master/slaves relationship
@@ -26,35 +26,30 @@ The master logs the updates to the data, and propagates the logs
 through a network to the slaves. The slaves, for their part, send a
 message indicating that they have received the update successfully.
 Once the master receives these messages from the slaves, it can send
-subsequent updates to the slaves. This approach is know as
-asynchronous replication, as there is a delay between the application
-of changes on the master node and the propagation of changes to
-the slave nodes.
+subsequent updates to the slaves.
 
-Asynchronous replication is depicted in the figure below:
+A master/slaves relationship is depicted in the figure below:
 
 .. figure:: images/asynchronousreplication.png
 
-   *Asynchronous Replication*
+   *Master/Slave Replication*
 
 Another common replication method is to create a multi-master replication
 system, where updates can be submitted to any database node, and
 then propagated through a network to other database nodes. In other
 words, all database nodes act as masters, and no logs or update
-success indications are sent. This approach is know as synchronous
-replication, as there is no delay between the application of changes
-on the nodes.
+success indications are sent. 
 
-Synchronous replication is depicted in the figure below:
+A multi-master replication system is depicted in the figure below:
 
 .. figure:: images/synchronousreplication.png
 
-   *Synchronous Replication*
+   *Multi-master Replication*
 
-----------------------------
- Eager and Lazy Replication
-----------------------------
-.. _`Eager and Lazy Replication`:
+----------------------------------------------
+ Asynchronous and Synchronous Replication
+----------------------------------------------
+.. _`Asynchronous and Synchronous Replication`:
 
 From a more technical perspective, asynchronous and synchronous
 replication protocols differ in the way they propagate database
@@ -105,9 +100,9 @@ MySQL or PostgreSQL only offer asynchronous replication
 solutions.
 
 -----------------------------------------------
- Solving the Issues in Syncronous Replication
+ Solving the Issues in Synchronous Replication
 -----------------------------------------------
-.. _`Solving the Issues in Syncronous Replication`:
+.. _`Solving the Issues in Synchronous Replication`:
 
 To solve the problems in the traditional synchronous replication
 systems and approaches, researchers all around the world have,

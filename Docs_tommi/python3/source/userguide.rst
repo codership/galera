@@ -24,4 +24,6 @@ Contents:
    backingupthecluster
    arbitrator
    faq
+   myisamtoinnodb
+   compiling
    configurationtips
