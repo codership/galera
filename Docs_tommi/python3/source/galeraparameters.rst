@@ -56,6 +56,9 @@ Table legend:
 |                                       |                       |   gmcast.mcast_addr=239.192.0.11                   |
 |                                       |                       |                                                    |
 |                                       |                       | The value must be the same on all nodes.           |
+|                                       |                       |                                                    |
+|                                       |                       | If you are planning to build a large cluster, we   |
+|                                       |                       | recommend using UDP.                               |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gmcast.mcast_ttl``                  | *1*                   | Time to live value for multicast packets.          |
 +---------------------------------------+-----------------------+----------------------------------------------------+

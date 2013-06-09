@@ -188,6 +188,10 @@ by (L).
 |                                    |                          | - *rsync_wan* |---| This option is almost the same as *rsync*,  |
 |                                    |                          |   but uses the *delta-xfer* algorithm to minimize               |
 |                                    |                          |   network traffic.                                              |
+|                                    |                          |                                                                 |
+|                                    |                          |   **Note!** You can only use *rsync* when a node is starting.   |
+|                                    |                          |   In other words, you cannot use *rsync* under a running InnoDB |
+|                                    |                          |   storage engine.                                               |
 |                                    |                          | - *xtrabackup* |---| This option is a fast and practically      |
 |                                    |                          |   non-blocking SST method based on Percona's xtrabackup tool.   |
 |                                    |                          |                                                                 |

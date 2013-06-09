@@ -4,9 +4,9 @@
 .. _`Enabling SSL`:
 
 Galera library supports :abbr:`SSL (Secure Sockets Layer)`
-for the encryption of replication traffic. SSL is a cluster-wide
-option and must be enabled either on all of the nodes or none
-at all. 
+for the encryption of replication traffic. Authentication
+is not supprtoed. SSL is a cluster-wide option and must be
+enabled either on all of the nodes or none at all. 
 
 To use SSL, you must generate a private certificate/key pair
 for the cluster, for example, by the following command::
