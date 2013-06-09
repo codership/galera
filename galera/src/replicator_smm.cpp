@@ -1362,7 +1362,15 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
 
 wsrep_seqno_t galera::ReplicatorSMM::pause()
 {
-    gu_trace(local_monitor_.lock());
+    try
+    {
+        gu_trace(local_monitor_.lock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EALREADY) return cert_.position();
+        throw;
+    }
 
     wsrep_seqno_t const ret(cert_.position());
 
@@ -1385,7 +1393,22 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 void galera::ReplicatorSMM::resume()
 {
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
-    local_monitor_.unlock();
+
+    try
+    {
+        gu_trace(local_monitor_.unlock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EBUSY)
+        {
+            /* monitor is still locked, restore saved state */
+            st_.set(state_uuid_, cert_.position());
+            return;
+        }
+        throw;
+    }
+
     log_info << "Provider resumed.";
 }
 
