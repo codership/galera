@@ -7,6 +7,8 @@
  Reference
 ==========
 
+This chapter contains reference information on *Galera Cluster for MySQL*.
+
 Contents:
 
 .. toctree::

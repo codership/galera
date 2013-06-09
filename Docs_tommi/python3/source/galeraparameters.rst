@@ -33,11 +33,12 @@ Table legend:
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``protonet.version``                  | *0*                   |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``socket.ssl_cert``                   |                       | A path (absolute or relative to the working dir)   |
-|                                       |                       | to an SSL certificate (in PEM format).             |
+| ``socket.ssl_cert``                   |                       | A path (absolute or relative to the working        |
+|                                       |                       | directory )to an SSL certificate (in PEM format).  |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``socket.ssl_key``                    |                       | A path (absolute or relative to the working dir) to|
-|                                       |                       | a private key for a certificate (in PEM format).   |
+| ``socket.ssl_key``                    |                       | A path (absolute or relative to the working        |
+|                                       |                       | directory to a private key for a certificate       |
+|                                       |                       | (in PEM format).                                   |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``socket.ssl_compression``            | *yes*                 | Whether to enable compression on SSL connections.  |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -122,7 +123,7 @@ Table legend:
 | ``evs.use_aggregate``                 | *true*                | Aggregate small packets into one, when possible.   |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.user_send_window`` **(R)**      | *2*                   | Maximum data packets in replication at a time.     |
-|                                       |                       | For WAN setups, this calue can be set considerably |
+|                                       |                       | For WAN setups, this value can be set considerably |
 |                                       |                       | higher, to, for example, 512.                      |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.view_forget_timeout``           | *PT5M*                | Drop past views from the view history after this   |
@@ -131,7 +132,7 @@ Table legend:
 | ``evs.version``                       | *0*                   |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``pc.bootstrap``                      |                       | If you set this value to *true* is a signal to     |
-|                                       |                       | turn a ``NON-PRIMARY`` compoment into ``PRIMARY``. |
+|                                       |                       | turn a ``NON-PRIMARY`` component into ``PRIMARY``. |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``pc.checksum``                       | *true*                | Checksum replicated messages.                      |
 +---------------------------------------+-----------------------+----------------------------------------------------+

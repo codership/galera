@@ -8,7 +8,7 @@ regular MySQL backups, using a backup script. Since all the
 cluster nodes are identical, backing up one node backs up
 the entire cluster.
 
-However, such backups will have no :term:`Global Transaction ID`s
+However, such backups will have no global transaction IDs
 associated with them. You can use these backups to recover
 data, but they cannot be used to recover a Galera node to a
 well-defined state. Furthermore, the backup procedure may

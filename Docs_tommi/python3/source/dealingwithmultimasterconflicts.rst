@@ -56,7 +56,7 @@ See also chapter :ref:`Certification Based Replication <Certification Based Repl
    pair: Parameters; wsrep_local_cert_failures
 
 You can log cluster wide conflicts by using the ``wsrep_debug``
-variable, which will log these conlicts and plenty of other
+variable, which will log these conflicts and plenty of other
 information. You can also monitor the parameters below:
 
 - ``wsrep_local_bf_aborts``
@@ -76,7 +76,7 @@ logic inbuilt.
 
 Nevertheless, *Galera Cluster for MySQL* can re-try to autocommit
 deadlocked transactions on behalf of the client application. The
-``wsrep_retry_autocommit`` parameter defines how manyt times the
+``wsrep_retry_autocommit`` parameter defines how many times the
 transaction is retried before returning a deadlock error.
 
 .. note:: Retrying only applies to autocommit transactions, as retrying

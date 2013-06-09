@@ -53,7 +53,7 @@ Lenny proceeds as follows::
     $ sudo apt-get install psmisc
     $ sudo apt-get -t lenny-backports install mysql-client-5.1
 
-To install *Galera Cluster for MySQL*, proceed as follows::
+To install *Galera Cluster for MySQL*, proceed as follows:
 
 1. Install the write set replication patches:
 
@@ -90,7 +90,7 @@ If you are migrating from an existing MySQL installation, there are two optins:
      2. Install the official *MySQL-shared-compat-5.1.x* from
         http://dev.mysql.com/downloads/mysql/5.1.html
 
-To install *Galera Cluster for MySQL*, proceed as follows::
+To install *Galera Cluster for MySQL*, proceed as follows:
 
 1. Install the write set replication patches:
 

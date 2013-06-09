@@ -9,7 +9,7 @@ ready to continue replication. This prevents any node in the
 cluster from lagging too far behind the others in applying
 replication.
 
-Read also this percona article:
+Read also this Percona article:
 http://www.mysqlperformanceblog.com/2013/05/02/galera-flow-control-in-percona-xtradb-cluster-for-mysql/
 
 This chapter describes the flow control of node states and the
@@ -23,7 +23,7 @@ possible node state changes.
 To ensure temporal synchrony and consistency (as opposed
 to logical which is provided by virtual synchrony), Galera
 implements several forms of flow control, depending on the
-node state. The node states are descibed in the chapters
+node state. The node states are described in the chapters
 below.
 
 ``OPEN`` and ``PRIMARY``
@@ -41,7 +41,7 @@ cache them. There is no reasonable way to keep the node
 synchronized with the cluster (except for stopping all
 replication). However, it is possible to limit the replication
 rate to make sure that the writeset cache does not exceed the
-configured size. The writeset cache cache size is controlled
+configured size. The writeset cache size is controlled
 by the following variables:
 
 - ``gcs.recv_q_hard_limit`` sets the maximum writeset cache

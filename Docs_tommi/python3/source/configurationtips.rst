@@ -58,7 +58,7 @@ be no less than the ``evs.suspect_timeout`` parameter value and the
 ``evs.install_timeout`` parameter value must be no less than the
 ``evs.inactive_timeout`` parameter value.
 
-.. note:: WAN links can have have exceptionally high latencies. Take
+.. note:: WAN links can have exceptionally high latencies. Take
           Round-Trip Time (RTT) measurements (ping RTT is a fair estimate)
           from between your cluster nodes and make sure
           that all temporal Galera settings (periods and timeouts, such

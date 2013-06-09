@@ -11,8 +11,6 @@ These are MySQL system variables introduced by *wsrep*
 patch v0.8. All variables are global except where marked
 by (L).
 
-.. table::
-    :widths: 3 3 6
 
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | Option                             | Default                  | Description                                                     |
@@ -35,7 +33,7 @@ by (L).
 | <wsrep_cluster_address>`           |                          |                                                                 |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_cluster_name``             | *my_test_cluster*        | The logical cluster name. If a node tries to connect to a       |
-|                                    |                          | cluste rwith a different name, the connection fails. The        |
+|                                    |                          | cluster with a different name, the connection fails. The        |
 |                                    |                          | cluster name must be same on all the cluster nodes.             |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_convert_LOCK_to_trx``      | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT.``  |
@@ -78,7 +76,7 @@ by (L).
 |                                    |                          | *STATEMENT*, *MIXED* and the special value *NONE*,              |
 |                                    |                          | meaning that there is no forced binlog format in effect.        |
 |                                    |                          |                                                                 |
-|                                    |                          | This variable was intruduced to support ``STATEMENT`` format    |
+|                                    |                          | This variable was introduced to support ``STATEMENT`` format    |
 |                                    |                          | replication during  rolling schema upgrade processing.          |
 |                                    |                          | However, in most cases, ``ROW`` replication                     |
 |                                    |                          | is valid for asymmetric schema replication.                     |
@@ -91,7 +89,7 @@ by (L).
 |                                    |                          | limits the supported size of transactions and ``LOAD DATA``     |
 |                                    |                          | statements.                                                     |
 |                                    |                          |                                                                 |
-|                                    |                          | The maximum allowed allowed writeset size is 2G.                |
+|                                    |                          | The maximum allowed writeset size is 2G.                        |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_node_address``             | *<address>[:port]*       | An option to explicitly specify the network address of the      |
 |                                    |                          | node, if autoguessing for some reason does not produce          |
@@ -117,24 +115,6 @@ by (L).
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | :ref:`wsrep_OSU_method             | *TOI*                    | Online schema upgrade method (MySQL >= 5.5.17). See also        |
 | <wsrep_OSU_method>`                |                          | :ref:`Schema Upgrades <Schema Upgrades>`.                       |
-|                                    |                          |                                                                 |
-|                                    |                          | Online Schema Upgrade (OSU) can be performed with two           |
-|                                    |                          | alternative methods:                                            |
-|                                    |                          |                                                                 |
-|                                    |                          |  - *Total Order Isolation* (TOI) runs the DDL statement in all  |
-|                                    |                          |    cluster nodes in the same total order sequence, locking the  |
-|                                    |                          |    affected table for the duration of the operation. This may   |
-|                                    |                          |    result in the whole cluster being blocked for the duration   |
-|                                    |                          |    of the operation.                                            |
-|                                    |                          |  - *Rolling Schema Upgrade* (RSU) executes the DDL statement    |
-|                                    |                          |    only locally, thus blocking one cluster                      |
-|                                    |                          |    node only. During the DDL processing, the node is            |
-|                                    |                          |    not replicating and may be unable to process replication     |
-|                                    |                          |    events (due to a table lock). Once the DDL operation is      |
-|                                    |                          |    complete, the node will catch up and sync with the cluster   |
-|                                    |                          |    to become fully operational again. The DDL statement or its  |
-|                                    |                          |    effects are not replicated; the user is responsible for      |
-|                                    |                          |    manually performing this operation on each of the nodes.     |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_provider``                 | *none*                   | A path to wsrep provider to load. If not specified, all calls   |
 |                                    |                          | to wsrep provider will be bypassed and the server               |
@@ -150,7 +130,7 @@ by (L).
 |                                    |                          | should it go into deadlock with other transactions              |
 |                                    |                          | in the database lock manager.                                   |
 +------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_slave_threads``            | *1*                      | How many threads to use for applying slave writsets. There      |
+| ``wsrep_slave_threads``            | *1*                      | How many threads to use for applying slave writesets. There     |
 |                                    |                          | are two things to consider when choosing the number:            |
 |                                    |                          |                                                                 |
 |                                    |                          | 1. The number should be at least two times the number of CPU    |
@@ -252,7 +232,7 @@ list of other nodes in the cluster as follows::
     gcomm://node1:port1,node2:port2,...[?option1=value1&...]
 
 Using the string *gcomm://* without any address will cause
-the node to startup alone, thus initializing a new cluste
+the node to startup alone, thus initializing a new cluster
 (that the other nodes can join to).
 
 .. note: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts,
@@ -300,7 +280,7 @@ one or more of the following options:
                              The members are presented in the following syntax: 
                             
                              - ``<node UUID>`` |---| A unique node ID. The wsrep
-                               provider automatically assigns tjhis ID for each node.
+                               provider automatically assigns this ID for each node.
                              - ``<node name>`` |---| The node name as it is set in the
                                ``wsrep_node_name`` option.
                              - ``<incoming address>`` |---| The address for client

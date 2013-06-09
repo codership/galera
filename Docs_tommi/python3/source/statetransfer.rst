@@ -81,7 +81,7 @@ transfer. Incremental state transfer means that if:
 2. all of the missed writesets can be found in the donor Gcache
 
 then, instead of whole state snapshot, a node will receive the
-missing writes ets and catch up with the group by replaying them.
+missing write sets and catch up with the group by replaying them.
 
 For example, if the local node state is::
 
@@ -100,7 +100,7 @@ to the cluster. It is also non-blocking on the donor.
 
 Perhaps the most important parameter for IST is the GCache size
 on the donor. The bigger it is, the more write sets can be
-stored in it and the bigger seqno gaps can be closed with
+stored in it, and the bigger seqno gaps can be closed with
 IST. On the other hand, if the GCache is much bigger than
 the state size, serving IST may be less efficient than
 sending a state snapshot.

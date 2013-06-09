@@ -7,7 +7,7 @@ Database replication refers to the frequent copying of data
 from one node, that is, a database on one server, to a node on
 another server. A database replication system is, in other words,
 a distributed database in which all nodes share the same level
-of information. This system is also know as a database cluster.
+of information. This system is also known as a database cluster.
 
 The database client (such as a Web browser or a computer
 application) does not see the database replication system in any
@@ -89,7 +89,7 @@ over asynchronous replication:
 Traditionally, eager replication protocols coordinated nodes
 one operation at a time, using *2-phase commit* or distributed
 locking. In a system with *x* nodes and *y* operations, a
-throughtput of *z* transactions per second requires
+throughput of *z* transactions per second requires
 *x* |times| *y* |times| *z* messages per second. When
 the number of nodes increases, transaction response times,
 conflict probability and deadlock rates grow exponentially.
@@ -114,7 +114,7 @@ important improvements these studies have brought about are:
 - **Group communication** |---| Group communication is a high
   level abstraction that defines patterns for the communication
   of database nodes to guarantee the consistency of replicated data.
-- **Write sets** |---| Write sets budle database writes into a single
+- **Write sets** |---| Write sets bundle database writes into a single
   *writeset* message, thus avoiding the coordination of nodes
   one operation at a time.
 - **Database State Machine** |---| In the Database State

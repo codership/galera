@@ -134,7 +134,7 @@ nodes synchronized to a fraction of second.
 
 The group communication framework also provides total
 ordering of messages from multiple sources, which is
-used to build :term:`Global Transaction ID`s in a multi-master
+used to build global Transaction IDs in a multi-master
 cluster. 
 
 At the transport level, Galera cluster is a symmetric
