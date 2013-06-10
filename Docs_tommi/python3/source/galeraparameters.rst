@@ -241,6 +241,9 @@ Table legend:
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcache.size``                       | *128Mb*               | Size of the on-disk ring buffer storage. This will |
 |                                       |                       | be preallocated on startup.                        |
+|                                       |                       |                                                    |
+|                                       |                       | See also chapter :ref:`Optimizing GCache Size      |
+|                                       |                       | <Optimizing GCache Size>`.                         |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcache.page_size``                  | *128Mb*               | Size of the page files in page storage. The limit  |
 |                                       |                       | on overall page storage is the size of the disk.   |
@@ -250,8 +253,8 @@ Table legend:
 |                                       |                       | caching purposes. If only page storage is enabled, |
 |                                       |                       | one page is always present.                        |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``gcache.mem_size``                   | *0*                   | Max size of the malloc() store (read: RAM). For    |
-|                                       |                       | setups with spare RAM.                             |
+| ``gcache.mem_size``                   | *0*                   | Max size of the ``malloc()`` store (read: RAM).    |
+|                                       |                       | For setups with spare RAM.                         |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 
 .. |---|   unicode:: U+2014 .. EM DASH

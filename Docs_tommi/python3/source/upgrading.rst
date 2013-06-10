@@ -19,7 +19,7 @@ the following steps on each cluster node:
 
 1. Shutdown the node
 2. Upgrade the software
-3. Retart the node
+3. Restart the node
 4. Wait until the node gets synchronized with the cluster
 
 .. tip:: If the upgraded node has been or will be part of a

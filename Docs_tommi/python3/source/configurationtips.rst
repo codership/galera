@@ -10,6 +10,15 @@ Setting Parallel CPU Threads
 --------------------------------------
 .. _`Setting Parallel CPU Threads`:
 
+.. index::
+   pair: Configuration Tips; innodb_autoinc_lock_mode
+   
+.. index::
+   pair: Configuration Tips; innodb_locks_unsafe_for_binlog
+   
+.. index::
+   pair: Configuration Tips; wsrep_slave_threads
+
 There is no rule about how many slave :abbr:`CPU (Central Processing Unit)`
 threads one should configure for replication. At the same time,
 parallel threads do not guarantee better performance. However,
@@ -42,6 +51,9 @@ To set four parallel CPU threads, use the parameter value below::
  WAN Replication
 -------------------
 .. _`WAN Replication`:
+
+.. index::
+   pair: Configuration Tips; wsrep_provider_options
 
 Transient network connectivity failures are not rare in
 :abbr:`WAN (Wide Area Network)` configurations. Thus, you
@@ -80,6 +92,9 @@ In such a case, reduce the number of masters.
 ----------------------
 .. _`Single Master Setup`:
 
+.. index::
+   pair: Configuration Tips; wsrep_provider_options
+
 If only one node at a time is used as a master, certain requirements,
 such as the slave queue size, may be relaxed. Flow control can be
 relaxed by using the settings below::
@@ -89,6 +104,46 @@ relaxed by using the settings below::
 These settings may improve replication performance by
 reducing the rate of flow control events. This setting
 can also be used as suboptimal in a multi-master setup.
+
+--------------------------
+  Optimizing GCache Size
+--------------------------
+.. _`Optimizing GCache Size`:
+
+.. index::
+   pair: Configuration Tips; gcache.size
+
+.. index::
+   pair: Configuration Tips; wsrep_received_bytes
+
+These configuration tips are guidelines only. You may end up
+using a bigger GCache that suggested by these guidelies, for
+example, if you must avoid SST as much as possible. 
+
+The GCache size, that is the ``gcache.size`` parameter value,
+should be smaller than the database size. However, in this context,
+the database size depends on the SST method. For example,
+*mysqldump* does not copy InnoDB log files whereas *rsync*
+and *xtrabackup* do. As a rule, it is recommended to use the
+data directory size (including any possible links) minus the
+size of the ``galera.cache`` parameter.
+
+You can also consider the speed of copying as one variable in
+the calculation. If you use Incremental State Transfer (IST)
+as your node provisioning method, you can probably copy the
+database five times faster through IST than through *mysqldump*.
+With *xtrabackup*, the factor is approximately 1.5. If this
+is the case, you can use a relatively big GCache size.
+
+The database write rate indicates the tail length that will be
+stored in the GCache. You can calculate the write rate by using
+the ``wsrep_received_bytes`` status variable. Proceed as follows:
+
+1. Read the ``wsrep_received_bytes1`` value at time ``t1``.
+2. Read the ``wsrep_received_bytes2`` value at time ``t2``.
+3. Calculate the write rate as follows:
+
+   ``(wsrep_received_bytes2 - wsrep_received_bytes1)/(t2 - t1)``
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

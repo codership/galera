@@ -120,7 +120,7 @@ GCache has three types of stores:
 1. A permanent in-memory store, where write sets are allocated
    by the default OS memory allocator. This store can be useful
    in systems that have spare RAM. The store has a hard size
-   limit. By default, it is disabled (the size is set to 0).
+   limit. By default, it is disabled.
 2. A permanent ring-buffer file, which is preallocated on disk
    during cache initialization. This store is intended as the
    main writeset store. By default, its size is 128Mb.
@@ -134,6 +134,10 @@ GCache has three types of stores:
    limit can be set on the total size of the page files to
    keep. When all other stores are disabled, at least one
    page file is always present on disk.
+   
+   For more information, see the GCache related parameter
+   descriptions in chapter
+   :ref:`Galera Parameters <Galera Parameters>`.
 
 The allocation algorithm attempts to store write sets in the above
 order. If the first store does not have enough space to allocate the
