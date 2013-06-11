@@ -664,27 +664,36 @@ void galera::Certification::purge_trxs_upto_(wsrep_seqno_t seqno)
 }
 
 
-void galera::Certification::set_trx_committed(TrxHandle* trx)
+wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandle* trx)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0 &&
            trx->is_committed() == false);
 
-    if (trx->is_certified() == true)
+    wsrep_seqno_t ret(-1);
     {
-        // trxs with depends_seqno == -1 haven't gone through
-        // append_trx
         gu::Lock lock(mutex_);
+        if (trx->is_certified() == true)
+        {
+            // trxs with depends_seqno == -1 haven't gone through
+            // append_trx
+            DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
+            assert(i != deps_set_.end());
 
-        DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
-        assert(i != deps_set_.end());
+            if (deps_set_.size() == 1) safe_to_discard_seqno_ = *i;
 
-        if (deps_set_.size() == 1) safe_to_discard_seqno_ = *i;
+            deps_set_.erase(i);
+        }
 
-        deps_set_.erase(i);
+        if (gu_unlikely(index_purge_required()))
+        {
+            ret = get_safe_to_discard_seqno_();
+        }
     }
 
     trx->mark_committed();
     trx->clear();
+
+    return ret;
 }
 
 galera::TrxHandle* galera::Certification::get_trx(wsrep_seqno_t seqno)
