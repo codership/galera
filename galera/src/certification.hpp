@@ -74,7 +74,9 @@ namespace galera
             purge_trxs_upto_(std::min(seqno, stds));
         }
 
-        void set_trx_committed(TrxHandle*);
+        // Set trx corresponding to handle committed. Return purge seqno if
+        // index purge is required, -1 otherwise.
+        wsrep_seqno_t set_trx_committed(TrxHandle*);
         TrxHandle* get_trx(wsrep_seqno_t);
 
         // statistics section

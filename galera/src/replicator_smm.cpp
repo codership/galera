@@ -490,9 +490,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     if (trx->local_seqno() != -1)
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
-        cert_.set_trx_committed(trx);
+        report_last_committed(cert_.set_trx_committed(trx));
     }
-    report_last_committed();
 }
 
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
@@ -862,10 +861,9 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
 
-    cert_.set_trx_committed(trx);
+    report_last_committed(cert_.set_trx_committed(trx));
     trx->set_state(TrxHandle::S_COMMITTED);
 
-    report_last_committed();
     ++local_commits_;
 
     return WSREP_OK;
@@ -884,7 +882,9 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 
     trx->set_state(TrxHandle::S_ROLLED_BACK);
 
-    report_last_committed();
+    // Trx was either rolled back by user or via certification failure,
+    // last committed report not needed since cert index state didn't change.
+    // report_last_committed();
     ++local_rollbacks_;
 
     return WSREP_OK;
@@ -968,7 +968,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
         trx->set_state(TrxHandle::S_ABORTING);
-        report_last_committed();
+        // Called now from cert()
+        // report_last_committed();
         break;
     default:
         log_error << "unrecognized retval "
@@ -995,8 +996,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     apply_monitor_.leave(ao);
 
     st_.mark_safe();
-    cert_.set_trx_committed(trx);
-    report_last_committed();
+    report_last_committed(cert_.set_trx_committed(trx));
 
     return WSREP_OK;
 }
@@ -1514,7 +1514,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                cert_.set_trx_committed(trx);
+                report_last_committed(cert_.set_trx_committed(trx));
                 retval = WSREP_TRX_FAIL;
             }
             break;
@@ -1533,7 +1533,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             }
             trx->set_state(TrxHandle::S_MUST_ABORT);
             local_cert_failures_ += trx->is_local();
-            cert_.set_trx_committed(trx);
+            report_last_committed(cert_.set_trx_committed(trx));
             retval = WSREP_TRX_FAIL;
             break;
         }

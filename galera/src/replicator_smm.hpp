@@ -149,11 +149,10 @@ namespace galera
                    commit_monitor_.last_left() : apply_monitor_.last_left();
         }
 
-        void report_last_committed()
+        void report_last_committed(wsrep_seqno_t purge_seqno)
         {
-            if (gu_unlikely(cert_.index_purge_required()))
+            if (gu_unlikely(purge_seqno != -1))
             {
-                wsrep_seqno_t const purge_seqno(cert_.get_safe_to_discard_seqno());
                 service_thd_.report_last_committed(purge_seqno);
             }
         }
