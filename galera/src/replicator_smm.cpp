@@ -368,7 +368,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     wsrep_status_t retval(WSREP_OK);
 
-    while (state_() != S_CLOSING)
+    while (WSREP_OK == retval && state_() != S_CLOSING)
     {
         ssize_t rc;
 
@@ -388,6 +388,14 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     if (receivers_.sub_and_fetch(1) == 0)
     {
+        if (state_() != S_CLOSING)
+        {
+            log_warn << "Broken shutdown sequence, provider state: "
+                     << state_() << ", retval: " << retval;
+            assert (0);
+            /* avoid abort in production */
+            state_.shift_to(S_CLOSING);
+        }
         state_.shift_to(S_CLOSED);
     }
 
@@ -409,7 +417,8 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     if (handle->opaque != 0)
     {
         trx = reinterpret_cast<TrxHandle*>(handle->opaque);
-        assert(trx->trx_id() == handle->trx_id);
+        assert(trx->trx_id() == handle->trx_id ||
+               wsrep_trx_id_t(-1) == handle->trx_id);
         trx->ref();
     }
     else
@@ -1385,7 +1394,15 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
 
 wsrep_seqno_t galera::ReplicatorSMM::pause()
 {
-    gu_trace(local_monitor_.lock());
+    try
+    {
+        gu_trace(local_monitor_.lock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EALREADY) return cert_.position();
+        throw;
+    }
 
     wsrep_seqno_t const ret(cert_.position());
 
@@ -1408,7 +1425,22 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 void galera::ReplicatorSMM::resume()
 {
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
-    local_monitor_.unlock();
+
+    try
+    {
+        gu_trace(local_monitor_.unlock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EBUSY)
+        {
+            /* monitor is still locked, restore saved state */
+            st_.set(state_uuid_, cert_.position());
+            return;
+        }
+        throw;
+    }
+
     log_info << "Provider resumed.";
 }
 

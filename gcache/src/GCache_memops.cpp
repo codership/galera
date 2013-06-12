@@ -31,7 +31,7 @@ namespace gcache
         }
     }
 
-    void* 
+    void*
     GCache::malloc (ssize_t size)
     {
         size += sizeof(BufferHeader);
