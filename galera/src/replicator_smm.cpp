@@ -365,7 +365,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     wsrep_status_t retval(WSREP_OK);
 
-    while (state_() != S_CLOSING)
+    while (WSREP_OK == retval && state_() != S_CLOSING)
     {
         ssize_t rc;
 
@@ -385,6 +385,14 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     if (receivers_.sub_and_fetch(1) == 0)
     {
+        if (state_() != S_CLOSING)
+        {
+            log_warn << "Broken shutdown sequence, provider state: "
+                     << state_() << ", retval: " << retval;
+            assert (0);
+            /* avoid abort in production */
+            state_.shift_to(S_CLOSING);
+        }
         state_.shift_to(S_CLOSED);
     }
 
@@ -406,7 +414,8 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     if (handle->opaque != 0)
     {
         trx = reinterpret_cast<TrxHandle*>(handle->opaque);
-        assert(trx->trx_id() == handle->trx_id);
+        assert(trx->trx_id() == handle->trx_id ||
+               wsrep_trx_id_t(-1) == handle->trx_id);
         trx->ref();
     }
     else

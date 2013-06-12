@@ -963,6 +963,7 @@ gcs_handle_state_change (gcs_conn_t*           conn,
 
     if (buf) {
         memcpy (buf, act->buf, act->buf_len);
+        /* initially act->buf points to internal static recv buffer. No leak here */
         ((struct gcs_act*)act)->buf = buf;
         return 1;
     }
@@ -1122,7 +1123,6 @@ static void *gcs_recv_thread (void *arg)
             assert (0             == rcvd.act.buf_len);
             assert (GCS_ACT_ERROR == rcvd.act.type);
             assert (GCS_SEQNO_ILL == rcvd.id);
-//            assert (NULL == repl_buf);
 
             err_act->rcvd     = rcvd;
             err_act->local_id = GCS_SEQNO_ILL;
@@ -1307,28 +1307,27 @@ out:
  * on it. */
 long gcs_close (gcs_conn_t *conn)
 {
+    /* all possible races in connection closing should be resolved by
+     * the following call, it is thread-safe */
+
     long ret;
 
-    if ((ret = gcs_sm_close (conn->sm))) return ret;
+    if (!(ret = gcs_sm_close   (conn->sm)) &&
+        !(ret = gcs_core_close (conn->core))) {
 
-    if (GCS_CONN_CLOSED <= conn->state) {
-        return -EBADFD;
-    }
-    else if (!(ret = gcs_core_close (conn->core))) {
-
-        /* here we synchronize with SELF_LEAVE event */
-        gu_thread_join (conn->recv_thread, NULL);
-        gu_info ("recv_thread() joined.");
-
-        if (GCS_CONN_CLOSED != conn->state) {
-            gu_warn ("Broken shutdown sequence: GCS connection state is %s,"
-                     " expected %s", gcs_conn_state_str[conn->state],
-                     gcs_conn_state_str[GCS_CONN_CLOSED]);
-            gcs_shift_state (conn, GCS_CONN_CLOSED);
+        /* here we synchronize with SELF_LEAVE event caused by gcs_core_close */
+        if ((ret = gu_thread_join (conn->recv_thread, NULL))) {
+            gu_error ("Failed to join recv_thread(): %d (%s)",
+                      -ret, strerror(-ret));
         }
-    }
+        else {
+            gu_info ("recv_thread() joined.");
+        }
 
-    if (!ret) {
+        /* recv_thread() is supposed to set state to CLOSED when exiting */
+        assert (GCS_CONN_CLOSED == conn->state);
+
+        gu_info ("Closing replication queue.");
         struct gcs_repl_act** act_ptr;
         /* At this point (state == CLOSED) no new threads should be able to
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
@@ -1494,9 +1493,9 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
         {
             struct gcs_repl_act** act_ptr;
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
             const void* const orig_buf = act->buf;
-#endif
+//#endif
 
             // some hack here to achieve one if() instead of two:
             // ret = -EAGAIN part is a workaround for #569
@@ -1544,7 +1543,6 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
 #else
                 assert (act->buf == 0);
 #endif /* GCS_FOR_GARB */
-                assert (act->buf != orig_buf);
 
                 if (act->seqno_g < 0) {
                     assert (GCS_SEQNO_ILL    == act->seqno_l ||
@@ -1552,15 +1550,19 @@ long gcs_repl (gcs_conn_t*        conn,      //!<in
 
                     if (act->seqno_g == GCS_SEQNO_ILL) {
                         /* action was not replicated for some reason */
+                        assert (orig_buf == act->buf);
                         ret = -EINTR;
                     }
                     else {
                         /* core provided an error code in global seqno */
+                        assert (orig_buf != act->buf);
                         ret = act->seqno_g;
                         act->seqno_g = GCS_SEQNO_ILL;
                     }
 
-                    gcs_gcache_free (conn->gcache, act->buf);
+                    if (orig_buf != act->buf) // action was allocated in gcache
+                        gcs_gcache_free (conn->gcache, act->buf);
+
                     act->buf = NULL;
                 }
             }

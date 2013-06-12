@@ -146,14 +146,13 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     assert (NULL == df->head);
 #endif
 
-    if (gu_likely (df->received != df->size)) {
-        return 0;
-    }
-    else {
-        assert (df->received == df->size);
+    if (df->received == df->size) {
         act->buf     = df->head;
         act->buf_len = df->received;
         gcs_defrag_init (df, df->cache);
         return act->buf_len;
+    }
+    else {
+        return 0;
     }
 }
