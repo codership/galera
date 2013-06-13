@@ -239,8 +239,10 @@ Table legend:
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gcache.name``                       | *"galera.cache"*      | Name of the ring buffer storage file.              |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``gcache.size``                       | *128Mb*               | Size of the on-disk ring buffer storage. This will |
-|                                       |                       | be preallocated on startup.                        |
+| ``gcache.size``                       | *128Mb*               | Size of the persistent on-disk ring buffer         |
+|                                       |                       | storage. This will be preallocated on startup.     |
+|                                       |                       |                                                    |
+|                                       |                       | The buffer file name is ``galera.cache``.          |
 |                                       |                       |                                                    |
 |                                       |                       | See also chapter :ref:`Optimizing GCache Size      |
 |                                       |                       | <Optimizing GCache Size>`.                         |

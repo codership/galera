@@ -153,7 +153,7 @@ by (L).
 |                                       |                          | that should be used as a source for state transfer. If not      |
 |                                       |                          | specified, Galera will choose the most appropriate one.         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_donor_rejects_queries |                          | This parameter prevents blocking client sessions on a donor     |
+| :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor     |
 | <wsrep_sst_donor_rejects_queries>`    |                          | if the donor is performing a blocking SST.                      |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_sst_method``                  | *mysqldump*              | The method to use for state snapshot transfers. The             |
