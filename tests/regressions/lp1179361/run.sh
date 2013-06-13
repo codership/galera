@@ -114,7 +114,7 @@ thread_delete()
 
 thread_delete &
 delete_pid=$!
-trap "kill $delete_pid >/dev/null 2>&1" TERM EXIT
+trap "kill $delete_pid >/dev/null 2>&1 || true" TERM EXIT
 
 thread_insert | $MYSQL0
 FAILED=${PIPESTATUS[0]}
