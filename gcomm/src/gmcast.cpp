@@ -72,10 +72,10 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     pending_addrs_(),
     remote_addrs_ (),
     addr_blacklist_(),
-    relaying_     (false),
     isolate_      (false),
     proto_map_    (new ProtoMap()),
     mcast_tree_   (),
+    relay_set_    (),
     time_wait_    (param<gu::datetime::Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period_ ("PT0.5S"),
     peer_timeout_ (param<gu::datetime::Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
@@ -660,6 +660,11 @@ void gcomm::GMCast::handle_failed(Proto* failed)
         }
     }
 
+    std::set<Socket*>::iterator si(relay_set_.find(failed->socket().get()));
+    if (si != relay_set_.end())
+    {
+        relay_set_.erase(si);
+    }
     proto_map_->erase(failed->socket()->id());
     delete failed;
     update_addresses();
@@ -934,6 +939,45 @@ void gcomm::GMCast::reconnect()
     }
 }
 
+namespace
+{
+    class CmpUuidCounts
+    {
+    public:
+        CmpUuidCounts(const std::set<gcomm::UUID>& uuids) : uuids_(uuids) { }
+
+        size_t count(const gcomm::gmcast::Proto* p) const
+        {
+            size_t cnt(0);
+            for (std::set<gcomm::UUID>::const_iterator i(uuids_.begin());
+                 i != uuids_.end(); ++i)
+            {
+                for (gcomm::gmcast::LinkMap::const_iterator
+                         lm_i(p->link_map().begin());
+                     lm_i != p->link_map().end(); ++lm_i)
+                {
+                    if (lm_i->uuid() == *i)
+                    {
+                        ++cnt;
+                        break;
+                    }
+                }
+            }
+            return cnt;
+        }
+        bool operator()(const gcomm::gmcast::Proto* a,
+                        const gcomm::gmcast::Proto* b) const
+        {
+
+            return (count(a) < count(b));
+
+        }
+
+    private:
+        const std::set<gcomm::UUID>& uuids_;
+    };
+}
+
 
 void gcomm::GMCast::check_liveness()
 {
@@ -971,6 +1015,7 @@ void gcomm::GMCast::check_liveness()
     // iterate over addr list and check if there is at least one live
     // proto entry associated to each addr entry
 
+    std::set<UUID> nonlive_uuids;
     std::string nonlive_peers;
     for (AddrList::const_iterator i(remote_addrs_.begin());
          i != remote_addrs_.end(); ++i)
@@ -981,24 +1026,55 @@ void gcomm::GMCast::check_liveness()
         {
             // log_info << self_string()
             // << " missing live proto entry for " << ae.uuid();
+            nonlive_uuids.insert(ae.uuid());
             nonlive_peers += AddrList::key(i) + " ";
             should_relay = true;
         }
     }
 
-    if (relaying_ == false && should_relay == true)
+    if (relay_set_.empty() == true && should_relay == true)
     {
         log_info << self_string()
                  << " turning message relay requesting on, nonlive peers: "
                  << nonlive_peers;
-        relaying_ = true;
+        // build set of protos having OK status
+        std::set<Proto*> proto_set;
+        for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end();
+             ++i)
+        {
+            Proto* p(ProtoMap::value(i));
+            if (p->state() == Proto::S_OK)
+            {
+                proto_set.insert(p);
+            }
+        }
+        // find minimal set of proto entries required to reach maximum set
+        // of nonlive peers
+        while (nonlive_uuids.empty() == false &&
+               proto_set.empty() == false)
+        {
+            std::set<Proto*>::iterator maxel(
+                std::max_element(proto_set.begin(),
+                                 proto_set.end(), CmpUuidCounts(nonlive_uuids)));
+            Proto* p(*maxel);
+            log_debug << "relay set maxel :" << *p << " count: "
+                      << CmpUuidCounts(nonlive_uuids).count(p);
+
+            relay_set_.insert(p->socket().get());
+            const LinkMap& lm(p->link_map());
+            for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end();
+                 ++lm_i)
+            {
+                nonlive_uuids.erase((*lm_i).uuid());
+            }
+            proto_set.erase(maxel);
+        }
     }
-    else if (relaying_ == true && should_relay == false)
+    else if (relay_set_.empty() == false && should_relay == false)
     {
         log_info << self_string() << " turning message relay requesting off";
-        relaying_ = false;
+        relay_set_.clear();
     }
-
 }
 
 
@@ -1191,21 +1267,16 @@ void gcomm::GMCast::handle_up(const void*        id,
 int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
     Message msg(version_, Message::T_USER_BASE, uuid(), 1);
-
     gu_trace(push_header(msg, dg));
 
-    size_t relay_idx(mcast_tree_.size());
-    if (relaying_ == true && relay_idx > 0)
-    {
-        relay_idx = rand() % relay_idx;
-    }
-
-    size_t idx(0);
     for (std::list<Socket*>::iterator i(mcast_tree_.begin());
-         i != mcast_tree_.end(); ++i, ++idx)
+         i != mcast_tree_.end(); ++i)
     {
-        if (relay_idx == idx)
+        bool relay(false);
+        if (relay_set_.empty()  == false &&
+            relay_set_.find(*i) != relay_set_.end())
         {
+            relay = true;
             gu_trace(pop_header(msg, dg));
             msg.set_flags(msg.flags() | Message::F_RELAY);
             gu_trace(push_header(msg, dg));
@@ -1215,7 +1286,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         {
             log_debug << "transport: " << ::strerror(err);
         }
-        if (relay_idx == idx)
+        if (relay == true)
         {
             gu_trace(pop_header(msg, dg));
             msg.set_flags(msg.flags() & ~Message::F_RELAY);
