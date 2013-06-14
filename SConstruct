@@ -138,7 +138,11 @@ if link != 'default':
 env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
 env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
 
-# Freebsd ports are installed under /usr/local 
+# Set -pthread flag explicitly to make sure that pthreads are
+# enabled on all platforms.
+env.Append(CPPFLAGS = ' -pthread')
+
+# Freebsd ports are installed under /usr/local
 if sysname == 'freebsd' or sysname == 'sunos':
     env.Append(LIBPATH  = ['/usr/local/lib'])
     env.Append(CPPFLAGS = ' -I/usr/local/include ')
@@ -148,7 +152,7 @@ if sysname == 'sunos':
 # print env.Dump()
 #
 # Set up build and link paths
-# 
+#
 
 # Include paths
 env.Append(CPPPATH = Split('''#/common
@@ -180,7 +184,7 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
 env.Replace(CCFLAGS = opt_flags + compile_arch +
-                      ' -Wall -Wextra -Werror -Wno-unused-parameter')
+                      ' -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
 env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
@@ -304,6 +308,7 @@ if ssl == 1:
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
+   conf.env.Append(CPPFLAGS = ' -Werror ')
    conf.env.Append(CCFLAGS  = ' -pedantic')
    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
