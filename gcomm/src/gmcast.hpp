@@ -155,11 +155,11 @@ namespace gcomm
         AddrList          pending_addrs_;
         AddrList          remote_addrs_;
         AddrList          addr_blacklist_;
-        bool              relaying_;
         bool              isolate_;
 
         gmcast::ProtoMap*  proto_map_;
         std::list<Socket*> mcast_tree_;
+        std::set<Socket*>  relay_set_;
 
         gu::datetime::Period time_wait_;
         gu::datetime::Period check_period_;
