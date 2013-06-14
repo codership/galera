@@ -17,6 +17,12 @@
 
 #include "asio/detail/config.hpp"
 
+// #763 - Galera library is multithreaded so make sure that ASIO will have
+//        MT support too.
+#if !defined(BOOST_HAS_THREADS)
+#error "BOOST_HAS_THREADS not defined"
+#endif
+
 #if !defined(BOOST_HAS_THREADS) \
   || defined(ASIO_DISABLE_THREADS) \
   || defined(ASIO_DISABLE_FENCED_BLOCK)
