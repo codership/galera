@@ -155,6 +155,7 @@ namespace gcomm
         AddrList          pending_addrs_;
         AddrList          remote_addrs_;
         AddrList          addr_blacklist_;
+        bool              relaying_;
         bool              isolate_;
 
         gmcast::ProtoMap*  proto_map_;

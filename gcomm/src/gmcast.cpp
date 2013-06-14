@@ -72,6 +72,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     pending_addrs_(),
     remote_addrs_ (),
     addr_blacklist_(),
+    relaying_     (false),
     isolate_      (false),
     proto_map_    (new ProtoMap()),
     mcast_tree_   (),
@@ -1032,11 +1033,12 @@ void gcomm::GMCast::check_liveness()
         }
     }
 
-    if (relay_set_.empty() == true && should_relay == true)
+    if (relaying_ == false && should_relay == true)
     {
         log_info << self_string()
                  << " turning message relay requesting on, nonlive peers: "
                  << nonlive_peers;
+        relaying_ = true;
         // build set of protos having OK status
         std::set<Proto*> proto_set;
         for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end();
@@ -1070,10 +1072,11 @@ void gcomm::GMCast::check_liveness()
             proto_set.erase(maxel);
         }
     }
-    else if (relay_set_.empty() == false && should_relay == false)
+    else if (relaying_ == true && should_relay == false)
     {
         log_info << self_string() << " turning message relay requesting off";
         relay_set_.clear();
+        relaying_ = false;
     }
 }
 
