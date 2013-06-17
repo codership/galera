@@ -1033,12 +1033,16 @@ void gcomm::GMCast::check_liveness()
         }
     }
 
-    if (relaying_ == false && should_relay == true)
+    if (should_relay == true)
     {
-        log_info << self_string()
-                 << " turning message relay requesting on, nonlive peers: "
-                 << nonlive_peers;
-        relaying_ = true;
+        if (relaying_ == false)
+        {
+            log_info << self_string()
+                     << " turning message relay requesting on, nonlive peers: "
+                     << nonlive_peers;
+            relaying_ = true;
+        }
+        relay_set_.clear();
         // build set of protos having OK status
         std::set<Proto*> proto_set;
         for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end();
