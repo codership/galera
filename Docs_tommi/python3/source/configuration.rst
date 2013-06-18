@@ -5,6 +5,8 @@
 
 .. index::
    pair: Parameters; wsrep_cluster_address
+.. index::
+   pair: Parameters; wsrep_provider
 
 This chapter presents the mandatory and recommended settings
 for *Galera Cluster for MySQL* installation and use. It may
