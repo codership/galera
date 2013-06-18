@@ -210,8 +210,8 @@ START_TEST (ver0)
 
         fail_if (size <= 4);
 
-        const char* str = reinterpret_cast<const char*>(
-            out_bufs[i].ptr + sizeof(uint32_t));
+        const char* str =
+            reinterpret_cast<const char*>(out_bufs[i].ptr) + sizeof(uint32_t);
 
         // the above variables make have sense only on certain pages
         // hence ifs below
@@ -240,9 +240,10 @@ START_TEST (ver0)
 
         size_t old_size = in_buf.size();
 
-        in_buf.insert (in_buf.end(),
-                       out_bufs[i].ptr,
-                       out_bufs[i].ptr + out_bufs[i].size);
+        const gu::byte_t* const begin
+            (reinterpret_cast<const gu::byte_t*>(out_bufs[i].ptr));
+
+        in_buf.insert (in_buf.end(), begin, begin + out_bufs[i].size);
 
         fail_if (old_size + out_bufs[i].size != in_buf.size());
     }

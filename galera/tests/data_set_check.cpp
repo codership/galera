@@ -21,34 +21,34 @@ public:
     TestRecord (size_t size, const char* str) :
         size_(size),
         buf_(reinterpret_cast<gu::byte_t*>(::malloc(size_))),
-        str_(reinterpret_cast<const char*>(buf_ + sizeof(uint32_t))),
+        str_(reinterpret_cast<const char*>(buf_) + sizeof(uint32_t)),
         own_(true)
     {
         if (0 == buf_) throw std::runtime_error("failed to allocate record");
-        gu::byte_t* tmp = const_cast<gu::byte_t*>(buf_);
+        void* tmp = const_cast<void*>(buf_);
         *reinterpret_cast<uint32_t*>(tmp) = htog32(size_);
         ::strncpy (const_cast<char*>(str_), str, size_ - 4);
     }
 
-    TestRecord (const gu::byte_t* const buf, ssize_t const size) :
+    TestRecord (const void* const buf, ssize_t const size) :
         size_(TestRecord::serial_size(buf, size)),
         buf_(buf),
-        str_(reinterpret_cast<const char*>(buf_ + sizeof(uint32_t))),
+        str_(reinterpret_cast<const char*>(buf_) + sizeof(uint32_t)),
         own_(false)
     {}
 
     TestRecord (const TestRecord& t)
     : size_(t.size_), buf_(t.buf_), str_(t.str_), own_(false) {}
 
-    virtual ~TestRecord () { if (own_) free (const_cast<gu::byte_t*>(buf_)); }
+    virtual ~TestRecord () { if (own_) free (const_cast<void*>(buf_)); }
 
-    const gu::byte_t* buf() const { return buf_; }
+    const void* buf()     const { return buf_; }
 
-    const char* c_str() const { return str_; }
+    const char* c_str()   const { return str_; }
 
     ssize_t serial_size() const { return my_serial_size(); }
 
-    static ssize_t serial_size(const gu::byte_t* const buf, ssize_t const size)
+    static ssize_t serial_size(const void* const buf, ssize_t const size)
     {
         check_buf (buf, size, 1);
         return gtoh32 (*reinterpret_cast<const uint32_t*>(buf));
@@ -67,7 +67,7 @@ public:
 private:
 
     size_t const            size_;
-    const gu::byte_t* const buf_;
+    const void* const buf_;
     const char* const       str_;
     bool const              own_;
 
@@ -174,9 +174,9 @@ START_TEST (ver0)
 
         size_t old_size = in_buf.size();
 
-        in_buf.insert (in_buf.end(),
-                       out_bufs[i].ptr,
-                       out_bufs[i].ptr + out_bufs[i].size);
+        const gu::byte_t* ptr
+            (reinterpret_cast<const gu::byte_t*>(out_bufs[i].ptr));
+        in_buf.insert (in_buf.end(), ptr, ptr + out_bufs[i].size);
 
         fail_if (old_size + out_bufs[i].size != in_buf.size());
     }

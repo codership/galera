@@ -29,7 +29,7 @@ public:
                     bool               allocate = true,
                     bool               sync     = true);
 
-    virtual ~FileDescriptor ();
+    ~FileDescriptor ();
 
     int                get()   const { return fd_;   }
     const std::string& name()  const { return name_; }

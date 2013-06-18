@@ -16,8 +16,8 @@ extern "C" {
 
 struct gu_buf
 {
-    const gu_byte_t* ptr;
-    ssize_t          size;
+    const void* ptr;
+    ssize_t     size;
 };
 
 #ifdef __cplusplus

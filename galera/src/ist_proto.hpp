@@ -401,116 +401,62 @@ namespace galera
             void send_trx(ST&                           socket,
                           const gcache::GCache::Buffer& buffer)
             {
-                const size_t trx_meta_size(
-                    8   // serial_size(buffer.seqno_g())
-                    + 8 // serial_size(buffer.seqno_d())
-                    );
                 const bool rolled_back(buffer.seqno_d() == -1);
 
                 galera::WriteSetIn ws;
                 boost::array<asio::const_buffer, 3> cbs;
-                size_t      payload_size(0);
+                size_t      payload_size; /* size of the 2nd cbs buffer */
                 size_t      sent;
 
-                if (rolled_back == true)
+                if (gu_unlikely(rolled_back))
                 {
-                }
-                else if (keep_keys_ || buffer.ptr()[0] < WS_NG_VERSION)
-                {
-                    payload_size = buffer.size();
-                    const void* const ptr(buffer.ptr());
-                    cbs[1] = asio::const_buffer(ptr, payload_size);
-                    cbs[2] = asio::const_buffer(ptr, 0);
-                    // valid pointer, 0 size. Can anything go wrong?
+                    payload_size = 0;
                 }
                 else
                 {
-                    gu_throw_error (ENOSYS) << "Not supported yet";
-
-                    gu::Buf tmp = { buffer.ptr(), buffer.size() };
-                    ws.read_buf (tmp, 0);
-
-                    std::vector<gu::Buf> out;
-                    payload_size = ws.gather (out, false, false);
-                    assert (2 == out.size());
-                    cbs[1] = asio::const_buffer(out[0].ptr, out[0].size);
-                    cbs[2] = asio::const_buffer(out[1].ptr, out[1].size);
-
-#if 0 // removing in favour of #737
-                    class AutoRelease
+                    if (keep_keys_ || version_ < WS_NG_VERSION)
                     {
-                    public:
-                        AutoRelease(TrxHandle* trx) : trx_(trx) { }
-                        ~AutoRelease() { trx_->unref(); }
-                        TrxHandle* trx() { return trx_; }
-                    private:
-                        AutoRelease(const AutoRelease&);
-                        void operator=(const AutoRelease&);
-                        TrxHandle* trx_;
-                    };
-                    // reconstruct trx without keys
-                    AutoRelease ar(new TrxHandle);
-                    galera::TrxHandle* trx(ar.trx());
-
-                    const gu::byte_t* const ptr(
-                        reinterpret_cast<const gu::byte_t*>(buffer.ptr()));
-                    size_t offset(unserialize(ptr,buffer.size(), 0, *trx));
-                    while (offset < static_cast<size_t>(buffer.size()))
-                    {
-                        // skip over keys
-                        uint32_t len;
-                        offset = gu::unserialize4(
-                            ptr, buffer.size(), offset, len);
-                        offset += len;
-                        offset = gu::unserialize4(
-                            ptr, buffer.size(), offset, len);
-                        if (offset + len > static_cast<size_t>(buffer.size()))
-                        {
-                            gu_throw_error(ERANGE)
-                                << (offset + len) << " > " << buffer.size();
-                        }
-                        trx->append_data(ptr + offset, len, false);
-                        offset += len;
+                        payload_size = buffer.size();
+                        const void* const ptr(buffer.ptr());
+                        cbs[1] = asio::const_buffer(ptr, payload_size);
+                        cbs[2] = asio::const_buffer(ptr, 0);
                     }
-                    trx->flush(0);
+                    else
+                    {
+                        gu::Buf tmp = { buffer.ptr(), buffer.size() };
+                        ws.read_buf (tmp, 0);
 
-                    Trx trx_msg(version_, trx_meta_size
-                                + trx->write_set_collection().size());
-                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
-                    offset = serialize(trx_msg, &buf[0], buf.size(), 0);
-                    offset = gu::serialize8(buffer.seqno_g(),
-                                            &buf[0], buf.size(), offset);
-                    offset = gu::serialize8(buffer.seqno_d(),
-                                            &buf[0], buf.size(), offset);
-                    boost::array<asio::const_buffer, 2> cbs;
-                    cbs[0] = asio::const_buffer(&buf[0], buf.size());
-                    cbs[1] = asio::const_buffer(
-                        &trx->write_set_collection()[0],
-                        trx->write_set_collection().size());
-                    raw_sent_ += buffer.size();
-                    real_sent_ += trx->write_set_collection().size();
-                    sent = asio::write(socket, cbs);
-#endif // 0
+                        std::vector<gu::Buf> out;
+                        payload_size = ws.gather (out, false, false);
+                        assert (2 == out.size());
+                        cbs[1] = asio::const_buffer(out[0].ptr, out[0].size);
+                        cbs[2] = asio::const_buffer(out[1].ptr, out[1].size);
+                    }
                 }
+
+                size_t const trx_meta_size(
+                    8 /* serial_size(buffer.seqno_g()) */ +
+                    8 /* serial_size(buffer.seqno_d()) */
+                    );
 
                 Trx trx_msg(version_, trx_meta_size + payload_size);
 
                 gu::Buffer buf(trx_msg.serial_size() + trx_meta_size);
-                size_t offset(trx_msg.serialize(&buf[0], buf.size(), 0));
+                size_t  offset(trx_msg.serialize(&buf[0], buf.size(), 0));
+
                 offset = gu::serialize8(buffer.seqno_g(),
                                         &buf[0], buf.size(), offset);
                 offset = gu::serialize8(buffer.seqno_d(),
                                         &buf[0], buf.size(), offset);
+                cbs[0] = asio::const_buffer(&buf[0], buf.size());
 
-                if (payload_size)
+                if (gu_likely(payload_size))
                 {
-
-                    cbs[0] = asio::const_buffer(&buf[0], buf.size());
                     sent = asio::write(socket, cbs);
                 }
                 else
                 {
-                    sent = asio::write(socket,asio::buffer(&buf[0],buf.size()));
+                    sent = asio::write(socket, asio::buffer(cbs[0]));
                 }
 
                 log_debug << "sent " << sent << " bytes";
@@ -554,7 +500,8 @@ namespace galera
                                               seqno_d);
 
                     galera::TrxHandle* trx(new galera::TrxHandle);
-                    if (seqno_d == -1)
+
+                    if (seqno_d == WSREP_SEQNO_UNDEFINED)
                     {
                         if (offset != msg.len())
                         {

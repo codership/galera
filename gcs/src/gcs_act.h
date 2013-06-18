@@ -18,10 +18,10 @@ struct gcs_act
 
 struct gcs_act_rcvd
 {
-    struct gcs_act        act;
-    const struct gcs_buf* local; // local buffer vector if any
-    gcs_seqno_t           id;    // global total order seqno
-    int                   sender_idx;
+    struct gcs_act       act;
+    const struct gu_buf* local; // local buffer vector if any
+    gcs_seqno_t          id;    // global total order seqno
+    int                  sender_idx;
 };
 
 #endif /* _gcs_act_h_ */

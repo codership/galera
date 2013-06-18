@@ -450,10 +450,12 @@ class RecordSetIn : public RecordSetInBase
 {
 public:
 
-    RecordSetIn (const byte_t* buf,/* pointer to the beginning of buffer */
-                 size_t        size,             /* total size of buffer */
-                 bool          check_first = true)       /* checksum now */
-        : RecordSetInBase (buf, size, check_first)
+    RecordSetIn (const void* buf,/* pointer to the beginning of buffer */
+                 size_t      size,             /* total size of buffer */
+                 bool        check_first = true)       /* checksum now */
+        :
+        RecordSetInBase (reinterpret_cast<const byte_t*>(buf),
+                         size, check_first)
     {}
 
     RecordSetIn () : RecordSetInBase (NULL, 0, false) {}

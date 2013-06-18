@@ -14,21 +14,25 @@
 namespace galera
 {
 
-WriteSetNG::Header::Offsets::Offsets (int a1, int a2, int a3, int a4, int a5,
-                                      int a6, int a7, int a8, int a9, int a10,
-                                      int a11)
-:
-    header_ver_  (a1),
-    keyset_ver_  (a2),
-    dataset_ver_ (a3),
-    unrdset_ver_ (a4),
-    flags_       (a5),
-    dep_window_  (a6),
-    last_seen_   (a7),
-    seqno_       (a8),
-    timestamp_   (a9),
-    crc_         (a10),
-    size_        (a11)
+WriteSetNG::Header::Offsets::Offsets (
+    int a01, int a02, int a03, int a04, int a05,
+    int a06, int a07, int a08, int a09, int a10,
+    int a11, int a12, int a13, int a14
+    ) :
+    header_ver_  (a01),
+    keyset_ver_  (a02),
+    dataset_ver_ (a03),
+    unrdset_ver_ (a04),
+    flags_       (a05),
+    dep_window_  (a06),
+    last_seen_   (a07),
+    seqno_       (a08),
+    timestamp_   (a09),
+    source_id_   (a10),
+    conn_id_     (a11),
+    trx_id_      (a12),
+    crc_         (a13),
+    size_        (a14)
 {}
 
 WriteSetNG::Header::Offsets const
@@ -38,20 +42,27 @@ WriteSetNG::Header::V3 (
     V3_DATASET_VER,
     V3_UNRDSET_VER,
     V3_FLAGS,
-    V3_PA_RANGE,
+    V3_DEP_WINDOW,
     V3_LAST_SEEN,
     V3_SEQNO,
     V3_TIMESTAMP,
+    V3_SOURCE_ID,
+    V3_CONN_ID,
+    V3_TRX_ID,
     V3_CRC,
     V3_SIZE
     );
 
 size_t
-WriteSetNG::Header::init (Version const          ver,
-                          KeySet::Version const  kver,
-                          DataSet::Version const dver,
-                          DataSet::Version const uver,
-                          uint16_t const         flags)
+WriteSetNG::Header::gather (Version const          ver,
+                            KeySet::Version const  kver,
+                            DataSet::Version const dver,
+                            DataSet::Version const uver,
+                            uint16_t const         flags,
+                            const wsrep_uuid_t&    source,
+                            const wsrep_conn_id_t& conn,
+                            const wsrep_trx_id_t&  trx,
+                            std::vector<gu::Buf>&  out)
 {
     BOOST_STATIC_ASSERT(MAX_VERSION <= 255);
     BOOST_STATIC_ASSERT(KeySet::MAX_VERSION <= 15);
@@ -62,136 +73,145 @@ WriteSetNG::Header::init (Version const          ver,
     assert (uint(dver) <= DataSet::MAX_VERSION);
     assert (uint(uver) <= DataSet::MAX_VERSION);
 
-    local_[V3_HEADER_VER] = ver;
+    /* this strange action is needed for compatibility with previous versions */
+    gu::serialize4(uint32_t(ver) << 24, local_, V3_KEYSET_VER, 0);
+
     local_[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
 
     uint16_t* const fl(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS));
-    uint32_t* const pa(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE));
+    uint32_t* const dw(reinterpret_cast<uint32_t*>(local_ + V3_DEP_WINDOW));
 
-    *fl = gu::htog(flags);
-    *pa = 0;
+    *fl = gu::htog<uint16_t>(flags);
+    *dw = 0; // certified ws will have dep. window of at least 1
 
-    return buf_.size;
+    wsrep_uuid_t* const sc(reinterpret_cast<wsrep_uuid_t*>(local_ +
+                                                           V3_SOURCE_ID));
+    *sc = source;
+
+    uint64_t* const cn(reinterpret_cast<uint64_t*>(local_ + V3_CONN_ID));
+    uint64_t* const tx(reinterpret_cast<uint64_t*>(local_ + V3_TRX_ID));
+
+    *cn = gu::htog<uint64_t>(conn);
+    *tx = gu::htog<uint64_t>(trx);
+
+    gu::Buf const buf = { ptr_, size() };
+    out.push_back(buf);
+
+    return buf.size;
 }
 
 
 void
-WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& ls)
+WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
 {
-    assert (buf_.ptr);
-    assert (buf_.size);
+    assert (ptr_);
+    assert (size_ > 0);
 
     /* only VER3 sypported so far */
-    gu::byte_t* ptr     = const_cast<gu::byte_t*>(buf_.ptr);
-    uint64_t* last_seen = reinterpret_cast<uint64_t*>(ptr + V3_LAST_SEEN);
-    uint64_t* timestamp = reinterpret_cast<uint64_t*>(ptr + V3_TIMESTAMP);
+    uint64_t*   const ls  (reinterpret_cast<uint64_t*>(ptr_ + V3_LAST_SEEN));
+    uint64_t*   const ts  (reinterpret_cast<uint64_t*>(ptr_ + V3_TIMESTAMP));
 
-    *last_seen = gu::htog<uint64_t>(ls);
-    *timestamp = gu::htog<uint64_t>(gu_time_monotonic());
+    *ls = gu::htog<uint64_t>(last_seen);
+    *ts = gu::htog<uint64_t>(gu_time_monotonic());
 
-    update_checksum (ptr, V3_CRC);
+    update_checksum (ptr_, V3_CRC);
 }
 
 
 void
-WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
+WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int dep_window)
 {
-    assert (buf_.ptr);
-    assert (buf_.size);
+    assert (ptr_);
+    assert (size_ > 0);
     assert (seqno > 0);
-    assert (pa_range > 0);
+    assert (dep_window > 0);
 
     /* only VER3 sypported so far */
-    gu::byte_t* ptr = const_cast<gu::byte_t*>(buf_.ptr);
-    uint32_t* pr    = reinterpret_cast<uint32_t*>(ptr + V3_PA_RANGE);
-    uint64_t* sq    = reinterpret_cast<uint64_t*>(ptr + V3_SEQNO);
+    uint32_t* const dw(reinterpret_cast<uint32_t*>(ptr_ + V3_DEP_WINDOW));
+    uint64_t* const sq(reinterpret_cast<uint64_t*>(ptr_ + V3_SEQNO));
 
-    *pr = gu::htog<uint32_t>(pa_range);
+    *dw = gu::htog<uint32_t>(dep_window);
     *sq = gu::htog<uint64_t>(seqno);
 
-    update_checksum (ptr, V3_CRC);
+    update_checksum (ptr_, V3_CRC);
 }
 
 
 gu::Buf
-WriteSetNG::Header::copy(bool const include_keys, bool const include_unrd)
+WriteSetNG::Header::copy(bool const include_keys, bool const include_unrd) const
 {
-    assert (buf_.ptr != &local_[0]);
+    assert (ptr_ != &local_[0]);
     assert (size_t(size()) <= sizeof(local_));
 
-    gu::byte_t* const ptr(&local_[0]);
+    gu::byte_t* const lptr(&local_[0]);
 
-    ::memcpy (ptr, buf_.ptr, size());
+    ::memcpy (lptr, ptr_, size_);
 
     gu::byte_t const mask(0x0c | (0xf0 * include_keys) | (0x03 * include_unrd));
 
-    ptr[V3_KEYSET_VER] &= mask; // zero up versions of non-included sets
+    lptr[V3_KEYSET_VER] &= mask; // zero up versions of non-included sets
 
-    update_checksum (ptr, V3_CRC);
+    update_checksum (lptr, V3_CRC);
 
-    gu::Buf ret = { ptr, size() };
+    gu::Buf ret = { lptr, size_ };
     return ret;
 }
 
 
 void
-WriteSetNG::Header::Checksum::verify (const gu::byte_t* const ptr,
-                                      ssize_t const           size)
+WriteSetNG::Header::Checksum::verify (Version           ver,
+                                      const void* const ptr,
+                                      ssize_t const     hsize)
 {
-    assert (size > 0);
+    assert (hsize > 0);
 
-    Version const ver   (Header::version(ptr[0]));
-    ssize_t const hsize (Header::size(ver));
+    type_t check(0), hcheck(0);
 
-    if (gu_likely (size >= hsize))
+    switch (ver)
     {
-        type_t check(0), hcheck(0);
+    case VER3:
+        size_t const hhsize(hsize - sizeof(check));
 
-        switch (ver)
-        {
-        case VER3:
-            size_t const hhsize(hsize - sizeof(check));
+        compute (ptr, hhsize, check);
 
-            compute (ptr, hhsize, check);
+        hcheck = *(reinterpret_cast<const type_t*>(
+                       reinterpret_cast<const gu::byte_t*>(ptr) + hhsize
+                       ));
 
-            hcheck = *(reinterpret_cast<const type_t*>(ptr + hhsize));
-
-            if (gu_likely(check == hcheck)) return;
-        }
-
-        gu_throw_error (EINVAL) << "Header checksum mismatch: computed "
-                                << std::hex << std::setfill('0')
-                                << std::setw(sizeof(check) << 1)
-                                << check << ", found "
-                                << std::setw(sizeof(hcheck) << 1)
-                                << hcheck;
+        if (gu_likely(check == hcheck)) return;
     }
 
-    gu_throw_error (EMSGSIZE) << "Buffer size " << size
-                              << " shorter than header size " << hsize;
+    gu_throw_error (EINVAL) << "Header checksum mismatch: computed "
+                            << std::hex << std::setfill('0')
+                            << std::setw(sizeof(check) << 1)
+                            << check << ", found "
+                            << std::setw(sizeof(hcheck) << 1)
+                            << hcheck;
 }
 
 
 void
 WriteSetIn::init (ssize_t const st)
 {
-    WriteSetNG::Version const ver  (header_.version());
-    const gu::byte_t*         pptr (header_.payload());
-    ssize_t                   psize(size_ - header_.size(ver));
+    const gu::byte_t* const pptr (header_.payload());
+    ssize_t           const psize(size_ - header_.size());
 
     assert (psize >= 0);
 
     KeySet::Version const kver(header_.keyset_ver());
+
     if (kver != KeySet::EMPTY) gu_trace(keys_.init (kver, pptr, psize));
 
-    if (gu_likely(size_ < st))
+    if (size_ < st)
     {
+        assert (false == check_);
         checksum();
         checksum_fin();
     }
     else if (st > 0) // st <= 0 means no checksumming (except for header) is
                      // performed.
     {
+        assert (false == check_);
         int err = pthread_create (&check_thr_, NULL,
                                   checksum_thread, this);
 
@@ -200,14 +220,18 @@ WriteSetIn::init (ssize_t const st)
             gu_throw_error(err) << "Starting checksum thread failed";
         }
     }
+    else
+    {
+        assert (true == check_);
+    }
 }
 
 
 void
 WriteSetIn::checksum()
 {
-    const gu::byte_t*         pptr (header_.payload());
-    ssize_t                   psize(size_ - header_.size());
+    const gu::byte_t* pptr (header_.payload());
+    ssize_t           psize(size_ - header_.size());
 
     assert (psize >= 0);
 
@@ -225,6 +249,7 @@ WriteSetIn::checksum()
 
         if (gu_likely(dver != DataSet::EMPTY))
         {
+            assert (psize > 0);
             gu_trace(data_.init(dver, pptr, psize));
             gu_trace(data_.checksum());
             psize -= data_.size();
@@ -259,12 +284,11 @@ WriteSetIn::checksum()
 
 size_t
 WriteSetIn::gather(std::vector<gu::Buf>& out,
-                   bool include_keys, bool include_unrd)
+                   bool include_keys, bool include_unrd) const
 {
     if (include_keys && include_unrd)
     {
-        gu::Buf buf(header_());
-        buf.size = size_;
+        gu::Buf buf = { header_.ptr(), size_ };
         out.push_back(buf);
         return size_;
     }

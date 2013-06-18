@@ -288,10 +288,10 @@ core_msg_send_retry (gcs_core_t*    core,
 }
 
 ssize_t
-gcs_core_send (gcs_core_t*           const conn,
-               const struct gcs_buf* const action,
-               size_t                      act_size,
-               gcs_act_type_t        const act_type)
+gcs_core_send (gcs_core_t*          const conn,
+               const struct gu_buf* const action,
+               size_t                     act_size,
+               gcs_act_type_t       const act_type)
 {
     ssize_t        ret  = 0;
     ssize_t        sent = 0;
@@ -331,9 +331,9 @@ gcs_core_send (gcs_core_t*           const conn,
         goto out;
     }
 
-    int         idx  = 0;
-    const char* ptr  = action[idx].ptr;
-    size_t      left = action[idx].size;
+    int            idx  = 0;
+    const uint8_t* ptr  = action[idx].ptr;
+    size_t         left = action[idx].size;
 
     do {
         const size_t chunk_size =
@@ -391,7 +391,7 @@ gcs_core_send (gcs_core_t*           const conn,
 
                 /* 2. move ptr back to point at the first unsent byte */
                 size_t move_back = chunk_size - ret;
-                size_t ptrdiff   = ptr - (const char*)action[idx].ptr;
+                size_t ptrdiff   = ptr - (uint8_t*)action[idx].ptr;
                 do {
                     if (move_back <= ptrdiff) {
                         ptr -= move_back;
@@ -403,7 +403,7 @@ gcs_core_send (gcs_core_t*           const conn,
                         move_back -= ptrdiff;
                         idx--;
                         ptrdiff = action[idx].size;
-                        ptr = (const char*)action[idx].ptr + ptrdiff;
+                        ptr = (uint8_t*)action[idx].ptr + ptrdiff;
                     }
                 } while (true);
             }
@@ -428,7 +428,7 @@ gcs_core_send (gcs_core_t*           const conn,
              * change or broken connection (leave group). In both cases other
              * members discard fragments */
             goto out;
-	}
+        }
 
     } while (act_size && gcs_act_proto_inc(conn->send_buf));
 

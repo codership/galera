@@ -31,8 +31,10 @@ namespace galera
 
     // this is an overall replicator-level protocol version which employs new
     // writeset format. See replicator_smm.hpp. Note that writeset version is 3.
-    static int const NEW_WRITE_SET_PROTO_VER = 5;
-    static int const WS_NG_VERSION = 3; /* new WS version to be used */
+//    static int const NEW_WRITE_SET_PROTO_VER = 5;
+
+    static int const WS_NG_VERSION = WriteSetNG::VER3;
+    /* new WS version to be used */
 
     class TrxHandle
     {
@@ -49,24 +51,38 @@ namespace galera
             F_PA_UNSAFE   = 1 << 7
         };
 
-        bool has_mac() const
+        bool has_mac() const /* shall return 0 for new writeset ver */
         {
             return ((write_set_flags_ & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
         }
 
-        bool has_annotation() const
+        bool has_annotation() const /* shall return 0 for new writeset ver */
         {
             return ((write_set_flags_ & F_ANNOTATION) != 0);
         }
 
         bool is_toi() const
         {
-            return ((write_set_flags_ & F_ISOLATION) != 0);
+            if (new_version())
+            {
+                return write_set_in_.is_toi();
+            }
+            else
+            {
+                return ((write_set_flags_ & F_ISOLATION) != 0);
+            }
         }
 
         bool pa_safe() const
         {
-            return ((write_set_flags_ & F_PA_UNSAFE) == 0);
+            if (new_version())
+            {
+                return !write_set_in_.pa_unsafe();
+            }
+            else
+            {
+                return ((write_set_flags_ & F_PA_UNSAFE) == 0);
+            }
         }
 
         typedef enum
@@ -127,13 +143,12 @@ namespace galera
         public:
             Mac() { }
             ~Mac() { }
-        private:
-            friend size_t serialize(const galera::TrxHandle::Mac& mac,
-                                    gu::byte_t* buf, size_t buflen, size_t offset);
-            friend size_t unserialize(const gu::byte_t* buf, size_t buflen,
-                                      size_t offset,
-                                      galera::TrxHandle::Mac& mac);
-            friend size_t serial_size(const galera::TrxHandle::Mac&);
+
+            size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)
+                const;
+            size_t unserialize(const gu::byte_t* buf, size_t buflen,
+                               size_t offset);
+            size_t serial_size() const;
         };
 
 
@@ -176,15 +191,16 @@ namespace galera
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
 
-        int version() const { return version_; }
+        int  version()     const { return version_; }
+        bool new_version() const { return version() < WS_NG_VERSION; }
+
         const wsrep_uuid_t& source_id() const { return source_id_; }
+        wsrep_trx_id_t      trx_id()    const { return trx_id_;    }
+        wsrep_conn_id_t     conn_id()   const { return conn_id_;   }
 
-        wsrep_trx_id_t trx_id() const { return trx_id_; }
         void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
-        wsrep_conn_id_t conn_id() const { return conn_id_; }
 
-        bool is_local() const { return local_; }
-
+        bool is_local()     const { return local_; }
         bool is_certified() const { return certified_; }
         void mark_certified() { certified_ = true; }
 
@@ -202,6 +218,7 @@ namespace galera
 
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
+            assert (!new_version());
             last_seen_seqno_ = last_seen_seqno;
         }
 
@@ -210,28 +227,35 @@ namespace galera
             depends_seqno_ = seqno_lt;
         }
 
-        void set_state(State state)
-        {
-            state_.shift_to(state);
-        }
         State state() const { return state_(); }
+        void set_state(State state) { state_.shift_to(state); }
 
-        void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
         long gcs_handle() const { return gcs_handle_; }
+        void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
 
         const void* action() const { return action_; }
 
-        wsrep_seqno_t local_seqno() const { return local_seqno_; }
+        wsrep_seqno_t local_seqno()     const { return local_seqno_; }
 
-        wsrep_seqno_t global_seqno() const { return global_seqno_; }
+        wsrep_seqno_t global_seqno()    const { return global_seqno_; }
 
         wsrep_seqno_t last_seen_seqno() const { return last_seen_seqno_; }
 
-        wsrep_seqno_t depends_seqno() const { return depends_seqno_; }
+        wsrep_seqno_t depends_seqno()   const { return depends_seqno_; }
 
-
-        void set_flags(int flags) { write_set_flags_ = flags; }
         int flags() const { return write_set_flags_; }
+        void set_flags(int flags)
+        {
+            write_set_flags_ = flags;
+
+            if (new_version())
+            {
+                uint16_t ws_flags(flags & 0x07);
+                if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
+                if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
+                write_set_out_.set_flags(ws_flags);
+            }
+        }
 
         void append_key(const KeyData& key)
         {
@@ -245,7 +269,7 @@ namespace galera
                     << version_ << "'";
             }
 
-            if (gu_likely (version_ >= WS_NG_VERSION))
+            if (new_version())
             {
                 write_set_out_.append_key(key);
             }
@@ -257,7 +281,7 @@ namespace galera
 
         void append_data(const void* data, const size_t data_len, bool store)
         {
-            if (gu_likely (version_ >= WS_NG_VERSION))
+            if (new_version())
             {
                 write_set_out_.append_data(data, data_len, store);
             }
@@ -282,7 +306,7 @@ namespace galera
 
         size_t prepare_write_set_collection()
         {
-            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
+            if (new_version()) assert(0);
 
             size_t offset;
             if (write_set_collection_.empty() == true)
@@ -300,7 +324,7 @@ namespace galera
 
         void append_write_set(const void* data, size_t data_len)
         {
-            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
+            if (new_version()) assert(0);
 
             const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + data_len);
@@ -311,12 +335,17 @@ namespace galera
 
         void append_write_set(const gu::Buffer& ws)
         {
-            if (gu_likely (version_ >= WS_NG_VERSION)) assert(0);
-
-            const size_t offset(prepare_write_set_collection());
-            write_set_collection_.resize(offset + ws.size());
-            std::copy(ws.begin(), ws.end(),
-                      &write_set_collection_[0] + offset);
+            if (new_version())
+            {
+                /* trx->unserialize() must have done all the job */
+            }
+            else
+            {
+                const size_t offset(prepare_write_set_collection());
+                write_set_collection_.resize(offset + ws.size());
+                std::copy(ws.begin(), ws.end(),
+                          &write_set_collection_[0] + offset);
+            }
         }
 
         const MappedBuffer& write_set_collection() const
@@ -353,7 +382,7 @@ namespace galera
 
         bool empty() const
         {
-            if (gu_likely (version_ >= WS_NG_VERSION))
+            if (new_version())
             {
                 return write_set_out_.is_empty();
             }
@@ -366,7 +395,7 @@ namespace galera
 
         void flush(size_t mem_limit)
         {
-            if (gu_likely (version_ >= WS_NG_VERSION)) return;
+            if (new_version()) { assert(0); return; }
 
             if (write_set_.get_key_buf().size() + write_set_.get_data().size()
                 > mem_limit || mem_limit == 0)
@@ -380,17 +409,18 @@ namespace galera
 
         void clear()
         {
-            if (gu_likely (version_ >= WS_NG_VERSION)) return;
+            if (new_version()) { assert(0); return; }
 
             write_set_.clear();
             write_set_collection_.clear();
         }
 
-        void   ref()          { ++refcnt_; }
-        void   unref()        { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
+        void   ref()   { ++refcnt_; }
+        void   unref() { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
         size_t refcnt() const { return refcnt_(); }
 
-//        std::ostream& operator<<(std::ostream& os) const;
+        WriteSetOut& write_set_out() { return write_set_out_; }
+        WriteSetIn&  write_set_in () { return write_set_in_;  }
 
     private:
 
@@ -443,20 +473,10 @@ public:
 private:
         CertKeySet cert_keys_;
 
-// REMOVE        friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
-//                                size_t buflen, size_t offset);
-//        friend size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
-//        friend size_t serial_size(const TrxHandle&);
-
         friend std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
     };
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
-
-// REMOVE    size_t serialize(const TrxHandle&, gu::byte_t* buf,
-//                     size_t buflen, size_t offset);
-//    size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
-//    size_t serial_size(const TrxHandle&);
 
     class TrxHandleLock
     {

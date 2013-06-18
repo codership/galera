@@ -17,6 +17,8 @@
 #include "key_set.hpp"
 #include "data_set.hpp"
 
+#include "gu_serialize.hpp"
+
 #include <vector>
 #include <string>
 
@@ -36,23 +38,38 @@ namespace galera
 
         static Version const MAX_VERSION = VER3;
 
+        static Version version(int v)
+        {
+            switch (v)
+            {
+            case VER3: return VER3;
+            }
+
+            gu_throw_error (EPROTO) << "Unrecognized writeset version: "<<v;
+        }
+
+        enum Flags
+        {
+            F_COMMIT      = 1 << 0,
+            F_ROLLBACK    = 1 << 1,
+            F_OOC         = 1 << 2,
+            F_TOI         = 1 << 3,
+            F_PA_UNSAFE   = 1 << 4
+        };
+
+        /* TODO: separate metadata access from physical representation in
+         *       future versions */
         class Header
         {
         public:
 
-            static Version version(int v)
+            static Version version(const gu::Buf& buf)
             {
-                switch (v)
-                {
-                case VER3: return VER3;
-                }
-
-                gu_throw_error (EPROTO) << "Unrecognized writeset version: "<<v;
-            }
-
-            static Version version(const gu::byte_t* hdr)
-            {
-                return version(hdr[0]);
+                uint32_t vr(0);
+                if (gu_likely(size_t(buf.size) >= sizeof(vr)))
+                    gu::unserialize4(buf.ptr, sizeof(vr), 0, vr);
+                /* the following will throw also if buf is too short and vr=0 */
+                return WriteSetNG::version(vr >> 24);// compatibility with ver 2
             }
 
             static int size (Version ver)
@@ -63,63 +80,73 @@ namespace galera
                 }
 
                 log_fatal << "Unsupported writeset version: " << ver;
-                abort();
+                abort(); // want to dump core right here
             }
 
 
             /* This is for WriteSetOut */
             explicit
-            Header (Version ver) : checksum_(), buf_(), local_()
+            Header (Version ver)
+            : local_(), ver_(ver), ptr_(local_), size_(size(ver)), chksm_()
             {
-                buf_.ptr  = &local_[0];
-                buf_.size = size(ver);
+                assert (size_t(size_) <= sizeof(local_));
             }
 
-            size_t init (Version          ver,
-                         KeySet::Version  kver,
-                         DataSet::Version dver,
-                         DataSet::Version uver,
-                         uint16_t         flags);
+            size_t gather (Version                ver,
+                           KeySet::Version        kver,
+                           DataSet::Version       dver,
+                           DataSet::Version       uver,
+                           uint16_t               flags,
+                           const wsrep_uuid_t&    source,
+                           const wsrep_conn_id_t& conn,
+                           const wsrep_trx_id_t&  trx,
+                           std::vector<gu::Buf>&  out);
 
             /* records last_seen, timestamp and CRC before replication */
             void set_last_seen (const wsrep_seqno_t& ls);
 
             /* This is for WriteSetIn */
             explicit
-            Header (const gu::Buf& buf) : checksum_(buf), buf_(buf), local_()
-            {
-                buf_.size = size(version());
-            }
+            Header (const gu::Buf& buf)
+                :
+                local_(),
+                ver_  (version(buf)),
+                ptr_  (reinterpret_cast<gu::byte_t*>(
+                           const_cast<void*>(buf.ptr))),
+                size_ (check_size(ver_, buf.size)),
+                chksm_(ver_, ptr_, size_)
+            {}
 
-            Header () : checksum_(), buf_(), local_()
-            {
-                buf_.ptr = NULL; buf_.size = 0;
-            }
+            Header () : local_(), ver_(), ptr_(NULL), size_(0), chksm_()
+            {}
 
             /* for late WriteSetIn initialization */
             void read_buf (const gu::Buf& buf)
             {
-                Checksum::verify(buf.ptr, buf.size);
-                buf_.ptr  = buf.ptr;
-                buf_.size = size(version());
+                ver_ = version(buf);
+                ptr_ =
+                    reinterpret_cast<gu::byte_t*>(const_cast<void*>(buf.ptr));
+                size_ = check_size (ver_, buf.size);
+                Checksum::verify(ver_, ptr_, size_);
             }
 
-            Version version() const { return version(buf_.ptr); }
-            int     size()    const { return buf_.size;   }
+            Version version() const { return ver_;  }
+            int     size()    const { return size_; }
+            const gu::byte_t* ptr() const { return ptr_; }
 
-            KeySet::Version keyset_ver() const
+            KeySet::Version  keyset_ver() const
             {
-                return KeySet::version((buf_.ptr[V3_KEYSET_VER] & 0xf0) >> 4);
+                return KeySet::version((ptr_[V3_KEYSET_VER] & 0xf0) >> 4);
             }
 
             DataSet::Version dataset_ver() const
             {
-                return DataSet::version((buf_.ptr[V3_DATASET_VER] & 0x0c) >> 2);
+                return DataSet::version((ptr_[V3_DATASET_VER] & 0x0c) >> 2);
             }
 
             DataSet::Version unrdset_ver() const
             {
-                return DataSet::version((buf_.ptr[V3_UNRDSET_VER] & 0x03));
+                return DataSet::version((ptr_[V3_UNRDSET_VER] & 0x03));
             }
 
             bool          has_keys()  const
@@ -135,49 +162,84 @@ namespace galera
             uint16_t      flags() const
             {
                 return gu::gtoh(
-                    *(reinterpret_cast<const uint16_t*>(buf_.ptr + V3_FLAGS))
+                    *(reinterpret_cast<const uint16_t*>(ptr_ + V3_FLAGS))
                     );
             }
 
-            uint32_t      pa_range() const
+            uint32_t      dep_window() const
             {
                 return gu::gtoh(
-                    *(reinterpret_cast<const uint32_t*>(buf_.ptr + V3_PA_RANGE))
+                    *(reinterpret_cast<const uint32_t*>(ptr_ + V3_DEP_WINDOW))
                     );
             }
 
             wsrep_seqno_t last_seen() const
             {
-                assert (pa_range() == 0);
+                assert (dep_window() == 0);
                 return seqno_priv();
             }
 
             wsrep_seqno_t seqno() const
             {
-                assert (pa_range() > 0);
+                assert (dep_window() > 0);
                 return seqno_priv();
             }
 
             long long     timestamp() const
             {
                 return gu::gtoh(
-                    *(reinterpret_cast<const uint64_t*>(buf_.ptr +V3_TIMESTAMP))
+                    *(reinterpret_cast<const uint64_t*>(ptr_ + V3_TIMESTAMP))
+                    );
+            }
+
+            const wsrep_uuid_t& source_id() const
+            {
+                return *(reinterpret_cast<const wsrep_uuid_t*>(ptr_ +
+                                                               V3_SOURCE_ID));
+            }
+
+            wsrep_trx_id_t conn_id() const
+            {
+                return gu::gtoh(
+                    *(reinterpret_cast<const uint64_t*>(ptr_ + V3_CONN_ID))
+                    );
+            }
+
+            wsrep_trx_id_t trx_id() const
+            {
+                return gu::gtoh(
+                    *(reinterpret_cast<const uint64_t*>(ptr_ + V3_TRX_ID))
                     );
             }
 
             const gu::byte_t* payload() const
             {
-                return buf_.ptr + size();
+                return ptr_ + size();
             }
-
-            const gu::Buf& operator() () const { return buf_; }
 
             /* to set seqno and parallel applying range after certification */
             void set_seqno(const wsrep_seqno_t& seqno, int pa_range);
 
-            gu::Buf copy(bool include_keys, bool include_unrd);
+            gu::Buf copy(bool include_keys, bool include_unrd) const;
 
         private:
+
+            static ssize_t
+            check_size (Version ver, ssize_t bufsize)
+            {
+                assert (bufsize > 4);
+
+                ssize_t const hsize(size(ver));
+
+                if (gu_unlikely(hsize > bufsize))
+                {
+                    gu_throw_error (EMSGSIZE)
+                        << "Input buffer size " << bufsize
+                        << " smaller than header size " << hsize;
+                }
+
+                return hsize;
+            }
 
             class Checksum
             {
@@ -186,34 +248,37 @@ namespace galera
 
                 /* produce value corrected for endianness */
                 static void
-                compute (const gu::byte_t* ptr, size_t size, type_t& value)
+                compute (const void* ptr, size_t size, type_t& value)
                 {
                     gu::CRC::digest (ptr, size, value);
                     value = gu::htog<type_t>(value);
                 }
 
                 static void
-                verify (const gu::byte_t* ptr, ssize_t size);
+                verify (Version ver, const void* ptr, ssize_t size);
 
                 Checksum () {}
-                Checksum (const gu::Buf& buf)
+                Checksum (Version ver, const void* ptr, ssize_t size)
                 {
-                    verify (buf.ptr, buf.size);
+                    verify (ver, ptr, size);
                 }
             };
 
             static int const V3_HEADER_VER  = 0;
-            static int const V3_KEYSET_VER  = V3_HEADER_VER + sizeof(uint8_t);
+            static int const V3_KEYSET_VER  = V3_HEADER_VER + sizeof(uint32_t);
             // data and unordered sets share the same byte with keyset version
             static int const V3_DATASET_VER = V3_KEYSET_VER;
             static int const V3_UNRDSET_VER = V3_DATASET_VER;
-            static int const V3_FLAGS       = V3_UNRDSET_VER + sizeof(uint8_t);
-            static int const V3_PA_RANGE    = V3_FLAGS       + sizeof(uint16_t);
-            static int const V3_LAST_SEEN   = V3_PA_RANGE    + sizeof(uint32_t);
+            static int const V3_FLAGS       = V3_UNRDSET_VER + sizeof(uint16_t);
+            static int const V3_DEP_WINDOW  = V3_FLAGS       + sizeof(uint16_t);
+            static int const V3_LAST_SEEN   = V3_DEP_WINDOW  + sizeof(uint32_t);
             static int const V3_SEQNO       = V3_LAST_SEEN;
             // seqno takes place of last seen
             static int const V3_TIMESTAMP   = V3_LAST_SEEN   + sizeof(uint64_t);
-            static int const V3_CRC         = V3_TIMESTAMP   + sizeof(uint64_t);
+            static int const V3_SOURCE_ID   = V3_TIMESTAMP   + sizeof(uint64_t);
+            static int const V3_CONN_ID     = V3_SOURCE_ID+sizeof(wsrep_uuid_t);
+            static int const V3_TRX_ID      = V3_CONN_ID     + sizeof(uint64_t);
+            static int const V3_CRC         = V3_TRX_ID      + sizeof(uint64_t);
             static int const V3_SIZE        = V3_CRC + sizeof(Checksum::type_t);
 
             struct Offsets
@@ -227,28 +292,36 @@ namespace galera
                 int const last_seen_;
                 int const seqno_;
                 int const timestamp_;
+                int const source_id_;
+                int const conn_id_;
+                int const trx_id_;
                 int const crc_;
                 int const size_;
 
-                Offsets(int, int, int, int, int, int, int, int, int, int, int);
+                Offsets(int, int, int, int, int, int, int, int, int, int,
+                        int, int, int, int);
             };
 
             static Offsets const V3;
 
             static int const MAX_HEADER_SIZE = V3_SIZE;
 
-            Checksum   checksum_;
-            gu::Buf    buf_;
-            gu::byte_t local_[MAX_HEADER_SIZE];
+            mutable
+            gu::byte_t  local_[MAX_HEADER_SIZE];
+            Version     ver_;
+            gu::byte_t* ptr_;
+            ssize_t     size_;
+            Checksum    chksm_;
 
             wsrep_seqno_t seqno_priv() const
             {
                 return gu::gtoh(
-                    *(reinterpret_cast<const uint64_t*>(buf_.ptr +V3_LAST_SEEN))
+                    *(reinterpret_cast<const uint64_t*>(ptr_ + V3_LAST_SEEN))
                     );
             }
 
-            static void update_checksum(gu::byte_t* const ptr, size_t size)
+            static void
+            update_checksum(gu::byte_t* const ptr, size_t const size)
             {
                 Checksum::type_t cval;
                 Checksum::compute (ptr, size, cval);
@@ -295,14 +368,20 @@ namespace galera
             left_ -= unrd_.append(data, data_len, store);
         }
 
-        void set_flags(uint16_t flags) { flags_ |= flags; }
+        void set_flags(uint16_t flags) { flags_  = flags; }
+        void add_flags(uint16_t flags) { flags_ |= flags; }
+        void mark_toi()                { flags_ |= WriteSetNG::F_TOI; }
+        void mark_pa_unsafe()          { flags_ |= WriteSetNG::F_PA_UNSAFE; }
 
         bool is_empty() const
         {
             return ((data_.count() + keys_.count() + unrd_.count()) == 0);
         }
 
-        size_t gather(std::vector<gu::Buf>& out)
+        size_t gather(const wsrep_uuid_t&    source,
+                      const wsrep_conn_id_t& conn,
+                      const wsrep_trx_id_t&  trx,
+                      std::vector<gu::Buf>&  out)
         {
             check_size();
 
@@ -310,12 +389,12 @@ namespace galera
                          + unrd_.page_count() + 1 /* global header */);
 
 
-            size_t out_size (header_.init (ver_,
-                                           keys_.version(),
-                                           data_.version(),
-                                           unrd_.version(),
-                                           flags_));
-            out.push_back(header_());
+            size_t out_size (header_.gather (ver_,
+                                             keys_.version(),
+                                             data_.version(),
+                                             unrd_.version(),
+                                             flags_, source, conn, trx,
+                                             out));
 
             out_size += keys_.gather(out);
             out_size += data_.gather(out);
@@ -386,6 +465,14 @@ namespace galera
             init (st);
         }
 
+        void read_buf (const gu::byte_t* const ptr, ssize_t const len)
+        {
+            assert (ptr != NULL);
+            assert (len >= 0);
+            gu::Buf tmp = { ptr, len };
+            read_buf (tmp);
+        }
+
         ~WriteSetIn ()
         {
             if (gu_unlikely(false == check_))
@@ -395,12 +482,20 @@ namespace galera
             }
         }
 
-        uint16_t      flags()     const { return header_.flags();     }
-        int           pa_range()  const { return header_.pa_range();  }
-        bool          certified() const { return header_.pa_range();  }
-        wsrep_seqno_t last_seen() const { return header_.last_seen(); }
-        wsrep_seqno_t seqno()     const { return header_.seqno();     }
-        long long     timestamp() const { return header_.timestamp(); }
+        uint16_t      flags()      const { return header_.flags();       }
+        bool          is_toi()     const
+        { return flags() & WriteSetNG::F_TOI; }
+        bool          pa_unsafe()  const
+        { return flags() & WriteSetNG::F_PA_UNSAFE; }
+        int           dep_window() const { return header_.dep_window();  }
+        bool          certified()  const { return header_.dep_window();  }
+        wsrep_seqno_t last_seen()  const { return header_.last_seen();   }
+        wsrep_seqno_t seqno()      const { return header_.seqno();       }
+        long long     timestamp()  const { return header_.timestamp();   }
+
+        const wsrep_uuid_t& source_id() const { return header_.source_id(); }
+        wsrep_conn_id_t     conn_id()   const { return header_.conn_id();   }
+        wsrep_trx_id_t      trx_id()    const { return header_.trx_id();    }
 
         const KeySetIn&  keyset()  const { return keys_; }
         const DataSetIn& dataset() const { return data_; }
@@ -418,17 +513,17 @@ namespace galera
             }
         }
 
-        void set_seqno(const wsrep_seqno_t& seqno, int pa_range)
+        void set_seqno(const wsrep_seqno_t& seqno, int dep_window)
         {
             assert (seqno > 0);
-            assert (pa_range > 0);
-            header_.set_seqno (seqno, pa_range);
+            assert (dep_window > 0);
+            header_.set_seqno (seqno, dep_window);
         }
 
         /* can return pointer to internal storage: out can be used only
          * within object scope. */
         size_t gather(std::vector<gu::Buf>& out,
-                      bool include_keys, bool include_unrd);
+                      bool include_keys, bool include_unrd) const;
 
     private:
 

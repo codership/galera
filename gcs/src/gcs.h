@@ -21,6 +21,7 @@ extern "C" {
 #include <stdio.h>
 
 #include "gu_config.h"
+#include "gu_buf.h"
 #include "gcache.h"
 
 /*! @typedef @brief Sequence number type. */
@@ -160,12 +161,6 @@ gcs_act_type_t;
 /*! String representations of action types */
 extern const char* gcs_act_type_to_str(gcs_act_type_t);
 
-/*! this should be castable to struct iovec, but has better const safety */
-struct gcs_buf {
-    const void* ptr;
-    ssize_t     size;
-};
-
 /*! @brief Sends a vector of buffers as a single action to group and returns.
  * A copy of action will be returned through gcs_recv() call, or discarded
  * in case it is not delivered by group.
@@ -179,11 +174,11 @@ struct gcs_buf {
  * @return           negative error code, action size in case of success
  * @retval -EINTR    thread was interrupted while waiting to enter the monitor
  */
-extern long gcs_sendv (gcs_conn_t*           conn,
-                       const struct gcs_buf* act_bufs,
-                       size_t                act_size,
-                       gcs_act_type_t        act_type,
-                       bool                  scheduled);
+extern long gcs_sendv (gcs_conn_t*          conn,
+                       const struct gu_buf* act_bufs,
+                       size_t               act_size,
+                       gcs_act_type_t       act_type,
+                       bool                 scheduled);
 
 /*! A wrapper for single buffer communication */
 static inline long gcs_send (gcs_conn_t*    const conn,
@@ -192,7 +187,7 @@ static inline long gcs_send (gcs_conn_t*    const conn,
                              gcs_act_type_t const act_type,
                              bool           const scheduled)
 {
-    struct gcs_buf const buf = { act, (ssize_t)act_size };
+    struct gu_buf const buf = { act, (ssize_t)act_size };
     return gcs_sendv (conn, &buf, act_size, act_type, scheduled);
 }
 
@@ -217,17 +212,17 @@ struct gcs_action {
  * @return          negative error code, action size in case of success
  * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
  */
-extern long gcs_replv (gcs_conn_t*           conn,
-                       const struct gcs_buf* act_in,
-                       struct gcs_action*    action,
-                       bool                  scheduled);
+extern long gcs_replv (gcs_conn_t*          conn,
+                       const struct gu_buf* act_in,
+                       struct gcs_action*   action,
+                       bool                 scheduled);
 
 /*! A wrapper for single buffer communication */
 static inline long gcs_repl (gcs_conn_t*        const conn,
                              struct gcs_action* const action,
                              bool               const scheduled)
 {
-    struct gcs_buf const buf = { action->buf, action->size };
+    struct gu_buf const buf = { action->buf, action->size };
     return gcs_replv (conn, &buf, action, scheduled);
 }
 

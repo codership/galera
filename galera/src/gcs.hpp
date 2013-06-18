@@ -8,6 +8,7 @@
 #include "gu_atomic.hpp"
 #include "gu_throw.hpp"
 #include "gu_config.hpp"
+#include "gu_buf.hpp"
 #include "gcs.h"
 #include "wsrep_api.h"
 
@@ -30,8 +31,12 @@ namespace galera
                                              gcs_seqno_t seqno) = 0;
         virtual void    close() = 0;
         virtual ssize_t recv(gcs_action& act) = 0;
-        virtual ssize_t send(const void*, size_t, gcs_act_type_t, bool) = 0;
-        virtual ssize_t repl(gcs_action& act, bool) = 0;
+        virtual ssize_t sendv(const std::vector<gu::Buf>&, size_t,
+                              gcs_act_type_t, bool) = 0;
+        virtual ssize_t send (const void*, size_t, gcs_act_type_t, bool) = 0;
+        virtual ssize_t replv(const std::vector<gu::Buf>&,
+                              gcs_action& act, bool) = 0;
+        virtual ssize_t repl (gcs_action& act, bool) = 0;
         virtual gcs_seqno_t caused() = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
@@ -102,10 +107,22 @@ namespace galera
             return gcs_recv(conn_, &act);
         }
 
+        ssize_t sendv(const std::vector<gu::Buf>& actv, size_t act_len,
+                      gcs_act_type_t act_type, bool scheduled)
+        {
+            return gcs_sendv(conn_, &actv[0], act_len, act_type, scheduled);
+        }
+
         ssize_t send(const void* act, size_t act_len, gcs_act_type_t act_type,
                      bool scheduled)
         {
             return gcs_send(conn_, act, act_len, act_type, scheduled);
+        }
+
+        ssize_t replv(const std::vector<gu::Buf>& actv,
+                      struct gcs_action& act, bool scheduled)
+        {
+            return gcs_replv(conn_, &actv[0], &act, scheduled);
         }
 
         ssize_t repl(struct gcs_action& act, bool scheduled)
@@ -113,9 +130,9 @@ namespace galera
             return gcs_repl(conn_, &act, scheduled);
         }
 
-        gcs_seqno_t caused() { return gcs_caused(conn_); }
+        gcs_seqno_t caused() { return gcs_caused(conn_);   }
 
-        ssize_t schedule() { return gcs_schedule(conn_); }
+        ssize_t schedule()   { return gcs_schedule(conn_); }
 
         ssize_t interrupt(ssize_t handle)
         {
@@ -217,44 +234,43 @@ namespace galera
 
         ssize_t recv(gcs_action& act);
 
+        ssize_t sendv(const std::vector<gu::Buf>&, size_t, gcs_act_type_t, bool)
+        { return -ENOSYS; }
+
         ssize_t send(const void*, size_t, gcs_act_type_t, bool)
         { return -ENOSYS; }
 
-        ssize_t repl(gcs_action& act, bool scheduled)
+        ssize_t replv(const std::vector<gu::Buf>& actv,
+                      gcs_action& act, bool scheduled)
         {
-            act.seqno_g = GCS_SEQNO_ILL;
-            act.seqno_l = GCS_SEQNO_ILL;
-
-            ssize_t ret(-EBADFD);
-
-            {
-                gu::Lock lock(mtx_);
-
-                switch (state_)
-                {
-                case S_CONNECTED:
-                case S_SYNCED:
-                {
-                    ++global_seqno_;
-                    act.seqno_g = global_seqno_;
-                    ++local_seqno_;
-                    act.seqno_l = local_seqno_;
-                    ret = act.size;
-                    break;
-                }
-                case S_CLOSED:
-                    ret = -EBADFD;
-                    break;
-                case S_OPEN:
-                    ret = -ENOTCONN;
-                    break;
-                }
-            }
+            ssize_t ret(set_seqnos(act));
 
             if (gu_likely(0 != gcache_ && ret > 0))
             {
                 assert (ret == act.size);
-                void* ptr = gcache_->malloc(act.size);
+                gu::byte_t* ptr(
+                    reinterpret_cast<gu::byte_t*>(gcache_->malloc(act.size)));
+                act.buf = ptr;
+                ssize_t copied(0);
+                for (int i(0); copied < act.size; ++i)
+                {
+                    memcpy (ptr + copied, actv[i].ptr, actv[i].size);
+                    copied += actv[i].size;
+                }
+                assert (copied == act.size);
+            }
+
+            return ret;
+        }
+
+        ssize_t repl(gcs_action& act, bool scheduled)
+        {
+            ssize_t ret(set_seqnos(act));
+
+            if (gu_likely(0 != gcache_ && ret > 0))
+            {
+                assert (ret == act.size);
+                void* ptr(gcache_->malloc(act.size));
                 memcpy (ptr, act.buf, act.size);
                 act.buf = ptr;
             }
@@ -348,6 +364,40 @@ namespace galera
         int          repl_proto_ver_;
         int          appl_proto_ver_;
         bool         report_last_applied_;
+
+        ssize_t set_seqnos (gcs_action& act)
+        {
+            act.seqno_g = GCS_SEQNO_ILL;
+            act.seqno_l = GCS_SEQNO_ILL;
+
+            ssize_t ret(-EBADFD);
+
+            {
+                gu::Lock lock(mtx_);
+
+                switch (state_)
+                {
+                case S_CONNECTED:
+                case S_SYNCED:
+                {
+                    ++global_seqno_;
+                    act.seqno_g = global_seqno_;
+                    ++local_seqno_;
+                    act.seqno_l = local_seqno_;
+                    ret = act.size;
+                    break;
+                }
+                case S_CLOSED:
+                    ret = -EBADFD;
+                    break;
+                case S_OPEN:
+                    ret = -ENOTCONN;
+                    break;
+                }
+            }
+
+            return ret;
+        }
 
         DummyGcs (const DummyGcs&);
         DummyGcs& operator=(const DummyGcs&);

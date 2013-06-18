@@ -170,6 +170,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     trx_proto_ver_      (-1),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
+    proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
@@ -196,7 +197,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_retry_sec_      (1),
     ist_sst_            (false),
     gcache_             (config_, data_dir_),
-    gcs_                (config_, gcache_, MAX_PROTO_VER, args->proto_ver,
+    gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
     service_thd_        (gcs_),
     as_                 (0),
@@ -517,24 +518,39 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
-    trx->set_last_seen_seqno(last_committed());
-    trx->flush(0);
-    trx->set_state(TrxHandle::S_REPLICATING);
-
-    const MappedBuffer& wscoll(trx->write_set_collection());
-    ssize_t rcode;
+    std::vector<gu::Buf> actv;
 
     gcs_action act;
-    act.size = wscoll.size();
     act.type = GCS_ACT_TORDERED;
 #ifndef NDEBUG
     act.seqno_g = GCS_SEQNO_ILL;
 #endif
 
+    if (trx->new_version())
+    {
+        act.buf  = 0;
+        act.size = trx->write_set_out().gather(trx->source_id(),
+                                               trx->conn_id(),
+                                               trx->trx_id(),
+                                               actv);
+    }
+    else
+    {
+        trx->set_last_seen_seqno(last_committed());
+        trx->flush(0);
+
+        const MappedBuffer& wscoll(trx->write_set_collection());
+
+        act.buf  = &wscoll[0];
+        act.size = wscoll.size();
+    }
+
+    trx->set_state(TrxHandle::S_REPLICATING);
+
+    ssize_t rcode;
+
     do
     {
-        act.buf = &wscoll[0];
-        assert(act.buf);
         assert(act.seqno_g == GCS_SEQNO_ILL);
 
         const ssize_t gcs_handle(gcs_.schedule());
@@ -547,9 +563,18 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         }
 
         trx->set_gcs_handle(gcs_handle);
-        trx->unlock();
 
-        rcode = gcs_.repl(act, true);
+        if (trx->new_version())
+        {
+            trx->write_set_out().set_last_seen(last_committed());
+            trx->unlock();
+            rcode = gcs_.replv(actv, act, true);
+        }
+        else
+        {
+            trx->unlock();
+            rcode = gcs_.repl(act, true);
+        }
 
         trx->lock();
     }
@@ -577,11 +602,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     }
 
     assert(act.buf);
+    assert(act.size == rcode);
     assert(act.seqno_l != GCS_SEQNO_ILL && act.seqno_g != GCS_SEQNO_ILL);
 
     ++replicated_;
-    replicated_bytes_ += wscoll.size();
+    replicated_bytes_ += rcode;
     trx->set_gcs_handle(-1);
+
     trx->set_received(act.buf, act.seqno_l, act.seqno_g);
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)

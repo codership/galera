@@ -185,8 +185,8 @@ MMH3::digest (const void* const in, size_t size, uint64_t& out)
     out = gu_mmh128_64(in, size); return sizeof(out);
 }
 
-
 typedef MMH3 Hash;
+
 
 class FastHash
 {

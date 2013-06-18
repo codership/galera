@@ -8,6 +8,7 @@
 #include "test_key.hpp"
 #include "../src/write_set_ng.hpp"
 
+#include "gu_uuid.h"
 #include "gu_logger.hpp"
 #include "gu_hexdump.hpp"
 
@@ -18,6 +19,10 @@ using namespace galera;
 START_TEST (ver3_basic)
 {
     uint16_t const flag1(0xabcd);
+    wsrep_uuid_t source;
+    gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
+    wsrep_conn_id_t const conn(652653);
+    wsrep_trx_id_t const  trx(99994952);
 
     WriteSetOut wso ("ver3_basic", flag1, WriteSetNG::VER3);
 
@@ -37,12 +42,12 @@ START_TEST (ver3_basic)
     }
 
     wso.append_data (&data_out_persistent, sizeof(data_out_persistent), false);
-    wso.set_flags (flag2);
+    wso.add_flags (flag2);
 
     uint16_t const flags(flag1 | flag2);
 
     std::vector<gu::Buf> out;
-    size_t const out_size(wso.gather(out));
+    size_t const out_size(wso.gather(source, conn, trx, out));
 
     log_info << "Gather size: " << out_size << ", buf count: " << out.size();
 
@@ -57,15 +62,16 @@ START_TEST (ver3_basic)
     in.reserve(out_size);
     for (size_t i(0); i < out.size(); ++i)
     {
-        in.insert (in.end(), out[i].ptr, out[i].ptr + out[i].size);
+        const gu::byte_t* ptr(reinterpret_cast<const gu::byte_t*>(out[i].ptr));
+        in.insert (in.end(), ptr, ptr + out[i].size);
     }
 
     fail_if (in.size() != out_size);
 
-    gu::Buf in_buf = { in.data(), static_cast<ssize_t>(in.size()) };
+    gu::Buf const in_buf = { in.data(), static_cast<ssize_t>(in.size()) };
 
-    try
-    {
+//    try
+//    {
         mark_point();
         WriteSetIn wsi(in_buf);
 
@@ -112,11 +118,11 @@ START_TEST (ver3_basic)
         const DataSetIn& usi(wsi.unrdset());
         fail_if (usi.count() != 0);
         fail_if (usi.size()  != 0);
-    }
-    catch (std::exception& e)
-    {
-        fail("%s", e.what());
-    }
+//    }
+//    catch (std::exception& e)
+//    {
+//        fail("%s", e.what());
+//    }
 
     mark_point();
 
@@ -126,8 +132,11 @@ START_TEST (ver3_basic)
         mark_point();
         wsi.verify_checksum();
         fail_unless(wsi.certified());
-        fail_if (wsi.pa_range() != pa_range);
-        fail_if (wsi.seqno()    != seqno);
+        fail_if (wsi.dep_window() != pa_range);
+        fail_if (wsi.seqno()      != seqno);
+        fail_if (memcmp(&wsi.source_id(), &source, sizeof(source)));
+        fail_if (wsi.conn_id()    != conn);
+        fail_if (wsi.trx_id()     != trx);
     }
     catch (gu::Exception& e)
     {
@@ -136,30 +145,35 @@ START_TEST (ver3_basic)
 
     mark_point();
 
-    try /* this is to test reassembly after gather() + late initialization */
+    /* this is to test reassembly without keys and unordered data after gather()
+     * + late initialization */
+    try
     {
         WriteSetIn tmp_wsi(in_buf);
         std::vector<gu::Buf> out;
 
         mark_point();
-        tmp_wsi.gather(out, false, false);
+        gu_trace(tmp_wsi.gather(out, false, false)); // no keys or unrd
 
         /* concatenate all out buffers */
         std::vector<gu::byte_t> in;
         in.reserve(out_size);
         for (size_t i(0); i < out.size(); ++i)
         {
-            in.insert (in.end(), out[i].ptr, out[i].ptr + out[i].size);
+            const gu::byte_t* ptr
+                (reinterpret_cast<const gu::byte_t*>(out[i].ptr));
+            in.insert (in.end(), ptr, ptr + out[i].size);
         }
 
+        mark_point();
         gu::Buf tmp_buf = { in.data(), static_cast<ssize_t>(in.size()) };
 
-        WriteSetIn wsi;      // first - create an empty writeset
+        WriteSetIn wsi;        // first - create an empty writeset
         wsi.read_buf(tmp_buf); // next  - initialize from buffer
         wsi.verify_checksum();
         fail_unless(wsi.certified());
-        fail_if (wsi.pa_range() != pa_range);
-        fail_if (wsi.seqno()    != seqno);
+        fail_if (wsi.dep_window()      != pa_range);
+        fail_if (wsi.seqno()           != seqno);
         fail_if (wsi.keyset().count()  != 0);
         fail_if (wsi.dataset().count() == 0);
         fail_if (wsi.unrdset().count() != 0);

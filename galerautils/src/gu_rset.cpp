@@ -192,10 +192,12 @@ RecordSetOutBase::gather (std::vector<Buf>& out)
 {
     if (count_)
     {
-        byte_t* const ptr    = const_cast<byte_t*>(bufs_.front().ptr);
+        byte_t* const ptr =
+            reinterpret_cast<byte_t*>(const_cast<void*>(bufs_.front().ptr));
+
         ssize_t const offset = write_header (ptr, bufs_.front().size);
 
-        bufs_.front().ptr  += offset;
+        bufs_.front().ptr   = ptr + offset;
         bufs_.front().size -= offset;
         // size_ is taken care of in write_header()
 

@@ -22,7 +22,7 @@ public:
 
     MMap (const FileDescriptor& fd, bool sequential = false);
 
-    virtual ~MMap ();
+    ~MMap ();
 
     void dont_need() const;
     void sync() const;

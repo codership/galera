@@ -153,7 +153,8 @@ START_TEST (ver0)
     in.reserve(out_size);
     for (size_t i(0); i < out.size(); ++i)
     {
-        in.insert (in.end(), out[i].ptr, out[i].ptr + out[i].size);
+        const gu::byte_t* ptr(reinterpret_cast<const gu::byte_t*>(out[i].ptr));
+        in.insert (in.end(), ptr, ptr + out[i].size);
     }
 
     fail_if (in.size() != out_size);
