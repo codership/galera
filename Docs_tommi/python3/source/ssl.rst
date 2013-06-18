@@ -3,6 +3,18 @@
 =============
 .. _`Enabling SSL`:
 
+.. index::
+   pair: Parameters; socket.ssl_compression
+
+.. index::
+   pair: Parameters; socket.ssl_cipher
+
+.. index::
+   pair: Parameters; socket.ssl_cert
+
+.. index::
+   pair: Parameters; socket.ssl_key
+   
 Galera library supports :abbr:`SSL (Secure Sockets Layer)`
 for the encryption of replication traffic. Authentication
 is not supprtoed. SSL is a cluster-wide option and must be

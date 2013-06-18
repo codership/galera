@@ -14,6 +14,15 @@
 ================================
 .. _`Node Provisioning and Recovery`:
 
+.. index::
+   pair: Parameters; wsrep_data_dir
+
+.. index::
+   pair: Parameters; wsrep_sst_donor
+
+.. index::
+   pair: Parameters; wsrep_node_name
+
 The state of new and failed nodes differs from the state of
 the :term:`Primary Component` and needs to be synchronized. As a result,
 new node provisioning and failed node recovery are essentially

@@ -122,8 +122,14 @@ column from the left. The values are:
 |                                       |   |                            |                                                                |
 |                                       |   |                            | unless the ``wsrep_on`` session variable is set to *0*.        |
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
-
-
+| ``wsrep_cert_index_size``             | G | *30936*                    | The number of entries in the certification index.              |
++---------------------------------------+---+----------------------------+----------------------------------------------------------------+
+| `` wsrep_protocol_version``           | G | *4*                        | The version of the wsrep protocol used.                        |
++---------------------------------------+---+----------------------------+----------------------------------------------------------------+
+| ``wsrep_connected``                   | G | *ON*                       | If the value is *OFF*, the node has not yet connected to any   |
+|                                       |   |                            | of the cluster components. This may be due to                  |
+|                                       |   |                            | misconfiguration. Check the error log for proper diagnostics.  |
++---------------------------------------+---+----------------------------+----------------------------------------------------------------+
 
 
 

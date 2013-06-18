@@ -57,7 +57,14 @@ See also chapter :ref:`Certification Based Replication <Certification Based Repl
 
 You can log cluster wide conflicts by using the ``wsrep_debug``
 variable, which will log these conflicts and plenty of other
-information. You can also monitor the parameters below:
+information. You may see any of the following messages::
+
+     110906 17:45:01 [Note] WSREP: BF kill (1, seqno: 16962377), victim:  (140588996478720 4) trx: 35525064
+     110906 17:45:01 [Note] WSREP: Aborting query: commit
+     110906 17:45:01 [Note] WSREP: kill trx QUERY_COMMITTING for 35525064
+     110906 17:45:01 [Note] WSREP: commit failed for reason: 3, seqno: -1
+
+You can also monitor the parameters below:
 
 - ``wsrep_local_bf_aborts``
 - ``wsrep_local_cert_failures``

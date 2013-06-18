@@ -26,6 +26,9 @@ These methods are described in the chapters below.
 ----------------------------------
 .. _`State Snapshot Transfer (SST)`:
 
+.. index::
+   pair: Parameters; wsrep_sst_method
+
 State Snapshot Transfer (SST) refers to a full data copy from
 one cluster node (donor) to the joining node (joiner). 
 SST is used when a new node joins the cluster. To get synchronized

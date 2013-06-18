@@ -11,6 +11,8 @@ These are MySQL system variables introduced by *wsrep*
 patch v0.8. All variables are global except where marked
 by (L).
 
+.. note:: Some variable names are links to more detailed information presented in chapters below the table.
+
 
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | Option                                | Default                  | Description                                                     |
@@ -36,19 +38,9 @@ by (L).
 |                                       |                          | cluster with a different name, the connection fails. The        |
 |                                       |                          | cluster name must be same on all the cluster nodes.             |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_convert_LOCK_to_trx``         | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT.``  |
-|                                       |                          | In other words, this parameter implicitly converts locking      |
-|                                       |                          | sessions into transactions within *mysqld*. By itself, it does  |
-|                                       |                          | not mean support for locking sessions, but it prevents the      |
-|                                       |                          | database from ending up in a logically                          |
-|                                       |                          | inconsistent state.                                             |
-|                                       |                          |                                                                 |
-|                                       |                          | Sometimes this parameter may help to get old applications       |
-|                                       |                          | working in a multi-master setup.                                |
-|                                       |                          |                                                                 |
-|                                       |                          | **Note!** Loading a large database dump with ``LOCK``           |
-|                                       |                          | statements can result in abnormally large transactions and      |
-|                                       |                          | cause an out-of-memory condition.                               |
+| :ref:`wsrep_convert_LOCK_to_trx`      | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT``.  |
+| <wsrep_convert_LOCK_to_trx>           |                          | In other words, this parameter implicitly converts locking      |
+|                                       |                          | sessions into transactions within *mysqld*.                     |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_data_home_dir``               | *<mysql_real_            | A directory where the wsrep provider will store its files.      |
 |                                       | data_home>*              | *Galera Cluster for MySQL* uses this parameter                  |
@@ -67,19 +59,10 @@ by (L).
 |                                       |                          | - http://bugs.mysql.com/bug.php?id=41984                        |
 |                                       |                          | - http://drupal.org/node/282555                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_forced_binlog_format``        | *NONE*                   | Force every transaction to use the given binlog format. When    |
-|                                       |                          | this variable is set to something else than *NONE*, all         |
+| :ref:`wsrep_forced_binlog_format`     | *NONE*                   | Force every transaction to use the given binlog format. When    |
+| <wsrep_forced_binlog_format>          |                          | this variable is set to something else than *NONE*, all         |
 |                                       |                          | transactions will use the given forced format, regardless of    |
 |                                       |                          | the client session specified in ``binlog_format``.              |
-|                                       |                          |                                                                 |
-|                                       |                          | Valid choices for ``wsrep_forced_binlog_format`` are: *ROW*,    |
-|                                       |                          | *STATEMENT*, *MIXED* and the special value *NONE*,              |
-|                                       |                          | meaning that there is no forced binlog format in effect.        |
-|                                       |                          |                                                                 |
-|                                       |                          | This variable was introduced to support ``STATEMENT`` format    |
-|                                       |                          | replication during  rolling schema upgrade processing.          |
-|                                       |                          | However, in most cases, ``ROW`` replication                     |
-|                                       |                          | is valid for asymmetric schema replication.                     |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_max_ws_rows``                 | *128K*                   | The maximum number of rows allowed in the writeset. Currently,  |
 |                                       |                          | this parameter limits the supported size of transactions        |
@@ -91,16 +74,9 @@ by (L).
 |                                       |                          |                                                                 |
 |                                       |                          | The maximum allowed writeset size is 2G.                        |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_node_address``                | *<address>[:port]*       | An option to explicitly specify the network address of the      |
-|                                       |                          | node, if autoguessing for some reason does not produce          |
+| :ref:`wsrep_node_address`             | *<address>[:port]*       | An option to explicitly specify the network address of the      |
+| <wsrep_node_address>                  |                          | node, if autoguessing for some reason does not produce          |
 |                                       |                          | desirable results (multiple network interfaces, NAT, etc.)      |
-|                                       |                          |                                                                 |
-|                                       |                          | By default, the address of the first network interface (*eth0*) |
-|                                       |                          | and the default port 4567 are used. The *<address>* and         |
-|                                       |                          | *:port* will be passed to the wsrep provider (Galera) to be     |
-|                                       |                          | used as a base address in its communications. It will also be   |
-|                                       |                          | used to derive the default values for parameters                |
-|                                       |                          | ``wsrep_sst_receive_address`` and ``ist.recv_address``.         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_node_incoming_address``       | *<address>               | The address at which the server expects client connections.     |
 |                                       | [:mysqld_port]*          | Intended for integration with load balancers. Not used for now. |
@@ -149,43 +125,15 @@ by (L).
 |                                       |                          | authenticate with both the state snapshot receiver and the      |
 |                                       |                          | state snapshot donor.                                           |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_sst_donor``                   |                          | A name (given in the ``wsrep_node_name`` option) of the server  |
-|                                       |                          | that should be used as a source for state transfer. If not      |
+| :ref:`wsrep_sst_donor`                |                          | A name (given in the ``wsrep_node_name`` option) of the server  |
+| <wsrep_sst_donor>                     |                          | that should be used as a source for state transfer. If not      |
 |                                       |                          | specified, Galera will choose the most appropriate one.         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor     |
 | <wsrep_sst_donor_rejects_queries>`    |                          | if the donor is performing a blocking SST.                      |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_sst_method``                  | *mysqldump*              | The method to use for state snapshot transfers. The             |
-|                                       |                          | ``wsrep_sst_<wsrep_sst_method>`` command will be called with    |
-|                                       |                          | the following arguments. For more information, see also         |
-|                                       |                          | :ref:`Scriptable State Snapshot Transfer                        |
-|                                       |                          | <Scriptable State Snapshot Transfer>`.                          |
-|                                       |                          |                                                                 |
-|                                       |                          | The supported methods are:                                      |
-|                                       |                          |                                                                 |
-|                                       |                          | - *mysqldump* |---| This is a slow (except for small datasets), |
-|                                       |                          |   but the most tested option.                                   |
-|                                       |                          | - *rsync* |---| This option is much faster than *mysqldump* on  |
-|                                       |                          |   large datasets.                                               |
-|                                       |                          | - *rsync_wan* |---| This option is almost the same as *rsync*,  |
-|                                       |                          |   but uses the *delta-xfer* algorithm to minimize               |
-|                                       |                          |   network traffic.                                              |
-|                                       |                          |                                                                 |
-|                                       |                          |   **Note!** You can only use *rsync* when a node is starting.   |
-|                                       |                          |   In other words, you cannot use *rsync* under a running InnoDB |
-|                                       |                          |   storage engine.                                               |
-|                                       |                          | - *xtrabackup* |---| This option is a fast and practically      |
-|                                       |                          |   non-blocking SST method based on Percona's xtrabackup tool.   |
-|                                       |                          |                                                                 |
-|                                       |                          |   If you want to use *xtrabackup*, the following settings must  |
-|                                       |                          |   be present in the *my.cnf* configuration file on all nodes::  |
-|                                       |                          |                                                                 |
-|                                       |                          |       [mysqld]                                                  |
-|                                       |                          |       wsrep_sst_auth=root:<root password>                       |
-|                                       |                          |       datadir=<path to data dir>                                |
-|                                       |                          |       [client]                                                  |
-|                                       |                          |       socket=<path to socket>                                   |
+| :ref:`wsrep_sst_method`               | *mysqldump*              | The method to use for state snapshot transfers.                 |
+| <wsrep_sst_method>                    |                          |                                                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_sst_receive_address``         | *<wsrep_node             | The address at which this node expects to receive state         |
 |                                       | _address>*               | transfers. Depends on state transfer method. For example, for   |
@@ -245,6 +193,80 @@ the node to startup alone, thus initializing a new cluster
          only pass the ``gcomm://`` string on the command line, such as:
          
          ``service mysql start --wsrep-cluster-address="gcomm://"``
+
+
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_convert_LOCK_to_trx
+-------------------------------
+.. _`wsrep_convert_LOCK_to_trx`:
+
+.. index::
+   pair: Parameters; wsrep_convert_LOCK_to_trx
+
+Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT`` statements.
+In other words, this parameter implicitly converts locking sessions into
+transactions within *mysqld*. By itself, it does not mean support for
+locking sessions, but it prevents the database from ending up in a logically
+inconsistent state.
+
+Sometimes this parameter may help to get old applications
+working in a multi-master setup.
+
+.. note:: Loading a large database dump with ``LOCK``
+          statements can result in abnormally large transactions and
+          cause an out-of-memory condition.
+  
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_forced_binlog_format
+-------------------------------
+.. _`wsrep_forced_binlog_format`:
+
+.. index::
+   pair: Parameters; wsrep_forced_binlog_format
+
+Force every transaction to use the given binlog format. When
+this variable is set to something else than *NONE*, all
+transactions will use the given forced format, regardless of
+the client session specified in ``binlog_format``.
+
+Valid choices for ``wsrep_forced_binlog_format`` are: *ROW*,
+*STATEMENT*, *MIXED* and the special value *NONE*,
+meaning that there is no forced binlog format in effect.
+
+This variable was introduced to support ``STATEMENT`` format
+replication during  rolling schema upgrade processing.
+However, in most cases, ``ROW`` replication
+is valid for asymmetric schema replication.
+
+
+
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_node_address
+-------------------------------
+.. _`wsrep_node_address`:
+
+
+.. index::
+   pair: Parameters; wsrep_node_address
+
+An option to explicitly specify the network address of the
+node, if autoguessing for some reason does not produce
+desirable results (multiple network interfaces, NAT, etc.)
+
+By default, the address of the first network interface (*eth0*)
+and the default port 4567 are used. The *<address>* and
+*:port* will be passed to the wsrep provider (Galera) to be
+used as a base address in its communications. It will also be
+used to derive the default values for parameters
+``wsrep_sst_receive_address`` and ``ist.recv_address``.
+
+
 
 
 .. rst-class:: html-toggle
@@ -328,7 +350,41 @@ alternative methods:
   to become fully operational again. The DDL statement or its
   effects are not replicated; the user is responsible for
   manually performing this operation on each of the nodes.
+
   
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_sst_donor
+-------------------------------
+.. _`wsrep_sst_donor`:
+
+.. index::
+   pair: Parameters; wsrep_sst_donor
+
+A name (given in the ``wsrep_node_name`` option) of the server
+that should be used as a source for state transfer. If not
+specified, Galera will choose the most appropriate one.
+
+In this case, the group communication module monitors the node
+state for the purpose of flow control, state transfer and quorum
+calculations. The node can be a if it is in the ``SYNCED` state.
+The first node in the ``SYNCED` state in the index becomes the
+donor and is not available for requests. 
+
+If there are no free ``SYNCED`` nodes at the moment, the
+joining node reports:
+
+``Requesting state transfer failed: -11(Resource temporarily unavailable). Will keep retrying every 1 second(s)``
+
+and keeps on retrying the state transfer request until it
+succeeds. When the state transfer request succeeds, the
+entry below is written to log:
+
+``Node 0 (XXX) requested state transfer from '*any*'. Selected 1 (XXX) as donor.``
+
+.. rst-class:: html-toggle
+
 ---------------------------------
  wsrep_sst_donor_rejects_queries
 ---------------------------------
@@ -363,5 +419,47 @@ reconnect to another node.
           regular client session. 
 
 
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_sst_method
+-------------------------------
+.. _`wsrep_OSU_method`:
+
+.. index::
+   pair: Parameters; wsrep_sst_method
+
+The method to use for state snapshot transfers. The
+``wsrep_sst_<wsrep_sst_method>`` command will be called with
+the following arguments. For more information, see also
+:ref:`Scriptable State Snapshot Transfer
+<Scriptable State Snapshot Transfer>`.
+
+The supported methods are:
+
+- *mysqldump* |---| This is a slow (except for small datasets),
+  but the most tested option.
+- *rsync* |---| This option is much faster than *mysqldump* on
+  large datasets.
+- *rsync_wan* |---| This option is almost the same as *rsync*,
+  but uses the *delta-xfer* algorithm to minimize
+  network traffic.
+
+  .. note::  You can only use *rsync* when a node is starting.
+             In other words, you cannot use *rsync* under a running InnoDB
+             storage engine.
+- *xtrabackup* |---| This option is a fast and practically
+  non-blocking SST method based on Percona's xtrabackup tool.
+
+  If you want to use *xtrabackup*, the following settings must
+  be present in the *my.cnf* configuration file on all nodes::
+
+      [mysqld]
+      wsrep_sst_auth=root:<root password>
+      datadir=<path to data dir>
+      [client]
+      socket=<path to socket>
+  
+  
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

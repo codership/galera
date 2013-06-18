@@ -21,6 +21,21 @@ failure.
 Single Node Failure Detection
 =============================
 
+.. index::
+   pair: Parameters; evs.keepalive_period
+
+.. index::
+   pair: Parameters; evs.inactive_check_period
+
+.. index::
+   pair: Parameters; evs.suspect_timeout
+
+.. index::
+   pair: Parameters; evs.inactive_timeout
+
+.. index::
+   pair: Parameters; evs.consensus_timeout
+
 The only sign of a node failure is a loss of connection to the
 node process as seen by another node. The node is considered failed
 when it is no longer a member of the cluster :term:`Primary Component`, that
@@ -105,6 +120,9 @@ the backup switch if the main switch fails. However, the most likely
 split-brain situation is when a single node fails in a two-node cluster.
 Thus it is strongly advised that the minimum Galera cluster
 configuration is three nodes.
+
+In a split-brain situation, proceed as described in chapter
+:ref:`Node Resetting the Quorum <Resetting the Quorum>`.
 
 ------------------------
  State Transfer Failure

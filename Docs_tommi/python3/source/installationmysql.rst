@@ -1,7 +1,7 @@
 ======================================================
  Installing Galera Cluster for MySQL
 ======================================================
-.. _`Downloading and Installing Galera Cluster for MySQL`:
+.. _`Installing Galera Cluster for MySQL`:
 .. index::
    pair: Installation; Galera Cluster for MySQL
 

@@ -97,6 +97,7 @@ configuration variables:
   replication is paused. It is essential for multi-master
   configurations that this limit is low, as the certification
   conflict rate is proportional to the slave queue length.
+  
   In master-slave setups, this value can be considerably higher
   to reduce flow control intervention. The default value is 16.
 - ``gcs.fc_factor`` |---| When the slave queue goes below

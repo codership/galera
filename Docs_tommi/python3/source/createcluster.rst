@@ -50,6 +50,9 @@ MySQL user database on all nodes to allow this, as follows:
  Starting the First Cluster Node
 ------------------------------------
 
+.. index::
+   pair: Parameters; wsrep-cluster-address
+
 To create and bootstrap the first cluster node, you must set up
 the group communication structure for the cluster nodes. Proceed
 as follows:
@@ -91,8 +94,15 @@ as follows:
  Adding Nodes to a Cluster
 -----------------------------
 .. _`Adding Nodes to a Cluster`:
+
 .. index::
    pair: Weighted Quorum; Setting weight on a node
+
+.. index::
+   pair: Parameters; wsrep_provider
+
+.. index::
+   pair: Parameters; wsrep-cluster-address
 
 To add a new node to an existing cluster, proceed as follows:
 
@@ -140,6 +150,15 @@ it. After this, the new node is ready for use.
  Testing that the Cluster Works
 --------------------------------
 .. _`Testing that the Cluster Works`:
+
+.. index::
+   pair: Parameters; wsrep_local_state_comment
+
+.. index::
+   pair: Parameters; wsrep_cluster_size
+
+.. index::
+   pair: Parameters; wsrep_ready
 
 You can test that the cluster actually works as follows:
 

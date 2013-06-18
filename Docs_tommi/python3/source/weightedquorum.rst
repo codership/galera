@@ -28,7 +28,10 @@ See also chapter :ref:`Galera Arbitrator <Galera Arbitrator>`.
 .. _`Weighted Quorum`:
 .. index::
    pair: Weighted Quorum; Descriptions
-
+.. index::
+   pair: Parameters; wsrep_provider_options
+.. index::
+   single: Split-brain; description
 
 The current number of nodes in the cluster defines the current
 cluster size. There is no configuration setting that would define
@@ -49,11 +52,15 @@ from before the disconnect remains, that partition remains up.
 In the case of a network partition, there will be nodes active
 on both sides of the network disconnect. In this case, only
 the quorum will continue, the partition(s) without quorum will
-enter the non-Primary state.
+enter the non-Primary state and attempt to connect to the
+Primary Component.
+
+.. figure:: images/pc.png
 
 As quorum requires a majority, you cannot have automatic failover
-in a two-node cluster. The failure of one node will cause the
-remaining node to go non-Primary. Furthermore, a cluster with an
+in a two node cluster, or in anly cluster that has an even number
+of nodes. The failure of one or an even number of nodes will cause the
+remaining node(s) to go non-Primary. Furthermore, a cluster with an
 even number of nodes has a risk of a split brain condition; if
 network connectivity is lost between the two partitions, neither
 partition would retain quorum, and both would go to non-Primary,
@@ -72,7 +79,10 @@ on other infrastructure levels. For example:
 -------------------
 Quorum Calculation
 -------------------
-   
+
+.. index::
+   pair: Parameters; pc.weight
+
 Galera supports a weighted quorum, where each node can be
 assigned a weight in the 0 to 255 range, with which it will
 participate in quorum calculations. 

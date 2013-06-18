@@ -64,6 +64,9 @@ matching rules. Delete them::
 Firewall Settings
 ====================
 
+.. index::
+   pair: Configuration; Firewall
+
 The *MySQL-wsrep* server must be accessible from other cluster members through
 its client listening socket and through the wsrep provider socket. See your
 distribution and wsrep provider documentation for details. For example, on
@@ -79,6 +82,9 @@ direct connections between the nodes (for example, through port forwarding).
 SELinux
 ====================
 
+.. index::
+   pair: Configuration; SELinux
+
 If you have SELinux enabled, it may block *mysqld* from carrying out the
 required operations. Disable SELinux or configure it to allow *mysqld*
 to run external programs and open listen sockets at unprivileged ports
@@ -93,6 +99,9 @@ To disable SELinux, proceed as follows:
 
 AppArmor
 ====================
+
+.. index::
+   pair: Configuration; AppArmor
 
 AppArmor is always included in Ubuntu. It may prevent *mysqld* from
 opening additional ports or run scripts. See AppArmor documentation
@@ -189,9 +198,9 @@ For better performance, you can give values to the settings below:
   data.
 - ``innodb_log_file_size=100M`` |---| The size in bytes of each log file
   in a log group. 
-- ``innodb_file_per_table`` |---| When innodb_file_per_table is enabled,
+- ``innodb_file_per_table`` |---| When ``innodb_file_per_table`` is enabled,
   InnoDB stores the data and indexes for each newly created table in
-  a separate .ibd file, rather than in the system tablespace. 
+  a separate *.ibd* file, rather than in the system tablespace. 
 - ``innodb_flush_log_at_trx_commit`` |---| This parameter
   improves performance. The parameter defines how often the
   log buffer is written out to the log file and how often

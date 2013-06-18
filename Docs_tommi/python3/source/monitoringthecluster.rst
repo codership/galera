@@ -35,6 +35,18 @@ For more information on the ``wsrep_notify_cmd`` command, see chapter
 ---------------------------------
 .. _`Checking the Cluster Integrity`:
 
+.. index::
+   pair: Parameters; wsrep_cluster_state_uuid
+
+.. index::
+   pair: Parameters; wsrep_cluster_conf_id
+
+.. index::
+   pair: Parameters; wsrep_cluster_size
+   
+.. index::
+   pair: Parameters; wsrep_cluster_status
+
 When checking the cluster integrity, the first thing you want to know
 is whether the node belongs to the right cluster. You can check this
 by checking the value of the variable below::
@@ -99,6 +111,15 @@ and resynchronize themselves with the primary component.
 .. index::
    pair: Parameters; wsrep_cluster_address
 
+.. index::
+   pair: Parameters; wsrep_ready
+
+.. index::
+   pair: Parameters; wsrep_connected
+
+.. index::
+   pair: Parameters; wsrep_local_state_comment
+
 When checking the node status, the first thing you want to know
 is whether the node is ready to accept SQL load. You can check this
 by checking the value of the variable below::
@@ -135,6 +156,12 @@ In a non-primary component, the node state comment should be
 ---------------------------------
 .. _`Checking the Replication Health`:
 
+.. index::
+   pair: Parameters; wsrep_flow_control_paused
+
+.. index::
+   pair: Parameters; wsrep_cert_deps_distance
+
 When checking the replication health, the first thing you want to know
 is how much slave lag is slowing down the cluster. You can check this
 by checking the value of the variable below::
@@ -163,6 +190,9 @@ of ``wsrep_slave_threads``.
  Detecting Slow Network Issues
 ---------------------------------
 .. _`Detecting Slow Network Issues`:
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_avg
 
 If you have a slow network, check the value of the variable below::
 

@@ -3,6 +3,16 @@
 =========================
 .. _`Backing up Cluster Data`:
 
+
+.. index::
+   pair: Parameters; gmcast.listen_addr
+   
+.. index::
+   pair: Parameters; wsrep_cluster_name
+
+.. index::
+   pair: Parameters; wsrep_node_name
+
 *Galera Cluster for MySQL* backups can be performed just as
 regular MySQL backups, using a backup script. Since all the
 cluster nodes are identical, backing up one node backs up
