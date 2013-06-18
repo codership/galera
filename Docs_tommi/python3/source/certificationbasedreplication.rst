@@ -8,7 +8,7 @@ transaction ordering techniques to achieve synchronous replication.
 Transactions execute optimistically in a single node (or replica)
 and, at commit time, run a coordinated certification process to
 enforce global consistency. Global coordination is achieved with
-the help of a broadcast service, that establishes a global total
+the help of a broadcast service that establishes a global total
 order among concurrent transactions.  
 
 Pre-requisites for certification based replication:
@@ -48,8 +48,8 @@ the rest of the nodes.
 The certification test implemented in Galera depends on the
 global ordering of transactions. Each transaction is assigned
 a global ordinal sequence number during replication. Thus, when
-a transaction reaches the commit point, it is known what was the
-sequence number of the last transaction it did not conflict with.
+a transaction reaches the commit point, the sequence number of
+the last transaction it did not conflict with, is known.
 The interval between those two numbers is an uncertainty land:
 transactions in this interval have not seen the effects of
 each other. Therefore, all transactions in this interval are

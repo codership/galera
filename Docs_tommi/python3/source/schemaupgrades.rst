@@ -11,6 +11,9 @@ statements change the database structure and are non-transactional.
 two different methods in Galera. These methods are described in the
 chapters below.
 
+.. note:: See also the ``pt-online-schema-change`` command in Percona
+          Toolkit for MySQL: http://www.percona.com/software/percona-toolkit.
+
 ---------------------------------
  Total Order Isolation
 ---------------------------------
@@ -65,6 +68,9 @@ into consideration:
  Rolling Schema Upgrade
 ---------------------------------
 .. _`Rolling Schema Upgrade`:
+
+.. index::
+   pair: Parameters; wsrep_OSU_method
 
 As of *wsrep* patch 5.5.17-22.3, you can choose whether to use the
 traditional total order isolation method or the rolling schema upgrade

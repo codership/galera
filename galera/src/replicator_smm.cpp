@@ -369,7 +369,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     wsrep_status_t retval(WSREP_OK);
 
-    while (state_() != S_CLOSING)
+    while (WSREP_OK == retval && state_() != S_CLOSING)
     {
         ssize_t rc;
 
@@ -389,6 +389,14 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     if (receivers_.sub_and_fetch(1) == 0)
     {
+        if (state_() != S_CLOSING)
+        {
+            log_warn << "Broken shutdown sequence, provider state: "
+                     << state_() << ", retval: " << retval;
+            assert (0);
+            /* avoid abort in production */
+            state_.shift_to(S_CLOSING);
+        }
         state_.shift_to(S_CLOSED);
     }
 
@@ -410,7 +418,8 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     if (handle->opaque != 0)
     {
         trx = reinterpret_cast<TrxHandle*>(handle->opaque);
-        assert(trx->trx_id() == handle->trx_id);
+        assert(trx->trx_id() == handle->trx_id ||
+               wsrep_trx_id_t(-1) == handle->trx_id);
         trx->ref();
     }
     else
@@ -495,9 +504,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     if (trx->local_seqno() != -1)
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
-        cert_.set_trx_committed(trx);
+        report_last_committed(cert_.set_trx_committed(trx));
     }
-    report_last_committed();
 }
 
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
@@ -901,10 +909,9 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
 
-    cert_.set_trx_committed(trx);
+    report_last_committed(cert_.set_trx_committed(trx));
     trx->set_state(TrxHandle::S_COMMITTED);
 
-    report_last_committed();
     ++local_commits_;
 
     return WSREP_OK;
@@ -923,7 +930,9 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 
     trx->set_state(TrxHandle::S_ROLLED_BACK);
 
-    report_last_committed();
+    // Trx was either rolled back by user or via certification failure,
+    // last committed report not needed since cert index state didn't change.
+    // report_last_committed();
     ++local_rollbacks_;
 
     return WSREP_OK;
@@ -1018,7 +1027,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
         trx->set_state(TrxHandle::S_ABORTING);
-        report_last_committed();
+        // Called now from cert()
+        // report_last_committed();
         break;
     default:
         log_error << "unrecognized retval "
@@ -1045,8 +1055,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     apply_monitor_.leave(ao);
 
     st_.mark_safe();
-    cert_.set_trx_committed(trx);
-    report_last_committed();
+    report_last_committed(cert_.set_trx_committed(trx));
 
     return WSREP_OK;
 }
@@ -1416,7 +1425,15 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
 
 wsrep_seqno_t galera::ReplicatorSMM::pause()
 {
-    gu_trace(local_monitor_.lock());
+    try
+    {
+        gu_trace(local_monitor_.lock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EALREADY) return cert_.position();
+        throw;
+    }
 
     wsrep_seqno_t const ret(cert_.position());
 
@@ -1439,7 +1456,22 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 void galera::ReplicatorSMM::resume()
 {
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
-    local_monitor_.unlock();
+
+    try
+    {
+        gu_trace(local_monitor_.unlock());
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EBUSY)
+        {
+            /* monitor is still locked, restore saved state */
+            st_.set(state_uuid_, cert_.position());
+            return;
+        }
+        throw;
+    }
+
     log_info << "Provider resumed.";
 }
 
@@ -1545,7 +1577,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                cert_.set_trx_committed(trx);
+                report_last_committed(cert_.set_trx_committed(trx));
                 retval = WSREP_TRX_FAIL;
             }
             break;
@@ -1564,7 +1596,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             }
             trx->set_state(TrxHandle::S_MUST_ABORT);
             local_cert_failures_ += trx->is_local();
-            cert_.set_trx_committed(trx);
+            report_last_committed(cert_.set_trx_committed(trx));
             retval = WSREP_TRX_FAIL;
             break;
         }

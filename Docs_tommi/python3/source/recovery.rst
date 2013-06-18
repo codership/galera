@@ -1,7 +1,7 @@
 ==================================
- Automatic Recovery from Failures
+ Node Failure and Recovery
 ==================================
-.. _`Recovery from Failures`:
+.. _`Node Failure and Recovery`:
 
 --------------------
  Single Node Failure
@@ -21,9 +21,24 @@ failure.
 Single Node Failure Detection
 =============================
 
+.. index::
+   pair: Parameters; evs.keepalive_period
+
+.. index::
+   pair: Parameters; evs.inactive_check_period
+
+.. index::
+   pair: Parameters; evs.suspect_timeout
+
+.. index::
+   pair: Parameters; evs.inactive_timeout
+
+.. index::
+   pair: Parameters; evs.consensus_timeout
+
 The only sign of a node failure is a loss of connection to the
 node process as seen by another node. The node is considered failed
-when it is no longer a member of the cluster primary component, that
+when it is no longer a member of the cluster :term:`Primary Component`, that
 is, when the members of the primary component no longer see it.
 From the perspective of the failed node (unless it has crashed
 itself), it has lost connection to the primary component.
@@ -88,28 +103,6 @@ See chapter
 :ref:`Node Provisioning and Recovery <Node Provisioning and Recovery>`
 for more information on manual node recover.
 
--------------------
- Primary Component
--------------------
-.. _`Primary Component`:
-
-In addition to single node failures, the cluster may be split into
-several components due to network failure. A component is a set of
-nodes, which are connected to each other, but not to nodes in other
-components. 
-
-.. A component is not formed until all nodes agree on the component
-   membership. If consensus cannot be reached before a configurable
-   timeout, the network is considered too unstable for replication.
-   *What happens in this case? The entire cluster fails?*
-
-In such a situation, only one of the components can continue to
-modify the database state to avoid history divergence. This component
-is called the Primary Pomponent (PC). In normal operation, the Galera
-cluster is a PC. When cluster partitioning happens, Galera invokes a
-special quorum algorithm to select a PC that guarantees that there
-is no more than one primary component in the cluster.
-
 ---------------
  Split-brain
 ---------------
@@ -127,6 +120,9 @@ the backup switch if the main switch fails. However, the most likely
 split-brain situation is when a single node fails in a two-node cluster.
 Thus it is strongly advised that the minimum Galera cluster
 configuration is three nodes.
+
+In a split-brain situation, proceed as described in chapter
+:ref:`Node Resetting the Quorum <Resetting the Quorum>`.
 
 ------------------------
  State Transfer Failure

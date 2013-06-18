@@ -13,7 +13,7 @@ Due to its synchronous multi-master qualities, Galera
 cluster can be seen as a single server listening at many
 interfaces. To give you an idea of what Galera is capable
 of, we will consider a typical N-tier application and
-discuss different benefits and drawbacks of deploying
+discuss different benefits and considerations of deploying
 Galera cluster in that context.
 
 -------------------
@@ -52,7 +52,7 @@ direct connection from the application tier to the
 :abbr:`DBMS (Database Management System)`, the solution has
 low latencies.
 
-Whole stack clustering has the following drawbacks:
+Whole stack clustering has the following challenges:
 
 - :abbr:`DBMS (Database Management System)` failure fails
   the whole stack.
@@ -68,7 +68,7 @@ Whole stack clustering has the following drawbacks:
 - Inflexibility. There is no way to limit the number of master nodes,
   or perform intelligent load-balancing.
   
-Despite a long list of drawbacks, this setup can be usable
+Despite a long list of considerations, this setup can be usable
 for several applications. 
 
 
@@ -90,7 +90,7 @@ rest of the cluster. Furthermore, resources are consolidated
 better and the setup is flexible: nodes can be assigned different
 roles by using intelligent load balancing.
 
-DBMS-tier clustering has the following drawbacks:
+DBMS-tier clustering has the following challenges:
 
 - The structure is complex. A load balancer is involved and it
   must be backed up in case of failures. This typically means
@@ -126,7 +126,7 @@ unlikely to become a bottlenecks. Finally, the client-server
 communication latencies are lower.
 
 DBMS-tier clustering with distributed load balancing has
-the following drawbacks:
+the following challenges:
 
 - There are N load balancers to manage and reconfigure when
   the database cluster configuration changes.

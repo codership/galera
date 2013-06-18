@@ -1,10 +1,9 @@
-=============================
- Upgrading Galera Cluster
-=============================
-.. _`Upgrading Galera Cluster`:
+====================================
+ Upgrading Galera Cluster for MySQL
+====================================
+.. _`Upgrading Galera Cluster for MySQL`:
 
-This chapter describes three different ways to upgrade Galera cluster
-software. 
+This chapter describes three different ways to upgrade *Galera Cluster for MySQL*. 
 
 ---------------
 Rolling Upgrade
@@ -20,7 +19,7 @@ the following steps on each cluster node:
 
 1. Shutdown the node
 2. Upgrade the software
-3. Retart the node
+3. Restart the node
 4. Wait until the node gets synchronized with the cluster
 
 .. tip:: If the upgraded node has been or will be part of a
@@ -103,6 +102,9 @@ on a single node.
 Provider-only Upgrade
 ---------------------
 .. _`Provider-only Upgrade`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_address
 
 If only a Galera provider upgrade is required, the bulk upgrade can
 be further optimized to only take a few seconds. The following is an

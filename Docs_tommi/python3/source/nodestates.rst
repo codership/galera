@@ -1,20 +1,30 @@
 =============
- Node States
+ Flow Control
 =============
-.. _`Node States`:
+.. _`Flow Control`:
+
+Flow control allows a cluster node to instruct the other nodes
+in the cluster when it needs to pause replication and when it is
+ready to continue replication. This prevents any node in the
+cluster from lagging too far behind the others in applying
+replication.
+
+Read also this Percona article:
+http://www.mysqlperformanceblog.com/2013/05/02/galera-flow-control-in-percona-xtradb-cluster-for-mysql/
 
 This chapter describes the flow control of node states and the
 possible node state changes. 
 
 ---------------
- Flow Control
+ Node States
 ---------------
-.. _`Flow Control`:
+.. _`Node States`:
 
 To ensure temporal synchrony and consistency (as opposed
 to logical which is provided by virtual synchrony), Galera
 implements several forms of flow control, depending on the
-node state.
+node state. The node states are described in the chapters
+below.
 
 ``OPEN`` and ``PRIMARY``
 =========================
@@ -31,7 +41,7 @@ cache them. There is no reasonable way to keep the node
 synchronized with the cluster (except for stopping all
 replication). However, it is possible to limit the replication
 rate to make sure that the writeset cache does not exceed the
-configured size. The writeset cache cache size is controlled
+configured size. The writeset cache size is controlled
 by the following variables:
 
 - ``gcs.recv_q_hard_limit`` sets the maximum writeset cache
@@ -87,6 +97,7 @@ configuration variables:
   replication is paused. It is essential for multi-master
   configurations that this limit is low, as the certification
   conflict rate is proportional to the slave queue length.
+  
   In master-slave setups, this value can be considerably higher
   to reduce flow control intervention. The default value is 16.
 - ``gcs.fc_factor`` |---| When the slave queue goes below
@@ -126,7 +137,7 @@ state changes as depicted in the figure below:
 
 In the figure:
 
-1. The node establishes a connection to a *primary component*.
+1. The node establishes a connection to a :term:`Primary Component`.
 2. The state *transfer request* of the node succeeds. The node
    starts to cache the write sets.
 3. The node receives a state snapshot. Now it has all cluster

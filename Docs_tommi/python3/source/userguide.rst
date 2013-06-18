@@ -10,12 +10,20 @@
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   :numbered:
 
+   deploymentvariants
    nodeprovisioning
    quorumreset
    monitoringthecluster
    ssl
    firewallsettings
+   limitations
    upgrading
+   schemaupgrades
+   performance
+   backingupthecluster
+   arbitrator
+   faq
+   myisamtoinnodb
+   compiling
+   configurationtips

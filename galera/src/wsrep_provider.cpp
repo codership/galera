@@ -201,7 +201,8 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 #ifdef NDEBUG
     try
     {
-#endif // NDEBUG
+#endif /* NDEBUG */
+
         return repl->async_recv(recv_ctx);
 
 #ifdef NDEBUG

@@ -1,13 +1,13 @@
-===============
- Introduction
-===============
-.. _`Introduction`:
+======================
+ Database Replication
+======================
+.. _`Database Replication`:
 
 Database replication refers to the frequent copying of data
 from one node, that is, a database on one server, to a node on
 another server. A database replication system is, in other words,
 a distributed database in which all nodes share the same level
-of information. This system is also know as a database cluster.
+of information. This system is also known as a database cluster.
 
 The database client (such as a Web browser or a computer
 application) does not see the database replication system in any
@@ -15,9 +15,9 @@ way, but experiences close to native :abbr:`DBMS (DataBase Management System)`
 behavior.
 
 ---------------------
- Replication Methods
+ Masters and Slaves
 ---------------------
-.. _`Replication Methods`:
+.. _`Masters and Slaves`:
 
 Many database management systems replicate databases. The most
 common replication method is to create a master/slaves relationship
@@ -26,35 +26,30 @@ The master logs the updates to the data, and propagates the logs
 through a network to the slaves. The slaves, for their part, send a
 message indicating that they have received the update successfully.
 Once the master receives these messages from the slaves, it can send
-subsequent updates to the slaves. This approach is know as
-asynchronous replication, as there is a delay between the application
-of changes on the master node and the propagation of changes to
-the slave nodes.
+subsequent updates to the slaves.
 
-Asynchronous replication is depicted in the figure below:
+A master/slaves relationship is depicted in the figure below:
 
 .. figure:: images/asynchronousreplication.png
 
-   *Asynchronous Replication*
+   *Master/Slave Replication*
 
 Another common replication method is to create a multi-master replication
 system, where updates can be submitted to any database node, and
 then propagated through a network to other database nodes. In other
 words, all database nodes act as masters, and no logs or update
-success indications are sent. This approach is know as synchronous
-replication, as there is no delay between the application of changes
-on the nodes.
+success indications are sent. 
 
-Synchronous replication is depicted in the figure below:
+A multi-master replication system is depicted in the figure below:
 
 .. figure:: images/synchronousreplication.png
 
-   *Synchronous Replication*
+   *Multi-master Replication*
 
-----------------------------
- Eager and Lazy Replication
-----------------------------
-.. _`Eager and Lazy Replication`:
+----------------------------------------------
+ Asynchronous and Synchronous Replication
+----------------------------------------------
+.. _`Asynchronous and Synchronous Replication`:
 
 From a more technical perspective, asynchronous and synchronous
 replication protocols differ in the way they propagate database
@@ -76,12 +71,15 @@ transactions to other nodes in the database cluster:
 Theoretically, synchronous replication has several advantages
 over asynchronous replication:
 
-- Synchronous replication is always highly available, as:
+- Synchronous replication provides highly available clusters
+  and guarantees 24/7 service availability, as:
 
   - There is no data loss when one of the nodes crashes
   - Data replicas are always consistent
+  - There are no complex, time-consuming failovers
   
 - Transactions can be executed on all nodes in parallel
+  to increase performance.
 
 - Synchronous replication can guarantee causality across
   the whole cluster. For example, a ``SELECT S`` issued after
@@ -91,7 +89,7 @@ over asynchronous replication:
 Traditionally, eager replication protocols coordinated nodes
 one operation at a time, using *2-phase commit* or distributed
 locking. In a system with *x* nodes and *y* operations, a
-throughtput of *z* transactions per second requires
+throughput of *z* transactions per second requires
 *x* |times| *y* |times| *z* messages per second. When
 the number of nodes increases, transaction response times,
 conflict probability and deadlock rates grow exponentially.
@@ -102,9 +100,9 @@ MySQL or PostgreSQL only offer asynchronous replication
 solutions.
 
 -----------------------------------------------
- Solving the Issues in Syncronous Replication
+ Solving the Issues in Synchronous Replication
 -----------------------------------------------
-.. _`Solving the Issues in Syncronous Replication`:
+.. _`Solving the Issues in Synchronous Replication`:
 
 To solve the problems in the traditional synchronous replication
 systems and approaches, researchers all around the world have,
@@ -116,7 +114,7 @@ important improvements these studies have brought about are:
 - **Group communication** |---| Group communication is a high
   level abstraction that defines patterns for the communication
   of database nodes to guarantee the consistency of replicated data.
-- **Write sets** |---| Write sets budle database writes into a single
+- **Write sets** |---| Write sets bundle database writes into a single
   *writeset* message, thus avoiding the coordination of nodes
   one operation at a time.
 - **Database State Machine** |---| In the Database State

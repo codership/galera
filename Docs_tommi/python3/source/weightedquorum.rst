@@ -1,9 +1,37 @@
-==================
+===================
+ Primary Component
+===================
+.. _`Primary Component`:
+
+In addition to single node failures, the cluster may be split into
+several components due to network failure. A component is a set of
+nodes, which are connected to each other, but not to nodes in other
+components. 
+
+.. A component is not formed until all nodes agree on the component
+   membership. If consensus cannot be reached before a configurable
+   timeout, the network is considered too unstable for replication.
+   *What happens in this case? The entire cluster fails?*
+
+In such a situation, only one of the components can continue to
+modify the database state to avoid history divergence. This component
+is called the Primary Component (PC). In normal operation, the Galera
+cluster is a PC. When cluster partitioning happens, Galera invokes a
+special quorum algorithm to select a PC that guarantees that there
+is no more than one primary component in the cluster.
+
+See also chapter :ref:`Galera Arbitrator <Galera Arbitrator>`.
+
+-------------------
  Weighted Quorum
-==================
+-------------------
 .. _`Weighted Quorum`:
 .. index::
    pair: Weighted Quorum; Descriptions
+.. index::
+   pair: Parameters; wsrep_provider_options
+.. index::
+   single: Split-brain; description
 
 The current number of nodes in the cluster defines the current
 cluster size. There is no configuration setting that would define
@@ -16,7 +44,7 @@ The cluster size determines the required votes to achieve quorum.
 A quorum vote is carried out when a node does not respond
 and is suspected to no longer be part of the cluster. This no
 response timeout is defined by the ``evs.suspect_timeout`` setting
-in the wsrep_provider_options (default 5 sec).
+in the ``wsrep_provider_options`` (default 5 sec).
 
 If a node is determined to be disconnected, the remaining nodes
 cast a quorum vote. If a majority from the total nodes connected
@@ -24,14 +52,21 @@ from before the disconnect remains, that partition remains up.
 In the case of a network partition, there will be nodes active
 on both sides of the network disconnect. In this case, only
 the quorum will continue, the partition(s) without quorum will
-enter the non-Primary state.
+enter the non-Primary state and attempt to connect to the
+Primary Component.
+
+.. figure:: images/pc.png
 
 As quorum requires a majority, you cannot have automatic failover
-in a two-node cluster. The failure of one node will cause the
-remaining node to go non-Primary. Furthermore, a cluster with an
+in a two node cluster, or in anly cluster that has an even number
+of nodes. The failure of one or an even number of nodes will cause the
+remaining node(s) to go non-Primary. Furthermore, a cluster with an
 even number of nodes has a risk of a split brain condition; if
 network connectivity is lost between the two partitions, neither
-partition would retain quorum, and both would go to Non-Primary.
+partition would retain quorum, and both would go to non-Primary,
+as depicted in the figure below.
+
+.. figure:: images/splitbrain.png
 
 For automatic failover, use at least three nodes. The same applies
 on other infrastructure levels. For example:
@@ -42,45 +77,12 @@ on other infrastructure levels. For example:
 - A cluster spanning data centers should spread across at least 3 data centers
 
 -------------------
-Galera Arbitrator
--------------------
-If the expense of adding, for example, a third datacenter is too high,
-you can use the Galera arbitrator. An arbitrator is a member of the
-cluster which participates in voting, but not it actual replication.
-
-The Galera arbitrator servers two purposes:
-
-- It helps to avoid split-brain situations by acting as an odd
-  node in a cluster that is spread only across two nodes.
-- It can request a consistent application state snapshot.
-
-Galera arbitrator it is a separate daemon called *garbd*. As a Galera
-cluster member, the arbitrator accepts all Galera parameters except those
-prefixed as ``replicator.``.
-
-The Galera arbitrator is depicted in the figure below:
-
-.. figure:: images/arbitrator.png
-
-   *Galera Arbitrator*
-
-In the figure above, if one of the data centers fails or loses
-WAN connection, the node that sees the arbitrator (and therefore
-sees clients) will continue operation.
-
-.. note:: *garbd* must see all replication traffic although it does not
-          store it anywhere. Placing the arbitrator in a location with
-          poor connectivity to the rest of the cluster may lead to poor
-          cluster performance.
-
-Arbitrator failure does not affect cluster operation and a new
-instance can be reattached to the cluster at any time. There can be
-several arbitrators in the cluster.
-
--------------------
 Quorum Calculation
 -------------------
-   
+
+.. index::
+   pair: Parameters; pc.weight
+
 Galera supports a weighted quorum, where each node can be
 assigned a weight in the 0 to 255 range, with which it will
 participate in quorum calculations. 
@@ -98,7 +100,7 @@ Where:
 
 In other words, the quorum is preserved if (and only if) the sum
 weight of the nodes in a new component strictly exceeds half of
-that of the preceding primary component, minus the nodes which left
+that of the preceding :term:`Primary Component`, minus the nodes which left
 gracefully.
 
 Node weight can be customized by using the ``pc.weight`` Galera

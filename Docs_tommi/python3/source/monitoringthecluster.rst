@@ -3,6 +3,9 @@
 ==========================
 .. _`Monitoring the Cluster`:
 
+.. index::
+   pair: Parameters; wsrep_notify_cmd
+
 You can monitor *wsrep*-related status variables in the Galera
 cluster by using the standard *wsrep* queries. As all *wsrep*-related
 status variables are prefixed with *wsrep*, you can query them all by
@@ -14,7 +17,7 @@ You can also define the notification command ``wsrep_notify_cmd``
 to be invoked when the cluster membership or node status changes.
 This command can also communicate the event to a monitoring agent.
 For more information on the ``wsrep_notify_cmd`` command, see chapter 
-:ref:`Status Variables <Status Variables>`.
+:ref:`wsrep_notify_cmd <wsrep_notify_cmd>`.
 
 .. note:: Status variables and variables in the chapters below are
           differential and reset on every ``SHOW STATUS`` command.
@@ -23,10 +26,26 @@ For more information on the ``wsrep_notify_cmd`` command, see chapter
           ~1 minute. The output of the last invocation will correspond
           to the current moment.
 
+.. note:: You can also use *Nagios* for monitoring *Galera Cluster for MySQL*.
+
+          For more information, see http://www.fromdual.com/galera-cluster-nagios-plugin-en.
+
 ---------------------------------
  Checking the Cluster Integrity
 ---------------------------------
 .. _`Checking the Cluster Integrity`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_state_uuid
+
+.. index::
+   pair: Parameters; wsrep_cluster_conf_id
+
+.. index::
+   pair: Parameters; wsrep_cluster_size
+   
+.. index::
+   pair: Parameters; wsrep_cluster_status
 
 When checking the cluster integrity, the first thing you want to know
 is whether the node belongs to the right cluster. You can check this
@@ -68,7 +87,7 @@ in the cluster and this component is currently unoperational (due to
 multiple membership changes and the loss of quorum). A split-brain
 condition is also possible. 
 
-If no other node in the cluster is connected to the primary component
+If no other node in the cluster is connected to the :term:`Primary Component`
 (that is, all nodes belong to the same component, which is a
 non-primary component) the cluster must be manually rebootstrapped.
 If this is the case,
@@ -88,6 +107,18 @@ and resynchronize themselves with the primary component.
  Checking the Node Status
 ---------------------------------
 .. _`Checking the Node Status`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_address
+
+.. index::
+   pair: Parameters; wsrep_ready
+
+.. index::
+   pair: Parameters; wsrep_connected
+
+.. index::
+   pair: Parameters; wsrep_local_state_comment
 
 When checking the node status, the first thing you want to know
 is whether the node is ready to accept SQL load. You can check this
@@ -125,6 +156,12 @@ In a non-primary component, the node state comment should be
 ---------------------------------
 .. _`Checking the Replication Health`:
 
+.. index::
+   pair: Parameters; wsrep_flow_control_paused
+
+.. index::
+   pair: Parameters; wsrep_cert_deps_distance
+
 When checking the replication health, the first thing you want to know
 is how much slave lag is slowing down the cluster. You can check this
 by checking the value of the variable below::
@@ -149,26 +186,13 @@ value much higher than this. This value can also be quite high, even in
 the hundreds. Use common sense and discretion when you define the value
 of ``wsrep_slave_threads``.
 
----------------------------------------
- Determining the Slowest Cluster Node
----------------------------------------
-.. _`Determining the Slowest Cluster Node`:
-
-The slowest cluster node will have the highest values for the
-following variables::
-
-    wsrep_flow_control_sent
-
-and::
-
-    wsrep_local_recv_queue_avg
-
-The lower the values are the better.
-
 ---------------------------------
  Detecting Slow Network Issues
 ---------------------------------
 .. _`Detecting Slow Network Issues`:
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_avg
 
 If you have a slow network, check the value of the variable below::
 

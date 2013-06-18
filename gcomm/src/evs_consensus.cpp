@@ -134,10 +134,14 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
         {
             if (lm != 0)
             {
-                if (node.is_suspected() == false)
-                {
-                    seq_list.push_back(lm->seq());
-                }
+                // #760 - commented out: It does not matter whether
+                //        the node that has sent leave message is suspected
+                //        or not, leave message seqno is the highest that it
+                //        will declare as safe
+                // if (node.is_suspected() == false)
+                // {
+                seq_list.push_back(lm->seq());
+                // }
             }
             else if (node.operational() == false)
             {

@@ -6,9 +6,9 @@
 As of version 0.8 Galera accepts parameters as semicolon-separated
 key value pair lists, such as ``key1 = value1; key2 = value2``.
 In this way, you can configure an arbitrary number of Galera parameters
-in one call. A key consists of parameter group and parameter name:
+in one call. A key consists of parameter group and parameter name::
 
-``<group>.<name>``
+  <group>.<name>
 
 Where ``<group>`` roughly corresponds to some Galera module.
 
@@ -25,8 +25,6 @@ Table legend:
 .. |230| replace:: 2\ :sup:`30`\
 .. |240| replace:: 2\ :sup:`40`\
 
-A test on documenting options in a table:
-
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | Parameter                             | Default               | Description                                        |
 +=======================================+=======================+====================================================+
@@ -35,11 +33,12 @@ A test on documenting options in a table:
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``protonet.version``                  | *0*                   |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``socket.ssl_cert``                   |                       | A path (absolute or relative to the working dir)   |
-|                                       |                       | to an SSL certificate (in PEM format).             |
+| ``socket.ssl_cert``                   |                       | A path (absolute or relative to the working        |
+|                                       |                       | directory )to an SSL certificate (in PEM format).  |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-| ``socket.ssl_key``                    |                       | A path (absolute or relative to the working dir) to|
-|                                       |                       | a private key for a certificate (in PEM format).   |
+| ``socket.ssl_key``                    |                       | A path (absolute or relative to the working        |
+|                                       |                       | directory to a private key for a certificate       |
+|                                       |                       | (in PEM format).                                   |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``socket.ssl_compression``            | *yes*                 | Whether to enable compression on SSL connections.  |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -55,9 +54,12 @@ A test on documenting options in a table:
 | ``gmcast.mcast_addr``                 |                       | If set, UDP multicast will be used for replication,|
 |                                       |                       | for example::                                      |
 |                                       |                       |                                                    |
-|                                       |                       |   ``gmcast.mcast_addr=239.192.0.11``               |
+|                                       |                       |   gmcast.mcast_addr=239.192.0.11                   |
 |                                       |                       |                                                    |
 |                                       |                       | The value must be the same on all nodes.           |
+|                                       |                       |                                                    |
+|                                       |                       | If you are planning to build a large cluster, we   |
+|                                       |                       | recommend using UDP.                               |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``gmcast.mcast_ttl``                  | *1*                   | Time to live value for multicast packets.          |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -90,7 +92,7 @@ A test on documenting options in a table:
 |                                       |                       | - *0x2* |---| extra state change info              |
 |                                       |                       | - *0x4* |---| statistics                           |
 |                                       |                       | - *0x8* |---| profiling (only in builds with       |
-|                                       |                       |         profiling enabled)                         |
+|                                       |                       |   profiling enabled)                               |
 |                                       |                       |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.install_timeout`` **(R)**       | *PT15S*               | Timeout on waiting for install message             |
@@ -121,7 +123,7 @@ A test on documenting options in a table:
 | ``evs.use_aggregate``                 | *true*                | Aggregate small packets into one, when possible.   |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.user_send_window`` **(R)**      | *2*                   | Maximum data packets in replication at a time.     |
-|                                       |                       | For WAN setups, this calue can be set considerably |
+|                                       |                       | For WAN setups, this value can be set considerably |
 |                                       |                       | higher, to, for example, 512.                      |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.view_forget_timeout``           | *PT5M*                | Drop past views from the view history after this   |
@@ -130,7 +132,7 @@ A test on documenting options in a table:
 | ``evs.version``                       | *0*                   |                                                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``pc.bootstrap``                      |                       | If you set this value to *true* is a signal to     |
-|                                       |                       | turn a ``NON-PRIMARY`` compoment into ``PRIMARY``. |
+|                                       |                       | turn a ``NON-PRIMARY`` component into ``PRIMARY``. |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``pc.checksum``                       | *true*                | Checksum replicated messages.                      |
 +---------------------------------------+-----------------------+----------------------------------------------------+
@@ -154,58 +156,108 @@ A test on documenting options in a table:
 |                                       |                       | component overrides older ones in the case of      |
 |                                       |                       | conflicting primaries.                             |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-|                                       |                       |                                                    |
+| ``pc.wait_prim``                      | ``false``             | If set to ``true``, the node waits for the primary |
+|                                       |                       | component forever. Useful to bring up a            |
+|                                       |                       | non-primary component and make it primary with     |
+|                                       |                       | ``pc.bootstrap``                                   |
 +---------------------------------------+-----------------------+----------------------------------------------------+
-
-
-
-A test on documenting options in man page style:
-
-
--------------------
- Status Variables
--------------------
-.. _`Status Variables`:
-
-``wsrep_notify_cmd``
-
-This command is run whenever the cluster membership or state
-of this node changes. This option can be used to (re)configure
-load balancers, raise alarms, and so on. The command passes on
-one or more of the following options:
-
---status <status str>        The status of this node. The possible statuses are:
-
-                             - *Undefined* |---| The node has just started up 
-                               and is not connected to any primary component
-                             - *Joiner* |---| The node is connected to a primary
-                               component and now is receiving state snapshot.
-                             - *Donor* |---| The node is connected to primary
-                               component and now is sending state snapshot.
-                             - *Joined* |---| The node has a complete state and
-                               now is catching up with the cluster.  
-                             - *Synced* |---| The node has synchronized itself
-                               with the cluster.
-                             - *Error(<error code if available>)* |---| The node
-                               is in an error state.
-                                
---uuid <state UUID>          The cluster state UUID.
---primary <yes/no>           Whether the current cluster component is primary or not.
---members <list>             A comma-separated list of the component member UUIDs.
-                             The members are presented in the following syntax: 
-                            
-                             - ``<node UUID>`` |---| A unique node ID. The wsrep
-                               provider automatically assigns tjhis ID for each node.
-                             - ``<node name>`` |---| The node name as it is set in the
-                               ``wsrep_node_name`` option.
-                             - ``<incoming address>`` |---| The address for client
-                               connections as it is set in the ``wsrep_node_incoming_address``
-                               option.
-
-Click this link `link <http://bazaar.launchpad.net/~codership/codership-mysql/wsrep-5.5/view/head:/support-files/wsrep_notify.sh>`_ 
-to view an example script that updates two tables
-on the local node with changes taking place at the
-cluster.
+| ``pc.weight``` **(R)**                | *1*                   | As of version 2.4. Node weight for quorum          |
+|                                       |                       | calculation.                                       |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``pc.version``                        | *0*                   |                                                    |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.fc_debug``                      | *0*                   | Post debug statistics about SST flow every this    |
+|                                       |                       | number of writesets.                               |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.fc_factor`` **(R)**             | *0.5*                 | Resume replication after recv queue drops below    |
+|                                       |                       | this fraction of ``gcs.fc_limit``.                 |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.fc_limit`` **(R)**              | *16*                  | Pause replication if recv queue exceeds this       |
+|                                       |                       | number of  writesets. For master-slave setups this |
+|                                       |                       | number can be increased considerably.              |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.fc_master_slave``               | *NO*                  | Should we assume that there is only one master     |
+|                                       |                       | in the group?                                      |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.max_packet_size``               | *32616*               | All writesets exceeding that size will be          |
+|                                       |                       | fragmented.                                        |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.max_throttle``                  | *0.25*                | How much to throttle replication rate during state |
+|                                       |                       | transfer (to avoid running out of memory). Set the |
+|                                       |                       | value to 0.0 if stopping replication is acceptable |
+|                                       |                       | for completing state transfer.                     |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.recv_q_hard_limit``             | *LLONG_MAX*           | Maximum allowed size of recv queue. This should    |
+|                                       |                       | normally be half of (RAM + swap). If this limit is |
+|                                       |                       | exceeded, Galera will abort the server.            |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.recv_q_soft_limit``             | *0.25*                | The fraction of ``gcs.recv_q_hard_limit`` after    |
+|                                       |                       | which replication rate will be throttled.          |
+|                                       |                       |                                                    |
+|                                       |                       | The degree of throttling is a linear function of   |
+|                                       |                       | recv queue size and goes from 1.0 (*full rate*)    |
+|                                       |                       | at ``gcs.recv_q_soft_limit`` to                    |
+|                                       |                       | ``gcs.max_throttle`` at ``gcs.recv_q_hard_limit``  |
+|                                       |                       | Note that *full rate*, as estimated between 0 and  |
+|                                       |                       | ``gcs.recv_q_soft_limit`` is a very imprecise      |
+|                                       |                       | estimate of a regular replication rate.            |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcs.sync_donor``                    | *NO*                  | Should the rest of the cluster keep in sync with   |
+|                                       |                       | the donor? *Yes* means that if the donor is        |
+|                                       |                       | blocked by state transfer, the whole cluster       |
+|                                       |                       | is blocked with it.                                |
+|                                       |                       |                                                    |
+|                                       |                       | If you choose to use value *YES*, it is            |
+|                                       |                       | theoretically possible that the donor node cannot  |
+|                                       |                       | keep up with the rest of the cluster due to the    |
+|                                       |                       | extra load from the SST. If the node lags behind,  |
+|                                       |                       | it may send flow control messages stalling the     |
+|                                       |                       | whole cluster. However, you can monitor this using |
+|                                       |                       | the ``wsrep_flow_control_paused`` status variable. |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``ist.recv_addr``                     |                       | As of 2.0. Address to listen for Incremental State |
+|                                       |                       | Transfer. By default this is the                   |
+|                                       |                       | ``<address>:<port+1>`` from ``wsrep_node_address`` |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``replicator.commit_order``           | *3*                   | Whether to allow Out-Of-Order committing (improves |
+|                                       |                       | parallel applying performance). Possible settings: |
+|                                       |                       |                                                    |
+|                                       |                       | - 0 |---| BYPASS: all commit order monitoring is   |
+|                                       |                       |   switched off (useful for measuring performance   |
+|                                       |                       |   penalty)                                         |
+|                                       |                       | - 1 |---| OOOC: allow out of order committing for  |
+|                                       |                       |   all transactions                                 |
+|                                       |                       | - 2 |---| LOCAL_OOOC: allow out of order           |
+|                                       |                       |   committing only for local transactions           |
+|                                       |                       | - 3 |---| NO_OOOC: no out of order committing is   |
+|                                       |                       |   allowed (strict total order committing)          |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``replicator.causal_read_timeout``    | *PT30S*               | Sometimes causal reads need to timeout.            |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.dir``                        |                       | Directory where GCache should place its files.     |
+|                                       |                       | Defaults to the working directory.                 |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.name``                       | *"galera.cache"*      | Name of the ring buffer storage file.              |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.size``                       | *128Mb*               | Size of the persistent on-disk ring buffer         |
+|                                       |                       | storage. This will be preallocated on startup.     |
+|                                       |                       |                                                    |
+|                                       |                       | The buffer file name is ``galera.cache``.          |
+|                                       |                       |                                                    |
+|                                       |                       | See also chapter :ref:`Optimizing GCache Size      |
+|                                       |                       | <Optimizing GCache Size>`.                         |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.page_size``                  | *128Mb*               | Size of the page files in page storage. The limit  |
+|                                       |                       | on overall page storage is the size of the disk.   |
+|                                       |                       | Pages are prefixed by ``gcache.page``.             |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.keep_pages_size``            | *0*                   | Total size of the page storage pages to keep for   |
+|                                       |                       | caching purposes. If only page storage is enabled, |
+|                                       |                       | one page is always present.                        |
++---------------------------------------+-----------------------+----------------------------------------------------+
+| ``gcache.mem_size``                   | *0*                   | Max size of the ``malloc()`` store (read: RAM).    |
+|                                       |                       | For setups with spare RAM.                         |
++---------------------------------------+-----------------------+----------------------------------------------------+
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

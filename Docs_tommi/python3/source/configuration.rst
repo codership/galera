@@ -1,16 +1,120 @@
-===========================
- Configuring Galera Cluster
-===========================
-.. _`Configuring Galera Cluster`:
+======================================
+ Configuring Galera Cluster for MySQL
+======================================
+.. _`Configuring Galera Cluster for MySQL`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_address
+.. index::
+   pair: Parameters; wsrep_provider
 
 This chapter presents the mandatory and recommended settings
-for a Galera cluster. It may be possible to start the cluster after
+for *Galera Cluster for MySQL* installation and use. It may
+be possible to start the cluster after
 only setting the ``wsrep_provider`` and ``wsrep_cluster_address``
 variables. However, the best results can be achieved by
 fine-tuning the configuration to best match the use case.
 
 For more information on the settings, see chapter
 :ref:`Galera Parameters <Galera Parameters>`.
+
+---------------------------
+Installation Configuration
+---------------------------
+
+Unless you are upgrading an already installed *mysql-wsrep*
+package, you must configure the installation to prepare the
+server for operation.
+
+
+Configuration Files
+====================
+
+Edit the *my.cnf* configuration file as follows:
+
+- Make sure that the system-wide *my.cnf* file does not bind *mysqld*
+  to 127.0.0.1. To be more specific, if you have the following line
+  in the [mysqld] section, comment it out::
+
+      #bind-address = 127.0.0.1
+
+- Make sure that the system-wide *my.cnf* file contains the line below::
+  
+    !includedir /etc/mysql/conf.d/
+
+Edit the */etc/mysql/conf.d/wsrep.cnf* configuration file as follows:
+
+- When a new node joins the cluster, it will have to receive a state
+  snapshot from one of the peers. This requires a privileged MySQL
+  account with access from the rest of the cluster. Set the *mysql*
+  login/password pair for SST in the */etc/mysql/conf.d/wsrep.cnf*
+  configuration file as follows::
+
+      wsrep_sst_auth=wsrep_sst:wspass
+
+Database Privileges
+====================
+
+Restart the MySQL server and connect to it as root to grant privileges
+to the SST account. Furthermore, empty users confuse MySQL authentication
+matching rules. Delete them::
+
+    $ mysql -e "SET wsrep_on=OFF; DELETE FROM mysql.user WHERE user='';"
+    $ mysql -e "SET wsrep_on=OFF; GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'";
+
+
+Firewall Settings
+====================
+
+.. index::
+   pair: Configuration; Firewall
+
+The *MySQL-wsrep* server must be accessible from other cluster members through
+its client listening socket and through the wsrep provider socket. See your
+distribution and wsrep provider documentation for details. For example, on
+CentOS you could use these settings::
+
+    # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 3306 -j ACCEPT
+    # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 4567 -j ACCEPT
+
+If there is a NAT firewall between the nodes, configure it to allow
+direct connections between the nodes (for example, through port forwarding).
+
+
+SELinux
+====================
+
+.. index::
+   pair: Configuration; SELinux
+
+If you have SELinux enabled, it may block *mysqld* from carrying out the
+required operations. Disable SELinux or configure it to allow *mysqld*
+to run external programs and open listen sockets at unprivileged ports
+(that is, things that an unprivileged user can do). See SELinux
+documentation for more information.
+
+To disable SELinux, proceed as follows:
+
+1) run *setenforce 0* as root.
+2) set ``SELINUX=permissive`` in  */etc/selinux/config*
+
+
+AppArmor
+====================
+
+.. index::
+   pair: Configuration; AppArmor
+
+AppArmor is always included in Ubuntu. It may prevent *mysqld* from
+opening additional ports or run scripts. See AppArmor documentation
+for more information on its configuration.
+
+To disable AppArmor, proceed as follows::
+
+    $ cd /etc/apparmor.d/disable/
+    $ sudo ln -s /etc/apparmor.d/usr.sbin.mysqld
+    $ sudo service apparmor restart
+
 
 -------------------------------
  Example Configuration File
@@ -63,13 +167,22 @@ This is usually all that is needed for clustering.
 You must give values to the settings below:
 
 - ``query_cache_size=0`` |---| This value disables the query cache.
-- ``binlog_format=ROW`` |---| This variable sets the binary logging format.
+  The query cache is disabled as, in the typical high concurrency
+  environments, InnoDB scalability outstrips the query cache.
+  It is not recommended to enable the query cache.
+- ``binlog_format=ROW`` |---| This variable sets the binary logging
+  format to use row-level replication as opposed to statement-level
+  replication. Do not change this value, as it affects performance
+  and consistency. As a side effect to using this value, binlog, if
+  turned on, can be ROW only.
 - ``default_storage_engine=InnoDB`` |---| InnoDB is a high-reliability
   and high-performance storage engine for MySQL. Starting with MySQL
   5.5, it is the default MySQL storage engine.
 - ``innodb_autoinc_lock_mode=2`` |---| This variable sets the lock mode
   to use for generating auto-increment values. Value 2 sets the interleaved
-  lock mode. See also chapter `Setting Parallel CPU Threads`_
+  lock mode. Without this parameter, ``INSERT``s into tables with an
+  ``AUTO_INCREMENT`` column may fail. Lock modes 0 and 1 can cause
+  unresolved deadlocks and make the system unresponsive.
 
    .. note:: If you use Galera provider version 2.0 or higher,
              set ``innodb_doublewrite`` to 1 (default).
@@ -87,9 +200,9 @@ For better performance, you can give values to the settings below:
   data.
 - ``innodb_log_file_size=100M`` |---| The size in bytes of each log file
   in a log group. 
-- ``innodb_file_per_table`` |---| When innodb_file_per_table is enabled,
+- ``innodb_file_per_table`` |---| When ``innodb_file_per_table`` is enabled,
   InnoDB stores the data and indexes for each newly created table in
-  a separate .ibd file, rather than in the system tablespace. 
+  a separate *.ibd* file, rather than in the system tablespace. 
 - ``innodb_flush_log_at_trx_commit`` |---| This parameter
   improves performance. The parameter defines how often the
   log buffer is written out to the log file and how often
@@ -119,7 +232,7 @@ The basic wsrep provider settings are:
 - ``wsrep_provider=/usr/lib64/galera/libgalera_smm.so`` |---| The
   path to the Galera plugin.
 - ``wsrep_cluster_address=gcomm://192.168.0.1,192.168.0.2,192.168.0.3`` |---| The
-  cluster connection URL. See chapter :ref:`Creating a Cluster <Creating a Cluster>`.
+  cluster connection URL. See chapter :ref:`Starting a Cluster <Starting a Cluster>`.
 - ``wsrep_provider_options="gcache.size=32G; gcache.page_size=1G"`` |---| A
   string of provider options passed directly to provider.
 - ``wsrep_cluster_name='my_galera_cluster'`` |---| The logical cluster
@@ -175,94 +288,6 @@ Galera parameters below:
   after which replication rate will be throttled.
 - ``gcs.max_throttle`` |---| How much we can throttle the replication
   rate during state transfer (to avoid running out of memory).
-
--------------------
- Configuration Tips
--------------------
-.. _`Configuration Tips`:
-
-This chapter contains some advanced configuration tips.
-
-Setting Parallel CPU Threads
-============================
-.. _`Setting Parallel CPU Threads`:
-
-There is no rule about how many slave :abbr:`CPU (Central Processing Unit)`
-threads one should configure for replication. At the same time,
-parallel threads do not guarantee better performance. However,
-parallel applying will not impair regular operation performance
-and will most likely speed up the synchronization of new nodes
-with the cluster.
-
-Start with four slave threads per core, the logic being that, in a
-balanced system, four slave threads can usually saturate the core.
-However, depending on IO performance, this figure can be increased
-several times (for example, you can use 32 slave threads on a
-single-core ThinkPad R51 with a 4200 RPM drive). 
-
-The top limit on the total number of slave threads can be
-obtained from the ``wsrep_cert_deps_distance`` status
-variable. This value essentially determines how many writesets
-on average can be applied in parallel. Do not use a value higher
-than that.
-
-To set four parallel CPU threads, use the parameter value below::
-
-    wsrep_slave_threads=4
-
-.. note:: Parallel applying requires the following settings:
-
-          - ``innodb_autoinc_lock_mode=2``
-          - ``innodb_locks_unsafe_for_binlog=1``
- 
-WAN Replication
-===============
-.. _`WAN Replication`:
-
-Transient network connectivity failures are not rare in
-:abbr:`WAN (Wide Area Network)` configurations. Thus, you
-may want to increase the keepalive timeouts to avoid
-partitioning. The following group of *my.cnf* settings
-tolerates 30 second connectivity outages::
-
-  wsrep_provider_options = "evs.keepalive_period = PT3S; evs.inactive_check_period = PT10S; evs.suspect_timeout = PT30S; evs.inactive_timeout = PT1M; evs.install_timeout = PT1M"
-
-Set the ``evs.suspect_timeout`` parameter value as high as possible
-to avoid partitions (as partitions will cause state transfers, which
-are very heavy). The ``evs.inactive_timeout`` parameter value must
-be no less than the ``evs.suspect_timeout`` parameter value and the
-``evs.install_timeout`` parameter value must be no less than the
-``evs.inactive_timeout`` parameter value.
-
-.. note:: WAN links can have have exceptionally high latencies. Take
-          Round-Trip Time (RTT) measurements (ping RTT is a fair estimate)
-          from between your cluster nodes and make sure
-          that all temporal Galera settings (periods and timeouts, such
-          as ``evs.join_retrans_period``) exceed the highest RTT in
-          your cluster.
-  
-Multi-Master Setup
-==================
-.. _`Multi-Master Setup`:
-
-The more masters (nodes which simultaneously process writes from
-clients) are in the cluster, the higher the probability of certification
-conflict. This may cause undesirable rollbacks and performance degradation.
-In such a case, reduce the number of masters.
-
-Single Master Setup
-===================
-.. _`Single Master Setup`:
-
-If only one node at a time is used as a master, certain requirements,
-such as the slave queue size, may be relaxed. Flow control can be
-relaxed by using the settings below::
-
-    wsrep_provider_options = "gcs.fc_limit = 256; gcs.fc_factor = 0.99; gcs.fc_master_slave = yes"
-
-These settings may improve replication performance by
-reducing the rate of flow control events. This setting
-can also be used as suboptimal in a multi-master setup.
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:
