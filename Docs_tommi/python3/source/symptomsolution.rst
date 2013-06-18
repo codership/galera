@@ -44,6 +44,6 @@ troubleshooting purposes.
 | may be unset, or there can be networking issues).      | standalone MySQL server. This may lead to data            |
 | In this case, the node is considered to be unsynced    | inconsistency with the rest of the cluster, which, on the |
 | with the global state and unable to serve SQL requests | other hand, may be a desirable result for, for example,   |
-| except ``SET`` and/or ``SHOW``.                        | modifying “local” tables.                                 |
+| except ``SET`` and/or ``SHOW``.                        | modifying "local" tables.                                 |
 +--------------------------------------------------------+-----------------------------------------------------------+
 

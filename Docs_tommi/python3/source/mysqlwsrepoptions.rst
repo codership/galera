@@ -38,8 +38,8 @@ by (L).
 |                                       |                          | cluster with a different name, the connection fails. The        |
 |                                       |                          | cluster name must be same on all the cluster nodes.             |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_convert_LOCK_to_trx`      | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT``.  |
-| <wsrep_convert_LOCK_to_trx>           |                          | In other words, this parameter implicitly converts locking      |
+| :ref:`wsrep_convert_LOCK_to_trx       | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT``.  |
+| <wsrep_convert_LOCK_to_trx>`          |                          | In other words, this parameter implicitly converts locking      |
 |                                       |                          | sessions into transactions within *mysqld*.                     |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_data_home_dir``               | *<mysql_real_            | A directory where the wsrep provider will store its files.      |
@@ -59,8 +59,8 @@ by (L).
 |                                       |                          | - http://bugs.mysql.com/bug.php?id=41984                        |
 |                                       |                          | - http://drupal.org/node/282555                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_forced_binlog_format`     | *NONE*                   | Force every transaction to use the given binlog format. When    |
-| <wsrep_forced_binlog_format>          |                          | this variable is set to something else than *NONE*, all         |
+| :ref:`wsrep_forced_binlog_format      | *NONE*                   | Force every transaction to use the given binlog format. When    |
+| <wsrep_forced_binlog_format>`         |                          | this variable is set to something else than *NONE*, all         |
 |                                       |                          | transactions will use the given forced format, regardless of    |
 |                                       |                          | the client session specified in ``binlog_format``.              |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
@@ -74,8 +74,8 @@ by (L).
 |                                       |                          |                                                                 |
 |                                       |                          | The maximum allowed writeset size is 2G.                        |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_node_address`             | *<address>[:port]*       | An option to explicitly specify the network address of the      |
-| <wsrep_node_address>                  |                          | node, if autoguessing for some reason does not produce          |
+| :ref:`wsrep_node_address              | *<address>[:port]*       | An option to explicitly specify the network address of the      |
+| <wsrep_node_address>`                 |                          | node, if autoguessing for some reason does not produce          |
 |                                       |                          | desirable results (multiple network interfaces, NAT, etc.)      |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_node_incoming_address``       | *<address>               | The address at which the server expects client connections.     |
@@ -125,15 +125,15 @@ by (L).
 |                                       |                          | authenticate with both the state snapshot receiver and the      |
 |                                       |                          | state snapshot donor.                                           |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_donor`                |                          | A name (given in the ``wsrep_node_name`` option) of the server  |
-| <wsrep_sst_donor>                     |                          | that should be used as a source for state transfer. If not      |
+| :ref:`wsrep_sst_donor                 |                          | A name (given in the ``wsrep_node_name`` option) of the server  |
+| <wsrep_sst_donor>`                    |                          | that should be used as a source for state transfer. If not      |
 |                                       |                          | specified, Galera will choose the most appropriate one.         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor     |
 | <wsrep_sst_donor_rejects_queries>`    |                          | if the donor is performing a blocking SST.                      |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_method`               | *mysqldump*              | The method to use for state snapshot transfers.                 |
-| <wsrep_sst_method>                    |                          |                                                                 |
+| :ref:`wsrep_sst_method                | *mysqldump*              | The method to use for state snapshot transfers.                 |
+| <wsrep_sst_method>`                   |                          |                                                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_sst_receive_address``         | *<wsrep_node             | The address at which this node expects to receive state         |
 |                                       | _address>*               | transfers. Depends on state transfer method. For example, for   |
@@ -424,7 +424,7 @@ reconnect to another node.
 -------------------------------
  wsrep_sst_method
 -------------------------------
-.. _`wsrep_OSU_method`:
+.. _`wsrep_sst_method`:
 
 .. index::
    pair: Parameters; wsrep_sst_method
