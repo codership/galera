@@ -99,6 +99,7 @@ by (L).
 | ``wsrep_provider_options``            |                          | A string of provider options passed directly to the provider.   |
 |                                       |                          |                                                                 |
 |                                       |                          | Usually, you just fine-tune:                                    |
+|                                       |                          |                                                                 |
 |                                       |                          | - ``gcache.size``, that is, the size of the GCache ring buffer, |
 |                                       |                          |   which is used for Incremental State Transfer, among other     |
 |                                       |                          |   things. See chapter :ref:`Galera Parameters                   |
@@ -379,8 +380,8 @@ specified, Galera will choose the most appropriate one.
 
 In this case, the group communication module monitors the node
 state for the purpose of flow control, state transfer and quorum
-calculations. The node can be a if it is in the ``SYNCED` state.
-The first node in the ``SYNCED` state in the index becomes the
+calculations. The node can be a if it is in the ``SYNCED`` state.
+The first node in the ``SYNCED`` state in the index becomes the
 donor and is not available for requests. 
 
 If there are no free ``SYNCED`` nodes at the moment, the
