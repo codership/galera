@@ -261,8 +261,13 @@ For better performance, you can also give values to the settings below:
 ---------------------------
 .. _`Optional Memory Settings`:
 
-During normal operation a MariaDB Galera node does not consume
-much more memory than a regular MariaDB server. Additional
+.. index::
+   pair: Performance; Memory
+.. index::
+   pair: Performance; Swap size
+
+In normal operation, a Galera node does not consume
+much more memory than a regular MySQL server. Additional
 memory is consumed for the certification index and uncommitted
 write sets, but usually this is not noticeable in a typical
 application. However, writeset caching during state transfer

@@ -113,7 +113,7 @@ in the cluster begin to operate autonomously from each other.
 Data can get irreparably corrupted as two different database nodes
 update the data independently.
 
-Like any quorum-based system, the Galera cluster is subject to the
+Like any quorum-based system, *Galera Cluster for MySQL* is subject to the
 split-brain condition when the quorum algorithm fails to select a
 primary component. This can happen, for example, in a cluster without
 the backup switch if the main switch fails. However, the most likely

@@ -111,12 +111,16 @@ sending a state snapshot.
 Writeset Cache (GCache)
 =======================
 .. _`Writeset Cache (GCache)`:
+.. index::
+   pair: GCache; Descriptions
+.. index::
+   pair: Writeset Cache; Descriptions
 
 Galera stores write sets in a special cache called Writeset
 Cache (GCache). In short, GCache is a memory allocator for
 write sets and its primary purpose is to minimize the write
 set footprint on the :abbr:`RAM (Random-access memory)`.
-Galera also improves the offload writeset storage to disk 
+Galera also improves the offload writeset storage to disk.
 
 GCache has three types of stores:
 

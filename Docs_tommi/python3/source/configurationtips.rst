@@ -120,7 +120,7 @@ These configuration tips are guidelines only. You may end up
 using a bigger GCache that suggested by these guidelies, for
 example, if you must avoid SST as much as possible. 
 
-The GCache size, that is the ``gcache.size`` parameter value,
+The GCache size, that is, the ``gcache.size`` parameter value,
 should be smaller than the database size. However, in this context,
 the database size depends on the SST method. For example,
 *mysqldump* does not copy InnoDB log files whereas *rsync*

@@ -1,6 +1,6 @@
-====================================
+===================
  Replication API
-====================================
+===================
 .. _`Replication API`:
 
 As we learned in the introduction, synchronous replication
@@ -41,6 +41,9 @@ in more detail in the chapters below:
 ---------------
 .. _`wsrep API`:
 
+.. index::
+   pair: Global Transaction ID; Descriptions
+
 The *wsrep API* is a generic replication plugin interface for databases.
 The API defines a set of application callbacks and replication
 plugin calls. 
@@ -68,8 +71,8 @@ as follows:
 At the receiving end, the application process takes place by high
 priority transaction(s).
 
-To keep the state identical on all nodes, the wsrep API uses a global
-transaction ID (GTID), which is used to both:
+To keep the state identical on all nodes, the wsrep API uses a Global
+Transaction ID (GTID), which is used to both:
 
 - Identify the state change
 - Identify the state itself by the ID of the last state change
@@ -98,18 +101,18 @@ In a human-readable format, the GTID might look like this::
 ---------------
 .. _`Galera Plugin`:
 
- The Galera plugin consists of:
+The Galera plugin consists of:
 
-  - *Galera wsrep provider* implements the wsrep API for the Galera
-    plugin.
-  - *Certification layer* |---| The certification layer prepares
-    the write sets and performs the certification.
-  - *Replication layer* |---| The replication layer manages the
-    replication protocol and provides the total ordering
-    capability.
-  - *Group communication framework* |---| The group communication
-    framework provides a plugin architecture for various group
-    communication systems.
+- *Galera wsrep provider* implements the wsrep API for the Galera
+  plugin.
+- *Certification layer* |---| The certification layer prepares
+  the write sets and performs the certification.
+- *Replication layer* |---| The replication layer manages the
+  replication protocol and provides the total ordering
+  capability.
+- *Group communication framework* |---| The group communication
+  framework provides a plugin architecture for various group
+  communication systems.
 
 
 ------------------------------
@@ -119,7 +122,7 @@ In a human-readable format, the GTID might look like this::
 The group communication framework provides a plugin
 architecture for various group communication systems.
 
-The Galera cluster is built on top of a proprietary
+*Galera Cluster for MySQL* is built on top of a proprietary
 group communication system layer which implements
 virtual synchrony :abbr:`QoS (Quality of Service)`. Virtual
 synchrony unifies the data delivery and cluster membership
@@ -134,10 +137,10 @@ nodes synchronized to a fraction of second.
 
 The group communication framework also provides total
 ordering of messages from multiple sources, which is
-used to build global Transaction IDs in a multi-master
+used to build Global Transaction IDs in a multi-master
 cluster. 
 
-At the transport level, Galera cluster is a symmetric
+At the transport level, *Galera Cluster for MySQL* is a symmetric
 undirected graph, where all database nodes are connected
 with each other over a :abbr:`TCP (Transmission Control Protocol)`
 connection. By default, TCP
@@ -148,6 +151,3 @@ multicast can be used for replication in a :abbr:`LAN (Local Area Network)`.
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:
-
-
-

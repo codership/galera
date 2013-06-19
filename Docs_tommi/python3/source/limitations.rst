@@ -130,7 +130,7 @@ Galera uses transaction isolation on two levels:
   transaction isolation level is vulnerable for multi-master
   conflicts. It holds read locks and any replicated write to a
   read locked row will cause the transaction to abort. Hence,
-  it is recommended not to use it in a Galera cluster.
+  it is recommended not to use it in *Galera Cluster for MySQL*.
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

@@ -97,6 +97,17 @@ by (L).
 |                                       |                          | behaves like a regular *mysqld* server.                         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_provider_options``            |                          | A string of provider options passed directly to the provider.   |
+|                                       |                          |                                                                 |
+|                                       |                          | Usually, you just fine-tune:                                    |
+|                                       |                          | - ``gcache.size``, that is, the size of the GCache ring buffer, |
+|                                       |                          |   which is used for Incremental State Transfer, among other     |
+|                                       |                          |   things. See chapter :ref:`Galera Parameters                   |
+|                                       |                          |   <Galera Parameters>`.                                         |
+|                                       |                          | - Group communication timeouts. See chapter                     |
+|                                       |                          |   :ref:`WAN Replication <WAN Replication>`.                     |
+|                                       |                          |                                                                 |
+|                                       |                          | See also a list of all Galera parameters in chapter             |
+|                                       |                          | :ref:`Galera Parameters <Galera Parameters>`.                   |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_retry_autocommit``            | *1*                      | If an autocommit query fails the certification test due to a    |
 |                                       |                          | cluster-wide conflict, we can retry it without returning an     |

@@ -1,9 +1,9 @@
-====================================
- Galera Cluster Deployment Variants
-====================================
-.. _`Galera Cluster Deployment Variants`:
+==============================
+ Cluster Deployment Variants
+==============================
+.. _`Cluster Deployment Variants`:
 
-Galera cluster consists of nodes. We recommend that you
+*Galera Cluster for MySQL* consists of nodes. We recommend that you
 have at least three nodes in your cluster. Each cluster
 node is a regular MySQL server and you convert your
 existing MySQL server into a node and use that server
@@ -14,7 +14,7 @@ cluster can be seen as a single server listening at many
 interfaces. To give you an idea of what Galera is capable
 of, we will consider a typical N-tier application and
 discuss different benefits and considerations of deploying
-Galera cluster in that context.
+*Galera Cluster for MySQL* in that context.
 
 -------------------
  No Clustering

@@ -17,3 +17,4 @@ Contents:
    cloudinstallation
    configuration
    createcluster
+   restartingacluster

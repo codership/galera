@@ -34,6 +34,6 @@ Proceed as follows:
    .. note:: If you install to **/usr/local**, ensure that **/usr/local/lib**
              is in your linker path:
 
-			 ``$ sudo crle -u -l /usr/local/lib``
+             ``$ sudo crle -u -l /usr/local/lib``
 
 3. Run *./scripts/build.sh*.

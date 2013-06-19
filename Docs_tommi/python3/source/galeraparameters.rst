@@ -18,7 +18,7 @@ Table legend:
   K, M, G, T standing for |210|, |220|, |230| and |240| respectively.
 - *Boolean values* |---| Galera accepts the following boolean values: 0, 1, yes, no, true, false, on, off.
 - Time periods must be expressed in the ISO8601 format. See also the examples below.
-- ``(R)`` marks parameters that can be changed during runtime.
+- **(R)** marks parameters that can be changed during runtime.
 
 .. |210| replace:: 2\ :sup:`10`\
 .. |220| replace:: 2\ :sup:`20`\
@@ -258,6 +258,34 @@ Table legend:
 | ``gcache.mem_size``                   | *0*                   | Max size of the ``malloc()`` store (read: RAM).    |
 |                                       |                       | For setups with spare RAM.                         |
 +---------------------------------------+-----------------------+----------------------------------------------------+
+
+-------------------------------------
+ Setting Galera Parameters in MySQL
+-------------------------------------
+.. _`Setting Galera Parameters in MySQL`:
+
+.. index::
+   pair: Parameters; Setting
+.. index::
+   pair: Parameters; Checking
+   
+You can set Galera parameters in the *my.cnf* configuration file
+as follows:
+
+``wsrep_provider_options="gcs.fc_limit=256;gcs.fc_factor=0.9"``
+
+This is useful in master-slave setups.
+
+You can set Galera parameters through a MySQL client as follows:
+
+``mysql> SET GLOBAL wsrep_provider_options="evs.send_window=16";``
+
+This command would only change the ``evs.send_window`` value.
+
+To check which parameters are used in *Galera Cluster for MySQL*,
+enter the command below:
+
+``mysql> SHOW VARIABLES LIKE 'wsrep_provider_options';``
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:
