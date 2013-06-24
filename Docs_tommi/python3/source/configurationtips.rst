@@ -145,5 +145,25 @@ the ``wsrep_received_bytes`` status variable. Proceed as follows:
 
    ``(wsrep_received_bytes2 - wsrep_received_bytes1)/(t2 - t1)``
 
+-----------------------------
+  Using Galera with SElinux
+-----------------------------
+.. _`Using Galera with SElinux`:
+
+.. index::
+   pair: Configuration; SELinux
+
+If you want to use Galera with SElinux, start by running SELinux
+in the permissive mode. In this mode, SELinux will not prohibit
+any Galera actions, but will log a warning for all actions that
+would have been prohibited. Collect these warnings and iteratively 
+create a policy for Galera that allows to use all the different
+ports and files that you need. When there are no more warnings,
+switch back to the enforcing mode. 
+
+Virtually every Linux distribution ships with a MySQL SELinux
+policy. You can use this policy as a starting point and extend
+it with the above procedure.
+
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

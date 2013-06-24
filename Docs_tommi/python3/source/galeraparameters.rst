@@ -112,6 +112,9 @@ Table legend:
 | ``evs.send_window`` **(R)**           | *4*                   | Maximum packets in replication at a time. For WAN  |
 |                                       |                       | setups may be set considerably higher, e.g. 512.   |
 |                                       |                       | Must be no less than ``evs.user_send_window``.     |
+|                                       |                       | If you must use other that the default value, we   |
+|                                       |                       | recommend using double the                         |
+|                                       |                       | ``evs.user_send_window`` value.                    |
 +---------------------------------------+-----------------------+----------------------------------------------------+
 | ``evs.stats_report_period``           | *PT1M*                | Control period of EVS statistics reporting.        |
 +---------------------------------------+-----------------------+----------------------------------------------------+

@@ -18,6 +18,7 @@ Before you start, ensure that you have:
 - No firewalls between the hosts.
 - *Selinux* or *apparmor* disabled or running in permissive mode.
 
+See also chapter :ref:`Using Galera with SElinux <Using Galera with SElinux>`.
 
 ------------------------------------------------------
  Creating a MySQL Client Connection Between the Nodes

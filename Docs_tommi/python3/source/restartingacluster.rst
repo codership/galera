@@ -53,7 +53,7 @@ example below, the node has crashed:
        cert_index:
 
 To find the sequence number of the last committed transaction,
-run *mysqld* with the ``–wsrep-recover`` option. This option
+run *mysqld* with the ``--wsrep-recover`` option. This option
 will recover the InnoDB table space to a consistent state, print
 the corresponding GTID into the error log and exit. In the error
 log, you can see something like this:

@@ -10,6 +10,8 @@
    pair: Parameters; wsrep_provider
 .. index::
    pair: Parameters; wsrep_last_committed
+.. index::
+   pair: Errors; ER_UNKNOWN_COM_ERROR
 
 The table below lists some symptoms and solutions for
 troubleshooting purposes.
@@ -63,7 +65,7 @@ troubleshooting purposes.
 |                                                        |    the node with the highest value.                         |
 |                                                        | 2. Run                                                      |
 |                                                        |    ``SET GLOBAL wsrep_provider_options='pc.bootstrap=yes'`` |
-|                                                        |     on it.                                                  |
+|                                                        |    on it.                                                   |
 |                                                        |                                                             |
 |                                                        | The component this node is part of will become a Primary    |
 |                                                        | Component, and all nodes in it will synchronize to the most |

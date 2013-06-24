@@ -37,3 +37,7 @@
     is called the Primary Component (PC). 
       
         See :ref:`Primary Component <Primary Component>` for more details.
+   
+   Parallel Applying
+    As *Galera Cluster for MySQL* can detect conflicts between writesets,
+    it can also detect which writesets can be applied concurrently.

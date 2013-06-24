@@ -141,17 +141,17 @@ by (L).
 | <wsrep_sst_donor>`                    |                          | that should be used as a source for state transfer. If not      |
 |                                       |                          | specified, Galera will choose the most appropriate one.         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor     |
+| :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor,    |
 | <wsrep_sst_donor_rejects_queries>`    |                          | if the donor is performing a blocking SST.                      |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | :ref:`wsrep_sst_method                | *mysqldump*              | The method to use for state snapshot transfers.                 |
 | <wsrep_sst_method>`                   |                          |                                                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_sst_receive_address``         | *<wsrep_node             | The address at which this node expects to receive state         |
-|                                       | _address>*               | transfers. Depends on state transfer method. For example, for   |
-|                                       |                          | *mysqldump* state transfer it is the address and the port on    |
-|                                       |                          | which this server listens. By default this is set to the        |
-|                                       |                          | *<address>* part of ``wsrep_node_address``.                     |
+|                                       | _address>*               | transfers. Depends on the state transfer method. For example,   |
+|                                       |                          | for the *mysqldump* state transfer, it is the address and the   |
+|                                       |                          | port on which this server listens. By default this is set to    |
+|                                       |                          | the *<address>* part of ``wsrep_node_address``.                 |
 |                                       |                          |                                                                 |
 |                                       |                          | *Note!* Check that your firewall allows connections to this     |
 |                                       |                          | address from other cluster nodes.                               |
