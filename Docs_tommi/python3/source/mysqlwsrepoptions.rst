@@ -5,6 +5,8 @@
 
 .. index::
    single: Drupal
+.. index::
+   pair: Logs; Debug log
 
 
 These are MySQL system variables introduced by *wsrep*

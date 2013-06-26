@@ -5,15 +5,14 @@
 
 .. index::
    pair: Parameters; wsrep_last_committed
-
 .. index::
    pair: Parameters; wsrep_provider_options
-
 .. index::
    pair: Parameters; pc.bootstrap
-   
 .. index::
-   single: Split-brain; recovery
+   single: Split-brain; Recovery
+.. index::
+   single: Primary Component; Nominating
 
 In the case of a network failure, failure of more than half
 of the cluster nodes, or a split-brain situation, your node(s)

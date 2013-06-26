@@ -3,13 +3,12 @@
 =========================
 .. _`Backing up Cluster Data`:
 
-
+.. index::
+   pair: Logs; mysqld error log
 .. index::
    pair: Parameters; gmcast.listen_addr
-   
 .. index::
    pair: Parameters; wsrep_cluster_name
-
 .. index::
    pair: Parameters; wsrep_node_name
 

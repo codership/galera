@@ -22,6 +22,8 @@ follows:
 ------------------------------------
  Identifying the Most Advanced Node
 ------------------------------------
+.. index::
+   pair: Logs; mysqld error log
 
 You can identify the node with the most advanced node state ID
 by comparing the :term:`Global Transaction ID` values on

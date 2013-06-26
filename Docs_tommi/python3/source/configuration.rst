@@ -129,7 +129,6 @@ See below for an example *my.cnf* file::
     binlog_format=ROW
     default_storage_engine=innodb
     innodb_autoinc_lock_mode=2
-    # innodb_doublewrite=1 - this is the default and it should stay this way
     
     # 2. Optional mysqld settings: your regular InnoDB tuning and such
     datadir=/mnt/mysql/data
@@ -183,9 +182,6 @@ You must give values to the settings below:
   lock mode. Without this parameter, ``INSERT``s into tables with an
   ``AUTO_INCREMENT`` column may fail. Lock modes 0 and 1 can cause
   unresolved deadlocks and make the system unresponsive.
-
-   .. note:: If you use Galera provider version 2.0 or higher,
-             set ``innodb_doublewrite`` to 1 (default).
 
 --------------------------
  Optional MySQL Settings

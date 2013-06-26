@@ -12,6 +12,8 @@
    pair: Parameters; wsrep_last_committed
 .. index::
    pair: Errors; ER_UNKNOWN_COM_ERROR
+.. index::
+   pair: Logs; mysqld error log
 
 The table below lists some symptoms and solutions for
 troubleshooting purposes.

@@ -31,7 +31,7 @@ See also chapter :ref:`Galera Arbitrator <Galera Arbitrator>`.
 .. index::
    pair: Parameters; wsrep_provider_options
 .. index::
-   single: Split-brain; description
+   single: Split-brain; Descriptions
 
 The current number of nodes in the cluster defines the current
 cluster size. There is no configuration setting that would define

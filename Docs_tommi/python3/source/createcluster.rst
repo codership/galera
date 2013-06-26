@@ -161,7 +161,7 @@ it. After this, the new node is ready for use.
 .. index::
    pair: Parameters; wsrep_ready
 
-You can test that the cluster actually works as follows:
+You can test that *Galera Cluster for MySQL* works as follows:
 
 1. Connect to MySQL on any node:
 
@@ -222,6 +222,27 @@ You can test that the cluster actually works as follows:
 
 5. The results above indicate that the cluster works.
 
+--------------------
+ Failure Simulation
+--------------------
+.. _`Failure Simulation`:
+
+You can also test *Galera Cluster for MySQL* by simulating various
+failure situations on three nodes as follows:
+
+- To simulate a crash of a single *mysqld* process, run the command
+  below on one of the nodes:
+
+      ``killall -9 mysqld``
+
+- To simulate a network disconnection, use *iptables* or *netem*
+  to block all TCP/IP traffic to a node.
+- To simulate an entire server crash, run each *mysqld* in a
+  virtualized guest, and abrubtly terminate the entire
+  virtual instance.
+
+If you have three or more Galera nodes, the cluster should be able to
+survive the simulations.
 
 ----------------------------------
  Galera Cluster URL

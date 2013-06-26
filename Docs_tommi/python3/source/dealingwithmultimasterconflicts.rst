@@ -48,12 +48,12 @@ See also chapter :ref:`Certification Based Replication <Certification Based Repl
 
 .. index::
    pair: Parameters; wsrep_debug
-   
 .. index::
    pair: Parameters; wsrep_local_bf_aborts
-
 .. index::
    pair: Parameters; wsrep_local_cert_failures
+.. index::
+   pair: Logs; Debug log
 
 You can log cluster wide conflicts by using the ``wsrep_debug``
 variable, which will log these conflicts and plenty of other

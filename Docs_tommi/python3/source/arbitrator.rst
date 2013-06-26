@@ -3,6 +3,13 @@
 ===================
 .. _`Galera Arbitrator`:
 
+.. index::
+   pair: Descriptions; Galera Arbitrator
+.. index::
+   single: Split-brain; Prevention
+.. index::
+   pair: Logs; Galera Arbitrator
+
 If the expense of adding, for example, a third datacenter is too high,
 you can use the Galera arbitrator. An arbitrator is a member of the
 cluster which participates in voting, but not in actual replication.
