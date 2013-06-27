@@ -3,6 +3,9 @@
 ======================
 .. _`Database Replication`:
 
+.. index::
+   pair: Database cluster; Descriptions
+
 Database replication refers to the frequent copying of data
 from one node, that is, a database on one server, to a node on
 another server. A database replication system is, in other words,
@@ -50,6 +53,15 @@ A multi-master replication system is depicted in the figure below:
  Asynchronous and Synchronous Replication
 ----------------------------------------------
 .. _`Asynchronous and Synchronous Replication`:
+
+.. index::
+   pair: Eager replication; Descriptions
+.. index::
+   pair: Lazy replication; Descriptions
+.. index::
+   pair: Asynchronous replication; Descriptions
+.. index::
+   pair: Synchronous replication; Descriptions
 
 From a more technical perspective, asynchronous and synchronous
 replication protocols differ in the way they propagate database

@@ -27,3 +27,18 @@ will block and wait for the state transfer to end.
 
 To control memory usage for writeset caching, see chapter
 :ref:`Optional Memory Settings <Optional Memory Settings>`.
+
+------------------------------------
+ Dealing with Large Transactions
+------------------------------------
+.. _`Dealing with Large Transactions`:
+
+If you must frequently handle large transactions, such as transactions
+caused by the ``DELETE`` command that may delete millions of rows from
+a table at once, we recommend using the Percona toolkit's *pt-archiver*
+command. For example:
+
+  ``pt-archiver --source h=dbhost,D=keystone,t=token --purge --where "expires < NOW()" --primary-key-only --sleep-coef 1.0 --txn-size 500``
+
+This tool deletes rows efficiently. For more information on the tool,
+see: http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html.

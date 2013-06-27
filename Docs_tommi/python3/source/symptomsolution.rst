@@ -14,6 +14,8 @@
    pair: Errors; ER_UNKNOWN_COM_ERROR
 .. index::
    pair: Logs; mysqld error log
+.. index::
+   pair: Primary Component; Nominating
 
 The table below lists some symptoms and solutions for
 troubleshooting purposes.
@@ -27,11 +29,12 @@ troubleshooting purposes.
 | to restart the node. The problem will show up as       |                                                             |
 | *port in use* in the server error log.                 |                                                             |
 +--------------------------------------------------------+-------------------------------------------------------------+
-| If you use mysqldump for state transfer, and it fails, | Read the pseudo-statement within the ``SQL SYNTAX``         |
-| an ``SQL SYNTAX`` error is written in the server error | error.                                                      |
-| log. This error is only an indication of the error.    |                                                             |
-| The pseudo-statement within the ``SQL SYNTAX``         |                                                             |
-| error contains the actual error message.               |                                                             |
+| If you use *mysqldump* for state transfer, and it      | Read the pseudo-statement within the ``SQL SYNTAX``         |
+| fails, an ``SQL SYNTAX`` error is written in the       | error.                                                      |
+| server error log. This error is only an indication of  |                                                             |
+| the error. The pseudo-statement within the             |                                                             |
+| ``SQL SYNTAX`` error contains the actual error         |                                                             |
+| message.                                               |                                                             |
 +--------------------------------------------------------+-------------------------------------------------------------+
 | After a temporary split, if the Primary Component was  | Wait. This situation is automatically cleared after a       |
 | still reachable and its state was modified,            | while.                                                      |
@@ -52,24 +55,18 @@ troubleshooting purposes.
 | with the global state and unable to serve SQL requests | other hand, may be a desirable result for, for example,     |
 | except ``SET`` and/or ``SHOW``.                        | modifying "local" tables.                                   |
 +--------------------------------------------------------+-------------------------------------------------------------+
-| Every query returns "Unknown command".                 | The nodes no longer think that they are part of the         |
-|                                                        | Component (that is, they suspect that there may be          |
-|                                                        | another Primary Component, which they have no connection    |
-|                                                        | to). This can be due to a network failure, crash of half    |
-|                                                        | or more of the nodes, split brain, and so on.               |
-|                                                        |                                                             |
-|                                                        | If you know that no other nodes of your cluster form        |
-|                                                        | Primary Component, rebootstrap the primary component as     |
-|                                                        | follows:                                                    |
-|                                                        |                                                             |
-|                                                        | 1. Choose the most up-to-date node by checking the output   |
-|                                                        |    of ``SHOW STATUS LIKE 'wsrep_last_committed'``. Choose   | 
-|                                                        |    the node with the highest value.                         |
-|                                                        | 2. Run                                                      |
+| Every query returns "Unknown command".                 | If you know that no other nodes of your cluster form        |
+|                                                        | Primary Component, rebootstrap the Primary Component as     |
+| The nodes no longer think that they are part of the    | follows:                                                    |
+| Primary Component (that is, they suspect that there    |                                                             |
+| may be another Primary Component, which they have no   | 1. Choose the most up-to-date node by checking the output   |
+| connection to). This can be due to a network failure,  |    of ``SHOW STATUS LIKE 'wsrep_last_committed'``. Choose   |
+| crash of half or more of the nodes, split brain, and   |    the node with the highest value.                         |
+| so on.                                                 | 2. Run                                                      |
 |                                                        |    ``SET GLOBAL wsrep_provider_options='pc.bootstrap=yes'`` |
 |                                                        |    on it.                                                   |
 |                                                        |                                                             |
-|                                                        | The component this node is part of will become a Primary    |
+|                                                        | The component this node is part of will become a Primary    | 
 |                                                        | Component, and all nodes in it will synchronize to the most |
 |                                                        | up-to-date one and start accepting SQL requests again.      |
 +--------------------------------------------------------+-------------------------------------------------------------+

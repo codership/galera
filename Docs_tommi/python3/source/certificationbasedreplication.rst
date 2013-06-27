@@ -2,6 +2,8 @@
  Certification Based Replication
 ===================================
 .. _`Certification Based Replication`:
+.. index::
+   pair: Certification Based Replication; Descriptions
 
 Certification based replication uses group communication and
 transaction ordering techniques to achieve synchronous replication.

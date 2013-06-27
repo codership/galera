@@ -7,9 +7,15 @@
  Overview
 =========
 
+.. index::
+   pair: Certification based replication; Descriptions
+.. index::
+   pair: Virtual synchrony; Descriptions
+
 *Galera Cluster for MySQL* is a synchronous multi-master
-database cluster, based on Oracle's MySQL/InnoDB. When you
-use *Galera Cluster for MySQL*, you can read from and write
+database cluster, based on synchronous replication and Oracle's
+MySQL/InnoDB, providing 24/7 high availability and scalability.
+When you use *Galera Cluster for MySQL*, you can read from and write
 to any node, and you can lose any individual node without
 interruption in operations, and without the need to handle
 complicated failover procedures.

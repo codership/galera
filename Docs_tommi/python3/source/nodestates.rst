@@ -20,6 +20,19 @@ possible node state changes.
 ---------------
 .. _`Node States`:
 
+.. index::
+   pair: Node states; OPEN
+.. index::
+   pair: Node states; PRIMARY
+.. index::
+   pair: Node states; JOINER
+.. index::
+   pair: Node states; DONOR
+.. index::
+   pair: Node states; JOINED
+.. index::
+   pair: Node states; SYNCED
+
 To ensure temporal synchrony and consistency (as opposed
 to logical which is provided by virtual synchrony), Galera
 implements several forms of flow control, depending on the
@@ -126,6 +139,8 @@ configuration variables:
  Node State Changes
 --------------------
 .. _`Node State Changes`:
+.. index::
+   pair: Node states; Node state changes
 
 Galera node state machines handle different state changes on
 different Galera layers. At the top layer, there are node

@@ -14,14 +14,16 @@ Galera node is shut down and you have no *mysqld*
 process at all. If this happens, proceed as
 follows:
 
-1. Identify the node with the most advanced node state ID. See chapter
-   :ref:`Identifying the Most Advanced Node <Identifying the Most Advanced Node>`.
+1. Identify the node with the most advanced node state ID.
+   See chapter :ref:`Identifying the Most Advanced Node
+   <Identifying the Most Advanced Node>`.
 2. Start the node as the first node of the cluster.
 3. Start the rest of the nodes as usual.
 
 ------------------------------------
  Identifying the Most Advanced Node
 ------------------------------------
+.. _`Identifying the Most Advanced Node`:
 .. index::
    pair: Logs; mysqld error log
 

@@ -124,7 +124,7 @@ column from the left. The values are:
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
 | ``wsrep_cert_index_size``             | G | *30936*                    | The number of entries in the certification index.              |
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
-| `` wsrep_protocol_version``           | G | *4*                        | The version of the wsrep protocol used.                        |
+| ``wsrep_protocol_version``            | G | *4*                        | The version of the wsrep protocol used.                        |
 +---------------------------------------+---+----------------------------+----------------------------------------------------------------+
 | ``wsrep_connected``                   | G | *ON*                       | If the value is *OFF*, the node has not yet connected to any   |
 |                                       |   |                            | of the cluster components. This may be due to                  |

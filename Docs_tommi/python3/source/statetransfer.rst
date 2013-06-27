@@ -28,6 +28,8 @@ These methods are described in the chapters below.
 
 .. index::
    pair: Parameters; wsrep_sst_method
+.. index::
+   pair: State Snapshot Transfer methods; State Snapshot Transfer
 
 State Snapshot Transfer (SST) refers to a full data copy from
 one cluster node (donor) to the joining node (joiner). 
@@ -76,6 +78,11 @@ with the ``wsrep_sst_method`` variable. For example::
  Incremental State Transfer (IST)
 ----------------------------------
 .. _`Incremental State Transfer (IST)`:
+
+.. index::
+   pair: Parameters; wsrep_sst_method
+.. index::
+   pair: State Snapshot Transfer methods; Incremental State Transfer
 
 Galera supports a functionality known as incremental state
 transfer. Incremental state transfer means that if:

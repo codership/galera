@@ -48,6 +48,8 @@ several arbitrators in the cluster.
  Configuring the Arbitrator
 ----------------------------
 .. _`Configuring the Arbitrator`:
+.. index::
+   pair: Configuration; Galera Arbitrator
 
 As a Galera cluster member, the arbitrator accepts all Galera
 parameters except those prefixed as ``replicator.``. For

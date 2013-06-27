@@ -39,7 +39,7 @@ Galera has the following differences to a standalone MySQL server:
   a writeset is processed as a single memory-resident buffer and, as a result,
   extremely large transactions (for example, ``LOAD DATA``) may adversely affect
   node performance. To avoid that, the ``wsrep_max_ws_rows`` and ``wsrep_max_ws_size``
-  variables limit the transaction rows to 128K and the transaction size to 1Gb,
+  variables limit the transaction rows to 128 K and the transaction size to 1 Gb,
   by default. If necessary, you can increase those limits.
 - Due to cluster level optimistic concurrency control, a transaction issuing
   a ``COMMIT`` may still be aborted at that stage. There can be two transactions
@@ -58,83 +58,6 @@ Galera has the following differences to a standalone MySQL server:
 - Do not use server system variables ``character_set_server``, ``utf16`` or
   ``utf32`` or ``ucs2`` if you choose rsync as a state transfer method.
   The server will crash.
-
-------------------------------------
- Dealing with Large Transactions
-------------------------------------
-.. _`Dealing with Large Transactions`:
-
-If you must frequently handle large transactions, such as transactions
-caused by the ``DELETE`` command that may delete millions of rows from
-a table at once, we recommend using the Prcona toolkit's *pt-archiver*
-command. For example:
-
-  ``pt-archiver --source h=dbhost,D=keystone,t=token --purge --where "expires < NOW()" --primary-key-only --sleep-coef 1.0 --txn-size 500``
-
-This tool deletes rows efficiently. For more information on the tool,
-see: http://www.percona.com/doc/percona-toolkit/2.1/pt-archiver.html.
-
-
------------------- 
- Isolation Levels
-------------------
-.. _`Isolation Levels`:
-
-Isolation guarantees that transactions are processed in a
-reliable manner. To be more specific, it ensures that concurrently
-running transactions do not interfere with each other. In this way,
-isolation ensures data consistency. If the transactions were not
-isolated, one transaction could modify data that other transactions
-are reading. This would lead to data inconsistency.
-
-The four isolation levels are, from lowest to highest:
-
-- ``READ-UNCOMMITTED`` |---| On this isolation level, transactions can
-  see changes to data made by other transactions that are not committed
-  yet. In other words, transactions can read data that may not eventually
-  exist, as the other transactions can always roll-back the changes
-  without commit. This is called a *dirty read*. ``READ-UNCOMMITTED``
-  has actually no real isolation at all.
-- ``READ-COMMITTED`` |---| On this isolation level, dirty reads are
-  impossible, as uncommitted changes are invisible to other transactions
-  until the transaction is committed. However, at this isolation level,
-  ``SELECT`` clauses use their own snapshots of committed data, committed
-  before the ``SELECT`` clause was executed. As a result, the same
-  ``SELECT`` clause, when run multiple times within the same transaction,
-  can return different result sets. This is called a *non-repeatable read*.
-- ``REPEATABLE-READ`` |---| On this isolation level, non-repeatable reads
-  are impossible, as the snapshot for the ``SELECT`` clause is taken the
-  first time the ``SELECT`` clause is executed during the transaction.
-  This snapshot is used throughout the entire transaction for this
-  ``SELECT`` clause and it always returns the same result set. This level
-  does not take into account changes to data made by other transactions,
-  regardless of whether they have been committed or not. In this way,
-  reads are always repeatable.
-- ``SERIALIZABLE`` |---| This isolation level place locks on all records
-  that are accessed within a transaction. ``SERIALIZABLE`` also locks
-  the resource in a way that records cannot be appended to the table being
-  operated on by the transaction. This level prevents a phenomenon known
-  as a *phantom read*. A phantom read occurs when, within a transaction,
-  two identical queries are executed, and the rows returned by the second
-  query are different from the first.
-
-Galera uses transaction isolation on two levels:
-
-- Locally, that is, on each node, transaction isolation works as
-  with native InnoDB. You can use all levels. The default isolation
-  level for InnoDB is ``REPEATABLE-READ``. 
-- At the cluster level, between transactions processing at separate
-  nodes, Galera implements a transaction level called ``SNAPSHOT ISOLATION``.
-  The ``SNAPSHOT ISOLATION`` level is between the ``REPEATABLE READ``
-  and ``SERIALIZABLE`` levels.
-
-  The ``SERIALIZABLE`` transaction isolation level cannot be
-  guaranteed in a multi-master use case, as :term:`Galera Replication`
-  does not carry a transaction read set. Also, the ``SERIALIZABLE``
-  transaction isolation level is vulnerable for multi-master
-  conflicts. It holds read locks and any replicated write to a
-  read locked row will cause the transaction to abort. Hence,
-  it is recommended not to use it in *Galera Cluster for MySQL*.
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

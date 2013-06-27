@@ -3,7 +3,7 @@
 =====================================
 .. _`Third Party Galera Implementations`:
 
-There are three products that implement
+There are two products that implement
 *Galera Cluster for MySQL*:
 
 - *Percona XtraDB Cluster* |---| Percona XtraDB Cluster

@@ -79,6 +79,9 @@ it will accept client connections.
 ------------------------------------------------
 .. _`Comparison of State Snapshot Transfer Methods`:
 
+.. index::
+   pair: State Snapshot Transfer methods; Comparison of
+
 You can choose between two different node provisioning methods:
 
 - If you have a node state, use State Snapshot Transfer (SST)
@@ -91,8 +94,8 @@ must be chosen depending on the situation. Fortunately, the choice
 only must be done on the receiving node; the donor will serve
 whatever is requested, as long as it has support for it.
 
-See the table below for a summary table on the the difference
-between the different state snapshot transfer methods:
+See the table below for a summary on the the differences
+between the state snapshot transfer methods:
 
 +------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
 | Method     | Speed          | Blocks the donor? | Available on live node? | Logical/Physical | Requires root access to MySQL server? |
@@ -140,7 +143,7 @@ of configuration:
   to the Barracuda file format, start using compression or resize, or
   place iblog* files to another partition.
   
-  :red:`Minuses`: A logical state transfer is as slow as mysqldump. The 
+  :red:`Minuses`: A logical state transfer is as slow as *mysqldump*. The 
   receiving server must be prepared to accept root connections from
   potential donor nodes and the receiving server must have a
   non-corrupted database.
@@ -201,6 +204,9 @@ server.
 
 xtrabackup
 ==========
+
+.. index::
+   single: my.cnf
 
 *Xtrabackup*-based state snapshot transfer is probably the most
 popular choice. As *rsync*, it has the pluses and minuses of the

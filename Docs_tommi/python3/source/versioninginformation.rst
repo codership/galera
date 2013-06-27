@@ -22,7 +22,7 @@ release numbering schemes as follows:
 - *Galera wsrep provider* |---| The Galera wsrep provider release
   numbering scheme is as follows:
   
-  ``wsrep API main version``.``Galera wsrep provider version``
+  ``wsrep API main version.Galera wsrep provider version``
   
   For example, release number 23.2.4 indicates that the Galera
   wsrep provider is meant to be used with wsrep API version
@@ -30,7 +30,7 @@ release numbering schemes as follows:
 - *MySQL server patched with the wsrep API* |---| The patched
   MySQL server release numbering scheme is as follows:
   
-  ``MySQL version``-``wsrep API version``
+  ``MySQL version-wsrep API version``
   
   For example, release number 5.5.29-23.7.3 indicates that
   the patched MySQL server release contains MySQL version
@@ -52,26 +52,26 @@ Linux distributions are available as follows:
 - Galera wsrep provider:
 
     - A 32-bit binary for Debian based distributions
-	- A 64-bit binary for Debian based distributions
-	- A 32-bit binary for RHEL/CentOS 5
-	- A 64-bit binary for RHEL/CentOS 5
-	- A 32-bit binary for RHEL/CentOS 6
-	- A 64-bit binary for RHEL/CentOS 6
-	- A source code package
+    - A 64-bit binary for Debian based distributions
+    - A 32-bit binary for RHEL/CentOS 5
+    - A 64-bit binary for RHEL/CentOS 5
+    - A 32-bit binary for RHEL/CentOS 6
+    - A 64-bit binary for RHEL/CentOS 6
+    - A source code package
   
   You can download these packages from: https://launchpad.net/galera/+download.
 
 - MySQL server patched with the wsrep API:
 
     - A 32-bit binary for Debian based distributions
-	- A 64-bit binary for Debian based distributions
-	- A 32-bit binary for RHEL/CentOS 5
-	- A 64-bit binary for RHEL/CentOS 5
-	- A 32-bit binary for RHEL/CentOS 6
-	- A 64-bit binary for RHEL/CentOS 6
-	- A 32-bit generic tarball for system-wide installations
-	- A 64-bit generic tarball for system-wide installations
-	- The separate wsrep API patches without the MySQL server
+    - A 64-bit binary for Debian based distributions
+    - A 32-bit binary for RHEL/CentOS 5
+    - A 64-bit binary for RHEL/CentOS 5
+    - A 32-bit binary for RHEL/CentOS 6
+    - A 64-bit binary for RHEL/CentOS 6
+    - A 32-bit generic tarball for system-wide installations
+    - A 64-bit generic tarball for system-wide installations
+    - The separate wsrep API patches without the MySQL server
 
   You can download these packages from: https://launchpad.net/codership-mysql/+download.
 

@@ -18,9 +18,10 @@ fine-tuning the configuration to best match the use case.
 For more information on the settings, see chapter
 :ref:`Galera Parameters <Galera Parameters>`.
 
----------------------------
-Installation Configuration
----------------------------
+----------------------------
+ Installation Configuration
+----------------------------
+.. _`Installation Configuration`:
 
 Unless you are upgrading an already installed *mysql-wsrep*
 package, you must configure the installation to prepare the
@@ -29,6 +30,12 @@ server for operation.
 
 Configuration Files
 ====================
+.. _`Configuration Files`:
+
+.. index::
+   pair: Configuration files; wsrep.cnf
+.. index::
+   pair: Configuration files; my.cnf
 
 Edit the *my.cnf* configuration file as follows:
 

@@ -98,12 +98,12 @@ as follows:
 
 .. index::
    pair: Weighted Quorum; Setting weight on a node
-
 .. index::
    pair: Parameters; wsrep_provider
-
 .. index::
    pair: Parameters; wsrep-cluster-address
+.. index::
+   single: my.cnf
 
 To add a new node to an existing cluster, proceed as follows:
 
@@ -244,10 +244,32 @@ failure situations on three nodes as follows:
 If you have three or more Galera nodes, the cluster should be able to
 survive the simulations.
 
+---------------------
+ Split-brain Testing
+---------------------
+
+.. index::
+   pair: Split-brain; Prevention
+
+You can test *Galera Cluster for MySQL* for split-brain
+situations on a two node cluster as follows:
+
+- Disconnect the network connection between the cluster nodes.
+  The quorum is lost, and the nodes do not serve requests.
+- Re-connect the network connection between the cluster nodes.
+  The quorum remains lost, and the nodes do not serve requests.
+- Run the command below on one of the servers::
+
+     mysql> SET GLOBAL wsrep_provider_options='pc.bootstrap=1';
+
+  This command resets the quorum and the cluster is recovered. 
+
 ----------------------------------
  Galera Cluster URL
 ----------------------------------
 .. _`Galera Cluster URL`:
+.. index::
+   single: my.cnf
 
 The syntax for the Galera Cluster URL address where
 the nodes connect to, is shown below::

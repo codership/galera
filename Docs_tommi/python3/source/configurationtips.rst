@@ -54,6 +54,8 @@ To set four parallel CPU threads, use the parameter value below::
 
 .. index::
    pair: Configuration Tips; wsrep_provider_options
+.. index::
+   single: my.cnf
 
 Transient network connectivity failures are not rare in
 :abbr:`WAN (Wide Area Network)` configurations. Thus, you

@@ -133,7 +133,7 @@ A failure in state transfer renders the receiving node unusable.
 If a state transfer failure is detected, the receiving node will
 abort.
 
-Restarting the node after a mysqldump failure may require manual
+Restarting the node after a *mysqldump* failure may require manual
 restoring of the administrative tables. The rsync method does not
 have this issue, since it does not need the server to be in
 operational state.

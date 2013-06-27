@@ -98,19 +98,8 @@ by (L).
 |                                       |                          | to wsrep provider will be bypassed and the server               |
 |                                       |                          | behaves like a regular *mysqld* server.                         |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_provider_options``            |                          | A string of provider options passed directly to the provider.   |
-|                                       |                          |                                                                 |
-|                                       |                          | Usually, you just fine-tune:                                    |
-|                                       |                          |                                                                 |
-|                                       |                          | - ``gcache.size``, that is, the size of the GCache ring buffer, |
-|                                       |                          |   which is used for Incremental State Transfer, among other     |
-|                                       |                          |   things. See chapter :ref:`Galera Parameters                   |
-|                                       |                          |   <Galera Parameters>`.                                         |
-|                                       |                          | - Group communication timeouts. See chapter                     |
-|                                       |                          |   :ref:`WAN Replication <WAN Replication>`.                     |
-|                                       |                          |                                                                 |
-|                                       |                          | See also a list of all Galera parameters in chapter             |
-|                                       |                          | :ref:`Galera Parameters <Galera Parameters>`.                   |
+| :ref:`wsrep_provider_options          |                          | A string of provider options passed directly to the provider.   |
+| <wsrep_provider_options>`             |                          |                                                                 |
 +---------------------------------------+--------------------------+-----------------------------------------------------------------+
 | ``wsrep_retry_autocommit``            | *1*                      | If an autocommit query fails the certification test due to a    |
 |                                       |                          | cluster-wide conflict, we can retry it without returning an     |
@@ -178,6 +167,8 @@ by (L).
 
 .. index::
    pair: Parameters; wsrep_cluster_address
+.. index::
+   single: my.cnf
 
 Galera takes addresses in the URL format::
 
@@ -256,8 +247,6 @@ replication during  rolling schema upgrade processing.
 However, in most cases, ``ROW`` replication
 is valid for asymmetric schema replication.
 
-
-
 .. rst-class:: html-toggle
 
 -------------------------------
@@ -279,9 +268,6 @@ and the default port 4567 are used. The *<address>* and
 used as a base address in its communications. It will also be
 used to derive the default values for parameters
 ``wsrep_sst_receive_address`` and ``ist.recv_address``.
-
-
-
 
 .. rst-class:: html-toggle
 
@@ -366,6 +352,30 @@ alternative methods:
   manually performing this operation on each of the nodes.
 
   
+  
+.. rst-class:: html-toggle
+
+-------------------------------
+ wsrep_provider_options
+-------------------------------
+.. _`wsrep_provider_options`:
+
+.. index::
+   pair: Parameters; wsrep_provider_options
+
+A string of provider options passed directly to the provider.
+
+Usually, you just fine-tune:
+
+- ``gcache.size``, that is, the size of the GCache ring buffer,
+  which is used for Incremental State Transfer, among other
+  things. See chapter :ref:`Galera Parameters <Galera Parameters>`.
+- Group communication timeouts. See chapter
+  :ref:`WAN Replication <WAN Replication>`.
+
+  See also a list of all Galera parameters in chapter
+  :ref:`Galera Parameters <Galera Parameters>`.
+  
 .. rst-class:: html-toggle
 
 -------------------------------
@@ -412,7 +422,7 @@ entry below is written to log:
 
 This parameter prevents blocking client sessions on a
 donor if the donor is performing a blocking SST, such
-as mysqldump or rsync.
+as *mysqldump* or *rsync*.
 
 In these situations, all queries return error
 ``ER_UNKNOWN_COM_ERROR, "Unknown command"`` like a joining

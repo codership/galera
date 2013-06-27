@@ -11,6 +11,8 @@
    pair: Parameters; wsrep_cluster_name
 .. index::
    pair: Parameters; wsrep_node_name
+.. index::
+   single: Galera Arbitrator
 
 *Galera Cluster for MySQL* backups can be performed just as
 regular MySQL backups, using a backup script. Since all the

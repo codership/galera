@@ -14,8 +14,10 @@ Contents:
    introduction
    architecture
    certificationbasedreplication
+   isolationlevels
    statetransfer
    nodestates
    weightedquorum
    arbitrator
+   loadbalancing
    recovery

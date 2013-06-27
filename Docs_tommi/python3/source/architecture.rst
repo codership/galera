@@ -43,6 +43,8 @@ in more detail in the chapters below:
 
 .. index::
    pair: Global Transaction ID; Descriptions
+.. index::
+   pair: wsrep API; Descriptions
 
 The *wsrep API* is a generic replication plugin interface for databases.
 The API defines a set of application callbacks and replication
@@ -118,6 +120,9 @@ The Galera plugin consists of:
 ------------------------------
  Group Communication Plugins
 ------------------------------
+
+.. index::
+   pair: Virtual Synchrony; Descriptions
 
 The group communication framework provides a plugin
 architecture for various group communication systems.
