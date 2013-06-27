@@ -23,10 +23,10 @@
 .. index::
    pair: Parameters; wsrep_node_name
 
-The state of new and failed nodes differs from the state of
-the :term:`Primary Component` and needs to be synchronized. As a result,
+If a state of a new or failed node differs from the state of
+the cluster :term:`Primary Component` it needs to be synchronized. As a result,
 new node provisioning and failed node recovery are essentially
-the same process of joining the node to the cluster
+the same process of joining a node to the cluster
 :abbr:`PC (Primary Component)`.
 
 The initial node state ID is read from the *grastate.txt*
@@ -37,7 +37,7 @@ is undefined (``00000000-0000-0000-0000-000000000000:-1``).
 
 When a node joins the primary component, it compares its
 state ID to that of the :abbr:`PC (Primary Component)` and
-if they do not match, the node requests for state transfer
+if they do not match, the node requests state transfer
 from the cluster.
 
 There are two possibilities to select the state transfer donor:
@@ -60,7 +60,7 @@ parameter on the donor node.
           Configure the load balancer to transfer client connections
           to the other nodes for the duration of state transfer.
 
-During state transfer the joining node caches writesets received
+During the state transfer the joining node caches writesets received
 from other nodes in a *slave queue* and applies them after the
 state transfer is over, to catch up with the current primary
 component state. Since the state snapshot always has a

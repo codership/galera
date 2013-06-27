@@ -1,12 +1,12 @@
 ====================================================
- Differences to a Standalone MySQL Server
+ Differences from a Standalone MySQL Server
 ====================================================
-.. _`Differences to a Standalone MySQL Server`:
+.. _`Differences from a Standalone MySQL Server`:
 
 .. index::
    pair: Errors; ER_LOCK_DEADLOCK
 
-Galera has the following differences to a standalone MySQL server:
+*Galera Cluster for MySQL* has the following differences to a standalone MySQL server:
 
 - Replication only works with the InnoDB storage engine. Any writes to tables
   of other types, including system (mysql.*) tables are not replicated. However,
@@ -51,7 +51,7 @@ Galera has the following differences to a standalone MySQL server:
      code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK))
 
   In this case, restart the failing transaction.
-- Windows is not supported.
+- Windows OS is not supported.
 - Do not use ``binlog-do-db`` and ``binlog-ignore-db``. These binary log
   options are only supported for DML, but not for DDL. Using these options
   will create a discrepancy and replication will abort.

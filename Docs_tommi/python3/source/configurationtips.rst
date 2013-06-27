@@ -26,7 +26,7 @@ parallel applying will not impair regular operation performance
 and will most likely speed up the synchronization of new nodes
 with the cluster.
 
-Start with four slave threads per core, the logic being that, in a
+Start with four slave threads per CPU core, the logic being that, in a
 balanced system, four slave threads can usually saturate the core.
 However, depending on IO performance, this figure can be increased
 several times (for example, you can use 32 slave threads on a
@@ -87,7 +87,7 @@ be no less than the ``evs.suspect_timeout`` parameter value and the
 The more masters (nodes which simultaneously process writes from
 clients) are in the cluster, the higher the probability of certification
 conflict. This may cause undesirable rollbacks and performance degradation.
-In such a case, reduce the number of masters.
+In such a case, reduce the number of nodes used as masters.
 
 ----------------------
   Single Master Setup
@@ -108,9 +108,9 @@ reducing the rate of flow control events. This setting
 can also be used as suboptimal in a multi-master setup.
 
 --------------------------
-  Optimizing GCache Size
+  Customizing GCache Size
 --------------------------
-.. _`Optimizing GCache Size`:
+.. _`Customizing GCache Size`:
 
 .. index::
    pair: Configuration Tips; gcache.size
@@ -119,7 +119,7 @@ can also be used as suboptimal in a multi-master setup.
    pair: Configuration Tips; wsrep_received_bytes
 
 These configuration tips are guidelines only. You may end up
-using a bigger GCache that suggested by these guidelies, for
+using a bigger GCache than suggested by these guidelies, for
 example, if you must avoid SST as much as possible. 
 
 The GCache size, that is, the ``gcache.size`` parameter value,

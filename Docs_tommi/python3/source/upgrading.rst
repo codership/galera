@@ -14,7 +14,7 @@ You can carry out a rolling upgrade on a Galera cluster by applying
 the following steps on each cluster node:
 
 .. note:: Transfer all clients connections from the node
-          to be upgraded to the another nodes for the time
+          to be upgraded to the other nodes for the time
           of migration.
 
 1. Shutdown the node

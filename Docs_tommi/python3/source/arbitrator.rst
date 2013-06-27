@@ -52,7 +52,7 @@ several arbitrators in the cluster.
    pair: Configuration; Galera Arbitrator
 
 As a Galera cluster member, the arbitrator accepts all Galera
-parameters except those prefixed as ``replicator.``. For
+parameters except those prefixed by ``replicator.``. For
 more information, see chapters :ref:`Galera Parameters <Galera Parameters>`
 and :ref:`Starting the Arbitrator <Starting the Arbitrator>` below.
 

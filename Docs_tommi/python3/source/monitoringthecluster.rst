@@ -19,13 +19,6 @@ This command can also communicate the event to a monitoring agent.
 For more information on the ``wsrep_notify_cmd`` command, see chapter 
 :ref:`wsrep_notify_cmd <wsrep_notify_cmd>`.
 
-.. note:: Status variables and variables in the chapters below are
-          differential and reset on every ``SHOW STATUS`` command.
-          To view the value for the current moment, execute two
-          ``SHOW STATUS`` commandson the node with an interval of
-          ~1 minute. The output of the last invocation will correspond
-          to the current moment.
-
 .. note:: You can also use *Nagios* for monitoring *Galera Cluster for MySQL*.
 
           For more information, see http://www.fromdual.com/galera-cluster-nagios-plugin-en.
@@ -87,7 +80,7 @@ in the cluster and this component is currently unoperational (due to
 multiple membership changes and the loss of quorum). A split-brain
 condition is also possible. 
 
-If no other node in the cluster is connected to the :term:`Primary Component`
+If no node in the cluster is connected to the :term:`Primary Component`
 (that is, all nodes belong to the same component, which is a
 non-primary component) the cluster must be manually rebootstrapped.
 If this is the case,
@@ -161,6 +154,13 @@ In a non-primary component, the node state comment should be
 
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
+
+.. note:: Status variables and variables in the chapters below are
+          differential and reset on every ``SHOW STATUS`` command.
+          To view the value for the current moment, execute two
+          ``SHOW STATUS`` commandson the node with an interval of
+          ~1 minute. The output of the last invocation will correspond
+          to the current moment.
 
 When checking the replication health, the first thing you want to know
 is how much slave lag is slowing down the cluster. You can check this
