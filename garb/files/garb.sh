@@ -1,11 +1,23 @@
 #!/bin/bash
 #
-# Copyright (C) 2012 Codership Oy <info@codership.com>
+# Copyright (C) 2012-2013 Codership Oy <info@codership.com>
 #
 # init.d script for garbd
 #
 # chkconfig: - 99 01
 # config: /etc/sysconfig/garb | /etc/default/garb
+#
+#### BEGIN INIT INFO
+# Provides:          garbd
+# Required-Start:    $network
+# Should-Start:
+# Required-Stop:     $network
+# Should-Stop:
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Galera Arbitrator Daemon
+# Description:       Galera Arbitrator Daemon
+### END INIT INFO
 
 # Source function library.
 if [ -f /etc/redhat-release ]; then
