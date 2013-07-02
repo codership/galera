@@ -56,7 +56,7 @@ Galera Arbitrator accepts all *Galera Cluster*
 parameters except those prefixed by ``replicator.``.
 
 .. seealso:: Chapters :ref:`Galera Parameters <Galera Parameters>`
-             and :ref:`Starting the Arbitrator <Starting the Arbitrator>`.
+             and :ref:`Starting Galera Arbitrator <Starting Galera Arbitrator>`.
 
 ----------------------------
  Starting Galera Arbitrator

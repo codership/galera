@@ -53,7 +53,7 @@ The four isolation levels are, from lowest to highest:
 
   The ``SERIALIZABLE`` transaction isolation level is not supported
   in a multi-master use case, , not in the ``STATEMENT`` nor in the
-  ``ROW`` format. This is due to the fact that :term:`Galera Replication`
+  ``ROW`` format. This is due to the fact that Galera replication
   does not carry a transaction read set. Also, the ``SERIALIZABLE``
   transaction isolation level is vulnerable for multi-master
   conflicts. It holds read locks and any replicated write to a
