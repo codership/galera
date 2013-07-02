@@ -6,11 +6,8 @@
 This chapter lists a number of frequently asked questions
 on *Galera Cluster for MySQL* and other related matters.
 
-.. rst-class:: html-toggle
+.. rubric:: What does "commit failed for reason: 3" mean?
 
-----------------------------------------------------
- What does "commit failed for reason: 3" mean?
-----------------------------------------------------
 .. _`What does "commit failed for reason: 3" mean?`:
 
 Occasionally, a slave thread tries to apply a replicated writeset
@@ -27,6 +24,9 @@ messages:
       110906 17:45:01 [Note] WSREP: Aborting query: commit
       110906 17:45:01 [Note] WSREP: kill trx QUERY_COMMITTING for 35525064
       110906 17:45:01 [Note] WSREP: commit failed for reason: 3, seqno: -1
+
+
+.. note:: The log example is taken from a debug log (``wsrep_debug=1``).
 
 To avoid such conflicts, you can:
 

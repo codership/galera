@@ -8,8 +8,8 @@ statement run for the database. :abbr:`DDL (Data Definition Language)`
 statements change the database structure and are non-transactional.
 
 :abbr:`DDL (Data Definition Language)` statements are processed in
-two different methods in Galera cluster for MySQL. These methods are described in the
-chapters below.
+two different methods in *Galera Cluster*.
+These methods are described in the chapters below.
 
 .. note:: See also the ``pt-online-schema-change`` command in Percona
           Toolkit for MySQL: http://www.percona.com/software/percona-toolkit.
@@ -18,6 +18,8 @@ chapters below.
  Total Order Isolation
 ---------------------------------
 .. _`Total Order Isolation`:
+.. index::
+   pair: Descriptions; Total Order Isolation
 
 By default, :abbr:`DDL (Data Definition Language)`
 statements are processed by using the Total Order Isolation
@@ -68,7 +70,8 @@ into consideration:
  Rolling Schema Upgrade
 ---------------------------------
 .. _`Rolling Schema Upgrade`:
-
+.. index::
+   pair: Descriptions; Rolling Schema Upgrade
 .. index::
    pair: Parameters; wsrep_OSU_method
 

@@ -2,7 +2,6 @@
  MySQL wsrep Options
 ======================
 .. _`MySQL wsrep Options`:
-
 .. index::
    single: Drupal
 .. index::
@@ -13,156 +12,141 @@ These are MySQL system variables introduced by *wsrep*
 patch v0.8. All variables are global except where marked
 by (L).
 
-.. note:: Some variable names are links to more detailed information presented in chapters below the table.
+
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| Option                                | Default                  | Introduced           | Deprecated         | Dynamic             |
++=======================================+==========================+======================+====================+=====================+
+| :ref:`wsrep_auto_increment_control    | *ON*                     |                      |                    |                     |
+| <wsrep_auto_increment_control>`       |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_causal_reads              | *OFF*                    |                      |                    |                     |
+| <wsrep_causal_reads>` **(L)**         |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_certify_nonPK             | *ON*                     |                      |                    |                     |
+| <wsrep_certify_nonPK>`                |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_cluster_address           |                          |                      |                    |                     |
+| <wsrep_cluster_address>`              |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_cluster_name              | *my_test_cluster*        |                      |                    |                     |
+| <wsrep_cluster_name>`                 |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_convert_LOCK_to_trx       | *OFF*                    |                      |                    |                     |
+| <wsrep_convert_LOCK_to_trx>`          |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_data_home_dir             | *<mysql_real_            |                      |                    |                     |
+| <wsrep_data_home_dir>`                | data_home>*              |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_dbug_option               |                          |                      |                    |                     |
+| <wsrep_dbug_option>`                  |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_debug                     | *OFF*                    |                      |                    |                     |
+| <wsrep_debug>`                        |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_drupal_282555_workaround  | *ON*                     |                      |                    |                     |
+| <wsrep_drupal_282555_workaround>`     |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_forced_binlog_format      | *NONE*                   |                      |                    |                     |
+| <wsrep_forced_binlog_format>`         |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_max_ws_rows               | *128K*                   |                      |                    |                     |
+| <wsrep_max_ws_rows>`                  |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_max_ws_size               | *1G*                     |                      |                    |                     |
+| <wsrep_max_ws_size>`                  |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_node_address              | *<address>[:port]*       |                      |                    |                     |
+| <wsrep_node_address>`                 |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_node_incoming_address     | *<address>               |                      |                    |                     |
+| <wsrep_node_incoming_address>`        | [:mysqld_port]*          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_node_name                 | *<hostname>*             |                      |                    |                     |
+| <wsrep_node_name>`                    |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_notify_cmd                |                          |                      |                    |                     |
+| <wsrep_notify_cmd>`                   |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_on                        | *ON*                     |                      |                    |                     |
+| <wsrep_on>` **(L)**                   |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_OSU_method                | *TOI*                    |                      |                    |                     |
+| <wsrep_OSU_method>`                   |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_provider                  | *none*                   |                      |                    |                     |
+| <wsrep_provider>`                     |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_provider_options          |                          |                      |                    |                     |
+| <wsrep_provider_options>`             |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_retry_autocommit          | *1*                      |                      |                    |                     |
+| <wsrep_retry_autocommit>`             |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_slave_threads             | *1*                      |                      |                    |                     |
+| <wsrep_slave_threads>`                |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_sst_auth                  |                          |                      |                    |                     |
+| <wsrep_sst_auth>`                     |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_sst_donor                 |                          |                      |                    |                     |
+| <wsrep_sst_donor>`                    |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    |                      |                    |                     |
+| <wsrep_sst_donor_rejects_queries>`    |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_sst_method                | *mysqldump*              |                      |                    |                     |
+| <wsrep_sst_method>`                   |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_sst_receive_address       | *<wsrep_node             |                      |                    |                     |
+| <wsrep_sst_receive_address>`          | _address>*               |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_start_position            | *00000000-0000-0000-*    |                      |                    |                     |
+| <wsrep_start_position>`               | *0000-000000000000:-1*   |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
+| :ref:`wsrep_ws_persistency            | *OFF*                    |                      |                    |                     |
+| <wsrep_ws_persistency>`               |                          |                      |                    |                     |
++---------------------------------------+--------------------------+----------------------+--------------------+---------------------+
 
 
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| Option                                | Default                  | Description                                                     |
-+=======================================+==========================+=================================================================+
-| ``wsrep_auto_increment_control``      | *ON*                     | Automatically adjust ``auto_increment_increment`` and           |
-|                                       |                          | ``auto_increment_offset`` system variables when the             |
-|                                       |                          | cluster membership changes.                                     |
-|                                       |                          |                                                                 |
-|                                       |                          | This parameters significantly reduces the certification         |
-|                                       |                          | conflict rate for``INSERT`` clauses.                            |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_causal_reads`` **(L)**        | *OFF*                    | Enforce strict cluster-wide ``READ COMMITTED`` semantics on     |
-|                                       |                          | non-transactional reads. Results in larger read latencies.      |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_certify_nonPK``               | *ON*                     | Generate primary keys for rows without them for the             |
-|                                       |                          | purpose of certification. This is required for parallel         |
-|                                       |                          | applying. Do not use tables without primary keys.               |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_cluster_address           |                          | Address to connect to cluster.                                  |
-| <wsrep_cluster_address>`              |                          |                                                                 |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_cluster_name``                | *my_test_cluster*        | The logical cluster name. If a node tries to connect to a       |
-|                                       |                          | cluster with a different name, the connection fails. The        |
-|                                       |                          | cluster name must be same on all the cluster nodes.             |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_convert_LOCK_to_trx       | *OFF*                    | Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT``.  |
-| <wsrep_convert_LOCK_to_trx>`          |                          | In other words, this parameter implicitly converts locking      |
-|                                       |                          | sessions into transactions within *mysqld*.                     |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_data_home_dir``               | *<mysql_real_            | A directory where the wsrep provider will store its files.      |
-|                                       | data_home>*              | *Galera Cluster for MySQL* uses this parameter                  |
-|                                       |                          | to store its internal state.                                    |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_dbug_option``                 |                          | A debug option to be passed to the provider.                    |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_debug``                       | *OFF*                    | Enable debug log output.                                        |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_drupal_282555_workaround``    | *ON*                     | Enable a workaround for Drupal (actually MySQL/InnoDB) bug      |
-|                                       |                          | #282555 (Inserting a ``DEFAULT`` value into an                  |
-|                                       |                          | ``AUTO_INCREMENT`` column may return a duplicate key error).    |
-|                                       |                          |                                                                 |
-|                                       |                          | Documented at:                                                  |
-|                                       |                          |                                                                 |
-|                                       |                          | - http://bugs.mysql.com/bug.php?id=41984                        |
-|                                       |                          | - http://drupal.org/node/282555                                 |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_forced_binlog_format      | *NONE*                   | Force every transaction to use the given binlog format. When    |
-| <wsrep_forced_binlog_format>`         |                          | this variable is set to something else than *NONE*, all         |
-|                                       |                          | transactions will use the given forced format, regardless of    |
-|                                       |                          | the client session specified in ``binlog_format``.              |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_max_ws_rows``                 | *128K*                   | The maximum number of rows allowed in the writeset. Currently,  |
-|                                       |                          | this parameter limits the supported size of transactions        |
-|                                       |                          | and ``LOAD DATA`` statements.                                   |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_max_ws_size``                 | *1G*                     | The maximum allowed writeset size. Currently, this parameter    |
-|                                       |                          | limits the supported size of transactions and ``LOAD DATA``     |
-|                                       |                          | statements.                                                     |
-|                                       |                          |                                                                 |
-|                                       |                          | The maximum allowed writeset size is 2G.                        |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_node_address              | *<address>[:port]*       | An option to explicitly specify the network address of the      |
-| <wsrep_node_address>`                 |                          | node, if autoguessing for some reason does not produce          |
-|                                       |                          | desirable results (multiple network interfaces, NAT, etc.)      |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_node_incoming_address``       | *<address>               | The address at which the server expects client connections.     |
-|                                       | [:mysqld_port]*          | Intended for integration with load balancers. Not used for now. |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_node_name``                   | *<hostname>*             | The logical node name - for convenience.                        |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_notify_cmd                |                          | A command to run when the cluster membership or state of this   |
-| <wsrep_notify_cmd>`                   |                          | node changes.                                                   |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_on`` **(L)**                  | *ON*                     | Use wsrep replication. When switched off, no changes made in    |
-|                                       |                          | this session will be replicated.                                |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_OSU_method                | *TOI*                    | Online schema upgrade method (MySQL >= 5.5.17). See also        |
-| <wsrep_OSU_method>`                   |                          | :ref:`Schema Upgrades <Schema Upgrades>`.                       |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_provider``                    | *none*                   | A path to wsrep provider to load. If not specified, all calls   |
-|                                       |                          | to wsrep provider will be bypassed and the server               |
-|                                       |                          | behaves like a regular *mysqld* server.                         |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_provider_options          |                          | A string of provider options passed directly to the provider.   |
-| <wsrep_provider_options>`             |                          |                                                                 |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_retry_autocommit``            | *1*                      | If an autocommit query fails the certification test due to a    |
-|                                       |                          | cluster-wide conflict, we can retry it without returning an     |
-|                                       |                          | error to the client. This option sets how many times to retry.  |
-|                                       |                          |                                                                 |
-|                                       |                          | This option is analogous to rescheduling an autocommit query    |
-|                                       |                          | should it go into deadlock with other transactions              |
-|                                       |                          | in the database lock manager.                                   |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_slave_threads``               | *1*                      | How many threads to use for applying slave writesets. There     |
-|                                       |                          | are two things to consider when choosing the number:            |
-|                                       |                          |                                                                 |
-|                                       |                          | 1. The number should be at least two times the number of CPU    |
-|                                       |                          |    cores.                                                       |
-|                                       |                          | 2. Consider how many writing client connections the other       |
-|                                       |                          |    nodes would have. Divide this by four and use that as the    |
-|                                       |                          |    ``wsrep_slave_threads`` value.                               |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_sst_auth``                    |                          | A string with authentication information for state snapshot     |
-|                                       |                          | transfer. The string depends on the state transfer method. For  |
-|                                       |                          | the *mysqldump* state transfer, it is *<username>:<password>*,  |
-|                                       |                          | where *username* has root privileges on this server. The        |
-|                                       |                          | *rsync* method ignores this option.                             |
-|                                       |                          |                                                                 |
-|                                       |                          | Use the same value on all nodes. This parameter is used to      |
-|                                       |                          | authenticate with both the state snapshot receiver and the      |
-|                                       |                          | state snapshot donor.                                           |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_donor                 |                          | A name (given in the ``wsrep_node_name`` option) of the server  |
-| <wsrep_sst_donor>`                    |                          | that should be used as a source for state transfer. If not      |
-|                                       |                          | specified, Galera will choose the most appropriate one.         |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_donor_rejects_queries | *OFF*                    | This parameter prevents blocking client sessions on a donor,    |
-| <wsrep_sst_donor_rejects_queries>`    |                          | if the donor is performing a blocking SST.                      |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| :ref:`wsrep_sst_method                | *mysqldump*              | The method to use for state snapshot transfers.                 |
-| <wsrep_sst_method>`                   |                          |                                                                 |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_sst_receive_address``         | *<wsrep_node             | The address at which this node expects to receive state         |
-|                                       | _address>*               | transfers. Depends on the state transfer method. For example,   |
-|                                       |                          | for the *mysqldump* state transfer, it is the address and the   |
-|                                       |                          | port on which this server listens. By default this is set to    |
-|                                       |                          | the *<address>* part of ``wsrep_node_address``.                 |
-|                                       |                          |                                                                 |
-|                                       |                          | *Note!* Check that your firewall allows connections to this     |
-|                                       |                          | address from other cluster nodes.                               |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_start_position``              | *00000000-0000-0000-*    | This variable exists for the sole purpose of notifying joining  |
-|                                       | *0000-000000000000:-1*   | node about state transfer completion. For more information, see |
-|                                       |                          | :ref:`Scriptable State Snapshot Transfer                        |
-|                                       |                          | <Scriptable State Snapshot Transfer>`.                          |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
-| ``wsrep_ws_persistency``              | *OFF*                    | Whether to store writesets locally for debugging. Not used      |
-|                                       |                          | in 0.8.                                                         |
-+---------------------------------------+--------------------------+-----------------------------------------------------------------+
+.. rubric:: wsrep_auto_increment_control
+
+.. _`wsrep_auto_increment_control`:
+
+.. index::
+   pair: Parameters; wsrep_auto_increment_control
+
+Automatically adjust ``auto_increment_increment`` and
+``auto_increment_offset`` system variables when the
+cluster membership changes.
+
+This parameters significantly reduces the certification
+conflict rate for``INSERT`` clauses.
 
 
+.. rubric:: wsrep_causal_reads
 
-.. rst-class:: html-toggle
+.. _`wsrep_causal_reads`:
 
--------------------------------
- wsrep_cluster_address
--------------------------------
+.. index::
+   pair: Parameters; wsrep_causal_reads
+
+Enforce strict cluster-wide ``READ COMMITTED`` semantics on
+non-transactional reads. Results in larger read latencies. 
+
+
+.. rubric:: wsrep_certify_nonPK
+
+.. _`wsrep_certify_nonPK`:
+
+.. index::
+   pair: Parameters; wsrep_certify_nonPK
+
+Generate primary keys for rows without them for the
+purpose of certification. This is required for parallel
+applying. Do not use tables without primary keys. 
+
+.. rubric:: wsrep_cluster_address
+
 .. _`wsrep_cluster_address`:
 
 .. index::
@@ -170,7 +154,7 @@ by (L).
 .. index::
    single: my.cnf
 
-Galera takes addresses in the URL format::
+*Galera Cluster* takes addresses in the URL format::
 
     <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
 
@@ -182,7 +166,8 @@ Changing this variable in runtime will cause the node to
 close connection to the current cluster (if any), and
 reconnect to the new address. (However, doing this at
 runtime may not be possible for all SST methods.) As of
-Galera 23.2.2, it is possible to provide a comma separated
+*Galera Cluster* 23.2.2,
+it is possible to provide a comma separated
 list of other nodes in the cluster as follows::
 
     gcomm://node1:port1,node2:port2,...[?option1=value1&...]
@@ -200,11 +185,20 @@ the node to startup alone, thus initializing a new cluster
          ``service mysql start --wsrep-cluster-address="gcomm://"``
 
 
-.. rst-class:: html-toggle
+.. rubric:: wsrep_cluster_name
 
--------------------------------
- wsrep_convert_LOCK_to_trx
--------------------------------
+.. _`wsrep_cluster_name`:
+
+.. index::
+   pair: Parameters; wsrep_cluster_name
+
+The logical cluster name. If a node tries to connect to a
+cluster with a different name, the connection fails. The
+cluster name must be same on all the cluster nodes. 
+
+ 
+.. rubric:: wsrep_convert_LOCK_to_trx
+
 .. _`wsrep_convert_LOCK_to_trx`:
 
 .. index::
@@ -222,12 +216,56 @@ working in a multi-master setup.
 .. note:: Loading a large database dump with ``LOCK``
           statements can result in abnormally large transactions and
           cause an out-of-memory condition.
-  
-.. rst-class:: html-toggle
 
--------------------------------
- wsrep_forced_binlog_format
--------------------------------
+.. rubric:: wsrep_data_home_dir
+
+.. _`wsrep_data_home_dir`:
+
+.. index::
+   pair: Parameters; wsrep_data_home_dir
+
+A directory where the wsrep provider will store its files.
+*Galera Cluster* uses this parameter
+to store its internal state.
+
+.. rubric:: wsrep_dbug_option
+
+.. _`wsrep_dbug_option`:
+
+.. index::
+   pair: Parameters; wsrep_dbug_option
+
+A debug option to be passed to the provider.
+
+
+.. rubric:: wsrep_debug
+
+.. _`wsrep_debug`:
+
+.. index::
+   pair: Parameters; wsrep_debug
+
+Enable debug log output.
+
+
+.. rubric:: wsrep_drupal_282555_workaround
+
+.. _`wsrep_drupal_282555_workaround`:
+
+.. index::
+   pair: Parameters; wsrep_drupal_282555_workaround
+
+Enable a workaround for Drupal (actually MySQL/InnoDB) bug
+#282555 (Inserting a ``DEFAULT`` value into an
+``AUTO_INCREMENT`` column may return a duplicate key error).
+
+Documented at:
+
+- http://bugs.mysql.com/bug.php?id=41984
+- http://drupal.org/node/282555
+
+.. rubric:: wsrep_forced_binlog_format
+
 .. _`wsrep_forced_binlog_format`:
 
 .. index::
@@ -247,11 +285,36 @@ replication during  rolling schema upgrade processing.
 However, in most cases, ``ROW`` replication
 is valid for asymmetric schema replication.
 
-.. rst-class:: html-toggle
 
--------------------------------
- wsrep_node_address
--------------------------------
+
+.. rubric:: wsrep_max_ws_rows
+
+.. _`wsrep_max_ws_rows`:
+
+.. index::
+   pair: Parameters; wsrep_max_ws_rows
+
+The maximum number of rows allowed in the writeset. Currently,
+this parameter limits the supported size of transactions
+and ``LOAD DATA`` statements.
+
+
+.. rubric:: wsrep_max_ws_size
+
+.. _`wsrep_max_ws_size`:
+
+.. index::
+   pair: Parameters; wsrep_max_ws_size
+
+The maximum allowed writeset size. Currently, this parameter
+limits the supported size of transactions and ``LOAD DATA``
+statements.
+
+The maximum allowed writeset size is 2G.
+
+
+.. rubric:: wsrep_node_address
+
 .. _`wsrep_node_address`:
 
 
@@ -264,16 +327,35 @@ desirable results (multiple network interfaces, NAT, etc.)
 
 By default, the address of the first network interface (*eth0*)
 and the default port 4567 are used. The *<address>* and
-*:port* will be passed to the wsrep provider (Galera) to be
+*:port* will be passed to the Galera replication Plugin to be
 used as a base address in its communications. It will also be
 used to derive the default values for parameters
 ``wsrep_sst_receive_address`` and ``ist.recv_address``.
 
-.. rst-class:: html-toggle
 
--------------------------------
- wsrep_notify_cmd
--------------------------------
+.. rubric:: wwsrep_node_incoming_address
+
+.. _`wsrep_node_incoming_address`:
+
+
+.. index::
+   pair: Parameters; wsrep_node_incoming_address
+
+The address at which the server expects client connections.
+Intended for integration with load balancers. Not used for now.
+
+.. rubric:: wsrep_node_name
+
+.. _`wsrep_node_name`:
+
+
+.. index::
+   pair: Parameters; wsrep_node_name
+
+The logical node name - for convenience.
+
+.. rubric:: wsrep_notify_cmd
+
 .. _`wsrep_notify_cmd`:
 
 .. index::
@@ -320,11 +402,20 @@ on the local node with changes taking place at the
 cluster.
 
 
-.. rst-class:: html-toggle
+.. rubric:: wsrep_on
 
--------------------------------
- wsrep_OSU_method
--------------------------------
+.. _`wsrep_on`:
+
+
+.. index::
+   pair: Parameters; wsrep_on
+
+Use wsrep replication. When switched off, no changes made in
+this session will be replicated.
+
+
+.. rubric:: wsrep_OSU_method
+
 .. _`wsrep_OSU_method`:
 
 .. index::
@@ -351,13 +442,21 @@ alternative methods:
   effects are not replicated; the user is responsible for
   manually performing this operation on each of the nodes.
 
-  
-  
-.. rst-class:: html-toggle
 
--------------------------------
- wsrep_provider_options
--------------------------------
+.. rubric:: wsrep_provider
+
+.. _`wsrep_provider`:
+
+
+.. index::
+   pair: Parameters; wsrep_provider
+
+A path to wsrep provider to load. If not specified, all calls
+to wsrep provider will be bypassed and the server
+behaves like a regular *mysqld* server.
+   
+.. rubric:: wsrep_provider_options
+
 .. _`wsrep_provider_options`:
 
 .. index::
@@ -373,22 +472,73 @@ Usually, you just fine-tune:
 - Group communication timeouts. See chapter
   :ref:`WAN Replication <WAN Replication>`.
 
-  See also a list of all Galera parameters in chapter
-  :ref:`Galera Parameters <Galera Parameters>`.
-  
-.. rst-class:: html-toggle
+  See also a list of all *Galera Cluster* parameters
+  in chapter :ref:`Galera Parameters <Galera Parameters>`.
 
--------------------------------
- wsrep_sst_donor
--------------------------------
+
+.. rubric:: wsrep_retry_autocommit
+
+.. _`wsrep_retry_autocommit`:
+
+.. index::
+   pair: Parameters; wsrep_retry_autocommit
+
+If an autocommit query fails the certification test due to a
+cluster-wide conflict, we can retry it without returning an
+error to the client. This option sets how many times to retry.
+
+This option is analogous to rescheduling an autocommit query
+should it go into deadlock with other transactions
+in the database lock manager.
+
+
+.. rubric:: wsrep_slave_threads
+
+.. _`wsrep_slave_threads`:
+
+.. index::
+   pair: Parameters; wsrep_slave_threads
+
+How many threads to use for applying slave writesets. There
+are two things to consider when choosing the number:
+
+1. The number should be at least two times the number of CPU
+   cores.
+2. Consider how many writing client connections the other
+   nodes would have. Divide this by four and use that as the
+   ``wsrep_slave_threads`` value.
+
+
+.. rubric:: wsrep_sst_auth
+
+.. _`wsrep_sst_auth`:
+
+.. index::
+   pair: Parameters; wsrep_sst_auth
+
+A string with authentication information for state snapshot
+transfer. The string depends on the state transfer method. For
+the *mysqldump* state transfer, it is *<username>:<password>*,
+where *username* has root privileges on this server. The
+*rsync* method ignores this option.
+
+Use the same value on all nodes. This parameter is used to
+authenticate with both the state snapshot receiver and the
+state snapshot donor.
+
+
+
+.. rubric:: wsrep_sst_donor
+
 .. _`wsrep_sst_donor`:
 
 .. index::
    pair: Parameters; wsrep_sst_donor
 
-A name (given in the ``wsrep_node_name`` option) of the server
+A name (given in the ``wsrep_node_name`` parameter) of the server
 that should be used as a source for state transfer. If not
-specified, Galera will choose the most appropriate one.
+specified, *Galera Cluster* will choose
+the most appropriate one.
 
 In this case, the group communication module monitors the node
 state for the purpose of flow control, state transfer and quorum
@@ -397,9 +547,10 @@ The first node in the ``SYNCED`` state in the index becomes the
 donor and is not available for requests. 
 
 If there are no free ``SYNCED`` nodes at the moment, the
-joining node reports:
+joining node reports::
 
-``Requesting state transfer failed: -11(Resource temporarily unavailable). Will keep retrying every 1 second(s)``
+    Requesting state transfer failed: -11(Resource temporarily unavailable).
+    Will keep retrying every 1 second(s)
 
 and keeps on retrying the state transfer request until it
 succeeds. When the state transfer request succeeds, the
@@ -407,11 +558,8 @@ entry below is written to log:
 
 ``Node 0 (XXX) requested state transfer from '*any*'. Selected 1 (XXX) as donor.``
 
-.. rst-class:: html-toggle
+.. rubric:: wsrep_sst_donor_rejects_queries
 
----------------------------------
- wsrep_sst_donor_rejects_queries
----------------------------------
 .. _`wsrep_sst_donor_rejects_queries`:
 
 .. index::
@@ -443,11 +591,8 @@ reconnect to another node.
           regular client session. 
 
 
-.. rst-class:: html-toggle
+.. rubric:: wsrep_sst_method
 
--------------------------------
- wsrep_sst_method
--------------------------------
 .. _`wsrep_sst_method`:
 
 .. index::
@@ -483,7 +628,46 @@ The supported methods are:
       datadir=<path to data dir>
       [client]
       socket=<path to socket>
+
+
+.. rubric:: wsrep_sst_receive_address
+
+.. _`wsrep_sst_receive_address`:
+
+.. index::
+   pair: Parameters; wsrep_sst_receive_address
+
+The address at which this node expects to receive state
+transfers. Depends on the state transfer method. For example,
+for the *mysqldump* state transfer, it is the address and the
+port on which this server listens. By default this is set to
+the *<address>* part of ``wsrep_node_address``.
+
+.. note:: Check that your firewall allows connections to this
+          address from other cluster nodes.
   
-  
+
+
+.. rubric:: wsrep_start_position
+
+.. _`wsrep_start_position`:
+
+.. index::
+   pair: Parameters; wsrep_start_position
+
+This variable exists for the sole purpose of notifying a joining
+node about state transfer completion. For more information, see
+:ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
+
+.. rubric:: wsrep_ws_persistency
+
+.. _`wsrep_ws_persistency`:
+
+.. index::
+   pair: Parameters; wsrep_ws_persistency
+
+Whether to store writesets locally for debugging. Not used in 0.8.
+
+
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

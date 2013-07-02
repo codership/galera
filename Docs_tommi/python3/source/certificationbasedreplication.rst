@@ -47,7 +47,7 @@ the original transaction is rolled back. If the test succeeds,
 the transaction is committed and the writeset is applied on
 the rest of the nodes.  
 
-The certification test implemented in Galera depends on the
+The certification test implemented in *Galera Cluster* depends on the
 global ordering of transactions. Each transaction is assigned
 a global ordinal sequence number during replication. Thus, when
 a transaction reaches the commit point, the sequence number of

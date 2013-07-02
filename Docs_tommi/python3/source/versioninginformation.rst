@@ -9,15 +9,15 @@
 - MySQL server patched with the wsrep
   :abbr:`API (Application Programming Interface)`
 
-This chapter describes *Galera Cluster for MySQL* release
-numbering schemes and software packages.
+This chapter describes the Galera Cluster
+release numbering schemes and software packages.
 
 ---------------------------
  Release Numbering Schemes
 ---------------------------
 
-*Galera Cluster for MySQL* software packages have their own
-release numbering schemes as follows:
+*Galera Cluster* software packages have
+their own release numbering schemes as follows:
 
 - *Galera wsrep provider* |---| The Galera wsrep provider release
   numbering scheme is as follows:
@@ -46,7 +46,7 @@ release numbering schemes as follows:
 .. index::
    single: Linux distributions
 
-*Galera Cluster for MySQL* software packages for different
+*Galera Cluster* software packages for different
 Linux distributions are available as follows:
 
 - Galera wsrep provider:

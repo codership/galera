@@ -8,9 +8,9 @@
    pair: Global Transaction ID; Recovery
    
 Occarsionally, you may have to restart the entire
-*Galera Cluster for MySQL*. This may happen, for
+*Galera Cluster*. This may happen, for
 example in the case of a power failure where every
-Galera node is shut down and you have no *mysqld*
+*Galera Cluster* node is shut down and you have no *mysqld*
 process at all. If this happens, proceed as
 follows:
 

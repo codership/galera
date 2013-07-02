@@ -5,12 +5,12 @@
 .. index::
    pair: Installation; Galera Cluster for MySQL
 
-If you want to install *Galera Cluster for MySQL*,
+If you want to install *Galera Cluster*,
 proceed as follows:
 
 1. Download the write set replication patches for MySQL as a binary package for your
    Linux distribution from (https://launchpad.net/codership-mysql/+download).
-2. Download *Galera*, a generic synchronous multi-master
+2. Download Galera replication Plugin, a generic synchronous multi-master
    replication plugin for transactional applications from
    (https://launchpad.net/galera).
 3. Verify the downloads using the MD5 sums that Launchpad generates.
@@ -27,17 +27,17 @@ proceed as follows:
 Installing Galera Cluster for MySQL on DEB-based Distributions
 ---------------------------------------------------------------
 
-This chapter describes how to install *Galera Cluster for MySQL* on Debian
+This chapter describes how to install *Galera Cluster* on Debian
 and Debian-derived distributions. 
 
 Upgrade from *mysql-server-5.0* to *mysql-wsrep* is not supported.
-Upgrade to *mysql-server-5.1*.
+Upgrade to *mysql-server-5.5*.
 
 If you are installing over an existing MySQL installation,
 *mysql-server-wsrep* will conflict with the
-*mysql-server-5.1* package. Remove the package as follows::
+*mysql-server-5.5* package. Remove the package as follows::
 
-    $ sudo apt-get remove mysql-server-5.1 mysql-server-core-5.1
+    $ sudo apt-get remove mysql-server-5.5 mysql-server-core-5.5
 
 The *mysql-server-wsrep* package requires packages *psmisc* and
 *mysql-client-5.1.47* (or later). The MySQL 5.1 packages can be
@@ -53,14 +53,14 @@ Lenny proceeds as follows::
     $ sudo apt-get install psmisc
     $ sudo apt-get -t lenny-backports install mysql-client-5.1
 
-To install *Galera Cluster for MySQL*, proceed as follows:
+To install *Galera Cluster*, proceed as follows:
 
 1. Install the write set replication patches:
 
    ``$ sudo dpkg -i <mysql-server-wsrep DEB>``
 
 2. Configure the write set replication patches to use the
-   Galera plugin as a wsrep provider:
+   Galera Replication Plugin as a *wsrep provider*:
    
    ``wsrep_provider=/usr/lib/galera/libgalera_smm.so``
 
@@ -71,12 +71,12 @@ To install *Galera Cluster for MySQL*, proceed as follows:
 Installing Galera Cluster for MySQL on RPM-based Distributions
 ---------------------------------------------------------------
 
-This chapter describes how to install *Galera Cluster for MySQL* on CentOS and
+This chapter describes how to install *Galera Cluster* on CentOS and
 similar RPM-based distributions.
 
-If you are migrating from an existing MySQL installation, there are two optins:
+If you are migrating from an existing MySQL installation, there are two options:
 
-- If you're already using official MySQL-server-community 5.1.x RPM from
+- If you're already using official MySQL-server-community 5.5.x RPM from
   Oracle:
 
      ``# rpm -e mysql-server``
@@ -87,17 +87,17 @@ If you are migrating from an existing MySQL installation, there are two optins:
      
         ``# rpm --nodeps --allmatches -e mysql-server mysql-test mysql-bench``
 
-     2. Install the official *MySQL-shared-compat-5.1.x* from
+     2. Install the official *MySQL-shared-compat-5.5.x* from
         http://dev.mysql.com/downloads/mysql/5.1.html
 
-To install *Galera Cluster for MySQL*, proceed as follows:
+To install *Galera Cluster*, proceed as follows:
 
 1. Install the write set replication patches:
 
    ``# rpm -Uvh <MySQL-server-wsrep RPM>``
 
 2. Configure the write set replication patches to use the
-   Galera plugin as a wsrep provider:
+   Galera Replication Plugin as a *wsrep provider*:
    
    ``wsrep_provider=/usr/lib64/galera/libgalera_smm.so``
 
@@ -114,8 +114,8 @@ Installing Additional Packages
 Install also the following additional packages (if not yet installed):
 
 - *MySQL-client-community* for connecting to the server and for the
-  *mysqldump*-based SST.
-- *rsync* for the *rsync*-based SST
+  *mysqldump*-based SST (for RPM-based distributions only).
+- *rsync* for the *rsync*-based SST.
 - *xtrabackup* and *nc* (*netcat*) for the *xtrabackup*-based SST.
 
 -----------------------

@@ -6,24 +6,22 @@
 This chapter contains some advanced configuration tips.
 
 --------------------------------------
-Setting Parallel CPU Threads
+Setting Parallel Slave Threads
 --------------------------------------
-.. _`Setting Parallel CPU Threads`:
+.. _`Setting Parallel Slave Threads`:
 
 .. index::
    pair: Configuration Tips; innodb_autoinc_lock_mode
-   
 .. index::
    pair: Configuration Tips; innodb_locks_unsafe_for_binlog
-   
 .. index::
    pair: Configuration Tips; wsrep_slave_threads
 
-There is no rule about how many slave :abbr:`CPU (Central Processing Unit)`
-threads one should configure for replication. At the same time,
-parallel threads do not guarantee better performance. However,
-parallel applying will not impair regular operation performance
-and will most likely speed up the synchronization of new nodes
+There is no rule about how many slave threads one should
+configure for replication. At the same time, parallel threads
+do not guarantee better performance. However, parallel
+applying will not impair regular operation performance and
+will most likely speed up the synchronization of new nodes
 with the cluster.
 
 Start with four slave threads per CPU core, the logic being that, in a
@@ -38,7 +36,7 @@ variable. This value essentially determines how many writesets
 on average can be applied in parallel. Do not use a value higher
 than that.
 
-To set four parallel CPU threads, use the parameter value below::
+To set four parallel slave threads, use the parameter value below::
 
     wsrep_slave_threads=4
 
@@ -75,7 +73,8 @@ be no less than the ``evs.suspect_timeout`` parameter value and the
 .. note:: WAN links can have exceptionally high latencies. Take
           Round-Trip Time (RTT) measurements (ping RTT is a fair estimate)
           from between your cluster nodes and make sure
-          that all temporal Galera settings (periods and timeouts, such
+          that all temporal *Galera Cluster*
+          settings (periods and timeouts, such
           as ``evs.join_retrans_period``) exceed the highest RTT in
           your cluster.
   
@@ -148,18 +147,18 @@ the ``wsrep_received_bytes`` status variable. Proceed as follows:
    ``(wsrep_received_bytes2 - wsrep_received_bytes1)/(t2 - t1)``
 
 -----------------------------
-  Using Galera with SElinux
+  Using GCM with SElinux
 -----------------------------
-.. _`Using Galera with SElinux`:
+.. _`Using GCM with SElinux`:
 
 .. index::
    pair: Configuration; SELinux
 
-If you want to use Galera with SElinux, start by running SELinux
+If you want to use *Galera Cluster* with SElinux, start by running SELinux
 in the permissive mode. In this mode, SELinux will not prohibit
-any Galera actions, but will log a warning for all actions that
+any *Galera Cluster* actions, but will log a warning for all actions that
 would have been prohibited. Collect these warnings and iteratively 
-create a policy for Galera that allows to use all the different
+create a policy for *Galera Cluster* that allows to use all the different
 ports and files that you need. When there are no more warnings,
 switch back to the enforcing mode. 
 

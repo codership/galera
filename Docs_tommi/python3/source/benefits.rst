@@ -1,19 +1,19 @@
 =================
- Galera Benefits
+ GCM Benefits
 =================
-.. _`Galera Benefits`:
+.. _`GCM Benefits`:
 
-Galera is a significant step in terms of improving MySQL
+*Galera Cluster* is a significant step in terms of improving MySQL
 high availability. The MySQL ecosystem has offered users
 various ways to achieve high availability, but typically
 all alternatives have provided only some of the following
 features, but not all, thus making the choice of a high
 availability solution an exercise in tradeoffs.
 
-Galera provides all of the following features:
+*Galera Cluster* provides all of the following features:
 
 * *True multi-master* |---| Read and write to any node at any time.
-* *Synchronous replication* |---| No slave lag, no data is lost at node crash or failover.
+* *Synchronous replication* |---| No slave lag, no data is lost at node crash.
 * *Tightly coupled* |---| All nodes hold the same state. No diverged data between nodes allowed.
 * *Multi-threaded slave* |---| For better performance. For any workload.
 * *No master-slave failover* operations or use of VIP.
@@ -24,7 +24,7 @@ Galera provides all of the following features:
 * *Tranparent to applications* |---| Required no (or minimal) changes)
   to the application. 
 * No read and write splitting needed. 
-* Zero downtime operations. Rolling Schema Upgrade.
+
 
 
 The result is a high availability solution that is both robust
@@ -32,13 +32,13 @@ in terms of data integrity and high performance with instant
 failovers.
 
 ------------------------------
- Galera Cloud Implementations
+ GCM Cloud Implementations
 ------------------------------
-.. _`Galera Cloud Implementations`:
+.. _`GCM Cloud Implementations`:
 
-Another main benefit of Galera is good cloud support.
+Another main benefit of *Galera Cluster* is good cloud support.
 Automatic node provisioning makes elastic scale-out
-and scale-in operations painless. Galera has proven
+and scale-in operations painless. *Galera Cluster* has proven
 to perform extremely well in the cloud, such as when
 using multiple small node instances, across multiple
 data centers (e.g. AWS zones) or even over Wider Area

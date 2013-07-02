@@ -8,19 +8,15 @@ several components due to network failure. A component is a set of
 nodes, which are connected to each other, but not to nodes in other
 components. 
 
-.. A component is not formed until all nodes agree on the component
-   membership. If consensus cannot be reached before a configurable
-   timeout, the network is considered too unstable for replication.
-   *What happens in this case? The entire cluster fails?*
-
 In such a situation, only one of the components can continue to
 modify the database state to avoid history divergence. This component
-is called the Primary Component (PC). In normal operation, the Galera
-cluster is a PC. When cluster partitioning happens, Galera invokes a
-special quorum algorithm to select a PC that guarantees that there
-is no more than one primary component in the cluster.
+is called the Primary Component (PC). In normal operation, the
+*Galera Cluster* is a PC. When
+cluster partitioning happens, *Galera Cluster*
+invokes a special quorum algorithm to select a PC that guarantees
+that there is no more than one primary component in the cluster.
 
-See also chapter :ref:`Galera Arbitrator <Galera Arbitrator>`.
+.. seealso:: Chapter :ref:`Galera Arbitrator <Galera Arbitrator>`
 
 -------------------
  Weighted Quorum
@@ -58,13 +54,13 @@ Primary Component.
 .. figure:: images/pc.png
 
 As quorum requires a majority, you cannot have automatic failover
-in a two node cluster, or in anly cluster that has an even number
-of nodes. The failure of one or an even number of nodes will cause the
-remaining node(s) to go non-Primary. Furthermore, a cluster with an
-even number of nodes has a risk of a split brain condition; if
-network connectivity is lost between the two partitions, neither
-partition would retain quorum, and both would go to non-Primary,
-as depicted in the figure below.
+in a two node cluster. The failure of one node will cause the
+remaining node to go non-Primary. Furthermore, a cluster with an
+even number of nodes has a risk of a potential split brain condition; if
+network connectivity is lost somwhere between partitions, and the
+number of nodes is split exactly in half, neither partition would
+retain quorum, and both would go to non-Primary, as depicted in the
+figure below.
 
 .. figure:: images/splitbrain.png
 
@@ -76,6 +72,18 @@ on other infrastructure levels. For example:
 - A cluster spanning networks should be spread across at least 3 networks
 - A cluster spanning data centers should spread across at least 3 data centers
 
+To prevent the risk of a split-brain situation within a
+cluster that has an even number of nodes, partition the
+cluster in a way that one component always forms the
+Primary cluster section. For example (P = Primary, NP = Non-Primary):
+
+4 -> 3(P) + 1(NP)
+6 -> 4(P) + 2(NP)
+6 -> 5(P) + 1(NP)
+
+In these partitioning examples, it is extremely rare that the
+number of nodes would be split exactly in half.
+
 -------------------
 Quorum Calculation
 -------------------
@@ -83,9 +91,9 @@ Quorum Calculation
 .. index::
    pair: Parameters; pc.weight
 
-Galera supports a weighted quorum, where each node can be
-assigned a weight in the 0 to 255 range, with which it will
-participate in quorum calculations. 
+Galera Cluster supports a weighted quorum, where
+each node can be assigned a weight in the 0 to 255 range, with which it
+will participate in quorum calculations. 
 
 The quorum calculation formula is::
 

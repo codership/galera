@@ -1,10 +1,9 @@
-=====================================
- Third Party Galera Implementations
-=====================================
-.. _`Third Party Galera Implementations`:
+============================================
+ Third Party Galera Cluster Implementations
+============================================
+.. _`Third Party Galera Cluster Implementations`:
 
-There are two products that implement
-*Galera Cluster for MySQL*:
+There are two products that implement *Galera Cluster*:
 
 - *Percona XtraDB Cluster* |---| Percona XtraDB Cluster
   is a high availability and high scalability solution
@@ -16,8 +15,7 @@ There are two products that implement
 - *MariaDB Galera Cluster* |---| MariaDB Galera Cluster
   uses the Galera library for the replication implementation.
   To interface with :term:`Galera Replication`, MariaDB is enhanced
-  to support the replication API definition in the wsrep
-  API project.
+  to support the replication API definition in the *wsrep API* project.
   
   For more information, see https://kb.askmonty.org/en/what-is-mariadb-galera-cluster/.
 

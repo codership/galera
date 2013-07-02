@@ -6,18 +6,16 @@
 .. index::
    pair: Installation; Compiling Galera
 
-These instructions describe how to compile *Galera
-Cluster for MySQL* from source.
+These instructions describe how to compile
+*Galera Cluster* from source.
 
-The latest revision of *Galera Cluster for MySQL* can be
-compiled on Solaris 11 x86 and in Linux. You cannot compile
-*Galera Cluster for MySQL* on Solaris 10 or on computers
-using the big endian byte order.
+The latest revision of *Galera Cluster* can be
+compiled on Solaris 11 x86 and in Linux.
 
 Proceed as follows:
 
-1. Download the *Galera Cluster for MySQL* source code from
-   the latest Galera tree from Launchpad:
+1. Download the *Galera Cluster* source code from
+   the latest *Galera Cluster* tree from Launchpad:
    
    https://code.launchpad.net/~codership/galera/2.x
 2. Before compiling, ensure that (in this order):

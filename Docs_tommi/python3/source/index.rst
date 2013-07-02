@@ -34,8 +34,9 @@ Legal Notice
 Any trademarks, logos, and service marks in this document are the
 property of Codership or other third parties. You are not permitted
 to use these Marks without the prior written consent of Codership
-or such appropriate third party. Codership, Galera, and the Codership
-logo are trademarks or registered trademarks of Codership.
+or such appropriate third party. Codership, Galera Cluster for MySQL,
+and the Codership logo are trademarks or registered trademarks of
+Codership.
 
 All Materials on this Document are (and shall continue to be) owned
 exclusively by Codership or other respective third party owners and

@@ -3,14 +3,16 @@
 ====================================
 .. _`Upgrading Galera Cluster for MySQL`:
 
-This chapter describes three different ways to upgrade *Galera Cluster for MySQL*. 
+This chapter describes three different ways to upgrade
+*Galera Cluster*. 
 
 ---------------
 Rolling Upgrade
 ---------------
 .. _`Rolling Upgrade`:
 
-You can carry out a rolling upgrade on a Galera cluster by applying
+You can carry out a rolling upgrade on a
+*Galera Cluster* by applying
 the following steps on each cluster node:
 
 .. note:: Transfer all clients connections from the node
@@ -72,12 +74,13 @@ Bulk Upgrade
 A bulk upgrade upgrades all nodes in an idle cluster to avoid
 time-consuming state transfers. Bulk upgrade produces a short
 but complete service outage. You can carry out a bulk upgrade
-on a Galera cluster as follows:
+on a *Galera Cluster* as follows:
 
 1. Stop all load on the cluster
 2. Shut down all the nodes
 3. Upgrade software
-4. Restart the nodes. The nodes will merge to the cluster without state transfers, in a matter of seconds.
+4. Restart the nodes. The nodes will merge to the cluster
+   without state transfers, in a matter of seconds.
 5. Resume the load on the cluster
 
 .. note:: You can carry out steps 2-3-4 on all nodes in parallel,

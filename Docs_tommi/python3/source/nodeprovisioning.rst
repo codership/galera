@@ -16,14 +16,14 @@
 
 .. index::
    pair: Parameters; wsrep_data_dir
-
 .. index::
    pair: Parameters; wsrep_sst_donor
-
 .. index::
    pair: Parameters; wsrep_node_name
+.. index::
+   single: Total Order Isolation
 
-If a state of a new or failed node differs from the state of
+If the state of a new or failed node differs from the state of
 the cluster :term:`Primary Component` it needs to be synchronized. As a result,
 new node provisioning and failed node recovery are essentially
 the same process of joining a node to the cluster
@@ -31,9 +31,16 @@ the same process of joining a node to the cluster
 
 The initial node state ID is read from the *grastate.txt*
 file in ``wsrep_data_dir``, where it is saved every time
-the node is gracefully shut down. If the node crashes, its
-database state is unknown and its initial Galera node state
-is undefined (``00000000-0000-0000-0000-000000000000:-1``).
+the node is gracefully shut down. If the node crashes in
+the :term:`Total Order Isolation` mode, its database state is
+unknown and its initial *Galera Cluster*
+node state is undefined
+(``00000000-0000-0000-0000-000000000000:-1``). [1]_
+
+.. [1] In normal transaction processing, only the ``seqno`` part
+       of the GTID remains undefined (``-1``), and the ``UUID``
+       part remains valid. In this case, the node can be recovered
+       through IST.
 
 When a node joins the primary component, it compares its
 state ID to that of the :abbr:`PC (Primary Component)` and
@@ -54,7 +61,7 @@ aborts. Use the same donor name as set in the ``wsrep_node_name``
 parameter on the donor node.
 
 .. note:: State transfer is a heavy operation not only on the
-          joining node, but also on donor. The state donor may
+          joining node, but also on the donor. The state donor may
           not be able to serve client requests. Thus, when possible,
           select the donor manually, based on network proximity.
           Configure the load balancer to transfer client connections
@@ -82,12 +89,17 @@ it will accept client connections.
 .. index::
    pair: State Snapshot Transfer methods; Comparison of
 
-You can choose between two different node provisioning methods:
+There are two different node provisioning methods:
 
-- If you have a node state, use State Snapshot Transfer (SST)
-- If you do not have a state, use Incremental State Transfer (IST)
+- State Snapshot Transfer (SST), which transfers the entire
+  node state as it is (hence "snapshot").
+- Incremental State Transfer (IST), which only transfers the
+  results of transactions missing from the joining node.
 
-These methods are compared in this chapter.
+You can choose the SST method (*mysqldump*, *rsync*, or
+*xtrabackup*), whereas IST will be automatically chosen
+by the donor node, when it is available.  The SST methods
+are compared in this chapter.
 
 There is no single best state snapshot transfer method; the method
 must be chosen depending on the situation. Fortunately, the choice

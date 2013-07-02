@@ -9,12 +9,13 @@ node is a regular MySQL server and you convert your
 existing MySQL server into a node and use that server
 as the cluster base. 
 
-Due to its synchronous multi-master qualities, Galera
-cluster can be seen as a single server listening at many
-interfaces. To give you an idea of what Galera is capable
-of, we will consider a typical N-tier application and
-discuss different benefits and considerations of deploying
-*Galera Cluster for MySQL* in that context.
+Due to its synchronous multi-master qualities, the
+*Galera Cluster* can be
+seen as a single server listening at many interfaces. To give
+you an idea of what *Galera Cluster*
+is capable of, we will consider a typical N-tier application
+and discuss different benefits and considerations of deploying
+*Galera Cluster* in that context.
 
 -------------------
  No Clustering

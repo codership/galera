@@ -30,39 +30,39 @@ troubleshooting purposes.
 | *port in use* in the server error log.                 |                                                             |
 +--------------------------------------------------------+-------------------------------------------------------------+
 | If you use *mysqldump* for state transfer, and it      | Read the pseudo-statement within the ``SQL SYNTAX``         |
-| fails, an ``SQL SYNTAX`` error is written in the       | error.                                                      |
+| fails, an ``SQL SYNTAX`` error is written in the       | resynchronizes with the primary component.                  |
 | server error log. This error is only an indication of  |                                                             |
 | the error. The pseudo-statement within the             |                                                             |
 | ``SQL SYNTAX`` error contains the actual error         |                                                             |
 | message.                                               |                                                             |
 +--------------------------------------------------------+-------------------------------------------------------------+
-| After a temporary split, if the Primary Component was  | Wait. This situation is automatically cleared after a       |
+| After a temporary split, if the Primary Component was  | This situation will be cleared after the node automatically |
 | still reachable and its state was modified,            | while.                                                      |
 | resynchronization occurs. In resynchronization, nodes  |                                                             |
 | on the other part of the cluster drop all client       |                                                             |
 | connections. The connections get the *Unknown command* |                                                             |
 | error.                                                 |                                                             |
 +--------------------------------------------------------+-------------------------------------------------------------+
-| ``SELECT ... FROM ...`` returns "Unknown command".     | You can bypass the ``wsrep_provider`` check by switching    |
+| Every query returns "Unknown command".                 | You can bypass the ``wsrep_provider`` check by switching    |
 |                                                        | the wsrep service off by using the command:                 |
 | This phenomenon takes place if you have explicitly     |                                                             |
 | specified the ``wsrep_provider`` variable, but the     | ``mysql> SET wsrep_on=0;``                                  |
 | wsrep provider rejects service, for example, because   |                                                             |
-| the node is not connected to the cluster primary       | This command instructs *mysqld* to ignore the               |
-| component (the ``wsrep_cluster_address`` parameter     | ``wsrep_provider setting`` and to behave as a               |
+| the node is not connected to the cluster Primary       | This command instructs *mysqld* to ignore the               |
+| Component (the ``wsrep_cluster_address`` parameter     | ``wsrep_provider setting`` and to behave as a               |
 | may be unset, or there can be networking issues).      | standalone MySQL server. This may lead to data              |
 | In this case, the node is considered to be unsynced    | inconsistency with the rest of the cluster, which, on the   |
 | with the global state and unable to serve SQL requests | other hand, may be a desirable result for, for example,     |
 | except ``SET`` and/or ``SHOW``.                        | modifying "local" tables.                                   |
-+--------------------------------------------------------+-------------------------------------------------------------+
-| Every query returns "Unknown command".                 | If you know that no other nodes of your cluster form        |
+|                                                        |                                                             |
+|                                                        | If you know that no other nodes of your cluster form        |
 |                                                        | Primary Component, rebootstrap the Primary Component as     |
-| The nodes no longer think that they are part of the    | follows:                                                    |
-| Primary Component (that is, they suspect that there    |                                                             |
-| may be another Primary Component, which they have no   | 1. Choose the most up-to-date node by checking the output   |
-| connection to). This can be due to a network failure,  |    of ``SHOW STATUS LIKE 'wsrep_last_committed'``. Choose   |
-| crash of half or more of the nodes, split brain, and   |    the node with the highest value.                         |
-| so on.                                                 | 2. Run                                                      |
+|                                                        | follows:                                                    |
+|                                                        |                                                             |
+|                                                        | 1. Choose the most up-to-date node by checking the output   |
+|                                                        |    of ``SHOW STATUS LIKE 'wsrep_last_committed'``. Choose   |
+|                                                        |    the node with the highest value.                         |
+|                                                        | 2. Run                                                      |
 |                                                        |    ``SET GLOBAL wsrep_provider_options='pc.bootstrap=yes'`` |
 |                                                        |    on it.                                                   |
 |                                                        |                                                             |

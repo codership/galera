@@ -10,7 +10,7 @@ proceed as follows:
 
 1. Download the MariaDB Galera Cluster
    (http://downloads.mariadb.org/mariadb-galera).
-2. Download the Galera wsrep provider
+2. Download the Galera Replication Plugin
    (https://launchpad.net/galera/+download).
 3. Extract the downloaded packages.
 4. Install the downloaded packages.

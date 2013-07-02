@@ -5,7 +5,7 @@
 .. index::
    single: Load balancing
 
-*Galera Cluster for MySQL* guarantees node consistency regardless
+*Galera Cluster* guarantees node consistency regardless
 of where and when the query is issued. In other words, you are
 free to choose a load-balancing approach that best suits your
 purposes. If you decide to place the load balancing mechanism

@@ -14,21 +14,23 @@ examples.
 
 Before you start, ensure that you have:
 
-- Three database hosts with Galera installed.
+- Three database hosts with the *Galera Cluster* installed.
 - No firewalls between the hosts.
 - *Selinux* or *apparmor* disabled or running in permissive mode.
+- Defined the ``wsrep_provider`` parameter value.
 
-See also chapter :ref:`Using Galera with SElinux <Using Galera with SElinux>`.
+.. seealso:: Chapter :ref:`Using GCM with SElinux <Using GCM with SElinux>`
 
 ------------------------------------------------------
  Creating a MySQL Client Connection Between the Nodes
 ------------------------------------------------------
  .. _`Creating a MySQL Client Connection Between the Nodes`:
  
-After the MySQL and Galera installations, the MySQL servers are
+After the MySQL and *Galera Cluster*
+installations, the MySQL servers are
 running as three independent databases. They are not connected
-to each other as a cluster. Furthermore, the Galera Cluster
-plugin is not loaded in the configuration.
+to each other as a cluster. Furthermore, the Galera Replication
+Plugin is not loaded in the configuration.
 
 To connect the MySQL servers to each other as a cluster, you
 must create MySQL client connections between the nodes. In
@@ -124,6 +126,7 @@ To add a new node to an existing cluster, proceed as follows:
    initial node weight to zero. In this way, it can be guaranteed
    that if the joining node fails before it gets synchronized,
    it does not have effect in the quorum computation that follows. 
+   See chapter :ref:`Weighted Quorum <Weighted Quorum>`.
 4. Start the *mysqld* server:
 
    ``/etc/init.d/mysql start``
@@ -161,7 +164,7 @@ it. After this, the new node is ready for use.
 .. index::
    pair: Parameters; wsrep_ready
 
-You can test that *Galera Cluster for MySQL* works as follows:
+You can test that *Galera Cluster* works as follows:
 
 1. Connect to MySQL on any node:
 
@@ -227,7 +230,7 @@ You can test that *Galera Cluster for MySQL* works as follows:
 --------------------
 .. _`Failure Simulation`:
 
-You can also test *Galera Cluster for MySQL* by simulating various
+You can also test *Galera Cluster* by simulating various
 failure situations on three nodes as follows:
 
 - To simulate a crash of a single *mysqld* process, run the command
@@ -241,8 +244,8 @@ failure situations on three nodes as follows:
   virtualized guest, and abrubtly terminate the entire
   virtual instance.
 
-If you have three or more Galera nodes, the cluster should be able to
-survive the simulations.
+If you have three or more *Galera Cluster*
+nodes, the cluster should be able to survive the simulations.
 
 ---------------------
  Split-brain Testing
@@ -251,7 +254,7 @@ survive the simulations.
 .. index::
    pair: Split-brain; Prevention
 
-You can test *Galera Cluster for MySQL* for split-brain
+You can test *Galera Cluster* for split-brain
 situations on a two node cluster as follows:
 
 - Disconnect the network connection between the cluster nodes.
@@ -265,21 +268,21 @@ situations on a two node cluster as follows:
   This command resets the quorum and the cluster is recovered. 
 
 ----------------------------------
- Galera Cluster URL
+ Galera Cluster for MySQL URL
 ----------------------------------
-.. _`Galera Cluster URL`:
+.. _`Galera Cluster for MySQL URL`:
 .. index::
    single: my.cnf
 
-The syntax for the Galera Cluster URL address where
-the nodes connect to, is shown below::
+The syntax for the *Galera Cluster*
+URL address where the nodes connect to, is shown below::
 
     <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
 
 where:
 
-- ``<backend schema>`` |---| Refers to the Galera Cluster schema.
-  Galera Cluster supports two schemata:
+- ``<backend schema>`` |---| Refers to the *Galera Cluster*
+  schema. *Galera Cluster* supports two schemata:
   
     - ``dummy`` |---| This schema is a pass-through backend for
       testing and profiling purposes. The schema does not connect
@@ -301,8 +304,9 @@ where:
       a new cluster (that is, there are no pre-existing nodes to
       connect to).
 
-  .. note:: As of version 2.2, Galera Cluster supports a comma-separated
-            list of cluster members in the cluster address, such as::
+  .. note:: As of version 2.2, *Galera Cluster*
+            supports a comma-separated list of cluster members in the
+            cluster address, such as::
 
                 gcomm://node1,node2:port2,node3?key1=value1&key2=value2...
 
@@ -321,9 +325,13 @@ where:
             primary component indefinitely. Then bootstrap the primary
             component by setting ``pc.bootstrap=1`` on any other node.
 
+            However, you can only use the ``pc.wait_prim=no`` option with
+            mysqldump SST, as the MySQL parser must be initialized before
+            SST, to pass the ``pc.bootstrap=1`` option.
+
 - ``options`` |---| The option list can be used to set backend parameters,
   such as the listen address and timeout values. In version .7.x, this was
-  the only way to customize the Galera Cluster behavior. The parameter values
+  the only way to customize *Galera Cluster* behavior. The parameter values
   set in the option list are not durable and must be resubmitted on every
   connection to the cluster. As of version 0.8, customized parameters can
   be made durable by seting them in ``wsrep_provider_options``.

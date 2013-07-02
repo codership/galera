@@ -41,20 +41,24 @@ The four isolation levels are, from lowest to highest:
   two identical queries are executed, and the rows returned by the second
   query are different from the first.
 
-Galera uses transaction isolation on two levels:
+*Galera Cluster* uses transaction isolation on two levels:
 
 - Locally, that is, on each node, transaction isolation works as
   with native InnoDB. You can use all levels. The default isolation
   level for InnoDB is ``REPEATABLE-READ``. 
 - At the cluster level, between transactions processing at separate
-  nodes, Galera implements a transaction level called ``SNAPSHOT ISOLATION``.
+  nodes, *Galera Cluster* implements a transaction level called ``SNAPSHOT ISOLATION``.
   The ``SNAPSHOT ISOLATION`` level is between the ``REPEATABLE READ``
   and ``SERIALIZABLE`` levels.
 
-  The ``SERIALIZABLE`` transaction isolation level cannot be
-  guaranteed in a multi-master use case, as :term:`Galera Replication`
+  The ``SERIALIZABLE`` transaction isolation level is not supported
+  in a multi-master use case, , not in the ``STATEMENT`` nor in the
+  ``ROW`` format. This is due to the fact that :term:`Galera Replication`
   does not carry a transaction read set. Also, the ``SERIALIZABLE``
   transaction isolation level is vulnerable for multi-master
   conflicts. It holds read locks and any replicated write to a
   read locked row will cause the transaction to abort. Hence,
-  it is recommended not to use it in *Galera Cluster for MySQL*.
+  it is recommended not to use it in *Galera Cluster*.
+
+.. |---|   unicode:: U+2014 .. EM DASH
+   :trim:

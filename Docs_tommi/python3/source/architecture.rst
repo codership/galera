@@ -10,7 +10,7 @@ In other words, when a transaction commits, all nodes have the
 same value. This takes place by using writeset replication
 over group communication.
 
-The :term:`Galera Replication` architecture software entities are 
+The *Galera Cluster* replication architecture software entities are 
 
 - *DBMS* |---| A Database Management System (DBMS), such as MySQL.
 - *wsrep API* |---| The wsrep API defines the interface and the
@@ -21,12 +21,11 @@ The :term:`Galera Replication` architecture software entities are
   - *dlopen* |---| The ``dlopen()`` function makes the wsrep
     provider available to *wsrep hooks*. 
 
-- *Galera plugin* |---| The Galera plugin implements the 
-  synchronous replication between the database nodes.
+- *Galera Replication Plugin* |---| The :term:`Galera Replication Plugin`
+  provides the *wsrep* service functionality.
 - *Group communication plugins* |---| Galera can use various
   group communication systems. We have used, for example,
-  Spread (http://www.spread.org/) and our own implementations,
-  such as *vsbes* and *gemini*.
+  *gcomm* and Spread (http://www.spread.org/).
 
 The entities above are depicted in the figure below and explained
 in more detail in the chapters below:
@@ -65,15 +64,15 @@ as follows:
 1. A state change takes place on the database.
 2. The *wsrep hooks* within the database populate the write sets
    for the other database nodes in the cluster.
-3. The *wsrep hooks* call the *Galera wsrep provider* through the
-   ``dlopen()`` function.
-4. The Galera plugin handles the writeset certification and
+3. The *wsrep provider* functions are made available for
+   the *wsrep hooks* through the ``dlopen()`` function.
+4. The Galera Replication Plugin handles the writeset certification and
    replication to the other database nodes in the cluster.
 
 At the receiving end, the application process takes place by high
 priority transaction(s).
 
-To keep the state identical on all nodes, the wsrep API uses a Global
+To keep the state identical on all nodes, the *wsrep API* uses a Global
 Transaction ID (GTID), which is used to both:
 
 - Identify the state change
@@ -98,15 +97,15 @@ In a human-readable format, the GTID might look like this::
 
     45eec521-2f34-11e0-0800-2a36050b826b:94530586304
 
----------------
- Galera Plugin
----------------
-.. _`Galera Plugin`:
+---------------------------
+ Galera Replication Plugin
+---------------------------
+.. _`Galera Replication Plugin`:
 
-The Galera plugin consists of:
+Galera Replication Plugin implements the *wsrep API* and operates
+as the *wsrep provider*.  From a more technical perspective,
+it consists of:
 
-- *Galera wsrep provider* implements the wsrep API for the Galera
-  plugin.
 - *Certification layer* |---| The certification layer prepares
   the write sets and performs the certification.
 - *Replication layer* |---| The replication layer manages the
@@ -127,7 +126,7 @@ The Galera plugin consists of:
 The group communication framework provides a plugin
 architecture for various group communication systems.
 
-*Galera Cluster for MySQL* is built on top of a proprietary
+*Galera Cluster* is built on top of a proprietary
 group communication system layer which implements
 virtual synchrony :abbr:`QoS (Quality of Service)`. Virtual
 synchrony unifies the data delivery and cluster membership
@@ -145,10 +144,10 @@ ordering of messages from multiple sources, which is
 used to build Global Transaction IDs in a multi-master
 cluster. 
 
-At the transport level, *Galera Cluster for MySQL* is a symmetric
-undirected graph, where all database nodes are connected
-with each other over a :abbr:`TCP (Transmission Control Protocol)`
-connection. By default, TCP
+At the transport level, *Galera Cluster*
+is a symmetric undirected graph, where all database nodes are
+connected with each other over a :abbr:`TCP (Transmission
+Control Protocol)` connection. By default, TCP
 is used for both message replication and the cluster
 membership service, but also :abbr:`UDP (User Datagram Protocol)`
 multicast can be used for replication in a :abbr:`LAN (Local Area Network)`.

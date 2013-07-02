@@ -11,20 +11,20 @@
    pair: Logs; Galera Arbitrator
 
 If the expense of adding, for example, a third datacenter is too high,
-you can use the Galera arbitrator. An arbitrator is a member of the
+you can use Galera Arbitrator. Galera Arbitrator is a member of the
 cluster which participates in voting, but not in actual replication.
 
-.. warning:: The arbitrator does not participate in actual replication,
+.. warning:: Galera Arbitrator does not participate in actual replication,
              but it receives the same data as the nodes. Use a secure
              network connection for the arbitrator.
 
-The Galera arbitrator servers two purposes:
+Galera Arbitrator servers two purposes:
 
 - It helps to avoid split-brain situations by acting as an odd
   node in a cluster that is spread only across two nodes.
 - It can request a consistent application state snapshot.
 
-The Galera arbitrator is depicted in the figure below:
+Galera Arbitrator is depicted in the figure below:
 
 .. figure:: images/arbitrator.png
 
@@ -44,22 +44,24 @@ instance can be reattached to the cluster at any time. There can be
 several arbitrators in the cluster.
 
 
-----------------------------
- Configuring the Arbitrator
-----------------------------
-.. _`Configuring the Arbitrator`:
+--------------------------------
+ Configuring Galera Arbitrator
+--------------------------------
+.. _`Configuring Galera Arbitrator`:
 .. index::
    pair: Configuration; Galera Arbitrator
 
-As a Galera cluster member, the arbitrator accepts all Galera
-parameters except those prefixed by ``replicator.``. For
-more information, see chapters :ref:`Galera Parameters <Galera Parameters>`
-and :ref:`Starting the Arbitrator <Starting the Arbitrator>` below.
+As a *Galera Cluster* cluster member,
+Galera Arbitrator accepts all *Galera Cluster*
+parameters except those prefixed by ``replicator.``.
+
+.. seealso:: Chapters :ref:`Galera Parameters <Galera Parameters>`
+             and :ref:`Starting the Arbitrator <Starting the Arbitrator>`.
 
 ----------------------------
- Starting the Arbitrator
+ Starting Galera Arbitrator
 ----------------------------
-.. _`Starting the Arbitrator`:
+.. _`Starting Galera Arbitrator`:
 
 Galera Arbitrator it is a separate daemon called *garbd*. 
 You can start is manually as follows::
@@ -68,7 +70,7 @@ You can start is manually as follows::
 
 You can also add configuration options to the command.
 
-You can also automate running the Galera Arbitrator by using an
+You can also automate running Galera Arbitrator by using an
 */etc/default/garb* init script, such as the one below::
 
     # Copyright (C) 2013 Codership Oy

@@ -26,10 +26,8 @@ Many database management systems replicate databases. The most
 common replication method is to create a master/slaves relationship
 between the original data set (master) and its copies (slaves).
 The master logs the updates to the data, and propagates the logs
-through a network to the slaves. The slaves, for their part, send a
-message indicating that they have received the update successfully.
-Once the master receives these messages from the slaves, it can send
-subsequent updates to the slaves.
+through a network to the slaves. The slaves, for their part, receive
+a stream of updates from the master and apply the changes accordingly.
 
 A master/slaves relationship is depicted in the figure below:
 
@@ -136,12 +134,12 @@ important improvements these studies have brought about are:
   broadcast as a read set to the other database sites for
   certification and possibly commit.
 - **Transaction Re-ordering** |---| Transaction re-ordering
-  means that we reorder the transactions before they are
+  means that transactions are re-ordered before they are
   committed and broadcast to the other database sites.
   Reordering increases the number of transactions that
   successfully pass the certification test.
 
-Galera's certification based replication builds on these approaches.
+*Galera Cluster*'s certification based replication builds on these approaches.
 
 .. |times|   unicode:: U+00D7 .. MULTIPLICATION SIGN
 

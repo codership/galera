@@ -8,7 +8,7 @@
 .. index::
    pair: Performance; Swap size
 
-In normal operation, a Galera node does not consume
+In normal operation, a *Galera Cluster* node does not consume
 much more memory than a regular MySQL server. Additional
 memory is consumed for the certification index and uncommitted
 write sets, but usually this is not noticeable in a typical
@@ -20,13 +20,14 @@ and apply incoming write sets because it has no state to
 apply them to yet. Depending on a state transfer mechanism
 (for example, *mysqldump*), the node that sends the state
 transfer may not be able to apply write sets. Instead, the
-node must cache the write sets for a catch-up phase. Currently,
-the write sets are cached in memory and, if the system runs out
-of memory, either the state transfer will fail or the cluster
-will block and wait for the state transfer to end.
+node must cache the write sets for a catch-up phase. The
+Writeset Cache (GCache) is used to cache write sets on
+memory-mapped files on disk. These files are allocated as
+needed. In other words, the limit for the cache is the
+available disk space. Writing on disk reduces memory
+consumption.
 
-To control memory usage for writeset caching, see chapter
-:ref:`Optional Memory Settings <Optional Memory Settings>`.
+.. seealso:: Chapter :ref:`Optional Memory Settings <Optional Memory Settings>`
 
 ------------------------------------
  Dealing with Large Transactions

@@ -35,7 +35,8 @@
   Use ``general_log`` and ``general_log_file`` to choose query logging and log file name.
 - Do not use a query cache.
 - XA transactions cannot be supported due to possible rollback on commit.
-- Transaction size. While Galera does not explicitly limit the transaction size,
+- Transaction size. While *Galera Cluster*
+  does not explicitly limit the transaction size,
   a writeset is processed as a single memory-resident buffer and, as a result,
   extremely large transactions (for example, ``LOAD DATA``) may adversely affect
   node performance. To avoid that, the ``wsrep_max_ws_rows`` and ``wsrep_max_ws_size``
@@ -46,7 +47,7 @@
   writing the to same rows and committing in separate cluster nodes, and only one
   of the them can successfully commit. The failing one will be aborted.
   
-  For cluster level aborts, *Galera Cluster for MySQL* gives back a deadlock error::
+  For cluster level aborts, *Galera Cluster* gives back a deadlock error::
   
      code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK))
 

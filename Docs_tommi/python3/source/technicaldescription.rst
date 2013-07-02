@@ -18,6 +18,5 @@ Contents:
    statetransfer
    nodestates
    weightedquorum
-   arbitrator
    loadbalancing
    recovery

@@ -3,44 +3,18 @@
 ======================================
 .. _`Dealing with Multi-Master Conflicts`:
 
-This chapter describes how *Galera Cluster for MySQL*
+This chapter describes how *Galera Cluster*
 deals with conflicts in multi-master database environments.
-In practice, there a two conflict scenarios that must be
-addressed:
-
-- **Row conflicts on different nodes**
-
-  In a multi-master replication system, where updates can
-  be submitted to any database node, different nodes may
-  try to update the same database row with different data.
-- **Database hot spots**
+In practice, the conflict scenario that must be
+addressed is row conflicts on different nodes.
+In a multi-master replication system, where updates can
+be submitted to any database node, different nodes may
+try to update the same database row with different data.
   
-  Database hot spots are rows where many transactions attempt to 
-  write simultaneously. Typical hot spots are patterns such as
-  ``queue`` or *ID allocation*.
-  
-  
-*Galera Cluster for MySQL* can cope with situations such as
-these by using Certification Based Replication. In Certification
-Based Replication, a transaction is executed conventionally until
-the commit point, under the assumption that there will be no
-conflict. When the client issues a ``COMMIT`` command (but
-before the actual commit has happened), all changes made to
-the database by the transaction and the primary keys of changed
-rows are collected into a writeset.
+*Galera Cluster* can cope with a situation such as
+this by using Certification Based Replication.
 
-The writeset is replicated to the rest of the nodes.
-After that, the writeset undergoes a deterministic certification
-test (using the collected primary keys) on each node
-(including the writeset originator node) which determines
-if the writeset can be applied or not.
-
-If the certification test fails, the writeset is dropped and
-the original transaction is rolled back. If the test succeeds,
-the transaction is committed and the writeset is applied on
-the rest of the nodes.
-
-See also chapter :ref:`Certification Based Replication <Certification Based Replication>`.
+.. seealso:: Chapter :ref:`Certification Based Replication <Certification Based Replication>`.
 
 -----------------------------------
  Diagnosing Multi-Master Conflicts
@@ -55,8 +29,8 @@ See also chapter :ref:`Certification Based Replication <Certification Based Repl
 .. index::
    pair: Logs; Debug log
 
-You can log cluster wide conflicts by using the ``wsrep_debug``
-variable, which will log these conflicts and plenty of other
+You can log cluster wide conflicts by using the ``wsrep_debug=1``
+variable value, which will log these conflicts and plenty of other
 information. You may see any of the following messages::
 
      110906 17:45:01 [Note] WSREP: BF kill (1, seqno: 16962377), victim:  (140588996478720 4) trx: 35525064
@@ -81,7 +55,7 @@ sees a deadlock error. The client application *should* try to re-commit
 the deadlocked transactions, but not all client applications have this
 logic inbuilt.
 
-Nevertheless, *Galera Cluster for MySQL* can re-try to autocommit
+Nevertheless, Galera Cluster can re-try to autocommit
 deadlocked transactions on behalf of the client application. The
 ``wsrep_retry_autocommit`` parameter defines how many times the
 transaction is retried before returning a deadlock error.
@@ -89,21 +63,21 @@ transaction is retried before returning a deadlock error.
 .. note:: Retrying only applies to autocommit transactions, as retrying
           is not safe for multi-statement transactions.
 
------------------------------------
- Resolving Multi-Master Conflicts
------------------------------------
+---------------------------------------
+ Working Around Multi-Master Conflicts
+---------------------------------------
 
 .. index::
    pair: Parameters; wsrep_retry_autocommit
 
-To resolve multi-master conflicts:
+Galera Cluster automatically resolves multi-master
+conflicts. However, you can try to minimize the amount of multi-master
+conflicts as follows:
 
 - Analyze the hot-spot. See if you can change the application
   logic to catch deadlock exceptions and use retrying logic.
 - Use ``wsrep_retry_autocommit`` and see if it helps.
-- Limit the number of master nodes.
-- If these tips provide not help, see if you can change completely
-  to a master-slave model.
+- Limit the number of master nodes or switch to a master-slave model.
   
   .. note:: If you can filter out the access to the hot spot
             table, it is enough to treat writes only to the hot
