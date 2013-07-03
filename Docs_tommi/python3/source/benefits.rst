@@ -1,7 +1,7 @@
-=================
- GCM Benefits
-=================
-.. _`GCM Benefits`:
+=========================
+ Galera Cluster Benefits
+=========================
+.. _`Galera Cluster Benefits`:
 
 *Galera Cluster* is a significant step in terms of improving MySQL
 high availability. The MySQL ecosystem has offered users
@@ -31,17 +31,17 @@ The result is a high availability solution that is both robust
 in terms of data integrity and high performance with instant
 failovers.
 
-------------------------------
- GCM Cloud Implementations
-------------------------------
-.. _`GCM Cloud Implementations`:
+----------------------------------------
+ Galera Cluster Cloud Implementations
+----------------------------------------
+.. _`Galera Cluster Cloud Implementations`:
 
 Another main benefit of *Galera Cluster* is good cloud support.
 Automatic node provisioning makes elastic scale-out
 and scale-in operations painless. *Galera Cluster* has proven
 to perform extremely well in the cloud, such as when
 using multiple small node instances, across multiple
-data centers (e.g. AWS zones) or even over Wider Area
+data centers (for example, AWS zones) or even over Wider Area
 Networks.
 
 .. |---|   unicode:: U+2014 .. EM DASH

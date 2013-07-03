@@ -151,7 +151,7 @@ the figure below:
 
 .. figure:: images/galerafsm.png
 
-   *GCM Node State Changes*
+   *Galera Cluster Node State Changes*
 
 In the figure:
 

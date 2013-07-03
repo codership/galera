@@ -19,7 +19,7 @@ Before you start, ensure that you have:
 - *Selinux* or *apparmor* disabled or running in permissive mode.
 - Defined the ``wsrep_provider`` parameter value.
 
-.. seealso:: Chapter :ref:`Using GCM with SElinux <Using GCM with SElinux>`
+.. seealso:: Chapter :ref:`Using Galera Cluster with SElinux <Using Galera Cluster with SElinux>`
 
 ------------------------------------------------------
  Creating a MySQL Client Connection Between the Nodes

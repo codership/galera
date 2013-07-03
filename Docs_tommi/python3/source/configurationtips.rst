@@ -6,7 +6,7 @@
 This chapter contains some advanced configuration tips.
 
 --------------------------------------
-Setting Parallel Slave Threads
+ Setting Parallel Slave Threads
 --------------------------------------
 .. _`Setting Parallel Slave Threads`:
 
@@ -79,7 +79,7 @@ be no less than the ``evs.suspect_timeout`` parameter value and the
           your cluster.
   
 ---------------------
-  Multi-Master Setup
+ Multi-Master Setup
 ---------------------
 .. _`Multi-Master Setup`:
 
@@ -89,7 +89,7 @@ conflict. This may cause undesirable rollbacks and performance degradation.
 In such a case, reduce the number of nodes used as masters.
 
 ----------------------
-  Single Master Setup
+ Single Master Setup
 ----------------------
 .. _`Single Master Setup`:
 
@@ -107,7 +107,7 @@ reducing the rate of flow control events. This setting
 can also be used as suboptimal in a multi-master setup.
 
 --------------------------
-  Customizing GCache Size
+ Customizing GCache Size
 --------------------------
 .. _`Customizing GCache Size`:
 
@@ -146,10 +146,10 @@ the ``wsrep_received_bytes`` status variable. Proceed as follows:
 
    ``(wsrep_received_bytes2 - wsrep_received_bytes1)/(t2 - t1)``
 
------------------------------
-  Using GCM with SElinux
------------------------------
-.. _`Using GCM with SElinux`:
+------------------------------------
+ Using Galera Cluster with SElinux
+------------------------------------
+.. _`Using Galera Cluster with SElinux`:
 
 .. index::
    pair: Configuration; SELinux
