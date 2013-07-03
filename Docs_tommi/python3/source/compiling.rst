@@ -9,29 +9,52 @@
 These instructions describe how to compile
 *Galera Cluster* from source.
 
-The latest revision of *Galera Cluster* can be
-compiled on Solaris 11 x86 and in Linux.
 
-Proceed as follows:
+Build dependencies for the Galera Replication Plugin are:
+* System headers
+* Bash
+* GNU toolchain, gcc/g++ >= 4.4
+* Boost libraries >= 1.41
+* Check (http://check.sourceforge.net/)
+* Scons (http://www.scons.org/)
 
-1. Download the *Galera Cluster* source code from
-   the latest *Galera Cluster* tree from Launchpad:
-   
-   https://code.launchpad.net/~codership/galera/2.x
-2. Before compiling, ensure that (in this order):
+To build, proceed as follows:
 
-    - you have installed system headers
-    - you have installed *bash*
-    - you have a full GNU toolchain installed: *GNU make*, *GNU ld*, and so on
-    - you have *GCC* >= 4.4
-    - you have **/usr/gnu/bin** as the first element in your **PATH**
-    - you installed boost libraries >= 1.41 (http://www.boost.org/users/download/)
-    - you have installed *check* (http://check.sourceforge.net/)
-    - you have installed *scons* (http://www.scons.org/)
+1. Download and extract the Galera Replication Plugin
+   source package from
+   https://launchpad.net/galera/+download::
+  
+    $ wget https://launchpad.net/galera/2.x/23.2.6/+download/galera-23.2.6-src.tar.gz
+    $ tar zxf galera-23.2.6-src.tar.gz
+    $ cd galera-23.2.6-src/
 
-   .. note:: If you install to **/usr/local**, ensure that **/usr/local/lib**
-             is in your linker path:
+2. Run *scons* to build the Galera Replication Plugin::
 
-             ``$ sudo crle -u -l /usr/local/lib``
+    $ scons
 
-3. Run *./scripts/build.sh*.
+3. When the build process is completed, the Galera provider
+   library *libgalera_smm.so* can be found in the build
+   directory root.
+
+Build the MySQL server as follows:
+
+1. Download MySQL source code from http://dev.mysql.com/downloads/mysql/.
+2. Extract the source package::
+
+    $ tar zxf mysql-5.5.31.tar.gz
+
+3. Download and uncompress the *wsrep* patch that
+   corresponds to the MySQL version::
+
+    $ wget https://launchpad.net/codership-mysql/5.5/5.5.31-23.7.5/+download/mysql-5.5.31-23.7.5.patch.gz
+    $ gunzip mysql-5.5.31-23.7.5.patch.gz
+
+3. Apply the patch::
+
+    $ cd mysql-5.5.31
+    $ patch -p0 < ../mysql-5.5.31-23.7.5.patch
+
+4. Build the MySQL server::
+
+    $ cmake -DWITH_WSREP=1 -DWITH_INNODB_DISALLOW_WRITES=1
+    $ make 

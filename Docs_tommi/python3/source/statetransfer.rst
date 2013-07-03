@@ -37,7 +37,7 @@ State Snapshot Transfer (SST) refers to a full data copy from
 one cluster node (donor) to the joining node (joiner). 
 SST is used when a new node joins the cluster. To get synchronized
 with the cluster, the new node has to transfer data from a node
-that is already part of the cluster. In :term:`Galera Replication`, you
+that is already part of the cluster. In Galera replication, you
 can choose from two conceptually different ways to transfer a
 state from one MySQL server to another:
 

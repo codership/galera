@@ -19,8 +19,10 @@ body
 {
     margin: 1em 1em 0 1em;
     padding: 0;
-    background: #DC7531;
-    background-attachment: fixed;
+/*    background: #DC7531; */
+/*    background-attachment: fixed; */
+    background-image:url('tweed.png');
+    background-repeat:repeat;
     color: #000;
     font-family: "Open Sans", sans-serif;
     font-size: 100%;
@@ -35,7 +37,7 @@ div.related
 {
     margin: 0 auto;
     max-width: 11in;
-    background: #B23300;
+    background: #DC7531;
     line-height: 1.5em;
     padding: .5em 0;
     color: #ffffff;

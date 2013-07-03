@@ -22,7 +22,6 @@ Table legend:
 - *Boolean values* |---| *Galera Cluster*
   accepts the following boolean values: 0, 1, yes, no, true, false, on, off.
 - Time periods must be expressed in the ISO8601 format. See also the examples below.
-- **(R)** marks parameters that can be changed during runtime.
 
 .. |210| replace:: 2\ :sup:`10`\
 .. |220| replace:: 2\ :sup:`20`\
@@ -32,172 +31,172 @@ Table legend:
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | Parameter                             | Default               |  Introduced           | Deprecated         | Dynamic  |
 +=======================================+=======================+=======================+====================+==========+
-| :ref:`protonet.backend                | *asio*                |                       |                    |          |
+| :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`protonet.version                | *0*                   |                       |                    |          |
+| :ref:`protonet.version                | *0*                   | 1.0                   | n/a                | No       |
 | <protonet.version>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`socket.ssl_cert                 |                       |                       |                    |          |
+| :ref:`socket.ssl_cert                 |                       | 1.0                   | n/a                | No       |
 | <socket.ssl_cert>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`socket.ssl_key                  |                       |                       |                    |          |
+| :ref:`socket.ssl_key                  |                       | 1.0                   | n/a                | No       |
 | <socket.ssl_key>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`socket.ssl_compression          | *yes*                 |                       |                    |          |
+| :ref:`socket.ssl_compression          | *yes*                 | 1.0                   | n/a                | No       |
 | <socket.ssl_compression>`             |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`socket.ssl_cipher               | *AES128-SHA*          |                       |                    |          |
+| :ref:`socket.ssl_cipher               | *AES128-SHA*          | 1.0                   | n/a                | No       |
 | <socket.ssl_cipher>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.listen_addr              | *tcp://0.0.0.0:4567*  |                       |                    |          |
+| :ref:`gmcast.listen_addr              | *tcp://0.0.0.0:4567*  | 1.0                   | n/a                | No       |
 | <gmcast.listen_addr>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.mcast_addr               |                       |                       |                    |          |
+| :ref:`gmcast.mcast_addr               |                       | 1.0                   | n/a                | No       |
 | <gmcast.mcast_addr>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.mcast_ttl                | *1*                   |                       |                    |          |
+| :ref:`gmcast.mcast_ttl                | *1*                   | 1.0                   | n/a                | No       |
 | <gmcast.mcast_ttl>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.peer_timeout             | *PT3S*                |                       |                    |          |
+| :ref:`gmcast.peer_timeout             | *PT3S*                | 1.0                   | n/a                | No       |
 | <gmcast.peer_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.time_wait                | *PT5S*                |                       |                    |          |
+| :ref:`gmcast.time_wait                | *PT5S*                | 1.0                   | n/a                | No       |
 | <gmcast.time_wait>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.version                  | *0*                   |                       |                    |          |
+| :ref:`gmcast.version                  | *0*                   | 1.0                   | n/a                | No       |
 | <gmcast.version>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.causal_keepalive_period     |                       |                       |                    |          |
+| :ref:`evs.causal_keepalive_period     |                       | 1.0                   | n/a                | No       |
 | <evs.causal_keepalive_period>`        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.consensus_timeout           | *PT30S*               |                       |                    |          |
+| :ref:`evs.consensus_timeout           | *PT30S*               | 1.0                   | Yes, as of 2.0     | No       |
 | <evs.consensus_timeout>`              |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.debug_log_mask              | *0x1*                 |                       |                    |          |
-| <evs.debug_log_mask>` **(R)**         |                       |                       |                    |          |
+| :ref:`evs.debug_log_mask              | *0x1*                 | 1.0                   | n/a                | Yes      |
+| <evs.debug_log_mask>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.inactive_check_period       | *PT1S*                |                       |                    |          |
+| :ref:`evs.inactive_check_period       | *PT1S*                | 1.0                   | n/a                | No       |
 | <evs.inactive_check_period>`          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.inactive_timeout            | *PT15S*               |                       |                    |          |
+| :ref:`evs.inactive_timeout            | *PT15S*               | 1.0                   | n/a                | No       |
 | <evs.inactive_timeout>`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.info_log_mask               | *0*                   |                       |                    |          |
+| :ref:`evs.info_log_mask               | *0*                   | 1.0                   | n/a                | No       |
 | <evs.info_log_mask>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.install_timeout             | *PT15S*               |                       |                    |          |
-| <evs.install_timeout>` **(R)**        |                       |                       |                    |          |
+| :ref:`evs.install_timeout             | *PT15S*               | 1.0                   | n/a                | Yes      |
+| <evs.install_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.join_retrans_period         | *PT1S*                |                       |                    |          |
-| <evs.join_retrans_period>` **(R)**    |                       |                       |                    |          |
+| :ref:`evs.join_retrans_period         | *PT1S*                | 1.0                   | n/a                | Yes      |
+| <evs.join_retrans_period>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.keepalive_period            | *PT1S*                |                       |                    |          |
+| :ref:`evs.keepalive_period            | *PT1S*                | 1.0                   | n/a                | No       |
 | <evs.keepalive_period>`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.max_install_timeouts        | *1*                   |                       |                    |          |
+| :ref:`evs.max_install_timeouts        | *1*                   | 1.0                   | n/a                | No       |
 | <evs.max_install_timeouts>`           |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.send_window                 | *4*                   |                       |                    |          |
-| <evs.send_window>` **(R)**            |                       |                       |                    |          |
+| :ref:`evs.send_window                 | *4*                   | 1.0                   | n/a                | Yes      |
+| <evs.send_window>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.stats_report_period         | *PT1M*                |                       |                    |          |
+| :ref:`evs.stats_report_period         | *PT1M*                | 1.0                   | n/a                | No       |
 | <evs.stats_report_period>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.suspect_timeout             | *PT5S*                |                       |                    |          |
+| :ref:`evs.suspect_timeout             | *PT5S*                | 1.0                   | n/a                | No       |
 | <evs.suspect_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.use_aggregate               | *true*                |                       |                    |          |
+| :ref:`evs.use_aggregate               | *true*                | 1.0                   | n/a                | No       |
 | <evs.use_aggregate>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.user_send_window            | *2*                   |                       |                    |          |
-| <evs.user_send_window>` **(R)**       |                       |                       |                    |          |
+| :ref:`evs.user_send_window            | *2*                   | 1.0                   | n/a                | Yes      |
+| <evs.user_send_window>`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.view_forget_timeout         | *PT5M*                |                       |                    |          |
+| :ref:`evs.view_forget_timeout         | *PT5M*                | 1.0                   | n/a                | No       |
 | <evs.view_forget_timeout>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.version                     | *0*                   |                       |                    |          |
+| :ref:`evs.version                     | *0*                   | 1.0                   | n/a                | No       |
 | <evs.version>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.bootstrap                    |                       |                       |                    |          |
+| :ref:`pc.bootstrap                    |                       | 1.0                   | n/a                | No       |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.checksum                     | *true*                |                       |                    |          |
+| :ref:`pc.checksum                     | *true*                | 1.0                   | n/a                | No       |
 | <pc.checksum>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.ignore_sb                    | *false*               |                       |                    |          | 
-| <pc.ignore_sb>` **(R)**               |                       |                       |                    |          |
+| :ref:`pc.ignore_sb                    | *false*               | 1.0                   | n/a                | Yes      | 
+| <pc.ignore_sb>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.ignore_quorum                | *false*               |                       |                    |          |
-| <pc.ignore_quorum>` **(R)**           |                       |                       |                    |          |
+| :ref:`pc.ignore_quorum                | *false*               | 1.0                   | n/a                | Yes      |
+| <pc.ignore_quorum>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.linger                       | *PT2S*                |                       |                    |          |
+| :ref:`pc.linger                       | *PT2S*                | 1.0                   | n/a                | No       |
 | <pc.linger>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.npvo                         | *false*               |                       |                    |          |
+| :ref:`pc.npvo                         | *false*               | 1.0                   | n/a                | No       |
 | <pc.npvo>`                            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.wait_prim                    | ``false``             |                       |                    |          |
+| :ref:`pc.wait_prim                    | ``false``             | 1.0                   | n/a                | No       |
 | <pc.wait_prim>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.weight                       | *1*                   |                       |                    |          |
-| <pc.weight>` **(R)**                  |                       |                       |                    |          |
+| :ref:`pc.weight                       | *1*                   | 2.4                   | n/a                | Yes      |
+| <pc.weight>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.version                      | *0*                   |                       |                    |          |
+| :ref:`pc.version                      | *0*                   | 1.0                   | n/a                | No       |
 | <pc.version>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_debug                    | *0*                   |                       |                    |          |
+| :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
 | <gcs.fc_debug>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_factor                   | *0.5*                 |                       |                    |          |
-| <gcs.fc_factor>` **(R)**              |                       |                       |                    |          |
+| :ref:`gcs.fc_factor                   | *0.5*                 | 1.0                   | n/a                | Yes      |
+| <gcs.fc_factor>`                      |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_limit                    | *16*                  |                       |                    |          |
-| <gcs.fc_limit>` **(R)**               |                       |                       |                    |          |
+| :ref:`gcs.fc_limit                    | *16*                  | 1.0                   | n/a                | Yes      |
+| <gcs.fc_limit>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_master_slave             | *NO*                  |                       |                    |          |
+| :ref:`gcs.fc_master_slave             | *NO*                  | 1.0                   | n/a                | No       |
 | <gcs.fc_master_slave>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.max_packet_size             | *32616*               |                       |                    |          |
+| :ref:`gcs.max_packet_size             | *32616*               | 1.0                   | n/a                | No       |
 | <gcs.max_packet_size>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.max_throttle                | *0.25*                |                       |                    |          |
+| :ref:`gcs.max_throttle                | *0.25*                | 1.0                   | n/a                | No       |
 | <gcs.max_throttle>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.recv_q_hard_limit           | *LLONG_MAX*           |                       |                    |          |
+| :ref:`gcs.recv_q_hard_limit           | *LLONG_MAX*           | 1.0                   | n/a                | No       |
 | <gcs.recv_q_hard_limit>`              |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.recv_q_soft_limit           | *0.25*                |                       |                    |          |
+| :ref:`gcs.recv_q_soft_limit           | *0.25*                | 1.0                   | n/a                | No       |
 | <gcs.recv_q_soft_limit>`              |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.sync_donor                  | *NO*                  |                       |                    |          |
+| :ref:`gcs.sync_donor                  | *NO*                  | 1.0                   | n/a                | No       |
 | <gcs.sync_donor>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`ist.recv_addr                   |                       |                       |                    |          |
+| :ref:`ist.recv_addr                   |                       | 1.0                   | n/a                | No       |
 | <ist.recv_addr>`                      |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`replicator.commit_order         | *3*                   |                       |                    |          |
+| :ref:`replicator.commit_order         | *3*                   | 1.0                   | n/a                | No       |
 | <replicator.commit_order>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`replicator.causal_read_timeout  | *PT30S*               |                       |                    |          |
+| :ref:`replicator.causal_read_timeout  | *PT30S*               | 1.0                   | n/a                | No       |
 | <replicator.causal_read_timeout>`     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.dir                      |                       |                       |                    |          |
+| :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.name                     | *"galera.cache"*      |                       |                    |          |
+| :ref:`gcache.name                     | *"galera.cache"*      | 1.0                   | n/a                | No       |
 | <gcache.name>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.size                     | *128Mb*               |                       |                    |          |
+| :ref:`gcache.size                     | *128Mb*               | 1.0                   | n/a                | No       |
 | <gcache.size>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.page_size                | *128Mb*               |                       |                    |          |
+| :ref:`gcache.page_size                | *128Mb*               | 1.0                   | n/a                | No       |
 | <gcache.page_size>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.keep_pages_size          | *0*                   |                       |                    |          |
+| :ref:`gcache.keep_pages_size          | *0*                   | 1.0                   | n/a                | No       |
 | <gcache.keep_pages_size>`             |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.mem_size                 | *0*                   |                       |                    |          |
+| :ref:`gcache.mem_size                 | *0*                   | 1.0                   | n/a                | No       |
 | <gcache.mem_size>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 
@@ -217,7 +216,9 @@ Which transport backend to use. Currently only ASIO is supported.
 .. index::
    pair: Parameters; protonet.version
 
-Which transport backend version to use.
+This status variable is used to check which transport
+backend protocol  version is used. This variable is
+mostly used for troubleshooting purposes.
 
 .. rubric:: socket.ssl_cert
 
@@ -327,7 +328,9 @@ of stable view to reconnect.
 .. index::
    pair: Parameters; gmcast.version
 
-TBD
+This status variable is used to check which gmcast
+protocol version is used. This variable is mostly used
+for troubleshooting purposes.
 
 
 .. rubric:: evs.causal_keepalive_period
@@ -518,7 +521,9 @@ Drop past views from the view history after this timeout.
 .. index::
    pair: Parameters; evs.version
 
-TBD
+This status variable is used to check which evs
+protocol version is used. This variable is mostly used
+for troubleshooting purposes.
 
 .. rubric:: pc.bootstrap
 
@@ -617,7 +622,9 @@ As of version 2.4. Node weight for quorum calculation.
 .. index::
    pair: Parameters; pc.version
 
-TBD
+This status variable is used to check which pc
+protocol version is used. This variable is mostly used
+for troubleshooting purposes.
 
 
 .. rubric:: gcs.fc_debug

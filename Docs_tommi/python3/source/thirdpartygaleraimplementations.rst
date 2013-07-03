@@ -14,7 +14,7 @@ There are two products that implement *Galera Cluster*:
   For more information, see http://www.percona.com/software/percona-xtradb-cluster.
 - *MariaDB Galera Cluster* |---| MariaDB Galera Cluster
   uses the Galera library for the replication implementation.
-  To interface with :term:`Galera Replication`, MariaDB is enhanced
+  To interface with the :term:`Galera Replication Plugin`, MariaDB is enhanced
   to support the replication API definition in the *wsrep API* project.
   
   For more information, see https://kb.askmonty.org/en/what-is-mariadb-galera-cluster/.

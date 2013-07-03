@@ -11,7 +11,7 @@
       transactional system. It can be used to create a synchronous multi-master
       replication solution to achieve high availability and scale-out.
       
-      See :ref:`Galera Replication <Galera Replication>` for more details.
+      See :ref:`Galera Replication Plugin <Galera Replication Plugin>` for more details.
 
    Global Transaction ID
       To keep the state identical on all nodes, the *wsrep API* uses

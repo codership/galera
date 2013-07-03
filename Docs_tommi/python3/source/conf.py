@@ -26,7 +26,7 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.todo', 'cloud_sptheme.ext.autodoc_sections', 'cloud_sptheme.ext.table_styling', 'cloud_sptheme.ext.relbar_toc']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.todo', 'cloud_sptheme.ext.autodoc_sections', 'cloud_sptheme.ext.table_styling']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -97,7 +97,7 @@ pygments_style = 'sphinx'
 # import Cloud
 import cloud_sptheme as csp
 
-html_theme_options = {  "roottarget": "index" }
+html_theme_options = { "roottarget": "index" }
 
 # set the theme path to point to cloud's theme data
 html_theme_path = [csp.get_theme_dir()]
