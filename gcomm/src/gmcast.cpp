@@ -78,6 +78,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     relaying_     (false),
     isolate_      (false),
     proto_map_    (new ProtoMap()),
+    relay_set_    (),
     segment_map_  (),
     self_index_   (std::numeric_limits<size_t>::max()),
     time_wait_    (param<gu::datetime::Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
@@ -667,6 +668,11 @@ void gcomm::GMCast::handle_failed(Proto* failed)
         }
     }
 
+    std::set<Socket*>::iterator si(relay_set_.find(failed->socket().get()));
+    if (si != relay_set_.end())
+    {
+        relay_set_.erase(si);
+    }
     proto_map_->erase(failed->socket()->id());
     delete failed;
     update_addresses();
@@ -958,6 +964,53 @@ void gcomm::GMCast::reconnect()
     }
 }
 
+namespace
+{
+    class CmpUuidCounts
+    {
+    public:
+        CmpUuidCounts(const std::set<gcomm::UUID>& uuids,
+                      gcomm::SegmentId preferred_segment)
+            :
+            uuids_(uuids),
+            preferred_segment_(preferred_segment)
+        { }
+
+        size_t count(const gcomm::gmcast::Proto* p) const
+        {
+            size_t cnt(0);
+            for (std::set<gcomm::UUID>::const_iterator i(uuids_.begin());
+                 i != uuids_.end(); ++i)
+            {
+                for (gcomm::gmcast::LinkMap::const_iterator
+                         lm_i(p->link_map().begin());
+                     lm_i != p->link_map().end(); ++lm_i)
+                {
+                    if (lm_i->uuid() == *i)
+                    {
+                        ++cnt;
+                        break;
+                    }
+                }
+            }
+            return cnt;
+        }
+        bool operator()(const gcomm::gmcast::Proto* a,
+                        const gcomm::gmcast::Proto* b) const
+        {
+            size_t ac(count(a));
+            size_t bc(count(b));
+            // if counts are equal, prefer peer from the same segment
+            return (ac < bc ||
+                    (ac == bc && a->remote_segment() != preferred_segment_));
+        }
+
+    private:
+        const std::set<gcomm::UUID>& uuids_;
+        gcomm::SegmentId preferred_segment_;
+    };
+}
+
 
 void gcomm::GMCast::check_liveness()
 {
@@ -1006,6 +1059,7 @@ void gcomm::GMCast::check_liveness()
     // iterate over addr list and check if there is at least one live
     // proto entry associated to each addr entry
 
+    std::set<UUID> nonlive_uuids;
     std::string nonlive_peers;
     for (AddrList::const_iterator i(remote_addrs_.begin());
          i != remote_addrs_.end(); ++i)
@@ -1016,24 +1070,61 @@ void gcomm::GMCast::check_liveness()
         {
             // log_info << self_string()
             // << " missing live proto entry for " << ae.uuid();
+            nonlive_uuids.insert(ae.uuid());
             nonlive_peers += AddrList::key(i) + " ";
             should_relay = true;
         }
     }
 
-    if (relaying_ == false && should_relay == true)
+    if (should_relay == true)
     {
-        log_info << self_string()
-                 << " turning message relay requesting on, nonlive peers: "
-                 << nonlive_peers;
-        relaying_ = true;
+        if (relaying_ == false)
+        {
+            log_info << self_string()
+                     << " turning message relay requesting on, nonlive peers: "
+                     << nonlive_peers;
+            relaying_ = true;
+        }
+        relay_set_.clear();
+        // build set of protos having OK status
+        std::set<Proto*> proto_set;
+        for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end();
+             ++i)
+        {
+            Proto* p(ProtoMap::value(i));
+            if (p->state() == Proto::S_OK)
+            {
+                proto_set.insert(p);
+            }
+        }
+        // find minimal set of proto entries required to reach maximum set
+        // of nonlive peers
+        while (nonlive_uuids.empty() == false &&
+               proto_set.empty() == false)
+        {
+            std::set<Proto*>::iterator maxel(
+                std::max_element(proto_set.begin(),
+                                 proto_set.end(), CmpUuidCounts(nonlive_uuids, segment_)));
+            Proto* p(*maxel);
+            log_debug << "relay set maxel :" << *p << " count: "
+                      << CmpUuidCounts(nonlive_uuids, segment_).count(p);
+
+            relay_set_.insert(p->socket().get());
+            const LinkMap& lm(p->link_map());
+            for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end();
+                 ++lm_i)
+            {
+                nonlive_uuids.erase((*lm_i).uuid());
+            }
+            proto_set.erase(maxel);
+        }
     }
     else if (relaying_ == true && should_relay == false)
     {
         log_info << self_string() << " turning message relay requesting off";
+        relay_set_.clear();
         relaying_ = false;
     }
-
 }
 
 
@@ -1070,57 +1161,62 @@ void gcomm::GMCast::relay(const Message& msg,
     relay_dg.normalize();
     Message relay_msg(msg);
 
-    if (msg.flags() & Message::F_SEGMENT_RELAY)
+    // reset all relay flags from message to be relayed
+    relay_msg.set_flags(relay_msg.flags() &
+                        ~(Message::F_RELAY | Message::F_SEGMENT_RELAY));
+
+    // if F_RELAY is set in received message, relay to all peers except
+    // the originator
+    if (msg.flags() & Message::F_RELAY)
     {
+        gu_trace(push_header(relay_msg, relay_dg));
+        for (SegmentMap::iterator i(segment_map_.begin());
+             i != segment_map_.end(); ++i)
+        {
+            Segment& segment(i->second);
+            for (Segment::iterator j(segment.begin()); j != segment.end(); ++j)
+            {
+                if ((*j)->id() != exclude_id)
+                {
+                    send(*j, relay_dg);
+                }
+            }
+        }
+    }
+    else if (msg.flags() & Message::F_SEGMENT_RELAY)
+    {
+        if (relay_set_.empty() == false)
+        {
+            // send message to all nodes in relay set to reach
+            // nodes in local segment that are not directly reachable
+            relay_msg.set_flags(relay_msg.flags() | Message::F_RELAY);
+            gu_trace(push_header(relay_msg, relay_dg));
+            for (std::set<Socket*>::iterator ri(relay_set_.begin());
+                 ri != relay_set_.end(); ++ri)
+            {
+                send(*ri, relay_dg);
+            }
+            gu_trace(pop_header(relay_msg, relay_dg));
+            relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
+        }
+
         if (msg.segment_id() == segment_)
         {
             log_warn << "message with F_SEGMENT_RELAY from own segment, "
                      << "source " << msg.source_uuid();
         }
 
-        if (msg.flags() & Message::F_RELAY)
-        {
-            // Relay message to other segments, excluding source segment
-            relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
-            gu_trace(push_header(relay_msg, relay_dg));
-            for (SegmentMap::iterator i(segment_map_.begin());
-                 i != segment_map_.end(); ++i)
-            {
-                uint8_t segment_id(i->first);
-                if (segment_id != segment_ && segment_id != msg.segment_id())
-                {
-                    Segment& segment(i->second);
-                    send(segment[(self_index_ + segment_id) % segment.size()],
-                         relay_dg);
-                }
-            }
-            gu_trace(pop_header(relay_msg, relay_dg));
-        }
-        relay_msg.set_flags(relay_msg.flags() & ~Message::F_SEGMENT_RELAY);
-
         // Relay to local segment
-        Segment& segment(segment_map_[segment_]);
         gu_trace(push_header(relay_msg, relay_dg));
+        Segment& segment(segment_map_[segment_]);
         for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
         {
             send(*i, relay_dg);
         }
-        gu_trace(pop_header(relay_msg, relay_dg));
     }
     else
     {
-        relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
-        // Relay to local segment
-        gu_trace(push_header(relay_msg, relay_dg));
-        Segment& segment(segment_map_[segment_]);
-        for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
-        {
-            if ((*i)->id() != exclude_id)
-            {
-                send(*i, relay_dg);
-            }
-        }
-        gu_trace(pop_header(relay_msg, relay_dg));
+        log_warn << "GMCast::relay() called without relay flags set";
     }
 }
 
@@ -1281,6 +1377,22 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
     Message msg(version_, Message::T_USER_BASE, uuid(), 1, segment_);
 
+    // handle relay set first, skip these peers below
+    if (relay_set_.empty() == false)
+    {
+        msg.set_flags(msg.flags() | Message::F_RELAY);
+        gu_trace(push_header(msg, dg));
+        for (std::set<Socket*>::iterator ri(relay_set_.begin());
+             ri != relay_set_.end(); ++ri)
+        {
+            send(*ri, dg);
+        }
+        gu_trace(pop_header(msg, dg));
+        msg.set_flags(msg.flags() & ~Message::F_RELAY);
+    }
+
+
+
     for (SegmentMap::iterator si(segment_map_.begin());
          si != segment_map_.end(); ++si)
     {
@@ -1289,42 +1401,29 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 
         if (segment_id != segment_)
         {
+            size_t target_idx((self_index_ + segment_id) % segment.size());
             msg.set_flags(msg.flags() | Message::F_SEGMENT_RELAY);
-            if (relaying_ == true)
+            // skip peers that are in relay set
+            if (relay_set_.empty() == true ||
+                relay_set_.find(segment[target_idx]) == relay_set_.end())
             {
-                msg.set_flags(msg.flags() | Message::F_RELAY);
+                gu_trace(push_header(msg, dg));
+                send(segment[target_idx], dg);
+                gu_trace(pop_header(msg, dg));
             }
-            gu_trace(push_header(msg, dg));
-            send(segment[(self_index_ + segment_id) % segment.size()], dg);
-            gu_trace(pop_header(msg, dg));
         }
         else
         {
             msg.set_flags(msg.flags() & ~Message::F_SEGMENT_RELAY);
             gu_trace(push_header(msg, dg));
-
-            size_t relay_idx(segment.size());
-            if (relaying_ == true && relay_idx > 0)
-            {
-                relay_idx = rand() % relay_idx;
-            }
-
-            size_t idx(0);
             for (Segment::iterator i(segment.begin());
-                 i != segment.end(); ++i, ++idx)
+                 i != segment.end(); ++i)
             {
-                if (relay_idx == idx)
+                // skip peers that are in relay set
+                if (relay_set_.empty() == true ||
+                    relay_set_.find(*i) == relay_set_.end())
                 {
-                    gu_trace(pop_header(msg, dg));
-                    msg.set_flags(msg.flags() | Message::F_RELAY);
-                    gu_trace(push_header(msg, dg));
-                }
-                send(*i, dg);
-                if (relay_idx == idx)
-                {
-                    gu_trace(pop_header(msg, dg));
-                    msg.set_flags(msg.flags() & ~Message::F_RELAY);
-                    gu_trace(push_header(msg, dg));
+                    send(*i, dg);
                 }
             }
             gu_trace(pop_header(msg, dg));
