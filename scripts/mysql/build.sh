@@ -342,8 +342,7 @@ then
             DEBUG_OPT=""
         fi
 
-        # This will be put to --prefix by SETUP.sh.
-        export MYSQL_BUILD_PREFIX="/usr"
+        MYSQL_BUILD_PREFIX="/usr"
 
         [ $DEBIAN -ne 0 ] && \
         MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
@@ -351,26 +350,27 @@ then
 
         if [ $MYSQL_MAJOR = "5.1" ]
         then
-            export wsrep_configs="$LAYOUT \
-                                  --libexecdir=/usr/sbin \
+            # This will be put to --prefix by SETUP.sh.
+            export MYSQL_BUILD_PREFIX
+            export wsrep_configs="--libexecdir=/usr/sbin \
                                   --localstatedir=/var/lib/mysql/ \
+                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH \
                                   --with-extra-charsets=all \
-                                  --with-ssl \
-                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH"
+                                  --with-ssl"
 
             BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
         else # CMake build
             cmake -DWITH_WSREP=1 \
+                  -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
                   -DINSTALL_LAYOUT=RPM \
-                  -DMYSQL_DATADIR=/var/lib/mysql \
                   -DINSTALL_SBINDIR=/usr/sbin \
+                  -DMYSQL_DATADIR=/var/lib/mysql \
+                  -DMYSQL_UNIX_ADDR=$MYSQL_SOCKET_PATH \
                   -DWITH_EXTRA_CHARSETS=all \
                   -DWITH_READLINE=yes \
-                  -DMYSQL_UNIX_ADDR=$MYSQL_SOCKET_PATH \
-                  -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
+                  -DWITH_SSL=system \
+                  -DWITH_ZLIB=system \
             && make -j $JOBS || exit 1
-# not working with 5.6.10                 -DWITH_SSL=system \
-#                  -DWITH_ZLIB=system \
         fi
     else  # just recompile and relink with old configuration
         #set -x
@@ -539,7 +539,7 @@ RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
-# Hack to avoid 'file changed as we read it'-error 
+# Hack to avoid 'file changed as we read it'-error
 sync
 sleep 1
 
