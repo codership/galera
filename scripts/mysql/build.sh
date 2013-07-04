@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -e
 
 if test -z "$MYSQL_SRC"
 then
@@ -353,10 +353,10 @@ then
                                   --with-extra-charsets=all \
                                   --with-ssl"
 
-            [ "$DEBUG" = "yes" ] DEBUG_OPT="-debug"
+            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-debug"
             BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
         else # CMake build
-            [ "$DEBUG" = "yes" ] DEBUG_OPT="-DCMAKE_BUILD_TYPE=Debug"
+            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-DCMAKE_BUILD_TYPE=Debug"
             cmake -DWITH_WSREP=1 \
                   -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
                   -DINSTALL_LAYOUT=RPM \
@@ -368,7 +368,7 @@ then
                   -DWITH_SSL=system \
                   -DWITH_ZLIB=system \
                   $DEBUG_OPT \
-            && make -j $JOBS || exit 1
+            && make -j $JOBS -S || exit 1
         fi
     else  # just recompile and relink with old configuration
         #set -x
