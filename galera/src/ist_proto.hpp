@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
@@ -485,15 +485,20 @@ namespace galera
                 {
                 case Message::T_TRX:
                 {
-                    buf.resize(msg.len());
+                    // TODO: ideally we want to make seqno_g and cert verdict
+                    // be a part of msg object above, so that we can skip this
+                    // read. The overhead is tiny given that vast majority of
+                    // messages will be trx writesets.
+                    wsrep_seqno_t seqno_g, seqno_d;
+
+                    buf.resize(sizeof(seqno_g) + sizeof(seqno_d));
 
                     n = asio::read(socket, asio::buffer(&buf[0], buf.size()));
                     if (n != buf.size())
                     {
-                        gu_throw_error(EPROTO) << "error reading trx data";
+                        gu_throw_error(EPROTO) << "error reading trx meta data";
                     }
 
-                    wsrep_seqno_t seqno_g, seqno_d;
                     size_t offset(gu::unserialize8(&buf[0], buf.size(), 0,
                                                    seqno_g));
                     offset = gu::unserialize8(&buf[0], buf.size(), offset,
@@ -512,9 +517,22 @@ namespace galera
                     }
                     else
                     {
-                        offset = trx->unserialize(&buf[0], buf.size(), offset);
-                        trx->append_write_set(&buf[0]    + offset,
-                                              buf.size() - offset);
+                        MappedBuffer& wbuf(trx->write_set_collection());
+                        size_t const wsize(msg.len() - offset);
+                        wbuf.resize(wsize);
+
+                        n = asio::read(socket,
+                                       asio::buffer(&wbuf[0], wbuf.size()));
+
+                        if (gu_unlikely(n != wbuf.size()))
+                        {
+                            gu_throw_error(EPROTO)
+                                << "error reading write set data";
+                        }
+
+                        trx->unserialize(&wbuf[0], wbuf.size(), 0);
+// trx->unserialize should do the job                        trx->append_write_set(&buf[0]    + offset,
+//                                              buf.size() - offset);
                     }
 
                     trx->set_received(0, -1, seqno_g);
@@ -537,7 +555,7 @@ namespace galera
                         }
                         else
                         {
-                            gu_throw_error(-msg.ctrl()) << "peer reported error";
+                            gu_throw_error(-msg.ctrl()) <<"peer reported error";
                         }
                     }
                 default:

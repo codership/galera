@@ -475,7 +475,7 @@ namespace galera
 
         ~WriteSetIn ()
         {
-            if (gu_unlikely(false == check_))
+            if (gu_unlikely(false == check_ && size_ != 0))
             {
                 /* checksum was performed in a parallel thread */
                 pthread_join (check_thr_, NULL);
@@ -503,9 +503,9 @@ namespace galera
 
         /* This should be called right after certification verdict is obtained
          * and before it is finalized. */
-        void verify_checksum() const
+        void verify_checksum() const /* throws */
         {
-            if (gu_unlikely(false == check_))
+            if (gu_unlikely(false == check_ && size_ != 0))
             {
                 /* checksum was performed in a parallel thread */
                 pthread_join (check_thr_, NULL);

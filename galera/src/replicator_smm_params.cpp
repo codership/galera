@@ -6,15 +6,19 @@
 
 #include <gu_uri.hpp>
 
+int const galera::ReplicatorSMM::MAX_PROTO_VER(5);
+
 static const std::string common_prefix = "repl.";
 
 const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
 const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
     common_prefix + "causal_read_timeout";
+const std::string galera::ReplicatorSMM::Param::proto_max =
+    common_prefix + "proto_max";
+
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
-const std::string galera::ReplicatorSMM::Param::proto_max = "proto_max";
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {

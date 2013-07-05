@@ -65,11 +65,11 @@ namespace galera
         // buffer after scan.
         static size_t keys(const gu::byte_t*, size_t, size_t, int, KeySequence&);
 
-    private:
-        friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
-        friend size_t serial_size(const WriteSet&);
+        size_t serialize(gu::byte_t*, size_t, size_t) const;
+        size_t unserialize(const gu::byte_t*, size_t, size_t);
+        size_t serial_size() const;
 
+    private:
         typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
 
         int                version_;

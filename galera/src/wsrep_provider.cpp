@@ -402,6 +402,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
 
         if (retval == WSREP_OK)
         {
+            assert(trx->last_seen_seqno() >= 0);
             retval = repl->pre_commit(trx, meta);
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
@@ -54,16 +54,16 @@ START_TEST(test_key1)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
-                serial_size(key), expected_size);
+    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
+                key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
     fail_unless(kp.size() == 4);
 
-    gu::Buffer buf(galera::serial_size(key));
-    serialize(key, &buf[0], buf.size(), 0);
+    gu::Buffer buf(key.serial_size());
+    key.serialize(&buf[0], buf.size(), 0);
     KeyOS key2(1);
-    unserialize(&buf[0], buf.size(), 0, key2);
+    key2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -106,16 +106,16 @@ START_TEST(test_key2)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
-                serial_size(key), expected_size);
+    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
+                key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
     fail_unless(kp.size() == 4);
 
-    gu::Buffer buf(serial_size(key));
-    serialize(key, &buf[0], buf.size(), 0);
+    gu::Buffer buf(key.serial_size());
+    key.serialize(&buf[0], buf.size(), 0);
     KeyOS key2(2);
-    unserialize(&buf[0], buf.size(), 0, key2);
+    key2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -137,21 +137,21 @@ START_TEST(test_write_set1)
     const char* rbr = "rbrbuf";
     size_t rbr_len = 6;
 
-    log_info << "ws0 " << serial_size(ws);
+    log_info << "ws0 " << ws.serial_size();
     ws.append_key(KeyData(1, key1, 2, 0, 0));
-    log_info << "ws1 " << serial_size(ws);
+    log_info << "ws1 " << ws.serial_size();
     ws.append_key(KeyData(1, key2, 2, 0, 0));
-    log_info << "ws2 " << serial_size(ws);
+    log_info << "ws2 " << ws.serial_size();
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << gu::serial_size4(rbrbuf);
-    log_info << "wsrbr " << serial_size(ws);
+    log_info << "wsrbr " << ws.serial_size();
 
-    gu::Buffer buf(serial_size(ws));
+    gu::Buffer buf(ws.serial_size());
 
-    serialize(ws, &buf[0], buf.size(), 0);
+    ws.serialize(&buf[0], buf.size(), 0);
 
     size_t expected_size =
         4 // row key sequence size
@@ -164,12 +164,12 @@ START_TEST(test_write_set1)
 #endif
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, serial_size(ws));
+                buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(0);
 
-    size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
+    size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(ret == expected_size);
 
     WriteSet::KeySequence rks;
@@ -204,21 +204,21 @@ START_TEST(test_write_set2)
     const char* rbr = "rbrbuf";
     size_t rbr_len = 6;
 
-    log_info << "ws0 " << serial_size(ws);
+    log_info << "ws0 " << ws.serial_size();
     ws.append_key(KeyData(2, key1, 2, 0, 0));
-    log_info << "ws1 " << serial_size(ws);
+    log_info << "ws1 " << ws.serial_size();
     ws.append_key(KeyData(2, key2, 2, 0, 0));
-    log_info << "ws2 " << serial_size(ws);
+    log_info << "ws2 " << ws.serial_size();
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << gu::serial_size4(rbrbuf);
-    log_info << "wsrbr " << serial_size(ws);
+    log_info << "wsrbr " << ws.serial_size();
 
-    gu::Buffer buf(serial_size(ws));
+    gu::Buffer buf(ws.serial_size());
 
-    serialize(ws, &buf[0], buf.size(), 0);
+    ws.serialize(&buf[0], buf.size(), 0);
 
     size_t expected_size =
         4 // row key sequence size
@@ -231,12 +231,12 @@ START_TEST(test_write_set2)
 #endif
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, serial_size(ws));
+                buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(2);
 
-    size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
+    size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(ret == expected_size);
 
     WriteSet::KeySequence rks;

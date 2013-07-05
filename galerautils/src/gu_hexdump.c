@@ -37,8 +37,8 @@ _write_byte_alpha (char* const str, uint8_t const byte)
     str[1] = '.';
 }
 
-#define GU_ASCII_ALPHA_START    0x20 /* ' ' */
-#define GU_ASCII_ALPHA_END      0x7e /* '~' */
+#define GU_ASCII_ALPHA_START    0x20U /* ' ' */
+#define GU_ASCII_ALPHA_END      0x7eU /* '~' */
 #define GU_ASCII_ALPHA_INTERVAL (GU_ASCII_ALPHA_END - GU_ASCII_ALPHA_START)
 
 static GU_FORCE_INLINE bool
@@ -52,7 +52,7 @@ void
 gu_hexdump(const void* buf, ssize_t const buf_size,
            char* str, ssize_t str_size, bool alpha)
 {
-    uint8_t* b = (uint8_t*)buf;
+    const uint8_t* b = (uint8_t*)buf;
     ssize_t i;
 
     str_size--; /* reserve a space for \0 */

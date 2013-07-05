@@ -1,9 +1,10 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
 #include "uuid.hpp"
+#include "galera_exception.hpp"
 
 #include "gu_serialize.hpp"
 
@@ -179,7 +180,7 @@ galera::TrxHandle::serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
 
 
 size_t
-galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
+galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
                                size_t offset)
 {
     uint32_t hdr;
@@ -200,16 +201,21 @@ galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
             offset = gu::unserialize8(buf, buflen, offset, conn_id_);
             offset = gu::unserialize8(buf, buflen, offset, trx_id_);
             offset = gu::unserialize8(buf, buflen, offset, last_seen_seqno_);
+            assert(last_seen_seqno_ >= 0);
             offset = gu::unserialize8(buf, buflen, offset, timestamp_);
 
             if (has_annotation())
             {
                 offset = gu::unserialize4(buf, buflen, offset, annotation_);
             }
+
             if (has_mac())
             {
                 offset = mac_.unserialize(buf, buflen, offset);
             }
+
+            set_write_set_buffer(buf + offset, buflen - offset);
+
             break;
         case 3:
             write_set_in_.read_buf (buf, buflen);
@@ -220,7 +226,11 @@ galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
         default:
             gu_throw_error(EPROTONOSUPPORT);
         }
-        return offset;
+
+        assert(last_seen_seqno_ >= 0);
+
+//        return offset;
+        return buflen;
     }
     catch (gu::Exception& e)
     {
@@ -233,7 +243,6 @@ galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
                   << std::endl << "Trx conn_id:   " << conn_id_
                   << std::endl << "Trx trx_id:    " << trx_id_
                   << std::endl << "Trx last_seen: " << last_seen_seqno_;
-
         throw;
     }
 }
@@ -242,6 +251,7 @@ galera::TrxHandle::unserialize(const gu::byte_t* buf, size_t buflen,
 size_t
 galera::TrxHandle::serial_size() const
 {
+    assert (new_version() == false);
     return (4 // hdr
             + galera::serial_size(source_id_)
             + 8 // serial_size(trx.conn_id_)
@@ -250,6 +260,65 @@ galera::TrxHandle::serial_size() const
             + 8 // serial_size(trx.timestamp_)
             + (has_annotation() ? gu::serial_size4(annotation_) : 0)
             + (has_mac() ? mac_.serial_size() : 0));
+}
+
+void
+galera::TrxHandle::apply (void*                   recv_ctx,
+                          wsrep_apply_cb_t        apply_cb,
+                          const wsrep_trx_meta_t& meta) const
+{
+    wsrep_status_t err(WSREP_OK);
+
+    if (new_version())
+    {
+        const DataSetIn& ws(write_set_in_.dataset());
+
+        for (ssize_t i = 0; WSREP_OK == err && i < ws.count(); ++i)
+        {
+            gu::Buf buf = ws.next();
+
+            err = apply_cb (recv_ctx, buf.ptr, buf.size, &meta);
+        }
+    }
+    else
+    {
+        const gu::byte_t* buf(write_set_buffer().first);
+        const size_t buf_len(write_set_buffer().second);
+        size_t offset(0);
+
+        while (offset < buf_len && WSREP_OK == err)
+        {
+            // Skip key segment
+            std::pair<size_t, size_t> k(
+                galera::WriteSet::segment(buf, buf_len, offset));
+            offset = k.first + k.second;
+            // Data part
+            std::pair<size_t, size_t> d(
+                galera::WriteSet::segment(buf, buf_len, offset));
+            offset = d.first + d.second;
+
+            err = apply_cb (recv_ctx, buf + d.first, d.second, &meta);
+        }
+
+        assert(offset == buf_len);
+    }
+
+    if (gu_unlikely(err != WSREP_OK))
+    {
+        const char* const err_str(galera::wsrep_status_str(err));
+        std::ostringstream os;
+
+        os << "Failed to apply app buffer: seqno: " << global_seqno()
+           << ", status: " << err_str;
+
+        galera::ApplyException ae(os.str(), err);
+
+        GU_TRACE(ae);
+
+        throw ae;
+    }
+
+    return;
 }
 
 

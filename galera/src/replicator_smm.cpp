@@ -15,8 +15,8 @@ extern "C"
 #include <sstream>
 #include <iostream>
 
-
-static inline void
+#if 0 // DELETE
+static void
 apply_wscoll(void*                    recv_ctx,
              wsrep_apply_cb_t         apply_cb,
              const galera::TrxHandle& trx,
@@ -61,7 +61,7 @@ apply_wscoll(void*                    recv_ctx,
 
     return;
 }
-
+#endif // DELETE
 
 static void
 apply_trx_ws(void*                    recv_ctx,
@@ -80,7 +80,7 @@ apply_trx_ws(void*                    recv_ctx,
             {
                 log_debug << "Executing TO isolated action: " << trx;
             }
-            gu_trace(apply_wscoll(recv_ctx, apply_cb, trx, meta));
+            gu_trace(trx.apply(recv_ctx, apply_cb, meta));
             if (trx.is_toi())
             {
                 log_debug << "Done executing TO isolated action: "
@@ -275,8 +275,10 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     cc_seqno_ = seqno; // is it needed here?
     apply_monitor_.set_initial_position(seqno);
+
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
+
     cert_.assign_initial_position(seqno, trx_proto_ver_);
 
     build_stats_vars(wsrep_stats_);
@@ -536,7 +538,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
     if (trx->new_version())
     {
-        act.buf  = 0;
+        act.buf  = NULL;
         act.size = trx->write_set_out().gather(trx->source_id(),
                                                trx->conn_id(),
                                                trx->trx_id(),
@@ -545,17 +547,21 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     else
     {
         trx->set_last_seen_seqno(last_committed());
+        assert (trx->last_seen_seqno() >= 0);
         trx->flush(0);
 
         const MappedBuffer& wscoll(trx->write_set_collection());
 
         act.buf  = &wscoll[0];
         act.size = wscoll.size();
+
+        assert (act.buf != NULL);
+        assert (act.size > 0);
     }
 
     trx->set_state(TrxHandle::S_REPLICATING);
 
-    ssize_t rcode;
+    ssize_t rcode(-1);
 
     do
     {
@@ -576,11 +582,14 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         {
             trx->write_set_out().set_last_seen(last_committed());
             trx->unlock();
+            assert (act.buf == NULL); // just a sanity check
             rcode = gcs_.replv(actv, act, true);
         }
         else
         {
+            assert(trx->last_seen_seqno() >= 0);
             trx->unlock();
+            assert (act.buf != NULL);
             rcode = gcs_.repl(act, true);
         }
 
@@ -611,7 +620,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
     assert(act.buf);
     assert(act.size == rcode);
-    assert(act.seqno_l != GCS_SEQNO_ILL && act.seqno_g != GCS_SEQNO_ILL);
+    assert(act.seqno_l != GCS_SEQNO_ILL);
+    assert(act.seqno_g != GCS_SEQNO_ILL);
 
     ++replicated_;
     replicated_bytes_ += rcode;
@@ -639,6 +649,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     {
         retval = WSREP_OK;
     }
+    assert(trx->last_seen_seqno() >= 0);
 
     return retval;
 }
@@ -716,6 +727,11 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
 wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
                                                  wsrep_trx_meta_t* meta)
 {
+    assert(trx->state() == TrxHandle::S_REPLICATING);
+    assert(trx->local_seqno()  > -1);
+    assert(trx->global_seqno() > -1);
+    assert(trx->last_seen_seqno() >= 0);
+
     if (meta != 0)
     {
         meta->gtid.uuid  = state_uuid_;
@@ -725,9 +741,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
     // State should not be checked here: If trx has been replicated,
     // it has to be certified and potentially applied. #528
     // if (state_() < S_JOINED) return WSREP_TRX_FAIL;
-
-    assert(trx->state() == TrxHandle::S_REPLICATING);
-    assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
 
     wsrep_status_t retval(cert(trx));
 
@@ -1175,7 +1188,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
     };
 
     protocol_version_ = proto_ver;
-    log_debug << "REPL Protocols: " << protocol_version_ << " ("
+    log_info << "REPL Protocols: " << protocol_version_ << " ("
               << trx_proto_ver_ << ", " << str_proto_ver_ << ")";
 }
 
@@ -1530,9 +1543,10 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     assert(trx->state() == TrxHandle::S_REPLICATING ||
            trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY);
 
-    assert(trx->local_seqno()     != WSREP_SEQNO_UNDEFINED &&
-           trx->global_seqno()    != WSREP_SEQNO_UNDEFINED &&
-           trx->last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
+    assert(trx->local_seqno()     != WSREP_SEQNO_UNDEFINED);
+    assert(trx->global_seqno()    != WSREP_SEQNO_UNDEFINED);
+    assert(trx->last_seen_seqno() >= 0);
+    assert(trx->last_seen_seqno() < trx->global_seqno());
 
     trx->set_state(TrxHandle::S_CERTIFYING);
 

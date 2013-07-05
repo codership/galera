@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
@@ -149,7 +149,7 @@ static bool
 certify_v1to2(galera::TrxHandle*                            trx,
               galera::Certification::CertIndex&             cert_index,
               const galera::KeyOS&                          key,
-              galera::TrxHandle::CertKeySet&                key_list,
+//              galera::TrxHandle::CertKeySet&                key_list,
               bool const store_keys, bool const log_conflicts)
 {
     typedef std::list<galera::KeyPartOS> KPS;
@@ -157,6 +157,8 @@ certify_v1to2(galera::TrxHandle*                            trx,
     KPS key_parts(key.key_parts<KPS>());
     KPS::const_iterator begin(key_parts.begin()), end;
     bool full_key(false);
+    galera::TrxHandle::CertKeySet& key_list(trx->cert_keys());
+
     for (end = begin; full_key == false; end != key_parts.end() ? ++end : end)
     {
         full_key = (end == key_parts.end());
@@ -230,9 +232,8 @@ galera::Certification::TestResult
 galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 {
     cert_debug << "BEGIN CERTIFICATION: " << *trx;
-    galera::TrxHandle::CertKeySet& key_list(trx->cert_keys_);
-    long key_count(0);
     gu::Lock lock(mutex_);
+    galera::TrxHandle::CertKeySet& key_list(trx->cert_keys_);
 
     if ((trx->flags() & (TrxHandle::F_ISOLATION | TrxHandle::F_PA_UNSAFE))
         || trx_map_.empty())
@@ -250,10 +251,12 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
     // to original size
     size_t prev_cert_index_size(cert_index_.size());
 #endif // NDEBUG
-    /* Scan over write sets */
+
+    long   key_count(0);
     size_t offset(0);
     const gu::byte_t* buf(trx->write_set_buffer().first);
     const size_t buf_len(trx->write_set_buffer().second);
+
     while (offset < buf_len)
     {
         std::pair<size_t, size_t> k(WriteSet::segment(buf, buf_len, offset));
@@ -263,8 +266,11 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
         while (offset < k.first + k.second)
         {
             KeyOS key(trx->version());
-            offset = unserialize(buf, buf_len, offset, key);
-            if (certify_v1to2(trx, cert_index_, key, key_list, store_keys,
+            offset = key.unserialize(buf, buf_len, offset);
+            if (certify_v1to2(trx,
+                              cert_index_,
+                              key,
+                              store_keys,
                               log_conflicts_) == false)
             {
                 goto cert_fail;
@@ -282,6 +288,11 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
+        /* we don't want to go any further unless the writeset checksum is ok */
+        trx->verify_checksum();
+        /* if checksum failed we need to abort ASAP, let the caller catch it,
+         * flush monitors, save state and abort. */
+
         for (TrxHandle::CertKeySet::iterator i(key_list.begin());
              i != key_list.end();)
         {

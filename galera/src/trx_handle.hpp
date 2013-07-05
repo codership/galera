@@ -186,13 +186,13 @@ namespace galera
             annotation_        (),
             write_set_buffer_  (0, 0),
             cert_keys_         ()
-        { }
+        { assert(version_ < 3); }
 
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
 
         int  version()     const { return version_; }
-        bool new_version() const { return version() < WS_NG_VERSION; }
+        bool new_version() const { return version() >= WS_NG_VERSION; }
 
         const wsrep_uuid_t& source_id() const { return source_id_; }
         wsrep_trx_id_t      trx_id()    const { return trx_id_;    }
@@ -219,6 +219,7 @@ namespace galera
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
             assert (!new_version());
+            assert (last_seen_seqno >= 0);
             last_seen_seqno_ = last_seen_seqno;
         }
 
@@ -262,11 +263,9 @@ namespace galera
             /*! protection against protocol change during trx lifetime */
             if (key.proto_ver != version_)
             {
-                gu_throw_error(EINVAL)
-                    << "key version '"
-                    << key.proto_ver
-                    << "' does not match to trx version' "
-                    << version_ << "'";
+                gu_throw_error(EINVAL) << "key version '" << key.proto_ver
+                                       << "' does not match to trx version' "
+                                       << version_ << "'";
             }
 
             if (new_version())
@@ -318,6 +317,9 @@ namespace galera
             {
                 offset = write_set_collection_.size();
             }
+//            log_info << "########### prepare_write_set_collection(): "
+//                     << reinterpret_cast<void*>(&write_set_collection_[0])
+//                     << " + " << offset;
             (void)serialize(&write_set_collection_[0], offset, 0);
             return offset;
         }
@@ -328,6 +330,10 @@ namespace galera
 
             const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + data_len);
+//            log_info << "########### append_write_set(): "
+//                     << reinterpret_cast<void*>(&write_set_collection_[0])
+//                     << " + " << offset << ", data_len: " << data_len;
+//            log_info << "\n" << gu::Hexdump(data, data_len);
             std::copy(reinterpret_cast<const gu::byte_t*>(data),
                       reinterpret_cast<const gu::byte_t*>(data) + data_len,
                       &write_set_collection_[0] + offset);
@@ -343,19 +349,23 @@ namespace galera
             {
                 const size_t offset(prepare_write_set_collection());
                 write_set_collection_.resize(offset + ws.size());
+//            log_info << "########### append_write_set(): "
+//                     << reinterpret_cast<void*>(&write_set_collection_[0])
+//                     << " + " << offset << ", ws.size(): " << ws.size;
+//            log_info << "\n" << gu::Hexdump(ws.begin(), ws.size());
                 std::copy(ws.begin(), ws.end(),
                           &write_set_collection_[0] + offset);
             }
         }
 
-        const MappedBuffer& write_set_collection() const
+        MappedBuffer& write_set_collection()
         {
             return write_set_collection_;
         }
 
         void set_write_set_buffer(const gu::byte_t* buf, size_t buf_len)
         {
-            write_set_buffer_.first = buf;
+            write_set_buffer_.first  = buf;
             write_set_buffer_.second = buf_len;
         }
 
@@ -363,7 +373,7 @@ namespace galera
         write_set_buffer() const
         {
             // If external write set buffer location not specified,
-            // return location from write_set_colletion_. This is still
+            // return location from write_set_collection_. This is still
             // needed for unit tests and IST which don't use GCache
             // storage.
             if (write_set_buffer_.first == 0)
@@ -378,7 +388,6 @@ namespace galera
             }
             return write_set_buffer_;
         }
-
 
         bool empty() const
         {
@@ -400,8 +409,8 @@ namespace galera
             if (write_set_.get_key_buf().size() + write_set_.get_data().size()
                 > mem_limit || mem_limit == 0)
             {
-                gu::Buffer buf(serial_size());
-                (void)serialize(&buf[0], buf.size(), 0);
+                gu::Buffer buf(write_set_.serial_size());
+                (void)write_set_.serialize(&buf[0], buf.size(), 0);
                 append_write_set(buf);
                 write_set_.clear();
             }
@@ -419,8 +428,17 @@ namespace galera
         void   unref() { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
         size_t refcnt() const { return refcnt_(); }
 
-        WriteSetOut& write_set_out() { return write_set_out_; }
-        WriteSetIn&  write_set_in () { return write_set_in_;  }
+        WriteSetOut&  write_set_out() { return write_set_out_; }
+        WriteSetIn&   write_set_in () { return write_set_in_;  }
+
+        void apply(void*                   recv_ctx,
+                   wsrep_apply_cb_t        apply_cb,
+                   const wsrep_trx_meta_t& meta) const /* throws */;
+
+        void verify_checksum() const /* throws */
+        {
+            write_set_in_.verify_checksum();
+        }
 
     private:
 
@@ -465,6 +483,8 @@ public:
                                  std::pair<bool, bool>,
                                  KeyEntryPtrHash,
                                  KeyEntryPtrEqualAll> CertKeySet;
+
+        CertKeySet& cert_keys() { return cert_keys_; }
 
         size_t serial_size() const;
         size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;

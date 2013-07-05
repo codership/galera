@@ -32,9 +32,9 @@ struct gcs_node
 //    long           queue_len;    // action queue length on that node
     gcs_node_state_t status;       // node status
     int              gcs_proto_ver;// supported protocol versions
-    int              repl_proto_ver;//
+    int              repl_proto_ver;
     int              appl_proto_ver;
-    gcs_defrag_t     app;          // defragmenter for application actions
+    gcs_defrag_t     app;        // defragmenter for application actions
     gcs_defrag_t     oob;        // defragmenter for out-of-band service acts.
 
     // globally unique id from a component message

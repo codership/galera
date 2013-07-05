@@ -1472,10 +1472,8 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
     long ret;
 
     assert (act);
-    assert (act->buf);
     assert (act->size > 0);
 
-    act->buf     = NULL;
     act->seqno_l = GCS_SEQNO_ILL;
     act->seqno_g = GCS_SEQNO_ILL;
 
@@ -1565,9 +1563,10 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
                     }
 
                     if (orig_buf != act->buf) // action was allocated in gcache
+                    {
                         gcs_gcache_free (conn->gcache, act->buf);
-
-                    act->buf = NULL;
+                        act->buf = orig_buf;
+                    }
                 }
             }
         }

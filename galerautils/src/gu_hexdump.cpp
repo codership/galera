@@ -30,9 +30,9 @@ Hexdump::to_stream (std::ostream& os) const
 
         gu_hexdump (buf_ + off, to_print, str, sizeof(str), alpha_);
 
-        os << str;
-
         off += to_print;
+
+        os << str; if (off < size_) os << '\n';
     }
 
     return os;
