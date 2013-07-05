@@ -8,8 +8,8 @@ statement run for the database. :abbr:`DDL (Data Definition Language)`
 statements change the database structure and are non-transactional.
 
 :abbr:`DDL (Data Definition Language)` statements are processed in
-two different methods in Galera. These methods are described in the
-chapters below.
+two different methods in *Galera Cluster*.
+These methods are described in the chapters below.
 
 .. note:: See also the ``pt-online-schema-change`` command in Percona
           Toolkit for MySQL: http://www.percona.com/software/percona-toolkit.
@@ -18,6 +18,8 @@ chapters below.
  Total Order Isolation
 ---------------------------------
 .. _`Total Order Isolation`:
+.. index::
+   pair: Descriptions; Total Order Isolation
 
 By default, :abbr:`DDL (Data Definition Language)`
 statements are processed by using the Total Order Isolation
@@ -46,15 +48,15 @@ into consideration:
 
 - From the perspective of certification:
 
-    - TOI transactions never conflict with preceding transactions,
-      since they are only executed after all preceding transactions
-      were committed. Hence, their certification interval is of zero
-      length. This means that TOI transactions will never fail
-      certification and are guaranteed to be executed.
-    - Certification takes place on a resource level. For example,
-      for server-level isolation this means any transaction that
-      has a TOI query in its certification interval will fail
-      certification.
+  - TOI transactions never conflict with preceding transactions,
+    since they are only executed after all preceding transactions
+    were committed. Hence, their certification interval is of zero
+    length. This means that TOI transactions will never fail
+    certification and are guaranteed to be executed.
+  - Certification takes place on a resource level. For example,
+    for server-level isolation this means any transaction that
+    has a TOI query in its certification interval will fail
+    certification.
 
 - The system replicates the TOI query before execution and there
   is no way to know whether it succeeds or fails. Thus, error checking
@@ -68,7 +70,8 @@ into consideration:
  Rolling Schema Upgrade
 ---------------------------------
 .. _`Rolling Schema Upgrade`:
-
+.. index::
+   pair: Descriptions; Rolling Schema Upgrade
 .. index::
    pair: Parameters; wsrep_OSU_method
 

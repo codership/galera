@@ -7,22 +7,27 @@
  Overview
 =========
 
+.. index::
+   pair: Certification based replication; Descriptions
+.. index::
+   pair: Virtual synchrony; Descriptions
+
 *Galera Cluster for MySQL* is a synchronous multi-master
-database cluster, based on Oracle's MySQL/InnoDB. When you
-use *Galera Cluster for MySQL*, you can read from and write
-to any node, and you can lose any individual node without
-interruption in operations, and without the need to handle
-complicated failover procedures.
+database cluster, based on synchronous replication and Oracle's
+MySQL/InnoDB. When *Galera Cluster* is used, reads and
+writes can be directed to any node, and any individual node can
+be lost without interruption in operations and without the need
+to handle complicated failover procedures.
 
-On a high level, *Galera Cluster for MySQL* consists of the
+On a high level, *Galera Cluster* consists of the
 standard MySQL server and the standard InnoDB storage engine,
-using the :term:`Galera Replication` plugin for replication.
-To be more specific, we do extend the MySQL replication plugin
-API to provide all the information and hooks required for true
-multi-master, synchronous replication. We call this API the
-*Write Set REPlication API*.
+using the :term:`Galera Replication Plugin` for replication.
+To be more specific, the MySQL replication plugin API has been
+extended to provide all the information and hooks required for
+true multi-master, synchronous replication. This API is called
+the Write Set Replication API, *wsrep API*.
 
-*Galera Cluster for MySQL* provides *certification based*
+*Galera Cluster* provides *certification based*
 replication. The idea is that the transactions to be replicated
 |---| the write set |---| not only contains the database rows
 to replicate, but also includes information on all the locks

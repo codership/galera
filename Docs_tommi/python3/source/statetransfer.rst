@@ -14,10 +14,12 @@
 ==========================
 .. _`Node Provisioning`:
 
-You can choose between two different node provisioning methods:
+There are two different node provisioning methods:
 
-- If you have a node state, use State Snapshot Transfer (SST)
-- If you do not have a state, use Incremental State Transfer (IST)
+- State Snapshot Transfer (SST), which transfers the entire
+  node state as it is (hence "snapshot").
+- Incremental State Transfer (IST), which only transfers the
+  results of transactions missing from the joining node.
 
 These methods are described in the chapters below.
 
@@ -28,12 +30,14 @@ These methods are described in the chapters below.
 
 .. index::
    pair: Parameters; wsrep_sst_method
+.. index::
+   pair: State Snapshot Transfer methods; State Snapshot Transfer
 
 State Snapshot Transfer (SST) refers to a full data copy from
 one cluster node (donor) to the joining node (joiner). 
 SST is used when a new node joins the cluster. To get synchronized
 with the cluster, the new node has to transfer data from a node
-that is already part of the cluster. In :term:`Galera Replication`, you
+that is already part of the cluster. In Galera replication, you
 can choose from two conceptually different ways to transfer a
 state from one MySQL server to another:
 
@@ -64,8 +68,7 @@ state from one MySQL server to another:
   made non-blocking on donor. These methods are supported
   through a scriptable SST interface.
 
-For more information, see chapter
-:ref:`Comparison of State Snapshot Transfer Methods <Comparison of State Snapshot Transfer Methods>`.
+.. seealso:: Chapter :ref:`Comparison of State Snapshot Transfer Methods <Comparison of State Snapshot Transfer Methods>`
   
 You can configure the state snapshot transfer method
 with the ``wsrep_sst_method`` variable. For example::
@@ -77,7 +80,12 @@ with the ``wsrep_sst_method`` variable. For example::
 ----------------------------------
 .. _`Incremental State Transfer (IST)`:
 
-Galera supports a functionality known as incremental state
+.. index::
+   pair: Parameters; wsrep_sst_method
+.. index::
+   pair: State Snapshot Transfer methods; Incremental State Transfer
+
+*Galera Cluster* supports a functionality known as incremental state
 transfer. Incremental state transfer means that if:
 
 1. the joining node state UUID is the same as that of the group, and
@@ -111,12 +119,16 @@ sending a state snapshot.
 Writeset Cache (GCache)
 =======================
 .. _`Writeset Cache (GCache)`:
+.. index::
+   pair: GCache; Descriptions
+.. index::
+   pair: Writeset Cache; Descriptions
 
-Galera stores write sets in a special cache called Writeset
+*Galera Cluster* stores write sets in a special cache called Writeset
 Cache (GCache). In short, GCache is a memory allocator for
 write sets and its primary purpose is to minimize the write
 set footprint on the :abbr:`RAM (Random-access memory)`.
-Galera also improves the offload writeset storage to disk 
+*Galera Cluster* also improves the offload writeset storage to disk.
 
 GCache has three types of stores:
 
@@ -138,9 +150,8 @@ GCache has three types of stores:
    keep. When all other stores are disabled, at least one
    page file is always present on disk.
    
-   For more information, see the GCache related parameter
-   descriptions in chapter
-   :ref:`Galera Parameters <Galera Parameters>`.
+   .. seealso:: GCache related parameter descriptions in chapter
+                :ref:`Galera Parameters <Galera Parameters>`
 
 The allocation algorithm attempts to store write sets in the above
 order. If the first store does not have enough space to allocate the
@@ -160,14 +171,14 @@ the process, but a dedicated location can be specified (see chapter
 ------------------------------------
 .. _`Scriptable State Snapshot Transfer`:
 
-Galera has an interface to customize state snapshot transfer through
+*Galera Cluster* has an interface to customize state snapshot transfer through
 an external script. The script assumes that the storage engine
 initialization on the receiving node takes place only after the state
 transfer is complete. In short, this transfer copies the contents of
 the source data directory to the destination data directory (with possible
 variations).
 
-As of wsrep API patch level 23.7, SST parameters are named. Individual
+As of *wsrep API* patch level 23.7, SST parameters are named. Individual
 scripts can use the *wsrep_sst_common.sh* file, which contains common
 functions for parsing argument lists, logging errors, and so on. There
 is no constraint on the order or number of parameters. New parameters

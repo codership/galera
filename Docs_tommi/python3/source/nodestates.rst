@@ -20,8 +20,21 @@ possible node state changes.
 ---------------
 .. _`Node States`:
 
+.. index::
+   pair: Node states; OPEN
+.. index::
+   pair: Node states; PRIMARY
+.. index::
+   pair: Node states; JOINER
+.. index::
+   pair: Node states; DONOR
+.. index::
+   pair: Node states; JOINED
+.. index::
+   pair: Node states; SYNCED
+
 To ensure temporal synchrony and consistency (as opposed
-to logical which is provided by virtual synchrony), Galera
+to logical which is provided by virtual synchrony), *Galera Cluster*
 implements several forms of flow control, depending on the
 node state. The node states are described in the chapters
 below.
@@ -114,7 +127,8 @@ configuration variables:
   
 .. warning:: Since Galera nodes process transactions asynchronously
              with regards to each other, the amount of replication
-             data cannot be anticipated in any way. Hence, Galera
+             data cannot be anticipated in any way. Hence,
+             the *Galera Cluster*
              flow control is reactive, that is, it only affects after
              certain limits are exceeded. It cannot prevent exceeding
              these limits or make any guarantees about by how much
@@ -126,14 +140,18 @@ configuration variables:
  Node State Changes
 --------------------
 .. _`Node State Changes`:
+.. index::
+   pair: Node states; Node state changes
 
-Galera node state machines handle different state changes on
-different Galera layers. At the top layer, there are node
-state changes as depicted in the figure below:
+The *Galera Cluster* node state
+machines handle different state changes on different
+*Galera Cluster* layers. At the
+top layer, there are node state changes as depicted in
+the figure below:
 
 .. figure:: images/galerafsm.png
 
-   *Galera Node State Changes*
+   *Galera Cluster Node State Changes*
 
 In the figure:
 

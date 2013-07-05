@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -e
 
 if test -z "$MYSQL_SRC"
 then
@@ -14,17 +14,20 @@ use_mysql_5.1_sources()
     export MYSQL_MINOR_VER="1"
     MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
 }
+
 use_mariadb_5.1_sources()
 {
     use_mysql_5.1_sources
 }
+
 use_mysql_5.5_sources()
 {
-    MYSQL_MAJOR="5.5"
+    export MYSQL_MAJOR_VER=`grep MYSQL_VERSION_MAJOR $MYSQL_SRC/VERSION | cut -d = -f 2`
+    export MYSQL_MINOR_VER=`grep MYSQL_VERSION_MINOR $MYSQL_SRC/VERSION | cut -d = -f 2`
+    export MYSQL_PATCH_VER=`grep MYSQL_VERSION_PATCH $MYSQL_SRC/VERSION | cut -d = -f 2`
+    MYSQL_MAJOR=$MYSQL_MAJOR_VER.$MYSQL_MINOR_VER
     export MYSQL_5_5=$MYSQL_MAJOR # for DEB build
-    export MYSQL_MAJOR_VER="5"
-    export MYSQL_MINOR_VER="5"
-    MYSQL_VER=`awk -F '=' 'BEGIN { ORS = "" } /MYSQL_VERSION_MAJOR/ { print $2 "." } /MYSQL_VERSION_MINOR/ { print $2 "." } /MYSQL_VERSION_PATCH/ { print $2 }' $MYSQL_SRC/VERSION`
+    MYSQL_VER=$MYSQL_MAJOR.$MYSQL_PATCH_VER
 }
 
 if test -f "$MYSQL_SRC/configure.in"
@@ -332,35 +335,44 @@ then
     if [ "$CONFIGURE" == "yes" ] && [ "$SKIP_CONFIGURE" == "no" ]
     then
         rm -f config.status
-        if [ "$DEBUG" == "yes" ]
-        then
-            DEBUG_OPT="-debug"
-        else
-            DEBUG_OPT=""
-        fi
 
-        # This will be put to --prefix by SETUP.sh.
-        export MYSQL_BUILD_PREFIX="/usr"
-
-        # There is no other way to pass these options to SETUP.sh but
-        # via env. variable
-        [ $MYSQL_MAJOR = "5.5" ] && LAYOUT="--layout=RPM" || LAYOUT=""
+        DEBUG_OPT=""
+        MYSQL_BUILD_PREFIX="/usr"
 
         [ $DEBIAN -ne 0 ] && \
         MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
         MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
 
-        export wsrep_configs="$LAYOUT \
-                              --libexecdir=/usr/sbin \
-                              --localstatedir=/var/lib/mysql/ \
-                              --with-extra-charsets=all \
-                              --with-ssl \
-                              --with-unix-socket-path=$MYSQL_SOCKET_PATH"
+        if [ $MYSQL_MAJOR = "5.1" ]
+        then
+            # This will be put to --prefix by SETUP.sh.
+            export MYSQL_BUILD_PREFIX
+            export wsrep_configs="--libexecdir=/usr/sbin \
+                                  --localstatedir=/var/lib/mysql/ \
+                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH \
+                                  --with-extra-charsets=all \
+                                  --with-ssl"
 
-        BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
+            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-debug"
+            BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
+        else # CMake build
+            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-DCMAKE_BUILD_TYPE=Debug"
+            cmake -DWITH_WSREP=1 \
+                  -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
+                  -DINSTALL_LAYOUT=RPM \
+                  -DINSTALL_SBINDIR=/usr/sbin \
+                  -DMYSQL_DATADIR=/var/lib/mysql \
+                  -DMYSQL_UNIX_ADDR=$MYSQL_SOCKET_PATH \
+                  -DWITH_EXTRA_CHARSETS=all \
+                  -DWITH_READLINE=yes \
+                  -DWITH_SSL=system \
+                  -DWITH_ZLIB=system \
+                  $DEBUG_OPT \
+            && make -j $JOBS -S || exit 1
+        fi
     else  # just recompile and relink with old configuration
         #set -x
-        make > /dev/null
+        make -j $JOBS > /dev/null
         #set +x
     fi
 fi # SKIP_BUILD
@@ -525,7 +537,7 @@ RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
-# Hack to avoid 'file changed as we read it'-error 
+# Hack to avoid 'file changed as we read it'-error
 sync
 sleep 1
 

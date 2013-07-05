@@ -161,6 +161,7 @@ namespace gcomm
         bool              isolate_;
 
         gmcast::ProtoMap*  proto_map_;
+        std::set<Socket*>   relay_set_;
 
         typedef std::vector<Socket*> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;

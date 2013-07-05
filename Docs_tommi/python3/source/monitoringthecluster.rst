@@ -6,8 +6,8 @@
 .. index::
    pair: Parameters; wsrep_notify_cmd
 
-You can monitor *wsrep*-related status variables in the Galera
-cluster by using the standard *wsrep* queries. As all *wsrep*-related
+You can monitor *wsrep*-related status variables in
+the *Galera Cluster* by using the standard *wsrep* queries. As all *wsrep*-related
 status variables are prefixed with *wsrep*, you can query them all by
 using the command below::
 
@@ -19,14 +19,7 @@ This command can also communicate the event to a monitoring agent.
 For more information on the ``wsrep_notify_cmd`` command, see chapter 
 :ref:`wsrep_notify_cmd <wsrep_notify_cmd>`.
 
-.. note:: Status variables and variables in the chapters below are
-          differential and reset on every ``SHOW STATUS`` command.
-          To view the value for the current moment, execute two
-          ``SHOW STATUS`` commandson the node with an interval of
-          ~1 minute. The output of the last invocation will correspond
-          to the current moment.
-
-.. note:: You can also use *Nagios* for monitoring *Galera Cluster for MySQL*.
+.. note:: You can also use *Nagios* for monitoring the *Galera Cluster*.
 
           For more information, see http://www.fromdual.com/galera-cluster-nagios-plugin-en.
 
@@ -37,13 +30,10 @@ For more information on the ``wsrep_notify_cmd`` command, see chapter
 
 .. index::
    pair: Parameters; wsrep_cluster_state_uuid
-
 .. index::
    pair: Parameters; wsrep_cluster_conf_id
-
 .. index::
    pair: Parameters; wsrep_cluster_size
-   
 .. index::
    pair: Parameters; wsrep_cluster_status
 
@@ -87,15 +77,23 @@ in the cluster and this component is currently unoperational (due to
 multiple membership changes and the loss of quorum). A split-brain
 condition is also possible. 
 
-If no other node in the cluster is connected to the :term:`Primary Component`
+If no node in the cluster is connected to the :term:`Primary Component`
 (that is, all nodes belong to the same component, which is a
-non-primary component) the cluster must be manually rebootstrapped.
+non-primary component), attempt to reset the quorum as explained in
+chapter :ref:`Resetting the Quorum <Resetting the Quorum>`.
+
+If you cannot reset the quorum, the cluster must be manually rebootstrapped.
 If this is the case,
 
 1. Shut down all nodes.
 2. Restart all nodes starting with the most advanced node. To find
    out the most advanced node, check the ``wsrep_last_committed``
    status variable. 
+
+.. note:: Manual bootstrapping has the downside that *gcache* contents are lost
+          and no IST is possible, which would probably be the fastest state transfer
+          method in this kind of case.
+
 
 This situation is very unlikely. If, however, there is another primary
 cluster component, there is a loss of connectivity between the nodes.
@@ -161,6 +159,13 @@ In a non-primary component, the node state comment should be
 
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
+
+.. note:: Status variables and variables in the chapters below are
+          differential and reset on every ``SHOW STATUS`` command.
+          To view the value for the current moment, execute two
+          ``SHOW STATUS`` commandson the node with an interval of
+          ~1 minute. The output of the last invocation will correspond
+          to the current moment.
 
 When checking the replication health, the first thing you want to know
 is how much slave lag is slowing down the cluster. You can check this

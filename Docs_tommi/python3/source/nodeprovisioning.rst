@@ -16,28 +16,35 @@
 
 .. index::
    pair: Parameters; wsrep_data_dir
-
 .. index::
    pair: Parameters; wsrep_sst_donor
-
 .. index::
    pair: Parameters; wsrep_node_name
+.. index::
+   single: Total Order Isolation
 
-The state of new and failed nodes differs from the state of
-the :term:`Primary Component` and needs to be synchronized. As a result,
+If the state of a new or failed node differs from the state of
+the cluster :term:`Primary Component` it needs to be synchronized. As a result,
 new node provisioning and failed node recovery are essentially
-the same process of joining the node to the cluster
+the same process of joining a node to the cluster
 :abbr:`PC (Primary Component)`.
 
 The initial node state ID is read from the *grastate.txt*
 file in ``wsrep_data_dir``, where it is saved every time
-the node is gracefully shut down. If the node crashes, its
-database state is unknown and its initial Galera node state
-is undefined (``00000000-0000-0000-0000-000000000000:-1``).
+the node is gracefully shut down. If the node crashes in
+the :term:`Total Order Isolation` mode, its database state is
+unknown and its initial *Galera Cluster*
+node state is undefined
+(``00000000-0000-0000-0000-000000000000:-1``). [1]_
+
+.. [1] In normal transaction processing, only the ``seqno`` part
+       of the GTID remains undefined (``-1``), and the ``UUID``
+       part remains valid. In this case, the node can be recovered
+       through IST.
 
 When a node joins the primary component, it compares its
 state ID to that of the :abbr:`PC (Primary Component)` and
-if they do not match, the node requests for state transfer
+if they do not match, the node requests state transfer
 from the cluster.
 
 There are two possibilities to select the state transfer donor:
@@ -54,13 +61,13 @@ aborts. Use the same donor name as set in the ``wsrep_node_name``
 parameter on the donor node.
 
 .. note:: State transfer is a heavy operation not only on the
-          joining node, but also on donor. The state donor may
+          joining node, but also on the donor. The state donor may
           not be able to serve client requests. Thus, when possible,
           select the donor manually, based on network proximity.
           Configure the load balancer to transfer client connections
           to the other nodes for the duration of state transfer.
 
-During state transfer the joining node caches writesets received
+During the state transfer the joining node caches writesets received
 from other nodes in a *slave queue* and applies them after the
 state transfer is over, to catch up with the current primary
 component state. Since the state snapshot always has a
@@ -79,20 +86,28 @@ it will accept client connections.
 ------------------------------------------------
 .. _`Comparison of State Snapshot Transfer Methods`:
 
-You can choose between two different node provisioning methods:
+.. index::
+   pair: State Snapshot Transfer methods; Comparison of
 
-- If you have a node state, use State Snapshot Transfer (SST)
-- If you do not have a state, use Incremental State Transfer (IST)
+There are two different node provisioning methods:
 
-These methods are compared in this chapter.
+- State Snapshot Transfer (SST), which transfers the entire
+  node state as it is (hence "snapshot").
+- Incremental State Transfer (IST), which only transfers the
+  results of transactions missing from the joining node.
+
+You can choose the SST method (*mysqldump*, *rsync*, or
+*xtrabackup*), whereas IST will be automatically chosen
+by the donor node, when it is available.  The SST methods
+are compared in this chapter.
 
 There is no single best state snapshot transfer method; the method
 must be chosen depending on the situation. Fortunately, the choice
 only must be done on the receiving node; the donor will serve
 whatever is requested, as long as it has support for it.
 
-See the table below for a summary table on the the difference
-between the different state snapshot transfer methods:
+See the table below for a summary on the the differences
+between the state snapshot transfer methods:
 
 +------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
 | Method     | Speed          | Blocks the donor? | Available on live node? | Logical/Physical | Requires root access to MySQL server? |
@@ -140,7 +155,7 @@ of configuration:
   to the Barracuda file format, start using compression or resize, or
   place iblog* files to another partition.
   
-  :red:`Minuses`: A logical state transfer is as slow as mysqldump. The 
+  :red:`Minuses`: A logical state transfer is as slow as *mysqldump*. The 
   receiving server must be prepared to accept root connections from
   potential donor nodes and the receiving server must have a
   non-corrupted database.
@@ -201,6 +216,9 @@ server.
 
 xtrabackup
 ==========
+
+.. index::
+   single: my.cnf
 
 *Xtrabackup*-based state snapshot transfer is probably the most
 popular choice. As *rsync*, it has the pluses and minuses of the

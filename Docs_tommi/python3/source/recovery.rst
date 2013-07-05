@@ -8,8 +8,8 @@
 --------------------
 .. _`Single Node Failure`:
 
-A single Galera cluster node can fail to operate for a variety
-of reasons, such as:
+A single *Galera Cluster* cluster node can
+fail to operate for a variety of reasons, such as:
 
 - A hardware failure
 - A software crash
@@ -45,11 +45,12 @@ itself), it has lost connection to the primary component.
 
 Third-party node monitoring tools, such as ping/Heartbeat/Pacemaker,
 may be grossly off in their estimates on the node failure, as they
-do not participate in the Galera group communication and are not
-aware of the primary component. Monitor the Galera node status
+do not participate in the *Galera Cluster* group communication and are not
+aware of the primary component. Monitor the *Galera Cluster* node status
 only by polling the ``wsrep_local_state`` status variable or use
-a notification script. For more information, see chapter
-:ref:`Monitoring the Cluster <Monitoring the Cluster>`.
+a notification script.
+
+.. seealso: Chapter :ref:`Monitoring the Cluster <Monitoring the Cluster>`
 
 Node connection liveness is determined from the last time a network
 packet was received from the node. This is checked every
@@ -78,7 +79,7 @@ The relation between the option values is::
 Trade-Off Between Availability and Partition Tolerance
 ======================================================
 
-Within the `CAP theorem`_, Galera emphasizes data safety and
+Within the `CAP theorem`_, *Galera Cluster* emphasizes data safety and
 consistency, which leads to a trade-off between cluster availability
 and partition tolerance. To be more specific, in unstable networks
 (such as :abbr:`WAN (Wide Area Network)`) low
@@ -113,16 +114,19 @@ in the cluster begin to operate autonomously from each other.
 Data can get irreparably corrupted as two different database nodes
 update the data independently.
 
-Like any quorum-based system, the Galera cluster is subject to the
+Like any quorum-based system, *Galera Cluster* is subject to the
 split-brain condition when the quorum algorithm fails to select a
 primary component. This can happen, for example, in a cluster without
-the backup switch if the main switch fails. However, the most likely
+a backup switch if the main switch fails. However, the most likely
 split-brain situation is when a single node fails in a two-node cluster.
-Thus it is strongly advised that the minimum Galera cluster
+Thus, it is strongly advised that the minimum *Galera Cluster*
 configuration is three nodes.
 
-In a split-brain situation, proceed as described in chapter
-:ref:`Node Resetting the Quorum <Resetting the Quorum>`.
+*Galera Cluster* is designed to avoid split-brain
+situations. If a cluster is split into two partitions of equal size,
+both of the split partitions end up in a non-primary component
+(unless explicitly configured otherwise). In this situation, proceed
+as described in chapter :ref:`Node Resetting the Quorum <Resetting the Quorum>`.
 
 ------------------------
  State Transfer Failure
@@ -133,7 +137,7 @@ A failure in state transfer renders the receiving node unusable.
 If a state transfer failure is detected, the receiving node will
 abort.
 
-Restarting the node after a mysqldump failure may require manual
+Restarting the node after a *mysqldump* failure may require manual
 restoring of the administrative tables. The rsync method does not
 have this issue, since it does not need the server to be in
 operational state.

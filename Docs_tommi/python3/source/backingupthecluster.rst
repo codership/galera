@@ -3,24 +3,25 @@
 =========================
 .. _`Backing up Cluster Data`:
 
-
+.. index::
+   pair: Logs; mysqld error log
 .. index::
    pair: Parameters; gmcast.listen_addr
-   
 .. index::
    pair: Parameters; wsrep_cluster_name
-
 .. index::
    pair: Parameters; wsrep_node_name
+.. index::
+   single: Galera Arbitrator
 
-*Galera Cluster for MySQL* backups can be performed just as
+Galera Cluster backups can be performed just as
 regular MySQL backups, using a backup script. Since all the
 cluster nodes are identical, backing up one node backs up
 the entire cluster.
 
 However, such backups will have no global transaction IDs
 associated with them. You can use these backups to recover
-data, but they cannot be used to recover a Galera node to a
+data, but they cannot be used to recover a Galera Cluster node to a
 well-defined state. Furthermore, the backup procedure may
 block the clusteroperation for the duration of backup, in
 the case of a blocking backup.
@@ -32,8 +33,8 @@ For that:
 
 - A special backup script must be installed in the *mysqld*
   path on the node that will be a backup source.
-- The backup must be initiated through the *Galera* replication
-  system.
+- The backup must be initiated through the
+  Galera Cluster replication system.
 
 For example, the command below will cause the chosen donor
 node to the ``run wsrep_sst_backup`` script and pass the

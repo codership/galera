@@ -15,9 +15,9 @@
 .. index::
    pair: Parameters; socket.ssl_key
    
-Galera library supports :abbr:`SSL (Secure Sockets Layer)`
+*Galera Cluster* supports :abbr:`SSL (Secure Sockets Layer)`
 for the encryption of replication traffic. Authentication
-is not supprtoed. SSL is a cluster-wide option and must be
+is not supported. SSL is a cluster-wide option and must be
 enabled either on all of the nodes or none at all. 
 
 To use SSL, you must generate a private certificate/key pair
@@ -33,7 +33,8 @@ for the cluster, for example, by the following command::
 Copy this certificate/key pair to the */etc/mysql* directory on all of the
 nodes. Copy the files over a secure channel between the nodes.
 
-Take the certificate/key pair to use by specifying the following Galera options::
+Take the certificate/key pair to use by specifying the
+following *Galera Cluster* options::
 
     socket.ssl_cert = <path_to_cert_file>; socket.ssl_key = <path_to_key_file>
 
@@ -47,7 +48,9 @@ for details.
           system, you must rebootstrap the cluster and accept a brief
           outage.
 
-.. warning:: Galera SSL support only covers Galera communication. Since state
-             snapshot transfer happens outside of Galera, protect it separately.
+.. warning:: The *Galera Cluster* SSL support only
+             covers *Galera Cluster* communication. Since state
+             snapshot transfer happens outside of *Galera Cluster*,
+             protect it separately.
              You can use, for example, the internal SSL support in the MySQL
              client or the **stunnel** program to protect *rsync* traffic.

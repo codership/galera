@@ -1,24 +1,24 @@
-====================
- Galera Replication
-====================
-.. _`Galera Replication`:
+===========================
+ Galera Replication Plugin
+===========================
+.. _`Galera Replication Plugin`:
 
-Galera Replication is a synchronous multi-master replication
+The :term:`Galera Replication Plugin` is a synchronous multi-master replication
 plug-in for MySQL, MariaDB and Percona XtraDB cluster. Galera
-Replication features are, for example:
+Replication Plugin features are, for example:
 
 - Unconstrained parallel applying, also known as parallel
   replication
 - Multicast replication
 - Automatic node provisioning
 
-The primary focus of Galera Replication is data consistency:
+The primary focus of the Galera Replication Plugin is data consistency:
 the transactions are either applied on every node, or not at
-all. In short, Galera Replication keeps databases synchronized
+all. In short, the Galera Replication Plugin keeps databases synchronized
 provided that they were properly configured and synchronized
 at the beginning.
 
-Galera Replication differs from the regular MySQL Replication
+The Galera Replication Plugin differs from the regular MySQL Replication
 by, for example, addressing a number of issues including write
 conflicts when writing on multiple masters, replication lag
 and slaves being out of sync with the master.
@@ -38,4 +38,4 @@ Certification-based replication is an alternative approach to
 synchronous database replication using group communication
 and transaction ordering techniques.
 
-A minimal Galera cluster consists of three nodes.
+The minimal recommended Galera Replication cluster consists of three nodes.

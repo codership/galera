@@ -9,18 +9,18 @@
    pair: Parameters; wsrep_provider
 
 This chapter presents the mandatory and recommended settings
-for *Galera Cluster for MySQL* installation and use. It may
+for *Galera Cluster* installation and use. It may
 be possible to start the cluster after
 only setting the ``wsrep_provider`` and ``wsrep_cluster_address``
 variables. However, the best results can be achieved by
 fine-tuning the configuration to best match the use case.
 
-For more information on the settings, see chapter
-:ref:`Galera Parameters <Galera Parameters>`.
+.. seealso:: Chapter :ref:`Galera Parameters <Galera Parameters>`.
 
----------------------------
-Installation Configuration
----------------------------
+----------------------------
+ Installation Configuration
+----------------------------
+.. _`Installation Configuration`:
 
 Unless you are upgrading an already installed *mysql-wsrep*
 package, you must configure the installation to prepare the
@@ -29,6 +29,12 @@ server for operation.
 
 Configuration Files
 ====================
+.. _`Configuration Files`:
+
+.. index::
+   pair: Configuration files; wsrep.cnf
+.. index::
+   pair: Configuration files; my.cnf
 
 Edit the *my.cnf* configuration file as follows:
 
@@ -76,6 +82,7 @@ CentOS you could use these settings::
 
     # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 3306 -j ACCEPT
     # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 4567 -j ACCEPT
+    # iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 4568 -j ACCEPT
 
 If there is a NAT firewall between the nodes, configure it to allow
 direct connections between the nodes (for example, through port forwarding).
@@ -129,7 +136,6 @@ See below for an example *my.cnf* file::
     binlog_format=ROW
     default_storage_engine=innodb
     innodb_autoinc_lock_mode=2
-    # innodb_doublewrite=1 - this is the default and it should stay this way
     
     # 2. Optional mysqld settings: your regular InnoDB tuning and such
     datadir=/mnt/mysql/data
@@ -184,9 +190,6 @@ You must give values to the settings below:
   ``AUTO_INCREMENT`` column may fail. Lock modes 0 and 1 can cause
   unresolved deadlocks and make the system unresponsive.
 
-   .. note:: If you use Galera provider version 2.0 or higher,
-             set ``innodb_doublewrite`` to 1 (default).
-
 --------------------------
  Optional MySQL Settings
 --------------------------
@@ -216,6 +219,10 @@ For better performance, you can give values to the settings below:
   crash or a power outage can erase the last second of transactions.
   However, this risk is handled by synchronous replication |---| you
   can always recover the node from another node.
+  
+  .. warning:: With ``innodb_flush_log_at_trx_commit=2``, some transactions
+               can be lost if the entire cluster goes down, for example, due
+               to a datacenter power outage. 
 
   Set::
 
@@ -230,7 +237,7 @@ For better performance, you can give values to the settings below:
 The basic wsrep provider settings are:
 
 - ``wsrep_provider=/usr/lib64/galera/libgalera_smm.so`` |---| The
-  path to the Galera plugin.
+  path to the Galera Replication Plugin.
 - ``wsrep_cluster_address=gcomm://192.168.0.1,192.168.0.2,192.168.0.3`` |---| The
   cluster connection URL. See chapter :ref:`Starting a Cluster <Starting a Cluster>`.
 - ``wsrep_provider_options="gcache.size=32G; gcache.page_size=1G"`` |---| A
@@ -252,7 +259,8 @@ For better performance, you can also give values to the settings below:
   which the server expects client connections. This parameter is intended
   for integration with load balancers. 
 - ``wsrep_sst_donor='node3'`` |---| The name of the server that should
-  be used as a source for state transfer. Give the name as ``wsrep_node_name``.
+  be used as a source for state transfer. Give the donor node name as
+  configured with the ``wsrep_node_name`` parameter on the desired donor.
 - ``wsrep_slave_threads=16`` |---| How many threads to use for applying
   slave writsets.
 
@@ -261,8 +269,13 @@ For better performance, you can also give values to the settings below:
 ---------------------------
 .. _`Optional Memory Settings`:
 
-During normal operation a MariaDB Galera node does not consume
-much more memory than a regular MariaDB server. Additional
+.. index::
+   pair: Performance; Memory
+.. index::
+   pair: Performance; Swap size
+
+In normal operation, a *Galera Cluster* node does not consume
+much more memory than a regular MySQL server. Additional
 memory is consumed for the certification index and uncommitted
 write sets, but usually this is not noticeable in a typical
 application. However, writeset caching during state transfer
@@ -270,20 +283,22 @@ makes an exception.
 
 When a node is receiving a state transfer, it cannot process
 and apply incoming write sets because it has no state to
-apply them to yet. Depending on a state transfer mechanism
+apply them to yet. Depending on the state transfer mechanism
 (for example, *mysqldump*), the node that sends the state
 transfer may not be able to apply write sets. Instead, the
-node must cache the write sets for a catch-up phase. Currently,
-the write sets are cached in memory and, if the system runs out
-of memory, either the state transfer will fail or the cluster
-will block and wait for the state transfer to end.
+node must cache the write sets for a catch-up phase. The
+Writeset Cache (GCache) is used to cache write sets on
+memory-mapped files on disk. These files are allocated as
+needed. In other words, the limit for the cache is the
+available disk space. Writing on disk reduces memory
+consumption.
 
-To control memory usage for writeset caching, adjust the
-Galera parameters below:
+However, if you want to adjust flow control settings, adjust the
+*Galera Cluster* parameters below:
 
 - ``gcs.recv_q_hard_limit`` |---| the maximum allowed size of
   recv queue. This should normally be half of (RAM + swap).
-  If this limit is exceeded, Galera will abort the server
+  If this limit is exceeded, *Galera Cluster* will abort the server
 - ``gcs.recv_q_soft_limit`` |---| A fraction of ``gcs.recv_q_hard_limit``
   after which replication rate will be throttled.
 - ``gcs.max_throttle`` |---| How much we can throttle the replication
