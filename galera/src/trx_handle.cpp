@@ -160,6 +160,7 @@ size_t galera::TrxHandle::Mac::serial_size() const
 size_t
 galera::TrxHandle::serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
 {
+    if (new_version()) { assert(0); } // we don't use serialize for that
     uint32_t hdr((version_ << 24) | (write_set_flags_ & 0xff));
     offset = gu::serialize4(hdr, buf, buflen, offset);
     offset = galera::serialize(source_id_, buf, buflen, offset);
@@ -222,6 +223,11 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             write_set_flags_ = write_set_in_.flags() & 0x07;
             if (write_set_in_.is_toi())    write_set_flags_ |= F_ISOLATION;
             if (write_set_in_.pa_unsafe()) write_set_flags_ |= F_PA_UNSAFE;
+            source_id_       = write_set_in_.source_id();
+            conn_id_         = write_set_in_.conn_id();
+            trx_id_          = write_set_in_.trx_id();
+            last_seen_seqno_ = write_set_in_.last_seen();
+            timestamp_       = write_set_in_.timestamp();
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT);
