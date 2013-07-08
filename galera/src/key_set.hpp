@@ -42,11 +42,19 @@ public:
     class Key
     {
     public:
-
-        static gu::byte_t const F_EXCLUSIVE = (1 << 0);
-
+        enum Prefix
+        {
+            P_SHARED = 0,
+            P_EXCLUSIVE,
+            P_LAST = P_EXCLUSIVE
+        };
     }; /* class Key */
 
+    /* This class describes what commonly would be referred to as a "key".
+     * It is called KeyPart because it does not fully represent a multi-part
+     * key, but only nth part out of N total.
+     * To fully represent a 3-part key p1:p2:p3 one would need 3 such objects:
+     * for parts p1, p1:p2, p1:p2:p3 */
     class KeyPart
     {
     public:
@@ -57,6 +65,8 @@ public:
         struct TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; };
         struct HashData { gu::byte_t buf[MAX_HASH_SIZE];  };
 
+        /* This ctor creates a serialized representation of a key in tmp store
+         * from a key hash and optional annotation. */
         KeyPart (TmpStore&       tmp,
                  const HashData& hash,
                  Version const   ver,
@@ -71,21 +81,28 @@ public:
             const uint64_t* from(reinterpret_cast<const uint64_t*>(hash.buf));
             uint64_t*       to  (reinterpret_cast<uint64_t*>(tmp.buf));
 
+            /* copy first 8 bytes of hash */
             to[0] = from[0];
 
             size_t ann_off(8);
 
             if (static_cast<unsigned int>(ver - FLAT16) <= 1)
             {
+                /* copy next 8 bytes of hash */
                 to[1] = from[1];
                 ann_off += 8;
             }
 
-            /* use 4 lower bits for header */
-            gu::byte_t b = (tmp.buf[0] & 0xf0 /* clear header bits */) |
-                ((ver << 1) & 0x0f);
+            /*  use lower bits for header:  */
 
-            if (exclusive) { b |= Key::F_EXCLUSIVE; }
+            /* clear header bits */
+            gu::byte_t b = tmp.buf[0] & (~HEADER_MASK);
+
+            /* set prefix  */
+            if (exclusive) { b |= (Key::P_EXCLUSIVE & PREFIX_MASK); }
+
+            /* set version */
+            b |= (ver & VERSION_MASK) << PREFIX_BITS;
 
             tmp.buf[0] = b;
 
@@ -96,6 +113,7 @@ public:
             }
         }
 
+        /* This ctor uses pointer to a permanently stored serialized key part */
         KeyPart (const gu::byte_t* const buf, size_t const size)
             : data_(buf)
         {
@@ -107,28 +125,34 @@ public:
 
         KeyPart () : data_(0) {}
 
+        Key::Prefix prefix() const
+        {
+            gu::byte_t const p(data_[0] & PREFIX_MASK);
+
+            if (gu_likely(p <= Key::P_LAST))
+                return static_cast<Key::Prefix>(p);
+
+            gu_throw_error(EPROTO) << "Unsupported key prefix: " << p;
+        }
+
+        bool shared()       const { return prefix() == Key::P_SHARED; }
+
+        bool exclusive()    const { return prefix() == Key::P_EXCLUSIVE; }
+
         static Version version(const gu::byte_t* const buf)
         {
-            return Version(buf ? (buf[0] & 0x0f) >> 1 : EMPTY);
+            return Version(
+                buf ? (buf[0] >> PREFIX_BITS) & VERSION_MASK : EMPTY);
         }
 
         Version version() const { return KeyPart::version(data_); }
 
-        bool exclusive() const { return (data_[0] & Key::F_EXCLUSIVE); }
-
-        bool shared() const { return !exclusive(); }
-#if REMOVE
-        void make_exclusive() const
-        {
-            const_cast<gu::byte_t*>(data_)[0] |= Key::F_EXCLUSIVE;
-        }
-#endif
         KeyPart (const KeyPart& k) : data_(k.data_) {}
 
-//        KeyPart& operator= (KeyPart k) { data_ = k.data_; return *this; }
         KeyPart& operator= (const KeyPart& k) { data_ = k.data_; return *this; }
 
-        bool operator == (const KeyPart& kp) const
+        /* for hash table */
+        bool match (const KeyPart& kp) const
         {
             assert (NULL != this->data_);
             assert (NULL != kp.data_);
@@ -154,20 +178,21 @@ public:
 #endif /* WORDSIZE */
             case FLAT8:
             case FLAT8A:
-                /* shift is to clear up the exclusive/shared bit */
+                /* shift is to clear up the header */
 #if GU_WORDSIZE == 64
-                ret = ret && ((gtoh64(lhs[0]) >> HEADER_SIZE) ==
-                              (gtoh64(rhs[0]) >> HEADER_SIZE));
+                ret = ret && ((gtoh64(lhs[0]) >> HEADER_BITS) ==
+                              (gtoh64(rhs[0]) >> HEADER_BITS));
 #else
                 ret = ret && (lhs[1] == rhs[1] &&
-                              (gtoh32(lhs[0]) >> HEADER_SIZE) ==
-                              (gtoh32(rhs[0]) >> HEADER_SIZE));
+                              (gtoh32(lhs[0]) >> HEADER_BITS) ==
+                              (gtoh32(rhs[0]) >> HEADER_BITS));
 #endif /* WORDSIZE */
                 return ret;
             case EMPTY:;
             }
 
-            abort();
+            assert(0);
+            gu_throw_error(EINVAL) << "Attempt to match against an empty key.";
         }
 
         size_t
@@ -177,8 +202,8 @@ public:
              * How bad is it in practice? Is it reasonable to assume that only
              * lower bits are used in unordered set? */
             size_t ret(gu::gtoh(reinterpret_cast<const size_t*>(data_)[0]) >>
-                       HEADER_SIZE);
-            return ret; // (ret ^ (ret << HEADER_SIZE))
+                       HEADER_BITS);
+            return ret; // (ret ^ (ret << HEADER_BITS)) to cover 0 bits
         }
 
         static size_t
@@ -196,15 +221,27 @@ public:
         store (gu::RecordSetOut<KeyPart>& rs)
         {
             data_ = rs.append(data_, serial_size(), true, true).first;
-            log_info << "Stored key of size: " << serial_size();
+//            log_info << "Stored key of size: " << serial_size();
         }
 
         void
         print (std::ostream& os) const;
 
+        void
+        swap (KeyPart& other)
+        {
+            using std::swap;
+            swap(data_, other.data_);
+        }
+
     private:
 
-        static int const HEADER_SIZE = 4;
+        static unsigned int const PREFIX_BITS  = 2;
+        static gu::byte_t   const PREFIX_MASK  = (1 << PREFIX_BITS)   -1;
+        static unsigned int const VERSION_BITS = 3;
+        static gu::byte_t   const VERSION_MASK = (1 << VERSION_BITS) - 1;
+        static unsigned int const HEADER_BITS  = PREFIX_BITS + VERSION_BITS;
+        static gu::byte_t   const HEADER_MASK  = (1 << HEADER_BITS)  - 1;
 
         const gu::byte_t* data_; // it never owns the buffer
 
@@ -277,6 +314,7 @@ public:
 
 }; /* class KeySet */
 
+void swap (KeySet::KeyPart& a, KeySet::KeyPart& b) { a.swap(b); }
 
 inline std::ostream&
 operator << (std::ostream& os, const KeySet::KeyPart& kp)
@@ -365,10 +403,7 @@ public:
 
         bool
         shared () const { return !exclusive(); }
-#if REMOVE
-        void
-        make_exclusive () { part_->make_exclusive(); }
-#endif
+
         void
         acquire()
         {
@@ -393,13 +428,6 @@ public:
         void
         print (std::ostream& os) const;
 
-#if REMOVE
-        bool
-        operator == (const KeyPart& kp) const { return (part_ == kp.part_); }
-
-        static size_t
-        hash(const KeyPart& kp) { return kp.part_.hash(); }
-#endif
     private:
 
         gu::Hash          hash_;

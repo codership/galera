@@ -11,7 +11,7 @@ namespace galera
 #ifndef NDEBUG
 
 void
-KeyEntryOS::assert_ref(TrxHandle* trx, bool full_key)
+KeyEntryOS::assert_ref(TrxHandle* trx, bool full_key) const
 {
     assert(ref_trx_ == 0 ||
            ref_trx_->global_seqno() <= trx->global_seqno());
@@ -24,7 +24,7 @@ KeyEntryOS::assert_ref(TrxHandle* trx, bool full_key)
 }
 
 void
-KeyEntryOS::assert_unref(TrxHandle* trx)
+KeyEntryOS::assert_unref(TrxHandle* trx) const
 {
     if (ref_full_trx_ != 0 && ref_trx_ == 0)
     {
@@ -37,7 +37,7 @@ KeyEntryOS::assert_unref(TrxHandle* trx)
 }
 
 void
-KeyEntryOS::assert_ref_shared(TrxHandle* trx, bool full_key)
+KeyEntryOS::assert_ref_shared(TrxHandle* trx, bool full_key) const
 {
     assert(ref_shared_trx_ == 0 ||
            ref_shared_trx_->global_seqno() <= trx->global_seqno());
@@ -50,7 +50,7 @@ KeyEntryOS::assert_ref_shared(TrxHandle* trx, bool full_key)
 }
 
 void
-KeyEntryOS::assert_unref_shared(TrxHandle* trx)
+KeyEntryOS::assert_unref_shared(TrxHandle* trx) const
 {
     if (ref_full_shared_trx_ != 0 && ref_shared_trx_ == 0)
     {

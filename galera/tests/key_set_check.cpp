@@ -207,6 +207,13 @@ START_TEST (ver0)
     {
         KeySet::KeyPart kp(ksi_empty.next());
     }
+
+    ksi_empty.rewind();
+
+    for (int i(0); i < ksi_empty.count(); ++i)
+    {
+        KeySet::KeyPart kp(ksi_empty.next());
+    }
 }
 END_TEST
 

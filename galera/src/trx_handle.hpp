@@ -186,7 +186,7 @@ namespace galera
             annotation_        (),
             write_set_buffer_  (0, 0),
             cert_keys_         ()
-        { assert(version_ < 3); }
+        { }
 
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
@@ -317,9 +317,6 @@ namespace galera
             {
                 offset = write_set_collection_.size();
             }
-//            log_info << "########### prepare_write_set_collection(): "
-//                     << reinterpret_cast<void*>(&write_set_collection_[0])
-//                     << " + " << offset;
             (void)serialize(&write_set_collection_[0], offset, 0);
             return offset;
         }
@@ -330,10 +327,6 @@ namespace galera
 
             const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + data_len);
-//            log_info << "########### append_write_set(): "
-//                     << reinterpret_cast<void*>(&write_set_collection_[0])
-//                     << " + " << offset << ", data_len: " << data_len;
-//            log_info << "\n" << gu::Hexdump(data, data_len);
             std::copy(reinterpret_cast<const gu::byte_t*>(data),
                       reinterpret_cast<const gu::byte_t*>(data) + data_len,
                       &write_set_collection_[0] + offset);
@@ -349,10 +342,6 @@ namespace galera
             {
                 const size_t offset(prepare_write_set_collection());
                 write_set_collection_.resize(offset + ws.size());
-//            log_info << "########### append_write_set(): "
-//                     << reinterpret_cast<void*>(&write_set_collection_[0])
-//                     << " + " << offset << ", ws.size(): " << ws.size;
-//            log_info << "\n" << gu::Hexdump(ws.begin(), ws.size());
                 std::copy(ws.begin(), ws.end(),
                           &write_set_collection_[0] + offset);
             }

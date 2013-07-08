@@ -128,10 +128,10 @@ namespace galera
         TrxHandle* ref_full_shared_trx_;
 
 #ifndef NDEBUG
-        void assert_ref(TrxHandle*, bool);
-        void assert_unref(TrxHandle*);
-        void assert_ref_shared(TrxHandle*, bool);
-        void assert_unref_shared(TrxHandle*);
+        void assert_ref(TrxHandle*, bool) const;
+        void assert_unref(TrxHandle*) const;
+        void assert_ref_shared(TrxHandle*, bool) const;
+        void assert_unref_shared(TrxHandle*) const;
 #endif /* NDEBUG */
     };
 
