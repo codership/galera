@@ -152,7 +152,7 @@ public:
         KeyPart& operator= (const KeyPart& k) { data_ = k.data_; return *this; }
 
         /* for hash table */
-        bool match (const KeyPart& kp) const
+        bool matches (const KeyPart& kp) const
         {
             assert (NULL != this->data_);
             assert (NULL != kp.data_);
@@ -308,13 +308,14 @@ public:
     public:
         bool operator() (const KeyPart& l, const KeyPart& r) const
         {
-            return (l == r);
+            return (l.matches(r));
         }
     }; /* functor KeyPartEqual */
 
 }; /* class KeySet */
 
-void swap (KeySet::KeyPart& a, KeySet::KeyPart& b) { a.swap(b); }
+inline void
+swap (KeySet::KeyPart& a, KeySet::KeyPart& b) { a.swap(b); }
 
 inline std::ostream&
 operator << (std::ostream& os, const KeySet::KeyPart& kp)
@@ -417,7 +418,7 @@ public:
         {
             if (own_)
             {
-                log_info << "released: " << gu::Hexdump(value_, size_, true);
+//                log_debug << "released: " << gu::Hexdump(value_, size_, true);
                 delete[] value_; value_ = 0;
             }
             own_ = false;

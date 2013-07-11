@@ -30,6 +30,7 @@ public:
         switch (act_.type)
         {
         case GCS_ACT_TORDERED:
+            break;
         case GCS_ACT_STATE_REQ:
             gcache_.free(act_.buf);
             break;

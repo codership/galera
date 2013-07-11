@@ -516,7 +516,7 @@ namespace galera
         void set_seqno(const wsrep_seqno_t& seqno, int dep_window)
         {
             assert (seqno > 0);
-            assert (dep_window > 0);
+            assert (dep_window >= 0);
             header_.set_seqno (seqno, dep_window);
         }
 

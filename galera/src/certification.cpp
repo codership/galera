@@ -10,7 +10,7 @@
 
 #include <map>
 
-using galera;
+using namespace galera;
 
 static const bool cert_debug_on(false);
 #define cert_debug                              \
@@ -79,7 +79,7 @@ galera::Certification::purge_for_trx_v1to2(TrxHandle* trx)
 void
 galera::Certification::purge_for_trx_v3(TrxHandle* trx)
 {
-    const KeySetIn& keys(trx->write_set_in().key_set());
+    const KeySetIn& keys(trx->write_set_in().keyset());
     keys.rewind();
 
     // Unref all referenced and remove if was referenced only by us
@@ -88,7 +88,7 @@ galera::Certification::purge_for_trx_v3(TrxHandle* trx)
         const KeySet::KeyPart& kp(keys.next());
         KeySet::Key::Prefix const p(kp.prefix());
 
-        KeyEntryNG const ke(kp);
+        KeyEntryNG ke(kp);
         CertIndexNG::iterator const ci(cert_index_ng_.find(&ke));
 
         assert(ci != cert_index_ng_.end());
@@ -102,7 +102,7 @@ galera::Certification::purge_for_trx_v3(TrxHandle* trx)
 
         if (kep->referenced() == false)
         {
-            cert_index_.erase(ci);
+            cert_index_ng_.erase(ci);
             delete kep;
         }
     }
@@ -521,20 +521,20 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
 
 /* returns true on collision, false otherwise */
 static bool
-certify_v3(galera::Certification::CertIndexNG& cert_index,
+certify_v3(galera::Certification::CertIndexNG& cert_index_ng,
            const galera::KeySet::KeyPart&      key,
            galera::TrxHandle*                  trx,
            bool const store_keys, bool const   log_conflicts)
 {
-    galera::KeyEntryNG const ke(key);
-    galera::Certification::CertIndex::iterator ci(cert_index_ng_.find(&ke));
+    galera::KeyEntryNG ke(key);
+    galera::Certification::CertIndexNG::iterator ci(cert_index_ng.find(&ke));
 
-    if (cert_index_ng_.end() == ci)
+    if (cert_index_ng.end() == ci)
     {
         if (store_keys)
         {
             galera::KeyEntryNG* const kep(new galera::KeyEntryNG(ke));
-            ci = cert_index.insert(kep).first;
+            ci = cert_index_ng.insert(kep).first;
 
             cert_debug << "created new entry";
         }
@@ -547,8 +547,8 @@ certify_v3(galera::Certification::CertIndexNG& cert_index,
         galera::KeyEntryNG* const kep(*ci);
         // Note: For we skip certification for isolated trxs, only
         // cert index and key_list is populated.
-        return (!trx->toi() &&
-                certify_and_depend_v3(kep, ke, trx, log_conflicts));
+        return (!trx->is_toi() &&
+                certify_and_depend_v3(kep, key, trx, log_conflicts));
     }
 }
 
@@ -567,13 +567,15 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
     long const      key_count(key_set.count());
     long            processed(0);
 
+    assert(key_count > 0);
+
     key_set.rewind();
 
     for (; processed < key_count; ++processed)
     {
         const KeySet::KeyPart& key(key_set.next());
 
-        if (certify_v3(cert_index_, trx, key, store_keys, log_conflicts_))
+        if (certify_v3(cert_index_ng_, key, trx, store_keys, log_conflicts_))
         {
             goto cert_fail;
         }
@@ -594,8 +596,8 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
         for (long i(0); i < key_count; ++i)
         {
             const KeySet::KeyPart& k(key_set.next());
-            const KeyEntryNG& ke(k);
-            CertIndexNG::const_iterator ci(cert_index_.find(&ke));
+            KeyEntryNG ke(k);
+            CertIndexNG::const_iterator ci(cert_index_ng_.find(&ke));
 
             if (ci == cert_index_ng_.end())
             {
@@ -605,7 +607,7 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
 
             KeyEntryNG* const kep(*ci);
 
-            kep->ref(k.prefix(), trx);
+            kep->ref(k.prefix(), k, trx);
 
         }
 
@@ -627,10 +629,10 @@ cert_fail:
         --processed; /* last key was not added to index */
 
         // Clean up key entries allocated for this trx
-        key_set.rewind()
+        key_set.rewind();
         for (long i(0); i < processed; ++i)
         {
-            const KeyEntryNG& ke(key_set.next());
+            KeyEntryNG ke(key_set.next());
 
             // Clean up cert_index_ from entries which were added by this trx
             CertIndexNG::iterator ci(cert_index_ng_.find(&ke));
@@ -646,15 +648,7 @@ cert_fail:
                     cert_index_ng_.erase(ci);
                 }
                 else continue;
-#if REMOVE
-                else if (ke == kel)
-                {
-                    // kel was added and is referenced by another trx - skip it
-                    continue;
-                }
-                // else kel != ke : kel is a duplicate of ke with different
-                //                  flags, fall through to delete
-#endif
+
                 assert(kep->referenced() == false);
 
                 delete kep;
@@ -665,7 +659,7 @@ cert_fail:
                 assert(0); // we actually should never be here, the key should
                            // be either added to cert_index_ or be there already
                 log_warn  << "could not find key '"
-                          << kel->key() << "' from cert index";
+                          << ke.key() << "' from cert index";
             }
         }
         assert(cert_index_.size() == prev_cert_index_size);
@@ -732,6 +726,9 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     case 1:
     case 2:
         res = do_test_v1to2(trx, store_keys);
+        break;
+    case 3:
+        res = do_test_v3(trx, store_keys);
         break;
     default:
         gu_throw_fatal << "certification test for version "
@@ -901,14 +898,17 @@ galera::Certification::append_trx(TrxHandle* trx)
 
     const TestResult retval(test(trx));
 
-    gu::Lock lock(mutex_);
+    {
+        gu::Lock lock(mutex_);
 
-    if (trx_map_.insert(
-            std::make_pair(trx->global_seqno(), trx)).second == false)
-        gu_throw_fatal << "duplicate trx entry " << *trx;
+        if (trx_map_.insert(
+                std::make_pair(trx->global_seqno(), trx)).second == false)
+            gu_throw_fatal << "duplicate trx entry " << *trx;
 
-    deps_set_.insert(trx->last_seen_seqno());
-    assert(deps_set_.size() <= trx_map_.size());
+        deps_set_.insert(trx->last_seen_seqno());
+        assert(deps_set_.size() <= trx_map_.size());
+    }
+
     trx->mark_certified();
 
     return retval;

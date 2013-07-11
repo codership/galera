@@ -202,7 +202,23 @@ namespace galera
 
         bool is_local()     const { return local_; }
         bool is_certified() const { return certified_; }
-        void mark_certified() { certified_ = true; }
+
+        void mark_certified()
+        {
+            if (new_version())
+            {
+                int dw(0);
+
+                if (gu_likely(depends_seqno_ >= 0))
+                {
+                    dw = global_seqno_ - depends_seqno_;
+                }
+
+                write_set_in_.set_seqno(global_seqno_, dw);
+            }
+
+            certified_ = true;
+        }
 
         bool is_committed() const { return committed_; }
         void mark_committed() { committed_ = true; }
@@ -218,8 +234,9 @@ namespace galera
 
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
-            assert (!new_version());
             assert (last_seen_seqno >= 0);
+            if (new_version())
+                write_set_out_.set_last_seen(last_seen_seqno);
             last_seen_seqno_ = last_seen_seqno;
         }
 
@@ -407,7 +424,7 @@ namespace galera
 
         void clear()
         {
-            if (new_version()) { assert(0); return; }
+            if (new_version()) { return; }
 
             write_set_.clear();
             write_set_collection_.clear();

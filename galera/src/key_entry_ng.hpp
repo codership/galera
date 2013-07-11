@@ -14,14 +14,26 @@ namespace galera
     class KeyEntryNG
     {
     public:
-        KeyEntryNG(const KeySet::KeyPart& key) : refs_(NULL), key_(key) {}
+        KeyEntryNG(const KeySet::KeyPart& key)
+            : refs_(), key_(key)
+        {
+            std::fill(&refs_[0],
+                      &refs_[KeySet::Key::P_LAST],
+                      reinterpret_cast<TrxHandle*>(NULL));
+        }
 
         KeyEntryNG(const KeyEntryNG& other)
-        : refs_(other.refs_), key_(other.key_) {}
+        : refs_(), key_(other.key_)
+        {
+            std::copy(&other.refs_[0],
+                      &other.refs_[KeySet::Key::P_LAST],
+                      &refs_[0]);
+        }
 
-        const KeyPart& key() const { return key_; }
+        const KeySet::KeyPart& key() const { return key_; }
 
-        void ref(KeySet::Key::Prefix p, KeySet::KeyPart& k, TrxHandle* trx)
+        void ref(KeySet::Key::Prefix p, const KeySet::KeyPart& k,
+                 TrxHandle* trx)
         {
             assert(0 == refs_[p] ||
                    refs_[p]->global_seqno() <= trx->global_seqno());
@@ -47,12 +59,14 @@ namespace galera
 
         bool referenced() const
         {
-            TrxHandle* ref(refs_[0])
+            bool ret(refs_[0] != NULL);
+
             for (int i(1); i <= KeySet::Key::P_LAST; ++i)
             {
-                ref |= refs_[i];
+                ret |= (refs_[i] != NULL);
             }
-            return (ref != NULL);
+
+            return ret;
         }
 
         const TrxHandle* ref_trx(KeySet::Key::Prefix p) const
@@ -94,7 +108,7 @@ namespace galera
 #endif /* NDEBUG */
     };
 
-    void swap(KeyEntryNG& a, KeyEntryNG& b) { a.swap(b); }
+    inline void swap(KeyEntryNG& a, KeyEntryNG& b) { a.swap(b); }
 
     class KeyEntryHashNG
     {
@@ -121,7 +135,7 @@ namespace galera
                         const KeyEntryNG& right)
             const
         {
-            return left.key().match(right.key());
+            return left.key().matches(right.key());
         }
     };
 
@@ -132,7 +146,7 @@ namespace galera
                         const KeyEntryNG* const right)
             const
         {
-            return left->key().match(right->key());
+            return left->key().matches(right->key());
         }
     };
 }

@@ -580,7 +580,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
         if (trx->new_version())
         {
-            trx->write_set_out().set_last_seen(last_committed());
+            trx->set_last_seen_seqno(last_committed());
+            assert(trx->last_seen_seqno() >= 0);
             trx->unlock();
             assert (act.buf == NULL); // just a sanity check
             rcode = gcs_.replv(actv, act, true);
@@ -597,6 +598,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     }
     while (rcode == -EAGAIN && trx->state() != TrxHandle::S_MUST_ABORT &&
            (usleep(1000), true));
+
+    assert(trx->last_seen_seqno() >= 0);
 
     if (rcode < 0)
     {
@@ -627,6 +630,12 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     replicated_bytes_ += rcode;
     trx->set_gcs_handle(-1);
 
+    if (trx->new_version())
+    {
+        gu_trace(trx->unserialize(reinterpret_cast<const gu::byte_t*>(act.buf),
+                                  act.size, 0));
+    }
+
     trx->set_received(act.buf, act.seqno_l, act.seqno_g);
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)
@@ -649,6 +658,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     {
         retval = WSREP_OK;
     }
+
     assert(trx->last_seen_seqno() >= 0);
 
     return retval;
@@ -1007,6 +1017,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
         meta->gtid.seqno = trx->global_seqno();
         meta->depends_on = trx->depends_seqno();
     }
+
     assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->trx_id() == static_cast<wsrep_trx_id_t>(-1));
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);

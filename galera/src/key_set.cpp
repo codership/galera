@@ -218,25 +218,26 @@ KeySetOut::append (const KeyData& kd)
     int const anc(i);
     const KeyPart* parent(&prev_[anc]);
 
-    log_info << "Common ancestor: " << anc << ' ' << *parent;
+//    log_debug << "Common ancestor: " << anc << ' ' << *parent;
 
     /* create parts that didn't match previous key and add to the set
-     * of previously added keys. */
+     * of preiously added keys. */
     size_t const old_size (size());
     int j(0);
     for (; i < kd.parts_num; ++i, ++j)
     {
         try
         {
+            KeyPart kp(added_, *this, parent, kd, i);
             if (size_t(j) < new_.size())
             {
-                new_[j] = KeyPart (added_, *this, parent, kd, i);
+                new_[j] = kp;
             }
             else
             {
-                KeyPart kp(added_, *this, parent, kd, i);
                 new_.push_back (kp);
             }
+//            log_debug << "pushed " << kp;
         }
         catch (KeyPart::DUPLICATE& e)
         {

@@ -111,7 +111,6 @@ namespace galera
 
     private:
         TestResult do_test(TrxHandle*, bool);
-//        TestResult do_test_v0(TrxHandle*, bool);
         TestResult do_test_v1to2(TrxHandle*, bool);
         TestResult do_test_v3(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
