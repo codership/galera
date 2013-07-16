@@ -30,13 +30,14 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
-    debug=n          debug build with optimization level n
-    arch=str         target architecture [i686|x86_64]
-    build_dir=dir    build directory, default: '.'
-    boost=[0|1]      disable or enable boost libraries
-    boost_pool=[0|1] use or not use boost pool allocator
-    revno=XXXX       source code revision number
-    bpostatic=path   a path to static libboost_program_options.a
+    debug=n             debug build with optimization level n
+    arch=str            target architecture [i686|x86_64]
+    build_dir=dir       build directory, default: '.'
+    boost=[0|1]         disable or enable boost libraries
+    boost_pool=[0|1]    use or not use boost pool allocator
+    revno=XXXX          source code revision number
+    bpostatic=path      a path to static libboost_program_options.a
+    extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
 ''')
 # bpostatic option added on Percona request
 
@@ -82,10 +83,14 @@ print 'Target: ' + sysname + ' ' + arch
 
 if arch == 'i386' or arch == 'i686':
     compile_arch = ' -m32 -march=i686'
-    link_arch    = compile_arch + ' -Wl,-melf_i386'
+    link_arth    = compile_arch
+    if sysname != 'darwin':
+        link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86_64' or arch == 'amd64':
     compile_arch = ' -m64'
-    link_arch    = compile_arch + ' -Wl,-melf_x86_64'
+    link_arth    = compile_arch
+    if sysname != 'darwin':
+        link_arch    = compile_arch + ' -Wl,-melf_x86_64'
 elif arch == 'ppc64':
     compile_arch = ' -mtune=native'
     link_arch    = ''
@@ -122,6 +127,10 @@ env = Environment(ENV = {'PATH' : os.environ['PATH'], 'HOME' : os.environ['HOME'
 # env['ENV']['HOME']          = os.environ['HOME']
 #env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
 #env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
+if 'CCACHE_DIR' in os.environ:
+    env['ENV']['CCACHE_DIR'] = os.environ['CCACHE_DIR']
+if 'CCACHE_CPP2' in os.environ:
+    env['ENV']['CCACHE_CPP2'] = os.environ['CCACHE_CPP2']
 
 # Set CC and CXX compilers
 cc = os.getenv('CC', 'default')
@@ -149,6 +158,20 @@ if sysname == 'freebsd' or sysname == 'sunos':
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
 
+# Add paths is extra_sysroot argument was specified
+extra_sysroot = ARGUMENTS.get('extra_sysroot', '')
+if sysname == 'darwin' && extra_sysroot == '':
+    # common developer environments and paths
+    if os.system('which -s port') == 0 and os.path.isfile('/opt/local/bin/port'):
+        extra_sysroot = '/opt/local'
+    elif os.system('which -s brew') == 0 and os.path.isfile('/usr/local/bin/brew'):
+        extra_sysroot = '/usr/local'
+    elif os.system('which -s fink') == 0 and os.path.isfile('/sw/bin/fink'):
+        extra_sysroot = '/sw'
+if extra_sysroot != '':
+    env.Append(LIBPATH = [extra_sysroot + '/lib'])
+    env.Append(CPPFLAGS = ' -I' + extra_sysroot + '/include')
+
 # print env.Dump()
 #
 # Set up build and link paths
@@ -175,9 +198,9 @@ env.Append(CPPPATH = Split('''#/common
 #                           '''))
 
 # Preprocessor flags
-if sysname != 'sunos':
+if sysname != 'sunos' and sysname != 'darwin':
     env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
-else:
+if sysname == 'sunos':
     env.Append(CPPFLAGS = ' -D__EXTENSIONS__')
 env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 
@@ -215,9 +238,10 @@ if not conf.CheckLib('pthread'):
     print 'Error: pthread library not found'
     Exit(1)
 
-if not conf.CheckLib('rt'):
-    print 'Error: rt library not found'
-    Exit(1)
+if sysname != 'darwin':
+    if not conf.CheckLib('rt'):
+        print 'Error: rt library not found'
+        Exit(1)
 
 if sysname == 'sunos':
     if not conf.CheckLib('socket'):
@@ -242,7 +266,7 @@ elif conf.CheckHeader('sys/endian.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_ENDIAN_H')
 elif conf.CheckHeader('sys/byteorder.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_BYTEORDER_H')
-else:
+elif sysname != 'darwin':
     print 'can\'t find byte order information'
     Exit(1)
 
@@ -266,6 +290,15 @@ else:
 
 # pool allocator
 if boost == 1:
+    # Default suffix for boost multi-threaded libraries
+    if sysname == 'darwin':
+        boost_library_suffix = '-mt'
+    else:
+        boost_library_suffix = ''
+    if sysname == 'darwin' and extra_sysroot != '':
+        boost_library_path = extra_sysroot + '/lib'
+    else:
+        boost_library_path = ''
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
     # Required boost headers/libraries
@@ -276,8 +309,9 @@ if boost == 1:
             conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
             # due to a bug in boost >= 1.50 we need to link with boost_system
             # - should be a noop with no boost_pool.
-#            if conf.CheckLib('boost_system'):
-#        	conf.env.Append(LIBS=['boost_system'])
+            if sysname == 'darwin':
+                if conf.CheckLib('boost_system' + boost_library_suffix):
+                    conf.env.Append(LIBS=['boost_system' + boost_library_suffix])
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)
@@ -313,7 +347,7 @@ if strict_build_flags == 1:
    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-Export('env')
+Export('env', 'boost_library_path', 'boost_library_suffix')
 
 #
 # Set up and export environment for check unit tests

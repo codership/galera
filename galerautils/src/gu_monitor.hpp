@@ -17,6 +17,10 @@
 
 #include <cassert>
 
+#ifndef NDEBUG /* warning on Darwin, where pthread_t is a pointer */
+#pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
 namespace gu
 {
     class Monitor;

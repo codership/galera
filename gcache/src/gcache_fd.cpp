@@ -7,7 +7,7 @@
 
 #include <galerautils.hpp>
 
-#ifndef _XOPEN_SOURCE
+#if !defined(_XOPEN_SOURCE) && !defined(__APPLE__)
 #define _XOPEN_SOURCE 600
 #endif
 
@@ -17,7 +17,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifndef O_CLOEXEC // CentOS does not have it
+#ifndef O_CLOEXEC // CentOS < 6.0 does not have it
 #define O_CLOEXEC 0
 #endif
 
@@ -87,6 +87,7 @@ namespace gcache
         if (value < 0) {
             gu_throw_error(errno) << "Failed to open file '" + name + '\'';
         }
+#if !defined(__APPLE__) /* Darwin does not have posix_fadvise */
 /* benefits are questionable
         int err(posix_fadvise (value, 0, size, POSIX_FADV_SEQUENTIAL));
 
@@ -96,6 +97,7 @@ namespace gcache
                      << name << ": " << err << " (" << strerror(err) << ")";
         }
 */
+#endif
         log_debug << "Opened file '" << name << "'";
         log_debug << "File descriptor: " << value;
     }
@@ -182,7 +184,11 @@ namespace gcache
         log_info << "Preallocating " << diff << '/' << size << " bytes in '"
                  << name << "'...";
 
+#if defined(__APPLE__)
+        if (0 != fcntl (value, F_SETSIZE, size) && 0 != ftruncate (value, size))
+#else
         if (0 != posix_fallocate (value, start, diff))
+#endif
         {
             if (EINVAL == errno && start >= 0 && diff > 0)
             {

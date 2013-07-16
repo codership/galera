@@ -10,6 +10,8 @@ get_cores()
             echo "$(grep -c ^processor /proc/cpuinfo)" ;;
         "SunOS")
             echo "$(psrinfo | wc -l)" ;;
+        "Darwin" | "FreeBSD")
+            echo "$(sysctl -n hw.ncpu)" ;;
         *)
             echo "CPU information not available: unsupported OS: '$OS'" >/dev/stderr
             echo 1

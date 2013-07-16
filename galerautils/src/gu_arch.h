@@ -11,10 +11,12 @@
 
 #if defined(HAVE_ENDIAN_H)
 # include <endian.h>
-#elif defined(HAVE_SYS_ENDIAN_H)
+#elif defined(HAVE_SYS_ENDIAN_H) /* FreeBSD */
 # include <sys/endian.h>
 #elif defined(HAVE_SYS_BYTEORDER_H)
 # include <sys/byteorder.h>
+#elif defined(__APPLE__)
+# include <machine/endian.h>
 #else
 # error "No byte order header file detected"
 #endif
@@ -23,8 +25,12 @@
 # if __BYTE_ORDER == __LITTLE_ENDIAN
 #  define GU_LITTLE_ENDIAN
 # endif
-#elif defined(_BYTE_ORDER)
+#elif defined(_BYTE_ORDER) /* FreeBSD */
 # if _BYTE_ORDER == _LITTLE_ENDIAN
+#  define GU_LITTLE_ENDIAN
+# endif
+#elif defined(__APPLE__) && defined(__DARWIN_BYTE_ORDER)
+# if __DARWIN_BYTE_ORDER == __DARWIN_LITTLE_ENDIAN
 #  define GU_LITTLE_ENDIAN
 # endif
 #elif defined(__sun__)
@@ -37,6 +43,9 @@
 
 #if defined(__sun__)
 # define GU_WORDSIZE 64 /* Solaris 11 is only 64-bit ATM */
+#elif defined(__APPLE__)
+# include <stdint.h>
+# define GU_WORDSIZE __WORDSIZE
 #else
 # include <bits/wordsize.h>
 # define GU_WORDSIZE __WORDSIZE

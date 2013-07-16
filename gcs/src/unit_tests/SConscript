@@ -50,3 +50,5 @@ gcs_tests = env.Program(target    = 'gcs_tests',
 
 env.Test("gcs_tests.passed", gcs_tests)
 env.Alias("test", "gcs_tests.passed")
+
+Clean(gcs_tests, '#/gcs_tests.log')

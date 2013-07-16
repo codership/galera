@@ -44,6 +44,8 @@ static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 
 #if defined(HAVE_BYTESWAP_H)
 #  include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
+#elif defined(__APPLE__)
+#  include <libkern/OSByteOrder.h> // for OSSwapInt16(x), etc.
 #endif /* HAVE_BYTESWAP_H */
 
 #if defined(bswap16)
@@ -58,6 +60,11 @@ static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 #  define gu_bswap16 BSWAP_16
 #  define gu_bswap32 BSWAP_32
 #  define gu_bswap64 BSWAP_64
+#elif defined(__APPLE__)
+/* We do not use OSSwapIntXX, because gcc44 gives false warning on old-style cast */
+#  define gu_bswap16 _OSSwapInt16
+#  define gu_bswap32 _OSSwapInt32
+#  define gu_bswap64 _OSSwapInt64
 #else
 #  error "No byteswap macros are defined"
 #endif

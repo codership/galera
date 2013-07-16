@@ -68,6 +68,8 @@ case $OS in
         JOBS=$(grep -c ^processor /proc/cpuinfo) ;;
     "SunOS")
         JOBS=$(psrinfo | wc -l) ;;
+    "Darwin" | "FreeBSD")
+        JOBS="$(sysctl -n hw.ncpu)" ;;
     *)
         echo "CPU information not available: unsupported OS: '$OS'";;
 esac
