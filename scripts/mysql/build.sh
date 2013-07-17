@@ -246,15 +246,6 @@ if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
-if [ "$MYSQL_MAJOR" = "5.1" ]
-then
-    MYSQL_BUILD_DIR="$MYSQL_SRC"
-else
-    [ "$DEBUG" == "yes" ] \
-    && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
-    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_install"
-fi
-
 which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
 
 # export command options for Galera build
@@ -269,6 +260,15 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 # Source paths are either absolute or relative to script, get absolute
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
+
+if [ "$MYSQL_MAJOR" = "5.1" ]
+then
+    MYSQL_BUILD_DIR="$MYSQL_SRC"
+else
+    [ "$DEBUG" == "yes" ] \
+    && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
+    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_install"
+fi
 
 
 ######################################

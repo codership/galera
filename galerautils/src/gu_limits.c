@@ -6,13 +6,16 @@
  * $Id:$
  */
 
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include "gu_limits.h"
+#include "gu_log.h"
+
 #if defined(__APPLE__)
 
-#include <stdio.h>
 #include <mach/mach.h>
-
-#include <unistd.h>
-#include "gu_limits.h"
 
 long gu_darwin_phys_pages (void)
 {
@@ -46,6 +49,9 @@ long gu_darwin_avphys_pages (void)
 }
 
 #elif defined(__FreeBSD__)
+
+#include <vm/vm_param.h> // VM_TOTAL
+#include <sys/vmmeter.h> // struct vmtotal
 
 long gu_freebsd_avphys_pages (void)
 {

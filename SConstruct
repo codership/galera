@@ -160,7 +160,7 @@ if sysname == 'sunos':
 
 # Add paths is extra_sysroot argument was specified
 extra_sysroot = ARGUMENTS.get('extra_sysroot', '')
-if sysname == 'darwin' && extra_sysroot == '':
+if sysname == 'darwin' and extra_sysroot == '':
     # common developer environments and paths
     if os.system('which -s port') == 0 and os.path.isfile('/opt/local/bin/port'):
         extra_sysroot = '/opt/local'
