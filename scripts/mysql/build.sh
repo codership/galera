@@ -366,6 +366,14 @@ then
                                   --with-ssl"
 
             [ "$DEBUG" = "yes" ] && BUILD_OPT="-debug"
+            [ "$OS" == "Darwin" ] && BUILD_OPT="$BUILD_OPT \
+                                                -DCMAKE_C_COMPILER=gcc \
+                                                -DCMAKE_CXX_COMPILER=g++ \
+                                                -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            [ "$OS" == "FreeBSD" ] && BUILD_OPT="$BUILD_OPT \
+                                                -DCMAKE_C_COMPILER=gcc47 \
+                                                -DCMAKE_CXX_COMPILER=g++47"
+
             BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
         else # CMake build
             [ "$DEBUG" = "yes" ] \
@@ -414,19 +422,24 @@ install_mysql_5.1_demo()
     MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
     MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
     MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
-    install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-    install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/sbin/mysqld
+    # BSD-based OSes does not have -D option on 'install'
+    install -m 755 -d $MYSQL_DIST_DIR/share/mysql/english
+    install -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
+    install -m 755 -d $MYSQL_DIST_DIR/sbin
+    install -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/sbin/mysqld
     if [ "$SKIP_CLIENTS" == "no" ]
     then
         # Hack alert:
         #  install libmysqlclient.so as libmysqlclient.so.16 as client binaries
         #  seem to be linked against explicit version. Figure out better way to 
         #  deal with this.
-        install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
+        install -m 755 -d $MYSQL_LIBS
+        install -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
     fi
     if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
     then
-        install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
+        install -m 755 -d $MYSQL_PLUGINS
+        install -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
                 $MYSQL_PLUGINS/ha_innodb_plugin.so
     fi
     install -m 755 -d $MYSQL_BINS
@@ -487,10 +500,12 @@ if [ $TAR == "yes" ]; then
     # Install required MySQL files in the DIST_DIR
     if [ $MYSQL_MAJOR == "5.1" ]; then
         install_mysql_5.1_demo
-        install -m 644 -D my-5.1.cnf $MYSQL_DIST_CNF
+        install -m 755 -d $(dirname $MYSQL_DIST_CNF)
+        install -m 644 my-5.1.cnf $MYSQL_DIST_CNF
     else
         install_mysql_5.5_demo > /dev/null
-        install -m 644 -D my-5.5.cnf $MYSQL_DIST_CNF
+        install -m 755 -d $(dirname $MYSQL_DIST_CNF)
+        install -m 644 my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
     cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
@@ -502,15 +517,25 @@ if [ $TAR == "yes" ]; then
     # Copy required Galera libraries
     GALERA_BINS=$GALERA_DIST_DIR/bin
     GALERA_LIBS=$GALERA_DIST_DIR/lib
-    install -m 644 -D ../../LICENSE $GALERA_DIST_DIR/LICENSE.galera
+    install -m 755 -d $GALERA_DIST_DIR
+    install -m 644 ../../LICENSE $GALERA_DIST_DIR/LICENSE.galera
     install -m 755 -d $GALERA_BINS
     install -m 755 -d $GALERA_LIBS
 
     if [ "$SCONS" == "yes" ]
     then
         SCONS_VD=$GALERA_SRC
-        cp -P $SCONS_VD/garb/garbd        $GALERA_BINS
-        cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
+        if [ "$OS" == "Darwin" ]; then
+            cp -P $SCONS_VD/garb/garbd          $GALERA_BINS
+            cp -P $SCONS_VD/libgalera_smm.dylib $GALERA_LIBS
+            if [ "$DEBUG" == "yes" ]; then
+                cp -P -R $SCONS_VD/garb/garbd.dSYM          $GALERA_BINS
+                cp -P -R $SCONS_VD/libgalera_smm.dylib.dSYM $GALERA_LIBS
+            fi
+        else
+            cp -P $SCONS_VD/garb/garbd        $GALERA_BINS
+            cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
+        fi
     else
         echo "Autotools compilation not supported any more."
         exit 1
