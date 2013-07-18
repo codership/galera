@@ -12,8 +12,7 @@
 #include "gu_macros.h"
 #include "gu_exception.hpp"
 
-#if defined(__GCC__) && defined(__FreeBSD__)
-# pragma GCC diagnostic push
+#if defined(__GNUC__) && defined(__FreeBSD__)
 // error: 'class gu::Cond' has pointer data members
 # pragma GCC diagnostic ignored "-Weffc++"
 #endif
@@ -69,8 +68,8 @@ namespace gu
     };
 }
 
-#if defined(__GCC__) && defined(__FreeBSD__)
-# pragma GCC diagnostic pop
+#if defined(__GNUC__) && defined(__FreeBSD__)
+# pragma GCC diagnostic error "-Weffc++"
 #endif
 
 #endif // __GU_COND__
