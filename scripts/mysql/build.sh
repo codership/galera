@@ -63,7 +63,7 @@ JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
 OS=$(uname)
-case $OS in
+case "$OS" in
     "Linux")
         JOBS=$(grep -c ^processor /proc/cpuinfo) ;;
     "SunOS")
@@ -366,6 +366,11 @@ then
                                   --with-ssl"
 
             [ "$DEBUG" = "yes" ] && BUILD_OPT="-debug"
+            BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
+        else # CMake build
+            [ "$DEBUG" = "yes" ] \
+            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
+            || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
             [ "$OS" == "Darwin" ] && BUILD_OPT="$BUILD_OPT \
                                                 -DCMAKE_C_COMPILER=gcc \
                                                 -DCMAKE_CXX_COMPILER=g++ \
@@ -373,12 +378,6 @@ then
             [ "$OS" == "FreeBSD" ] && BUILD_OPT="$BUILD_OPT \
                                                 -DCMAKE_C_COMPILER=gcc47 \
                                                 -DCMAKE_CXX_COMPILER=g++47"
-
-            BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
-        else # CMake build
-            [ "$DEBUG" = "yes" ] \
-            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
-            || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
             [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
             [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
             pushd $MYSQL_BUILD_DIR
@@ -478,6 +477,7 @@ install_mysql_5.5_demo()
     cmake -DCMAKE_INSTALL_COMPONENT=Client -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=SharedLibraries -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=ManPages -P cmake_install.cmake
+    [ "$DEBUG" == "yes" ] && cmake -DCMAKE_INSTALL_COMPONENT=Debuginfo -P cmake_install.cmake
     popd
     pushd $MYSQL_DIST_DIR
         mv usr/* ./ && rm -r usr

@@ -11,5 +11,3 @@ libmmgalera_objs = env['LIBGALERA_OBJS']
 libmmgalera_objs.extend(env['LIBMMGALERA_OBJS'])
 
 env.SharedLibrary('galera_smm', libmmgalera_objs)
-
-Clean('.', ['config.log', '.sconf_temp'])

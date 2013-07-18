@@ -350,6 +350,14 @@ env = conf.Finish()
 Export('env', 'boost_library_path', 'boost_library_suffix')
 
 #
+# Actions to build .dSYM directories, containing debugging information for Darwin
+#
+
+if sysname == 'darwin' and int(debug) >= 0 and int(debug) < 3:
+    env['LINKCOM'] = [env['LINKCOM'], 'dsymutil $TARGET']
+    env['SHLINKCOM'] = [env['SHLINKCOM'], 'dsymutil $TARGET']
+
+#
 # Set up and export environment for check unit tests
 #
 
