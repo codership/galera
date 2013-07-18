@@ -84,12 +84,12 @@ print 'Target: ' + sysname + ' ' + arch
 if arch == 'i386' or arch == 'i686':
     compile_arch = ' -m32 -march=i686'
     link_arth    = compile_arch
-    if sysname != 'darwin':
+    if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86_64' or arch == 'amd64':
     compile_arch = ' -m64'
     link_arth    = compile_arch
-    if sysname != 'darwin':
+    if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_x86_64'
 elif arch == 'ppc64':
     compile_arch = ' -mtune=native'
@@ -198,7 +198,7 @@ env.Append(CPPPATH = Split('''#/common
 #                           '''))
 
 # Preprocessor flags
-if sysname != 'sunos' and sysname != 'darwin':
+if sysname != 'sunos' and sysname != 'darwin' and sysname != 'freebsd':
     env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
 if sysname == 'sunos':
     env.Append(CPPFLAGS = ' -D__EXTENSIONS__')

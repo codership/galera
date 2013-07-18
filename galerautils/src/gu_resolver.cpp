@@ -80,7 +80,11 @@ private:
             family,
             socktype,
             protocol,
+#if defined(__FreeBSD__)
+	    0, // FreeBSD gives ENOMEM error with non-zero value
+#else
             sizeof(struct sockaddr),
+#endif
             0,
             0,
             0

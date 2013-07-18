@@ -5,6 +5,7 @@
  *
  * $Id: $
  */
+
 #if defined(__APPLE__)
 
 #include <errno.h>
@@ -181,4 +182,13 @@ clock_gettime (clockid_t clk_id, struct timespec * tp)
 }
 
 #endif /* !__LP64__ */
+
+#else /* !__APPLE__ */
+
+#ifdef __GNUC__
+// error: ISO C forbids an empty translation unit
+int dummy_var_gu_time;
+#endif
+
 #endif /* __APPLE__ */
+

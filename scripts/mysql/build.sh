@@ -376,8 +376,8 @@ then
                                                 -DCMAKE_CXX_COMPILER=g++ \
                                                 -DCMAKE_OSX_ARCHITECTURES=x86_64"
             [ "$OS" == "FreeBSD" ] && BUILD_OPT="$BUILD_OPT \
-                                                -DCMAKE_C_COMPILER=gcc47 \
-                                                -DCMAKE_CXX_COMPILER=g++47"
+                                                -DCMAKE_C_COMPILER=gcc44 \
+                                                -DCMAKE_CXX_COMPILER=g++44"
             [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
             [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
             pushd $MYSQL_BUILD_DIR

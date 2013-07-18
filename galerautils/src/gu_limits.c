@@ -58,20 +58,20 @@ long gu_freebsd_avphys_pages (void)
     /* TODO: 1) sysctlnametomib may be called once */
     /*       2) vm.stats.vm.v_cache_count is potentially free memory too */
     int mib_vm_stats_vm_v_free_count[4];
-    unsigned int vm_stats_vm_v_free_count;
-    size_t sz = countof (mib_vm_stats_vm_v_free_count);
-    int rc = sysctlnametomib ("vm.stats.vm.v_free_count", mib_vm_stats_vm_v_free_count, &sz);
+    size_t mib_sz = 4;
+    int rc = sysctlnametomib ("vm.stats.vm.v_free_count", mib_vm_stats_vm_v_free_count, &mib_sz);
     if (rc != 0)
     {
-        gu_error ("sysctlnametomib(vm.stats.vm.v_free_count) failed with code %d", ret);
+        gu_error ("sysctlnametomib(vm.stats.vm.v_free_count) failed with code %d", rc);
         return 0;
     }
 
-    sz = sizeof (vm_stats_vm_v_free_count);
-    rc = sysctl (mib_vm_stats_vm_v_free_count, countof (mib_vm_stats_vm_v_free_count), &vm_stats_vm_v_free_count, &sz, NULL, 0);
+    unsigned int vm_stats_vm_v_free_count;
+    size_t sz = sizeof (vm_stats_vm_v_free_count);
+    rc = sysctl (mib_vm_stats_vm_v_free_count, mib_sz, &vm_stats_vm_v_free_count, &sz, NULL, 0);
     if (rc != 0)
     {
-        gu_error ("sysctl(vm.stats.vm.v_free_count) failed with code %d", ret);
+        gu_error ("sysctl(vm.stats.vm.v_free_count) failed with code %d", rc);
         return 0;
     }
     return vm_stats_vm_v_free_count;

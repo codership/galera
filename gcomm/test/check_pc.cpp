@@ -12,6 +12,7 @@
 #include "check_templ.hpp"
 #include "check_trace.hpp"
 #include "gcomm/conf.hpp"
+#include "gu_errno.h"
 
 #include <check.h>
 
