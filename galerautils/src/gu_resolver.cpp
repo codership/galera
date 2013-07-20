@@ -525,7 +525,9 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
 
         if (err != 0)
         {
-            gu_throw_error(errno == 0 ? gu::Exception::E_UNSPEC : errno)
+            // Use EHOSTUNREACH as generic error number in case errno
+            // is zero. Real error should be apparent from exception message
+            gu_throw_error(errno == 0 ? EHOSTUNREACH : errno)
                 << "getaddrinfo failed with error '"
                 << gai_strerror(err) << "' ("
                 << err << ") for " << uri.to_string();
