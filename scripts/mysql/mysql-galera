@@ -252,12 +252,7 @@ galera_start()
         RBR_OPTS=" --binlog_format=$WS_LEVEL "
     fi
 
-    if [ "$(uname)" == "Darwin" ]; then
-        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.dylib"}
-    else
-        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
-    fi
-
+    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
     if test -f $WSREP || test $WSREP == "none"
     then
         WSREP_OPTS="--wsrep_provider=$WSREP"
@@ -347,6 +342,7 @@ galera_start()
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
+            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \

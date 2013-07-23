@@ -347,7 +347,7 @@ if strict_build_flags == 1:
    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-Export('env', 'boost_library_path', 'boost_library_suffix')
+Export('env', 'sysname', 'boost_library_path', 'boost_library_suffix')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

@@ -525,16 +525,11 @@ if [ $TAR == "yes" ]; then
     if [ "$SCONS" == "yes" ]
     then
         SCONS_VD=$GALERA_SRC
-        if [ "$OS" == "Darwin" ]; then
-            cp -P $SCONS_VD/garb/garbd          $GALERA_BINS
-            cp -P $SCONS_VD/libgalera_smm.dylib $GALERA_LIBS
-            if [ "$DEBUG" == "yes" ]; then
-                cp -P -R $SCONS_VD/garb/garbd.dSYM          $GALERA_BINS
-                cp -P -R $SCONS_VD/libgalera_smm.dylib.dSYM $GALERA_LIBS
-            fi
-        else
-            cp -P $SCONS_VD/garb/garbd        $GALERA_BINS
-            cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
+        cp -P $SCONS_VD/garb/garbd       $GALERA_BINS
+        cp -P $SCONS_VD/libgalera_smm.so $GALERA_LIBS
+        if [ "$OS" == "Darwin" -a "$DEBUG" == "yes" ]; then
+            cp -P -R $SCONS_VD/garb/garbd.dSYM          $GALERA_BINS
+            cp -P -R $SCONS_VD/libgalera_smm.so.dSYM $GALERA_LIBS
         fi
     else
         echo "Autotools compilation not supported any more."
