@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 if test -z "$MYSQL_SRC"
 then
@@ -73,6 +73,18 @@ case "$OS" in
     *)
         echo "CPU information not available: unsupported OS: '$OS'";;
 esac
+
+if [ "$OS" == "FreeBSD" ]; then
+    CC=${CC:-"gcc44"}
+    CXX=${CXX:-"g++44"}
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-"/usr/local/lib/gcc44"}
+else
+    CC=${CC:-"gcc"}
+    CXX=${CXX:-"g++"}
+fi
+CC=${CC:+$(which "$CC" 2>/dev/null)}
+CXX=${CXX:+$(which "$CXX" 2>/dev/null)}
+export CC CXX LD_LIBRARY_PATH
 
 usage()
 {
@@ -371,17 +383,13 @@ then
             [ "$DEBUG" = "yes" ] \
             && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
             || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
-            [ "$OS" == "Darwin" ] && BUILD_OPT="$BUILD_OPT \
-                                                -DCMAKE_C_COMPILER=gcc \
-                                                -DCMAKE_CXX_COMPILER=g++ \
-                                                -DCMAKE_OSX_ARCHITECTURES=x86_64"
-            [ "$OS" == "FreeBSD" ] && BUILD_OPT="$BUILD_OPT \
-                                                -DCMAKE_C_COMPILER=gcc44 \
-                                                -DCMAKE_CXX_COMPILER=g++44"
             [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
             [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
             pushd $MYSQL_BUILD_DIR
             cmake $BUILD_OPT \
+                  ${CC:+-DCMAKE_C_COMPILER="$CC"} \
+                  ${CXX:+-DCMAKE_CXX_COMPILER="$CXX"} \
+                  -DCMAKE_OSX_ARCHITECTURES=$(uname -m) \
                   -DWITH_WSREP=1 \
                   -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
                   -DINSTALL_LAYOUT=RPM \

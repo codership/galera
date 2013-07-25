@@ -243,6 +243,11 @@ if sysname != 'darwin':
         print 'Error: rt library not found'
         Exit(1)
 
+if sysname == 'freebsd':
+    if not conf.CheckLib('execinfo'):
+        print 'Error: execinfo library not found'
+        Exit(1)
+
 if sysname == 'sunos':
     if not conf.CheckLib('socket'):
         print 'Error: socket library not found'
