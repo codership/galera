@@ -387,9 +387,9 @@ then
             && make -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
-        [ $MYSQL_MAJOR != "5.1" ] pushd $MYSQL_BUILD_DIR
+        [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
         make -S > /dev/null
-        [ $MYSQL_MAJOR != "5.1" ] popd
+        [ $MYSQL_MAJOR != "5.1" ] && popd
     fi
 fi # SKIP_BUILD
 
