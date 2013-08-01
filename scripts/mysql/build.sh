@@ -43,6 +43,7 @@ fi
 
 # Initializing variables to defaults
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
+BOOTSTRAP=no
 DEBUG=no
 DEBUG_LEVEL=1
 GALERA_DEBUG=no
@@ -243,6 +244,15 @@ if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
+if [ "$MYSQL_MAJOR" = "5.1" ]
+then
+    MYSQL_BUILD_DIR="$MYSQL_SRC"
+else
+    [ "$DEBUG" == "yes" ] \
+    && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
+    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
+fi
+
 which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
 
 # export command options for Galera build
@@ -336,7 +346,7 @@ then
     then
         rm -f config.status
 
-        DEBUG_OPT=""
+        BUILD_OPT=""
         MYSQL_BUILD_PREFIX="/usr"
 
         [ $DEBIAN -ne 0 ] && \
@@ -353,11 +363,17 @@ then
                                   --with-extra-charsets=all \
                                   --with-ssl"
 
-            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-debug"
-            BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
+            [ "$DEBUG" = "yes" ] && BUILD_OPT="-debug"
+            BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
         else # CMake build
-            [ "$DEBUG" = "yes" ] && DEBUG_OPT="-DCMAKE_BUILD_TYPE=Debug"
-            cmake -DWITH_WSREP=1 \
+            [ "$DEBUG" = "yes" ] \
+            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
+            || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
+            [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
+            [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
+            pushd $MYSQL_BUILD_DIR
+            cmake $BUILD_OPT \
+                  -DWITH_WSREP=1 \
                   -DCMAKE_INSTALL_PREFIX=$MYSQL_BUILD_PREFIX \
                   -DINSTALL_LAYOUT=RPM \
                   -DINSTALL_SBINDIR=/usr/sbin \
@@ -367,13 +383,13 @@ then
                   -DWITH_READLINE=yes \
                   -DWITH_SSL=system \
                   -DWITH_ZLIB=system \
-                  $DEBUG_OPT \
-            && make -j $JOBS -S || exit 1
+                  $MYSQL_SRC \
+            && make -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
-        #set -x
-        make -j $JOBS > /dev/null
-        #set +x
+        [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
+        make -S > /dev/null
+        [ $MYSQL_MAJOR != "5.1" ] && popd
     fi
 fi # SKIP_BUILD
 
@@ -442,7 +458,7 @@ install_mysql_5.5_demo()
     export DESTDIR=$BUILD_ROOT/dist/mysql
 
     mkdir -p $DIST_DIR/mysql/etc
-    pushd $MYSQL_SRC
+    pushd $MYSQL_BUILD_DIR
     cmake -DCMAKE_INSTALL_COMPONENT=Server -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=Client -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=SharedLibraries -P cmake_install.cmake
@@ -475,7 +491,7 @@ if [ $TAR == "yes" ]; then
         install -m 644 -D my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
-    cat $MYSQL_SRC/support-files/wsrep.cnf | \
+    cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
     tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
