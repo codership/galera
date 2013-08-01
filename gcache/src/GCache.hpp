@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -9,7 +9,6 @@
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
 
-//#include <galerautils.hpp>
 #include "gu_types.hpp"
 
 #include <string>
@@ -53,15 +52,21 @@ namespace gcache
          * Reinitialize seqno sequence (after SST or such)
          * Clears seqno->ptr map // and sets seqno_min to seqno.
          */
-        void    seqno_reset (/*int64_t seqno*/);
+        void  seqno_reset (/*int64_t seqno*/);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
          */
-        void    seqno_assign (const void* ptr,
-                              int64_t     seqno_g,
-                              int64_t     seqno_d,
-                              bool        release);
+        void  seqno_assign (const void* ptr,
+                            int64_t     seqno_g,
+                            int64_t     seqno_d,
+                            bool        release);
+
+        /*!
+         * Release buffers up to seqno
+         */
+        void seqno_release (int64_t seqno);
+
 #if DEPRECATED
         /*!
          * Get the smallest seqno present in the cache.
@@ -69,6 +74,15 @@ namespace gcache
          */
         int64_t seqno_get_min ();
 #endif
+        /*!
+         * Returns smallest seqno present in history
+         */
+        int64_t seqno_min()
+        {
+            gu::Lock lock(mtx);
+            return seqno2ptr.begin()->first;
+        }
+
         /*!
          * Move lock to a given seqno.
          * @throws gu::NotFound if seqno is not in the cache.
@@ -88,28 +102,28 @@ namespace gcache
         {
         public:
 
-            Buffer() : ptr_(), size_(), seqno_g_(), seqno_d_() { }
+            Buffer() : seqno_g_(), ptr_(), size_(), seqno_d_() { }
 
             Buffer (const Buffer& other)
                 :
+                seqno_g_(other.seqno_g_),
                 ptr_    (other.ptr_),
                 size_   (other.size_),
-                seqno_g_(other.seqno_g_),
                 seqno_d_(other.seqno_d_)
             { }
 
             Buffer& operator= (const Buffer& other)
             {
+                seqno_g_ = other.seqno_g_;
                 ptr_     = other.ptr_;
                 size_    = other.size_;
-                seqno_g_ = other.seqno_g_;
                 seqno_d_ = other.seqno_d_;
                 return *this;
             }
 
+            int64_t           seqno_g() const { return seqno_g_; }
             const gu::byte_t* ptr()     const { return ptr_;     }
             ssize_t           size()    const { return size_;    }
-            int64_t           seqno_g() const { return seqno_g_; }
             int64_t           seqno_d() const { return seqno_d_; }
 
         protected:
@@ -124,9 +138,9 @@ namespace gcache
 
         private:
 
+            int64_t           seqno_g_;
             const gu::byte_t* ptr_;
             ssize_t           size_;
-            int64_t           seqno_g_;
             int64_t           seqno_d_;
 
             friend class GCache;
@@ -156,7 +170,7 @@ namespace gcache
 
         void discard (BufferHeader*) {}
 
-        void free_common (BufferHeader*bh)
+        void free_common (BufferHeader* bh)
         {
             void* const ptr(bh + 1);
 
@@ -202,11 +216,10 @@ namespace gcache
         gu::Mutex       mtx;
         gu::Cond        cond;
 
-        typedef std::map<int64_t, const void*> seqno2ptr_t;
-        seqno2ptr_t     seqno2ptr;
-
+        typedef std::map<int64_t, const void*>  seqno2ptr_t;
         typedef seqno2ptr_t::iterator           seqno2ptr_iter_t;
         typedef std::pair<int64_t, const void*> seqno2ptr_pair_t;
+        seqno2ptr_t     seqno2ptr;
 
         MemStore        mem;
         RingBuffer      rb;
@@ -217,8 +230,8 @@ namespace gcache
         long long       frees;
 
         int64_t         seqno_locked;
-//        int64_t         seqno_min;
         int64_t         seqno_max;
+        int64_t         seqno_released;
 
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;

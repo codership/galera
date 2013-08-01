@@ -1,13 +1,15 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #ifndef GALERA_SERVICE_THD_HPP
 #define GALERA_SERVICE_THD_HPP
 
+#include "gcs.hpp"
+#include <GCache.hpp>
+
 #include <galerautils.h>
 #include <galerautils.hpp>
-#include "gcs.hpp"
 
 namespace galera
 {
@@ -15,29 +17,38 @@ namespace galera
     {
     public:
 
-        ServiceThd (GcsI& gcs);
+        ServiceThd (GcsI& gcs, gcache::GCache& gcache);
 
         ~ServiceThd ();
 
         void report_last_committed (gcs_seqno_t seqno);
 
+        /* release write sets up to and including seqno */
+        void release_seqno (gcs_seqno_t seqno);
+
         void reset(); // reset to initial state before gcs (re)connect
 
     private:
 
-        GcsI&       gcs_;
-        gu_thread_t thd_;
-        gu::Mutex   mtx_;
-        gu::Cond    cond_;
+        GcsI&           gcs_;
+        gcache::GCache& gcache_;
+        gu_thread_t     thd_;
+        gu::Mutex       mtx_;
+        gu::Cond        cond_;
 
         static const uint32_t A_NONE;
 
         struct Data
         {
-            uint32_t    act_;
             gcs_seqno_t last_committed_;
+            gcs_seqno_t release_seqno_;
+            uint32_t    act_;
 
-            Data() : act_(A_NONE), last_committed_(0) {}
+            Data() :
+                last_committed_(0),
+                release_seqno_ (0),
+                act_           (A_NONE)
+            {}
         };
 
         Data data_;

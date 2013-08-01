@@ -11,10 +11,32 @@
 
 using namespace galera;
 
+class TestEnv
+{
+public:
+
+    TestEnv() :
+        conf_   (),
+        gcache_ (conf_, "."),
+        gcs_    (conf_, gcache_)
+    {}
+
+    ~TestEnv() {}
+
+    gcache::GCache& gcache()  { return gcache_; }
+    DummyGcs&           gcs()     { return gcs_;    }
+
+private:
+
+    gu::Config     conf_;
+    gcache::GCache gcache_;
+    DummyGcs       gcs_;
+};
+
 START_TEST(service_thd1)
 {
-    DummyGcs conn;
-    ServiceThd* thd = new ServiceThd(conn);
+    TestEnv env;
+    ServiceThd* thd = new ServiceThd(env.gcs(), env.gcache());
     fail_if (thd == 0);
     delete thd;
 }
@@ -26,8 +48,9 @@ END_TEST
 
 START_TEST(service_thd2)
 {
-    DummyGcs conn;
-    ServiceThd* thd = new ServiceThd(conn);
+    TestEnv env;
+    DummyGcs& conn(env.gcs());
+    ServiceThd* thd = new ServiceThd(conn, env.gcache());
     fail_if (thd == 0);
 
     conn.set_last_applied(0);
@@ -61,6 +84,19 @@ START_TEST(service_thd2)
 }
 END_TEST
 
+START_TEST(service_thd3)
+{
+    TestEnv env;
+    ServiceThd* thd = new ServiceThd(env.gcs(), env.gcache());
+    fail_if (thd == 0);
+    // so far for empty GCache the following should be a noop.
+    thd->release_seqno(-1);
+    thd->release_seqno(2345);
+    thd->release_seqno(23464567686);
+    delete thd;
+}
+END_TEST
+
 Suite* service_thd_suite()
 {
     Suite* s = suite_create ("service_thd");
@@ -69,6 +105,7 @@ Suite* service_thd_suite()
     tc = tcase_create ("service_thd");
     tcase_add_test  (tc, service_thd1);
     tcase_add_test  (tc, service_thd2);
+    tcase_add_test  (tc, service_thd3);
     suite_add_tcase (s, tc);
 
     return s;

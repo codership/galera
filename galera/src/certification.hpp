@@ -7,6 +7,7 @@
 
 #include "trx_handle.hpp"
 #include "key_entry_ng.hpp"
+#include "galera_service_thd.hpp"
 
 #include "gu_unordered.hpp"
 #include "gu_lock.hpp"
@@ -54,7 +55,7 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(gu::Config& conf);
+        Certification(gu::Config& conf, ServiceThd& thd);
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
@@ -170,6 +171,7 @@ namespace galera
         CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
         DepsSet       deps_set_;
+        ServiceThd&   service_thd_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t initial_position_;

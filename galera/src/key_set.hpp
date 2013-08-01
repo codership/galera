@@ -23,20 +23,19 @@ public:
     enum Version
     {
         EMPTY = 0,
-        FLAT16,    /* 16-byte hash (flat) */
-        FLAT16A,   /* 16-byte hash (flat), annotated */
-        FLAT8,     /*  8-byte hash (flat) */
-        FLAT8A     /*  8-byte hash (flat), annotated */
-//      TREE8      /*  8-byte hash + full serialized key */
+        FLAT8,    /*  8-byte hash (flat) */
+        FLAT8A,   /*  8-byte hash (flat), annotated */
+        FLAT16,   /* 16-byte hash (flat) */
+        FLAT16A,  /* 16-byte hash (flat), annotated */
+//      TREE8,    /*  8-byte hash + full serialized key */
+        MAX_VERSION = FLAT16A
     };
-
-    static Version const MAX_VERSION = FLAT8A;
 
     static Version version (unsigned int ver)
     {
         if (gu_likely (ver <= MAX_VERSION)) return static_cast<Version>(ver);
 
-        gu_throw_error (EINVAL) << "Unrecognized KeySet version: " << ver;
+        throw_version(ver);
     }
 
     class Key
@@ -119,8 +118,7 @@ public:
         {
             if (gu_likely(size >= 8 && serial_size() <= size)) return;
 
-            gu_throw_error (EINVAL) << "Buffer too short: expected "
-                                    << serial_size() << ", got " << size;
+            throw_buffer_too_short (serial_size(), size);
         }
 
         KeyPart () : data_(0) {}
@@ -132,7 +130,7 @@ public:
             if (gu_likely(p <= Key::P_LAST))
                 return static_cast<Key::Prefix>(p);
 
-            gu_throw_error(EPROTO) << "Unsupported key prefix: " << p;
+            throw_bad_prefix(p);
         }
 
         bool shared()       const { return prefix() == Key::P_SHARED; }
@@ -167,8 +165,11 @@ public:
             const uint32_t* rhs(reinterpret_cast<const uint32_t*>(kp.data_));
 #endif /* WORDSIZE */
 
-            switch (std::max(version(), kp.version()))
+            switch (std::min(version(), kp.version()))
             {
+            case EMPTY:
+                assert(0);
+                throw_match_empty_key(version(), kp.version());
             case FLAT16:
             case FLAT16A:
 #if GU_WORDSIZE == 64
@@ -187,12 +188,9 @@ public:
                               (gtoh32(lhs[0]) >> HEADER_BITS) ==
                               (gtoh32(rhs[0]) >> HEADER_BITS));
 #endif /* WORDSIZE */
-                return ret;
-            case EMPTY:;
             }
 
-            assert(0);
-            gu_throw_error(EINVAL) << "Attempt to match against an empty key.";
+            return ret;
         }
 
         size_t
@@ -237,7 +235,7 @@ public:
     private:
 
         static unsigned int const PREFIX_BITS  = 2;
-        static gu::byte_t   const PREFIX_MASK  = (1 << PREFIX_BITS)   -1;
+        static gu::byte_t   const PREFIX_MASK  = (1 << PREFIX_BITS)  - 1;
         static unsigned int const VERSION_BITS = 3;
         static gu::byte_t   const VERSION_MASK = (1 << VERSION_BITS) - 1;
         static unsigned int const HEADER_BITS  = PREFIX_BITS + VERSION_BITS;
@@ -296,6 +294,12 @@ public:
         static void
         print_annotation (std::ostream& os, const gu::byte_t* buf);
 
+        static void
+        throw_buffer_too_short (size_t expected, size_t got) GU_NORETURN;
+        static void
+        throw_bad_prefix       (gu::byte_t p)                GU_NORETURN;
+        static void
+        throw_match_empty_key  (Version my, Version other)   GU_NORETURN;
     }; /* class KeyPart */
 
     class KeyPartHash
@@ -312,6 +316,8 @@ public:
         }
     }; /* functor KeyPartEqual */
 
+private:
+    static void throw_version(int) GU_NORETURN;
 }; /* class KeySet */
 
 inline void

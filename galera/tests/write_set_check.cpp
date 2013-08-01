@@ -8,15 +8,15 @@
 #include "certification.hpp"
 #include "wsdb.cpp"
 #include "gcs_action_source.hpp"
-#include <cstdlib>
+#include "galera_service_thd.hpp"
 
+#include <cstdlib>
 #include <check.h>
 
 using namespace std;
 using namespace galera;
 
 typedef std::vector<galera::KeyPartOS> KeyPartSequence;
-
 
 START_TEST(test_key1)
 {
@@ -291,6 +291,29 @@ START_TEST(test_mapped_buffer)
 }
 END_TEST
 
+class TestEnv
+{
+public:
+
+    TestEnv() :
+        conf_   (),
+        gcache_ (conf_, "."),
+        gcs_    (conf_, gcache_),
+        thd_    (gcs_,  gcache_)
+    {}
+
+    ~TestEnv() {}
+
+    gu::Config& conf() { return conf_; }
+    ServiceThd& thd()  { return thd_;  }
+
+private:
+
+    gu::Config     conf_;
+    gcache::GCache gcache_;
+    DummyGcs       gcs_;
+    ServiceThd     thd_;
+};
 
 START_TEST(test_cert_hierarchical_v1)
 {
@@ -352,8 +375,8 @@ START_TEST(test_cert_hierarchical_v1)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
     cert.assign_initial_position(0, 1);
 
     mark_point();
@@ -471,8 +494,9 @@ START_TEST(test_cert_hierarchical_v2)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
+
     cert.assign_initial_position(0, version);
 
     mark_point();
@@ -516,8 +540,8 @@ START_TEST(test_trac_726)
 {
     log_info << "test_trac_726";
     const int version(2);
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
     wsrep_uuid_t uuid1 = {{1, }};
     wsrep_uuid_t uuid2 = {{2, }};
     cert.assign_initial_position(0, version);

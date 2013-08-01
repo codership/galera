@@ -24,7 +24,8 @@ public:
         :
         act_(act),
         gcache_(gcache)
-    { }
+    {}
+
     ~Release()
     {
         switch (act_.type)
@@ -39,6 +40,7 @@ public:
             break;
         }
     }
+
 private:
     struct gcs_action& act_;
     gcache::GCache&    gcache_;

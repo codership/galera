@@ -16,40 +16,21 @@ namespace gcache
      * Reinitialize seqno sequence (after SST or such)
      * Clears seqno->ptr map // and sets seqno_min to seqno.
      */
-#if OLD
-    void
-    GCache::seqno_reset (/*int64_t seqno*/)
-    {
-        gu::Lock lock(mtx);
-
-        if (!seqno2ptr.empty())
-        {
-            int64_t old_min = seqno2ptr.begin()->first;
-            int64_t old_max = seqno2ptr.rbegin()->first;
-
-            log_info << "Discarding old history seqnos from cache: " << old_min
-                     << '-' << old_max;
-
-            discard_seqno (old_max); // forget all previous seqnos
-        }
-
-//        seqno_min = seqno;
-    }
-#else
     void
     GCache::seqno_reset ()
     {
         gu::Lock lock(mtx);
 
-        if (seqno2ptr.empty()) return;
+        if (gu_unlikely(seqno2ptr.empty())) return;
 
         /* order is significant here */
         rb.seqno_reset();
         mem.seqno_reset();
 
         seqno2ptr.clear();
+
+        seqno_released = 0;
     }
-#endif
 
     /*!
      * Assign sequence number to buffer pointed to by ptr
@@ -91,6 +72,26 @@ namespace gcache
         bh->seqno_d = seqno_d;
         if (free) free_common(bh);
     }
+
+    void
+    GCache::seqno_release (int64_t seqno)
+    {
+        gu::Lock lock(mtx);
+
+        assert(seqno >= seqno_released);
+
+        for (seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
+             it != seqno2ptr.end() && it->first <= seqno;)
+        {
+            BufferHeader* const bh(ptr2BH(it->second));
+            assert (bh->seqno_g() == it->first);
+            seqno_released = it->first;
+            ++it; // free_common() below may invalidate current iterator,
+                  // so increment before calling free_common()
+            if (gu_likely(!BH_is_released(bh))) free_common(bh);
+        }
+    }
+
 #if DEPRECATED
     /*!
      * Get the smallest seqno present in the cache.

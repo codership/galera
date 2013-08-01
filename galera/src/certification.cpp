@@ -745,13 +745,14 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 }
 
 
-galera::Certification::Certification(gu::Config& conf)
+galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     :
     version_               (-1),
     trx_map_               (),
     cert_index_            (),
     cert_index_ng_         (),
     deps_set_              (),
+    service_thd_           (thd),
     mutex_                 (),
     trx_size_warn_count_   (0),
     initial_position_      (-1),
@@ -950,10 +951,18 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno_() const
 
 void galera::Certification::purge_trxs_upto_(wsrep_seqno_t seqno)
 {
-    TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
-    cert_debug << "purging index up to " << lower_bound->first;
+    TrxMap::iterator    lower_bound(trx_map_.lower_bound(seqno));
+    wsrep_seqno_t const purge_seqno(lower_bound->first);
+//    bool const          new_version(lower_bound->second->new_version());
+
+    cert_debug << "purging index up to " << purge_seqno;
+
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
+
+//    if (new_version)
+        service_thd_.release_seqno(purge_seqno);
+
     if (0 == ((trx_map_.size() + 1) % 10000))
     {
         log_debug << "trx map after purge: length: " << trx_map_.size()

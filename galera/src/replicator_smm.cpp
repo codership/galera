@@ -199,13 +199,13 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     gcache_             (config_, data_dir_),
     gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
-    service_thd_        (gcs_),
+    service_thd_        (gcs_, gcache_),
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
     ist_receiver_       (config_, args->node_address),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
-    cert_               (config_),
+    cert_               (config_, service_thd_),
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
@@ -611,6 +611,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
         assert(rcode != -EINTR || trx->state() == TrxHandle::S_MUST_ABORT);
         assert(act.seqno_l == GCS_SEQNO_ILL && act.seqno_g == GCS_SEQNO_ILL);
+        assert(NULL == act.buf || !trx->new_version());
 
         if (trx->state() != TrxHandle::S_MUST_ABORT)
         {
@@ -621,7 +622,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         goto must_abort;
     }
 
-    assert(act.buf);
+    assert(act.buf != NULL);
     assert(act.size == rcode);
     assert(act.seqno_l != GCS_SEQNO_ILL);
     assert(act.seqno_g != GCS_SEQNO_ILL);
@@ -1632,7 +1633,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
                               trx->depends_seqno(),
-                              trx->is_local());  // frees local actions
+                              trx->is_local() && !trx->new_version());  // frees local actions
 
         local_monitor_.leave(lo);
     }
@@ -1673,7 +1674,7 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
                               -1,
-                              trx->is_local());
+                              trx->is_local() && !trx->new_version());
         break;
     }
     return retval;

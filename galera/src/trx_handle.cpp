@@ -235,7 +235,6 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
 
         assert(last_seen_seqno_ >= 0);
 
-//        return offset;
         return buflen;
     }
     catch (gu::Exception& e)

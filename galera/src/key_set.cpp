@@ -12,6 +12,12 @@
 namespace galera
 {
 
+void
+KeySet::throw_version(int ver)
+{
+    gu_throw_error (EINVAL) << "Unrecognized KeySet version: " << ver;
+}
+
 size_t
 KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
                                    int const part_num,
@@ -80,10 +86,30 @@ KeySet::KeyPart::print_annotation(std::ostream& os, const gu::byte_t* buf)
     }
 }
 
+void
+KeySet::KeyPart::throw_buffer_too_short (size_t expected, size_t got)
+{
+    gu_throw_error (EINVAL) << "Buffer too short: expected "
+                            << expected << ", got " << got;
+}
+
+void
+KeySet::KeyPart::throw_bad_prefix (gu::byte_t p)
+{
+    gu_throw_error(EPROTO) << "Unsupported key prefix: " << p;
+}
+
 static const char* ver_str[KeySet::MAX_VERSION + 1] =
 {
-    "EMPTY", "FLAT16", "FLAT16A", "FLAT8", "FLAT8A"
+    "EMPTY", "FLAT8", "FLAT8A", "FLAT16", "FLAT16A"
 };
+
+void
+KeySet::KeyPart::throw_match_empty_key (Version my, Version other)
+{
+    gu_throw_error(EINVAL) << "Attempt to match against an empty key ("
+                           << my << ',' << other << ')';
+}
 
 void
 KeySet::KeyPart::print (std::ostream& os) const
@@ -92,7 +118,7 @@ KeySet::KeyPart::print (std::ostream& os) const
 
     size_t const size(ver != EMPTY ? base_size(ver, data_, 1) : 0);
 
-    os << '(' << int(exclusive()) << ',' << ver_str[ver] << ')'
+    os << '(' << int(exclusive()) << ',' << ver_str[ver] << ") "
        << gu::Hexdump(data_, size);
 
     if (annotated(ver))
@@ -146,9 +172,9 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
         {
 #ifndef NDEBUG
             if (leaf)
-                log_info << "KeyPart ctor: full duplicate of " << *found;
+                log_debug << "KeyPart ctor: full duplicate of " << *found;
             else
-                log_info << "Duplicate of exclusive: " << *found;
+                log_debug << "Duplicate of exclusive: " << *found;
 #endif
             throw DUPLICATE();
         }
@@ -198,7 +224,7 @@ KeySetOut::append (const KeyData& kd)
         if (prev_[i].exclusive())
         {
             assert (prev_.size() == (i + 1U));
-            log_info << "Returning after matching exclusive key: " << prev_[i];
+            log_debug << "Returning after matching exclusive key:\n"<< prev_[i];
             return 0;
         }
 
@@ -207,7 +233,7 @@ KeySetOut::append (const KeyData& kd)
             assert (prev_[i].shared());
             if (kd.shared)
             {
-                log_info << "Returning after matching all " << i << " parts";
+                log_debug << "Returning after matching all " << i << " parts";
                 return 0;
             }
             else /* need to add exclusive copy of the key */
@@ -245,7 +271,9 @@ KeySetOut::append (const KeyData& kd)
             /* There is a very small probability that child part thows DUPLICATE
              * even after parent was added as a new key. It does not matter:
              * a duplicate will be a duplicate in certification as well. */
-            log_info << "Returning after catching a DUPLICATE. Part: " << i;
+#ifndef NDEBUG
+            log_debug << "Returning after catching a DUPLICATE. Part: " << i;
+#endif /* BDEBUG */
             goto out;
         }
 

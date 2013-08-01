@@ -338,7 +338,7 @@ namespace galera
         WriteSetOut (const std::string&  base_name,
                      uint16_t            flags    = 0,
                      WriteSetNG::Version ver      = WriteSetNG::MAX_VERSION,
-                     KeySet::Version     kver     = KeySet::MAX_VERSION,
+                     KeySet::Version     kver     = KeySet::FLAT8,
                      DataSet::Version    dver     = DataSet::MAX_VERSION,
                      DataSet::Version    uver     = DataSet::MAX_VERSION,
                      size_t              max_size = WriteSetNG::MAX_SIZE)
