@@ -250,7 +250,7 @@ then
 else
     [ "$DEBUG" == "yes" ] \
     && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
-    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_install"
+    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
 fi
 
 which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
