@@ -1,14 +1,17 @@
 /*
- * Copyright (C) 2009-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  */
+
+#include "SeqnoNone.hpp"
+#include "gcache_bh.hpp"
+#include "GCache.hpp"
+
+#include <galerautils.hpp>
 
 #include <cerrno>
 #include <cassert>
 
-#include <galerautils.hpp>
-#include "SeqnoNone.hpp"
-#include "gcache_bh.hpp"
-#include "GCache.hpp"
+#include <sched.h>
 
 namespace gcache
 {
@@ -70,26 +73,76 @@ namespace gcache
 
         bh->seqno_g = seqno_g;
         bh->seqno_d = seqno_d;
-        if (free) free_common(bh);
+//        if (free) free_common(bh);
     }
 
     void
-    GCache::seqno_release (int64_t seqno)
+    GCache::seqno_release (int64_t const seqno)
     {
-        gu::Lock lock(mtx);
+        /* The number of buffers scheduled for release is unpredictable, so
+         * we want to allow some concurrency in cache access by releasing
+         * buffers in small batches */
+        static int const min_batch_size(32);
 
-        assert(seqno >= seqno_released);
+        /* Although extremely unlikely, theoretically concurrent access may
+         * lead to elements being added faster than released. The following is
+         * to control and possibly disable concurrency in that case. We start
+         * with min_batch_size and increase it if necessary. */
+        size_t old_gap(-1);
+        int    batch_size(min_batch_size);
 
-        for (seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
-             it != seqno2ptr.end() && it->first <= seqno;)
+        bool   loop(false);
+
+        do
         {
-            BufferHeader* const bh(ptr2BH(it->second));
-            assert (bh->seqno_g() == it->first);
-            seqno_released = it->first;
-            ++it; // free_common() below may invalidate current iterator,
-                  // so increment before calling free_common()
-            if (gu_likely(!BH_is_released(bh))) free_common(bh);
+            /* if we're doing this loop repeatedly, allow other threads to run*/
+            if (loop) sched_yield();
+
+            gu::Lock lock(mtx);
+
+            assert(seqno >= seqno_released);
+
+            seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
+
+            if (gu_unlikely(it == seqno2ptr.end()))
+            {
+                /* this means that there are no elements with
+                 * seqno > seqno_released - and this should never happen */
+                assert(0);
+                return;
+            }
+
+            assert(seqno_max >= seqno_released);
+
+            /* here we check if (seqno_max - seqno_released) is decreasing
+             * and if not - increase the batch_size (linearly) */
+            size_t const new_gap(seqno_max - seqno_released);
+            batch_size += (new_gap >= old_gap) * min_batch_size;
+            old_gap = new_gap;
+
+            int64_t const start(it->first - 1);
+            int64_t const end  (seqno - start >= 2*batch_size ?
+                                start + batch_size : seqno);
+#if 0
+            log_info << "############ releasing " << (seqno - start)
+                     << " buffers, batch_size: " << batch_size
+                     << ", seqno_max: " << seqno_max;
+#endif
+            for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
+            {
+                BufferHeader* const bh(ptr2BH(it->second));
+                assert (bh->seqno_g() == it->first);
+                seqno_released = it->first;
+                ++it; /* free_common() below may erase current element,
+                       * so advance iterator before calling free_common() */
+                if (gu_likely(!BH_is_released(bh))) free_common(bh);
+            }
+
+            assert (loop); /* should never try to release past seqno2ptr end */
+
+            loop = (end < seqno) && loop;
         }
+        while(loop);
     }
 
 #if DEPRECATED
