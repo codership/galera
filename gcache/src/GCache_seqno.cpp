@@ -41,8 +41,7 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-                          int64_t     const seqno_d,
-                          bool        const free)
+                          int64_t     const seqno_d)
     {
         gu::Lock lock(mtx);
 
@@ -73,7 +72,6 @@ namespace gcache
 
         bh->seqno_g = seqno_g;
         bh->seqno_d = seqno_d;
-//        if (free) free_common(bh);
     }
 
     void
@@ -131,7 +129,7 @@ namespace gcache
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {
                 BufferHeader* const bh(ptr2BH(it->second));
-                assert (bh->seqno_g() == it->first);
+                assert (bh->seqno_g == it->first);
                 seqno_released = it->first;
                 ++it; /* free_common() below may erase current element,
                        * so advance iterator before calling free_common() */
@@ -279,7 +277,7 @@ namespace gcache
     /*!
      * Releases any history locks present.
      */
-    void GCache::seqno_release ()
+    void GCache::seqno_unlock ()
     {
         gu::Lock lock(mtx);
         seqno_locked = SEQNO_NONE;

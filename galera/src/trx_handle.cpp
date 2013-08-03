@@ -226,14 +226,18 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             source_id_       = write_set_in_.source_id();
             conn_id_         = write_set_in_.conn_id();
             trx_id_          = write_set_in_.trx_id();
-            last_seen_seqno_ = write_set_in_.last_seen();
+            if (gu_unlikely(write_set_in_.certified()))
+                last_seen_seqno_ = WSREP_SEQNO_UNDEFINED;
+            else
+            {
+                last_seen_seqno_ = write_set_in_.last_seen();
+                assert(last_seen_seqno_ >= 0);
+            }
             timestamp_       = write_set_in_.timestamp();
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT);
         }
-
-        assert(last_seen_seqno_ >= 0);
 
         return buflen;
     }

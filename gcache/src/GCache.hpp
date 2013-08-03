@@ -59,11 +59,10 @@ namespace gcache
          */
         void  seqno_assign (const void* ptr,
                             int64_t     seqno_g,
-                            int64_t     seqno_d,
-                            bool        release);
+                            int64_t     seqno_d);
 
         /*!
-         * Release buffers up to seqno
+         * Release (free) buffers up to seqno
          */
         void seqno_release (int64_t seqno);
 
@@ -80,7 +79,10 @@ namespace gcache
         int64_t seqno_min()
         {
             gu::Lock lock(mtx);
-            return seqno2ptr.begin()->first;
+            if (gu_likely(!seqno2ptr.empty()))
+                return seqno2ptr.begin()->first;
+            else
+                return -1;
         }
 
         /*!
@@ -159,7 +161,7 @@ namespace gcache
         /*!
          * Releases any seqno locks present.
          */
-        void seqno_release ();
+        void seqno_unlock ();
 
         /*! @throws NotFound */
         void param_set (const std::string& key, const std::string& val);
@@ -232,6 +234,7 @@ namespace gcache
         int64_t         seqno_locked;
         int64_t         seqno_max;
         int64_t         seqno_released;
+
 
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;

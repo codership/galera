@@ -393,7 +393,7 @@ namespace galera
 
         int                    trx_proto_ver_;// transaction protocol
         int                    str_proto_ver_;// state transfer request protocol
-        int                    protocol_version_; // general repl layer proto
+        int                    protocol_version_;// general repl layer proto
         int                    proto_max_;    // maximum allowed WS version
 
         FSM<State, Transition> state_;

@@ -30,12 +30,6 @@ namespace galera
 
     private:
 
-        GcsI&           gcs_;
-        gcache::GCache& gcache_;
-        gu_thread_t     thd_;
-        gu::Mutex       mtx_;
-        gu::Cond        cond_;
-
         static const uint32_t A_NONE;
 
         struct Data
@@ -51,7 +45,12 @@ namespace galera
             {}
         };
 
-        Data data_;
+        gcache::GCache& gcache_;
+        GcsI&           gcs_;
+        gu_thread_t     thd_;
+        gu::Mutex       mtx_;
+        gu::Cond        cond_;
+        Data            data_;
 
         static void* thd_func (void*);
 

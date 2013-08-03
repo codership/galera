@@ -302,7 +302,6 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         // read recv_addr_ from acceptor_ in case zero port was specified
         recv_addr_ = uri.get_scheme()
             + "://"
-            // + 
             + uri.get_host()
             + ":"
             + gu::to_string(acceptor_.local_endpoint().port());
@@ -645,7 +644,7 @@ galera::ist::Sender::~Sender()
     {
         socket_.close();
     }
-    gcache_.seqno_release();
+    gcache_.seqno_unlock();
 }
 
 void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)

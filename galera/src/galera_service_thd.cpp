@@ -71,8 +71,8 @@ galera::ServiceThd::thd_func (void* arg)
 }
 
 galera::ServiceThd::ServiceThd (GcsI& gcs, gcache::GCache& gcache) :
-    gcs_    (gcs),
     gcache_ (gcache),
+    gcs_    (gcs),
     thd_    (),
     mtx_    (),
     cond_   (),

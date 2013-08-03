@@ -75,7 +75,7 @@ public:
             )
             : data_(tmp.buf)
         {
-            assert(ver >= FLAT16 && ver <= FLAT8A);
+            assert(ver >EMPTY && ver <= MAX_VERSION);
 
             const uint64_t* from(reinterpret_cast<const uint64_t*>(hash.buf));
             uint64_t*       to  (reinterpret_cast<uint64_t*>(tmp.buf));

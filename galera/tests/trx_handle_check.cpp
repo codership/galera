@@ -154,6 +154,8 @@ START_TEST(test_serialization)
     trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
     fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
+    trx->set_last_seen_seqno(0);
+
     TrxHandle* trx2(new TrxHandle());
 
     std::vector<gu::byte_t> buf(trx->serial_size());

@@ -166,22 +166,22 @@ namespace galera
                     );
             }
 
-            uint32_t      dep_window() const
+            uint32_t      pa_range() const
             {
                 return gu::gtoh(
-                    *(reinterpret_cast<const uint32_t*>(ptr_ + V3_DEP_WINDOW))
+                    *(reinterpret_cast<const uint32_t*>(ptr_ + V3_PA_RANGE))
                     );
             }
 
             wsrep_seqno_t last_seen() const
             {
-                assert (dep_window() == 0);
+                assert (pa_range() == 0);
                 return seqno_priv();
             }
 
             wsrep_seqno_t seqno() const
             {
-                assert (dep_window() > 0);
+                assert (pa_range() > 0);
                 return seqno_priv();
             }
 
@@ -270,8 +270,8 @@ namespace galera
             static int const V3_DATASET_VER = V3_KEYSET_VER;
             static int const V3_UNRDSET_VER = V3_DATASET_VER;
             static int const V3_FLAGS       = V3_UNRDSET_VER + sizeof(uint16_t);
-            static int const V3_DEP_WINDOW  = V3_FLAGS       + sizeof(uint16_t);
-            static int const V3_LAST_SEEN   = V3_DEP_WINDOW  + sizeof(uint32_t);
+            static int const V3_PA_RANGE    = V3_FLAGS       + sizeof(uint16_t);
+            static int const V3_LAST_SEEN   = V3_PA_RANGE    + sizeof(uint32_t);
             static int const V3_SEQNO       = V3_LAST_SEEN;
             // seqno takes place of last seen
             static int const V3_TIMESTAMP   = V3_LAST_SEEN   + sizeof(uint64_t);
@@ -288,7 +288,7 @@ namespace galera
                 int const dataset_ver_;
                 int const unrdset_ver_;
                 int const flags_;
-                int const dep_window_;
+                int const pa_range_;
                 int const last_seen_;
                 int const seqno_;
                 int const timestamp_;
@@ -378,6 +378,8 @@ namespace galera
             return ((data_.count() + keys_.count() + unrd_.count()) == 0);
         }
 
+        /* !!! This returns header without checksum! *
+         *     Use set_last_seen() to finalize it.   */
         size_t gather(const wsrep_uuid_t&    source,
                       const wsrep_conn_id_t& conn,
                       const wsrep_trx_id_t&  trx,
@@ -482,16 +484,16 @@ namespace galera
             }
         }
 
-        uint16_t      flags()      const { return header_.flags();       }
-        bool          is_toi()     const
+        uint16_t      flags()     const { return header_.flags();     }
+        bool          is_toi()    const
         { return flags() & WriteSetNG::F_TOI; }
-        bool          pa_unsafe()  const
+        bool          pa_unsafe() const
         { return flags() & WriteSetNG::F_PA_UNSAFE; }
-        int           dep_window() const { return header_.dep_window();  }
-        bool          certified()  const { return header_.dep_window();  }
-        wsrep_seqno_t last_seen()  const { return header_.last_seen();   }
-        wsrep_seqno_t seqno()      const { return header_.seqno();       }
-        long long     timestamp()  const { return header_.timestamp();   }
+        int           pa_range()  const { return header_.pa_range();  }
+        bool          certified() const { return header_.pa_range();  }
+        wsrep_seqno_t last_seen() const { return header_.last_seen(); }
+        wsrep_seqno_t seqno()     const { return header_.seqno();     }
+        long long     timestamp() const { return header_.timestamp(); }
 
         const wsrep_uuid_t& source_id() const { return header_.source_id(); }
         wsrep_conn_id_t     conn_id()   const { return header_.conn_id();   }
@@ -513,11 +515,11 @@ namespace galera
             }
         }
 
-        void set_seqno(const wsrep_seqno_t& seqno, int dep_window)
+        void set_seqno(const wsrep_seqno_t& seqno, int pa_range)
         {
             assert (seqno > 0);
-            assert (dep_window >= 0);
-            header_.set_seqno (seqno, dep_window);
+            assert (pa_range >= 0);
+            header_.set_seqno (seqno, pa_range);
         }
 
         /* can return pointer to internal storage: out can be used only

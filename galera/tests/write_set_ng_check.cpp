@@ -70,8 +70,8 @@ START_TEST (ver3_basic)
 
     gu::Buf const in_buf = { in.data(), static_cast<ssize_t>(in.size()) };
 
-//    try
-//    {
+    /* read ws buffer and "certify" */
+    {
         mark_point();
         WriteSetIn wsi(in_buf);
 
@@ -97,6 +97,27 @@ START_TEST (ver3_basic)
 
         wsi.set_seqno (seqno, pa_range);
         fail_unless(wsi.certified());
+    }
+    /* repeat reading buffer after "certification" */
+    {
+        WriteSetIn wsi(in_buf);
+        fail_unless(wsi.certified());
+        fail_if (wsi.seqno() != seqno);
+        fail_if (wsi.flags() != flags);
+        fail_if (0 == wsi.timestamp());
+
+        mark_point();
+        const KeySetIn& ksi(wsi.keyset());
+        fail_if (ksi.count() != 1);
+
+        mark_point();
+        for (int i(0); i < ksi.count(); ++i)
+        {
+            KeySet::KeyPart kp(ksi.next());
+        }
+
+        mark_point();
+        wsi.verify_checksum();
 
         mark_point();
         const DataSetIn& dsi(wsi.dataset());
@@ -118,11 +139,7 @@ START_TEST (ver3_basic)
         const DataSetIn& usi(wsi.unrdset());
         fail_if (usi.count() != 0);
         fail_if (usi.size()  != 0);
-//    }
-//    catch (std::exception& e)
-//    {
-//        fail("%s", e.what());
-//    }
+    }
 
     mark_point();
 
@@ -132,7 +149,7 @@ START_TEST (ver3_basic)
         mark_point();
         wsi.verify_checksum();
         fail_unless(wsi.certified());
-        fail_if (wsi.dep_window() != pa_range);
+        fail_if (wsi.pa_range()   != pa_range);
         fail_if (wsi.seqno()      != seqno);
         fail_if (memcmp(&wsi.source_id(), &source, sizeof(source)));
         fail_if (wsi.conn_id()    != conn);
@@ -172,7 +189,7 @@ START_TEST (ver3_basic)
         wsi.read_buf(tmp_buf); // next  - initialize from buffer
         wsi.verify_checksum();
         fail_unless(wsi.certified());
-        fail_if (wsi.dep_window()      != pa_range);
+        fail_if (wsi.pa_range()        != pa_range);
         fail_if (wsi.seqno()           != seqno);
         fail_if (wsi.keyset().count()  != 0);
         fail_if (wsi.dataset().count() == 0);

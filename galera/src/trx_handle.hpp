@@ -24,14 +24,7 @@
 
 namespace galera
 {
-
-//    class KeyEntry; // Forward declaration
-
     static std::string const working_dir = "/tmp";
-
-    // this is an overall replicator-level protocol version which employs new
-    // writeset format. See replicator_smm.hpp. Note that writeset version is 3.
-//    static int const NEW_WRITE_SET_PROTO_VER = 5;
 
     static int const WS_NG_VERSION = WriteSetNG::VER3;
     /* new WS version to be used */

@@ -13,6 +13,33 @@
 #include <cstdlib>
 #include <check.h>
 
+namespace
+{
+    class TestEnv
+    {
+    public:
+
+        TestEnv() :
+            conf_   (),
+            gcache_ (conf_, "."),
+            gcs_    (conf_, gcache_),
+            thd_    (gcs_,  gcache_)
+        {}
+
+        ~TestEnv() {}
+
+        gu::Config&         conf() { return conf_; }
+        galera::ServiceThd& thd()  { return thd_;  }
+
+    private:
+
+        gu::Config         conf_;
+        gcache::GCache     gcache_;
+        galera::DummyGcs   gcs_;
+        galera::ServiceThd thd_;
+    };
+}
+
 using namespace std;
 using namespace galera;
 
@@ -120,6 +147,7 @@ START_TEST(test_key2)
 }
 END_TEST
 
+
 START_TEST(test_write_set1)
 {
     WriteSet ws(1);
@@ -184,7 +212,6 @@ START_TEST(test_write_set1)
 
 }
 END_TEST
-
 
 
 START_TEST(test_write_set2)
@@ -253,7 +280,6 @@ START_TEST(test_write_set2)
 END_TEST
 
 
-
 START_TEST(test_mapped_buffer)
 {
     string wd("/tmp");
@@ -291,29 +317,6 @@ START_TEST(test_mapped_buffer)
 }
 END_TEST
 
-class TestEnv
-{
-public:
-
-    TestEnv() :
-        conf_   (),
-        gcache_ (conf_, "."),
-        gcs_    (conf_, gcache_),
-        thd_    (gcs_,  gcache_)
-    {}
-
-    ~TestEnv() {}
-
-    gu::Config& conf() { return conf_; }
-    ServiceThd& thd()  { return thd_;  }
-
-private:
-
-    gu::Config     conf_;
-    gcache::GCache gcache_;
-    DummyGcs       gcs_;
-    ServiceThd     thd_;
-};
 
 START_TEST(test_cert_hierarchical_v1)
 {
@@ -601,6 +604,7 @@ START_TEST(test_trac_726)
     }
 }
 END_TEST
+
 
 Suite* write_set_suite()
 {

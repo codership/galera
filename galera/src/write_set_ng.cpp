@@ -24,7 +24,7 @@ WriteSetNG::Header::Offsets::Offsets (
     dataset_ver_ (a03),
     unrdset_ver_ (a04),
     flags_       (a05),
-    dep_window_  (a06),
+    pa_range_    (a06),
     last_seen_   (a07),
     seqno_       (a08),
     timestamp_   (a09),
@@ -42,7 +42,7 @@ WriteSetNG::Header::V3 (
     V3_DATASET_VER,
     V3_UNRDSET_VER,
     V3_FLAGS,
-    V3_DEP_WINDOW,
+    V3_PA_RANGE,
     V3_LAST_SEEN,
     V3_SEQNO,
     V3_TIMESTAMP,
@@ -79,10 +79,10 @@ WriteSetNG::Header::gather (Version const          ver,
     local_[V3_KEYSET_VER] = (kver << 4) | (dver << 2) | (uver);
 
     uint16_t* const fl(reinterpret_cast<uint16_t*>(local_ + V3_FLAGS));
-    uint32_t* const dw(reinterpret_cast<uint32_t*>(local_ + V3_DEP_WINDOW));
+    uint32_t* const pa(reinterpret_cast<uint32_t*>(local_ + V3_PA_RANGE));
 
     *fl = gu::htog<uint16_t>(flags);
-    *dw = 0; // certified ws will have dep. window of at least 1
+    *pa = 0; // certified ws will have dep. window of at least 1
 
     wsrep_uuid_t* const sc(reinterpret_cast<wsrep_uuid_t*>(local_ +
                                                            V3_SOURCE_ID));
@@ -119,18 +119,18 @@ WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
 
 
 void
-WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int dep_window)
+WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
     assert (seqno > 0);
-    assert (dep_window > 0);
+    assert (pa_range > 0);
 
     /* only VER3 sypported so far */
-    uint32_t* const dw(reinterpret_cast<uint32_t*>(ptr_ + V3_DEP_WINDOW));
+    uint32_t* const pa(reinterpret_cast<uint32_t*>(ptr_ + V3_PA_RANGE));
     uint64_t* const sq(reinterpret_cast<uint64_t*>(ptr_ + V3_SEQNO));
 
-    *dw = gu::htog<uint32_t>(dep_window);
+    *pa = gu::htog<uint32_t>(pa_range);
     *sq = gu::htog<uint64_t>(seqno);
 
     update_checksum (ptr_, V3_CRC);

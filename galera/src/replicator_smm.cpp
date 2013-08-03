@@ -1632,8 +1632,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         /*! @todo: benchmark both variants on SMP */
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
-                              trx->depends_seqno(),
-                              trx->is_local() && !trx->new_version());  // frees local actions
+                              trx->depends_seqno());
 
         local_monitor_.leave(lo);
     }
@@ -1671,10 +1670,8 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
         }
         retval = WSREP_TRX_FAIL;
 
-        gcache_.seqno_assign (trx->action(),
-                              trx->global_seqno(),
-                              -1,
-                              trx->is_local() && !trx->new_version());
+        gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
+
         break;
     }
     return retval;

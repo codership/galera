@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #include "../src/galera_service_thd.hpp"
@@ -9,29 +9,30 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-using namespace galera;
-
-class TestEnv
+namespace
 {
-public:
+    class TestEnv
+    {
+    public:
 
-    TestEnv() :
-        conf_   (),
-        gcache_ (conf_, "."),
-        gcs_    (conf_, gcache_)
-    {}
+        TestEnv() :
+            conf_   (),
+            gcache_ (conf_, "."),
+            gcs_    (conf_, gcache_)
+        {}
 
-    ~TestEnv() {}
+        gcache::GCache&   gcache()  { return gcache_; }
+        galera::DummyGcs& gcs()     { return gcs_;    }
 
-    gcache::GCache& gcache()  { return gcache_; }
-    DummyGcs&           gcs()     { return gcs_;    }
+    private:
 
-private:
+        gu::Config       conf_;
+        gcache::GCache   gcache_;
+        galera::DummyGcs gcs_;
+    };
+}
 
-    gu::Config     conf_;
-    gcache::GCache gcache_;
-    DummyGcs       gcs_;
-};
+using namespace galera;
 
 START_TEST(service_thd1)
 {
