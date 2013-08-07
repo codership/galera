@@ -286,14 +286,14 @@ gu::net::MReq::MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr)
         gu_throw_fatal << "could not allocate memory";
     }
     memset(mreq_, 0, mreq_len_);
-    
+
     switch (mcast_addr.get_family())
     {
     case AF_INET:
     {
         struct ip_mreq* mr(reinterpret_cast<struct ip_mreq*>(mreq_));
         mr->imr_multiaddr.s_addr = *reinterpret_cast<const in_addr_t*>(mcast_addr.get_addr());
-        
+
         mr->imr_interface.s_addr = *reinterpret_cast<const in_addr_t*>(if_addr.get_addr());
         ipproto_             = IPPROTO_IP;
         add_membership_opt_  = IP_ADD_MEMBERSHIP;
@@ -436,7 +436,6 @@ std::string gu::net::Addrinfo::to_string() const
     ret.reserve(0); // free unused space if possible
     return ret;
 }
-
 
 
 

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_KEY_HPP
@@ -11,6 +11,7 @@
 #include "gu_serialize.hpp"
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 #include "gu_vlq.hpp"
 
 #include <deque>
@@ -31,10 +32,10 @@ namespace galera
     }
 
 
-    class KeyPart
+    class KeyPartOS
     {
     public:
-        KeyPart(const gu::byte_t* buf, size_t buf_size)
+        KeyPartOS(const gu::byte_t* buf, size_t buf_size)
             :
             buf_(buf),
             buf_size_(buf_size)
@@ -60,7 +61,7 @@ namespace galera
             return buf_ + gu::uleb128_decode(buf_, buf_size_, 0, not_used);
         }
 #endif
-        bool operator==(const KeyPart& other) const
+        bool operator==(const KeyPartOS& other) const
         {
             return (other.buf_size_ == buf_size_ &&
                     memcmp(other.buf_, buf_, buf_size_) == 0);
@@ -71,7 +72,7 @@ namespace galera
     };
 
 
-    inline std::ostream& operator<<(std::ostream& os, const KeyPart& kp)
+    inline std::ostream& operator<<(std::ostream& os, const KeyPartOS& kp)
     {
         const std::ostream::fmtflags prev_flags(os.flags(std::ostream::hex));
         const char                   prev_fill(os.fill('0'));
@@ -88,7 +89,7 @@ namespace galera
     }
 
 
-    class Key
+    class KeyOS
     {
     public:
         enum
@@ -96,9 +97,9 @@ namespace galera
             F_SHARED = 0x1
         };
 
-        Key(int version) : version_(version), flags_(), keys_() { }
+        KeyOS(int version) : version_(version), flags_(), keys_() { }
 
-        Key(int version, const wsrep_buf_t* keys, size_t keys_len,
+        KeyOS(int version, const wsrep_buf_t* keys, size_t keys_len,
             uint8_t flags)
             :
             version_(version),
@@ -141,7 +142,7 @@ namespace galera
         }
 
         template <class Ci>
-        Key(int version, Ci begin, Ci end, uint8_t flags)
+        KeyOS(int version, Ci begin, Ci end, uint8_t flags)
             : version_(version), flags_(flags), keys_()
         {
 
@@ -178,7 +179,7 @@ namespace galera
                         << " bytes: " << i + key_len << '/' << keys_size;
                 }
 
-                KeyPart kp(&keys_[i], key_len);
+                KeyPartOS kp(&keys_[i], key_len);
                 ret.push_back(kp);
                 i += key_len;
             }
@@ -189,12 +190,12 @@ namespace galera
 
         uint8_t flags() const { return flags_; }
 
-        bool operator==(const Key& other) const
+        bool operator==(const KeyOS& other) const
         {
             return (keys_ == other.keys_);
         }
 
-        bool equal_all(const Key& other) const
+        bool equal_all(const KeyOS& other) const
         {
             return (version_ == other.version_ &&
                     flags_   == other.flags_   &&
@@ -216,17 +217,18 @@ namespace galera
             return hash() ^ gu_table_hash(&flags_, sizeof(flags_));
         }
 
+        size_t serialize(gu::byte_t*, size_t, size_t) const;
+        size_t unserialize(const gu::byte_t*, size_t, size_t);
+        size_t serial_size() const;
+
     private:
-        friend size_t serialize(const Key&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Key&);
-        friend size_t serial_size(const Key&);
-        friend std::ostream& operator<<(std::ostream& os, const Key& key);
+        friend std::ostream& operator<<(std::ostream& os, const KeyOS& key);
         int        version_;
         uint8_t    flags_;
         gu::Buffer keys_;
     };
 
-    inline std::ostream& operator<<(std::ostream& os, const Key& key)
+    inline std::ostream& operator<<(std::ostream& os, const KeyOS& key)
     {
         std::ostream::fmtflags flags(os.flags());
         switch (key.version_)
@@ -236,9 +238,9 @@ namespace galera
             // Fall through
         case 1:
         {
-            std::deque<KeyPart> dq(key.key_parts<std::deque<KeyPart> >());
+            std::deque<KeyPartOS> dq(key.key_parts<std::deque<KeyPartOS> >());
             std::copy(dq.begin(), dq.end(),
-                      std::ostream_iterator<KeyPart>(os, " "));
+                      std::ostream_iterator<KeyPartOS>(os, " "));
             break;
         }
         default:
@@ -249,81 +251,82 @@ namespace galera
     }
 
 
-    inline size_t serialize(const Key& key, gu::byte_t* buf, size_t buflen,
-                            size_t offset)
+    inline size_t
+    KeyOS::serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
-        switch (key.version_)
+        switch (version_)
         {
 #ifndef GALERA_KEY_VLQ
         case 1:
-            return gu::serialize2(key.keys_, buf, buflen, offset);
+            return gu::serialize2(keys_, buf, buflen, offset);
         case 2:
-            offset = gu::serialize1(key.flags_, buf, buflen, offset);
-            return gu::serialize2(key.keys_, buf, buflen, offset);
+            offset = gu::serialize1(flags_, buf, buflen, offset);
+            return gu::serialize2(keys_, buf, buflen, offset);
 #else
         case 1:
         {
-            size_t keys_size(key.keys_.size());
+            size_t keys_size(keys_.size());
             offset = gu::uleb128_encode(keys_size, buf, buflen, offset);
             assert (offset + key_size <= buflen);
-            std::copy(&key.keys_[0], &key.keys_[0] + keys_size, buf + offset);
+            std::copy(&keys_[0], &keys_[0] + keys_size, buf + offset);
             return (offset + keys_size);
         }
 #endif
         default:
             log_fatal << "Internal error: unsupported key version: "
-                      << key.version_;
+                      << version_;
             abort();
             return 0;
         }
     }
 
-    inline size_t unserialize(const gu::byte_t* buf, size_t buflen,
-                              size_t offset, Key& key)
+    inline size_t
+    KeyOS::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
-        switch (key.version_)
+        switch (version_)
         {
 #ifndef GALERA_KEY_VLQ
         case 1:
-            return gu::unserialize2(buf, buflen, offset, key.keys_);
+            return gu::unserialize2(buf, buflen, offset, keys_);
         case 2:
-            offset = gu::unserialize1(buf, buflen, offset, key.flags_);
-            return gu::unserialize2(buf, buflen, offset, key.keys_);
+            offset = gu::unserialize1(buf, buflen, offset, flags_);
+            return gu::unserialize2(buf, buflen, offset, keys_);
 #else
         case 1:
         {
             size_t len;
             offset = gu::uleb128_decode(buf, buflen, offset, len);
-            key.keys_.resize(len);
-            std::copy(buf + offset, buf + offset + len, key.keys_.begin());
+            keys_.resize(len);
+            std::copy(buf + offset, buf + offset + len, keys_.begin());
             return (offset + len);
         }
 #endif
         default:
             gu_throw_error(EPROTONOSUPPORT) << "unsupported key version: "
-                                            << key.version_;
+                                            << version_;
         }
     }
 
-    inline size_t serial_size(const Key& key)
+    inline size_t
+    KeyOS::serial_size() const
     {
-        switch (key.version_)
+        switch (version_)
         {
 #ifndef GALERA_KEY_VLQ
         case 1:
-            return gu::serial_size2(key.keys_);
+            return gu::serial_size2(keys_);
         case 2:
-            return (gu::serial_size(key.flags_) + gu::serial_size2(key.keys_));
+            return (gu::serial_size(flags_) + gu::serial_size2(keys_));
 #else
         case 1:
         {
-            size_t size(gu::uleb128_size(key.keys_.size()));
-            return (size + key.keys_.size());
+            size_t size(gu::uleb128_size(keys_.size()));
+            return (size + keys_.size());
         }
 #endif
         default:
             log_fatal << "Internal error: unsupported key version: "
-                      << key.version_;
+                      << version_;
             abort();
             return 0;
         }

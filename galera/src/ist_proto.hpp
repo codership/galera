@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
@@ -47,6 +47,7 @@ namespace galera
                 T_CTRL = 3,
                 T_TRX = 4
             } Type;
+
             Message(int       version = -1,
                     Type      type    = T_NONE,
                     uint8_t   flags   = 0,
@@ -59,18 +60,113 @@ namespace galera
                 ctrl_   (ctrl   ),
                 len_    (len    )
             { }
-            int  version()  const { return version_; }
-            Type    type()  const { return type_   ; }
-            uint8_t flags() const { return flags_  ; }
-            int8_t  ctrl()  const { return ctrl_   ; }
-            uint64_t len()  const { return len_    ; }
+
+            int      version() const { return version_; }
+            Type     type()    const { return type_   ; }
+            uint8_t  flags()   const { return flags_  ; }
+            int8_t   ctrl()    const { return ctrl_   ; }
+            uint64_t len()     const { return len_    ; }
+
+            size_t serial_size() const
+            {
+                if (version_ > 3)
+                {
+                    // header: version 1 byte, type 1 byte, flags 1 byte,
+                    //         ctrl field 1 byte
+                    return 4 + sizeof(len_);
+                }
+                else
+                {
+                    return sizeof(*this);
+                }
+            }
+
+            size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
+            {
+#ifndef NDEBUG
+                size_t orig_offset(offset);
+#endif // NDEBUG
+                if (version_ > 3)
+                {
+                    offset = gu::serialize1(uint8_t(version_),
+                                            buf, buflen, offset);
+                    offset = gu::serialize1(uint8_t(type_),
+                                            buf, buflen, offset);
+                    offset = gu::serialize1(flags_, buf, buflen, offset);
+                    offset = gu::serialize1(ctrl_,  buf, buflen, offset);
+                    offset = gu::serialize8(len_,   buf, buflen, offset);
+                }
+                else
+                {
+                    if (buflen < offset + sizeof(*this))
+                    {
+                        gu_throw_error(EMSGSIZE) << "buffer too short";
+                    }
+
+                    *reinterpret_cast<Message*>(buf + offset) = *this;
+                    offset += sizeof(*this);
+                }
+
+                assert((version_ > 3 && offset - orig_offset == 12) ||
+                       (offset - orig_offset == sizeof(*this)));
+
+                return offset;
+            }
+
+            size_t unserialize(const gu::byte_t* buf, size_t buflen,
+                               size_t offset)
+            {
+                assert(version_ >= 0);
+#ifndef NDEBUG
+                size_t orig_offset(offset);
+#endif // NDEBUG
+                uint8_t u8;
+                if (version_ > 3)
+                {
+                    offset = gu::unserialize1(buf, buflen, offset, u8);
+                }
+                else
+                {
+                    u8 = *reinterpret_cast<const int*>(buf + offset);
+                }
+
+                if (u8 != version_)
+                {
+                    gu_throw_error(EPROTO) << "invalid protocol version "
+                                           << int(u8)
+                                           << ", expected " << version_;
+                }
+
+                if (u8 > 3)
+                {
+                    version_ = u8;
+                    offset = gu::unserialize1(buf, buflen, offset, u8);
+                    type_  = static_cast<Message::Type>(u8);
+                    offset = gu::unserialize1(buf, buflen, offset, flags_);
+                    offset = gu::unserialize1(buf, buflen, offset, ctrl_);
+                    offset = gu::unserialize8(buf, buflen, offset, len_);
+                }
+                else
+                {
+                    if (buflen < offset + sizeof(*this))
+                    {
+                        gu_throw_error(EMSGSIZE)
+                            <<" buffer too short for version " << version_
+                            << ": " << buflen << " " << offset << " "
+                            << sizeof(*this);
+                    }
+
+                    *this = *reinterpret_cast<const Message*>(buf + offset);
+                    offset += sizeof(*this);
+                }
+
+                assert((version_ > 3 && offset - orig_offset == 12) ||
+                       (offset - orig_offset == sizeof(*this)));
+
+                return offset;
+            }
 
         private:
-            friend size_t serial_size(const Message&);
-            friend size_t serialize(const Message&, gu::byte_t*,
-                                    size_t, size_t);
-            friend size_t unserialize(const gu::byte_t*, size_t, size_t,
-                                      Message&);
 
             int      version_; // unfortunately for compatibility with older
                                // versions we must leave it as int (4 bytes)
@@ -88,6 +184,7 @@ namespace galera
                 Message(version, Message::T_HANDSHAKE, 0, 0, 0)
             { }
         };
+
         class HandshakeResponse : public Message
         {
         public:
@@ -96,6 +193,7 @@ namespace galera
                 Message(version, Message::T_HANDSHAKE_RESPONSE, 0, 0, 0)
             { }
         };
+
         class Ctrl : public Message
         {
         public:
@@ -110,6 +208,7 @@ namespace galera
                 Message(version, Message::T_CTRL, 0, code, 0)
             { }
         };
+
         class Trx : public Message
         {
         public:
@@ -119,106 +218,6 @@ namespace galera
             { }
         };
 
-
-        inline size_t serial_size(const Message& msg)
-        {
-            if (msg.version_ > 3)
-            {
-                // header: version 1 byte, type 1 byte, flags 1 byte,
-                //         ctrl field 1 byte
-                return 4 + sizeof(msg.len_);
-            }
-            else
-            {
-                return sizeof(msg);
-            }
-        }
-
-        inline size_t serialize(const Message& msg,
-                                gu::byte_t* buf,
-                                size_t buflen, size_t offset)
-        {
-#ifndef NDEBUG
-            size_t orig_offset(offset);
-#endif // NDEBUG
-            if (msg.version_ > 3)
-            {
-                offset = gu::serialize1(uint8_t(msg.version_),
-                                        buf, buflen, offset);
-                offset = gu::serialize1(uint8_t(msg.type_),
-                                        buf, buflen, offset);
-                offset = gu::serialize1(msg.flags_, buf, buflen, offset);
-                offset = gu::serialize1(msg.ctrl_, buf, buflen, offset);
-                offset = gu::serialize8(msg.len(), buf, buflen, offset);
-            }
-            else
-            {
-                if (buflen < offset + sizeof(msg))
-                {
-                    gu_throw_error(EMSGSIZE) << "buffer too short";
-                }
-                *reinterpret_cast<Message*>(buf + offset) = msg;
-                offset += sizeof(msg);
-            }
-            assert((msg.version_ > 3 && offset - orig_offset == 12) ||
-                   (offset - orig_offset == sizeof(msg)));
-
-            return offset;
-        }
-
-        inline size_t unserialize(const gu::byte_t* buf,
-                                  size_t buflen,
-                                  size_t offset,
-                                  Message& msg)
-        {
-            assert(msg.version_ >= 0);
-#ifndef NDEBUG
-            size_t orig_offset(offset);
-#endif // NDEBUG
-            uint8_t u8;
-            if (msg.version_ > 3)
-            {
-                offset = gu::unserialize1(buf, buflen, offset, u8);
-            }
-            else
-            {
-                u8 = *reinterpret_cast<const int*>(buf + offset);
-            }
-
-            if (u8 != msg.version_)
-            {
-                gu_throw_error(EPROTO) << "invalid protocol version "
-                                       << int(u8)
-                                       << ", expected " << msg.version_;
-            }
-
-            if (u8 > 3)
-            {
-                msg.version_ = u8;
-                offset = gu::unserialize1(buf, buflen, offset, u8);
-                msg.type_ = static_cast<Message::Type>(u8);
-                offset = gu::unserialize1(buf, buflen, offset, msg.flags_);
-                offset = gu::unserialize1(buf, buflen, offset, msg.ctrl_);
-                offset = gu::unserialize8(buf, buflen, offset, msg.len_);
-            }
-            else
-            {
-                if (buflen < offset + sizeof(msg))
-                {
-                    gu_throw_error(EMSGSIZE) << "buffer too short for version "
-                                             << msg.version_ << ": "
-                                             << buflen << " " << offset
-                                             << " " << sizeof(msg);
-                }
-                msg = *reinterpret_cast<const Message*>(buf + offset);
-                offset += sizeof(msg);
-            }
-
-            assert((msg.version_ > 3 && offset - orig_offset == 12) ||
-                   (offset - orig_offset == sizeof(msg)));
-
-            return offset;
-        }
 
         class Proto
         {
@@ -249,9 +248,9 @@ namespace galera
             template <class ST>
             void send_handshake(ST& socket)
             {
-                Handshake hs(version_);
-                gu::Buffer buf(serial_size(hs));
-                size_t offset(serialize(hs, &buf[0], buf.size(), 0));
+                Handshake  hs(version_);
+                gu::Buffer buf(hs.serial_size());
+                size_t offset(hs.serialize(&buf[0], buf.size(), 0));
                 size_t n(asio::write(socket, asio::buffer(&buf[0],
                                                           buf.size())));
                 if (n != offset)
@@ -263,16 +262,20 @@ namespace galera
             template <class ST>
             void recv_handshake(ST& socket)
             {
-                Message msg(version_);
-                gu::Buffer buf(serial_size(msg));
+                Message    msg(version_);
+                gu::Buffer buf(msg.serial_size());
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
+
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                (void)unserialize(&buf[0], buf.size(), 0, msg);
+
+                (void)msg.unserialize(&buf[0], buf.size(), 0);
+
                 log_debug << "handshake msg: " << msg.version() << " "
                           << msg.type() << " " << msg.len();
+
                 switch (msg.type())
                 {
                 case Message::T_HANDSHAKE:
@@ -305,8 +308,8 @@ namespace galera
             void send_handshake_response(ST& socket)
             {
                 HandshakeResponse hsr(version_);
-                gu::Buffer buf(serial_size(hsr));
-                size_t offset(serialize(hsr, &buf[0], buf.size(), 0));
+                gu::Buffer buf(hsr.serial_size());
+                size_t offset(hsr.serialize(&buf[0], buf.size(), 0));
                 size_t n(asio::write(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != offset)
                 {
@@ -318,15 +321,16 @@ namespace galera
             template <class ST>
             void recv_handshake_response(ST& socket)
             {
-                Message msg(version_);
-                gu::Buffer buf(serial_size(msg));
+                Message    msg(version_);
+                gu::Buffer buf(msg.serial_size());
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
+
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
 
-                (void)unserialize(&buf[0], buf.size(), 0, msg);
+                (void)msg.unserialize(&buf[0], buf.size(), 0);
 
                 log_debug << "handshake response msg: " << msg.version()
                           << " " << msg.type()
@@ -354,9 +358,9 @@ namespace galera
             template <class ST>
             void send_ctrl(ST& socket, int8_t code)
             {
-                Ctrl ctrl(version_, code);
-                gu::Buffer buf(serial_size(ctrl));
-                size_t offset(serialize(ctrl, &buf[0], buf.size(), 0));
+                Ctrl       ctrl(version_, code);
+                gu::Buffer buf(ctrl.serial_size());
+                size_t offset(ctrl.serialize(&buf[0], buf.size(), 0));
                 size_t n(asio::write(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != offset)
                 {
@@ -367,16 +371,20 @@ namespace galera
             template <class ST>
             int8_t recv_ctrl(ST& socket)
             {
-                Message msg(version_);
-                gu::Buffer buf(serial_size(msg));
+                Message    msg(version_);
+                gu::Buffer buf(msg.serial_size());
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
+
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                (void)unserialize(&buf[0], buf.size(), 0, msg);
+
+                (void)msg.unserialize(&buf[0], buf.size(), 0);
+
                 log_debug << "msg: " << msg.version() << " " << msg.type()
                           << " " << msg.len();
+
                 switch (msg.type())
                 {
                 case Message::T_CTRL:
@@ -393,94 +401,65 @@ namespace galera
             void send_trx(ST&                           socket,
                           const gcache::GCache::Buffer& buffer)
             {
-                const size_t trx_meta_size(
-                    8   // serial_size(buffer.seqno_g())
-                    + 8 // serial_size(buffer.seqno_d())
-                    );
                 const bool rolled_back(buffer.seqno_d() == -1);
 
-                size_t n;
-                if (rolled_back == true)
+                galera::WriteSetIn ws;
+                boost::array<asio::const_buffer, 3> cbs;
+                size_t      payload_size; /* size of the 2nd cbs buffer */
+                size_t      sent;
+
+                if (gu_unlikely(rolled_back))
                 {
-                    Trx trx_msg(version_, trx_meta_size);
-                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
-                    size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
-                    offset = gu::serialize8(buffer.seqno_g(),
-                                                     &buf[0], buf.size(), offset);
-                    offset = gu::serialize8(buffer.seqno_d(),
-                                                     &buf[0], buf.size(), offset);
-                    n = asio::write(socket, asio::buffer(&buf[0], buf.size()));
-                }
-                else if (keep_keys_ == true)
-                {
-                    Trx trx_msg(version_, trx_meta_size + buffer.size());
-                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
-                    size_t offset(serialize(trx_msg, &buf[0], buf.size(), 0));
-                    offset = gu::serialize8(buffer.seqno_g(),
-                                            &buf[0], buf.size(), offset);
-                    offset = gu::serialize8(buffer.seqno_d(),
-                                            &buf[0], buf.size(), offset);
-                    boost::array<asio::const_buffer, 2> cbs;
-                    cbs[0] = asio::const_buffer(&buf[0], buf.size());
-                    cbs[1] = asio::const_buffer(buffer.ptr(), buffer.size());
-                    n = asio::write(socket, cbs);
+                    payload_size = 0;
                 }
                 else
                 {
-                    class AutoRelease
+                    if (keep_keys_ || version_ < WS_NG_VERSION)
                     {
-                    public:
-                        AutoRelease(TrxHandle* trx) : trx_(trx) { }
-                        ~AutoRelease() { trx_->unref(); }
-                        TrxHandle* trx() { return trx_; }
-                    private:
-                        AutoRelease(const AutoRelease&);
-                        void operator=(const AutoRelease&);
-                        TrxHandle* trx_;
-                    };
-                    // reconstruct trx without keys
-                    AutoRelease ar(new TrxHandle);
-                    galera::TrxHandle* trx(ar.trx());
-                    const gu::byte_t* const ptr(
-                        reinterpret_cast<const gu::byte_t*>(buffer.ptr()));
-                    size_t offset(unserialize(ptr,buffer.size(), 0, *trx));
-                    while (offset < static_cast<size_t>(buffer.size()))
-                    {
-                        // skip over keys
-                        uint32_t len;
-                        offset = gu::unserialize4(
-                            ptr, buffer.size(), offset, len);
-                        offset += len;
-                        offset = gu::unserialize4(
-                            ptr, buffer.size(), offset, len);
-                        if (offset + len > static_cast<size_t>(buffer.size()))
-                        {
-                            gu_throw_error(ERANGE)
-                                << (offset + len) << " > " << buffer.size();
-                        }
-                        trx->append_data(ptr + offset, len);
-                        offset += len;
+                        payload_size = buffer.size();
+                        const void* const ptr(buffer.ptr());
+                        cbs[1] = asio::const_buffer(ptr, payload_size);
+                        cbs[2] = asio::const_buffer(ptr, 0);
                     }
-                    trx->flush(0);
+                    else
+                    {
+                        gu::Buf tmp = { buffer.ptr(), buffer.size() };
+                        ws.read_buf (tmp, 0);
 
-                    Trx trx_msg(version_, trx_meta_size
-                                + trx->write_set_collection().size());
-                    gu::Buffer buf(serial_size(trx_msg) + trx_meta_size);
-                    offset = serialize(trx_msg, &buf[0], buf.size(), 0);
-                    offset = gu::serialize8(buffer.seqno_g(),
-                                                     &buf[0], buf.size(), offset);
-                    offset = gu::serialize8(buffer.seqno_d(),
-                                                     &buf[0], buf.size(), offset);
-                    boost::array<asio::const_buffer, 2> cbs;
-                    cbs[0] = asio::const_buffer(&buf[0], buf.size());
-                    cbs[1] = asio::const_buffer(
-                        &trx->write_set_collection()[0],
-                        trx->write_set_collection().size());
-                    raw_sent_ += buffer.size();
-                    real_sent_ += trx->write_set_collection().size();
-                    n = asio::write(socket, cbs);
+                        std::vector<gu::Buf> out;
+                        payload_size = ws.gather (out, false, false);
+                        assert (2 == out.size());
+                        cbs[1] = asio::const_buffer(out[0].ptr, out[0].size);
+                        cbs[2] = asio::const_buffer(out[1].ptr, out[1].size);
+                    }
                 }
-                log_debug << "sent " << n << " bytes";
+
+                size_t const trx_meta_size(
+                    8 /* serial_size(buffer.seqno_g()) */ +
+                    8 /* serial_size(buffer.seqno_d()) */
+                    );
+
+                Trx trx_msg(version_, trx_meta_size + payload_size);
+
+                gu::Buffer buf(trx_msg.serial_size() + trx_meta_size);
+                size_t  offset(trx_msg.serialize(&buf[0], buf.size(), 0));
+
+                offset = gu::serialize8(buffer.seqno_g(),
+                                        &buf[0], buf.size(), offset);
+                offset = gu::serialize8(buffer.seqno_d(),
+                                        &buf[0], buf.size(), offset);
+                cbs[0] = asio::const_buffer(&buf[0], buf.size());
+
+                if (gu_likely(payload_size))
+                {
+                    sent = asio::write(socket, cbs);
+                }
+                else
+                {
+                    sent = asio::write(socket, asio::buffer(cbs[0]));
+                }
+
+                log_debug << "sent " << sent << " bytes";
             }
 
 
@@ -488,46 +467,74 @@ namespace galera
             galera::TrxHandle*
             recv_trx(ST& socket)
             {
-                Message msg(version_);
-                gu::Buffer buf(serial_size(msg));
+                Message    msg(version_);
+                gu::Buffer buf(msg.serial_size());
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
+
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving trx header";
                 }
-                (void)unserialize(&buf[0], buf.size(), 0, msg);
+
+                (void)msg.unserialize(&buf[0], buf.size(), 0);
+
                 log_debug << "received header: " << n << " bytes, type "
                           << msg.type() << " len " << msg.len();
+
                 switch (msg.type())
                 {
                 case Message::T_TRX:
                 {
-                    buf.resize(msg.len());
+                    // TODO: ideally we want to make seqno_g and cert verdict
+                    // be a part of msg object above, so that we can skip this
+                    // read. The overhead is tiny given that vast majority of
+                    // messages will be trx writesets.
+                    wsrep_seqno_t seqno_g, seqno_d;
+
+                    buf.resize(sizeof(seqno_g) + sizeof(seqno_d));
+
                     n = asio::read(socket, asio::buffer(&buf[0], buf.size()));
                     if (n != buf.size())
                     {
-                        gu_throw_error(EPROTO) << "error reading trx data";
+                        gu_throw_error(EPROTO) << "error reading trx meta data";
                     }
-                    wsrep_seqno_t seqno_g, seqno_d;
+
+                    size_t offset(gu::unserialize8(&buf[0], buf.size(), 0,
+                                                   seqno_g));
+                    offset = gu::unserialize8(&buf[0], buf.size(), offset,
+                                              seqno_d);
+
                     galera::TrxHandle* trx(new galera::TrxHandle);
-                    size_t offset(gu::unserialize8(&buf[0], buf.size(), 0, seqno_g));
-                    offset = gu::unserialize8(&buf[0], buf.size(), offset, seqno_d);
-                    if (seqno_d == -1)
+
+                    if (seqno_d == WSREP_SEQNO_UNDEFINED)
                     {
                         if (offset != msg.len())
                         {
                             gu_throw_error(EINVAL)
-                                << "message size "
-                                << msg.len()
-                                << " does not match expected size "
-                                << offset;
+                                << "message size " << msg.len()
+                                << " does not match expected size " << offset;
                         }
                     }
                     else
                     {
-                        offset = unserialize(&buf[0], buf.size(), offset, *trx);
-                        trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+                        MappedBuffer& wbuf(trx->write_set_collection());
+                        size_t const wsize(msg.len() - offset);
+                        wbuf.resize(wsize);
+
+                        n = asio::read(socket,
+                                       asio::buffer(&wbuf[0], wbuf.size()));
+
+                        if (gu_unlikely(n != wbuf.size()))
+                        {
+                            gu_throw_error(EPROTO)
+                                << "error reading write set data";
+                        }
+
+                        trx->unserialize(&wbuf[0], wbuf.size(), 0);
+// trx->unserialize should do the job                        trx->append_write_set(&buf[0]    + offset,
+//                                              buf.size() - offset);
                     }
+
                     trx->set_received(0, -1, seqno_g);
                     trx->set_depends_seqno(seqno_d);
                     trx->mark_certified();
@@ -548,14 +555,15 @@ namespace galera
                         }
                         else
                         {
-                            gu_throw_error(-msg.ctrl()) << "peer reported error";
+                            gu_throw_error(-msg.ctrl()) <<"peer reported error";
                         }
                     }
                 default:
                     gu_throw_error(EPROTO) << "unexpected message type: "
                                            << msg.type();
                 }
-                gu_throw_fatal;
+
+                gu_throw_fatal; throw;
             }
 
         private:

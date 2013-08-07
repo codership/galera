@@ -24,12 +24,14 @@ public:
         :
         act_(act),
         gcache_(gcache)
-    { }
+    {}
+
     ~Release()
     {
         switch (act_.type)
         {
         case GCS_ACT_TORDERED:
+            break;
         case GCS_ACT_STATE_REQ:
             gcache_.free(act_.buf);
             break;
@@ -38,6 +40,7 @@ public:
             break;
         }
     }
+
 private:
     struct gcs_action& act_;
     gcache::GCache&    gcache_;
@@ -61,25 +64,28 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
         return galera::Replicator::S_SYNCED;
     case GCS_NODE_STATE_DONOR:
         return galera::Replicator::S_DONOR;
-    default:
-        gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    case GCS_NODE_STATE_MAX:;
     }
+
+    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    GU_DEBUG_NORETURN;
 }
 
 
 galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
     :
-    trx_(new TrxHandle())
+    trx_(new TrxHandle()) // TODO: this dynamic allocation should be unnecessary
 {
     assert(act.seqno_l != GCS_SEQNO_ILL);
     assert(act.seqno_g != GCS_SEQNO_ILL);
 
     const gu::byte_t* const buf = reinterpret_cast<const gu::byte_t*>(act.buf);
 
-    size_t offset(unserialize(buf, act.size, 0, *trx_));
+//    size_t offset(trx_->unserialize(buf, act.size, 0));
+    gu_trace(trx_->unserialize(buf, act.size, 0));
 
-    // trx_->append_write_set(buf + offset, act.size - offset);
-    trx_->set_write_set_buffer(buf + offset, act.size - offset);
+    //trx_->append_write_set(buf + offset, act.size - offset);
+    // moved to unserialize trx_->set_write_set_buffer(buf + offset, act.size - offset);
     trx_->set_received(act.buf, act.seqno_l, act.seqno_g);
     trx_->lock();
 }

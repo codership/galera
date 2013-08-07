@@ -83,5 +83,5 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 #error "No protonet backends defined"
 #endif /* HAVE_ASIO_HPP */
     gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
-                   << "' not supported";
+                   << "' not supported"; throw;
 }

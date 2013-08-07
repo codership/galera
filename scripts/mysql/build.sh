@@ -45,7 +45,7 @@ fi
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
 BOOTSTRAP=no
 DEBUG=no
-DEBUG_LEVEL=1
+DEBUG_LEVEL=0
 GALERA_DEBUG=no
 NO_STRIP=no
 RELEASE=""

@@ -4,8 +4,6 @@ Import('env')
 gcache_env = env.Clone()
 
 gcache_sources = Split ('''
-        gcache_fd.cpp
-        gcache_mmap.cpp
         GCache_seqno.cpp
         gcache_params.cpp
         gcache_page.cpp

@@ -10,7 +10,7 @@
 #include "gu_spooky_test.h"
 
 #include "../src/gu_spooky.h"
-#include "../src/gu_print_buf.h"
+#include "../src/gu_hexdump.h"
 
 #define BUFSIZE 512
 static uint64_t const expected[BUFSIZE] = {

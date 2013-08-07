@@ -6,7 +6,8 @@
 #ifndef GALERA_WRITE_SET_HPP
 #define GALERA_WRITE_SET_HPP
 
-#include "key.hpp"
+#include "key_os.hpp"
+#include "key_data.hpp"
 
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
@@ -23,7 +24,7 @@ namespace galera
     class WriteSet
     {
     public:
-        typedef std::deque<Key> KeySequence;
+        typedef std::deque<KeyOS> KeySequence;
 
         WriteSet(int version)
             :
@@ -36,7 +37,7 @@ namespace galera
         void set_version(int version) { version_ = version; }
         const gu::Buffer& get_data() const { return data_; }
 
-        void append_key(const Key&);
+        void append_key(const KeyData&);
 
         void append_data(const void*data, size_t data_len)
         {
@@ -64,11 +65,11 @@ namespace galera
         // buffer after scan.
         static size_t keys(const gu::byte_t*, size_t, size_t, int, KeySequence&);
 
-    private:
-        friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
-        friend size_t serial_size(const WriteSet&);
+        size_t serialize(gu::byte_t*, size_t, size_t) const;
+        size_t unserialize(const gu::byte_t*, size_t, size_t);
+        size_t serial_size() const;
 
+    private:
         typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
 
         int                version_;

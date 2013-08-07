@@ -6,12 +6,17 @@
 
 #include <gu_uri.hpp>
 
-static const std::string common_prefix = "replicator.";
+int const galera::ReplicatorSMM::MAX_PROTO_VER(5);
+
+static const std::string common_prefix = "repl.";
 
 const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
 const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
     common_prefix + "causal_read_timeout";
+const std::string galera::ReplicatorSMM::Param::proto_max =
+    common_prefix + "proto_max";
+
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
 
@@ -22,6 +27,7 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
     map_.insert(Default(CERTIFICATION_PARAM_LOG_CONFLICTS_STR,
                         CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR));
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
+    map_.insert(Default(Param::proto_max, gu::to_string(MAX_PROTO_VER)));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -63,6 +69,7 @@ galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
     }
 }
 
+/* helper for param_set() below */
 void
 galera::ReplicatorSMM::set_param (const std::string& key,
                                   const std::string& value)
@@ -82,7 +89,8 @@ galera::ReplicatorSMM::set_param (const std::string& key,
         cert_.set_log_conflicts(value);
     }
     else if (key == Param::base_host ||
-             key == Param::base_port)
+             key == Param::base_port ||
+             key == Param::proto_max)
     {
         // nothing to do here, these params take effect only at
         // provider (re)start

@@ -6,6 +6,8 @@
 #define GALERA_CERTIFICATION_HPP
 
 #include "trx_handle.hpp"
+#include "key_entry_ng.hpp"
+#include "galera_service_thd.hpp"
 
 #include "gu_unordered.hpp"
 #include "gu_lock.hpp"
@@ -32,9 +34,15 @@ namespace galera
             static const std::string log_conflicts;
         };
 
-        typedef gu::UnorderedSet<KeyEntry*,
+        typedef gu::UnorderedSet<KeyEntryOS*,
                                  KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
+
+        typedef gu::UnorderedSet<KeyEntryNG*,
+                                 KeyEntryPtrHashNG, KeyEntryPtrEqualNG>
+        CertIndexNG;
+
     private:
+
         typedef std::multiset<wsrep_seqno_t>        DepsSet;
 
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
@@ -47,7 +55,7 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(gu::Config& conf);
+        Certification(gu::Config& conf, ServiceThd& thd);
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
@@ -89,7 +97,7 @@ namespace galera
         size_t index_size() const
         {
             gu::Lock lock(mutex_);
-            return cert_index_.size();
+            return cert_index_.size() + cert_index_ng_.size();
         }
 
         bool index_purge_required()
@@ -104,9 +112,11 @@ namespace galera
 
     private:
         TestResult do_test(TrxHandle*, bool);
-        TestResult do_test_v0(TrxHandle*, bool);
         TestResult do_test_v1to2(TrxHandle*, bool);
+        TestResult do_test_v3(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
+        void purge_for_trx_v1to2(TrxHandle*);
+        void purge_for_trx_v3(TrxHandle*);
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
@@ -159,7 +169,9 @@ namespace galera
         int           version_;
         TrxMap        trx_map_;
         CertIndex     cert_index_;
+        CertIndexNG   cert_index_ng_;
         DepsSet       deps_set_;
+        ServiceThd&   service_thd_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t initial_position_;

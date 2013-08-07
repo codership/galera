@@ -40,11 +40,11 @@ gcache::Page::drop_fs_cache() const
 {
     mmap_.dont_need();
 
-    int const err (posix_fadvise (fd_.get(), 0, fd_.get_size(),
+    int const err (posix_fadvise (fd_.get(), 0, fd_.size(),
                                   POSIX_FADV_DONTNEED));
     if (err != 0)
     {
-        log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.get_name()
+        log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.name()
                  << ": " << err << " (" << strerror(err) << ")";
     }
 }

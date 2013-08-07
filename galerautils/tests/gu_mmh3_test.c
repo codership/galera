@@ -6,7 +6,7 @@
 
 #include "../src/gu_mmh3.h"
 #include "../src/gu_log.h"
-#include "../src/gu_print_buf.h"
+#include "../src/gu_hexdump.h"
 
 /* This is to verify all tails plus block + all tails. Max block is 16 bytes */
 static const char const test_input[] = "0123456789ABCDEF0123456789abcde";
@@ -112,8 +112,8 @@ check (const void* const exp, const void* const got, ssize_t size)
         ssize_t str_size = size * 2.2 + 1;
         char c[str_size], r[str_size];
 
-        gu_print_buf (exp, size, c, sizeof(c), false);
-        gu_print_buf (got, size, r, sizeof(r), false);
+        gu_hexdump (exp, size, c, sizeof(c), false);
+        gu_hexdump (got, size, r, sizeof(r), false);
 
         gu_info ("expected MurmurHash3:\n%s\nfound:\n%s\n", c, r);
 

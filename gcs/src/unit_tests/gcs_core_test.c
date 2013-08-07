@@ -56,13 +56,13 @@ static gcs_backend_t* Backend = NULL;
 static gcs_seqno_t    Seqno   = 0;
 
 typedef struct action {
-    const struct gcs_buf* in;
-    void*                 out;
-    const void*           local;
-    ssize_t               size;
-    gcs_act_type_t        type;
-    gcs_seqno_t           seqno;
-    gu_thread_t           thread;
+    const struct gu_buf* in;
+    void*                out;
+    const void*          local;
+    ssize_t              size;
+    gcs_act_type_t       type;
+    gcs_seqno_t          seqno;
+    gu_thread_t          thread;
 } action_t;
 
 //static struct action_t RecvAct;
@@ -70,20 +70,20 @@ static const ssize_t FRAG_SIZE = 4; // desirable action fragment size
 
 // 1-fragment action
 static const char act1_str[] = "101";
-static const struct gcs_buf act1[1] = {
+static const struct gu_buf act1[1] = {
     { act1_str, sizeof(act1_str) }
 };
 
 // 2-fragment action, with buffers aligned with FRAG_SIZE
 static const char act2_str[] = "202122";
-static const struct gcs_buf act2[2] = {
+static const struct gu_buf act2[2] = {
     { "2021", 4 },
     { "22",   3 } /* 4 + 3 = 7 = sizeof(act2_str) */
 };
 
 // 3-fragment action, with unaligned buffers
 static const char act3_str[] = "3031323334";
-static const struct gcs_buf act3[] = {
+static const struct gu_buf act3[] = {
     { "303", 3 },
     { "13",  2 },
     { "23",  2 },
@@ -411,7 +411,7 @@ START_TEST (gcs_core_test_api)
 
     long     ret;
     long     tout = 100; // 100 ms timeout
-    const struct gcs_buf* act = act3;
+    const struct gu_buf* act = act3;
     const void* act_buf  = act3_str;
     size_t      act_size = sizeof(act3_str);
 
@@ -506,9 +506,9 @@ START_TEST (gcs_core_test_own)
 {
     long const tout = 1000; // 100 ms timeout
 
-    const struct gcs_buf* act      = act2;
-    const void*           act_buf  = act2_str;
-    size_t                act_size = sizeof(act2_str);
+    const struct gu_buf* act      = act2;
+    const void*          act_buf  = act2_str;
+    size_t               act_size = sizeof(act2_str);
 
     action_t act_s = { act, NULL, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
     action_t act_r = { act, NULL, NULL, -1, -1, -1, -1 };

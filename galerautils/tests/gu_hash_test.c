@@ -15,7 +15,7 @@
 
 #include "../src/gu_hash.h"
 #include "../src/gu_log.h"
-#include "../src/gu_print_buf.h"
+#include "../src/gu_hexdump.h"
 
 /* checks equivalence of two buffers, returns true if check fails and logs
  * buffer contents. */
@@ -27,8 +27,8 @@ check (const void* const exp, const void* const got, ssize_t size)
         ssize_t str_size = size * 2.2 + 1;
         char c[str_size], r[str_size];
 
-        gu_print_buf (exp, size, c, sizeof(c), false);
-        gu_print_buf (got, size, r, sizeof(r), false);
+        gu_hexdump (exp, size, c, sizeof(c), false);
+        gu_hexdump (got, size, r, sizeof(r), false);
 
         gu_info ("expected hash value:\n%s\nfound:\n%s\n", c, r);
 

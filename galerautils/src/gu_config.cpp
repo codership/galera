@@ -132,8 +132,8 @@ gu::Config::overflow_char(long long ret)
 {
     if (ret >= CHAR_MIN && ret <= CHAR_MAX) return ret;
 
-    gu_throw_error(ERANGE) << "Value " << ret
-                           << " too large for requested type (char).";
+    gu_throw_error(EOVERFLOW) << "Value " << ret
+                              << " too large for requested type (char).";
 }
 
 short
@@ -141,8 +141,8 @@ gu::Config::overflow_short(long long ret)
 {
     if (ret >= SHRT_MIN && ret <= SHRT_MAX) return ret;
 
-    gu_throw_error(ERANGE) << "Value " << ret
-                           << " too large for requested type (short).";
+    gu_throw_error(EOVERFLOW) << "Value " << ret
+                              << " too large for requested type (short).";
 }
 
 int
@@ -150,8 +150,8 @@ gu::Config::overflow_int(long long ret)
 {
     if (ret >= INT_MIN && ret <= INT_MAX) return ret;
 
-    gu_throw_error(ERANGE) << "Value " << ret
-                           << " too large for requested type (int).";
+    gu_throw_error(EOVERFLOW) << "Value " << ret
+                              << " too large for requested type (int).";
 }
 
 std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)

@@ -96,10 +96,10 @@ gcs_core_destroy (gcs_core_t* conn);
  *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
-gcs_core_send (gcs_core_t*           core,
-               const struct gcs_buf* act,
-               size_t                act_size,
-               gcs_act_type_t        act_type);
+gcs_core_send (gcs_core_t*          core,
+               const struct gu_buf* act,
+               size_t               act_size,
+               gcs_act_type_t       act_type);
 
 /*
  * gcs_core_recv() blocks until some action is received from group.

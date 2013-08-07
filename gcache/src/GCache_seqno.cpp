@@ -1,14 +1,17 @@
 /*
- * Copyright (C) 2009-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  */
+
+#include "SeqnoNone.hpp"
+#include "gcache_bh.hpp"
+#include "GCache.hpp"
+
+#include <galerautils.hpp>
 
 #include <cerrno>
 #include <cassert>
 
-#include <galerautils.hpp>
-#include "SeqnoNone.hpp"
-#include "gcache_bh.hpp"
-#include "GCache.hpp"
+#include <sched.h>
 
 namespace gcache
 {
@@ -16,40 +19,21 @@ namespace gcache
      * Reinitialize seqno sequence (after SST or such)
      * Clears seqno->ptr map // and sets seqno_min to seqno.
      */
-#if OLD
-    void
-    GCache::seqno_reset (/*int64_t seqno*/)
-    {
-        gu::Lock lock(mtx);
-
-        if (!seqno2ptr.empty())
-        {
-            int64_t old_min = seqno2ptr.begin()->first;
-            int64_t old_max = seqno2ptr.rbegin()->first;
-
-            log_info << "Discarding old history seqnos from cache: " << old_min
-                     << '-' << old_max;
-
-            discard_seqno (old_max); // forget all previous seqnos
-        }
-
-//        seqno_min = seqno;
-    }
-#else
     void
     GCache::seqno_reset ()
     {
         gu::Lock lock(mtx);
 
-        if (seqno2ptr.empty()) return;
+        if (gu_unlikely(seqno2ptr.empty())) return;
 
         /* order is significant here */
         rb.seqno_reset();
         mem.seqno_reset();
 
         seqno2ptr.clear();
+
+        seqno_released = 0;
     }
-#endif
 
     /*!
      * Assign sequence number to buffer pointed to by ptr
@@ -57,8 +41,7 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-                          int64_t     const seqno_d,
-                          bool        const free)
+                          int64_t     const seqno_d)
     {
         gu::Lock lock(mtx);
 
@@ -89,8 +72,77 @@ namespace gcache
 
         bh->seqno_g = seqno_g;
         bh->seqno_d = seqno_d;
-        if (free) free_common(bh);
     }
+
+    void
+    GCache::seqno_release (int64_t const seqno)
+    {
+        /* The number of buffers scheduled for release is unpredictable, so
+         * we want to allow some concurrency in cache access by releasing
+         * buffers in small batches */
+        static int const min_batch_size(32);
+
+        /* Although extremely unlikely, theoretically concurrent access may
+         * lead to elements being added faster than released. The following is
+         * to control and possibly disable concurrency in that case. We start
+         * with min_batch_size and increase it if necessary. */
+        size_t old_gap(-1);
+        int    batch_size(min_batch_size);
+
+        bool   loop(false);
+
+        do
+        {
+            /* if we're doing this loop repeatedly, allow other threads to run*/
+            if (loop) sched_yield();
+
+            gu::Lock lock(mtx);
+
+            assert(seqno >= seqno_released);
+
+            seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
+
+            if (gu_unlikely(it == seqno2ptr.end()))
+            {
+                /* this means that there are no elements with
+                 * seqno > seqno_released - and this should never happen */
+                assert(0);
+                return;
+            }
+
+            assert(seqno_max >= seqno_released);
+
+            /* here we check if (seqno_max - seqno_released) is decreasing
+             * and if not - increase the batch_size (linearly) */
+            size_t const new_gap(seqno_max - seqno_released);
+            batch_size += (new_gap >= old_gap) * min_batch_size;
+            old_gap = new_gap;
+
+            int64_t const start(it->first - 1);
+            int64_t const end  (seqno - start >= 2*batch_size ?
+                                start + batch_size : seqno);
+#if 0
+            log_info << "############ releasing " << (seqno - start)
+                     << " buffers, batch_size: " << batch_size
+                     << ", seqno_max: " << seqno_max;
+#endif
+            for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
+            {
+                BufferHeader* const bh(ptr2BH(it->second));
+                assert (bh->seqno_g == it->first);
+                seqno_released = it->first;
+                ++it; /* free_common() below may erase current element,
+                       * so advance iterator before calling free_common() */
+                if (gu_likely(!BH_is_released(bh))) free_common(bh);
+            }
+
+            assert (loop); /* should never try to release past seqno2ptr end */
+
+            loop = (end < seqno) && loop;
+        }
+        while(loop);
+    }
+
 #if DEPRECATED
     /*!
      * Get the smallest seqno present in the cache.
@@ -225,7 +277,7 @@ namespace gcache
     /*!
      * Releases any history locks present.
      */
-    void GCache::seqno_release ()
+    void GCache::seqno_unlock ()
     {
         gu::Lock lock(mtx);
         seqno_locked = SEQNO_NONE;

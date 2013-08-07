@@ -29,9 +29,8 @@
 
 namespace gu
 {
-
     template <typename K>
-    class Hash
+    class UnorderedHash
     {
     public:
 #if defined(HAVE_BOOST_UNORDERED_MAP_HPP)
@@ -45,14 +44,14 @@ namespace gu
         }
     };
 
+
     template <typename K>
     size_t HashValue(const K& key)
     {
-        return Hash<K>()(key);
+        return UnorderedHash<K>()(key);
     }
 
-
-    template <typename K, typename H = Hash<K>,
+    template <typename K, typename H = UnorderedHash<K>,
               class P = std::equal_to<K>,
               class A = std::allocator<K> >
     class UnorderedSet
@@ -92,7 +91,7 @@ namespace gu
     };
 
 
-    template <typename K, typename V, typename H = Hash<K>,
+    template <typename K, typename V, typename H = UnorderedHash<K>,
               class P = std::equal_to<K>,
               class A = std::allocator<std::pair<const K, V> > >
     class UnorderedMap
@@ -131,7 +130,7 @@ namespace gu
         void rehash(size_t n) { impl_.rehash(n); }
     };
 
-    template <typename K, typename V, typename H = Hash<K> >
+    template <typename K, typename V, typename H = UnorderedHash<K> >
     class UnorderedMultimap
     {
 #if defined(HAVE_BOOST_UNORDERED_MAP_HPP)

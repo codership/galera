@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
@@ -8,15 +8,42 @@
 #include "certification.hpp"
 #include "wsdb.cpp"
 #include "gcs_action_source.hpp"
-#include <cstdlib>
+#include "galera_service_thd.hpp"
 
+#include <cstdlib>
 #include <check.h>
+
+namespace
+{
+    class TestEnv
+    {
+    public:
+
+        TestEnv() :
+            conf_   (),
+            gcache_ (conf_, "."),
+            gcs_    (conf_, gcache_),
+            thd_    (gcs_,  gcache_)
+        {}
+
+        ~TestEnv() {}
+
+        gu::Config&         conf() { return conf_; }
+        galera::ServiceThd& thd()  { return thd_;  }
+
+    private:
+
+        gu::Config         conf_;
+        gcache::GCache     gcache_;
+        galera::DummyGcs   gcs_;
+        galera::ServiceThd thd_;
+    };
+}
 
 using namespace std;
 using namespace galera;
 
-typedef std::vector<galera::KeyPart> KeyPartSequence;
-
+typedef std::vector<galera::KeyPartOS> KeyPartSequence;
 
 START_TEST(test_key1)
 {
@@ -37,7 +64,7 @@ START_TEST(test_key1)
         {k4, sizeof k4 }
     };
 
-    Key key(1, kiovec, 4, 0);
+    KeyOS key(1, kiovec, 4, 0);
     size_t expected_size(0);
 
 #ifndef GALERA_KEY_VLQ
@@ -54,16 +81,16 @@ START_TEST(test_key1)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
-                serial_size(key), expected_size);
+    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
+                key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
     fail_unless(kp.size() == 4);
 
-    gu::Buffer buf(galera::serial_size(key));
-    serialize(key, &buf[0], buf.size(), 0);
-    Key key2(1);
-    unserialize(&buf[0], buf.size(), 0, key2);
+    gu::Buffer buf(key.serial_size());
+    key.serialize(&buf[0], buf.size(), 0);
+    KeyOS key2(1);
+    key2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(key2 == key);
 }
 END_TEST
@@ -88,7 +115,7 @@ START_TEST(test_key2)
         {k4, sizeof k4 }
     };
 
-    Key key(2, kiovec, 4, 0);
+    KeyOS key(2, kiovec, 4, 0);
     size_t expected_size(0);
 
     expected_size += 1; // flags
@@ -106,19 +133,20 @@ START_TEST(test_key2)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(serial_size(key) == expected_size, "%ld <-> %ld",
-                serial_size(key), expected_size);
+    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
+                key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
     fail_unless(kp.size() == 4);
 
-    gu::Buffer buf(serial_size(key));
-    serialize(key, &buf[0], buf.size(), 0);
-    Key key2(2);
-    unserialize(&buf[0], buf.size(), 0, key2);
+    gu::Buffer buf(key.serial_size());
+    key.serialize(&buf[0], buf.size(), 0);
+    KeyOS key2(2);
+    key2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(key2 == key);
 }
 END_TEST
+
 
 START_TEST(test_write_set1)
 {
@@ -137,21 +165,21 @@ START_TEST(test_write_set1)
     const char* rbr = "rbrbuf";
     size_t rbr_len = 6;
 
-    log_info << "ws0 " << serial_size(ws);
-    ws.append_key(Key(1, key1, 2, 0));
-    log_info << "ws1 " << serial_size(ws);
-    ws.append_key(Key(1, key2, 2, 0));
-    log_info << "ws2 " << serial_size(ws);
+    log_info << "ws0 " << ws.serial_size();
+    ws.append_key(KeyData(1, key1, 2, 0, 0));
+    log_info << "ws1 " << ws.serial_size();
+    ws.append_key(KeyData(1, key2, 2, 0, 0));
+    log_info << "ws2 " << ws.serial_size();
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << gu::serial_size4(rbrbuf);
-    log_info << "wsrbr " << serial_size(ws);
+    log_info << "wsrbr " << ws.serial_size();
 
-    gu::Buffer buf(serial_size(ws));
+    gu::Buffer buf(ws.serial_size());
 
-    serialize(ws, &buf[0], buf.size(), 0);
+    ws.serialize(&buf[0], buf.size(), 0);
 
     size_t expected_size =
         4 // row key sequence size
@@ -164,12 +192,12 @@ START_TEST(test_write_set1)
 #endif
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, serial_size(ws));
+                buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(0);
 
-    size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
+    size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(ret == expected_size);
 
     WriteSet::KeySequence rks;
@@ -184,7 +212,6 @@ START_TEST(test_write_set1)
 
 }
 END_TEST
-
 
 
 START_TEST(test_write_set2)
@@ -204,21 +231,21 @@ START_TEST(test_write_set2)
     const char* rbr = "rbrbuf";
     size_t rbr_len = 6;
 
-    log_info << "ws0 " << serial_size(ws);
-    ws.append_key(Key(2, key1, 2, 0));
-    log_info << "ws1 " << serial_size(ws);
-    ws.append_key(Key(2, key2, 2, 0));
-    log_info << "ws2 " << serial_size(ws);
+    log_info << "ws0 " << ws.serial_size();
+    ws.append_key(KeyData(2, key1, 2, 0, 0));
+    log_info << "ws1 " << ws.serial_size();
+    ws.append_key(KeyData(2, key2, 2, 0, 0));
+    log_info << "ws2 " << ws.serial_size();
 
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << gu::serial_size4(rbrbuf);
-    log_info << "wsrbr " << serial_size(ws);
+    log_info << "wsrbr " << ws.serial_size();
 
-    gu::Buffer buf(serial_size(ws));
+    gu::Buffer buf(ws.serial_size());
 
-    serialize(ws, &buf[0], buf.size(), 0);
+    ws.serialize(&buf[0], buf.size(), 0);
 
     size_t expected_size =
         4 // row key sequence size
@@ -231,12 +258,12 @@ START_TEST(test_write_set2)
 #endif
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, serial_size(ws));
+                buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(2);
 
-    size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
+    size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
     fail_unless(ret == expected_size);
 
     WriteSet::KeySequence rks;
@@ -251,7 +278,6 @@ START_TEST(test_write_set2)
 
 }
 END_TEST
-
 
 
 START_TEST(test_mapped_buffer)
@@ -352,8 +378,8 @@ START_TEST(test_cert_hierarchical_v1)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
     cert.assign_initial_position(0, 1);
 
     mark_point();
@@ -362,7 +388,7 @@ START_TEST(test_cert_hierarchical_v1)
     {
         TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(1, wsi[i].key, wsi[i].iov_len, 0));
+        trx->append_key(KeyData(1, wsi[i].key, wsi[i].iov_len, 0, 0));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
@@ -373,7 +399,7 @@ START_TEST(test_cert_hierarchical_v1)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -471,8 +497,9 @@ START_TEST(test_cert_hierarchical_v2)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
+
     cert.assign_initial_position(0, version);
 
     mark_point();
@@ -481,8 +508,8 @@ START_TEST(test_cert_hierarchical_v2)
     {
         TrxHandle* trx(new TrxHandle(version, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(version, wsi[i].key, wsi[i].iov_len,
-                            (wsi[i].shared == true ? Key::F_SHARED : 0)));
+        trx->append_key(KeyData(version, wsi[i].key, wsi[i].iov_len, 0,
+                            (wsi[i].shared == true ? KeyOS::F_SHARED : 0)));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
@@ -493,7 +520,7 @@ START_TEST(test_cert_hierarchical_v2)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -516,8 +543,8 @@ START_TEST(test_trac_726)
 {
     log_info << "test_trac_726";
     const int version(2);
-    gu::Config conf;
-    galera::Certification cert(conf);
+    TestEnv env;
+    galera::Certification cert(env.conf(), env.thd());
     wsrep_uuid_t uuid1 = {{1, }};
     wsrep_uuid_t uuid2 = {{2, }};
     cert.assign_initial_position(0, version);
@@ -530,7 +557,7 @@ START_TEST(test_trac_726)
     {
         TrxHandle* trx(new TrxHandle(version, uuid1, 0, 0, false));
 
-        trx->append_key(Key(version, &key1, 1, 0));
+        trx->append_key(KeyData(version, &key1, 1, 0, 0));
         trx->set_last_seen_seqno(0);
         trx->flush(0);
 
@@ -540,7 +567,7 @@ START_TEST(test_trac_726)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, 1, 1);
@@ -553,9 +580,9 @@ START_TEST(test_trac_726)
     {
         TrxHandle* trx(new TrxHandle(version, uuid2, 0, 0, false));
 
-        trx->append_key(Key(version, &key2, 1, 0));
-        trx->append_key(Key(version, &key2, 1, Key::F_SHARED));
-        trx->append_key(Key(version, &key1, 1, 0));
+        trx->append_key(KeyData(version, &key2, 1, 0, 0));
+        trx->append_key(KeyData(version, &key2, 1, 0, KeyOS::F_SHARED));
+        trx->append_key(KeyData(version, &key1, 1, 0, 0));
 
         trx->set_last_seen_seqno(0);
         trx->flush(0);
@@ -566,7 +593,7 @@ START_TEST(test_trac_726)
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
         trx = new TrxHandle();
-        size_t offset(unserialize(&buf[0], buf.size(), 0, *trx));
+        size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
         trx->set_received(0, 2, 2);
@@ -577,6 +604,7 @@ START_TEST(test_trac_726)
     }
 }
 END_TEST
+
 
 Suite* write_set_suite()
 {

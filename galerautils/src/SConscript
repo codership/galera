@@ -14,7 +14,7 @@ libgalerautils_sources = [
     'gu_spooky.c',
     'gu_rand.c',
     'gu_mutex.c',
-    'gu_print_buf.c',
+    'gu_hexdump.c',
     'gu_to.c',
     'gu_utils.c',
     'gu_uuid.c',
@@ -23,8 +23,18 @@ libgalerautils_sources = [
 
 libgalerautils_env.StaticLibrary('galerautils', libgalerautils_sources)
 
+env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
+           libgalerautils_sources))
+
+
+libgalerautilsxx_env = env.Clone()
+
+# disable old style cast warnings
+libgalerautilsxx_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
+
 # C++ part
 libgalerautilsxx_sources = [
+    'gu_vlq.cpp',
     'gu_datetime.cpp',
     'gu_exception.cpp',
     'gu_logger.cpp',
@@ -35,20 +45,33 @@ libgalerautilsxx_sources = [
     'gu_buffer.cpp',
     'gu_utils++.cpp',
     'gu_config.cpp',
+    'gu_fdesc.cpp',
+    'gu_mmap.cpp',
+    'gu_alloc.cpp',
+    'gu_rset.cpp',
     'gu_resolver.cpp'
 ]
+
+#libgalerautilsxx_objs  = libgalerautilsxx_env.Object(
+#                         libgalerautilsxx_sources)
+
+libgalerautilsxx_sobjs = libgalerautilsxx_env.SharedObject(
+                         libgalerautilsxx_sources)
+
+#hexdump_obj  = libgalerautilsxx_env.Object('gu_hexdump++','gu_hexdump.cpp')
+hexdump_sobj = libgalerautilsxx_env.SharedObject('gu_hexdump++','gu_hexdump.cpp')
+
+#libgalerautilsxx_objs  += hexdump_obj
+libgalerautilsxx_sobjs += hexdump_sobj
 
 #if '-DGALERA_USE_GU_NETWORK' in libgalerautils_env['CPPFLAGS']:
 #    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
 #                                'gu_resolver.cpp']
 
-# disable old style cast warnings
-libgalerautils_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
 
-libgalerautils_env.StaticLibrary('galerautils++', libgalerautilsxx_sources)
+libgalerautilsxx_env.StaticLibrary('galerautils++',
+                                   libgalerautilsxx_sobjs)
 
-#
-env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
-        libgalerautils_sources))
-env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
-        libgalerautilsxx_sources))
+#env.Append(LIBGALERA_OBJS = libgalerautilsxx_env.SharedObject(
+#           libgalerautilsxx_sources))
+env.Append(LIBGALERA_OBJS = libgalerautilsxx_sobjs)

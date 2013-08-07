@@ -32,10 +32,10 @@ START_TEST(test_ist_message)
 #endif
 #endif /* 0 */
 
-    gu::Buffer buf(serial_size(m3));
-    serialize(m3, &buf[0], buf.size(), 0);
+    gu::Buffer buf(m3.serial_size());
+    m3.serialize(&buf[0], buf.size(), 0);
     Message mu3(3);
-    unserialize(&buf[0], buf.size(), 0, mu3);
+    mu3.unserialize(&buf[0], buf.size(), 0);
 
     fail_unless(mu3.version() == 3);
     fail_unless(mu3.type()    == Message::T_HANDSHAKE);
@@ -44,14 +44,14 @@ START_TEST(test_ist_message)
     fail_unless(mu3.len()     == 1001);
 
     Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
-    fail_unless(serial_size(m4) == 12);
+    fail_unless(m4.serial_size() == 12);
 
     buf.clear();
-    buf.resize(serial_size(m4));
-    serialize(m4, &buf[0], buf.size(), 0);
+    buf.resize(m4.serial_size());
+    m4.serialize(&buf[0], buf.size(), 0);
 
     Message mu4(4);
-    unserialize(&buf[0], buf.size(), 0, mu4);
+    mu4.unserialize(&buf[0], buf.size(), 0);
     fail_unless(mu4.version() == 4);
     fail_unless(mu4.type()    == Message::T_HANDSHAKE);
     fail_unless(mu4.flags()   == 0x2);
@@ -210,6 +210,8 @@ static int select_trx_version(int protocol_version)
     case 3:
     case 4:
         return 2;
+    case 5:
+        return 3;
     }
     fail("unknown protocol version %i", protocol_version);
     return -1;
@@ -218,8 +220,9 @@ static int select_trx_version(int protocol_version)
 
 static void test_ist_common(int version)
 {
+    using galera::KeyData;
     using galera::TrxHandle;
-    using galera::Key;
+    using galera::KeyOS;
     int trx_version(select_trx_version(version));
     gu::Config conf;
     std::string gcache_file("ist_check.cache");
@@ -239,13 +242,49 @@ static void test_ist_common(int version)
             {"key1", 4},
             {"key2", 4}
         };
-        trx->append_key(Key(trx_version, key, 2, 0));
-        trx->append_data("bar", 3);
+        trx->append_key(KeyData(trx_version, key, 2, 0, 0));
+        trx->append_data("bar", 3, true);
+        assert (i > 0);
+        int last_seen(i - 1);
+        int pa_range(i);
 
-        size_t trx_size(serial_size(*trx));
-        gu::byte_t* ptr(reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size)));
-        serialize(*trx, ptr, trx_size, 0);
-        gcache->seqno_assign(ptr, i, i - 1, false);
+        gu::byte_t* ptr(0);
+
+        if (trx_version < 3)
+        {
+            trx->set_last_seen_seqno(last_seen);
+            size_t trx_size(trx->serial_size());
+            ptr = reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size));
+            trx->serialize(ptr, trx_size, 0);
+        }
+        else
+        {
+            std::vector<gu::Buf> bufs;
+            ssize_t trx_size(trx->write_set_out().gather(trx->source_id(),
+                                                         trx->conn_id(),
+                                                         trx->trx_id(),
+                                                         bufs));
+            trx->set_last_seen_seqno(last_seen);
+            ptr = reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size));
+
+            /* concatenate buffer vector */
+            gu::byte_t* p(ptr);
+            for (size_t k(0); k < bufs.size(); ++k)
+            {
+                ::memcpy(p, bufs[k].ptr, bufs[k].size); p += bufs[k].size;
+            }
+            assert ((p - ptr) == trx_size);
+
+            gu::Buf ws_buf = { ptr, trx_size };
+            galera::WriteSetIn wsi(ws_buf);
+            assert (wsi.last_seen() == last_seen);
+            assert (wsi.pa_range()  == 0);
+            wsi.set_seqno(i, pa_range);
+            assert (wsi.seqno()     == int64_t(i));
+            assert (wsi.pa_range()  == pa_range);
+        }
+
+        gcache->seqno_assign(ptr, i, i - pa_range);
         trx->unref();
     }
 
@@ -296,6 +335,12 @@ START_TEST(test_ist_v4)
 }
 END_TEST
 
+START_TEST(test_ist_v5)
+{
+    test_ist_common(5);
+}
+END_TEST
+
 Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
@@ -323,6 +368,11 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_v4");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v4);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_v5");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v5);
     suite_add_tcase(s, tc);
 
     return s;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  */
 
 #include <cerrno>
@@ -52,7 +52,8 @@ namespace gcache
         reallocs  (0),
         frees     (0),
         seqno_locked(SEQNO_NONE),
-        seqno_max   (SEQNO_NONE)
+        seqno_max   (SEQNO_NONE),
+        seqno_released(0)
 #ifndef NDEBUG
         ,buf_tracker()
 #endif

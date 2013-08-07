@@ -131,6 +131,7 @@ namespace galera
             static const std::string causal_read_timeout;
             static const std::string base_host;
             static const std::string base_port;
+            static const std::string proto_max;
         };
 
         typedef std::pair<std::string, std::string> Default;
@@ -374,9 +375,10 @@ namespace galera
         {
             SetDefaults(gu::Config&, const Defaults&, const char* base_addr);
         }
-            set_defaults_; // sets missing parameters to default values
+        set_defaults_; // sets missing parameters to default values
 
-        static const int       MAX_PROTO_VER = 4;
+//        static int const      MAX_PROTO_VER = 5;
+        static int const       MAX_PROTO_VER;
         /*
          * |------------------------------------------------------
          * | protocol_version_ | trx_proto_ver_ | str_proto_ver_ |
@@ -385,12 +387,14 @@ namespace galera
          * |                 2 |              1 |              1 |
          * |                 3 |              2 |              1 |
          * |                 4 |              2 |              1 |
+         * |                 5 |              3 |              1 |
          * -------------------------------------------------------
          */
 
         int                    trx_proto_ver_;// transaction protocol
         int                    str_proto_ver_;// state transfer request protocol
-        int                    protocol_version_; // general repl layer proto
+        int                    protocol_version_;// general repl layer proto
+        int                    proto_max_;    // maximum allowed WS version
 
         FSM<State, Transition> state_;
         SstState               sst_state_;

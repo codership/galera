@@ -1,13 +1,14 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #include "galera_service_thd.hpp"
 
 const uint32_t galera::ServiceThd::A_NONE = 0;
 
-static const uint32_t A_LAST_COMMITTED = 1 <<  0;
-static const uint32_t A_EXIT           = 1 << 31;
+static const uint32_t A_LAST_COMMITTED = 1U <<  0;
+static const uint32_t A_RELEASE_SEQNO  = 1U <<  1;
+static const uint32_t A_EXIT           = 1U << 31;
 
 void*
 galera::ServiceThd::thd_func (void* arg)
@@ -34,7 +35,8 @@ galera::ServiceThd::thd_func (void* arg)
         {
             if (data.act_ & A_LAST_COMMITTED)
             {
-                ssize_t const ret(st->gcs_.set_last_applied(data.last_committed_));
+                ssize_t const ret
+                    (st->gcs_.set_last_applied(data.last_committed_));
 
                 if (gu_unlikely(ret < 0))
                 {
@@ -49,18 +51,32 @@ galera::ServiceThd::thd_func (void* arg)
                               << data.last_committed_;
                 }
             }
+
+            if (data.act_ & A_RELEASE_SEQNO)
+            {
+                try
+                {
+                    st->gcache_.seqno_release(data.release_seqno_);
+                }
+                catch (std::exception& e)
+                {
+                    log_warn << "Exception releasing seqno "
+                             << data.release_seqno_ << ": " << e.what();
+                }
+            }
         }
     }
 
     return 0;
 }
 
-galera::ServiceThd::ServiceThd (GcsI& gcs)
-  : gcs_  (gcs),
-    thd_  (),
-    mtx_  (),
-    cond_ (),
-    data_ ()
+galera::ServiceThd::ServiceThd (GcsI& gcs, gcache::GCache& gcache) :
+    gcache_ (gcache),
+    gcs_    (gcs),
+    thd_    (),
+    mtx_    (),
+    cond_   (),
+    data_   ()
 {
     gu_thread_create (&thd_, NULL, thd_func, this);
 }
@@ -85,11 +101,24 @@ galera::ServiceThd::report_last_committed(gcs_seqno_t seqno)
     {
         data_.last_committed_ = seqno;
 
-        if (!(data_.act_ & A_LAST_COMMITTED))
-        {
-            data_.act_ |= A_LAST_COMMITTED;
-            cond_.signal();
-        }
+        if (data_.act_ == A_NONE) cond_.signal();
+
+        data_.act_ |= A_LAST_COMMITTED;
+    }
+}
+
+void
+galera::ServiceThd::release_seqno(gcs_seqno_t seqno)
+{
+    gu::Lock lock(mtx_);
+
+    if (data_.release_seqno_ < seqno)
+    {
+        data_.release_seqno_ = seqno;
+
+        if (data_.act_ == A_NONE) cond_.signal();
+
+        data_.act_ |= A_RELEASE_SEQNO;
     }
 }
 

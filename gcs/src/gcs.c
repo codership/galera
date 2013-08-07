@@ -168,10 +168,10 @@ struct gcs_recv_act
 
 struct gcs_repl_act
 {
-    const struct gcs_buf* act_in;
-    struct gcs_action*    action;
-    gu_mutex_t            wait_mutex;
-    gu_cond_t             wait_cond;
+    const struct gu_buf* act_in;
+    struct gcs_action*   action;
+    gu_mutex_t           wait_mutex;
+    gu_cond_t            wait_cond;
 };
 
 /*! Releases resources associated with parameters */
@@ -1418,11 +1418,11 @@ long gcs_destroy (gcs_conn_t *conn)
 }
 
 /* Puts action in the send queue and returns */
-long gcs_sendv (gcs_conn_t*           const conn,
-                const struct gcs_buf* const act_bufs,
-                size_t                const act_size,
-                gcs_act_type_t        const act_type,
-                bool                  const scheduled)
+long gcs_sendv (gcs_conn_t*          const conn,
+                const struct gu_buf* const act_bufs,
+                size_t               const act_size,
+                gcs_act_type_t       const act_type,
+                bool                 const scheduled)
 {
     if (gu_unlikely(act_size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
 
@@ -1462,20 +1462,18 @@ gcs_seqno_t gcs_caused(gcs_conn_t* conn)
 }
 
 /* Puts action in the send queue and returns after it is replicated */
-long gcs_replv (gcs_conn_t*           const conn,      //!<in
-                const struct gcs_buf* const act_in,    //!<in
-                struct gcs_action*    const act,       //!<inout
-                bool                  const scheduled) //!<in
+long gcs_replv (gcs_conn_t*          const conn,      //!<in
+                const struct gu_buf* const act_in,    //!<in
+                struct gcs_action*   const act,       //!<inout
+                bool                 const scheduled) //!<in
 {
     if (gu_unlikely((size_t)act->size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
 
     long ret;
 
     assert (act);
-    assert (act->buf);
     assert (act->size > 0);
 
-    act->buf     = NULL;
     act->seqno_l = GCS_SEQNO_ILL;
     act->seqno_g = GCS_SEQNO_ILL;
 
@@ -1565,9 +1563,10 @@ long gcs_replv (gcs_conn_t*           const conn,      //!<in
                     }
 
                     if (orig_buf != act->buf) // action was allocated in gcache
+                    {
                         gcs_gcache_free (conn->gcache, act->buf);
-
-                    act->buf = NULL;
+                        act->buf = orig_buf;
+                    }
                 }
             }
         }

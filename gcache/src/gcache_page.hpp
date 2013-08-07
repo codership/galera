@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -8,9 +8,10 @@
 #define _gcache_page_hpp_
 
 #include "gcache_memops.hpp"
-#include "gcache_fd.hpp"
-#include "gcache_mmap.hpp"
 #include "gcache_bh.hpp"
+
+#include "gu_fdesc.hpp"
+#include "gu_mmap.hpp"
 
 #include <string>
 
@@ -43,7 +44,7 @@ namespace gcache
         ssize_t size () const /* total page size */
         { return mmap_.size - sizeof(BufferHeader); }
 
-        const std::string& name() const { return fd_.get_name(); }
+        const std::string& name() const { return fd_.name(); }
 
         void reset ();
 
@@ -52,11 +53,11 @@ namespace gcache
 
     private:
 
-        FileDescriptor fd_;
-        MMap           mmap_;
-        uint8_t*       next_;
-        ssize_t        space_;
-        ssize_t        used_;
+        gu::FileDescriptor fd_;
+        gu::MMap           mmap_;
+        uint8_t*           next_;
+        ssize_t            space_;
+        ssize_t            used_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);

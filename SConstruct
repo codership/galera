@@ -67,10 +67,11 @@ build_dir = ARGUMENTS.get('build_dir', '')
 debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
 
-if int(debug) >= 0 and int(debug) < 3:
-    opt_flags = ' -g -O%d -fno-inline' % int(debug)
+debug_lvl = int(debug)
+if debug_lvl >= 0 and debug_lvl < 3:
+    opt_flags = ' -g -O%d -fno-inline' % debug_lvl
     dbug = True
-elif int(debug) == 3:
+elif debug_lvl == 3:
     opt_flags = ' -g -O3'
 
 if dbug:
@@ -118,7 +119,7 @@ Export('LIBBOOST_PROGRAM_OPTIONS_A')
 env = Environment(ENV = {'PATH' : os.environ['PATH'], 'HOME' : os.environ['HOME']})
 
 # Set up environment for ccache and distcc
-# env['ENV']['HOME']          = os.environ['HOME']
+#env['ENV']['HOME']          = os.environ['HOME']
 #env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
 #env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
 
@@ -276,7 +277,7 @@ if boost == 1:
             # due to a bug in boost >= 1.50 we need to link with boost_system
             # - should be a noop with no boost_pool.
 #            if conf.CheckLib('boost_system'):
-#        	conf.env.Append(LIBS=['boost_system'])
+#               conf.env.Append(LIBS=['boost_system'])
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)

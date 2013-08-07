@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 
@@ -9,32 +9,30 @@
 #include "gu_logger.hpp"
 
 
-size_t galera::serialize(const WriteSet& ws,
-                         gu::byte_t*     buf,
-                         size_t          buf_len,
-                         size_t          offset)
+size_t galera::WriteSet::serialize(gu::byte_t* buf,
+                                   size_t      buf_len,
+                                   size_t      offset) const
 {
-    offset = gu::serialize4(ws.keys_, buf, buf_len, offset);
-    offset = gu::serialize4(ws.data_, buf, buf_len, offset);
+    offset = gu::serialize4(keys_, buf, buf_len, offset);
+    offset = gu::serialize4(data_, buf, buf_len, offset);
     return offset;
 }
 
 
-size_t galera::unserialize(const gu::byte_t* buf,
-                           size_t            buf_len,
-                           size_t            offset,
-                           WriteSet&         ws)
+size_t galera::WriteSet::unserialize(const gu::byte_t* buf,
+                                     size_t            buf_len,
+                                     size_t            offset)
 {
-    ws.keys_.clear();
-    offset = gu::unserialize4(buf, buf_len, offset, ws.keys_);
-    offset = gu::unserialize4(buf, buf_len, offset, ws.data_);
+    keys_.clear();
+    offset = gu::unserialize4(buf, buf_len, offset, keys_);
+    offset = gu::unserialize4(buf, buf_len, offset, data_);
     return offset;
 }
 
 
-size_t galera::serial_size(const WriteSet& ws)
+size_t galera::WriteSet::serial_size() const
 {
-    return (gu::serial_size4(ws.keys_) + gu::serial_size4(ws.data_));
+    return (gu::serial_size4(keys_) + gu::serial_size4(data_));
 }
 
 std::pair<size_t, size_t>
@@ -42,7 +40,15 @@ galera::WriteSet::segment(const gu::byte_t* buf, size_t buf_len, size_t offset)
 {
     uint32_t data_len;
     offset = gu::unserialize4(buf, buf_len, offset, data_len);
-    if (offset + data_len > buf_len) gu_throw_error(EMSGSIZE);
+    if (gu_unlikely(offset + data_len > buf_len))
+    {
+#ifdef NDEBUG
+        gu_throw_error(EMSGSIZE);
+#else
+        gu_throw_error(EMSGSIZE) << "offset: " << offset << ", data_len: "
+                                 << data_len << ", buf_len: " << buf_len;
+#endif /* NDEBUG */
+    }
     return std::pair<size_t, size_t>(offset, data_len);
 }
 
@@ -57,8 +63,8 @@ size_t galera::WriteSet::keys(const gu::byte_t* buf,
 
     while (offset < seg_end)
     {
-        Key key(version);
-        if ((offset = unserialize(buf, buf_len, offset, key)) == 0)
+        KeyOS key(version);
+        if ((offset = key.unserialize(buf, buf_len, offset)) == 0)
         {
             gu_throw_fatal << "failed to unserialize key";
         }
@@ -68,8 +74,14 @@ size_t galera::WriteSet::keys(const gu::byte_t* buf,
     return offset;
 }
 
-void galera::WriteSet::append_key(const Key& key)
+void galera::WriteSet::append_key(const KeyData& kd)
 {
+    KeyOS key (kd.proto_ver,
+               kd.parts,
+               kd.parts_num,
+               (kd.shared == true ? galera::KeyOS::F_SHARED : 0)
+               );
+
     const size_t hash(key.hash());
 
     std::pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator>
@@ -77,17 +89,17 @@ void galera::WriteSet::append_key(const Key& key)
 
     for (KeyRefMap::const_iterator i(range.first); i != range.second; ++i)
     {
-        Key cmp(version_);
+        KeyOS cmp(version_);
 
-        (void)unserialize(&keys_[0], keys_.size(), i->second, cmp);
+        (void)cmp.unserialize(&keys_[0], keys_.size(), i->second);
 
         if (key == cmp && key.flags() == cmp.flags()) return;
     }
 
-    size_t key_size(serial_size(key));
+    size_t key_size(key.serial_size());
     size_t offset(keys_.size());
     keys_.resize(offset + key_size);
-    (void)galera::serialize(key, &keys_[0], keys_.size(), offset);
+    (void)key.serialize(&keys_[0], keys_.size(), offset);
     (void)key_refs_.insert(std::make_pair(hash, offset));
 }
 
@@ -97,8 +109,8 @@ void galera::WriteSet::get_keys(KeySequence& s) const
     size_t offset(0);
     while (offset < keys_.size())
     {
-        Key key(version_);
-        if ((offset = unserialize(&keys_[0], keys_.size(), offset, key)) == 0)
+        KeyOS key(version_);
+        if ((offset = key.unserialize(&keys_[0], keys_.size(), offset)) == 0)
         {
             gu_throw_fatal << "failed to unserialize key";
         }

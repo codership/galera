@@ -22,6 +22,7 @@
 #  define GU_ULONG(x)      (x)
 #  define GU_LONG_LONG(x)  (x)
 #  define GU_ULONG_LONG(x) (x)
+#  define GU_DEBUG_NORETURN
 #else   /* !defined(_MSC_VER) */
 #  define GU_NORETURN      __attribute__((noreturn))
 #  define GU_INLINE        inline
@@ -31,6 +32,11 @@
 #  define GU_ULONG(x)      (x##LU)
 #  define GU_LONG_LONG(x)  (x##LL)
 #  define GU_ULONG_LONG(x) (x##LLU)
+#  ifndef __OPTIMIZE__
+#    define GU_DEBUG_NORETURN abort();
+#  else
+#    define GU_DEBUG_NORETURN
+#  endif
 #endif /* !defined(_MSC_VER) */
 
 /*

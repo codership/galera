@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -8,8 +8,8 @@
 #define _gcache_mem_store_hpp_
 
 #include "gcache_memops.hpp"
-#include "gcache_fd.hpp"
-#include "gcache_mmap.hpp"
+//#include "gcache_fd.hpp"
+//#include "gcache_mmap.hpp"
 #include "gcache_bh.hpp"
 
 #include <string>

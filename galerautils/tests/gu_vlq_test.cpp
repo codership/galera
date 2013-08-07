@@ -4,6 +4,7 @@
 
 #include "gu_vlq.hpp"
 #include "gu_vlq_test.hpp"
+#include "gu_logger.hpp"
 
 #include <stdint.h>
 #include <inttypes.h>

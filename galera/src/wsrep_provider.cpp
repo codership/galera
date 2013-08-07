@@ -1,6 +1,8 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
+
+#include "key_data.hpp"
 
 #if defined(GALERA_MULTIMASTER)
 #include "replicator_smm.hpp"
@@ -13,7 +15,8 @@
 
 #include <cassert>
 
-using galera::Key;
+
+using galera::KeyOS;
 using galera::WriteSet;
 using galera::TrxHandle;
 using galera::TrxHandleLock;
@@ -357,7 +360,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  const void*         rbr_data,
                                  size_t              rbr_data_len,
-                                 uint64_t            flags __attribute__((unused)) ,
+                                 uint64_t            flags,
                                  wsrep_trx_meta_t*   meta)
 {
     assert(gh != 0);
@@ -385,7 +388,8 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
     {
         TrxHandleLock lock(*trx);
         trx->set_conn_id(conn_id);
-        trx->append_data(rbr_data, rbr_data_len);
+        /* rbr_data should clearly persist over pre_commit() call */
+        trx->append_data(rbr_data, rbr_data_len, false);
         trx->set_flags(
             TrxHandle::F_COMMIT |
             ((flags & WSREP_FLAG_PA_SAFE) ? 0 : TrxHandle::F_PA_UNSAFE)
@@ -398,6 +402,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
 
         if (retval == WSREP_OK)
         {
+            assert(trx->last_seen_seqno() >= 0);
             retval = repl->pre_commit(trx, meta);
         }
 
@@ -443,11 +448,13 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            galera::Key k(repl->trx_proto_ver(),
-                          keys[i].key_parts,
-                          keys[i].key_parts_num,
-                          // std::min(key[i].key_parts_len, size_t(2)),
-                          (shared == true ? galera::Key::F_SHARED : 0));
+            galera::KeyData k (repl->trx_proto_ver(),
+                               keys[i].key_parts,
+                               keys[i].key_parts_num,
+                               // std::min(key[i].key_parts_len, size_t(2)),
+//                              (shared == true ? galera::KeyOS::F_SHARED : 0)
+                               nocopy, shared
+                              );
             // log_info << k;
             trx->append_key(k);
         }
@@ -559,11 +566,12 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
         TrxHandleLock lock(*trx);
         for (int i(0); i < keys_num; ++i)
         {
-            trx->append_key(Key(repl->trx_proto_ver(),
-                                keys[i].key_parts,
-                                keys[i].key_parts_num, 0));
+            galera::KeyData k(repl->trx_proto_ver(),
+                              keys[i].key_parts,
+                              keys[i].key_parts_num, false, false);
+            trx->append_key(k);
         }
-        trx->append_data(action, action_len);
+        trx->append_data(action, action_len, false);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
         retval = repl->replicate(trx);

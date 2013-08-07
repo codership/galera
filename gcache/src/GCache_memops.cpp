@@ -11,6 +11,7 @@ namespace gcache
     void
     GCache::discard_seqno (int64_t seqno)
     {
+//        seqno = std::min(seqno, seqno_released);
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {

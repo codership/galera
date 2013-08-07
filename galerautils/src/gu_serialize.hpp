@@ -60,108 +60,115 @@ namespace gu
     /* Should not be used directly! */
     template <typename TO, typename FROM>
     inline size_t
-    __private_serialize(const FROM& f,
-                        byte_t* const buf, size_t const buflen, size_t const offset)
-
+    __private_serialize(const FROM& f, void* const buf, size_t const buflen,
+                        size_t const offset)
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
         BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
         BOOST_STATIC_ASSERT(sizeof(FROM) == sizeof(TO));
         size_t const ret = offset + sizeof(TO);
-        if (gu_unlikely(ret > buflen)) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
-        *reinterpret_cast<TO*>(buf + offset) = htog<TO>(f);
+        if (gu_unlikely(ret > buflen))
+        {
+            gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
+        }
+        void* const pos(reinterpret_cast<byte_t*>(buf) + offset);
+        *reinterpret_cast<TO*>(pos) = htog<TO>(f);
         return ret;
     }
 
     /* Should not be used directly! */
     template <typename FROM, typename TO>
     inline size_t
-    __private_unserialize(const byte_t* const buf, size_t const buflen, size_t const offset,
-                          TO& t)
+    __private_unserialize(const void* const buf, size_t const buflen,
+                          size_t const offset, TO& t)
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
         BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
         BOOST_STATIC_ASSERT(sizeof(FROM) == sizeof(TO));
         size_t const ret = offset + sizeof(t);
-        if (gu_unlikely(ret > buflen)) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
-        t = gtoh<FROM>(*reinterpret_cast<const FROM*>(buf + offset));
+        if (gu_unlikely(ret > buflen))
+        {
+            gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
+        }
+        const void* const pos(reinterpret_cast<const byte_t*>(buf) + offset);
+        t = gtoh<FROM>(*reinterpret_cast<const FROM*>(pos));
         return ret;
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t serialize1(const T& t,
-                                      byte_t* const buf,
-                                      size_t  const buflen,
-                                      size_t  const offset)
+    GU_FORCE_INLINE size_t serialize1(const T&     t,
+                                      void*  const buf,
+                                      size_t const buflen,
+                                      size_t const offset)
     {
         return __private_serialize<uint8_t>(t, buf, buflen, offset);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t unserialize1(const byte_t* const buf,
-                                        size_t const buflen,
-                                        size_t const offset,
-                                        T& t)
+    GU_FORCE_INLINE size_t unserialize1(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        T&                t)
     {
         return __private_unserialize<uint8_t>(buf, buflen, offset, t);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t serialize2(const T& t,
-                                      byte_t* const buf,
-                                      size_t  const buflen,
-                                      size_t  const offset)
+    GU_FORCE_INLINE size_t serialize2(const T&     t,
+                                      void*  const buf,
+                                      size_t const buflen,
+                                      size_t const offset)
     {
         return __private_serialize<uint16_t>(t, buf, buflen, offset);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t unserialize2(const byte_t* const buf,
-                                        size_t const buflen,
-                                        size_t const offset,
-                                        T& t)
+    GU_FORCE_INLINE size_t unserialize2(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        T&                t)
     {
         return __private_unserialize<uint16_t>(buf, buflen, offset, t);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t serialize4(const T& t,
-                                      byte_t* const buf,
-                                      size_t  const buflen,
-                                      size_t  const offset)
+    GU_FORCE_INLINE size_t serialize4(const T&     t,
+                                      void*  const buf,
+                                      size_t const buflen,
+                                      size_t const offset)
     {
         return __private_serialize<uint32_t>(t, buf, buflen, offset);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t unserialize4(const byte_t* const buf,
-                                        size_t const buflen,
-                                        size_t const offset,
-                                        T& t)
+    GU_FORCE_INLINE size_t unserialize4(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        T&                t)
     {
         return __private_unserialize<uint32_t>(buf, buflen, offset, t);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t serialize8(const T& t,
-                                      byte_t* const buf,
-                                      size_t  const buflen,
-                                      size_t  const offset)
+    GU_FORCE_INLINE size_t serialize8(const T&     t,
+                                      void*  const buf,
+                                      size_t const buflen,
+                                      size_t const offset)
     {
         return __private_serialize<uint64_t>(t, buf, buflen, offset);
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t unserialize8(const byte_t* const buf,
-                                        size_t const buflen,
-                                        size_t const offset,
-                                        T& t)
+    GU_FORCE_INLINE size_t unserialize8(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        T&                t)
     {
         return __private_unserialize<uint64_t>(buf, buflen, offset, t);
     }
 
     template <typename ST>
-    inline size_t __private_serial_size(const gu::Buffer& sb)
+    inline size_t __private_serial_size(const Buffer& sb)
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<ST>::is_integer);
         if (sb.size() > std::numeric_limits<ST>::max())
@@ -170,120 +177,129 @@ namespace gu
         return sizeof(ST) + sb.size();
     }
 
-    GU_FORCE_INLINE size_t serial_size1(const gu::Buffer& sb)
+    GU_FORCE_INLINE size_t serial_size1(const Buffer& sb)
     {
         return __private_serial_size<uint8_t>(sb);
     }
 
-    GU_FORCE_INLINE size_t serial_size2(const gu::Buffer& sb)
+    GU_FORCE_INLINE size_t serial_size2(const Buffer& sb)
     {
         return __private_serial_size<uint16_t>(sb);
     }
 
-    GU_FORCE_INLINE size_t serial_size4(const gu::Buffer& sb)
+    GU_FORCE_INLINE size_t serial_size4(const Buffer& sb)
     {
         return __private_serial_size<uint32_t>(sb);
     }
 
-    GU_FORCE_INLINE size_t serial_size8(const gu::Buffer& sb)
+    GU_FORCE_INLINE size_t serial_size8(const Buffer& sb)
     {
         return __private_serial_size<uint64_t>(sb);
     }
 
     template <typename ST>
-    inline size_t __private_serialize(const gu::Buffer& b,
-                                      gu::byte_t* const buf,
-                                      size_t      const buflen,
-                                      size_t            offset)
+    inline size_t __private_serialize(const Buffer& b,
+                                      void*   const buf,
+                                      size_t  const buflen,
+                                      size_t        offset)
     {
         size_t const ret = offset + __private_serial_size<ST>(b);
-        if (ret > buflen) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
+
+        if (ret > buflen)
+        {
+            gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
+        }
+
         offset = __private_serialize<ST>(static_cast<ST>(b.size()),
                                          buf, buflen, offset);
-        copy(b.begin(), b.end(), buf + offset);
+        copy(b.begin(), b.end(), reinterpret_cast<byte_t*>(buf) + offset);
         return ret;
     }
 
     template <typename ST>
-    inline size_t __private_unserialize(const gu::byte_t* const buf,
-                                        size_t            const buflen,
-                                        size_t                  offset,
-                                        gu::Buffer&             b)
+    inline size_t __private_unserialize(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t            offset,
+                                        Buffer&           b)
     {
         BOOST_STATIC_ASSERT(std::numeric_limits<ST>::is_integer);
         ST len(0);
         size_t ret = offset + sizeof(len);
+
         if (ret > buflen) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
 
         offset = __private_unserialize<ST>(buf, buflen, offset, len);
         ret += len;
+
         if (ret > buflen) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
 
         b.resize(len);
-        copy(buf + offset, buf + ret, b.begin());
+        const byte_t* const ptr(reinterpret_cast<const byte_t*>(buf));
+        copy(ptr + offset, ptr + ret, b.begin());
+
         return ret;
     }
 
-    GU_FORCE_INLINE size_t serialize1(const gu::Buffer& b,
-                                      gu::byte_t* const buf,
-                                      size_t      const buflen,
-                                      size_t      const offset)
+    GU_FORCE_INLINE size_t serialize1(const Buffer& b,
+                                      void*   const buf,
+                                      size_t  const buflen,
+                                      size_t  const offset)
     {
         return __private_serialize<uint8_t>(b, buf, buflen, offset);
     }
 
-    GU_FORCE_INLINE size_t unserialize1(const gu::byte_t* const buf,
-                                        size_t            const buflen,
-                                        size_t            const offset,
-                                        gu::Buffer&             b)
+    GU_FORCE_INLINE size_t unserialize1(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        Buffer&           b)
     {
         return __private_unserialize<uint8_t>(buf, buflen, offset, b);
     }
 
-    GU_FORCE_INLINE size_t serialize2(const gu::Buffer& b,
-                                      gu::byte_t* const buf,
-                                      size_t      const buflen,
-                                      size_t      const offset)
+    GU_FORCE_INLINE size_t serialize2(const Buffer& b,
+                                      void*   const buf,
+                                      size_t  const buflen,
+                                      size_t  const offset)
     {
         return __private_serialize<uint16_t>(b, buf, buflen, offset);
     }
 
-    GU_FORCE_INLINE size_t unserialize2(const gu::byte_t* const buf,
-                                        size_t            const buflen,
-                                        size_t            const offset,
-                                        gu::Buffer&             b)
+    GU_FORCE_INLINE size_t unserialize2(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        Buffer&           b)
     {
         return __private_unserialize<uint16_t>(buf, buflen, offset, b);
     }
 
-    GU_FORCE_INLINE size_t serialize4(const gu::Buffer& b,
-                                      gu::byte_t* const buf,
-                                      size_t      const buflen,
-                                      size_t      const offset)
+    GU_FORCE_INLINE size_t serialize4(const Buffer& b,
+                                      void*   const buf,
+                                      size_t  const buflen,
+                                      size_t  const offset)
     {
         return __private_serialize<uint32_t>(b, buf, buflen, offset);
     }
 
-    GU_FORCE_INLINE size_t unserialize4(const gu::byte_t* const buf,
-                                        size_t            const buflen,
-                                        size_t            const offset,
-                                        gu::Buffer&             b)
+    GU_FORCE_INLINE size_t unserialize4(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        Buffer&           b)
     {
         return __private_unserialize<uint32_t>(buf, buflen, offset, b);
     }
 
-    GU_FORCE_INLINE size_t serialize8(const gu::Buffer& b,
-                                      gu::byte_t* const buf,
-                                      size_t      const buflen,
-                                      size_t      const offset)
+    GU_FORCE_INLINE size_t serialize8(const Buffer& b,
+                                      void*   const buf,
+                                      size_t  const buflen,
+                                      size_t  const offset)
     {
         return __private_serialize<uint64_t>(b, buf, buflen, offset);
     }
 
-    GU_FORCE_INLINE size_t unserialize8(const gu::byte_t* const buf,
-                                        size_t            const buflen,
-                                        size_t            const offset,
-                                        gu::Buffer&             b)
+    GU_FORCE_INLINE size_t unserialize8(const void* const buf,
+                                        size_t      const buflen,
+                                        size_t      const offset,
+                                        Buffer&           b)
     {
         return __private_unserialize<uint64_t>(buf, buflen, offset, b);
     }

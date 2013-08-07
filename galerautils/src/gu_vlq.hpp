@@ -1,12 +1,12 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2013 Codership Oy <info@codership.com>
 //
 
 //!
 // @file Variable-length quantity encoding for integers
 //
-// Unsigned integers: Implementation uses using unsigned LEB128, see for example
-// http://en.wikipedia.org/wiki/LEB128.
+// Unsigned integers: Implementation uses using unsigned LEB128,
+// see for example http://en.wikipedia.org/wiki/LEB128.
 //
 // Signed integers: TODO
 //
@@ -16,12 +16,11 @@
 
 #include "gu_buffer.hpp"
 #include "gu_throw.hpp"
-#include "gu_logger.hpp"
 
 #include "gu_macros.h"
 
 #define GU_VLQ_CHECKS
-//#define GU_VLQ_ALEX
+#define GU_VLQ_ALEX
 
 namespace gu
 {
@@ -68,17 +67,23 @@ namespace gu
         {
             buf[offset] |= 0x80;
             ++offset;
+#ifdef GU_VLQ_CHECKS
+            if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
+#else
             assert(offset < buflen);
+#endif /* GU_VLQ_CHECKS */
             buf[offset] = value & 0x7f;
         }
 
         return offset + 1;
-#else
+#else /* GU_VLQ_ALEX */
         do
         {
 #ifdef GU_VLQ_CHECKS
             if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
-#endif
+#else
+            assert(offset < buflen);
+#endif /* GU_VLQ_CHECKS */
             buf[offset] = value & 0x7f;
             value >>= 7;
             if (gu_unlikely(value != 0))
@@ -90,8 +95,23 @@ namespace gu
         while (value != 0);
 
         return offset;
-#endif
+#endif /* GU_VLQ_ALEX */
     }
+
+    template <typename UI>
+    inline size_t uleb128_encode(UI       value,
+                                 byte_t*  buf,
+                                 size_t   buflen)
+    {
+        return uleb128_encode(value, buf, buflen, 0);
+    }
+
+
+    /* checks helper for the uleb128_decode() below */
+    extern void uleb128_decode_checks (const byte_t* buf,
+                                       size_t        buflen,
+                                       size_t        offset,
+                                       size_t        avail_bits);
 
     //!
     // @brief Decode unsigned type from ULEB128 representation
@@ -109,8 +129,12 @@ namespace gu
                                  size_t        offset,
                                  UI&           value)
     {
+        // initial check for overflow, at least one byte must be readable
+#ifdef GU_VLQ_CHECKS
+        if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
+#endif
+
 #ifdef GU_VLQ_ALEX
-        assert (offset < buflen);
         value = buf[offset] & 0x7f;
         size_t shift(0);
 
@@ -120,49 +144,11 @@ namespace gu
             shift +=7;
 
 #ifdef GU_VLQ_CHECKS
-            // Check if trying to read past last byte in buffer without
-            // encountering byte without 0x80 bit set.
-            if (gu_unlikely(offset >= buflen))
-            {
-                gu_throw_error(EINVAL)
-                    << "read value is not uleb128 representation, missing "
-                    << "terminating byte before end of input";
-            }
-
-            //
-            // determine proper bit shift
-            //
-
-            // type width
-            static const size_t width(sizeof(UI) * 8);
-
-            // bits available after shift
-            const ssize_t avail_bits(width - shift);
-
-            assert(avail_bits > 0);
-
-            if (gu_unlikely(avail_bits < 7))
-            {
-                // mask to check if the remaining value can be represented
-                // with available bits
-                gu::byte_t mask(~((1 << avail_bits) - 1));
-                if ((buf[offset] & mask) != 0)
-                {
-                    gu_throw_error(ERANGE)
-                        << "read value not representable with "
-                        << width
-                        << " bits, shift: " << shift << " avail bits: "
-                        << avail_bits
-                        << " mask: 0x"
-                        << std::hex << static_cast<int>(mask)
-                        << " buf: 0x"
-                        << std::hex << static_cast<int>(buf[offset])
-                        << " excess: 0x"
-                        << std::hex << static_cast<int>(mask & buf[offset]);
-                }
-            }
+            ssize_t left_bits((sizeof(UI) << 3) - shift);
+            if (gu_unlikely(offset >= buflen || left_bits < 7))
+                uleb128_decode_checks (buf, buflen, offset, left_bits);
 #endif
-            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
+            value |= (UI(buf[offset] & 0x7f) << shift);
         }
 
         return offset + 1;
@@ -170,13 +156,9 @@ namespace gu
         value = 0;
         size_t shift(0);
 
-        // initial check for overflow, at least one byte must be readable
-#ifdef GU_VLQ_CHECKS
-        if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
-#endif
         while (true)
         {
-            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
+            value |= (UI(buf[offset] & 0x7f) << shift);
             if (gu_likely((buf[offset] & 0x80) == 0))
             {
                 // last byte
@@ -187,52 +169,22 @@ namespace gu
             shift += 7;
 
 #ifdef GU_VLQ_CHECKS
-            // Check if trying to read past last byte in buffer without
-            // encountering byte without 0x80 bit set.
-            if (gu_unlikely(offset >= buflen))
-            {
-                gu_throw_error(EINVAL)
-                    << "read value is not uleb128 representation, missing "
-                    << "terminating byte before end of input";
-            }
-
-            //
-            // determine proper bit shift
-            //
-
-            // type width
-            static const size_t width(sizeof(UI) * 8);
-
-            // bits available after shift
-            const ssize_t avail_bits(width - shift);
-
-            assert(avail_bits > 0);
-
-            if (gu_unlikely(avail_bits < 7))
-            {
-                // mask to check if the remaining value can be represented
-                // with available bits
-                gu::byte_t mask(~((1 << avail_bits) - 1));
-                if ((buf[offset] & mask) != 0)
-                {
-                    gu_throw_error(ERANGE)
-                        << "read value not representable with "
-                        << width
-                        << " bits, shift: " << shift << " avail bits: "
-                        << avail_bits
-                        << " mask: 0x"
-                        << std::hex << static_cast<int>(mask)
-                        << " buf: 0x"
-                        << std::hex << static_cast<int>(buf[offset])
-                        << " excess: 0x"
-                        << std::hex << static_cast<int>(mask & buf[offset]);
-                }
-            }
+            ssize_t left_bits((sizeof(UI) << 3) - shift);
+            if (gu_unlikely(offset >= buflen || left_bits < 7))
+                uleb128_decode_checks (buf, buflen, offset, left_bits);
 #endif
         }
 
         return offset;
-#endif /* GU_VLQ_NEW */
+#endif /* GU_VLQ_ALEX */
+    }
+
+    template <typename UI>
+    inline size_t uleb128_decode(const byte_t* buf,
+                                 size_t        buflen,
+                                 UI&           value)
+    {
+        return uleb128_decode(buf, buflen, 0, value);
     }
 }
 
