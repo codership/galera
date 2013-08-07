@@ -16,6 +16,7 @@
 
 import os
 import platform
+import string
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
@@ -114,8 +115,8 @@ GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 Export('GALERA_VER', 'GALERA_REV')
 print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
 
-LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '');
-Export('LIBBOOST_PROGRAM_OPTIONS_A')
+LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '')
+LIBBOOST_SYSTEM_A = string.replace(LIBBOOST_PROGRAM_OPTIONS_A, 'boost_program_options', 'boost_system')
 
 #
 # Set up and export default build environment
@@ -306,6 +307,35 @@ if boost == 1:
         boost_library_path = ''
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
+    # Common procedure to find boost static library
+    boost_libpaths = [ boost_library_path, '/usr/local/lib', '/usr/local/lib64', '/usr/lib', '/usr/lib64' ]
+    def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
+        libName = libBaseName + boost_library_suffix
+        if configuredLibPath != '' and not os.path.isfile(configuredLibPath):
+            print "Error: file '%s' does not exist" % configuredLibPath
+            Exit(1)
+        if configuredLibPath == '':
+           for libpath in boost_libpaths:
+               libname = libpath + '/lib%s.a' % libName
+               if os.path.isfile(libname):
+                   configuredLibPath = libname
+                   break
+        if configuredLibPath != '':
+            if not conf.CheckCXXHeader(header):
+                print "Error: header '%s' does not exist" % header
+                Exit (1)
+            if autoadd:
+                conf.env.Append(LIBS=File(configuredLibPath))
+            else:
+                return File(configuredLibPath)
+        else:
+            if not conf.CheckLibWithHeader(libs=[libName],
+                                           header=header,
+                                           language='CXX',
+                                           autoadd=autoadd):
+                print 'Error: library %s does not exist' % libName
+                Exit (1)
+            return [libName]
     # Required boost headers/libraries
     #
     if boost_pool == 1:
@@ -317,9 +347,17 @@ if boost == 1:
             if sysname == 'darwin':
                 if conf.CheckLib('boost_system' + boost_library_suffix):
                     conf.env.Append(LIBS=['boost_system' + boost_library_suffix])
+            check_boost_library('boost_system',
+                                'boost/system/error_code.hpp',
+                                LIBBOOST_SYSTEM_A)
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)
+    
+    libboost_program_options = check_boost_library('boost_program_options',
+                                                   'boost/program_options.hpp',
+                                                   LIBBOOST_PROGRAM_OPTIONS_A,
+                                                   autoadd = 0)
 else:
     print 'Not using boost'
 
@@ -352,7 +390,7 @@ if strict_build_flags == 1:
    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-Export('env', 'sysname', 'boost_library_path', 'boost_library_suffix')
+Export('env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

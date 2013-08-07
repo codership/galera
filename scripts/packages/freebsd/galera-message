@@ -1,0 +1,16 @@
+************************************************************************
+
+If you want to run Galera Arbitrator Daemon (garbd),
+remember to configure garb service in /etc/rc.conf, e.g.:
+
+garb_enable="YES"
+garb_galera_nodes="1.1.1.1:4567"
+garb_galera_group="wsrep_cluster_name"
+garb_galera_options="gmcast.listen_addr=tcp://2.2.2.2:4567"
+garb_log_file="/tmp/garb.log"
+
+To start garbd, use command:
+
+sudo service garb start
+
+************************************************************************
