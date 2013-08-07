@@ -100,88 +100,88 @@ TARGET=${TARGET:-""} # default target
 while test $# -gt 0 
 do
     case $1 in 
-	--stage)
-	    initial_stage=$2
-	    shift
-	    ;;
-	--last-stage)
-	    last_stage=$2
-	    shift
-	    ;;
-	--gainroot)
-	    gainroot=$2
-	    shift
-	    ;;
-	-b|--bootstrap)
-	    BOOTSTRAP="yes" # Bootstrap the build system
-	    ;;
-	-c|--configure)
-	    CONFIGURE="yes" # Reconfigure the build system
-	    ;;
-	-s|--scratch)
-	    SCRATCH="yes"   # Build from scratch (run make clean)
-	    ;;
-	-o|--opt)
-	    OPT="yes"       # Compile without debug
-	    ;;
-	-d|--debug)
-	    DEBUG="yes"     # Compile with debug
-	    NO_STRIP="yes"
-	    ;;
-	-r|--release)
-	    RELEASE="$2"
-	    shift
-	    ;;
-	-m32)
-	    CFLAGS="$CFLAGS -m32"
-	    CXXFLAGS="$CXXFLAGS -m32"
-	    SCRATCH="yes"
-	    TARGET="i686"
-	    ;;
-	-m64)
-	    CFLAGS="$CFLAGS -m64"
-	    CXXFLAGS="$CXXFLAGS -m64"
-	    SCRATCH="yes"
-	    TARGET="x86_64"
-	    ;;
-	-p|--package)
-	    PACKAGE="yes"   # build binary packages
-	    ;;
-	--with*-spread)
-	    WITH_SPREAD="$1"
-	    ;;
-	--help)
-	    usage
-	    exit 0
-	    ;;
-	--source)
-	    SOURCE="yes"
-	    ;;
-	--sb)
-	    SKIP_BUILD="yes"
-	    ;;
-	--scons)
-	    SCONS="yes"
-	    ;;
-	--so)
-	    SCONS_OPTS="$SCONS_OPTS $2"
-	    shift
-	    ;;
-	-j|--jobs)
-	    JOBS=$2
-	    shift
-	    ;;
-	--dl)
-	    DEBUG_LEVEL=$2
-	    shift
-	    ;;
-	*)
-	    if test ! -z "$1"; then
-	       echo "Unrecognized option: $1"
-	    fi
-	    usage
-	    exit 1
-	    ;;
+        --stage)
+            initial_stage=$2
+            shift
+            ;;
+        --last-stage)
+            last_stage=$2
+            shift
+            ;;
+        --gainroot)
+            gainroot=$2
+            shift
+            ;;
+        -b|--bootstrap)
+            BOOTSTRAP="yes" # Bootstrap the build system
+            ;;
+        -c|--configure)
+            CONFIGURE="yes" # Reconfigure the build system
+            ;;
+        -s|--scratch)
+            SCRATCH="yes"   # Build from scratch (run make clean)
+            ;;
+        -o|--opt)
+            OPT="yes"       # Compile without debug
+            ;;
+        -d|--debug)
+            DEBUG="yes"     # Compile with debug
+            NO_STRIP="yes"
+            ;;
+        -r|--release)
+            RELEASE="$2"
+            shift
+            ;;
+        -m32)
+            CFLAGS="$CFLAGS -m32"
+            CXXFLAGS="$CXXFLAGS -m32"
+            SCRATCH="yes"
+            TARGET="i686"
+            ;;
+        -m64)
+            CFLAGS="$CFLAGS -m64"
+            CXXFLAGS="$CXXFLAGS -m64"
+            SCRATCH="yes"
+            TARGET="x86_64"
+            ;;
+        -p|--package)
+            PACKAGE="yes"   # build binary packages
+            ;;
+        --with*-spread)
+            WITH_SPREAD="$1"
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        --source)
+            SOURCE="yes"
+            ;;
+        --sb)
+            SKIP_BUILD="yes"
+            ;;
+        --scons)
+            SCONS="yes"
+            ;;
+        --so)
+            SCONS_OPTS="$SCONS_OPTS $2"
+            shift
+            ;;
+        -j|--jobs)
+            JOBS=$2
+            shift
+            ;;
+        --dl)
+            DEBUG_LEVEL=$2
+            shift
+            ;;
+        *)
+            if test ! -z "$1"; then
+               echo "Unrecognized option: $1"
+            fi
+            usage
+            exit 1
+            ;;
     esac
     shift
 done
@@ -269,11 +269,10 @@ build_packages()
              --output-dir $ARCH $STRIP_OPT galera # && \
         $SUDO /bin/chown -R $WHOAMI.users $ARCH
     elif [ "$OS" == "FreeBSD" ]; then
-        echo "Working directory: $PWD"
-        env
-        $SUDO /usr/local/bin/epm -v -v -v -n -m "$ARCH" -a "$ARCH" -f "bsd" \
-             --output-dir $ARCH $STRIP_OPT galera # && \
-        $SUDO /usr/sbin/chown -R `id -u`:`id -g` $ARCH
+        if test "$NO_STRIP" != "yes"; then
+            strip $build_base/{garb/garbd,libgalera_smm.so}
+        fi
+        ./freebsd.sh $GALERA_VER
     else # build RPM
         ./rpm.sh $GALERA_VER
     fi
@@ -285,7 +284,7 @@ build_packages()
     if [ $DEBIAN -ne 0 ]; then
         mv -f $PKG_DIR/$ARCH/*.deb ./
     elif [ "$OS" == "FreeBSD" ]; then
-	mv -f $PKG_DIR/$ARCH/*.tbz ./
+        mv -f $PKG_DIR/*.tbz ./
     else
         mv -f $PKG_DIR/$ARCH/*.rpm ./
     fi
