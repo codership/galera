@@ -362,8 +362,10 @@ then
 
         BUILD_OPT=""
         if [ "$OS" == "FreeBSD" ]; then
+            # don't use INSTALL_LAYOUT=STANDALONE(default), it assumes prefix=.
             CMAKE_LAYOUT_OPTIONS=(
                 -DCMAKE_INSTALL_PREFIX="/usr/local" \
+                -DINSTALL_LAYOUT=RPM \
                 -DMYSQL_UNIX_ADDR="/tmp/mysql.sock" \
                 -DINSTALL_BINDIR="bin" \
                 -DINSTALL_DOCDIR="share/doc/mysql" \
@@ -523,21 +525,26 @@ install_mysql_5.1_demo()
 
 install_mysql_5.5_dist()
 {
-    mkdir -p $DIST_DIR/mysql/etc
-    pushd $MYSQL_BUILD_DIR
     export DESTDIR=$BUILD_ROOT/dist/mysql
+    mkdir -p $DESTDIR
+    pushd $MYSQL_BUILD_DIR
+    make install
+    popd
+    unset DESTDIR
+}
+
+install_mysql_5.5_demo()
+{
+    export DESTDIR=$BUILD_ROOT/dist/mysql
+    mkdir -p $DESTDIR
+    pushd $MYSQL_BUILD_DIR
     cmake -DCMAKE_INSTALL_COMPONENT=Server -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=Client -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=SharedLibraries -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=ManPages -P cmake_install.cmake
     [ "$DEBUG" == "yes" ] && cmake -DCMAKE_INSTALL_COMPONENT=Debuginfo -P cmake_install.cmake
-    unset DESTDIR
     popd
-}
-
-install_mysql_5.5_demo()
-{
-    install_mysql_5.5_dist
+    unset DESTDIR
     pushd $MYSQL_DIST_DIR
     mv usr/local/* ./ && rmdir usr/local # FreeBSD
     [ -d libexec -a ! -a sbin ] && mv libexec sbin # FreeBSD
@@ -710,14 +717,13 @@ build_freebsd_packages()
 {
     echo "Creating FreeBSD packages"
     # Create build directory structure
-    DIST_DIR=$BUILD_ROOT/pkg
+    DIST_DIR=$BUILD_ROOT/dist/mysql
     MYSQL_DIST_DIR=$DIST_DIR/usr/local
     MYSQL_DIST_CNF=$MYSQL_DIST_DIR/etc/my.cnf
-    GALERA_DIST_DIR=$DIST_DIR/usr/local
     MYSQL_BINS=$MYSQL_DIST_DIR/bin
 
     cd $BUILD_ROOT
-    rm -rf $DIST_DIR
+    rm -rf $BUILD_ROOT/dist
 
     install_mysql_5.5_dist > /dev/null
     install -m 755 -d $(dirname $MYSQL_DIST_CNF)
@@ -726,40 +732,18 @@ build_freebsd_packages()
     cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
-    tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
-    install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
+    install -m 755 -d $MYSQL_DIST_DIR/share/doc/mysql
+    install -m 644 LICENSE.mysql $MYSQL_DIST_DIR/share/doc/mysql
 
-    # Copy required Galera libraries
-    GALERA_BINS=$GALERA_DIST_DIR/bin
-    GALERA_LIBS=$GALERA_DIST_DIR/lib
-    install -m 755 -d $GALERA_DIST_DIR
-    install -m 644 ../../LICENSE $GALERA_DIST_DIR/LICENSE.galera
-    install -m 755 -d $GALERA_BINS
-    install -m 755 -d $GALERA_LIBS
-
-    if [ "$SCONS" == "yes" ]; then
-        SCONS_VD=$GALERA_SRC
-        cp -P $SCONS_VD/garb/garbd       $GALERA_BINS
-        cp -P $SCONS_VD/libgalera_smm.so $GALERA_LIBS
-        if [ "$OS" == "Darwin" -a "$DEBUG" == "yes" ]; then
-            cp -P -R $SCONS_VD/garb/garbd.dSYM       $GALERA_BINS
-            cp -P -R $SCONS_VD/libgalera_smm.so.dSYM $GALERA_LIBS
-        fi
-    else
-        echo "Autotools compilation not supported any more."
-        exit 1
-    fi
-
-    install -m 644 LICENSE       $DIST_DIR
-    install -m 755 mysql-galera  $DIST_DIR
-    install -m 644 README        $DIST_DIR
-    install -m 644 QUICK_START   $DIST_DIR
+    install -m 644 LICENSE       $DIST_DIR/usr/local/share/doc/mysql/LICENSE.wsrep
+    install -m 644 README        $DIST_DIR/usr/local/share/doc/mysql/README.wsrep
+    install -m 644 QUICK_START   $DIST_DIR/usr/local/share/doc/mysql/QUICK_START.wsrep
+    install -m 755 mysql-galera  $DIST_DIR/usr/local/bin/mysql-galera
 
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
     then
-         for d in $GALERA_BINS $GALERA_LIBS \
-                 $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib $MYSQL_DIST_DIR/libexec
+         for d in $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib $MYSQL_DIST_DIR/libexec
         do
             for f in $d/*
             do
@@ -768,44 +752,24 @@ build_freebsd_packages()
         done
     fi
 
-#    pushd $GALERA_SRC/scripts/mysql
-#
-#    local ARCH=$(get_arch)
-#    local WHOAMI=$(whoami)
-#
-#    local STRIP_OPT=""
-#    [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
-#
-#    export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
-#    export WSREP_VER=${RELEASE:-"$WSREP_REV"}
-#
-#    echo $MYSQL_SRC $MYSQL_VER $ARCH
-#    rm -rf $ARCH
-#
-#    set +e
-#    local pkg_uniquename="mysql-wsrep-server"
-#    local pkg_basename="mysql55-wsrep-server"
-#    cd freebsd
-#    $SUDO pkg_create
-#    RET=$?
-#    $SUDO /bin/chown -R `id -u`:`id -g` $ARCH
-#
-#    popd
-#    return $RET
+    pwd
+    ./freebsd.sh $MYSQL_VER $RELEASE
+    rm -rf $BUILD_ROOT/dist
 }
 
 if [ "$PACKAGE" == "yes" ]; then
     case "$OS" in
         Linux)
             build_linux_packages
-	    ;;
-	FreeBSD)
+            ;;
+        FreeBSD)
             build_freebsd_packages
-	    ;;
-	*)
-	    echo "packages for $OS are not supported."
-	    return 1
-	    ;;
+            mv *.tbz ../..
+            ;;
+        *)
+            echo "packages for $OS are not supported."
+            return 1
+            ;;
     esac
 fi
 #

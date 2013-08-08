@@ -27,16 +27,16 @@ install -m 444 "$PBD/scripts/packages/README-MySQL"   "$PBR/share/doc/galera/REA
 install -m 644 "$SCRIPT_ROOT/freebsd/galera-plist"  "$PBR/galera-plist"
 sed -e "s!%{SRCDIR}!$PBR!" -e "s!%{VERSION}!$1!" -i "" "$PBR/galera-plist"
 for pkg in $(grep '^@comment DEPORIGIN:' "$PBR/galera-plist" | cut -d : -f 2); do
-	pkgdep=$(/usr/sbin/pkg_info -q -O "$pkg")
-	sed -e "s!^@comment DEPORIGIN:$pkg!@pkgdep $pkgdep"$'\\\n&!' -i "" "$PBR/galera-plist"
+        pkgdep=$(/usr/sbin/pkg_info -q -O "$pkg")
+        sed -e "s!^@comment DEPORIGIN:$pkg!@pkgdep $pkgdep"$'\\\n&!' -i "" "$PBR/galera-plist"
 done
 
 /usr/sbin/pkg_create -c "$SCRIPT_ROOT/freebsd/galera-comment" \
-	             -d "$SCRIPT_ROOT/freebsd/galera-descr" \
-		     -m "$SCRIPT_ROOT/freebsd/galera-mtree" \
-		     -D "$SCRIPT_ROOT/freebsd/galera-message" \
-		     -f "$PBR/galera-plist" \
-		     -v "galera-$1-$(uname -m).tbz"
+                     -d "$SCRIPT_ROOT/freebsd/galera-descr" \
+                     -m "$SCRIPT_ROOT/freebsd/galera-mtree" \
+                     -D "$SCRIPT_ROOT/freebsd/galera-message" \
+                     -f "$PBR/galera-plist" \
+                     -v "galera-$1-$(uname -m).tbz"
 
 rm -rf "$PBR"
 

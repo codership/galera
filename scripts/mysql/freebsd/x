@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+pkg_create -c pkg-comment-server -d pkg-descr -f pkg-plist-server -m pkg-mtree -D pkg-display-server mysql55-wsrep-server.tbz
+#pkg_create -c pkg-comment-client -d pkg-descr -f pkg-plist-client -m pkg-mtree mysql55-wsrep-client.tbz
