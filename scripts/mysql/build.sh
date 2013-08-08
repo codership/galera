@@ -735,10 +735,10 @@ build_freebsd_packages()
     install -m 755 -d $MYSQL_DIST_DIR/share/doc/mysql
     install -m 644 LICENSE.mysql $MYSQL_DIST_DIR/share/doc/mysql
 
-    install -m 644 LICENSE       $DIST_DIR/usr/local/share/doc/mysql/LICENSE.wsrep
-    install -m 644 README        $DIST_DIR/usr/local/share/doc/mysql/README.wsrep
-    install -m 644 QUICK_START   $DIST_DIR/usr/local/share/doc/mysql/QUICK_START.wsrep
-    install -m 755 mysql-galera  $DIST_DIR/usr/local/bin/mysql-galera
+    install -m 644 LICENSE                  $DIST_DIR/usr/local/share/doc/mysql/LICENSE.wsrep
+    install -m 644 README                   $DIST_DIR/usr/local/share/doc/mysql/README.wsrep
+    install -m 644 QUICK_START              $DIST_DIR/usr/local/share/doc/mysql/QUICK_START.wsrep
+    install -m 755 freebsd/mysql-galera.sh  $DIST_DIR/usr/local/bin/mysql-galera
 
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
