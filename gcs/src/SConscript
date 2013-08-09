@@ -59,3 +59,4 @@ gcs4garb_env.VariantDir(garb_obj_dir, '.', duplicate = 0)
 garb_sources = [ garb_obj_dir + '/' + src for src in libgcs_sources ]
 gcs4garb_env.StaticLibrary('gcs4garb', garb_sources)
 
+Clean('.', garb_obj_dir)

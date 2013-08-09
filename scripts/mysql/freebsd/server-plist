@@ -1,0 +1,226 @@
+@comment PKG_FORMAT_REVISION:1.1
+@name mysql-server-5.5.31_wsrep_%{VERSION}
+@comment ORIGIN:databases/mysql55-server_wsrep
+@cwd /usr/local
+@srcdir %{SRCDIR}
+@comment "=== dependencies ==="
+@comment "require /usr/local/lib/gcc44/libstdc++.so"
+@comment // @pkgdep gcc-4.4.7,1
+@comment DEPORIGIN:lang/gcc44
+@comment // @pkgdep libexecinfo-1.1_3
+@comment DEPORIGIN:devel/libexecinfo
+@pkgdep mysql-client-5.5.31_wsrep_%{VERSION}
+@comment DEPORIGIN:databases/mysql55-client_wsrep
+@conflicts mysql-server-[345].*
+@conflicts mysql-server-5.[0-46-9].*
+@comment "=== preinstall stage ==="
+@exec echo "===> Linking /usr/local/bin/bash to /bin/bash"
+@exec [ -x /bin/bash ] && echo "Using existing /bin/bash." || ln -s ../usr/local/bin/bash /bin/bash
+@exec echo "===> Creating users and/or groups."
+@exec if ! /usr/sbin/pw groupshow mysql >/dev/null 2>&1; then  echo "Creating group 'mysql' with gid '88'.";  /usr/sbin/pw groupadd mysql -g 88; else echo "Using existing group 'mysql'."; fi
+@exec if ! /usr/sbin/pw usershow mysql >/dev/null 2>&1; then  echo "Creating user 'mysql' with uid '88'.";  /usr/sbin/pw useradd mysql -u 88 -g 88  -c "MySQL Daemon" -d /var/db/mysql -s /usr/sbin/nologin;  else echo "Using existing user 'mysql'."; fi
+@exec install -d -g 88 -o 88 /var/db/mysql
+@comment "=== preremove stage ==="
+@unexec %D/etc/rc.d/mysql-server forcestop 2>/dev/null || true
+@comment "=== file section ==="
+@owner root
+@group wheel
+@mode 0444
+@comment // man/man1/my_print_defaults.1.gz
+@comment // man/man1/myisam_ftdump.1.gz
+@comment // man/man1/myisamchk.1.gz
+@comment // man/man1/myisamlog.1.gz
+@comment // man/man1/myisampack.1.gz
+@comment // man/man1/mysql.server.1.gz
+@comment // man/man1/mysql_convert_table_format.1.gz
+@comment // man/man1/mysql_fix_extensions.1.gz
+@comment // man/man1/mysql_install_db.1.gz
+@comment // man/man1/mysql_plugin.1.gz
+@comment // man/man1/mysql_secure_installation.1.gz
+@comment // man/man1/mysql_setpermission.1.gz
+@comment // man/man1/mysql_tzinfo_to_sql.1.gz
+@comment // man/man1/mysql_upgrade.1.gz
+@comment // man/man1/mysql_zap.1.gz
+@comment // man/man1/mysqlbug.1.gz
+@comment // man/man1/mysqld_multi.1.gz
+@comment // man/man1/mysqld_safe.1.gz
+@comment // man/man1/mysqldumpslow.1.gz
+@comment // man/man1/mysqlhotcopy.1.gz
+man/man1/mysqlman.1.gz
+@comment // man/man1/mysqltest.1.gz
+@comment // man/man1/perror.1.gz
+@comment // man/man1/replace.1.gz
+@comment // man/man1/resolve_stack_dump.1.gz
+@comment // man/man1/resolveip.1.gz
+@comment // man/man8/mysqld.8.gz
+@mode 0555
+bin/innochecksum
+bin/my_print_defaults
+bin/myisam_ftdump
+bin/myisamchk
+bin/myisamlog
+bin/myisampack
+bin/mysql_convert_table_format
+bin/mysql_fix_extensions
+bin/mysql_install_db
+bin/mysql_plugin
+bin/mysql_secure_installation
+bin/mysql_setpermission
+bin/mysql_tzinfo_to_sql
+bin/mysql_upgrade
+bin/mysql_zap
+bin/mysqlbug
+bin/mysqld_multi
+bin/mysqld_safe
+bin/mysqldumpslow
+bin/mysqlhotcopy
+bin/mysqltest
+bin/perror
+bin/replace
+bin/resolve_stack_dump
+bin/resolveip
+@mode 0444
+@ignore
+lib/mysql/libmysqld.a
+lib/mysql/plugin/adt_null.so
+lib/mysql/plugin/auth.so
+lib/mysql/plugin/auth_test_plugin.so
+lib/mysql/plugin/daemon_example.ini
+@ignore
+lib/mysql/plugin/ha_archive.so
+@ignore
+lib/mysql/plugin/ha_blackhole.so
+@ignore
+lib/mysql/plugin/ha_example.so
+@ignore
+lib/mysql/plugin/ha_federated.so
+lib/mysql/plugin/libdaemon_example.so
+lib/mysql/plugin/mypluglib.so
+lib/mysql/plugin/qa_auth_client.so
+lib/mysql/plugin/qa_auth_interface.so
+lib/mysql/plugin/qa_auth_server.so
+lib/mysql/plugin/semisync_master.so
+lib/mysql/plugin/semisync_slave.so
+@mode 0555
+libexec/mysqld
+share/mysql/binary-configure
+@mode 0444
+share/mysql/charsets/Index.xml
+share/mysql/charsets/README
+share/mysql/charsets/armscii8.xml
+share/mysql/charsets/ascii.xml
+share/mysql/charsets/cp1250.xml
+share/mysql/charsets/cp1251.xml
+share/mysql/charsets/cp1256.xml
+share/mysql/charsets/cp1257.xml
+share/mysql/charsets/cp850.xml
+share/mysql/charsets/cp852.xml
+share/mysql/charsets/cp866.xml
+share/mysql/charsets/dec8.xml
+share/mysql/charsets/geostd8.xml
+share/mysql/charsets/greek.xml
+share/mysql/charsets/hebrew.xml
+share/mysql/charsets/hp8.xml
+share/mysql/charsets/keybcs2.xml
+share/mysql/charsets/koi8r.xml
+share/mysql/charsets/koi8u.xml
+share/mysql/charsets/latin1.xml
+share/mysql/charsets/latin2.xml
+share/mysql/charsets/latin5.xml
+share/mysql/charsets/latin7.xml
+share/mysql/charsets/macce.xml
+share/mysql/charsets/macroman.xml
+share/mysql/charsets/swe7.xml
+share/mysql/config.huge.ini
+share/mysql/config.medium.ini
+share/mysql/config.small.ini
+share/mysql/czech/errmsg.sys
+share/mysql/danish/errmsg.sys
+share/mysql/dutch/errmsg.sys
+share/mysql/english/errmsg.sys
+share/mysql/errmsg-utf8.txt
+share/mysql/estonian/errmsg.sys
+share/mysql/fill_help_tables.sql
+share/mysql/french/errmsg.sys
+share/mysql/german/errmsg.sys
+share/mysql/greek/errmsg.sys
+share/mysql/hungarian/errmsg.sys
+share/mysql/italian/errmsg.sys
+share/mysql/japanese/errmsg.sys
+share/mysql/korean/errmsg.sys
+share/mysql/magic
+share/mysql/my-huge.cnf
+share/mysql/my-innodb-heavy-4G.cnf
+share/mysql/my-large.cnf
+share/mysql/my-medium.cnf
+share/mysql/my-small.cnf
+share/mysql/mysql-log-rotate
+share/mysql/mysql.server
+share/mysql/mysql_system_tables.sql
+share/mysql/mysql_system_tables_data.sql
+share/mysql/mysql_test_data_timezone.sql
+share/mysql/mysqld_multi.server
+share/mysql/ndb-config-2-node.ini
+share/mysql/norwegian-ny/errmsg.sys
+share/mysql/norwegian/errmsg.sys
+share/mysql/polish/errmsg.sys
+share/mysql/portuguese/errmsg.sys
+share/mysql/romanian/errmsg.sys
+share/mysql/russian/errmsg.sys
+share/mysql/serbian/errmsg.sys
+share/mysql/slovak/errmsg.sys
+share/mysql/spanish/errmsg.sys
+share/mysql/swedish/errmsg.sys
+share/mysql/ukrainian/errmsg.sys
+@comment "wsrep specific
+@mode 0555
+bin/wsrep_sst_common
+bin/wsrep_sst_mysqldump
+bin/wsrep_sst_rsync
+bin/wsrep_sst_rsync_wan
+bin/wsrep_sst_xtrabackup
+bin/mysql-galera
+@mode 0444
+share/mysql/wsrep.cnf
+share/mysql/wsrep_notify
+share/doc/mysql/LICENSE.mysql
+share/doc/mysql/LICENSE.wsrep
+share/doc/mysql/README.wsrep
+share/doc/mysql/QUICK_START.wsrep
+@mode 0555
+etc/rc.d/mysql-server
+@comment // info/mysql.info
+@comment "=== postinstall stage ==="
+@comment // @exec && install-info --quiet %D/info/mysql.info %D/info/dir
+@comment "=== postremove stage ==="
+@dirrm lib/mysql/plugin
+@unexec rmdir "%D/lib/mysql" 2>/dev/null || true
+@dirrm share/mysql/charsets
+@dirrm share/mysql/czech
+@dirrm share/mysql/danish
+@dirrm share/mysql/dutch
+@dirrm share/mysql/english
+@dirrm share/mysql/estonian
+@dirrm share/mysql/french
+@dirrm share/mysql/german
+@dirrm share/mysql/greek
+@dirrm share/mysql/hungarian
+@dirrm share/mysql/italian
+@dirrm share/mysql/japanese
+@dirrm share/mysql/korean
+@dirrm share/mysql/norwegian
+@dirrm share/mysql/norwegian-ny
+@dirrm share/mysql/polish
+@dirrm share/mysql/portuguese
+@dirrm share/mysql/romanian
+@dirrm share/mysql/russian
+@dirrm share/mysql/serbian
+@dirrm share/mysql/slovak
+@dirrm share/mysql/spanish
+@dirrm share/mysql/swedish
+@dirrm share/mysql/ukrainian
+@dirrm share/mysql
+@comment // @unexec [ -f %D/info/mysql.info ] && install-info --quiet --delete %D/info/mysql.info %D/info/dir
+@comment // @unexec if [ -f %D/info/dir ]; then if sed -e '1,/Menu:/d' %D/info/dir | grep -q '^[*] '; then true; else rm %D/info/dir; fi; fi
+@unexec if /usr/sbin/pw user show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" user. "; fi
+@unexec if /usr/sbin/pw group show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" group. "; fi

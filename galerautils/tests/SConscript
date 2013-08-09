@@ -27,6 +27,8 @@ gu_tests = env.Program(target = 'gu_tests',
 env.Test("gu_tests.passed", gu_tests)
 env.Alias("test", "gu_tests.passed")
 
+Clean(gu_tests, '#/gu_tests.log')
+
 
 gu_testspp = env.Program(target = 'gu_tests++',
                          source = Split('''
@@ -40,3 +42,5 @@ gu_testspp = env.Program(target = 'gu_tests++',
 
 env.Test("gu_tests++.passed", gu_testspp)
 env.Alias("test", "gu_tests++.passed")
+
+Clean(gu_testspp, '#/gu_tests++.log')

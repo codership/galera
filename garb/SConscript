@@ -1,47 +1,16 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-Import('env')
+Import('env', 'libboost_program_options')
 
 garb_env = env.Clone()
-conf = Configure(garb_env)
-
-if not conf.CheckLibWithHeader(libs=['boost_program_options'],
-                               header='boost/program_options.hpp',
-                               language='CXX',
-                               autoadd=0):
-    print 'Error: boost_program_options not found'
-    Exit (1)
 
 garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 garb_env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
 garb_env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
 
-#bpo_static = '/usr/lib/libboost_program_options.a'
-#bpo_local_static = '/usr/local/lib/libboost_program_options.a'
-
-Import('LIBBOOST_PROGRAM_OPTIONS_A')
-
-import os
-
-if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-    if LIBBOOST_PROGRAM_OPTIONS_A != '':
-        print 'ERROR: file \'' + LIBBOOST_PROGRAM_OPTIONS_A + '\' does not exist'
-        Exit(1)
-    else:
-        LIBBOOST_PROGRAM_OPTIONS_A = '/usr/local/lib/libboost_program_options.a'
-        if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-            LIBBOOST_PROGRAM_OPTIONS_A = '/usr/local/lib64/libboost_program_options.a'
-            if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-                LIBBOOST_PROGRAM_OPTIONS_A = '/usr/lib/libboost_program_options.a'
-                if not os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-                    LIBBOOST_PROGRAM_OPTIONS_A = '/usr/lib64/libboost_program_options.a'
-
-if os.path.isfile(LIBBOOST_PROGRAM_OPTIONS_A):
-    garb_env.Append(LIBS=File(LIBBOOST_PROGRAM_OPTIONS_A))
-else:
-    # as a last resort try shared library
-    garb_env.Append(LIBS=['boost_program_options'])
+if libboost_program_options:
+    garb_env.Append(LIBS=libboost_program_options)
 
 # special environment for garb_config.cpp
 conf_env = garb_env.Clone()
@@ -50,13 +19,12 @@ conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
 conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
 
 garb = garb_env.Program(target = 'garbd',
-                   source = Split('''
-                                  garb_logger.cpp
-                                  garb_gcs.cpp
-                                  garb_recv_loop.cpp
-                                  garb_main.cpp
-                              ''')
-                              +
-                              conf_env.SharedObject(['garb_config.cpp'])
-                   )
-
+                        source = Split('''
+                                       garb_logger.cpp
+                                       garb_gcs.cpp
+                                       garb_recv_loop.cpp
+                                       garb_main.cpp
+                                   ''')
+                                   +
+                                   conf_env.SharedObject(['garb_config.cpp'])
+                       )

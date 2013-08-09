@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
  *
- * $Id: gu_throw.hpp 3032 2013-04-06 20:29:33Z alex $
+ * $Id$
  */
 
 /*!
@@ -56,7 +56,7 @@ namespace gu
         ThrowError (const char* file_,
                     const char* func_,
                     int         line_,
-                    int         err_ = Exception::E_UNSPEC)
+                    int         err_)
             :
             base (file_, func_, line_),
             err  (err_)
@@ -94,7 +94,7 @@ namespace gu
         {
             base.os << " (FATAL)";
 
-            Exception e(base.os.str(), Exception::E_NOTRECOVERABLE);
+            Exception e(base.os.str(), ENOTRECOVERABLE);
 
             e.trace (base.file, base.func, base.line);
 

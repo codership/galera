@@ -12,6 +12,11 @@
 #include "gu_macros.h"
 #include "gu_exception.hpp"
 
+#if defined(__GNUC__) && defined(__FreeBSD__)
+// error: 'class gu::Cond' has pointer data members
+# pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
 // TODO: make exceptions more verbose
 
 namespace gu
@@ -20,7 +25,9 @@ namespace gu
     {
 
         friend class Lock;
-
+        // non-copyable
+        Cond(const Cond&);
+        void operator=(const Cond&);
     protected:
 
         pthread_cond_t mutable cond;
@@ -62,5 +69,9 @@ namespace gu
 
     };
 }
+
+#if defined(__GNUC__) && defined(__FreeBSD__)
+# pragma GCC diagnostic error "-Weffc++"
+#endif
 
 #endif // __GU_COND__
