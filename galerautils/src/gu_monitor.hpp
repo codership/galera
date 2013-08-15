@@ -17,10 +17,6 @@
 
 #include <cassert>
 
-#ifndef NDEBUG /* warning on Darwin, where pthread_t is a pointer */
-#pragma GCC diagnostic ignored "-Weffc++"
-#endif
-
 namespace gu
 {
     class Monitor;
@@ -38,6 +34,10 @@ class gu::Monitor
 #endif
 
     // copy contstructor and operator= disabled by mutex and cond members.
+    // but on Darwin, we got an error 'class gu::Monitor' has pointer data members
+    // so make non-copyable explicitly
+    Monitor(const Monitor&);
+    void operator=(const Monitor&);
 
 public:
 
