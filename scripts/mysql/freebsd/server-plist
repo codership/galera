@@ -179,7 +179,6 @@ bin/wsrep_sst_mysqldump
 bin/wsrep_sst_rsync
 bin/wsrep_sst_rsync_wan
 bin/wsrep_sst_xtrabackup
-bin/mysql-galera
 @mode 0444
 share/mysql/wsrep.cnf
 share/mysql/wsrep_notify
