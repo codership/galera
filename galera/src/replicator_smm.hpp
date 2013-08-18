@@ -48,7 +48,7 @@ namespace galera
 
         ~ReplicatorSMM();
 
-        int trx_proto_ver() const { return trx_proto_ver_; }
+        int trx_proto_ver() const { return trx_params_.version_; }
 
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,
@@ -132,6 +132,7 @@ namespace galera
             static const std::string base_host;
             static const std::string base_port;
             static const std::string proto_max;
+            static const std::string key_format;
         };
 
         typedef std::pair<std::string, std::string> Default;
@@ -377,11 +378,10 @@ namespace galera
         }
         set_defaults_; // sets missing parameters to default values
 
-//        static int const      MAX_PROTO_VER = 5;
         static int const       MAX_PROTO_VER;
         /*
          * |------------------------------------------------------
-         * | protocol_version_ | trx_proto_ver_ | str_proto_ver_ |
+         * | protocol_version_ |  trx  version  | str_proto_ver_ |
          * |------------------------------------------------------
          * |                 1 |              1 |              0 |
          * |                 2 |              1 |              1 |
@@ -391,10 +391,9 @@ namespace galera
          * -------------------------------------------------------
          */
 
-        int                    trx_proto_ver_;// transaction protocol
         int                    str_proto_ver_;// state transfer request protocol
         int                    protocol_version_;// general repl layer proto
-        int                    proto_max_;    // maximum allowed WS version
+        int                    proto_max_;    // maximum allowed proto version
 
         FSM<State, Transition> state_;
         SstState               sst_state_;
@@ -406,6 +405,9 @@ namespace galera
         std::string           data_dir_;
         std::string           state_file_;
         SavedState            st_;
+
+        // currently installed trx parameters
+        TrxHandle::Params     trx_params_;
 
         // identifiers
         wsrep_uuid_t          uuid_;
@@ -454,6 +456,10 @@ namespace galera
         gu::Atomic<size_t>    receivers_;
         gu::Atomic<long long> replicated_;
         gu::Atomic<long long> replicated_bytes_;
+        gu::Atomic<long long> keys_count_;
+        gu::Atomic<long long> keys_bytes_;
+        gu::Atomic<long long> data_bytes_;
+        gu::Atomic<long long> unrd_bytes_;
         gu::Atomic<long long> local_commits_;
         gu::Atomic<long long> local_rollbacks_;
         gu::Atomic<long long> local_cert_failures_;

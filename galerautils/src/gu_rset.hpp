@@ -435,9 +435,9 @@ private:
     RecordSetInBase& operator= (const RecordSetInBase r);
 #if 0
     {
-        std::swap(head_,        r.head_);
-        std::swap(begin,        r.begin_);
-        std::swap(next_,        r.next_);
+        std::swap(head_, r.head_);
+        std::swap(begin, r.begin_);
+        std::swap(next_, r.next_);
     }
 #endif
 }; /* class RecordSetInBase */

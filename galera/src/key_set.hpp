@@ -38,6 +38,8 @@ public:
         throw_version(ver);
     }
 
+    static Version version (const std::string& ver);
+
     class Key
     {
     public:
@@ -316,7 +318,6 @@ public:
         }
     }; /* functor KeyPartEqual */
 
-private:
     static void throw_version(int) GU_NORETURN;
 }; /* class KeySet */
 
@@ -492,7 +493,8 @@ private:
         case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
         default: return gu::RecordSet::CHECK_MMH128;
         }
-        throw;
+
+        KeySet::throw_version(ver);
     }
 
     static gu::RecordSet::Version
@@ -503,7 +505,8 @@ private:
         case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
         default: return gu::RecordSet::VER1;
         }
-        throw;
+
+        KeySet::throw_version(ver);
     }
 
 }; /* class KeySetOut */

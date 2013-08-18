@@ -74,7 +74,8 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
 
 galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
     :
-    trx_(new TrxHandle()) // TODO: this dynamic allocation should be unnecessary
+    trx_(new TrxHandle())
+    // TODO: this dynamic allocation should be unnecessary
 {
     assert(act.seqno_l != GCS_SEQNO_ILL);
     assert(act.seqno_g != GCS_SEQNO_ILL);

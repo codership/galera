@@ -32,6 +32,19 @@ namespace galera
     class TrxHandle
     {
     public:
+
+        struct Params
+        {
+            std::string     working_dir_;
+            int             version_;
+            KeySet::Version key_format_;
+
+            Params (const std::string& wdir, int ver, KeySet::Version kformat) :
+                working_dir_(wdir), version_(ver), key_format_(kformat) {}
+        };
+
+        static const Params Defaults;
+
         enum
         {
             F_COMMIT      = 1 << 0,
@@ -146,28 +159,29 @@ namespace galera
 
 
         explicit
-        TrxHandle(int                 version   = -1,
+        TrxHandle(const Params&       params    = Defaults,
                   const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
                   wsrep_conn_id_t     conn_id   = -1,
                   wsrep_trx_id_t      trx_id    = -1,
                   bool                local     = false)
             :
-            version_           (version),
+            version_           (params.version_),
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
             local_             (local),
             mutex_             (),
-            write_set_collection_(working_dir),
+            write_set_collection_(params.working_dir_),
             state_             (&trans_map_, S_EXECUTING),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
-            write_set_         (version),
-            write_set_out_     (working_dir + '/' + gu::to_string(trx_id,
-                                                                  std::hex)),
+            write_set_         (version_),
+            write_set_out_     (params.working_dir_ + '/' +
+                                gu::to_string(trx_id, std::hex),
+                                KeySet::version(params.key_format_)),
             write_set_in_      (),
             write_set_flags_   (0),
             certified_         (false),
@@ -179,7 +193,7 @@ namespace galera
             annotation_        (),
             write_set_buffer_  (0, 0),
             cert_keys_         ()
-        { }
+        {}
 
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
@@ -437,6 +451,18 @@ namespace galera
         void verify_checksum() const /* throws */
         {
             write_set_in_.verify_checksum();
+        }
+
+        void update_stats(gu::Atomic<long long>& kc,
+                          gu::Atomic<long long>& kb,
+                          gu::Atomic<long long>& db,
+                          gu::Atomic<long long>& ub)
+        {
+            assert(new_version());
+            kc += write_set_in_.keyset().count();
+            kb += write_set_in_.keyset().size();
+            db += write_set_in_.dataset().size();
+            ub += write_set_in_.unrdset().size();
         }
 
     private:

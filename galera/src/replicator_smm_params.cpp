@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2012-2013 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
 #include "gcs.hpp"
@@ -16,6 +16,8 @@ const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
     common_prefix + "causal_read_timeout";
 const std::string galera::ReplicatorSMM::Param::proto_max =
     common_prefix + "proto_max";
+const std::string galera::ReplicatorSMM::Param::key_format =
+    common_prefix + "key_format";
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
@@ -27,7 +29,8 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
     map_.insert(Default(CERTIFICATION_PARAM_LOG_CONFLICTS_STR,
                         CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR));
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
-    map_.insert(Default(Param::proto_max, gu::to_string(MAX_PROTO_VER)));
+    map_.insert(Default(Param::proto_max,  gu::to_string(MAX_PROTO_VER)));
+    map_.insert(Default(Param::key_format, "FLAT8"));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -94,6 +97,10 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     {
         // nothing to do here, these params take effect only at
         // provider (re)start
+    }
+    else if (key == Param::key_format)
+    {
+        trx_params_.key_format_ = KeySet::version(value);
     }
     else
     {

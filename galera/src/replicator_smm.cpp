@@ -167,7 +167,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults, args->node_address),
-    trx_proto_ver_      (-1),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
     proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),
@@ -179,6 +178,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_file_         (data_dir_.length() ?
                          data_dir_+'/'+GALERA_STATE_FILE : GALERA_STATE_FILE),
     st_                 (state_file_),
+    trx_params_         (data_dir_, -1,
+                         KeySet::version(config_.get(Param::key_format))),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
@@ -213,6 +214,10 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     receivers_          (),
     replicated_         (),
     replicated_bytes_   (),
+    keys_count_         (),
+    keys_bytes_         (),
+    data_bytes_         (),
+    unrd_bytes_         (),
     local_commits_      (),
     local_rollbacks_    (),
     local_cert_failures_(),
@@ -279,7 +284,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
 
-    cert_.assign_initial_position(seqno, trx_proto_ver_);
+    cert_.assign_initial_position(seqno, trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
 }
@@ -408,7 +413,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 {
-    return wsdb_.get_trx(trx_proto_ver_, uuid_, trx_id, false);
+    return wsdb_.get_trx(trx_params_, uuid_, trx_id, false);
 }
 
 galera::TrxHandle*
@@ -426,7 +431,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     }
     else
     {
-        trx = wsdb_.get_trx(trx_proto_ver_, uuid_, handle->trx_id, create);
+        trx = wsdb_.get_trx(trx_params_, uuid_, handle->trx_id, create);
         handle->opaque = trx;
     }
 
@@ -449,7 +454,7 @@ void galera::ReplicatorSMM::discard_local_trx(wsrep_trx_id_t trx_id)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
 {
-    return wsdb_.get_conn_query(trx_proto_ver_, uuid_, conn_id, create);
+    return wsdb_.get_conn_query(trx_params_, uuid_, conn_id, create);
 }
 
 
@@ -635,6 +640,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     {
         gu_trace(trx->unserialize(reinterpret_cast<const gu::byte_t*>(act.buf),
                                   act.size, 0));
+        trx->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
     }
 
     trx->set_received(act.buf, act.seqno_l, act.seqno_g);
@@ -1177,20 +1183,20 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
     switch (proto_ver)
     {
     case 1:
-        trx_proto_ver_ = 1;
+        trx_params_.version_ = 1;
         str_proto_ver_ = 0;
         break;
     case 2:
-        trx_proto_ver_ = 1;
+        trx_params_.version_ = 1;
         str_proto_ver_ = 1;
         break;
     case 3:
     case 4:
-        trx_proto_ver_ = 2;
+        trx_params_.version_ = 2;
         str_proto_ver_ = 1;
         break;
     case 5:
-        trx_proto_ver_ = 3;
+        trx_params_.version_ = 3;
         str_proto_ver_ = 1;
         break;
     default:
@@ -1201,7 +1207,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 
     protocol_version_ = proto_ver;
     log_info << "REPL Protocols: " << protocol_version_ << " ("
-              << trx_proto_ver_ << ", " << str_proto_ver_ << ")";
+              << trx_params_.version_ << ", " << str_proto_ver_ << ")";
 }
 
 static bool
@@ -1310,7 +1316,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_proto_ver_);
+        cert_.assign_initial_position(group_seqno, trx_params_.version_);
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;

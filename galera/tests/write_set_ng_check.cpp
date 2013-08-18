@@ -24,7 +24,7 @@ START_TEST (ver3_basic)
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
 
-    WriteSetOut wso ("ver3_basic", flag1, WriteSetNG::VER3);
+    WriteSetOut wso ("ver3_basic", KeySet::FLAT8A, flag1, WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 

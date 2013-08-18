@@ -77,11 +77,15 @@ typedef enum status_vars
     STATS_LAST_APPLIED,
     STATS_REPLICATED,
     STATS_REPLICATED_BYTES,
+    STATS_KEYS_COUNT,
+    STATS_KEYS_BYTES,
+    STATS_DATA_BYTES,
+    STATS_UNRD_BYTES,
     STATS_RECEIVED,
     STATS_RECEIVED_BYTES,
     STATS_LOCAL_COMMITS,
     STATS_LOCAL_CERT_FAILURES,
-    STATS_LOCAL_BF_ABORTS,
+//    STATS_LOCAL_BF_ABORTS,
     STATS_LOCAL_REPLAYS,
     STATS_LOCAL_SEND_QUEUE,
     STATS_LOCAL_SEND_QUEUE_AVG,
@@ -112,11 +116,15 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "last_committed",       WSREP_VAR_INT64,  { -1 } },
     { "replicated",           WSREP_VAR_INT64,  { 0 }  },
     { "replicated_bytes",     WSREP_VAR_INT64,  { 0 }  },
+    { "repl_keys",            WSREP_VAR_INT64,  { 0 }  },
+    { "repl_keys_bytes",      WSREP_VAR_INT64,  { 0 }  },
+    { "repl_data_bytes",      WSREP_VAR_INT64,  { 0 }  },
+    { "repl_other_bytes",     WSREP_VAR_INT64,  { 0 }  },
     { "received",             WSREP_VAR_INT64,  { 0 }  },
     { "received_bytes",       WSREP_VAR_INT64,  { 0 }  },
     { "local_commits",        WSREP_VAR_INT64,  { 0 }  },
     { "local_cert_failures",  WSREP_VAR_INT64,  { 0 }  },
-    { "local_bf_aborts",      WSREP_VAR_INT64,  { 0 }  },
+//    { "local_bf_aborts",      WSREP_VAR_INT64,  { 0 }  },
     { "local_replays",        WSREP_VAR_INT64,  { 0 }  },
     { "local_send_queue",     WSREP_VAR_INT64,  { 0 }  },
     { "local_send_queue_avg", WSREP_VAR_DOUBLE, { 0 }  },
@@ -166,11 +174,15 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
+    sv[STATS_KEYS_COUNT         ].value._int64  = keys_count_();
+    sv[STATS_KEYS_BYTES         ].value._int64  = keys_bytes_();
+    sv[STATS_DATA_BYTES         ].value._int64  = data_bytes_();
+    sv[STATS_UNRD_BYTES         ].value._int64  = unrd_bytes_();
     sv[STATS_RECEIVED           ].value._int64  = gcs_as_.received();
     sv[STATS_RECEIVED_BYTES     ].value._int64  = gcs_as_.received_bytes();
     sv[STATS_LOCAL_COMMITS      ].value._int64  = local_commits_();
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
-    sv[STATS_LOCAL_BF_ABORTS    ].value._int64  = local_bf_aborts_();
+//    sv[STATS_LOCAL_BF_ABORTS    ].value._int64  = local_bf_aborts_();
     sv[STATS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
 
     struct gcs_stats stats;

@@ -8,6 +8,9 @@
 
 #include "gu_serialize.hpp"
 
+const galera::TrxHandle::Params
+galera::TrxHandle::Defaults(".", -1, KeySet::MAX_VERSION);
+
 std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 {
     switch (s)

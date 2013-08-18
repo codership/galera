@@ -124,7 +124,7 @@ WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
     assert (ptr_);
     assert (size_ > 0);
     assert (seqno > 0);
-    assert (pa_range > 0);
+    assert (pa_range >= 0);
 
     /* only VER3 sypported so far */
     uint32_t* const pa(reinterpret_cast<uint32_t*>(ptr_ + V3_PA_RANGE));

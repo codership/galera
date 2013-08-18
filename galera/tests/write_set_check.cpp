@@ -380,14 +380,16 @@ START_TEST(test_cert_hierarchical_v1)
 
     TestEnv env;
     galera::Certification cert(env.conf(), env.thd());
-    cert.assign_initial_position(0, 1);
+    int const version(1);
+    cert.assign_initial_position(0, version);
+    galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
 
     mark_point();
 
     for (size_t i(0); i < nws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
-                                     wsi[i].trx_id, false));
+        TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
+                                     wsi[i].conn_id, wsi[i].trx_id, false));
         trx->append_key(KeyData(1, wsi[i].key, wsi[i].iov_len, 0, 0));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
@@ -501,13 +503,14 @@ START_TEST(test_cert_hierarchical_v2)
     galera::Certification cert(env.conf(), env.thd());
 
     cert.assign_initial_position(0, version);
+    galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
 
     mark_point();
 
     for (size_t i(0); i < nws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(version, wsi[i].uuid, wsi[i].conn_id,
-                                     wsi[i].trx_id, false));
+        TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
+                                     wsi[i].conn_id, wsi[i].trx_id, false));
         trx->append_key(KeyData(version, wsi[i].key, wsi[i].iov_len, 0,
                             (wsi[i].shared == true ? KeyOS::F_SHARED : 0)));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
@@ -545,6 +548,7 @@ START_TEST(test_trac_726)
     const int version(2);
     TestEnv env;
     galera::Certification cert(env.conf(), env.thd());
+    galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
     wsrep_uuid_t uuid1 = {{1, }};
     wsrep_uuid_t uuid2 = {{2, }};
     cert.assign_initial_position(0, version);
@@ -555,7 +559,7 @@ START_TEST(test_trac_726)
     wsrep_buf_t key2 = {void_cast("2"), 1};
 
     {
-        TrxHandle* trx(new TrxHandle(version, uuid1, 0, 0, false));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid1, 0, 0, false));
 
         trx->append_key(KeyData(version, &key1, 1, 0, 0));
         trx->set_last_seen_seqno(0);
@@ -578,7 +582,7 @@ START_TEST(test_trac_726)
     }
 
     {
-        TrxHandle* trx(new TrxHandle(version, uuid2, 0, 0, false));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid2, 0, 0, false));
 
         trx->append_key(KeyData(version, &key2, 1, 0, 0));
         trx->append_key(KeyData(version, &key2, 1, 0, KeyOS::F_SHARED));

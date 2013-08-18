@@ -8,6 +8,7 @@
 #include "gu_hexdump.hpp"
 
 #include <limits>
+#include <algorithm> // std::transform
 
 namespace galera
 {
@@ -15,7 +16,26 @@ namespace galera
 void
 KeySet::throw_version(int ver)
 {
-    gu_throw_error (EINVAL) << "Unrecognized KeySet version: " << ver;
+    gu_throw_error(EINVAL) << "Unsupported KeySet version: " << ver;
+}
+
+static const char* ver_str[KeySet::MAX_VERSION + 1] =
+{
+    "EMPTY", "FLAT8", "FLAT8A", "FLAT16", "FLAT16A"
+};
+
+KeySet::Version
+KeySet::version (const std::string& ver)
+{
+    std::string tmp(ver);
+    std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::toupper);
+
+    for (int i(EMPTY); i <= MAX_VERSION; ++i)
+    {
+        if (tmp == ver_str[i]) return version(i);
+    }
+
+    gu_throw_error(EINVAL) << "Unsupported KeySet version: " << ver; throw;
 }
 
 size_t
@@ -31,7 +51,8 @@ KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
         tmp_size += 1 + std::min<size_t>(parts[i].len, 255);
     }
     tmp_size = std::min(tmp_size, size);
-    ann_size = std::min<size_t>(tmp_size,std::numeric_limits<ann_size_t>::max());
+    ann_size = std::min<size_t>(tmp_size,
+                                std::numeric_limits<ann_size_t>::max());
 
     assert (ann_size <= size);
 
@@ -98,11 +119,6 @@ KeySet::KeyPart::throw_bad_prefix (gu::byte_t p)
 {
     gu_throw_error(EPROTO) << "Unsupported key prefix: " << p;
 }
-
-static const char* ver_str[KeySet::MAX_VERSION + 1] =
-{
-    "EMPTY", "FLAT8", "FLAT8A", "FLAT16", "FLAT16A"
-};
 
 void
 KeySet::KeyPart::throw_match_empty_key (Version my, Version other)

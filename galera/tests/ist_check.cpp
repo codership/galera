@@ -218,12 +218,14 @@ static int select_trx_version(int protocol_version)
 }
 
 
-static void test_ist_common(int version)
+static void test_ist_common(int const version)
 {
     using galera::KeyData;
     using galera::TrxHandle;
     using galera::KeyOS;
-    int trx_version(select_trx_version(version));
+    int const trx_version(select_trx_version(version));
+    galera::TrxHandle::Params const trx_params("", trx_version,
+                                               galera::KeySet::MAX_VERSION);
     gu::Config conf;
     std::string gcache_file("ist_check.cache");
     conf.set("gcache.name", gcache_file);
@@ -237,7 +239,7 @@ static void test_ist_common(int version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx(new TrxHandle(trx_version, uuid, 1234, 5678, false));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid, 1234, 5678, false));
         const wsrep_buf_t key[2] = {
             {"key1", 4},
             {"key2", 4}

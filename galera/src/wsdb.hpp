@@ -64,11 +64,15 @@ namespace galera
         typedef gu::UnorderedMap<wsrep_conn_id_t, Conn, ConnHash> ConnMap;
 
     public:
-        TrxHandle* get_trx(int version,
-                           const wsrep_uuid_t& source_id,
-                           wsrep_trx_id_t trx_id, bool create = false);
+
+        TrxHandle* get_trx(const TrxHandle::Params& params,
+                           const wsrep_uuid_t&      source_id,
+                           wsrep_trx_id_t           trx_id,
+                           bool                     create = false);
+
         void unref_trx(TrxHandle* trx);
-        TrxHandle* get_conn_query(int version,
+
+        TrxHandle* get_conn_query(const TrxHandle::Params&,
                                   const wsrep_uuid_t&,
                                   wsrep_conn_id_t conn_id,
                                   bool create = false);
@@ -82,7 +86,10 @@ namespace galera
 
     private:
         // Create new trx handle
-        TrxHandle* create_trx(int, const wsrep_uuid_t&, wsrep_trx_id_t trx_id);
+        TrxHandle* create_trx(const TrxHandle::Params& params,
+                              const wsrep_uuid_t&      source_id,
+                              wsrep_trx_id_t           trx_id);
+
         Conn& create_conn(wsrep_conn_id_t conn_id);
 
         static const size_t trx_mem_limit_ = 1 << 20;
