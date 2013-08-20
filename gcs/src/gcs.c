@@ -1564,6 +1564,8 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
 
                     if (orig_buf != act->buf) // action was allocated in gcache
                     {
+                        gu_debug("Freeing gcache buffer %p after receiving %d",
+                                 act->buf, ret);
                         gcs_gcache_free (conn->gcache, act->buf);
                         act->buf = orig_buf;
                     }
@@ -1612,15 +1614,15 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 
         ret = gcs_repl(conn, &action, false);
 
-        assert (action.buf != rst);
-
         gu_free (rst);
 
         *local = action.seqno_l;
 
         if (ret > 0) {
+            assert (action.buf != rst);
 #ifndef GCS_FOR_GARB
             assert (action.buf != NULL);
+            gcs_gcache_free (conn->gcache, action.buf);
 #else
             assert (action.buf == NULL);
 #endif
@@ -1628,13 +1630,12 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
             assert (action.seqno_g >= 0);
             assert (action.seqno_l >  0);
 
-            gcs_gcache_free (conn->gcache, action.buf);
             // on joiner global seqno stores donor index
             // on donor global seqno stores global seqno
             ret = action.seqno_g;
         }
         else {
-            assert (action.buf == NULL);
+            assert (/*action.buf == NULL ||*/ action.buf == rst);
         }
     }
 

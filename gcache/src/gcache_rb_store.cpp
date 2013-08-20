@@ -273,7 +273,16 @@ namespace gcache
             BufferHeader* const b(ptr2BH(r->second));
             if (BUFFER_IN_RB == b->store)
             {
-                assert(BH_is_released(b));
+#ifndef NDEBUG
+                if (!BH_is_released(b))
+                {
+                    log_fatal << "Buffer "
+                              << reinterpret_cast<const void*>(r->second)
+                              << ", seqno_g " << b->seqno_g << ", seqno_d "
+                              << b->seqno_d << " is not released.";
+                    assert(0);
+                }
+#endif
                 bh = b;
                 break;
             }
@@ -314,7 +323,7 @@ namespace gcache
         ssize_t const old(size_free_);
         if (first_ < next_)
         {
-            /* start_  first_      next_    end_ 
+            /* start_  first_      next_    end_
              *   |       |###########|       |
              */
             size_used_ = next_ - first_;
@@ -323,7 +332,7 @@ namespace gcache
         }
         else
         {
-            /* start_  next_       first_   end_ 
+            /* start_  next_       first_   end_
              *   |#######|           |#####| |
              *                              ^size_trail_ */
             size_free_ = first_ - next_ + size_trail_;

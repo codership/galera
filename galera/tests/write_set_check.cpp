@@ -637,14 +637,17 @@ Suite* write_set_suite()
 
     tc = tcase_create("test_cert_hierarchical_v1");
     tcase_add_test(tc, test_cert_hierarchical_v1);
+    tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_cert_hierarchical_v2");
     tcase_add_test(tc, test_cert_hierarchical_v2);
+    tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_trac_726");
     tcase_add_test(tc, test_trac_726);
+    tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
 
     return s;

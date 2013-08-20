@@ -177,13 +177,12 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
             if (local) {
                 /* Let the sender know that it failed */
                 rcvd->id = -ERESTART;
-#ifndef NDEBUG
-                gu_info ("Returning -ERESTART for TORDERED action: group->state"
-                         " = %s, sender->status = %s, frag_reset = %s",
+                gu_debug("Returning -ERESTART for TORDERED action: group->state"
+                         " = %s, sender->status = %s, frag_reset = %s, "
+                         "buf = %p",
                          gcs_group_state_str[group->state],
                          gcs_node_state_to_str(group->nodes[sender_idx].status),
-                         group->frag_reset ? "true" : "false");
-#endif
+                         group->frag_reset ? "true" : "false", rcvd->act.buf);
             }
             else {
                 /* Just ignore it */

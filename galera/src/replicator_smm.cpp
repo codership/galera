@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -15,53 +15,6 @@ extern "C"
 #include <sstream>
 #include <iostream>
 
-#if 0 // DELETE
-static void
-apply_wscoll(void*                    recv_ctx,
-             wsrep_apply_cb_t         apply_cb,
-             const galera::TrxHandle& trx,
-             const wsrep_trx_meta_t&  meta)
-{
-    const gu::byte_t* buf(trx.write_set_buffer().first);
-    const size_t buf_len(trx.write_set_buffer().second);
-    size_t offset(0);
-    while (offset < buf_len)
-    {
-        // Skip key segment
-        std::pair<size_t, size_t> k(
-            galera::WriteSet::segment(buf, buf_len, offset));
-        offset = k.first + k.second;
-        // Data part
-        std::pair<size_t, size_t> d(
-            galera::WriteSet::segment(buf, buf_len, offset));
-        offset = d.first + d.second;
-
-        wsrep_status_t err = apply_cb (recv_ctx,
-                                       buf + d.first,
-                                       d.second,
-                                       &meta);
-
-        if (gu_unlikely(err != WSREP_OK))
-        {
-            const char* const err_str(galera::wsrep_status_str(err));
-            std::ostringstream os;
-
-            os << "Failed to apply app buffer: "
-               << "seqno: "<< trx.global_seqno() << ", status: " << err_str;
-
-            galera::ApplyException ae(os.str(), err);
-
-            GU_TRACE(ae);
-
-            throw ae;
-        }
-    }
-
-    assert(offset == buf_len);
-
-    return;
-}
-#endif // DELETE
 
 static void
 apply_trx_ws(void*                    recv_ctx,
@@ -1173,7 +1126,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     LocalOrder lo(seqno_l);
 
     gu_trace(local_monitor_.enter(lo));
-    cert_.purge_trxs_upto(seq);
+    cert_.purge_trxs_upto(seq, true);
     local_monitor_.leave(lo);
     log_debug << "Got commit cut from GCS: " << seq;
 }
@@ -1317,6 +1270,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         cert_.assign_initial_position(group_seqno, trx_params_.version_);
+        if (upto > 0) gcache_.seqno_release(upto);
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
@@ -1325,6 +1279,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (st_required && app_wants_st)
         {
+            // GCache::Seqno_reset() happens here
             request_state_transfer (recv_ctx,
                                     group_uuid, group_seqno, app_req,
                                     app_req_len);

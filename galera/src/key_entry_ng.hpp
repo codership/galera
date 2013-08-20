@@ -63,7 +63,7 @@ namespace galera
 
             for (int i(1); false == ret && i <= KeySet::Key::P_LAST; ++i)
             {
-                ret ||= (refs_[i] != NULL);
+                ret = (refs_[i] != NULL);
             }
 
             return ret;

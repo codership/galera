@@ -70,8 +70,8 @@ namespace galera
             return get_safe_to_discard_seqno_();
         }
 
-        void
-        purge_trxs_upto(wsrep_seqno_t seqno)
+        wsrep_seqno_t
+        purge_trxs_upto(wsrep_seqno_t const seqno, bool const handle_gcache)
         {
             gu::Lock lock(mutex_);
             const wsrep_seqno_t stds(get_safe_to_discard_seqno_());
@@ -79,7 +79,7 @@ namespace galera
             // Note: setting trx committed is not done in total order so
             // safe to discard seqno may decrease. Enable assertion above when
             // this issue is fixed.
-            purge_trxs_upto_(std::min(seqno, stds));
+            return purge_trxs_upto_(std::min(seqno, stds), handle_gcache);
         }
 
         // Set trx corresponding to handle committed. Return purge seqno if
@@ -120,7 +120,7 @@ namespace galera
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
-        void          purge_trxs_upto_(wsrep_seqno_t);
+        wsrep_seqno_t purge_trxs_upto_(wsrep_seqno_t, bool sync);
 
         class PurgeAndDiscard
         {

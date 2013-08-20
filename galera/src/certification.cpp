@@ -448,7 +448,8 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
                       galera::TrxHandle*          const trx,
                       bool                        const log_conflict)
 {
-    const galera::TrxHandle* const ref_trx(found->ref_trx(galera::KeySet::Key::P_EXCLUSIVE));
+    const galera::TrxHandle* const ref_trx(
+        found->ref_trx(galera::KeySet::Key::P_EXCLUSIVE));
 
     if (cert_debug_on && ref_trx)
     {
@@ -484,7 +485,8 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
     if (pfx == galera::KeySet::Key::P_EXCLUSIVE)
         // exclusive keys must depend on shared refs as well
     {
-        const galera::TrxHandle* const ref_shared_trx(found->ref_trx(galera::KeySet::Key::P_SHARED));
+        const galera::TrxHandle* const ref_shared_trx(
+            found->ref_trx(galera::KeySet::Key::P_SHARED));
 
         assert(ref_shared_trx != trx);
 
@@ -607,14 +609,15 @@ cert_fail:
 
     cert_debug << "END CERTIFICATION (failed): " << *trx;
 
-    assert (processed <= key_count);
+    assert (processed < key_count);
 
     if (store_keys == true)
     {
-        --processed; /* last key was not added to index */
-
-        // Clean up key entries allocated for this trx
+        /* Clean up key entries allocated for this trx */
         key_set.rewind();
+
+        /* 'strictly less' comparison is essential in the following loop:
+         * processed key failed cert and was not added to index */
         for (long i(0); i < processed; ++i)
         {
             KeyEntryNG ke(key_set.next());
@@ -775,6 +778,8 @@ galera::Certification::~Certification()
     log_info << "deps set usage at exit "     << deps_set_.size();
     log_info << "avg deps dist "              << get_avg_deps_dist();
 
+    gu::Lock lock(mutex_);
+
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
 }
 
@@ -796,12 +801,13 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
                        << version << " not supported";
     }
 
+    gu::Lock lock(mutex_);
+
     if (seqno >= position_)
     {
         std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
         assert(cert_index_.size() == 0);
         assert(cert_index_ng_.size() == 0);
-        trx_map_.clear();
     }
     else
     {
@@ -815,13 +821,13 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
                       Unref2nd<TrxMap::value_type>());
         cert_index_.clear();
         cert_index_ng_.clear();
-        trx_map_.clear();
     }
+
+    trx_map_.clear();
 
     log_info << "Assign initial position for certification: " << seqno
              << ", protocol version: " << version;
 
-    gu::Lock lock(mutex_);
     initial_position_      = seqno;
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
@@ -865,20 +871,21 @@ galera::Certification::append_trx(TrxHandle* trx)
             log_debug << "trx map size: " << trx_map_.size()
                       << " - check if status.last_committed is incrementing";
 
-            const wsrep_seqno_t trim_seqno(position_ - max_length_);
-            const wsrep_seqno_t stds(get_safe_to_discard_seqno_());
+            wsrep_seqno_t       trim_seqno(position_ - max_length_);
+            wsrep_seqno_t const stds      (get_safe_to_discard_seqno_());
 
             if (trim_seqno > stds)
             {
                 log_warn << "Attempt to trim certification index at "
                          << trim_seqno << ", above safe-to-discard: " << stds;
-                purge_trxs_upto_(stds);
+                trim_seqno = stds;
             }
             else
             {
                 cert_debug << "purging index up to " << trim_seqno;
-                purge_trxs_upto_(trim_seqno);
             }
+
+            purge_trxs_upto_(trim_seqno, true);
         }
     }
 
@@ -934,25 +941,30 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno_() const
 }
 
 
-void galera::Certification::purge_trxs_upto_(wsrep_seqno_t seqno)
+wsrep_seqno_t
+galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
+                                        bool const          handle_gcache)
 {
+    assert (seqno > 0);
     TrxMap::iterator    lower_bound(trx_map_.lower_bound(seqno));
-    wsrep_seqno_t const purge_seqno(lower_bound->first);
-//    bool const          new_version(lower_bound->second->new_version());
+    wsrep_seqno_t const purge_seqno(lower_bound != trx_map_.end() ?
+                                    lower_bound->first : seqno);
 
     cert_debug << "purging index up to " << purge_seqno;
 
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
 
-//    if (new_version)
-        service_thd_.release_seqno(purge_seqno);
+    if (handle_gcache) service_thd_.release_seqno(purge_seqno);
 
     if (0 == ((trx_map_.size() + 1) % 10000))
     {
         log_debug << "trx map after purge: length: " << trx_map_.size()
-                  << ", purge seqno " << seqno;
+                  << ", requested purge seqno: " << seqno
+                  << ", real purge seqno: " << purge_seqno;
     }
+
+    return purge_seqno;
 }
 
 
