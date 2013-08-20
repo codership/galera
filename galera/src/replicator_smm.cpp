@@ -459,13 +459,14 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
             gu_throw_fatal << "Commit failed. Trx: " << trx;
         trx->set_state(TrxHandle::S_COMMITTED);
     }
-    apply_monitor_.leave(ao);
 
     if (trx->local_seqno() != -1)
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
         report_last_committed(cert_.set_trx_committed(trx));
     }
+
+    apply_monitor_.leave(ao);
 }
 
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
@@ -890,9 +891,9 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
 
     ApplyOrder ao(*trx);
+    report_last_committed(cert_.set_trx_committed(trx));
     apply_monitor_.leave(ao);
 
-    report_last_committed(cert_.set_trx_committed(trx));
     trx->set_state(TrxHandle::S_COMMITTED);
 
     ++local_commits_;
@@ -1011,8 +1012,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
         trx->set_state(TrxHandle::S_ABORTING);
-        // Called now from cert()
-        // report_last_committed();
+        // Called now from cert(): report_last_committed();
         break;
     default:
         log_error << "unrecognized retval "
@@ -1036,10 +1036,10 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     CommitOrder co(*trx, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
     ApplyOrder ao(*trx);
+    report_last_committed(cert_.set_trx_committed(trx));
     apply_monitor_.leave(ao);
 
     st_.mark_safe();
-    report_last_committed(cert_.set_trx_committed(trx));
 
     return WSREP_OK;
 }
@@ -1270,7 +1270,13 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         cert_.assign_initial_position(group_seqno, trx_params_.version_);
-        if (upto > 0) gcache_.seqno_release(upto);
+        // at this point there is no ongoing master or slave transactions
+        // and no new requests to service thread should be possible
+
+        service_thd_.flush();             // make sure service thd is idle
+
+        if (upto > 0) gcache_.seqno_release(upto); // make sure all gcache
+                                                   // buffers are released
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;

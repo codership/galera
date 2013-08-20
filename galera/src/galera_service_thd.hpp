@@ -21,12 +21,23 @@ namespace galera
 
         ~ServiceThd ();
 
+        /*! flush all ongoing operations (before processing CC) */
+        void flush ();
+
+        /*! reset to initial state before gcs (re)connect */
+        void reset();
+
+        /* !!!
+         * The following methods must be invoked only within a monitor,
+         * so that monitors drain during CC ensures that no outdated
+         * actions are scheduled with the service thread after that.
+         * !!! */
+
+        /*! schedule seqno to be reported as last committed */
         void report_last_committed (gcs_seqno_t seqno);
 
-        /* release write sets up to and including seqno */
+        /*! release write sets up to and including seqno */
         void release_seqno (gcs_seqno_t seqno);
-
-        void reset(); // reset to initial state before gcs (re)connect
 
     private:
 
@@ -49,7 +60,8 @@ namespace galera
         GcsI&           gcs_;
         gu_thread_t     thd_;
         gu::Mutex       mtx_;
-        gu::Cond        cond_;
+        gu::Cond        cond_;  // service request condition
+        gu::Cond        flush_; // flush condition
         Data            data_;
 
         static void* thd_func (void*);

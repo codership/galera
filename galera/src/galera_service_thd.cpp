@@ -1,5 +1,8 @@
 /*
  * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ *
+ * Using broadcasts instead of signals below to wake flush callers due to
+ * theoretical possibility of more than 2 threads involved.
  */
 
 #include "galera_service_thd.hpp"
@@ -8,6 +11,7 @@ const uint32_t galera::ServiceThd::A_NONE = 0;
 
 static const uint32_t A_LAST_COMMITTED = 1U <<  0;
 static const uint32_t A_RELEASE_SEQNO  = 1U <<  1;
+static const uint32_t A_FLUSH          = 1U << 30;
 static const uint32_t A_EXIT           = 1U << 31;
 
 void*
@@ -27,6 +31,19 @@ galera::ServiceThd::thd_func (void* arg)
 
             data = st->data_;
             st->data_.act_ = A_NONE; // clear pending actions
+
+            if (data.act_ & A_FLUSH)
+            {
+                if (A_FLUSH == data.act_)
+                { // no other actions scheduled (all previous are "flushed")
+                    log_debug << "Service thread queue flushed.";
+                    st->flush_.broadcast();
+                }
+                else
+                { // restore flush flag for the next iteration
+                    st->data_.act_ |= A_FLUSH;
+                }
+            }
         }
 
         exit = ((data.act_ & A_EXIT));
@@ -76,6 +93,7 @@ galera::ServiceThd::ServiceThd (GcsI& gcs, gcache::GCache& gcache) :
     thd_    (),
     mtx_    (),
     cond_   (),
+    flush_  (),
     data_   ()
 {
     gu_thread_create (&thd_, NULL, thd_func, this);
@@ -85,11 +103,32 @@ galera::ServiceThd::~ServiceThd ()
 {
     {
         gu::Lock lock(mtx_);
-        data_.act_ |= A_EXIT;
+        data_.act_ = A_EXIT;
         cond_.signal();
+        flush_.broadcast();
     }
 
     gu_thread_join(thd_, NULL);
+}
+
+void
+galera::ServiceThd::flush()
+{
+    gu::Lock lock(mtx_);
+    if (!(data_.act_ & A_EXIT))
+    {
+        data_.act_ |= A_FLUSH;
+        cond_.signal();
+        do { lock.wait(flush_); } while (data_.act_ & A_FLUSH);
+    }
+}
+
+void
+galera::ServiceThd::reset()
+{
+    gu::Lock lock(mtx_);
+    data_.act_ = A_NONE;
+    data_.last_committed_ = 0;
 }
 
 void
@@ -120,12 +159,4 @@ galera::ServiceThd::release_seqno(gcs_seqno_t seqno)
 
         data_.act_ |= A_RELEASE_SEQNO;
     }
-}
-
-void
-galera::ServiceThd::reset()
-{
-    gu::Lock lock(mtx_);
-    data_.act_ = A_NONE;
-    data_.last_committed_ = 0;
 }
