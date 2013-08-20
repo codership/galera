@@ -76,4 +76,4 @@ Makefile.in
 .libs
 garb/garbd
 gcs/src/.garb
-
+docs/build/
