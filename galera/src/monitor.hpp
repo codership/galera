@@ -21,14 +21,6 @@ namespace galera
         {
             Process() : obj_(0), cond_(), wait_cond_(), state_(S_IDLE) { }
 
-            Process(const Process& other)
-                :
-                obj_  (other.obj_),
-                cond_ (other.cond_),
-                wait_cond_(other.wait_cond_),
-                state_(other.state_)
-            { }
-
             const C* obj_;
             gu::Cond cond_;
             gu::Cond wait_cond_;
@@ -43,6 +35,8 @@ namespace galera
 
         private:
 
+            // non-copyable
+            Process(const Process& other);
             void operator=(const Process&);
         };
 
@@ -58,7 +52,7 @@ namespace galera
             last_entered_(-1),
             last_left_(-1),
             drain_seqno_(LLONG_MAX),
-            process_(process_size_),
+            process_(new Process[process_size_]),
             entered_(0),
             oooe_(0),
             oool_(0),
@@ -68,6 +62,7 @@ namespace galera
 
         ~Monitor()
         {
+            delete[] process_;
             if (entered_ > 0)
             {
                 log_info << "mon: entered " << entered_
@@ -503,7 +498,7 @@ namespace galera
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         wsrep_seqno_t drain_seqno_;
-        std::vector<Process> process_;
+        Process*      process_;
         long entered_;  // entered
         long oooe_;     // out of order entered
         long oool_;     // out of order left

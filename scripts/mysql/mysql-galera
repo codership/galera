@@ -200,10 +200,12 @@ wsrep_start_position_opt=""
 # Position will be stored in wsrep_start_position_opt global.
 wsrep_recovery() {
   cmd="$@"
-  wr_logfile=$(mktemp)
+  wr_logfile=$(mktemp -t wsrep.XXXXXXXXXX)
   echo "WSREP: Running position recovery"
   set +e
+  [ "$OS" == "Darwin" ] && export LD_LIBRARY_PATH
   $cmd --log_error=$wr_logfile --wsrep-recover
+  [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
   rp=$(grep "WSREP: Recovered position:" $wr_logfile)
   if [ -z "$rp" ]; then
     skipped=$(grep WSREP $wr_logfile | grep "skipping position recovery")
@@ -251,7 +253,6 @@ galera_start()
     fi
 
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
-
     if test -f $WSREP || test $WSREP == "none"
     then
         WSREP_OPTS="--wsrep_provider=$WSREP"
@@ -312,6 +313,7 @@ galera_start()
         fi
     fi
 
+    [ "$OS" == "Darwin" ] && export LD_LIBRARY_PATH
     if test -z $GDB
     then
         nohup $VALGRIND $MYSQLD \
@@ -340,6 +342,7 @@ galera_start()
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
+            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
@@ -355,6 +358,7 @@ galera_start()
             $wsrep_start_position_opt
     fi
     my_pid=$!
+    [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
 #    echo "Waiting for pid file"
     while ! test -r $MYSQL_PID
@@ -620,7 +624,10 @@ then
     exit 1
 fi
 
-export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql
+OS=$(uname)
+export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql:$LD_LIBRARY_PATH
+[ "$OS" == "FreeBSD" ] && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/gcc44
+[ "$OS" == "Darwin"  ] && export -n LD_LIBRARY_PATH
 export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
 $COMMAND

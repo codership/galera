@@ -18,7 +18,9 @@ libgalerautils_sources = [
     'gu_to.c',
     'gu_utils.c',
     'gu_uuid.c',
-    'gu_backtrace.c'
+    'gu_backtrace.c',
+    'gu_limits.c',
+    'gu_time.c'
 ]
 
 libgalerautils_env.StaticLibrary('galerautils', libgalerautils_sources)

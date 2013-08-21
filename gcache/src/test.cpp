@@ -33,7 +33,7 @@ main (int argc, char* argv[])
     log_info  << "Exit: " << ret;
 
     try {
-        throw gu::Exception ("My test exception");
+        throw gu::Exception ("My test exception", EINVAL);
     }
     catch (gu::Exception& e) {
         log_info << "Exception caught: " << e.what() << ", errno: "

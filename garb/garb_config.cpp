@@ -66,7 +66,7 @@ Config::Config (int argc, char* argv[])
     {
         std::cerr << "\nUsage: " << argv[0] << " [options] [group address]\n"
                   << cmdline_opts << std::endl;
-        throw gu::Exception("Exit");
+        throw gu::Exception("Exit", 0);
     }
 
     if (vm.count("version"))

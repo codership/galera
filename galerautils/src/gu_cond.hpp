@@ -20,7 +20,9 @@ namespace gu
     {
 
         friend class Lock;
-
+        // non-copyable
+        Cond(const Cond&);
+        void operator=(const Cond&);
     protected:
 
         pthread_cond_t mutable cond;

@@ -89,4 +89,29 @@ typedef pthread_cond_t    gu_cond_t;
 #define gu_cond_broadcast pthread_cond_broadcast
 #define gu_cond_timedwait pthread_cond_timedwait
 
+#if defined(__APPLE__)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef int pthread_barrierattr_t;
+typedef struct
+{
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int count;
+    int tripCount;
+} pthread_barrier_t;
+
+int pthread_barrier_init (pthread_barrier_t *barrier, const pthread_barrierattr_t *attr, unsigned int count);
+int pthread_barrier_destroy (pthread_barrier_t *barrier);
+int pthread_barrier_wait (pthread_barrier_t *barrier);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __APPLE__ */
+
 #endif /* _gu_mutex_h_ */

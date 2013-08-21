@@ -17,3 +17,4 @@ stamp="gcache_tests.passed"
 env.Test(stamp, gcache_tests)
 env.Alias("test", stamp)
 
+Clean(gcache_tests, ['#/gcache_tests.log', '#/gcache.page.000000', '#/rb_test'])

@@ -18,11 +18,17 @@
 #include <map>
 #include <stdexcept>
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+# include <ifaddrs.h>
+# define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
+# define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
+#else /* !__APPLE__ && !__FreeBSD__ */
 extern "C" /* old style cast */
 {
 static int const GU_SIOCGIFCONF  = SIOCGIFCONF;
 static int const GU_SIOCGIFINDEX = SIOCGIFINDEX;
 }
+#endif /* !__APPLE__ && !__FreeBSD__ */
 
 //using namespace std;
 using std::make_pair;
@@ -74,7 +80,11 @@ private:
             family,
             socktype,
             protocol,
+#if defined(__FreeBSD__)
+	    0, // FreeBSD gives ENOMEM error with non-zero value
+#else
             sizeof(struct sockaddr),
+#endif
             0,
             0,
             0
@@ -186,6 +196,35 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     }
 
     unsigned int idx(-1);
+    int err(0);
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    struct ifaddrs *if_addrs = NULL;
+    struct ifaddrs *if_addr = NULL;
+
+    if (getifaddrs (&if_addrs) != 0)
+    {
+        err = errno;
+        goto out;
+    }
+    for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next)
+    {
+        try
+        {
+            gu::net::Sockaddr sa (if_addr->ifa_addr, sizeof (struct sockaddr));
+            if (sa.get_family () == addr.get_family () &&
+                memcmp (sa.get_addr (), addr.get_addr (), addr.get_addr_len ()) == 0)
+            {
+                idx = if_nametoindex (if_addr->ifa_name);
+                goto out;
+            }
+        }
+        catch (gu::Exception& e)
+        {
+        }
+    }
+
+out:
+# else /* !__APPLE__ && !__FreeBSD__ */
     struct ifconf ifc;
     memset(&ifc, 0, sizeof(struct ifconf));
     ifc.ifc_len = 16*sizeof(struct ifreq);
@@ -193,7 +232,6 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     ifc.ifc_req = &ifr[0];
 
     int fd(socket(AF_INET, SOCK_DGRAM, 0));
-    int err;
     if (fd == -1)
     {
         err = errno;
@@ -238,6 +276,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     
 out:
     close(fd);
+#endif /* !__APPLE__ && !__FreeBSD__ */
     if (err != 0)
     {
         gu_throw_error(err) << "failed to get interface index";
@@ -485,7 +524,9 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
 
         if (err != 0)
         {
-            gu_throw_error(errno == 0 ? gu::Exception::E_UNSPEC : errno)
+            // Use EHOSTUNREACH as generic error number in case errno
+            // is zero. Real error should be apparent from exception message
+            gu_throw_error(errno == 0 ? EHOSTUNREACH : errno)
                 << "getaddrinfo failed with error '"
                 << gai_strerror(err) << "' ("
                 << err << ") for " << uri.to_string();

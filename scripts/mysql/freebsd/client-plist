@@ -1,0 +1,116 @@
+@comment PKG_FORMAT_REVISION:1.1
+@name mysql-client-5.5.31_wsrep_%{VERSION}
+@comment ORIGIN:databases/mysql55-client_wsrep
+@cwd /usr/local
+@srcdir %{SRCDIR}
+@comment "=== dependencies ==="
+@comment "require /usr/local/lib/gcc44/libstdc++.so"
+@comment // @pkgdep gcc-4.4.7,1
+@comment DEPORIGIN:lang/gcc44
+@comment // @pkgdep libexecinfo-1.1_3
+@comment DEPORIGIN:devel/libexecinfo
+@conflicts mysql-client-[345].*
+@conflicts mysql-wsrep-client-5.[0-46-9].*
+@comment "=== preinstall stage ==="
+@exec echo "===> Linking /usr/local/bin/bash to /bin/bash"
+@exec [ -x /bin/bash ] && echo "Using existing /bin/bash." || ln -s ../usr/local/bin/bash /bin/bash
+@comment "=== file section ==="
+@owner root
+@group wheel
+@mode 0444
+@comment // man/man1/comp_err.1.gz
+@comment // man/man1/msql2mysql.1.gz
+@comment // man/man1/mysql.1.gz
+@comment // man/man1/mysql_config.1.gz
+@comment // man/man1/mysql_find_rows.1.gz
+@comment // man/man1/mysql_waitpid.1.gz
+@comment // man/man1/mysqlaccess.1.gz
+@comment // man/man1/mysqladmin.1.gz
+@comment // man/man1/mysqlbinlog.1.gz
+@comment // man/man1/mysqlcheck.1.gz
+@comment // man/man1/mysqldump.1.gz
+@comment // man/man1/mysqlimport.1.gz
+@comment // man/man1/mysqlshow.1.gz
+@comment // man/man1/mysqlslap.1.gz
+@mode 0555
+bin/msql2mysql
+bin/mysql
+bin/mysql_config
+bin/mysql_find_rows
+bin/mysql_waitpid
+bin/mysqlaccess
+bin/mysqlaccess.conf
+bin/mysqladmin
+bin/mysqlbinlog
+bin/mysqlcheck
+bin/mysqldump
+bin/mysqlimport
+bin/mysqlshow
+bin/mysqlslap
+@mode 0444
+include/mysql/decimal.h
+include/mysql/errmsg.h
+include/mysql/keycache.h
+include/mysql/m_ctype.h
+include/mysql/m_string.h
+include/mysql/my_alloc.h
+include/mysql/my_attribute.h
+include/mysql/my_compiler.h
+include/mysql/my_config.h
+include/mysql/my_dbug.h
+include/mysql/my_dir.h
+include/mysql/my_getopt.h
+include/mysql/my_global.h
+include/mysql/my_list.h
+include/mysql/my_net.h
+include/mysql/my_pthread.h
+include/mysql/my_sys.h
+include/mysql/my_xml.h
+include/mysql/mysql/client_plugin.h
+include/mysql/mysql/innodb_priv.h
+include/mysql/mysql/plugin.h
+include/mysql/mysql/plugin_audit.h
+include/mysql/mysql/plugin_auth.h
+include/mysql/mysql/plugin_auth_common.h
+include/mysql/mysql/plugin_ftparser.h
+include/mysql/mysql/psi/mysql_file.h
+include/mysql/mysql/psi/mysql_thread.h
+include/mysql/mysql/psi/psi.h
+include/mysql/mysql/psi/psi_abi_v1.h
+include/mysql/mysql/psi/psi_abi_v2.h
+include/mysql/mysql/service_my_snprintf.h
+include/mysql/mysql/service_thd_alloc.h
+include/mysql/mysql/service_thd_wait.h
+include/mysql/mysql/service_thread_scheduler.h
+include/mysql/mysql/services.h
+include/mysql/mysql/thread_pool_priv.h
+include/mysql/mysql.h
+include/mysql/mysql_com.h
+include/mysql/mysql_embed.h
+include/mysql/mysql_time.h
+include/mysql/mysql_version.h
+include/mysql/mysqld_ername.h
+include/mysql/mysqld_error.h
+include/mysql/sql_common.h
+include/mysql/sql_state.h
+include/mysql/sslopt-case.h
+include/mysql/sslopt-longopts.h
+include/mysql/sslopt-vars.h
+include/mysql/typelib.h
+lib/mysql/libmysqlclient.a
+lib/mysql/libmysqlclient.so
+lib/mysql/libmysqlclient.so.18
+lib/mysql/libmysqlclient_r.a
+lib/mysql/libmysqlclient_r.so
+lib/mysql/libmysqlclient_r.so.18
+lib/mysql/libmysqlservices.a
+share/aclocal/mysql.m4
+libdata/ldconfig/mysql55-client
+@comment "=== postinstall stage ==="
+@exec /sbin/ldconfig -m /usr/local/lib/mysql
+@comment "=== postremove stage ==="
+@dirrm include/mysql/mysql/psi
+@dirrm include/mysql/mysql
+@dirrm include/mysql
+@unexec rmdir "%D/lib/mysql" 2>/dev/null || true
+@unexec service ldconfig start >/dev/null

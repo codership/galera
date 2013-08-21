@@ -186,7 +186,7 @@ static bool CORE_RECV_END(action_t*      act,
 {
     {
         int ret = gu_thread_join (act->thread, NULL);
-        act->thread = -1;
+        act->thread = (gu_thread_t)-1;
         FAIL_IF(0 != ret, "Failed to join recv thread: %ld (%s)",
                 ret, strerror (ret));
     }
@@ -238,7 +238,7 @@ static bool CORE_SEND_END(action_t* act, long ret)
 {
     {
         long _ret = gu_thread_join (act->thread, NULL);
-        act->thread = -1;
+        act->thread = (gu_thread_t)-1;
         FAIL_IF (0 != _ret, "Failed to join recv thread: %ld (%s)",
                  _ret, strerror (_ret));
     }
@@ -415,8 +415,8 @@ START_TEST (gcs_core_test_api)
     const void* act_buf  = act3_str;
     size_t      act_size = sizeof(act3_str);
 
-    action_t act_s = { act, NULL, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
-    action_t act_r = { act, NULL, NULL, -1, -1, -1, -1 };
+    action_t act_s = { act, NULL, NULL, act_size, GCS_ACT_TORDERED, -1, (gu_thread_t)-1 };
+    action_t act_r = { act, NULL, NULL, -1, -1, -1, (gu_thread_t)-1 };
     long i = 5;
 
     // test basic fragmentaiton
@@ -510,8 +510,8 @@ START_TEST (gcs_core_test_own)
     const void*          act_buf  = act2_str;
     size_t               act_size = sizeof(act2_str);
 
-    action_t act_s = { act, NULL, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
-    action_t act_r = { act, NULL, NULL, -1, -1, -1, -1 };
+    action_t act_s = { act, NULL, NULL, act_size, GCS_ACT_TORDERED, -1, (gu_thread_t)-1 };
+    action_t act_r = { act, NULL, NULL, -1, -1, -1, (gu_thread_t)-1 };
 
     // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1);

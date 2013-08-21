@@ -34,6 +34,10 @@ class gu::Monitor
 #endif
 
     // copy contstructor and operator= disabled by mutex and cond members.
+    // but on Darwin, we got an error 'class gu::Monitor' has pointer data members
+    // so make non-copyable explicitly
+    Monitor(const Monitor&);
+    void operator=(const Monitor&);
 
 public:
 
