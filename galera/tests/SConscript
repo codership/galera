@@ -6,8 +6,8 @@ env.Append(LIBS=File('#/gcache/src/libgcache.a'))
 env.Append(LIBS=File('#/galera/src/libgalera++.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
-env.Append(LIBS = ['pthread',
-                   'rt'])
+#env.Append(LIBS = ['pthread',
+#                   'rt'])
 
 galera_check = env.Program(target='galera_check',
                            source=Split('''
@@ -22,3 +22,5 @@ galera_check = env.Program(target='galera_check',
 stamp = "galera_check.passed"
 env.Test(stamp, galera_check)
 env.Alias("test", stamp)
+
+Clean(galera_check, ['#/galera_check.log', 'ist_check.cache'])

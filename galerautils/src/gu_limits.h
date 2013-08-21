@@ -11,9 +11,33 @@
 
 #include <unistd.h>
 
-#define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
-#define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
-#define GU_AVPHYS_PAGES (sysconf (_SC_AVPHYS_PAGES))
+#ifdef __cplusplus
+extern "C" {
+#endif
+# if defined(__APPLE__)
+long gu_darwin_phys_pages (void);
+long gu_darwin_avphys_pages (void);
+# elif defined(__FreeBSD__)
+long gu_freebsd_avphys_pages (void);
+# endif
+#ifdef __cplusplus
+}
+#endif
+
+#if defined(__APPLE__)
+# define GU_PAGE_SIZE    (getpagesize ())
+# define GU_PHYS_PAGES   (gu_darwin_phys_pages ())
+# define GU_AVPHYS_PAGES (gu_darwin_avphys_pages ())
+#elif defined(__FreeBSD__)
+# define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
+# define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
+# define GU_AVPHYS_PAGES (gu_freebsd_avphys_pages ())
+#else /* !__APPLE__ && !__FreeBSD__ */
+# define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
+# define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
+# define GU_AVPHYS_PAGES (sysconf (_SC_AVPHYS_PAGES))
+#endif
+
 #define GU_AVPHYS_SIZE  (((unsigned long long)GU_AVPHYS_PAGES)*GU_PAGE_SIZE)
 
 #include <limits.h>

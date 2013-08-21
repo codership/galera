@@ -22,6 +22,7 @@ extern "C" {
 
 #include "gu_config.h"
 #include "gcache.h"
+#include "gu_errno.h"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;

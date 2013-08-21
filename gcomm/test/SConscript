@@ -20,6 +20,8 @@ gcomm_check = env.Program(target = 'check_gcomm',
 
 env.Test("gcomm_check.passed", gcomm_check)
 
+Clean(gcomm_check, '#/check_gcomm.log')
+
 
 ssl_test = env.Program(target = 'ssl_test',
                        source = ['ssl_test.cpp'])

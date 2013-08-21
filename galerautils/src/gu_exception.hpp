@@ -8,7 +8,7 @@
 
 #include <string>
 #include <exception>
-#include <cerrno>
+#include "gu_errno.h"
 
 namespace gu {
 
@@ -20,17 +20,7 @@ namespace gu {
     {
     public:
 
-        enum
-        {
-            E_UNSPEC = 255,                     // unspecified error
-#ifdef ENOTRECOVERABLE
-            E_NOTRECOVERABLE = ENOTRECOVERABLE  // not recoverable
-#else
-            E_NOTRECOVERABLE = E_UNSPEC         // not recoverable
-#endif
-        };
-
-        Exception (const std::string& msg_, int err_ = E_UNSPEC)
+        Exception (const std::string& msg_, int err_)
             : msg (msg_),
               err (err_)
         {}
