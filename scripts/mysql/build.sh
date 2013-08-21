@@ -210,7 +210,7 @@ do
     shift
 done
 
-if [ "$PACKAGE" == "yes" ]
+if [ "$PACKAGE" == "yes" -a "$OS" == "Linux" ]
 then
     # check whether sudo accepts -E to preserve environment
     echo "testing sudo"
