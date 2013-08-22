@@ -1051,6 +1051,17 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 
 
 wsrep_status_t
+galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&     source,
+                                         int                     pa_range,
+                                         const struct wsrep_buf* data,
+                                         long                    count,
+                                         bool                    copy)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
+
+
+wsrep_status_t
 galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
     if (state_() != S_DONOR)

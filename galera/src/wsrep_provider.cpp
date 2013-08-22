@@ -234,6 +234,43 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 
 
 extern "C"
+wsrep_status_t galera_replay_trx(wsrep_t*            gh,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 void*               recv_ctx)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    TrxHandle* trx(repl->local_trx(trx_handle, false));
+    assert(trx != 0);
+
+    wsrep_status_t retval;
+
+    try
+    {
+        TrxHandleLock lock(*trx);
+        retval = repl->replay_trx(trx, recv_ctx);
+    }
+    catch (std::exception& e)
+    {
+        log_warn << "failed to replay trx: " << *trx;
+        log_warn << e.what();
+        retval = WSREP_CONN_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+
+    repl->unref_local_trx(trx);
+
+    return retval;
+}
+
+
+extern "C"
 wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
                                        wsrep_seqno_t  bf_seqno,
                                        wsrep_trx_id_t victim_trx)
@@ -445,8 +482,8 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  const wsrep_key_t*  keys,
                                  long                keys_num,
-                                 bool                copy,
-                                 bool                shared)
+                                 wsrep_key_type_t    key_type,
+                                 bool const          copy)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -465,7 +502,7 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
             galera::KeyData k (repl->trx_proto_ver(),
                                keys[i].key_parts,
                                keys[i].key_parts_num,
-                               copy, shared
+                               copy, (key_type == WSREP_KEY_SHARED)
                               );
             trx->append_key(k);
         }
@@ -691,39 +728,38 @@ wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
 
 
 extern "C"
-wsrep_status_t galera_replay_trx(wsrep_t*            gh,
-                                 wsrep_trx_handle_t* trx_handle,
-                                 void*               recv_ctx)
+wsrep_status_t galera_preordered(wsrep_t* const gh,
+                                 const wsrep_uuid_t*     const source_id,
+                                 int                     const pa_range,
+                                 const struct wsrep_buf* const data,
+                                 long                    const count,
+                                 wsrep_bool_t            const copy)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
+    assert(source_id != 0);
+    assert(pa_range >= 0);
+    assert(data != 0);
+    assert(count > 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(repl->local_trx(trx_handle, false));
-    assert(trx != 0);
-
-    wsrep_status_t retval;
 
     try
     {
-        TrxHandleLock lock(*trx);
-        retval = repl->replay_trx(trx, recv_ctx);
+        repl->handle_preordered(*source_id, pa_range, data, count, copy);
+        return WSREP_OK;
+        // trx will be unreferenced (destructed) during purge
     }
     catch (std::exception& e)
     {
-        log_warn << "failed to replay trx: " << *trx;
         log_warn << e.what();
-        retval = WSREP_CONN_FAIL;
+        return WSREP_CONN_FAIL;
     }
     catch (...)
     {
         log_fatal << "non-standard exception";
-        retval = WSREP_FATAL;
+        return WSREP_FATAL;
     }
-
-    repl->unref_local_trx(trx);
-
-    return retval;
 }
 
 
@@ -926,6 +962,7 @@ static wsrep_t galera_str = {
     &galera_free_connection,
     &galera_to_execute_start,
     &galera_to_execute_end,
+    &galera_preordered,
     &galera_sst_sent,
     &galera_sst_received,
     &galera_snapshot,

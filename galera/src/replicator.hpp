@@ -60,14 +60,19 @@ namespace galera
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 
         virtual wsrep_status_t replicate(TrxHandle* trx) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandle* trx, wsrep_trx_meta_t*) = 0;
+        virtual wsrep_status_t pre_commit(TrxHandle* trx, wsrep_trx_meta_t*) =0;
         virtual wsrep_status_t post_commit(TrxHandle* trx) = 0;
         virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx) = 0;
         virtual void abort_trx(TrxHandle* trx) = 0;
         virtual wsrep_status_t causal_read(wsrep_gtid_t*) = 0;
-        virtual wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*) = 0;
+        virtual wsrep_status_t to_isolation_begin(TrxHandle* trx,
+                                                  wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;
+        virtual wsrep_status_t handle_preordered(const wsrep_uuid_t& source,
+                                                 int pa_range,
+                                                 const struct wsrep_buf* data,
+                                                 long count, bool copy) = 0;
         virtual wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
                                         wsrep_seqno_t seqno) = 0;
         virtual wsrep_status_t sst_received(const wsrep_uuid_t& uuid,
