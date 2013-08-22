@@ -71,8 +71,10 @@ namespace galera
 
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
     class DataSetOut : public gu::RecordSetOut<DataSet::RecordOut>
@@ -82,7 +84,7 @@ namespace galera
         DataSetOut (const std::string& base_name,
                     DataSet::Version   version)
             :
-            RecordSetOut (
+            gu::RecordSetOut<DataSet::RecordOut> (
                 base_name,
                 check_type      (version),
                 ds_to_rs_version(version)
@@ -99,9 +101,9 @@ namespace galera
                                                        sizeof(serial_size)));
 
             /* first - size of record */
-            RecordSetOut::append (&serial_size, size_size, true);
+            gu::RecordSetOut<DataSet::RecordOut>::append (&serial_size, size_size, true);
             /* then record itself, don't count as a new record */
-            RecordSetOut::append (src, size, store, false);
+            gu::RecordSetOut<DataSet::RecordOut>::append (src, size, store, false);
             /* this will be deserialized using DataSet::RecordIn in DataSetIn */
 
             return size_size + size;
@@ -145,19 +147,19 @@ namespace galera
 
         DataSetIn (DataSet::Version ver, const gu::byte_t* buf, size_t size)
             :
-            RecordSetIn(buf, size, false),
+            gu::RecordSetIn<DataSet::RecordIn>(buf, size, false),
             version_(ver)
         {}
 
-        DataSetIn () : RecordSetIn(), version_(DataSet::EMPTY) {}
+        DataSetIn () : gu::RecordSetIn<DataSet::RecordIn>(), version_(DataSet::EMPTY) {}
 
         void init (DataSet::Version ver, const gu::byte_t* buf, size_t size)
         {
-            RecordSetIn::init(buf, size, false);
+            gu::RecordSetIn<DataSet::RecordIn>::init(buf, size, false);
             version_ = ver;
         }
 
-        gu::Buf next () const { return RecordSetIn::next().buf(); }
+        gu::Buf next () const { return gu::RecordSetIn<DataSet::RecordIn>::next().buf(); }
 
     private:
 
@@ -166,7 +168,9 @@ namespace galera
     }; /* class DataSetIn */
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic pop
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #endif
 
 } /* namespace galera */

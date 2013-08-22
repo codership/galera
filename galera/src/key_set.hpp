@@ -333,8 +333,10 @@ operator << (std::ostream& os, const KeySet::KeyPart& kp)
 
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
 class KeySetOut : public gu::RecordSetOut<KeySet::KeyPart>
@@ -453,7 +455,7 @@ public:
     KeySetOut (const std::string&    base_name,
                KeySet::Version const version)
         :
-        RecordSetOut (
+        gu::RecordSetOut<KeySet::KeyPart> (
             base_name,
             check_type      (version),
             ks_to_rs_version(version)
@@ -526,20 +528,20 @@ public:
 
     KeySetIn (KeySet::Version ver, const gu::byte_t* buf, size_t size)
         :
-        RecordSetIn(buf, size, false),
+        gu::RecordSetIn<KeySet::KeyPart>(buf, size, false),
         version_(ver)
     {}
 
-    KeySetIn () : RecordSetIn(), version_(KeySet::EMPTY) {}
+    KeySetIn () : gu::RecordSetIn<KeySet::KeyPart>(), version_(KeySet::EMPTY) {}
 
     void init (KeySet::Version ver, const gu::byte_t* buf, size_t size)
     {
-        RecordSetIn::init(buf, size, false);
+        gu::RecordSetIn<KeySet::KeyPart>::init(buf, size, false);
         version_ = ver;
     }
 
     KeySet::KeyPart const
-    next () const { return RecordSetIn::next(); }
+    next () const { return gu::RecordSetIn<KeySet::KeyPart>::next(); }
 
 private:
 
@@ -548,7 +550,9 @@ private:
 }; /* class KeySetIn */
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic pop
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #endif
 
 } /* namespace galera */

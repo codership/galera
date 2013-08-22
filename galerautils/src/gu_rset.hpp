@@ -76,8 +76,10 @@ protected:
 
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
 /*! class to store records in buffer(s) to send out */
@@ -467,7 +469,9 @@ public:
 }; /* class RecordSetIn */
 
 #if defined(__GNUG__)
-#pragma GCC diagnostic pop
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #endif
 
 } /* namespace gu */
