@@ -36,7 +36,7 @@ galera::ServiceThd::thd_func (void* arg)
             {
                 if (A_FLUSH == data.act_)
                 { // no other actions scheduled (all previous are "flushed")
-                    log_debug << "Service thread queue flushed.";
+                    log_info << "Service thread queue flushed.";
                     st->flush_.broadcast();
                 }
                 else
@@ -115,10 +115,11 @@ void
 galera::ServiceThd::flush()
 {
     gu::Lock lock(mtx_);
+
     if (!(data_.act_ & A_EXIT))
     {
+        if (data_.act_ == A_NONE) cond_.signal();
         data_.act_ |= A_FLUSH;
-        cond_.signal();
         do { lock.wait(flush_); } while (data_.act_ & A_FLUSH);
     }
 }
