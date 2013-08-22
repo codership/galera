@@ -333,4 +333,19 @@ galera::TrxHandle::apply (void*                   recv_ctx,
     return;
 }
 
+/* we don't care about any failures in applying unordered events */
+void
+galera::TrxHandle::unordered(void*                recv_ctx,
+                             wsrep_unordered_cb_t cb) const
+{
+    if (new_version() && NULL != cb && write_set_in_.unrdset().count() > 0)
+    {
+        const DataSetIn& unrd(write_set_in_.unrdset());
+        for (int i(0); i < unrd.count(); ++i)
+        {
+            const gu::Buf data = unrd.next();
+            cb(recv_ctx, data.ptr, data.size);
+        }
+    }
+}
 

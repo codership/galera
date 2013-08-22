@@ -141,6 +141,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
     commit_cb_          (args->commit_cb),
+    unordered_cb_       (args->unordered_cb),
     sst_donate_cb_      (args->sst_donate_cb),
     synced_cb_          (args->synced_cb),
     sst_donor_          (),
@@ -465,6 +466,10 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
         // trx with local seqno -1 originates from IST (or other source not gcs)
         report_last_committed(cert_.set_trx_committed(trx));
     }
+
+    /* for now need to keep it inside apply monitor to ensure all processing
+     * end by the time monitors are drained. */
+    trx->unordered(recv_ctx, unordered_cb_);
 
     apply_monitor_.leave(ao);
 }

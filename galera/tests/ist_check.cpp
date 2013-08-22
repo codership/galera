@@ -245,7 +245,7 @@ static void test_ist_common(int const version)
             {"key2", 4}
         };
         trx->append_key(KeyData(trx_version, key, 2, 0, 0));
-        trx->append_data("bar", 3, true);
+        trx->append_data("bar", 3, true, false);
         assert (i > 0);
         int last_seen(i - 1);
         int pa_range(i);

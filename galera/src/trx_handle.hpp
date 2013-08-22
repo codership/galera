@@ -302,15 +302,21 @@ namespace galera
             }
         }
 
-        void append_data(const void* data, const size_t data_len, bool store)
+        void append_data(const void* data, const size_t data_len,
+                         bool store, bool unordered)
         {
             if (new_version())
             {
-                write_set_out_.append_data(data, data_len, store);
+                if (!unordered)
+                    write_set_out_.append_data(data, data_len, store);
+                else
+                    write_set_out_.append_unordered(data, data_len, store);
             }
             else
             {
-                write_set_.append_data(data, data_len);
+                if (!unordered) write_set_.append_data(data, data_len);
+                // just ignore unordered data for compatibility with previous
+                // versions
             }
         }
 
@@ -447,6 +453,9 @@ namespace galera
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
                    const wsrep_trx_meta_t& meta) const /* throws */;
+
+        void unordered(void*                recv_ctx,
+                       wsrep_unordered_cb_t apply_cb) const;
 
         void verify_checksum() const /* throws */
         {
