@@ -105,6 +105,15 @@ namespace galera
             /* records last_seen, timestamp and CRC before replication */
             void set_last_seen (const wsrep_seqno_t& ls);
 
+            /* records partial seqno, pa_range, timestamp and CRC before
+             * replication (for preordered events)*/
+            void set_preordered (uint32_t pa_range)
+            {
+                pa_range = gu::htog<uint32_t>(pa_range);
+                memcpy (ptr_ + V3_PA_RANGE, &pa_range, sizeof(pa_range));
+                set_last_seen (0);
+            }
+
             /* This is for WriteSetIn */
             explicit
             Header (const gu::Buf& buf)
@@ -378,12 +387,14 @@ namespace galera
             return ((data_.count() + keys_.count() + unrd_.count()) == 0);
         }
 
+        typedef std::vector<gu::Buf> BufferVector;
+
         /* !!! This returns header without checksum! *
          *     Use set_last_seen() to finalize it.   */
         size_t gather(const wsrep_uuid_t&    source,
                       const wsrep_conn_id_t& conn,
                       const wsrep_trx_id_t&  trx,
-                      std::vector<gu::Buf>&  out)
+                      BufferVector&          out)
         {
             check_size();
 
@@ -408,6 +419,12 @@ namespace galera
         void set_last_seen (const wsrep_seqno_t& ls)
         {
             header_.set_last_seen(ls);
+        }
+
+        void set_preordered (int const pa_range)
+        {
+            // by current convention pa_range is off by 1 from wsrep API def.
+            header_.set_preordered(pa_range + 1);
         }
 
     private:

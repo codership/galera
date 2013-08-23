@@ -1,12 +1,12 @@
 /*
  * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
+#define __STDC_FORMAT_MACROS
 
 #include "../src/galera_service_thd.hpp"
 #include <check.h>
 #include <errno.h>
 
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
 namespace

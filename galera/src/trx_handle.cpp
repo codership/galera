@@ -229,8 +229,11 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             source_id_       = write_set_in_.source_id();
             conn_id_         = write_set_in_.conn_id();
             trx_id_          = write_set_in_.trx_id();
-            if (gu_unlikely(write_set_in_.certified()))
+            if (write_set_in_.certified())
+            {
                 last_seen_seqno_ = WSREP_SEQNO_UNDEFINED;
+                write_set_flags_ |= F_PREORDERED;
+            }
             else
             {
                 last_seen_seqno_ = write_set_in_.last_seen();

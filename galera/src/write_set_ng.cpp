@@ -119,7 +119,7 @@ WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
 
 
 void
-WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int pa_range)
+WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno, int const pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);

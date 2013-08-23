@@ -54,7 +54,8 @@ namespace galera
             F_MAC_PAYLOAD = 1 << 4,
             F_ANNOTATION  = 1 << 5,
             F_ISOLATION   = 1 << 6,
-            F_PA_UNSAFE   = 1 << 7
+            F_PA_UNSAFE   = 1 << 7,
+            F_PREORDERED  = 1 << 8
         };
 
         bool has_mac() const /* shall return 0 for new writeset ver */
@@ -69,26 +70,17 @@ namespace galera
 
         bool is_toi() const
         {
-            if (new_version())
-            {
-                return write_set_in_.is_toi();
-            }
-            else
-            {
-                return ((write_set_flags_ & F_ISOLATION) != 0);
-            }
+            return ((write_set_flags_ & F_ISOLATION) != 0);
         }
 
         bool pa_safe() const
         {
-            if (new_version())
-            {
-                return !write_set_in_.pa_unsafe();
-            }
-            else
-            {
-                return ((write_set_flags_ & F_PA_UNSAFE) == 0);
-            }
+            return ((write_set_flags_ & F_PA_UNSAFE) == 0);
+        }
+
+        bool preordered() const
+        {
+            return ((write_set_flags_ & F_PREORDERED) != 0);
         }
 
         typedef enum
@@ -268,7 +260,8 @@ namespace galera
 
         wsrep_seqno_t depends_seqno()   const { return depends_seqno_; }
 
-        int flags() const { return write_set_flags_; }
+        uint32_t      flags()           const { return write_set_flags_; }
+
         void set_flags(int flags)
         {
             write_set_flags_ = flags;
@@ -496,7 +489,7 @@ namespace galera
         WriteSet               write_set_;
         WriteSetOut            write_set_out_;
         WriteSetIn             write_set_in_;
-        int                    write_set_flags_;
+        uint32_t               write_set_flags_;
         bool                   certified_;
         bool                   committed_;
         long                   gcs_handle_;

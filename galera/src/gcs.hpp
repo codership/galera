@@ -5,12 +5,13 @@
 #ifndef GALERA_GCS_HPP
 #define GALERA_GCS_HPP
 
+#include "write_set_ng.hpp"
+#include "wsrep_api.h"
+#include "gcs.h"
 #include "gu_atomic.hpp"
 #include "gu_throw.hpp"
 #include "gu_config.hpp"
 #include "gu_buf.hpp"
-#include "gcs.h"
-#include "wsrep_api.h"
 
 #include <GCache.hpp>
 #include <cerrno>
@@ -31,10 +32,10 @@ namespace galera
                                              gcs_seqno_t seqno) = 0;
         virtual void    close() = 0;
         virtual ssize_t recv(gcs_action& act) = 0;
-        virtual ssize_t sendv(const std::vector<gu::Buf>&, size_t,
+        virtual ssize_t sendv(const WriteSetOut::BufferVector&, size_t,
                               gcs_act_type_t, bool) = 0;
         virtual ssize_t send (const void*, size_t, gcs_act_type_t, bool) = 0;
-        virtual ssize_t replv(const std::vector<gu::Buf>&,
+        virtual ssize_t replv(const WriteSetOut::BufferVector&,
                               gcs_action& act, bool) = 0;
         virtual ssize_t repl (gcs_action& act, bool) = 0;
         virtual gcs_seqno_t caused() = 0;
@@ -107,7 +108,7 @@ namespace galera
             return gcs_recv(conn_, &act);
         }
 
-        ssize_t sendv(const std::vector<gu::Buf>& actv, size_t act_len,
+        ssize_t sendv(const WriteSetOut::BufferVector& actv, size_t act_len,
                       gcs_act_type_t act_type, bool scheduled)
         {
             return gcs_sendv(conn_, &actv[0], act_len, act_type, scheduled);
@@ -119,7 +120,7 @@ namespace galera
             return gcs_send(conn_, act, act_len, act_type, scheduled);
         }
 
-        ssize_t replv(const std::vector<gu::Buf>& actv,
+        ssize_t replv(const WriteSetOut::BufferVector& actv,
                       struct gcs_action& act, bool scheduled)
         {
             return gcs_replv(conn_, &actv[0], &act, scheduled);
@@ -234,13 +235,13 @@ namespace galera
 
         ssize_t recv(gcs_action& act);
 
-        ssize_t sendv(const std::vector<gu::Buf>&, size_t, gcs_act_type_t, bool)
+        ssize_t sendv(const WriteSetOut::BufferVector&, size_t, gcs_act_type_t, bool)
         { return -ENOSYS; }
 
         ssize_t send(const void*, size_t, gcs_act_type_t, bool)
         { return -ENOSYS; }
 
-        ssize_t replv(const std::vector<gu::Buf>& actv,
+        ssize_t replv(const WriteSetOut::BufferVector& actv,
                       gcs_action& act, bool scheduled)
         {
             ssize_t ret(set_seqnos(act));

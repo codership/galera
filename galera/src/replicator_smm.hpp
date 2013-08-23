@@ -473,6 +473,8 @@ namespace galera
         gu::Atomic<long long> local_replays_;
         gu::Atomic<long long> causal_reads_;
 
+        gu::Atomic<long long> preordered_id_; // temporary preordered ID
+
         // non-atomic stats
         std::string           incoming_list_;
         mutable gu::Mutex     incoming_mutex_;

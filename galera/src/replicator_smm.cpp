@@ -177,6 +177,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_cert_failures_(),
     local_bf_aborts_    (),
     local_replays_      (),
+    causal_reads_       (),
+    preordered_id_      (),
     incoming_list_      (""),
     incoming_mutex_     (),
     wsrep_stats_        ()
@@ -474,6 +476,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     apply_monitor_.leave(ao);
 }
 
+
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
@@ -492,7 +495,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
-    std::vector<gu::Buf> actv;
+    WriteSetOut::BufferVector actv;
 
     gcs_action act;
     act.type = GCS_ACT_TORDERED;
@@ -1051,13 +1054,48 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 
 
 wsrep_status_t
-galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&     source,
-                                         int                     pa_range,
-                                         const struct wsrep_buf* data,
-                                         long                    count,
-                                         bool                    copy)
+galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
+                                         int                     const pa_range,
+                                         const struct wsrep_buf* const data,
+                                         long                    const count,
+                                         bool                    const copy)
 {
-    return WSREP_NOT_IMPLEMENTED;
+    if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
+        return WSREP_NOT_IMPLEMENTED;
+
+    WriteSetOut ws(trx_params_.working_dir_ + '/' +
+                   gu::to_string(data, std::hex),
+                   /* key format is not essential since we're not adding keys */
+                   KeySet::version(trx_params_.key_format_));
+
+    for (long i(0); i < count; ++i)
+    {
+        ws.append_data(data[i].ptr, data[i].len, copy);
+    }
+
+    ws.set_flags (WriteSetNG::F_COMMIT/*| WriteSetNG::F_PREORDERED*/);
+
+    /* by loooking at trx_id we should be able to detect gaps / lost events
+     * (however resending is not implemented yet). Something like
+     *
+     * wsrep_trx_id_t const trx_id(cert_.append_preordered(source, ws));
+     *
+     * begs to be here. */
+    wsrep_trx_id_t const      trx_id(preordered_id_.add_and_fetch(1));
+    WriteSetOut::BufferVector actv;
+
+    size_t const actv_size(ws.gather(source, 0, trx_id, actv));
+
+    ws.set_preordered (pa_range); // also adds CRC
+
+    int rcode;
+    do
+    {
+        rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false);
+    }
+    while (rcode == -EAGAIN && (usleep(1000), true));
+
+    return WSREP_OK;
 }
 
 

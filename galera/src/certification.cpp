@@ -733,6 +733,37 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 }
 
 
+galera::Certification::TestResult
+galera::Certification::do_test_preordered(TrxHandle* trx)
+{
+    assert(trx->new_version());
+    assert(trx->preordered());
+
+    /* This is a primitive certification test for preordered actions:
+     * it does not handle gaps and relies on general apply monitor for
+     * parallel applying. Ideally there should be a certification object
+     * per source. */
+
+    if (gu_unlikely(last_preordered_id_ &&
+                    (last_preordered_id_ + 1 != trx->trx_id())))
+    {
+        log_warn << "Gap in preordered stream: source_id '" << trx->source_id()
+                 << "', trx_id " << trx->trx_id() << ", previous id "
+                 << last_preordered_id_;
+        assert(0);
+    }
+
+    trx->set_depends_seqno(last_preordered_seqno_ -
+                           trx->write_set_in().pa_range() + 1);
+    // +1 compensates for subtracting from a previous seqno, rather than own.
+
+    last_preordered_seqno_ = trx->global_seqno();
+    last_preordered_id_    = trx->trx_id();
+
+    return TEST_OK;
+}
+
+
 galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     :
     version_               (-1),
@@ -747,6 +778,8 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     position_              (-1),
     safe_to_discard_seqno_ (-1),
     last_pa_unsafe_        (-1),
+    last_preordered_seqno_ (position_),
+    last_preordered_id_    (0),
     n_certified_           (0),
     deps_dist_             (0),
 
@@ -832,79 +865,9 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
     last_pa_unsafe_        = seqno;
+    last_preordered_seqno_ = position_;
+    last_preordered_id_    = 0;
     version_               = version;
-}
-
-
-galera::Certification::TestResult
-galera::Certification::append_trx(TrxHandle* trx)
-{
-    // todo: enable when source id bug is fixed
-    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
-    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
-    assert(trx->global_seqno() > position_);
-
-    trx->ref();
-    {
-        gu::Lock lock(mutex_);
-
-        if (gu_unlikely(trx->global_seqno() != position_ + 1))
-        {
-            // this is perfectly normal if trx is rolled back just after
-            // replication, keeping the log though
-            log_debug << "seqno gap, position: " << position_
-                      << " trx seqno " << trx->global_seqno();
-        }
-
-        if (gu_unlikely((trx->last_seen_seqno() + 1) < trx_map_.begin()->first))
-        {
-            /* See #733 - for now it is false positive */
-            cert_debug << "WARNING: last_seen_seqno is below certification index: "
-            << trx_map_.begin()->first << " > " << trx->last_seen_seqno();
-        }
-
-        position_ = trx->global_seqno();
-
-        if (gu_unlikely(!(position_ & max_length_check_) &&
-                        (trx_map_.size() > static_cast<size_t>(max_length_))))
-        {
-            log_debug << "trx map size: " << trx_map_.size()
-                      << " - check if status.last_committed is incrementing";
-
-            wsrep_seqno_t       trim_seqno(position_ - max_length_);
-            wsrep_seqno_t const stds      (get_safe_to_discard_seqno_());
-
-            if (trim_seqno > stds)
-            {
-                log_warn << "Attempt to trim certification index at "
-                         << trim_seqno << ", above safe-to-discard: " << stds;
-                trim_seqno = stds;
-            }
-            else
-            {
-                cert_debug << "purging index up to " << trim_seqno;
-            }
-
-            purge_trxs_upto_(trim_seqno, true);
-        }
-    }
-
-    const TestResult retval(test(trx));
-
-    {
-        gu::Lock lock(mutex_);
-
-        if (trx_map_.insert(
-                std::make_pair(trx->global_seqno(), trx)).second == false)
-            gu_throw_fatal << "duplicate trx entry " << *trx;
-
-        deps_set_.insert(trx->last_seen_seqno());
-        assert(deps_set_.size() <= trx_map_.size());
-    }
-
-    trx->mark_certified();
-
-    return retval;
 }
 
 
@@ -913,7 +876,8 @@ galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
-    const TestResult ret(do_test(trx, bval));
+    const TestResult ret
+        (trx->preordered() ? do_test_preordered(trx) : do_test(trx, bval));
 
     if (gu_unlikely(ret != TEST_OK))
     {
@@ -965,6 +929,79 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
     }
 
     return purge_seqno;
+}
+
+
+galera::Certification::TestResult
+galera::Certification::append_trx(TrxHandle* trx)
+{
+    // todo: enable when source id bug is fixed
+    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
+    assert(trx->global_seqno() > position_);
+
+    trx->ref();
+    {
+        gu::Lock lock(mutex_);
+
+        if (gu_unlikely(trx->global_seqno() != position_ + 1))
+        {
+            // this is perfectly normal if trx is rolled back just after
+            // replication, keeping the log though
+            log_debug << "seqno gap, position: " << position_
+                      << " trx seqno " << trx->global_seqno();
+        }
+
+        if (gu_unlikely((trx->last_seen_seqno() + 1) < trx_map_.begin()->first))
+        {
+            /* See #733 - for now it is false positive */
+            cert_debug
+                << "WARNING: last_seen_seqno is below certification index: "
+                << trx_map_.begin()->first << " > " << trx->last_seen_seqno();
+        }
+
+        position_ = trx->global_seqno();
+
+        if (gu_unlikely(!(position_ & max_length_check_) &&
+                        (trx_map_.size() > static_cast<size_t>(max_length_))))
+        {
+            log_debug << "trx map size: " << trx_map_.size()
+                      << " - check if status.last_committed is incrementing";
+
+            wsrep_seqno_t       trim_seqno(position_ - max_length_);
+            wsrep_seqno_t const stds      (get_safe_to_discard_seqno_());
+
+            if (trim_seqno > stds)
+            {
+                log_warn << "Attempt to trim certification index at "
+                         << trim_seqno << ", above safe-to-discard: " << stds;
+                trim_seqno = stds;
+            }
+            else
+            {
+                cert_debug << "purging index up to " << trim_seqno;
+            }
+
+            purge_trxs_upto_(trim_seqno, true);
+        }
+    }
+
+    const TestResult retval(test(trx));
+
+    {
+        gu::Lock lock(mutex_);
+
+        if (trx_map_.insert(
+                std::make_pair(trx->global_seqno(), trx)).second == false)
+            gu_throw_fatal << "duplicate trx entry " << *trx;
+
+        deps_set_.insert(trx->last_seen_seqno());
+        assert(deps_set_.size() <= trx_map_.size());
+    }
+
+    trx->mark_certified();
+
+    return retval;
 }
 
 

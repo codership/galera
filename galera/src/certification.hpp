@@ -114,6 +114,7 @@ namespace galera
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v1to2(TrxHandle*, bool);
         TestResult do_test_v3(TrxHandle*, bool);
+        TestResult do_test_preordered(TrxHandle*);
         void purge_for_trx(TrxHandle*);
         void purge_for_trx_v1to2(TrxHandle*);
         void purge_for_trx_v3(TrxHandle*);
@@ -178,6 +179,8 @@ namespace galera
         wsrep_seqno_t position_;
         wsrep_seqno_t safe_to_discard_seqno_;
         wsrep_seqno_t last_pa_unsafe_;
+        wsrep_seqno_t last_preordered_seqno_;
+        wsrep_trx_id_t last_preordered_id_;
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
 

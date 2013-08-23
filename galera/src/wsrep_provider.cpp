@@ -746,9 +746,7 @@ wsrep_status_t galera_preordered(wsrep_t* const gh,
 
     try
     {
-        repl->handle_preordered(*source_id, pa_range, data, count, copy);
-        return WSREP_OK;
-        // trx will be unreferenced (destructed) during purge
+        return repl->handle_preordered(*source_id, pa_range, data, count, copy);
     }
     catch (std::exception& e)
     {
