@@ -25,22 +25,29 @@ long gu_freebsd_avphys_pages (void);
 #endif
 
 #if defined(__APPLE__)
-# define GU_PAGE_SIZE    (getpagesize ())
-# define GU_PHYS_PAGES   (gu_darwin_phys_pages ())
-# define GU_AVPHYS_PAGES (gu_darwin_avphys_pages ())
+static inline size_t gu_page_size()    { return getpagesize();             }
+static inline size_t gu_phys_pages()   { return gu_darwin_phys_pages();    }
+static inline size_t gu_avphys_pages() { return gu_darwin_avphys_pages();  }
 #elif defined(__FreeBSD__)
-# define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
-# define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
-# define GU_AVPHYS_PAGES (gu_freebsd_avphys_pages ())
+static inline size_t gu_page_size()    { return sysconf(_SC_PAGESIZE);     }
+static inline size_t gu_phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
+static inline size_t gu_avphys_pages() { return gu_freebsd_avphys_pages(); }
 #else /* !__APPLE__ && !__FreeBSD__ */
-# define GU_PAGE_SIZE    (sysconf (_SC_PAGESIZE))
-# define GU_PHYS_PAGES   (sysconf (_SC_PHYS_PAGES))
-# define GU_AVPHYS_PAGES (sysconf (_SC_AVPHYS_PAGES))
-#endif
+static inline size_t gu_page_size()    { return sysconf(_SC_PAGESIZE);     }
+static inline size_t gu_phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
+static inline size_t gu_avphys_pages() { return sysconf(_SC_AVPHYS_PAGES); }
+#endif /* !__APPLE__ && !__FreeBSD__ */
 
-#define GU_AVPHYS_SIZE  (((unsigned long long)GU_AVPHYS_PAGES)*GU_PAGE_SIZE)
+static inline size_t gu_avphys_bytes()
+{
+    // to detect overflow on systems with >4G of RAM, see #776
+    unsigned long long avphys = gu_avphys_pages(); avphys *= gu_page_size();
+    size_t max = -1;
+    return (avphys < max ? avphys : max);
+}
 
 #include <limits.h>
+
 #define GU_ULONG_MAX      ULONG_MAX
 #define GU_LONG_MAX       LONG_MAX
 #define GU_LONG_MIN       LONG_MIN

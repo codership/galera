@@ -103,9 +103,9 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
             return NULL;
         }
 
-        if (max_size > GU_AVPHYS_SIZE) {
+        if (max_size > gu_avphys_bytes()) {
             gu_error ("Maximum FIFO size %llu exceeds available memory "
-                      "limit %llu", max_size, GU_AVPHYS_SIZE);
+                      "limit %llu", max_size, gu_avphys_bytes());
             return NULL;
         }
 
