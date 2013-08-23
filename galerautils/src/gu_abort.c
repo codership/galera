@@ -29,11 +29,15 @@ gu_abort (void)
     /* restore default SIGABRT handler */
     signal (SIGABRT, SIG_DFL);
 
-#if !defined(__sun__) && !defined(__APPLE__) && !defined(__FreeBSD__)
+#if defined(__sun__)
+    gu_info ("%s: Terminated.", getexecname ());
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+    gu_info ("%s: Terminated.", getprogname ());
+#elif defined(__linux__)
     gu_info ("%s: Terminated.", program_invocation_name);
 #else
     gu_info ("Program terminated.");
-#endif /* _GNU_SOURCE */
+#endif
 
     abort();
 }
