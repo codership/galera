@@ -57,6 +57,7 @@ extern "C" {
  *  Write set replication flags
  */
 #define WSREP_FLAG_PA_SAFE              ( 1ULL << 0 )
+#define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 1 )
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
 typedef uint64_t wsrep_conn_id_t; //!< application connection ID
@@ -332,28 +333,6 @@ typedef enum wsrep_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
                                                    size_t      size);
 
 /*!
- * @brief expand callback
- *
- * This handler is called to expand events encapsulated by encapsulate()
- * method.
- *
- * @param recv_ctx receiver context pointer provided by the application
- * @param data     data buffer containing the write set
- * @param size     data buffer size
- * @param type     event/stream type
- * @param prod_id  producer/stream ID
- *
- * @return success code:
- * @retval WSREP_OK
- * @retval WSREP_ERROR call failed
- */
-typedef enum wsrep_status (*wsrep_expand_cb_t) (void*               recv_ctx,
-                                                const void*         data,
-                                                size_t              size,
-                                                wsrep_stream_t      type,
-                                                const wsrep_uuid_t* prod_id);
-
-/*!
  * @brief a callback to donate state snapshot
  *
  * This handler is called from wsrep library when it needs this node
@@ -424,7 +403,6 @@ struct wsrep_init_args
     wsrep_apply_cb_t      apply_cb;        //!< apply  callback
     wsrep_commit_cb_t     commit_cb;       //!< commit callback
     wsrep_unordered_cb_t  unordered_cb;    //!< callback for unordered actions
-    wsrep_expand_cb_t     expand_cb;       //!< callback to expand encapsulated events
 
     /* state snapshot transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
@@ -468,6 +446,17 @@ typedef struct wsrep_key
     long               key_parts_num; /*!< Number of key parts */
 } wsrep_key_t;
 
+/*! Key type:
+ *  EXCLUSIVE conflicts with any key type
+ *  SEMI      reserved. If not supported, will be interpeted as EXCLUSIVE
+ *  SHARED    conflicts only with EXCLUSIVE keys */
+typedef enum wsrep_key_type
+{
+    WSREP_KEY_SHARED = 0,
+    WSREP_KEY_SEMI,
+    WSREP_KEY_EXCLUSIVE
+} wsrep_key_type_t;
+
 /*! Transaction handle struct passed for wsrep transaction handling calls */
 typedef struct wsrep_trx_handle_
 {
@@ -493,7 +482,6 @@ static inline wsrep_trx_handle_t* wsrep_trx_handle_for_id(
     }
     return trx_handle;
 }
-
 
 typedef struct wsrep_ wsrep_t;
 /*!
@@ -593,8 +581,8 @@ struct wsrep_ {
    * @param wsrep      this wsrep handle
    * @param trx_handle transaction which is committing
    * @param conn_id    connection ID
-   * @param app_data   application specific applying data
-   * @param data_len   the size of the applying data
+//   * @param data       array of application data buffers
+//   * @param count      buffer count
    * @param flags      fine tuning the replication WSREP_FLAG_*
    * @param meta       transaction meta data
    *
@@ -603,13 +591,13 @@ struct wsrep_ {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*pre_commit)(wsrep_t*            wsrep,
-                                 wsrep_conn_id_t     conn_id,
-                                 wsrep_trx_handle_t* trx_handle,
-                                 const void*         app_data,
-                                 size_t              data_len,
-                                 uint64_t            flags,
-                                 wsrep_trx_meta_t*   meta);
+    wsrep_status_t (*pre_commit)(wsrep_t*                wsrep,
+                                 wsrep_conn_id_t         conn_id,
+                                 wsrep_trx_handle_t*     trx_handle,
+//                                 const struct wsrep_buf* data,
+//                                 long                    count,
+                                 uint64_t                flags,
+                                 wsrep_trx_meta_t*       meta);
 
   /*!
    * @brief Releases resources after transaction commit.
@@ -679,21 +667,21 @@ struct wsrep_ {
   /*!
    * @brief Appends a row reference in transaction's write set
    *
-   * Both nocopy and shared parameters can be ignored by provider.
+   * Both copy and shared flags can be ignored by provider.
    *
-   * @param wsrep       this wsrep handle
-   * @param trx_handle  transaction handle
-   * @param keys        array of keys
-   * @param keys_num    length of the array of keys
-   * @param nocopy      can be set to TRUE if keys persist until commit.
-   * @param shared      boolean denoting if key corresponds to shared resource
+   * @param wsrep      this wsrep handle
+   * @param trx_handle transaction handle
+   * @param keys       array of keys
+   * @param keys_num   length of the array of keys
+   * @param copy       can be set to FALSE if keys persist until commit.
+   * @param shared     boolean denoting if key corresponds to shared resource
    */
     wsrep_status_t (*append_key)(wsrep_t*            wsrep,
                                  wsrep_trx_handle_t* trx_handle,
                                  const wsrep_key_t*  keys,
                                  long                keys_num,
-                                 wsrep_bool_t        nocopy,
-                                 wsrep_bool_t        shared);
+                                 wsrep_key_type_t    key_type,
+                                 wsrep_bool_t        copy);
 
    /*!
     * @brief Appends data in transaction's write set
@@ -701,22 +689,22 @@ struct wsrep_ {
     * This method can be called any time before commit and it
     * appends data block into transaction's write set.
     *
-    * Both nocopy and unordered parameters can be ignored by provider.
+    * Both copy and unordered flags can be ignored by provider.
     *
     * @param wsrep      this wsrep handle
     * @param trx_handle transaction handle
-    * @param data data  buffer
-    * @param data_len   data buffer length
-    * @param nocopy     can be set to TRUE if data persists until commit.
+    * @param data       array of data buffers
+    * @param count      buffer count
+    * @param copy       can be set to FALSE if data persists until commit.
     * @param unordered  can be set to TRUE if this part of the write set
     *                   executed out of order.
     */
-    wsrep_status_t (*append_data)(wsrep_t*            wsrep,
-                                  wsrep_trx_handle_t* trx_handle,
-                                  const void*         data,
-                                  size_t              data_len,
-                                  wsrep_bool_t        nocopy,
-                                  wsrep_bool_t        unordered);
+    wsrep_status_t (*append_data)(wsrep_t*                wsrep,
+                                  wsrep_trx_handle_t*     trx_handle,
+                                  const struct wsrep_buf* data,
+                                  long                    count,
+                                  wsrep_bool_t            copy,
+                                  wsrep_bool_t            unordered);
 
   /*!
    * @brief Get causal ordering for read operation
@@ -758,21 +746,21 @@ struct wsrep_ {
    * @param conn_id     connection ID
    * @param keys        array of keys
    * @param keys_num    lenght of the array of keys
-   * @param action      action to be executed
-   * @param action_len  action buffer size
+   * @param action      action buffer array to be executed
+   * @param count       action buffer count
    * @param meta        transaction meta data
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*to_execute_start)(wsrep_t*           wsrep,
-                                       wsrep_conn_id_t    conn_id,
-                                       const wsrep_key_t* keys,
-                                       long               keys_num,
-                                       const void*        action,
-                                       size_t             action_len,
-                                       wsrep_trx_meta_t*  meta);
+    wsrep_status_t (*to_execute_start)(wsrep_t*                wsrep,
+                                       wsrep_conn_id_t         conn_id,
+                                       const wsrep_key_t*      keys,
+                                       long                    keys_num,
+                                       const struct wsrep_buf* action,
+                                       long                    count,
+                                       wsrep_trx_meta_t*       meta);
 
   /*!
    * @brief Ends the total order isolation section.
@@ -790,26 +778,32 @@ struct wsrep_ {
     wsrep_status_t (*to_execute_end)(wsrep_t* wsrep, wsrep_conn_id_t conn_id);
 
   /*!
-   * @brief Encapsulates opaque event into provider stream.
+   * @brief Submits preordered replication events to proveider.
    *
-   * On receiving end expand_cb_t callback will be called to expand and
-   * process the event.
+   * The contract is that they will be committed in the same (partial) order
+   * this method was called
    *
-   * @param wsrep       this wsrep handle
-   * @param events      array of events to be encapsulated
-   * @param events_num  number of events
-   * @param type        event/stream type
-   * @param prod_id     event producer/stream ID
+   * @param wsrep     this wsrep handle
+   * @param source_id ID of the event producer, also serves as the partial order
+   *                  or stream ID - events with different source_ids won't be
+   *                  ordered with respect to each other.
+   * @param pa_range  the number of preceding events this event can be processed
+   *                  in parallel with. A value of 0 means strict serial
+   *                  processing. Note: commits always happend in wsrep order.
+   * @param data      an array of data buffers.
+   * @param count     length of data buffer array.
+   * @param copy      whether provider needs to make a copy of event
    *
-   * @retval WSREP_OK         encapsulation succeeded
-   * @retval WSREP_CONN_FAIL  encapsulation failed, recoverable
-   * @retval WSREP_NODE_FAIL  encapsulation failed, unrecoverable
+   * @retval WSREP_OK         cluster commit succeeded
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*encapsulate)(wsrep_t*            wsrep,
-                                  const wsrep_buf_t*  events,
-                                  long                events_num,
-                                  wsrep_stream_t      type,
-                                  const wsrep_uuid_t* prod_id);
+    wsrep_status_t (*preordered)(wsrep_t*                wsrep,
+                                 const wsrep_uuid_t*     source_id,
+                                 int                     pa_range,
+                                 const struct wsrep_buf* data,
+                                 long                    count,
+                                 wsrep_bool_t            copy);
 
   /*!
    * @brief Signals to wsrep provider that state snapshot has been sent to
@@ -849,9 +843,9 @@ struct wsrep_ {
    * called only locally. This call will block until sst_sent is called
    * from callback.
    *
-   * @param wsrep   this wsrep handle
-   * @param msg     context message for SST donate callback
-   * @param msg_len length of context message
+   * @param wsrep      this wsrep handle
+   * @param msg        context message for SST donate callback
+   * @param msg_len    length of context message
    * @param donor_spec list of snapshot donors
    */
     wsrep_status_t (*snapshot)(wsrep_t*    wsrep,
