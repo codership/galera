@@ -31,15 +31,19 @@ namespace galera
     public:
         enum
         {
-            F_COMMIT      = 1 << 0,
-            F_ROLLBACK    = 1 << 1,
-            F_OOC         = 1 << 2,
-            F_MAC_HEADER  = 1 << 3,
-            F_MAC_PAYLOAD = 1 << 4,
+            F_COMMIT      = WSREP_FLAG_COMMIT,      /* 1 << 0 */
+            F_ROLLBACK    = WSREP_FLAG_ROLLBACK,    /* 1 << 1 */
+            F_PA_UNSAFE   = WSREP_FLAG_PA_UNSAFE,   /* 1 << 2 */
+            F_ISOLATION   = WSREP_FLAG_ISOLATION,   /* 1 << 3 */
+            F_COMMUTATIVE = WSREP_FLAG_COMMUTATIVE, /* 1 << 4 */
             F_ANNOTATION  = 1 << 5,
-            F_ISOLATION   = 1 << 6,
-            F_PA_UNSAFE   = 1 << 7
+            F_MAC_HEADER  = 1 << 6,
+            F_MAC_PAYLOAD = 1 << 7,
+            F_OOC         = 1 << 8
         };
+
+        /* where TrxHandle and wsrep flags are identical */
+        static uint64_t const WSREP_FLAGS_MASK = (1UL << 5) - 1;
 
         bool has_mac() const
         {
@@ -56,9 +60,9 @@ namespace galera
             return ((write_set_flags_ & F_ISOLATION) != 0);
         }
 
-        bool pa_safe() const
+        bool pa_unsafe() const
         {
-            return ((write_set_flags_ & F_PA_UNSAFE) == 0);
+            return ((write_set_flags_ & F_PA_UNSAFE) != 0);
         }
 
         typedef enum
@@ -219,7 +223,11 @@ namespace galera
         wsrep_seqno_t depends_seqno() const { return depends_seqno_; }
 
 
-        void set_flags(int flags) { write_set_flags_ = flags; }
+        void set_flags(uint32_t flags)
+        {
+            write_set_flags_ = flags;
+        }
+
         int flags() const { return write_set_flags_; }
 
         void append_key(const Key& key)
@@ -368,7 +376,7 @@ namespace galera
         wsrep_seqno_t          depends_seqno_;
         gu::Atomic<size_t>     refcnt_;
         WriteSet               write_set_;
-        int                    write_set_flags_;
+        uint32_t               write_set_flags_;
         bool                   certified_;
         bool                   committed_;
         long                   gcs_handle_;

@@ -409,7 +409,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 }
 
 galera::TrxHandle*
-galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
+galera::ReplicatorSMM::local_trx(wsrep_ws_handle_t* handle, bool create)
 {
     TrxHandle* trx;
     assert(handle != 0);
@@ -1227,8 +1227,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 
-    void*   app_req(0);
-    ssize_t app_req_len(0);
+    void* app_req(0);
+    int   app_req_len(0);
 
     const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
     view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);

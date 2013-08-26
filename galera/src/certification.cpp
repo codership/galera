@@ -331,7 +331,7 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 
         }
 
-        if (!trx->pa_safe()) last_pa_unsafe_ = trx->global_seqno();
+        if (trx->pa_unsafe()) last_pa_unsafe_ = trx->global_seqno();
 
         key_count_ += key_count;
     }

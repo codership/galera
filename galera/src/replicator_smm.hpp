@@ -58,7 +58,7 @@ namespace galera
         wsrep_status_t async_recv(void* recv_ctx);
 
         TrxHandle* local_trx(wsrep_trx_id_t);
-        TrxHandle* local_trx(wsrep_trx_handle_t*, bool);
+        TrxHandle* local_trx(wsrep_ws_handle_t*, bool);
         void unref_local_trx(TrxHandle* trx);
         void discard_local_trx(wsrep_trx_id_t trx_id);
 
