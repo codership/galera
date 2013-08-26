@@ -173,7 +173,9 @@ START_TEST(test_serialization)
     buf.resize(trx->serial_size());
     fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
     fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->serial_size() == trx->serial_size());
+    fail_unless(trx2->serial_size() == trx->serial_size(),
+                "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
+                trx2->serial_size(), trx->serial_size());
 
     trx2->unref();
     trx->unref();

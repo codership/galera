@@ -52,10 +52,27 @@ namespace galera
         {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
-            F_OOC         = 1 << 2,
+            F_PA_UNSAFE   = 1 << 2,
             F_TOI         = 1 << 3,
-            F_PA_UNSAFE   = 1 << 4
+            F_COMMUTATIVE = 1 << 4,
+            F_NATIVE      = 1 << 5
         };
+
+        static inline uint64_t
+        wsrep_flags_to_ws_flags (uint64_t flags)
+        {
+            uint64_t ret(0);
+
+            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
+            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_TOI;
+            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
+            if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
+
+            return ret;
+        }
+
 
         /* TODO: separate metadata access from physical representation in
          *       future versions */

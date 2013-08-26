@@ -373,7 +373,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 }
 
 galera::TrxHandle*
-galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
+galera::ReplicatorSMM::local_trx(wsrep_ws_handle_t* handle, bool create)
 {
     TrxHandle* trx;
     assert(handle != 0);
@@ -1055,9 +1055,10 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 
 wsrep_status_t
 galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
-                                         int                     const pa_range,
+                                         uint64_t                const flags,
                                          const struct wsrep_buf* const data,
-                                         long                    const count,
+                                         int                     const count,
+                                         int                     const pa_range,
                                          bool                    const copy)
 {
     if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
@@ -1073,7 +1074,7 @@ galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
         ws.append_data(data[i].ptr, data[i].len, copy);
     }
 
-    ws.set_flags (WriteSetNG::F_COMMIT/*| WriteSetNG::F_PREORDERED*/);
+    ws.set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags));
 
     /* by loooking at trx_id we should be able to detect gaps / lost events
      * (however resending is not implemented yet). Something like
@@ -1300,8 +1301,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 
-    void*   app_req(0);
-    ssize_t app_req_len(0);
+    void* app_req(0);
+    int   app_req_len(0);
 
     const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
     view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);

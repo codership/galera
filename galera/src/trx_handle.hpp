@@ -47,18 +47,22 @@ namespace galera
 
         enum
         {
-            F_COMMIT      = 1 << 0,
-            F_ROLLBACK    = 1 << 1,
-            F_OOC         = 1 << 2,
-            F_MAC_HEADER  = 1 << 3,
-            F_MAC_PAYLOAD = 1 << 4,
+            F_COMMIT      = WSREP_FLAG_COMMIT,      /* 1 << 0 */
+            F_ROLLBACK    = WSREP_FLAG_ROLLBACK,    /* 1 << 1 */
+            F_PA_UNSAFE   = WSREP_FLAG_PA_UNSAFE,   /* 1 << 2 */
+            F_ISOLATION   = WSREP_FLAG_ISOLATION,   /* 1 << 3 */
+            F_COMMUTATIVE = WSREP_FLAG_COMMUTATIVE, /* 1 << 4 */
             F_ANNOTATION  = 1 << 5,
-            F_ISOLATION   = 1 << 6,
-            F_PA_UNSAFE   = 1 << 7,
-            F_PREORDERED  = 1 << 8
+            F_MAC_HEADER  = 1 << 6,
+            F_MAC_PAYLOAD = 1 << 7,
+            F_OOC         = 1 << 8,
+            F_PREORDERED  = 1 << 9
         };
 
-        bool has_mac() const /* shall return 0 for new writeset ver */
+        /* where TrxHandle and wsrep flags are identical */
+        static uint64_t const WSREP_FLAGS_MASK = (1UL << 5) - 1;
+
+        bool has_mac() const
         {
             return ((write_set_flags_ & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
         }
@@ -73,9 +77,9 @@ namespace galera
             return ((write_set_flags_ & F_ISOLATION) != 0);
         }
 
-        bool pa_safe() const
+        bool pa_unsafe() const
         {
-            return ((write_set_flags_ & F_PA_UNSAFE) == 0);
+            return ((write_set_flags_ & F_PA_UNSAFE) != 0);
         }
 
         bool preordered() const
@@ -262,7 +266,7 @@ namespace galera
 
         uint32_t      flags()           const { return write_set_flags_; }
 
-        void set_flags(int flags)
+        void set_flags(uint32_t flags)
         {
             write_set_flags_ = flags;
 
@@ -296,20 +300,39 @@ namespace galera
         }
 
         void append_data(const void* data, const size_t data_len,
-                         bool store, bool unordered)
+                         wsrep_data_type_t type, bool store)
         {
             if (new_version())
             {
-                if (!unordered)
+                switch (type)
+                {
+                case WSREP_DATA_ORDERED:
                     write_set_out_.append_data(data, data_len, store);
-                else
+                    break;
+                case WSREP_DATA_UNORDERED:
                     write_set_out_.append_unordered(data, data_len, store);
+                    break;
+                case WSREP_DATA_ANNOTATION:
+                    assert(0);
+                    break;
+                }
             }
             else
             {
-                if (!unordered) write_set_.append_data(data, data_len);
-                // just ignore unordered data for compatibility with previous
-                // versions
+                switch (type)
+                {
+                case WSREP_DATA_ORDERED:
+                    write_set_.append_data(data, data_len);
+                    break;
+                case WSREP_DATA_UNORDERED:
+                    // just ignore unordered for compatibility with
+                    // previous versions
+                    break;
+                case WSREP_DATA_ANNOTATION:
+                    append_annotation(reinterpret_cast<const gu::byte_t*>(data),
+                                      data_len);
+                    break;
+                }
             }
         }
 

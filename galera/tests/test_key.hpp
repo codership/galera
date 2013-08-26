@@ -34,7 +34,9 @@ public:
 
         for (size_t i = 0; i < parts.size(); ++i)
         {
-            wsrep_buf_t b = { parts[i], parts[i] ? strlen(parts[i]) + 1 : 0 };
+            int p_len(parts[i] ? strlen(parts[i]) + 1 : 0);
+            if (p_len < 0) throw std::out_of_range("integer overflow");
+            wsrep_buf_t b = { parts[i], p_len };
             parts_.push_back(b);
         }
     }
@@ -92,9 +94,10 @@ private:
     bool
     push_back (const char* const p)
     {
-        if (p)
+        int p_len(-1);
+        if (p && (p_len = strlen(p) + 1) > 0)
         {
-            wsrep_buf_t b = { p, strlen(p) + 1 };
+            wsrep_buf_t b = { p, p_len };
             parts_.push_back(b);
             return true;
         }

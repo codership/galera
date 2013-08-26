@@ -58,7 +58,7 @@ namespace galera
         wsrep_status_t async_recv(void* recv_ctx);
 
         TrxHandle* local_trx(wsrep_trx_id_t);
-        TrxHandle* local_trx(wsrep_trx_handle_t*, bool);
+        TrxHandle* local_trx(wsrep_ws_handle_t*, bool);
         void unref_local_trx(TrxHandle* trx);
         void discard_local_trx(wsrep_trx_id_t trx_id);
 
@@ -80,9 +80,10 @@ namespace galera
         wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*);
         wsrep_status_t to_isolation_end(TrxHandle* trx);
         wsrep_status_t handle_preordered(const wsrep_uuid_t&     source,
-                                         int                     pa_range,
+                                         uint64_t                flags,
                                          const struct wsrep_buf* data,
-                                         long                    count,
+                                         int                     count,
+                                         int                     pa_range,
                                          bool                    copy);
         wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
                                 wsrep_seqno_t seqno);

@@ -41,15 +41,18 @@ KeySet::version (const std::string& ver)
 size_t
 KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
                                    int const part_num,
-                                   gu::byte_t* buf, size_t const size)
+                                   gu::byte_t* buf, int const size)
 {
-    ann_size_t ann_size;
+    assert(size >= 0);
 
-    size_t tmp_size(sizeof(ann_size));
+    ann_size_t ann_size;
+    int        tmp_size(sizeof(ann_size));
+
     for (int i(0); i <= part_num; ++i)
     {
-        tmp_size += 1 + std::min<size_t>(parts[i].len, 255);
+        tmp_size += 1 + std::min(parts[i].len, 255);
     }
+
     tmp_size = std::min(tmp_size, size);
     ann_size = std::min<size_t>(tmp_size,
                                 std::numeric_limits<ann_size_t>::max());
@@ -62,9 +65,8 @@ KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
 
     for (int i(0); i <= part_num && off < ann_size; ++i)
     {
-        size_t left(ann_size - off - 1);
-        gu::byte_t const part_len(
-            std::min<size_t>(std::min(parts[i].len, left), 255U));
+        int left(ann_size - off - 1);
+        gu::byte_t const part_len(std::min(std::min(parts[i].len, left), 255));
 
         buf[off] = part_len; ++off;
 

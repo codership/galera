@@ -50,7 +50,7 @@ namespace galera
 
         virtual int trx_proto_ver() const = 0;
         virtual TrxHandle* local_trx(wsrep_trx_id_t) = 0;
-        virtual TrxHandle* local_trx(wsrep_trx_handle_t*, bool) = 0;
+        virtual TrxHandle* local_trx(wsrep_ws_handle_t*, bool) = 0;
         virtual void unref_local_trx(TrxHandle* trx) = 0;
         virtual void discard_local_trx(wsrep_trx_id_t trx_id) = 0;
 
@@ -70,9 +70,11 @@ namespace galera
                                                   wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;
         virtual wsrep_status_t handle_preordered(const wsrep_uuid_t& source,
-                                                 int pa_range,
+                                                 uint64_t flags,
                                                  const struct wsrep_buf* data,
-                                                 long count, bool copy) = 0;
+                                                 int count,
+                                                 int pa_range,
+                                                 bool copy) = 0;
         virtual wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
                                         wsrep_seqno_t seqno) = 0;
         virtual wsrep_status_t sst_received(const wsrep_uuid_t& uuid,

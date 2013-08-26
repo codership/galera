@@ -291,7 +291,7 @@ public:
 
         static size_t
         store_annotation (const wsrep_buf_t* parts, int part_num,
-                          gu::byte_t* buf, size_t size);
+                          gu::byte_t* buf, int size);
 
         static void
         print_annotation (std::ostream& os, const gu::byte_t* buf);
