@@ -33,13 +33,12 @@ namespace galera
         {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
-            F_PA_UNSAFE   = 1 << 2,
-            F_ISOLATION   = 1 << 3,
-            F_COMMUTATIVE = 1 << 4,
+            F_OOC         = 1 << 2,
+            F_MAC_HEADER  = 1 << 3,
+            F_MAC_PAYLOAD = 1 << 4,
             F_ANNOTATION  = 1 << 5,
-            F_MAC_HEADER  = 1 << 6,
-            F_MAC_PAYLOAD = 1 << 7,
-            F_OOC         = 1 << 8
+            F_ISOLATION   = 1 << 6,
+            F_PA_UNSAFE   = 1 << 7
         };
 
         static inline uint64_t wsrep_flags_to_trx_flags (uint64_t flags)
