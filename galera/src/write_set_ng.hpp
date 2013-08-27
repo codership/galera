@@ -59,7 +59,7 @@ namespace galera
         };
 
         static inline uint64_t
-        wsrep_flags_to_ws_flags (uint64_t flags)
+        wsrep_flags_to_ws_flags (uint64_t const flags)
         {
             uint64_t ret(0);
 

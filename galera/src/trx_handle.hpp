@@ -54,7 +54,8 @@ namespace galera
             F_MAC_PAYLOAD = 1 << 4,
             F_ANNOTATION  = 1 << 5,
             F_ISOLATION   = 1 << 6,
-            F_PA_UNSAFE   = 1 << 7
+            F_PA_UNSAFE   = 1 << 7,
+            F_PREORDERED  = 1 << 8
         };
 
         static inline uint64_t wsrep_flags_to_trx_flags (uint64_t flags)
