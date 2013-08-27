@@ -438,8 +438,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         trx->set_conn_id(conn_id);
 //        /* rbr_data should clearly persist over pre_commit() call */
 //        append_data_array (trx, rbr_data, rbr_data_len, false, false);
-        assert (flags < TrxHandle::WSREP_FLAGS_MASK);
-        trx->set_flags(flags & TrxHandle::WSREP_FLAGS_MASK);
+        trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
 
         retval = repl->replicate(trx);
 
