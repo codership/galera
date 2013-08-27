@@ -65,7 +65,6 @@ namespace galera
             if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
             if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
-            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
 
             return ret;
         }
