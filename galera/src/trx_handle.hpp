@@ -47,20 +47,28 @@ namespace galera
 
         enum
         {
-            F_COMMIT      = WSREP_FLAG_COMMIT,      /* 1 << 0 */
-            F_ROLLBACK    = WSREP_FLAG_ROLLBACK,    /* 1 << 1 */
-            F_PA_UNSAFE   = WSREP_FLAG_PA_UNSAFE,   /* 1 << 2 */
-            F_ISOLATION   = WSREP_FLAG_ISOLATION,   /* 1 << 3 */
-            F_COMMUTATIVE = WSREP_FLAG_COMMUTATIVE, /* 1 << 4 */
+            F_COMMIT      = 1 << 0,
+            F_ROLLBACK    = 1 << 1,
+            F_OOC         = 1 << 2,
+            F_MAC_HEADER  = 1 << 3,
+            F_MAC_PAYLOAD = 1 << 4,
             F_ANNOTATION  = 1 << 5,
-            F_MAC_HEADER  = 1 << 6,
-            F_MAC_PAYLOAD = 1 << 7,
-            F_OOC         = 1 << 8,
-            F_PREORDERED  = 1 << 9
+            F_ISOLATION   = 1 << 6,
+            F_PA_UNSAFE   = 1 << 7
         };
 
-        /* where TrxHandle and wsrep flags are identical */
-        static uint64_t const WSREP_FLAGS_MASK = (1UL << 5) - 1;
+        static inline uint64_t wsrep_flags_to_trx_flags (uint64_t flags)
+        {
+            uint64_t ret(0);
+
+            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
+            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
+            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
+
+            return ret;
+        }
 
         bool has_mac() const
         {
