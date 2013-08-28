@@ -725,6 +725,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
                 assert(trx != 0);
+                TrxHandleLock lock(*trx);
                 if (trx->depends_seqno() == -1)
                 {
                     ApplyOrder ao(*trx);
@@ -743,12 +744,12 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     trx->set_state(TrxHandle::S_CERTIFYING);
                     apply_trx(recv_ctx, trx);
                 }
-                trx->unref();
             }
             else
             {
                 return;
             }
+            trx->unref();
         }
     }
     catch (gu::Exception& e)
