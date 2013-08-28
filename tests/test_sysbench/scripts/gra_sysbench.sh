@@ -7,7 +7,10 @@ run() {
     local CMD=$@
     local rcode
     echo "RUNNING: $CMD" >> $OUTPUT
-    LD_PRELOAD=$PRELOAD $CMD > /tmp/run_test.out
+    LD_PRELOAD=$PRELOAD \
+    DYLD_INSERT_LIBRARIES=$PRELOAD \
+    DYLD_FORCE_FLAT_NAMESPACE=1 \
+    $CMD > /tmp/run_test.out
     rcode=$?
     cat /tmp/run_test.out | tee -a $OUTPUT
     return $rcode

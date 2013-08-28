@@ -53,6 +53,8 @@ echo "starting node0, node1..."
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
 
 LD_PRELOAD=$GLB_PRELOAD \
+DYLD_INSERT_LIBRARIES=$GLB_PRELOAD \
+DYLD_FORCE_FLAT_NAMESPACE=1 \
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host ${NODE_INCOMING_HOST[0]} \
         --port ${NODE_INCOMING_PORT[0]} --users 1 --duration 300 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
