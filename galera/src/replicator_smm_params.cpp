@@ -46,6 +46,15 @@ galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
         if (!conf.has(i->first)) conf.set(i->first, i->second);
     }
 
+    // what is would be a better protection?
+    int const pv(gu::from_string<int>(conf.get(Param::proto_max)));
+    if (pv > MAX_PROTO_VER)
+    {
+        log_warn << "Can't set '" << Param::proto_max << "' to " << pv
+                 << ": maximum supported value is " << MAX_PROTO_VER;
+        conf.set(Param::proto_max, gu::to_string(MAX_PROTO_VER));
+    }
+
     if (node_address && strlen(node_address) > 0)
     {
         gu::URI na(node_address, false);
