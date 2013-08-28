@@ -1,4 +1,4 @@
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2013 Codership Oy <info@codership.com>
 
 /**
  * @file Clean abort function
@@ -6,10 +6,11 @@
  * $Id$
  */
 
+
 #include "gu_abort.h"
 
-#include "gu_log.h"
 #include "gu_system.h"
+#include "gu_log.h"
 #include <sys/resource.h> /* for setrlimit() */
 #include <signal.h>       /* for signal()    */
 #include <stdlib.h>       /* for abort()     */
