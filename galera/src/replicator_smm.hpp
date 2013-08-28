@@ -85,12 +85,11 @@ namespace galera
                                          int                     count,
                                          int                     pa_range,
                                          bool                    copy);
-        wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
-                                wsrep_seqno_t seqno);
-        wsrep_status_t sst_received(const wsrep_uuid_t& uuid,
-                                    wsrep_seqno_t       seqno,
+        wsrep_status_t sst_sent(const wsrep_gtid_t& state_id, int rcode);
+        wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
                                     const void*         state,
-                                    size_t              state_len);
+                                    size_t              state_len,
+                                    int                 rcode);
 
         void process_trx(void* recv_ctx, TrxHandle* trx);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);

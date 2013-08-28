@@ -282,13 +282,13 @@ galera::TrxHandle::apply (void*                   recv_ctx,
                           wsrep_apply_cb_t        apply_cb,
                           const wsrep_trx_meta_t& meta) const
 {
-    wsrep_status_t err(WSREP_OK);
+    wsrep_cb_status_t err(WSREP_CB_SUCCESS);
 
     if (new_version())
     {
         const DataSetIn& ws(write_set_in_.dataset());
 
-        for (ssize_t i = 0; WSREP_OK == err && i < ws.count(); ++i)
+        for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
         {
             gu::Buf buf = ws.next();
 
@@ -301,7 +301,7 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         const size_t buf_len(write_set_buffer().second);
         size_t offset(0);
 
-        while (offset < buf_len && WSREP_OK == err)
+        while (offset < buf_len && WSREP_CB_SUCCESS == err)
         {
             // Skip key segment
             std::pair<size_t, size_t> k(
@@ -318,13 +318,12 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         assert(offset == buf_len);
     }
 
-    if (gu_unlikely(err != WSREP_OK))
+    if (gu_unlikely(err > 0))
     {
-        const char* const err_str(galera::wsrep_status_str(err));
         std::ostringstream os;
 
         os << "Failed to apply app buffer: seqno: " << global_seqno()
-           << ", status: " << err_str;
+           << ", status: " << err;
 
         galera::ApplyException ae(os.str(), err);
 

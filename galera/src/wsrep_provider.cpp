@@ -763,28 +763,38 @@ wsrep_status_t galera_preordered(wsrep_t* const gh,
 
 
 extern "C"
-wsrep_status_t galera_sst_sent (wsrep_t*            gh,
-                                const wsrep_uuid_t* uuid,
-                                wsrep_seqno_t       seqno)
+wsrep_status_t galera_sst_sent (wsrep_t*            const gh,
+                                const wsrep_gtid_t* const state_id,
+                                int                 const rcode)
 {
-    assert(gh != 0);
-    assert(gh->ctx != 0);
+    assert(gh       != 0);
+    assert(gh->ctx  != 0);
+    assert(state_id != 0);
+    assert(rcode    <= 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    return repl->sst_sent(*uuid, seqno);
+
+    return repl->sst_sent(*state_id, rcode);
 }
 
 
 extern "C"
-wsrep_status_t galera_sst_received (wsrep_t*            gh,
-                                    const wsrep_uuid_t* uuid,
-                                    wsrep_seqno_t       seqno,
-                                    const char*         state,
-                                    size_t              state_len)
+wsrep_status_t galera_sst_received (wsrep_t*            const gh,
+                                    const wsrep_gtid_t* const state_id,
+                                    const void*         const state,
+                                    size_t              const state_len,
+                                    int                 const rcode)
 {
-    assert(gh != 0);
-    assert(gh->ctx != 0);
+    assert(gh       != 0);
+    assert(gh->ctx  != 0);
+    assert(state_id != 0);
+    assert(rcode    <= 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    return repl->sst_received(*uuid, seqno, state, state_len);
+
+    if (rcode < 0) { assert(state_id->seqno == WSREP_SEQNO_UNDEFINED); }
+
+    return repl->sst_received(*state_id, state, state_len, rcode);
 }
 
 
@@ -803,7 +813,9 @@ struct wsrep_stats_var* galera_stats_get (wsrep_t* gh)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
     return const_cast<struct wsrep_stats_var*>(repl->stats_get());
 }
 

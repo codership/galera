@@ -62,14 +62,14 @@ namespace galera
 
     inline size_t serial_size(const wsrep_uuid_t& uuid)
     {
-        return sizeof(uuid.uuid);
+        return sizeof(uuid.data);
     }
 
     inline size_t serialize(const wsrep_uuid_t& uuid, gu::byte_t* buf,
                             size_t buflen, size_t offset)
     {
         if (offset + serial_size(uuid) > buflen) gu_throw_fatal;
-        memcpy(buf + offset, uuid.uuid, serial_size(uuid));
+        memcpy(buf + offset, uuid.data, serial_size(uuid));
         offset += serial_size(uuid);
         return offset;
     }
@@ -78,7 +78,7 @@ namespace galera
                               size_t offset, wsrep_uuid_t& uuid)
     {
         if (offset + serial_size(uuid) > buflen) gu_throw_fatal;
-        memcpy(uuid.uuid, buf + offset, serial_size(uuid));
+        memcpy(uuid.data, buf + offset, serial_size(uuid));
         offset += serial_size(uuid);
         return offset;
     }

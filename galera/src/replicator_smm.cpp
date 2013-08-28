@@ -50,9 +50,9 @@ apply_trx_ws(void*                    recv_ctx,
             }
             else
             {
-                wsrep_status_t err = e.wsrep_status();
+                int const err(e.status());
 
-                if (WSREP_TRX_FAIL == err)
+                if (err > 0)
                 {
                     int const rcode(commit_cb(recv_ctx, &meta, false));
                     if (WSREP_OK != rcode)
@@ -85,7 +85,7 @@ apply_trx_ws(void*                    recv_ctx,
         msg << "Failed to apply trx " << trx.global_seqno() << " "
             << max_apply_attempts << " times";
 
-        throw galera::ApplyException(msg.str(), WSREP_TRX_FAIL);
+        throw galera::ApplyException(msg.str(), WSREP_CB_FAILURE);
     }
 
     return;
@@ -222,16 +222,18 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     st_.get (uuid, seqno);
 
-    if (0 != args->state_uuid &&
-        *args->state_uuid != WSREP_UUID_UNDEFINED &&
-        *args->state_uuid == uuid &&
-        seqno == WSREP_SEQNO_UNDEFINED)
+    if (0 != args->state_id &&
+        args->state_id->uuid != WSREP_UUID_UNDEFINED &&
+        args->state_id->uuid == uuid                 &&
+        seqno                == WSREP_SEQNO_UNDEFINED)
     {
         /* non-trivial recovery information provided on startup, and db is safe
          * so use recovered seqno value */
-        seqno = args->state_seqno;
+        seqno = args->state_id->seqno;
     }
+
     log_debug << "End state: " << uuid << ':' << seqno << " #################";
+
     update_state_uuid (uuid);
 
     cc_seqno_ = seqno; // is it needed here?
@@ -449,7 +451,10 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     {
         gu_trace(commit_monitor_.enter(co));
         trx->set_state(TrxHandle::S_COMMITTING);
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, &meta, true)))
+
+        wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
+
+        if (gu_unlikely (rcode > 0))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
 
         commit_monitor_.leave(co);
@@ -458,8 +463,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     else
     {
         trx->set_state(TrxHandle::S_COMMITTING);
-        if (gu_unlikely (WSREP_OK != commit_cb_(recv_ctx, &meta, true)))
+
+        wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
+
+        if (gu_unlikely (rcode > 0))
             gu_throw_fatal << "Commit failed. Trx: " << trx;
+
         trx->set_state(TrxHandle::S_COMMITTED);
     }
 
@@ -853,9 +862,12 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         {
             wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
                                      trx->depends_seqno()};
+
             gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx, meta));
 
-            if (gu_unlikely(WSREP_OK != commit_cb_(trx_ctx, &meta, true)))
+            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, true));
+
+            if (gu_unlikely(rcode > 0))
                 gu_throw_fatal << "Commit failed. Trx: " << trx;
         }
         catch (gu::Exception& e)
@@ -1101,15 +1113,21 @@ galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
 
 
 wsrep_status_t
-galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
+galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
 {
+    assert (rcode <= 0);
+    assert (rcode == 0 || state_id.seqno == WSREP_SEQNO_UNDEFINED);
+    assert (rcode != 0 || state_id.seqno >= 0);
+
     if (state_() != S_DONOR)
     {
         log_error << "sst sent called when not SST donor, state " << state_();
         return WSREP_CONN_FAIL;
     }
 
-    if (uuid != state_uuid_ && seqno >= 0)
+    gcs_seqno_t seqno(rcode ? rcode : state_id.seqno);
+
+    if (state_id.uuid != state_uuid_ && seqno >= 0)
     {
         // state we have sent no longer corresponds to the current group state
         // mark an error
@@ -1118,7 +1136,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 
     try {
         // #557 - remove this if() when we return back to joining after SST
-        if (!ist_sst_ || seqno < 0) gcs_.join(seqno);
+        if (!ist_sst_ || rcode < 0) gcs_.join(seqno);
         ist_sst_ = false;
         return WSREP_OK;
     }
@@ -1288,8 +1306,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     }
 
     bool const          st_required(state_transfer_required(view_info));
-    wsrep_seqno_t const group_seqno(view_info.seqno);
-    const wsrep_uuid_t& group_uuid (view_info.uuid);
+    wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
+    const wsrep_uuid_t& group_uuid (view_info.state_id.uuid);
 
     if (st_required)
     {

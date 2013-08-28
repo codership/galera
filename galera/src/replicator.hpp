@@ -75,12 +75,12 @@ namespace galera
                                                  int count,
                                                  int pa_range,
                                                  bool copy) = 0;
-        virtual wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
-                                        wsrep_seqno_t seqno) = 0;
-        virtual wsrep_status_t sst_received(const wsrep_uuid_t& uuid,
-                                            wsrep_seqno_t       seqno,
+        virtual wsrep_status_t sst_sent(const wsrep_gtid_t& state_id,
+                                        int                 rcode) = 0;
+        virtual wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
                                             const void*         state,
-                                            size_t              state_len) = 0;
+                                            size_t              state_len,
+                                            int                 rcode) = 0;
 
         // action source interface
         virtual void process_trx(void* recv_ctx, TrxHandle* trx) = 0;
