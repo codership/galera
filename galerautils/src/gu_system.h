@@ -9,10 +9,10 @@
 #ifndef _gu_system_h_
 #define _gu_system_h_
 
-#include <stdlib.h> // getexecname, getprogname
-
 #define _GNU_SOURCE // program_invocation_name, program_invocation_short_name
 #include <errno.h>
+
+#include <stdlib.h> // getexecname, getprogname
 
 #ifdef __cplusplus
 extern "C" {
