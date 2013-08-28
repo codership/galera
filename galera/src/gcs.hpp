@@ -89,7 +89,7 @@ namespace galera
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                      gcs_seqno_t seqno)
         {
-            return gcs_init(conn_, seqno, uuid.uuid);
+            return gcs_init(conn_, seqno, uuid.data);
         }
 
         void close()

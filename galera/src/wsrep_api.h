@@ -30,7 +30,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "24dev"
+#define WSREP_INTERFACE_VERSION "24rc1"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -88,10 +88,10 @@ typedef _Bool    wsrep_bool_t;    //!< should be the same as standard bool
 /*! undefined seqno */
 #define WSREP_SEQNO_UNDEFINED (-1)
 
-/*! wsrep status codes */
-typedef enum wsrep_status {
+/*! wsrep provider status codes */
+typedef enum wsrep_status
+{
     WSREP_OK = 0,          //!< success
-    WSREP_APPLIER_EXIT,    //!< success, applier marked to terminate
     WSREP_WARNING,         //!< minor warning, error logged
     WSREP_TRX_MISSING,     //!< transaction is not known by wsrep
     WSREP_TRX_FAIL,        //!< transaction aborted, server can continue
@@ -102,6 +102,19 @@ typedef enum wsrep_status {
     WSREP_FATAL,           //!< fatal error, server must abort
     WSREP_NOT_IMPLEMENTED  //!< feature not implemented
 } wsrep_status_t;
+
+/*! wsrep callbacks status codes */
+typedef enum wsrep_cb_status
+{
+    WSREP_CB_RETURN  = -1, //!< success, thread wants to return from wsrep::recv() call
+    WSREP_CB_SUCCESS =  0, //!< success (as in "not critical failure")
+    WSREP_CB_FAILURE       //!< critical failure (consistency violation)
+    /* Technically, wsrep provider has no use for specific failure codes since
+     * there is nothing it can do about it but abort execution. Therefore any
+     * positive number shall indicate a critical failure. Optionally that value
+     * may be used by provider to come to a consensus about state consistency
+     * in a group of nodes. */
+} wsrep_cb_status_t;
 
 /*!
  * @brief log severity levels, passed as first argument to log handler
@@ -130,7 +143,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
  * UUID type - for all unique IDs
  */
 typedef struct wsrep_uuid {
-    uint8_t uuid[16];
+    uint8_t data[16];
 } wsrep_uuid_t;
 
 /*! Undefined UUID */
@@ -234,8 +247,7 @@ typedef enum wsrep_view_status {
  * view of the group
  */
 typedef struct wsrep_view_info {
-    wsrep_uuid_t        uuid;      //!< global state UUID
-    wsrep_seqno_t       seqno;     //!< global state seqno
+    wsrep_gtid_t        state_id;  //!< global state ID
     wsrep_seqno_t       view;      //!< global view number
     wsrep_view_status_t status;    //!< view status
     wsrep_bool_t        state_gap; //!< gap between global and local states
@@ -282,13 +294,15 @@ typedef struct wsrep_view_info {
  * @param sst_req_len location to store SST request length or error code
  *                    value of 0 means no SST.
  */
-typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
-                                 void*                    recv_ctx,
-                                 const wsrep_view_info_t* view,
-                                 const char*              state,
-                                 size_t                   state_len,
-                                 void**                   sst_req,
-                                 int*                     sst_req_len);
+typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
+    void*                    app_ctx,
+    void*                    recv_ctx,
+    const wsrep_view_info_t* view,
+    const char*              state,
+    size_t                   state_len,
+    void**                   sst_req,
+    int*                     sst_req_len
+);
 
 /*!
  * @brief apply callback
@@ -306,11 +320,12 @@ typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
  * @retval WSREP_NOT_IMPLEMENTED appl. does not support the writeset format
  * @retval WSREP_ERROR failed to apply the writeset
  */
-typedef enum wsrep_status (*wsrep_apply_cb_t) (
+typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
     void*                   recv_ctx,
     const void*             data,
     size_t                  size,
-    const wsrep_trx_meta_t* meta);
+    const wsrep_trx_meta_t* meta
+);
 
 /*!
  * @brief commit callback
@@ -325,10 +340,11 @@ typedef enum wsrep_status (*wsrep_apply_cb_t) (
  * @retval WSREP_OK
  * @retval WSREP_ERROR call failed
  */
-typedef enum wsrep_status (*wsrep_commit_cb_t) (
+typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
     const wsrep_trx_meta_t* meta,
-    wsrep_bool_t            commit);
+    wsrep_bool_t            commit
+);
 
 /*!
  * @brief unordered callback
@@ -344,9 +360,9 @@ typedef enum wsrep_status (*wsrep_commit_cb_t) (
  * @retval WSREP_OK
  * @retval WSREP_ERROR call failed
  */
-typedef enum wsrep_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
-                                                   const void* data,
-                                                   size_t      size);
+typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
+                                                      const void* data,
+                                                      size_t      size);
 
 /*!
  * @brief a callback to donate state snapshot
@@ -361,8 +377,7 @@ typedef enum wsrep_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
  * @param recv_ctx  receiver context
  * @param msg       state transfer request message
  * @param msg_len   state transfer request message length
- * @param uuid      current state uuid on this node
- * @param seqno     current state seqno on this node
+ * @param gtid      current state ID on this node
  * @param state     current wsrep internal state buffer
  * @param state_len current wsrep internal state buffer len
  * @param bypass    bypass snapshot transfer, only transfer uuid:seqno pair
@@ -372,8 +387,7 @@ typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
                                       void*               recv_ctx,
                                       const void*         msg,
                                       size_t              msg_len,
-                                      const wsrep_uuid_t* uuid,
-                                      wsrep_seqno_t       seqno,
+                                      const wsrep_gtid_t* state_id,
                                       const char*         state,
                                       size_t              state_len,
                                       wsrep_bool_t        bypass);
@@ -406,8 +420,7 @@ struct wsrep_init_args
     int         proto_ver;     //!< Max supported application protocol version
 
     /* Application initial state information. */
-    const wsrep_uuid_t* state_uuid;  //!< Application state sequence UUID
-    wsrep_seqno_t       state_seqno; //!< Applicaiton state sequence number
+    const wsrep_gtid_t* state_id;    //!< Application state ID
     const char*         state;       //!< Initial state for wsrep implementation
     size_t              state_len;   //!< Length of state buffer
 
@@ -840,29 +853,29 @@ struct wsrep_ {
    * @brief Signals to wsrep provider that state snapshot has been sent to
    *        joiner.
    *
-   * @param wsrep  provider handle
-   * @param uuid   sequence UUID (group UUID)
-   * @param seqno  sequence number or negative error code of the operation
+   * @param wsrep    provider handle
+   * @param state_id state ID
+   * @param rcode    0 or negative error code of the operation.
    */
     wsrep_status_t (*sst_sent)(wsrep_t*            wsrep,
-                               const wsrep_uuid_t* uuid,
-                               wsrep_seqno_t       seqno);
+                               const wsrep_gtid_t* state_id,
+                               int                 rcode);
 
   /*!
    * @brief Signals to wsrep provider that new state snapshot has been received.
    *        May deadlock if called from sst_prepare_cb.
    *
    * @param wsrep     provider handle
-   * @param uuid      sequence UUID (group UUID)
-   * @param seqno     sequence number or negative error code of the operation
+   * @param state_id  state ID
    * @param state     initial state provided by SST donor
    * @param state_len length of state buffer
+   * @param rcode     0 or negative error code of the operation.
    */
     wsrep_status_t (*sst_received)(wsrep_t*            wsrep,
-                                   const wsrep_uuid_t* uuid,
-                                   wsrep_seqno_t       seqno,
-                                   const char*         state,
-                                   size_t              state_len);
+                                   const wsrep_gtid_t* state_id,
+                                   const void*         state,
+                                   size_t              state_len,
+                                   int                 rcode);
 
 
   /*!

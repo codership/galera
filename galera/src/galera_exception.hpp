@@ -17,18 +17,19 @@ namespace galera
 class ApplyException : public gu::Exception
 {
 public:
-    ApplyException (const std::string& msg, wsrep_status_t err)
+    ApplyException (const std::string& msg, int err)
         : gu::Exception (msg, err)
     {
-        if (WSREP_OK == err) // sanity check
+        if (err < 0) // sanity check
         {
-            log_fatal << "Attempt to throw exception with a WSREP_OK code";
+            log_fatal
+                << "Attempt to throw exception with a " << err << " code";
             abort();
         }
     }
 
-    wsrep_status_t
-    wsrep_status () { return static_cast<wsrep_status_t>(get_errno()); }
+    /* this is just int because we must handle any positive value */
+    int status () { return get_errno(); }
 };
 
 static inline const char* wsrep_status_str(wsrep_status_t& status)

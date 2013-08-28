@@ -15,9 +15,9 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
     {
         assert(view_info.view >= 0);
 
-        if (state_uuid_ == view_info.uuid) // common history
+        if (state_uuid_ == view_info.state_id.uuid) // common history
         {
-            wsrep_seqno_t const group_seqno(view_info.seqno);
+            wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
             wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
 
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
@@ -49,12 +49,12 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
 }
 
 wsrep_status_t
-ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
-                            wsrep_seqno_t       seqno,
+ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
                             const void*         state,
-                            size_t              state_len)
+                            size_t              state_len,
+                            int                 rcode)
 {
-    log_info << "SST received: " << uuid << ':' << seqno;
+    log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
 
     gu::Lock lock(sst_mutex_);
 
@@ -65,8 +65,11 @@ ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
         return WSREP_CONN_FAIL;
     }
 
-    sst_uuid_  = uuid;
-    sst_seqno_ = seqno;
+    assert(rcode <= 0);
+    if (rcode) { assert(state_id.seqno == WSREP_SEQNO_UNDEFINED); }
+
+    sst_uuid_  = state_id.uuid;
+    sst_seqno_ = rcode ? WSREP_SEQNO_UNDEFINED : state_id.seqno;
     sst_cond_.signal();
 
     return WSREP_OK;
@@ -361,11 +364,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
                     ist_sst_ = true; // gcs_.join() shall be called by IST
+
+                    wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
+
                     rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                            streq->sst_req(),
                                            streq->sst_len(),
-                                           &istr.uuid(),
-                                           istr.last_applied(), 0, 0, true);
+                                           &state_id, 0, 0, true);
 // this must be reset only in sst_sent() call            ist_sst_ = false;
                 }
 
@@ -400,12 +405,16 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         }
 
     full_sst:
+
         if (streq->sst_len())
         {
             assert(0 == rcode);
+
+            wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
+
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
-                                   &state_uuid_, donor_seq, 0, 0, false);
+                                   &state_id, 0, 0, false);
         }
         else
         {

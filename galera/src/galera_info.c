@@ -20,9 +20,12 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
         const char* str = conf->data;
         int m;
 
-        ret->uuid      = *(wsrep_uuid_t*)&conf->uuid;
-        ret->seqno     = conf->seqno != GCS_SEQNO_ILL ?
-                         conf->seqno : WSREP_SEQNO_UNDEFINED;
+        wsrep_uuid_t  uuid  = *(wsrep_uuid_t*)&conf->uuid;
+        wsrep_seqno_t seqno = conf->seqno != GCS_SEQNO_ILL ?
+                              conf->seqno : WSREP_SEQNO_UNDEFINED;
+        wsrep_gtid_t  gtid  = { uuid, seqno };
+
+        ret->state_id  = gtid;
         ret->view      = conf->conf_id;
         ret->status    = conf->conf_id != -1 ?
                          WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
