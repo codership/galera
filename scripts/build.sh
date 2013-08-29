@@ -74,8 +74,8 @@ fi
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
 if [ "$OS" == "FreeBSD" ]; then
-    CC=${CC:-"gcc44"}
-    CXX=${CXX:-"g++44"}
+    CC=${CC:-"gcc48"}
+    CXX=${CXX:-"g++48"}
     LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-"/usr/local/lib/$(basename $CC)"}
 else
     CC=${CC:-"gcc"}
