@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com>
+/* copyright (C) 2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -40,7 +40,7 @@ START_TEST (ver0)
     size_t total_size(kso.size());
     log_info << "Start size: " << total_size;
 
-    TestKey tk0(tk_ver, SHARED, true, "a0");
+    TestKey tk0(tk_ver, SHARED, false, "a0");
     kso.append(tk0());
     fail_if (kso.count() != 1);
 
@@ -54,7 +54,8 @@ START_TEST (ver0)
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
-    TestKey tk1(tk_ver, SHARED, false, "a0", "a1", "a2");
+    TestKey tk1(tk_ver, SHARED, true, "a0", "a1", "a2");
+    mark_point();
     kso.append(tk1());
     fail_if (kso.count() != 3, "key count: expected 3, got %d", kso.count());
 
@@ -63,7 +64,7 @@ START_TEST (ver0)
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
-    TestKey tk2(tk_ver, EXCLUSIVE, true, "a0", "a1", "b2");
+    TestKey tk2(tk_ver, EXCLUSIVE, false, "a0", "a1", "b2");
     kso.append(tk2());
     fail_if (kso.count() != 4, "key count: expected 4, got %d", kso.count());
 
@@ -72,7 +73,7 @@ START_TEST (ver0)
              kso.size(), total_size);
 
     /* it is a duplicate, but it should add an exclusive verision of the key */
-    TestKey tk3(tk_ver, EXCLUSIVE, false, "a0", "a1");
+    TestKey tk3(tk_ver, EXCLUSIVE, true, "a0", "a1");
     log_info << "######## Appending exclusive duplicate tk3: begin";
     kso.append(tk3());
     log_info << "######## Appending exclusive duplicate tk3: end";
@@ -83,7 +84,7 @@ START_TEST (ver0)
              kso.size(), total_size);
 
     /* tk3 should make it impossible to add anything past a0:a1 */
-    TestKey tk4(tk_ver, EXCLUSIVE, true, "a0", "a1", "c2");
+    TestKey tk4(tk_ver, EXCLUSIVE, false, "a0", "a1", "c2");
     kso.append(tk4());
     fail_if (kso.count() != 5, "key count: expected 5, got %d", kso.count());
 
@@ -91,7 +92,7 @@ START_TEST (ver0)
              kso.size(), total_size);
 
     /* adding shared key should have no effect */
-    TestKey tk5(tk_ver, SHARED, false, "a0", "a1");
+    TestKey tk5(tk_ver, SHARED, true, "a0", "a1");
     kso.append(tk5());
     fail_if (kso.count() != 5, "key count: expected 5, got %d", kso.count());
 
@@ -99,7 +100,7 @@ START_TEST (ver0)
              kso.size(), total_size);
 
     /* tk5 should not make any changes */
-    TestKey tk6(tk_ver, EXCLUSIVE, true, "a0", "a1", "c2");
+    TestKey tk6(tk_ver, EXCLUSIVE, false, "a0", "a1", "c2");
     kso.append(tk6());
     fail_if (kso.count() != 5, "key count: expected 5, got %d", kso.count());
 
@@ -107,7 +108,7 @@ START_TEST (ver0)
              kso.size(), total_size);
 
     /* a0:b1:... should still be possible, should add 2 keys: b1 and c2 */
-    TestKey tk7(tk_ver, EXCLUSIVE, false, "a0", "b1", "c2");
+    TestKey tk7(tk_ver, EXCLUSIVE, true, "a0", "b1", "c2");
     kso.append(tk7());
     fail_if (kso.count() != 7, "key count: expected 7, got %d", kso.count());
 
@@ -118,7 +119,7 @@ START_TEST (ver0)
 
     /* make sure a0:b1:b2 is possible despite we have a0:a1:b2 already
      * (should be no collision on b2) */
-    TestKey tk8(tk_ver, EXCLUSIVE, true, "a0", "b1", "b2");
+    TestKey tk8(tk_ver, EXCLUSIVE, false, "a0", "b1", "b2");
     kso.append(tk8());
     fail_if (kso.count() != 8, "key count: expected 8, got %d", kso.count());
 
@@ -131,7 +132,7 @@ START_TEST (ver0)
     char huge_key[2048];
     memset (huge_key, 'x', sizeof(huge_key));
     huge_key[ sizeof(huge_key) - 1 ] = 0;
-    TestKey tk9(tk_ver, EXCLUSIVE, true, huge_key, huge_key, huge_key);
+    TestKey tk9(tk_ver, EXCLUSIVE, false, huge_key, huge_key, huge_key);
     kso.append(tk9());
     fail_if (kso.count() != 11, "key count: expected 11, got %d", kso.count());
 

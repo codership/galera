@@ -91,19 +91,22 @@ KeySet::KeyPart::print_annotation(std::ostream& os, const gu::byte_t* buf)
     ann_size_t const ann_size(gu::gtoh<ann_size_t>(
                                   *reinterpret_cast<const ann_size_t*>(buf)));
 
-    size_t off(sizeof(ann_size_t));
+    size_t const begin(sizeof(ann_size_t));
+    size_t off(begin);
 
     while (off < ann_size)
     {
+        if (off != begin) os << '/';
+
         gu::byte_t const part_len(buf[off]); ++off;
 
         bool const last(ann_size == off + part_len);
 
         /* this is an attempt to guess whether we should interpret key part as
          * a string or numerical value */
-        bool   const alpha(!last || part_len > 8);
+        bool const alpha(!last || part_len > 8);
 
-        os << ' ' << gu::Hexdump (buf + off, part_len, alpha);
+        os << gu::Hexdump (buf + off, part_len, alpha);
 
         off += part_len;
     }
@@ -136,11 +139,12 @@ KeySet::KeyPart::print (std::ostream& os) const
 
     size_t const size(ver != EMPTY ? base_size(ver, data_, 1) : 0);
 
-    os << '(' << int(exclusive()) << ',' << ver_str[ver] << ") "
+    os << '(' << int(exclusive()) << ',' << ver_str[ver] << ')'
        << gu::Hexdump(data_, size);
 
     if (annotated(ver))
     {
+        os << "=";
         print_annotation (os, data_ + size);
     }
 }
@@ -170,7 +174,7 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     /* only leaf part of the key can be exclusive */
     bool const leaf (part_num + 1 == kd.parts_num);
-    bool const exclusive (!kd.shared && leaf);
+    bool const exclusive (!kd.shared() && leaf);
 
     assert (kd.parts_num > part_num);
 
@@ -217,22 +221,32 @@ KeySetOut::KeyPart::print (std::ostream& os) const
     else
         os << "0x0";
 
-    os << " / " << gu::Hexdump(value_, size_, true);
+    os << '(' << gu::Hexdump(value_, size_, true) << ')';
 }
+
+#define CHECK_PREVIOUS_KEY 1
 
 size_t
 KeySetOut::append (const KeyData& kd)
 {
     int i(0);
 
+#ifdef CHECK_PREVIOUS_KEY
     /* find common ancestor with the previous key */
     for (;
          i < kd.parts_num &&
              size_t(i + 1) < prev_.size() &&
              prev_[i + 1].match(kd.parts[i].ptr, kd.parts[i].len);
          ++i)
-    {}
-    /* matched i parts */
+    {
+#if 0
+        log_info << "prev[" << (i+1) << "]\n"
+                 << prev_[i+1]
+                 << "\nmatches\n"
+                 << gu::Hexdump(kd.parts[i].ptr, kd.parts[i].len, true);
+#endif /* 0 */
+    }
+//    log_info << "matched " << i << " parts";
 
     /* if we have a fully matched key OR common ancestor is exclusive, return */
     if (i > 0)
@@ -242,16 +256,16 @@ KeySetOut::append (const KeyData& kd)
         if (prev_[i].exclusive())
         {
             assert (prev_.size() == (i + 1U));
-            log_debug << "Returning after matching exclusive key:\n"<< prev_[i];
+//           log_info << "Returning after matching exclusive key:\n"<< prev_[i];
             return 0;
         }
 
         if (kd.parts_num == i) /* leaf */
         {
             assert (prev_[i].shared());
-            if (kd.shared)
+            if (kd.shared())
             {
-                log_debug << "Returning after matching all " << i << " parts";
+//                log_info << "Returning after matching all " << i << " parts";
                 return 0;
             }
             else /* need to add exclusive copy of the key */
@@ -262,7 +276,11 @@ KeySetOut::append (const KeyData& kd)
     int const anc(i);
     const KeyPart* parent(&prev_[anc]);
 
-//    log_debug << "Common ancestor: " << anc << ' ' << *parent;
+//    log_info << "Common ancestor: " << anc << ' ' << *parent;
+#else
+    KeyPart tmp(prev_[0]);
+    const KeyPart* const parent(&tmp);
+#endif /* CHECK_PREVIOUS_KEY */
 
     /* create parts that didn't match previous key and add to the set
      * of preiously added keys. */
@@ -273,6 +291,8 @@ KeySetOut::append (const KeyData& kd)
         try
         {
             KeyPart kp(added_, *this, parent, kd, i);
+
+#ifdef CHECK_PREVIOUS_KEY
             if (size_t(j) < new_.size())
             {
                 new_[j] = kp;
@@ -281,7 +301,15 @@ KeySetOut::append (const KeyData& kd)
             {
                 new_.push_back (kp);
             }
-//            log_debug << "pushed " << kp;
+            parent = &new_[j];
+#else
+            if (kd.copy) kp.acquire();
+            if (i + 1 != kd.parts_num)
+                tmp = kp; // <- updating parent for next iteration
+#endif /* CHECK_PREVIOUS_KEY */
+
+
+//            log_info << "pushed " << kp;
         }
         catch (KeyPart::DUPLICATE& e)
         {
@@ -291,18 +319,17 @@ KeySetOut::append (const KeyData& kd)
              * a duplicate will be a duplicate in certification as well. */
 #ifndef NDEBUG
             log_debug << "Returning after catching a DUPLICATE. Part: " << i;
-#endif /* BDEBUG */
+#endif /* NDEBUG */
             goto out;
         }
-
-        parent = &new_[j];
     }
 
     assert (i == kd.parts_num);
     assert (anc + j == kd.parts_num);
 
+#ifdef CHECK_PREVIOUS_KEY
     /* copy new parts to prev_ */
-    if (gu_unlikely(prev_.size() != size_t(1 + kd.parts_num)))
+    if (gu_unlikely(prev_.size() < size_t(1 + kd.parts_num)))
     {
         prev_.resize(1 + kd.parts_num);
     }
@@ -310,11 +337,13 @@ KeySetOut::append (const KeyData& kd)
     std::copy(new_.begin(), new_.begin() + j, prev_.begin() + anc + 1);
 
     /* acquire key part value if it is volatile */
-    if (!kd.nocopy)
+    if (kd.copy)
         for (int k(anc + 1); size_t(k) < prev_.size(); ++k)
         {
             prev_[k].acquire();
         }
+#endif /* CHECK_PREVIOUS_KEY */
+
 out:
     return size() - old_size;
 }

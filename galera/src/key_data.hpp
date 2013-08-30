@@ -15,25 +15,27 @@ struct KeyData
     const wsrep_buf_t* const parts;
     long const               parts_num;
     int  const               proto_ver;
-    bool const               nocopy;
-    bool const               shared;
+    wsrep_key_type_t const   type;
+    bool const               copy;
 
     KeyData (int const pv, const wsrep_buf_t* const k,
-             long const kn, bool const nc, bool const sh)
+             long const kn, wsrep_key_type_t const tp, bool const cp)
         : parts     (k),
           parts_num (kn),
           proto_ver (pv),
-          nocopy    (nc),
-          shared    (sh)
+          type      (tp),
+          copy      (cp)
     {}
 
     KeyData (const KeyData& kd)
-    : parts(kd.parts),
+    : parts    (kd.parts),
       parts_num(kd.parts_num),
       proto_ver(kd.proto_ver),
-      nocopy(kd.nocopy),
-      shared(kd.shared)
+      type     (kd.type),
+      copy     (kd.copy)
     {}
+
+    bool shared() const { return type == WSREP_KEY_SHARED; }
 
 private:
 

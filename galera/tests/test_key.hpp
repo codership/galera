@@ -20,15 +20,15 @@ class TestKey
 {
 public:
 
-    TestKey (int         ver,
+    TestKey (int a, int         ver,
              bool        exclusive,
              std::vector<const char*> parts,
-             bool        nocopy = false)
+             bool        copy = true)
         :
         parts_    (),
         ver_      (ver),
         exclusive_(exclusive),
-        nocopy_   (nocopy)
+        copy_     (copy)
     {
         parts_.reserve(parts.size());
 
@@ -43,7 +43,7 @@ public:
 
     TestKey (int         ver,
              bool        exclusive,
-             bool        nocopy,
+             bool        copy,
              const char* part0,
              const char* part1 = 0,
              const char* part2 = 0,
@@ -59,7 +59,7 @@ public:
         parts_    (),
         ver_      (ver),
         exclusive_(exclusive),
-        nocopy_   (nocopy)
+        copy_     (copy)
     {
         parts_.reserve(10);
 
@@ -80,7 +80,8 @@ public:
     operator() ()
     {
         return KeyData (ver_, parts_.data(), parts_.size(),
-                        nocopy_, !exclusive_);
+                        exclusive_ ? WSREP_KEY_EXCLUSIVE : WSREP_KEY_SHARED,
+                        copy_);
     }
 
 private:
@@ -89,7 +90,7 @@ private:
 
     int  const ver_;
     bool const exclusive_;
-    bool const nocopy_;
+    bool const copy_;
 
     bool
     push_back (const char* const p)
@@ -109,7 +110,7 @@ private:
 
 enum
 {
-    SHARED = false,
+    SHARED    = false,
     EXCLUSIVE = true
 };
 

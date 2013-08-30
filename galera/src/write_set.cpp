@@ -79,7 +79,7 @@ void galera::WriteSet::append_key(const KeyData& kd)
     KeyOS key (kd.proto_ver,
                kd.parts,
                kd.parts_num,
-               (kd.shared == true ? galera::KeyOS::F_SHARED : 0)
+               (kd.shared() ? galera::KeyOS::F_SHARED : 0)
                );
 
     const size_t hash(key.hash());

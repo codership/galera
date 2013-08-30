@@ -499,8 +499,8 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
             galera::KeyData k (repl->trx_proto_ver(),
                                keys[i].key_parts,
                                keys[i].key_parts_num,
-                               copy, (key_type == WSREP_KEY_SHARED)
-                              );
+                               key_type,
+                               copy);
             trx->append_key(k);
         }
         retval = WSREP_OK;
@@ -648,7 +648,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         {
             galera::KeyData k(repl->trx_proto_ver(),
                               keys[i].key_parts,
-                              keys[i].key_parts_num, false, false);
+                              keys[i].key_parts_num, WSREP_KEY_EXCLUSIVE, false);
             trx->append_key(k);
         }
 
