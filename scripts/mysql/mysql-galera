@@ -484,7 +484,11 @@ checksum()
 wait_for_last_committed
 
 set -o pipefail
-CS=$(dump | md5sum) || return $?
+if [ "$OS" == "Darwin" -o "$OS" == "FreeBSD" ]; then
+    CS=$(dump | md5)"  -" || return $?
+else
+    CS=$(dump | md5sum) || return $?
+fi
 
 echo $CS
 }
@@ -628,7 +632,7 @@ fi
 
 OS=$(uname)
 export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql:$LD_LIBRARY_PATH
-[ "$OS" == "FreeBSD" ] && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/gcc44
+[ "$OS" == "FreeBSD" ] && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/gcc48
 [ "$OS" == "Darwin"  ] && export -n LD_LIBRARY_PATH
 export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
