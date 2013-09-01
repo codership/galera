@@ -70,6 +70,18 @@ else
   true=/bin/true
   epm=/usr/bin/epm
 fi
+EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
+if [ "$OS" == "Darwin" ]; then
+  if which -s port && test -x /opt/local/bin/port; then
+    EXTRA_SYSROOT=/opt/local
+  elif which -s brew && test -x /usr/local/bin/brew; then
+    EXTRA_SYSROOT=/usr/local
+  elif which -s fink && test -x /sw/bin/fink; then
+    EXTRA_SYSROOT=/sw
+  fi
+elif [ "$OS" == "FreeBSD" ]; then
+  EXTRA_SYSROOT=/usr/local
+fi
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
@@ -351,9 +363,10 @@ then
     export SCONS_VD=$build_base
     scons_args="-C $build_base revno=$GALERA_REV"
 
-    [ -n "$TARGET"      ] && scons_args="$scons_args arch=$TARGET"
-    [ -n "$RELEASE"     ] && scons_args="$scons_args version=$RELEASE"
-    [ "$DEBUG" == "yes" ] && scons_args="$scons_args debug=$DEBUG_LEVEL"
+    [ -n "$TARGET"        ] && scons_args="$scons_args arch=$TARGET"
+    [ -n "$RELEASE"       ] && scons_args="$scons_args version=$RELEASE"
+    [ "$DEBUG" == "yes"   ] && scons_args="$scons_args debug=$DEBUG_LEVEL"
+    [ -n "$EXTRA_SYSROOT" ] && scons_args="$scons_args extra_sysroot=$EXTRA_SYSROOT"
 
     if [ "$SCRATCH" == "yes" ]
     then
