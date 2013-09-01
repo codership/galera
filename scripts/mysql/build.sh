@@ -75,8 +75,8 @@ case "$OS" in
 esac
 
 if [ "$OS" == "FreeBSD" ]; then
-    CC=${CC:-"gcc44"}
-    CXX=${CXX:-"g++44"}
+    CC=${CC:-"gcc48"}
+    CXX=${CXX:-"g++48"}
     LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-"/usr/local/lib/$(basename $CC)"}
 else
     CC=${CC:-"gcc"}
