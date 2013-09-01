@@ -86,6 +86,19 @@ CC=${CC:+$(which "$CC" 2>/dev/null)}
 CXX=${CXX:+$(which "$CXX" 2>/dev/null)}
 export CC CXX LD_LIBRARY_PATH
 
+EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
+if [ "$OS" == "Darwin" ]; then
+  if which -s port && test -x /opt/local/bin/port; then
+    EXTRA_SYSROOT=/opt/local
+  elif which -s brew && test -x /usr/local/bin/brew; then
+    EXTRA_SYSROOT=/usr/local
+  elif which -s fink && test -x /sw/bin/fink; then
+    EXTRA_SYSROOT=/sw
+  fi
+elif [ "$OS" == "FreeBSD" ]; then
+  EXTRA_SYSROOT=/usr/local
+fi
+
 usage()
 {
     cat <<EOF
@@ -400,6 +413,10 @@ then
                 -DCMAKE_OSX_ARCHITECTURES=$(uname -m) \
             )
         fi
+        [ -n "$EXTRA_SYSROOT" ] && \
+            CMAKE_LAYOUT_OPTIONS+=( \
+                -DCMAKE_PREFIX_PATH="$EXTRA_SYSROOT" \
+            )
 
         if [ $MYSQL_MAJOR = "5.1" ]
         then
