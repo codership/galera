@@ -554,7 +554,8 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
 
 //        (void)snprintf(cm->memb[n].id, GCS_COMP_MEMB_ID_MAX_LEN, "%s",
 //                       uuid._str().c_str());
-        long ret = gcs_comp_msg_add (cm, uuid._str().c_str());
+        long ret = gcs_comp_msg_add (cm, uuid._str().c_str(),
+                                     i->second.segment());
         if (ret < 0) {
             gu_throw_error(-ret) << "Failed to add member '" << uuid
                                  << "' to component message.";

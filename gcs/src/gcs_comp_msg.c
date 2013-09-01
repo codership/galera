@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -16,13 +16,13 @@
 #define   GCS_COMP_MSG_ACCESS
 #include "gcs_comp_msg.h"
 
-static inline long
-comp_msg_size (long memb_num)
+static inline int
+comp_msg_size (int memb_num)
 { return (sizeof(gcs_comp_msg_t) + memb_num * sizeof(gcs_comp_memb_t)); }
 
 /*! Allocates membership object and zeroes it */
 gcs_comp_msg_t*
-gcs_comp_msg_new (bool prim, bool bootstrap, long my_idx, long memb_num)
+gcs_comp_msg_new (bool prim, bool bootstrap, int my_idx, int memb_num)
 {
     gcs_comp_msg_t* ret;
 
@@ -54,7 +54,7 @@ gcs_comp_msg_delete (gcs_comp_msg_t* comp)
 }
 
 /*! Returns total size of the component message */
-long
+int
 gcs_comp_msg_size   (const gcs_comp_msg_t* comp)
 {
     assert (comp);
@@ -63,11 +63,12 @@ gcs_comp_msg_size   (const gcs_comp_msg_t* comp)
 
 /*! Adds a member to the component message
  *  Returns an index of the member or negative error code */
-long
-gcs_comp_msg_add (gcs_comp_msg_t* comp, const char* id)
+int
+gcs_comp_msg_add (gcs_comp_msg_t* comp, const char* id,
+                  gcs_segment_t const segment)
 {
-    size_t           id_len;
-    long             i;
+    size_t id_len;
+    int    i;
 
     assert (comp);
     assert (id);
@@ -77,7 +78,7 @@ gcs_comp_msg_add (gcs_comp_msg_t* comp, const char* id)
     if (!id_len) return -EINVAL;
     if (id_len > GCS_COMP_MEMB_ID_MAX_LEN) return -ENAMETOOLONG;
 
-    long free_slot = -1;
+    int free_slot = -1;
 
     /* find the free id slot and check for id uniqueness */
     for (i = 0; i < comp->memb_num; i++) {
@@ -88,6 +89,7 @@ gcs_comp_msg_add (gcs_comp_msg_t* comp, const char* id)
     if (free_slot < 0) return -1;
 
     memcpy (comp->memb[free_slot].id, id, id_len);
+    comp->memb[free_slot].segment = segment;
 
     return free_slot;
 }
@@ -105,21 +107,21 @@ gcs_comp_msg_copy   (const gcs_comp_msg_t* comp)
 }
 
 /*! Returns member ID by index, NULL if none */
-const char*
-gcs_comp_msg_id (const gcs_comp_msg_t* comp, long idx)
+const gcs_comp_memb_t*
+gcs_comp_msg_member (const gcs_comp_msg_t* comp, int idx)
 {
     if (0 <= idx && idx < comp->memb_num)
-        return comp->memb[idx].id;
+        return &comp->memb[idx];
     else
         return NULL;
 }
 
 /*! Returns member index by ID, -1 if none */
-long
+int
 gcs_comp_msg_idx (const gcs_comp_msg_t* comp, const char* id)
 {
     size_t id_len = strlen(id);
-    long   idx = comp->memb_num;
+    int    idx = comp->memb_num;
 
     if (id_len > 0 && id_len <= GCS_COMP_MEMB_ID_MAX_LEN)
         for (idx = 0; idx < comp->memb_num; idx++)
@@ -146,14 +148,14 @@ gcs_comp_msg_bootstrap(const gcs_comp_msg_t* comp)
 }
 
 /*! Returns our own index in the membership */
-long
+int
 gcs_comp_msg_self   (const gcs_comp_msg_t* comp)
 {
     return comp->my_idx;
 }
 
 /*! Returns number of members in the component */
-long
+int
 gcs_comp_msg_num    (const gcs_comp_msg_t* comp)
 {
     return comp->memb_num;

@@ -26,14 +26,6 @@
 
 struct gcs_node
 {
-    gcs_seqno_t      last_applied; // last applied action on that node
-    bool             count_last_applied; // should it be counted
-    bool             bootstrap; // is part of prim comp bootstrap process
-//    long           queue_len;    // action queue length on that node
-    gcs_node_state_t status;       // node status
-    int              gcs_proto_ver;// supported protocol versions
-    int              repl_proto_ver;
-    int              appl_proto_ver;
     gcs_defrag_t     app;        // defragmenter for application actions
     gcs_defrag_t     oob;        // defragmenter for out-of-band service acts.
 
@@ -47,6 +39,16 @@ struct gcs_node
     const char*      name;         // human-given name
     const char*      inc_addr;     // incoming address - for load balancer
     const gcs_state_msg_t* state_msg;// state message
+
+    gcs_seqno_t      last_applied; // last applied action on that node
+//    long           queue_len;    // action queue length on that node
+    int              gcs_proto_ver;// supported protocol versions
+    int              repl_proto_ver;
+    int              appl_proto_ver;
+    gcs_node_state_t status;       // node status
+    gcs_segment_t    segment;
+    bool             count_last_applied; // should it be counted
+    bool             bootstrap; // is part of prim comp bootstrap process
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -59,7 +61,8 @@ gcs_node_init (gcs_node_t* node,
                const char* inc_addr, ///< can be null
                int         gcs_proto_ver,
                int         repl_proto_ver,
-               int         appl_proto_ver);
+               int         appl_proto_ver,
+               gcs_segment_t segment);
 
 /*! Move data from one node object to another */
 extern void

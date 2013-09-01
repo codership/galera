@@ -18,6 +18,7 @@ struct node
 {
     gcs_group_t group;
     const char id[GCS_COMP_MEMB_ID_MAX_LEN + 1]; /// ID assigned by the backend
+//    gcs_segment_t segment;
 };
 
 #define MAX_NODES 10
@@ -42,7 +43,7 @@ deliver_component_msg (struct group* group, bool prim)
 
             for (j = 0; j < group->nodes_num; j++) {
                 const struct node* const node = group->nodes[j];
-                long ret = gcs_comp_msg_add (msg, node->id);
+                long ret = gcs_comp_msg_add (msg, node->id, j);
                 fail_if (j != ret, "Failed to add %d member: %ld (%s)",
                          j, ret, strerror(-ret));
             }
@@ -52,10 +53,15 @@ deliver_component_msg (struct group* group, bool prim)
             fail_if (group->nodes_num != gcs_comp_msg_num(msg));
             for (j = 0; j < group->nodes_num; j++) {
                 const char* const src_id = group->nodes[j]->id;
-                const char* const dst_id = gcs_comp_msg_id (msg, j);
+                const char* const dst_id = gcs_comp_msg_member(msg, j)->id;
                 fail_if (strcmp(src_id, dst_id),
                          "%d node id %s, recorded in comp msg as %s",
                          j, src_id, dst_id);
+//                gcs_segment_t const src_seg = group->nodes[j]->segment;
+                gcs_segment_t const dst_seg = gcs_comp_msg_member(msg, j)->segment;
+                fail_if (j != dst_seg,
+                         "%d node segment %d, recorded in comp msg as %d",
+                         j, j, (int)dst_seg);
             }
 
             gcs_group_state_t ret =

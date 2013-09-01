@@ -15,17 +15,18 @@
 #include "../gcs_comp_msg.h"
 #include "gcs_comp_test.h"
 
-static const char* members[] =
+
+static gcs_comp_memb_t const members[] =
 {
-    "0",
-    "88888888",
-    "1",
-    "7777777",
-    "22",
-    "666666",
-    "333",
-    "55555",
-    "4444"
+    { "0",        0 },
+    { "88888888", 1 },
+    { "1",        5 },
+    { "7777777",  1 },
+    { "22",       3 },
+    { "666666",   4 },
+    { "333",      5 },
+    { "55555",    5 },
+    { "4444",     0 }
 };
 
 static char long_id[] =
@@ -48,12 +49,15 @@ check_msg_identity (const gcs_comp_msg_t* m,
                           GCS_COMP_MEMB_ID_MAX_LEN),
                  "member %d IDs don't not match: got '%s', should be '%s'",
                  i, members[i], m->memb[i].id);
+        fail_if (n->memb[i].segment != m->memb[i].segment,
+                 "member %d segments don't not match: got '%d', should be '%d'",
+                 i, (int)members[i].segment, (int)m->memb[i].segment);
     }
 }
 
 START_TEST (gcs_comp_test)
 {
-    long memb_num     = sizeof(members)/sizeof(char*);
+    long memb_num     = sizeof(members)/sizeof(members[0]);
     long my_idx       = getpid() % memb_num;
     long prim         = my_idx % 2;
     gcs_comp_msg_t* m = gcs_comp_msg_new (prim, false, my_idx, memb_num);
@@ -69,7 +73,7 @@ START_TEST (gcs_comp_test)
 
     // add members except for the last
     for (i = 0; i < memb_num - 1; i++) {
-        ret = gcs_comp_msg_add (m, members[i]);
+        ret = gcs_comp_msg_add (m, members[i].id, members[i].segment);
         fail_if (ret != i, "gcs_comp_msg_add() returned %d, expected %d",
                  ret, i);
     }
@@ -80,30 +84,30 @@ START_TEST (gcs_comp_test)
     } else {
         j = i - 1;
     }
-    ret = gcs_comp_msg_add (m, members[j]);
+    ret = gcs_comp_msg_add (m, members[j].id, members[j].segment);
     fail_if (ret != -ENOTUNIQ, "gcs_comp_msg_add() returned %d, expected "
              "-ENOTUNIQ (%d)", ret, -ENOTUNIQ);
 
     // try to add empty id
-    ret = gcs_comp_msg_add (m, "");
+    ret = gcs_comp_msg_add (m, "", 0);
     fail_if (ret != -EINVAL, "gcs_comp_msg_add() returned %d, expected "
              "-EINVAL (%d)", ret, -EINVAL);
 
     // try to add id that is too long
-    ret = gcs_comp_msg_add (m, long_id);
+    ret = gcs_comp_msg_add (m, long_id, 3);
     fail_if (ret != -ENAMETOOLONG, "gcs_comp_msg_add() returned %d, expected "
              "-ENAMETOOLONG (%d)", ret, -ENAMETOOLONG);
 
     // add final id
-    ret = gcs_comp_msg_add (m, members[i]);
+    ret = gcs_comp_msg_add (m, members[i].id, members[i].segment);
     fail_if (ret != i, "gcs_comp_msg_add() returned %d, expected %d",
              ret, i);
 
     // check that all added correctly
     for (i = 0; i < memb_num; i++) {
-        const char* const id = gcs_comp_msg_id (m, i);
-        fail_if (strcmp (members[i], id),
-                 "Memeber %ld (%s) recorded as %s", i, members[i], id);
+        const char* const id = gcs_comp_msg_member(m, i)->id;
+        fail_if (strcmp (members[i].id, id),
+                 "Memeber %ld (%s) recorded as %s", i, members[i].id, id);
     }
 
     // check that memcpy preserves the message
@@ -120,20 +124,20 @@ START_TEST (gcs_comp_test)
     check_msg_identity (m, n);
     gcs_comp_msg_delete (m);
 
-    // test gcs_comp_msg_id()
-    fail_unless (NULL == gcs_comp_msg_id (n, -1));
+    // test gcs_comp_msg_member()
+    fail_unless (NULL == gcs_comp_msg_member (n, -1));
     for (i = 0; i < memb_num; i++) {
-        const char* id = gcs_comp_msg_id (n, i);
+        const char* id = gcs_comp_msg_member (n, i)->id;
         fail_if (NULL == id);
-        fail_if (strcmp(members[i], id));
+        fail_if (strcmp(members[i].id, id));
     }
-    fail_unless (NULL == gcs_comp_msg_id (n, i));
+    fail_unless (NULL == gcs_comp_msg_member (n, i));
 
     // test gcs_comp_msg_idx()
     fail_if (-1 != gcs_comp_msg_idx (n, ""));
     fail_if (-1 != gcs_comp_msg_idx (n, long_id));
     for (i = 0; i < memb_num; i++)
-        fail_if (i != gcs_comp_msg_idx (n, members[i]));
+        fail_if (i != gcs_comp_msg_idx (n, members[i].id));
 
     // test gcs_comp_msg_primary()
     fail_if (n->primary != gcs_comp_msg_primary(n));

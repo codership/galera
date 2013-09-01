@@ -518,8 +518,8 @@ START_TEST (gcs_core_test_own)
     gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, false, 0, 1);
     fail_if (NULL == prim);
     fail_if (NULL == non_prim);
-    gcs_comp_msg_add (prim,     "node1");
-    gcs_comp_msg_add (non_prim, "node1");
+    gcs_comp_msg_add (prim,     "node1", 0);
+    gcs_comp_msg_add (non_prim, "node1", 1);
 
     core_test_init ();
 

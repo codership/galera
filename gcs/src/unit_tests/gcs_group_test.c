@@ -140,7 +140,7 @@ START_TEST (gcs_group_configuration)
     // Prepare first  primary component message containing only one node
     comp = gcs_comp_msg_new (TRUE, false, 0, 1);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST));
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST, 0));
 
     ret = new_component (&group, comp);
     fail_if (ret < 0);
@@ -210,8 +210,8 @@ START_TEST (gcs_group_configuration)
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 1, 2);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST, 1) < 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST,  0) < 0);
 
     ret = new_component (&group, comp);
     fail_if (ret < 0);
@@ -248,9 +248,9 @@ START_TEST (gcs_group_configuration)
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 1, 3);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST, 1) < 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST,  0) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST,2) < 0);
 
 //    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
@@ -318,8 +318,8 @@ START_TEST (gcs_group_configuration)
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 0, 2);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST, 0) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST,1) < 0);
     ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
@@ -415,11 +415,11 @@ START_TEST(gcs_group_last_applied)
     // Create 4-node component
     comp = gcs_comp_msg_new (TRUE, false, 0, 4);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"1") < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") >= 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST,     0) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST,    1) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"1",2) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2",2) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2",2) >= 0);
 
     gcs_group_init(&group, NULL, "", "", 0, 0, 1);
     mark_point();
@@ -464,9 +464,9 @@ START_TEST(gcs_group_last_applied)
     gcs_comp_msg_delete(comp);
     comp = gcs_comp_msg_new (TRUE, false, 0, 3);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST,     0) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST,    1) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2",2) < 0);
 
     ret = new_component (&group, comp);
     fail_if (ret < 0);
@@ -482,10 +482,10 @@ START_TEST(gcs_group_last_applied)
     gcs_comp_msg_delete(comp);
     comp = gcs_comp_msg_new (TRUE, false, 0, 4);
     fail_if (comp == NULL);
-    fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
-    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"1") < 0);
+    fail_if (gcs_comp_msg_add (comp, LOCALHOST,     0) < 0);
+    fail_if (gcs_comp_msg_add (comp, REMOTEHOST,    1) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2",2) < 0);
+    fail_if (gcs_comp_msg_add (comp, DISTANTHOST"1",2) < 0);
 
     ret = new_component (&group, comp);
     fail_if (ret < 0);

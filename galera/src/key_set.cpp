@@ -255,7 +255,7 @@ KeySetOut::append (const KeyData& kd)
 
         if (prev_[i].exclusive())
         {
-            assert (prev_.size() == (i + 1U));
+            assert (prev_.size() == (i + 1U)); // only leaf can be exclusive.
 //           log_info << "Returning after matching exclusive key:\n"<< prev_[i];
             return 0;
         }
@@ -329,11 +329,7 @@ KeySetOut::append (const KeyData& kd)
 
 #ifdef CHECK_PREVIOUS_KEY
     /* copy new parts to prev_ */
-    if (gu_unlikely(prev_.size() < size_t(1 + kd.parts_num)))
-    {
-        prev_.resize(1 + kd.parts_num);
-    }
-
+    prev_.resize(1 + kd.parts_num);
     std::copy(new_.begin(), new_.begin() + j, prev_.begin() + anc + 1);
 
     /* acquire key part value if it is volatile */

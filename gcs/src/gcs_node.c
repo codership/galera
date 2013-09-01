@@ -17,7 +17,8 @@ gcs_node_init (gcs_node_t* const node,
                const char* const inc_addr,
                int const gcs_proto_ver,
                int const repl_proto_ver,
-               int const appl_proto_ver)
+               int const appl_proto_ver,
+               gcs_segment_t const segment)
 {
     assert(strlen(id) > 0);
     assert(strlen(id) < sizeof(node->id));
@@ -34,6 +35,7 @@ gcs_node_init (gcs_node_t* const node,
     node->gcs_proto_ver  = gcs_proto_ver;
     node->repl_proto_ver = repl_proto_ver;
     node->appl_proto_ver = appl_proto_ver;
+    node->segment        = segment;
 }
 
 /*! Move data from one node object to another */

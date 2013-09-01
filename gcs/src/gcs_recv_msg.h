@@ -16,9 +16,9 @@
 typedef struct gcs_recv_msg
 {
     void*          buf;
-    long           buf_len;
-    long           size;
-    long           sender_idx;
+    int            buf_len;
+    int            size;
+    int            sender_idx;
     gcs_msg_type_t type;
 }
 gcs_recv_msg_t;

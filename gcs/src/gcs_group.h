@@ -70,7 +70,7 @@ gcs_group_t;
 /*!
  * Initialize group at startup
  */
-extern long
+extern int
 gcs_group_init (gcs_group_t* group,
                 gcache_t*    cache,
                 const char*  node_name, ///< can be null
@@ -82,7 +82,7 @@ gcs_group_init (gcs_group_t* group,
 /*!
  * Initialize group action history parameters. See gcs.h
  */
-extern long
+extern int
 gcs_group_init_history (gcs_group_t*     group,
                         gcs_seqno_t      seqno,
                         const gu_uuid_t* uuid);
@@ -119,16 +119,16 @@ gcs_group_handle_last_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 /*! @return 0 for success, 1 for (success && i_am_sender)
  * or negative error code */
-extern long
+extern int
 gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 /*! @return 0 for success, 1 for (success && i_am_sender)
  * or negative error code */
-extern long
+extern int
 gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 /*! @return 0 if request is ignored, request size if it should be passed up */
-extern long
+extern int
 gcs_group_handle_state_request (gcs_group_t*         group,
                                 struct gcs_act_rcvd* act);
 /*!
@@ -207,7 +207,7 @@ gcs_group_is_primary (gcs_group_t* group)
     return (GCS_GROUP_PRIMARY == group->state);
 }
 
-static inline long
+static inline int
 gcs_group_my_idx (gcs_group_t* group)
 {
     return group->my_idx;

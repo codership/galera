@@ -211,7 +211,7 @@ GCS_BACKEND_OPEN_FN(dummy_open)
     comp = gcs_comp_msg_new (true, false, 0, 1);
 
     if (comp) {
-        ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555");
+        ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555",0);
         assert (0 == ret); // we have only one member, index = 0
 
         dummy->state = DUMMY_TRANS; // required by gcs_dummy_set_component()
@@ -367,7 +367,7 @@ gcs_dummy_set_component (gcs_backend_t*        backend,
     }
 
     for (i = 0; i < dummy->memb_num; i++) {
-        strcpy ((char*)&dummy->memb[i], gcs_comp_msg_id (comp, i));
+        strcpy ((char*)&dummy->memb[i], gcs_comp_msg_member(comp, i)->id);
     }
 
     dummy->my_idx = gcs_comp_msg_self(comp);
