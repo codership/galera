@@ -12,6 +12,7 @@
 #include "gu_byteswap.h"
 
 #include <stdint.h>
+#include <limits.h>
 
 namespace gu
 {
@@ -40,12 +41,12 @@ template <> GU_FORCE_INLINE unsigned int gtoh (const unsigned int& val)
     return  gtoh32(val);
 }
 
-#if sizeof (long) == sizeof (int)
+#if ULONG_MAX == UINT32_MAX
 template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
 {
     return  gtoh32(val);
 }
-#elif sizeof (long) == sizeof (long long)
+#elif ULONG_MAX == UINT64_MAX
 template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
 {
     return  gtoh64(val);
