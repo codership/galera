@@ -186,7 +186,7 @@ namespace gu
                   << name_ << "'...";
 
 #if defined(__APPLE__)
-        if (0 != fcntl (value, F_SETSIZE, size) && 0 != ftruncate (value, size))
+        if (0 != fcntl (fd_, F_SETSIZE, size_) && 0 != ftruncate (fd_, size_))
 #else
         if (0 != posix_fallocate (fd_, start, diff))
 #endif

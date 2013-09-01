@@ -35,16 +35,27 @@ template <> GU_FORCE_INLINE uint16_t gtoh (const uint16_t& val)
     return  gtoh16(val);
 }
 
-template <> GU_FORCE_INLINE uint32_t gtoh (const uint32_t& val)
+template <> GU_FORCE_INLINE unsigned int gtoh (const unsigned int& val)
 {
     return  gtoh32(val);
 }
 
-template <> GU_FORCE_INLINE uint64_t gtoh (const uint64_t& val)
+#if sizeof (long) == sizeof (int)
+template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
+{
+    return  gtoh32(val);
+}
+#elif sizeof (long) == sizeof (long long)
+template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
 {
     return  gtoh64(val);
 }
+#endif
 
+template <> GU_FORCE_INLINE unsigned long long gtoh (const unsigned long long& val)
+{
+    return  gtoh64(val);
+}
 
 template <typename T> T htog (const T& val) { return gtoh<T>(val); }
 
