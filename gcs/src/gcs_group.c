@@ -792,15 +792,16 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
 }
 
-static long
-group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name,
-                         gcs_node_state_t status)
+static int
+group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
+                         const char* const name, int const name_len,
+                         gcs_node_state_t const status)
 {
-    long idx;
+    int idx;
 
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
-        if (!strcmp(node->name, name)) {
+        if (!strncmp(node->name, name, name_len)) {
             if (joiner_idx == idx) {
                 return -EHOSTDOWN;
             }
@@ -816,10 +817,51 @@ group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name,
     return -EHOSTUNREACH;
 }
 
-static long
+/* calls group_find_node_by_name() for each name in comma-separated str */
+static int
+group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
+                                const char* const str, int const str_len,
+                                gcs_node_state_t const status)
+{
+    assert (str != NULL);
+    assert (str_len > 0);
+
+    const char* begin = str;
+    const char* end;
+    int err = -EHOSTDOWN; /* worst error */
+
+    do {
+        end = strchr(begin, ',');
+
+        int len;
+
+        if (NULL == end) {
+            len = str_len - (begin - str);
+        }
+        else {
+            len = end - begin;
+        }
+
+        int const idx = group_find_node_by_name (group, joiner_idx, begin, len,
+                                                 status);
+
+        if (idx >= 0) return idx;
+
+        if (-EAGAIN == idx)
+            err = -EAGAIN;
+        else if (-EHOSTDOWN == err) /* any error is better than EHOSTDOWN */
+            err = idx;
+
+        begin = end + 1; /* skip comma */
+    } while (end != NULL);
+
+    return err;
+}
+
+static int
 group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
 {
-    long idx;
+    int idx;
 
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
@@ -840,14 +882,15 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
  *         -EHOSTUNREACH if reqiested donor is not available
  *         -EAGAIN       if there were no nodes in the proper state.
  */
-static long
+static int
 group_select_donor (gcs_group_t* group, long const joiner_idx,
-                    const char* const donor_name, bool const desync)
+                    const char* const donor_string, bool const desync)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
 
-    long donor_idx;
-    bool required_donor = (strlen(donor_name) > 0);
+    int  donor_idx;
+    int  const donor_len = strlen(donor_string);
+    bool const required_donor = (donor_len > 0);
 
     if (required_donor) {
         if (desync) { // sender wants to become "donor" itself
@@ -858,8 +901,9 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
                 donor_idx = -EAGAIN;
         }
         else {
-            donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
-                                                 min_donor_state);
+            donor_idx = group_for_each_donor_in_string(group, joiner_idx,
+                                                       donor_string, donor_len,
+                                                       min_donor_state);
         }
     }
     else {
@@ -880,7 +924,7 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
         else {
             gu_info ("Node %ld (%s) requested state transfer from '%s'. "
                      "Selected %ld (%s)(%s) as donor.", joiner_idx,joiner->name,
-                     required_donor ? donor_name :"*any*",donor_idx,donor->name,
+                     required_donor ?donor_string:"*any*",donor_idx,donor->name,
                      gcs_node_state_to_str(donor->status));
         }
 
