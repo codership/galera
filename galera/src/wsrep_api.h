@@ -30,7 +30,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "24rc1"
+#define WSREP_INTERFACE_VERSION "24rc2"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -77,7 +77,6 @@ extern "C" {
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
 typedef uint64_t wsrep_conn_id_t; //!< application connection ID
-typedef uint64_t wsrep_stream_t;  //!< event/stream type of encapsulated event
 typedef int64_t  wsrep_seqno_t;   //!< sequence number of a writeset, etc.
 #ifdef __cplusplus
 typedef bool     wsrep_bool_t;
@@ -1003,11 +1002,6 @@ struct wsrep_ {
    * wsrep provider vendor name
    */
     const char* provider_vendor;
-
-  /*!
-   * wsrep provider stream type
-   */
-    wsrep_stream_t provider_type;
 
   /*!
    * @brief Frees allocated resources before unloading the library.

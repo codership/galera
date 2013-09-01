@@ -955,12 +955,6 @@ bool galera_is_locked (wsrep_t*      gh,
     return false;
 }
 
-static const union
-{
-    char str[8];
-    uint64_t uint64;
-}
-    galera_id = { {'G','a','l','e','r','a', 0, 0 } };
 
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -999,7 +993,6 @@ static wsrep_t galera_str = {
     "Galera",
     GALERA_VER"(r"GALERA_REV")",
     "Codership Oy <info@codership.com>",
-    galera_id.uint64,
     &galera_tear_down,
     NULL,
     NULL
