@@ -793,6 +793,21 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 }
 
 static int
+group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
+{
+    int idx;
+
+    for (idx = 0; idx < group->num; idx++) {
+        gcs_node_t* node = &group->nodes[idx];
+        if (status == node->status &&
+            strcmp (node->name, GCS_ARBITRATOR_NAME)) // avoid arbitrator
+            return idx;
+    }
+
+    return -EAGAIN;
+}
+
+static int
 group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
                          const char* const name, int const name_len,
                          gcs_node_state_t const status)
@@ -817,7 +832,8 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
     return -EHOSTUNREACH;
 }
 
-/* calls group_find_node_by_name() for each name in comma-separated str */
+/* Calls group_find_node_by_name() for each name in comma-separated list,
+ * falls back to group_find_node_by_state() if name (or list) is empty. */
 static int
 group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
                                 const char* const str, int const str_len,
@@ -842,8 +858,11 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
             len = end - begin;
         }
 
-        int const idx = group_find_node_by_name (group, joiner_idx, begin, len,
-                                                 status);
+        assert (len >= 0);
+
+        int const idx = len > 0 ? /* consider empty name as "any" */
+            group_find_node_by_name (group, joiner_idx, begin, len, status) :
+            group_find_node_by_state(group, status);
 
         if (idx >= 0) return idx;
 
@@ -856,21 +875,6 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     } while (end != NULL);
 
     return err;
-}
-
-static int
-group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
-{
-    int idx;
-
-    for (idx = 0; idx < group->num; idx++) {
-        gcs_node_t* node = &group->nodes[idx];
-        if (status == node->status &&
-            strcmp (node->name, GCS_ARBITRATOR_NAME)) // avoid arbitrator
-            return idx;
-    }
-
-    return -EAGAIN;
 }
 
 /*!
@@ -892,23 +896,19 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
     int  const donor_len = strlen(donor_string);
     bool const required_donor = (donor_len > 0);
 
-    if (required_donor) {
-        if (desync) { // sender wants to become "donor" itself
-            gcs_node_state_t const st = group->nodes[joiner_idx].status;
-            if (st >= min_donor_state)
-                donor_idx = joiner_idx;
-            else
-                donor_idx = -EAGAIN;
-        }
-        else {
-            donor_idx = group_for_each_donor_in_string(group, joiner_idx,
-                                                       donor_string, donor_len,
-                                                       min_donor_state);
-        }
+    if (desync) { /* sender wants to become "donor" itself */
+        assert(donor_len > 0);
+        gcs_node_state_t const st = group->nodes[joiner_idx].status;
+        if (st >= min_donor_state)
+            donor_idx = joiner_idx;
+        else
+            donor_idx = -EAGAIN;
     }
     else {
-        assert (!desync);
-        donor_idx = group_find_node_by_state (group, min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, joiner_idx,
+                                                    donor_string, donor_len,
+                                                    min_donor_state);
     }
 
     if (donor_idx >= 0) {
@@ -918,12 +918,12 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
         assert(donor_idx != joiner_idx || desync);
 
         if (desync) {
-            gu_info ("Node %ld (%s) desyncs itself from group",
+            gu_info ("Node %d (%s) desyncs itself from group",
                      donor_idx, donor->name);
         }
         else {
-            gu_info ("Node %ld (%s) requested state transfer from '%s'. "
-                     "Selected %ld (%s)(%s) as donor.", joiner_idx,joiner->name,
+            gu_info ("Node %d (%s) requested state transfer from '%s'. "
+                     "Selected %d (%s)(%s) as donor.", joiner_idx,joiner->name,
                      required_donor ?donor_string:"*any*",donor_idx,donor->name,
                      gcs_node_state_to_str(donor->status));
         }
@@ -936,7 +936,7 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
     }
     else {
 #if 0
-        gu_warn ("Node %ld (%s) requested state transfer from '%s', "
+        gu_warn ("Node %d (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
                  joiner_idx, group->nodes[joiner_idx].name,
                  required_donor ? donor_name : "*any*", strerror (-donor_idx));
