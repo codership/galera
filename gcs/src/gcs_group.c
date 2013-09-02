@@ -799,73 +799,6 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 }
 
 static int
-group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
-                         const char* const name, int const name_len,
-                         gcs_node_state_t const status)
-{
-    int idx;
-
-    for (idx = 0; idx < group->num; idx++) {
-        gcs_node_t* node = &group->nodes[idx];
-        if (!strncmp(node->name, name, name_len)) {
-            if (joiner_idx == idx) {
-                return -EHOSTDOWN;
-            }
-            else if (node->status >= status) {
-                return idx;
-            }
-            else {
-                return -EAGAIN;
-            }
-        }
-    }
-
-    return -EHOSTUNREACH;
-}
-
-/* calls group_find_node_by_name() for each name in comma-separated str */
-static int
-group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
-                                const char* const str, int const str_len,
-                                gcs_node_state_t const status)
-{
-    assert (str != NULL);
-    assert (str_len > 0);
-
-    const char* begin = str;
-    const char* end;
-    int err = -EHOSTDOWN; /* worst error */
-
-    do {
-        end = strchr(begin, ',');
-
-        int len;
-
-        if (NULL == end) {
-            len = str_len - (begin - str);
-        }
-        else {
-            len = end - begin;
-        }
-
-        int const idx = group_find_node_by_name (group, joiner_idx, begin, len,
-                                                 status);
-
-        if (idx >= 0) return idx;
-
-        if (-EAGAIN == idx)
-            err = -EAGAIN;
-        else if (-EHOSTDOWN == err) /* any error is better than EHOSTDOWN */
-            err = idx;
-
-        begin = end + 1; /* skip comma */
-
-    } while (end != NULL);
-
-    return err;
-}
-
-static int
 group_find_node_by_state (gcs_group_t*     const group,
                           int              const joiner_idx,
                           gcs_node_state_t const status)
@@ -907,6 +840,77 @@ group_find_node_by_state (gcs_group_t*     const group,
     }
 }
 
+static int
+group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
+                         const char* const name, int const name_len,
+                         gcs_node_state_t const status)
+{
+    int idx;
+
+    for (idx = 0; idx < group->num; idx++) {
+        gcs_node_t* node = &group->nodes[idx];
+        if (!strncmp(node->name, name, name_len)) {
+            if (joiner_idx == idx) {
+                return -EHOSTDOWN;
+            }
+            else if (node->status >= status) {
+                return idx;
+            }
+            else {
+                return -EAGAIN;
+            }
+        }
+    }
+
+    return -EHOSTUNREACH;
+}
+
+/* Calls group_find_node_by_name() for each name in comma-separated list,
+ * falls back to group_find_node_by_state() if name (or list) is empty. */
+static int
+group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
+                                const char* const str, int const str_len,
+                                gcs_node_state_t const status)
+{
+    assert (str != NULL);
+    assert (str_len > 0);
+
+    const char* begin = str;
+    const char* end;
+    int err = -EHOSTDOWN; /* worst error */
+
+    do {
+        end = strchr(begin, ',');
+
+        int len;
+
+        if (NULL == end) {
+            len = str_len - (begin - str);
+        }
+        else {
+            len = end - begin;
+        }
+
+        assert (len >= 0);
+
+        int const idx = len > 0 ? /* consider empty name as "any" */
+            group_find_node_by_name (group, joiner_idx, begin, len, status) :
+            group_find_node_by_state(group, joiner_idx, status);
+
+        if (idx >= 0) return idx;
+
+        if (-EAGAIN == idx)
+            err = -EAGAIN;
+        else if (-EHOSTDOWN == err) /* any error is better than EHOSTDOWN */
+            err = idx;
+
+        begin = end + 1; /* skip comma */
+
+    } while (end != NULL);
+
+    return err;
+}
+
 /*!
  * Selects and returns the index of state transfer donor, if available.
  * Updates donor and joiner status if state transfer is possible
@@ -926,24 +930,19 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
     int  const donor_len = strlen(donor_string);
     bool const required_donor = (donor_len > 0);
 
-    if (required_donor) {
-        if (desync) { // sender wants to become "donor" itself
-            gcs_node_state_t const st = group->nodes[joiner_idx].status;
-            if (st >= min_donor_state)
-                donor_idx = joiner_idx;
-            else
-                donor_idx = -EAGAIN;
-        }
-        else {
-            donor_idx = group_for_each_donor_in_string(group, joiner_idx,
-                                                       donor_string, donor_len,
-                                                       min_donor_state);
-        }
+    if (desync) { /* sender wants to become "donor" itself */
+        assert(donor_len > 0);
+        gcs_node_state_t const st = group->nodes[joiner_idx].status;
+        if (st >= min_donor_state)
+            donor_idx = joiner_idx;
+        else
+            donor_idx = -EAGAIN;
     }
     else {
-        assert (!desync);
-        donor_idx = group_find_node_by_state (group, joiner_idx,
-                                              min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, joiner_idx,
+                                                    donor_string, donor_len,
+                                                    min_donor_state);
     }
 
     if (donor_idx >= 0) {
