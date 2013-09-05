@@ -1,0 +1,248 @@
+# Names should be added to this file with this pattern:
+#
+# For individuals:
+#   Name <email address>
+#
+# For organizations:
+#   Organization <fnmatch pattern>
+#
+# See python fnmatch module documentation for more information.
+
+The Chromium Authors <*@chromium.org>
+Google Inc. <*@google.com>
+Mohamed I. Hammad <ibraaaa@gmail.com>
+Sergiy Byelozyorov <rryk.ua@gmail.com>
+Seo Sanghyeon <sanxiyn@gmail.com>
+Alex Scheele <alexscheele@gmail.com>
+Andrew Brampton <me@bramp.net>
+Paweł Hajdan jr <phajdan.jr@gmail.com>
+Jesse Miller <jesse@jmiller.biz>
+Szymon Piechowicz <szymonpiechowicz@o2.pl>
+James Vega <vega.james@gmail.com>
+Marco Rodrigues <gothicx@gmail.com>
+Matthias Reitinger <reimarvin@gmail.com>
+Peter Bright <drpizza@quiscalusmexicanus.org>
+Arthur Lussos <developer0420@gmail.com>
+Masahiro Yado <yado.masa@gmail.com>
+Yarin Kaul <yarin.kaul@gmail.com>
+Gaetano Mendola <mendola@gmail.com>
+Comodo CA Limited
+Torchmobile Inc.
+Craig Schlenter <craig.schlenter@gmail.com>
+Ibrar Ahmed <ibrar.ahmad@gmail.com>
+Naoki Takano <takano.naoki@gmail.com>
+Fabien Tassin <fta@sofaraway.org>
+Kunal Thakar <kunalt@gmail.com>
+Mohamed Mansour <m0.interactive@gmail.com>
+Joshua Roesslein <jroesslein@gmail.com>
+Yong Shin <sy3620@gmail.com>
+Laszlo Radanyi <bekkra@gmail.com>
+Raman Tenneti <raman.tenneti@gmail.com>
+Kyle Nahrgang <kpn24@drexel.edu>
+Kim Christensen <kimworking@gmail.com>
+Paul Robinson <paulrobinson85@googlemail.com>
+Josué Ratelle <jorat1346@gmail.com>
+Edward Crossman <tedoc2000@gmail.com>
+Nikita Ofitserov <himikof@gmail.com>
+Sean Bryant <sean@cyberwang.net>
+Robert Sesek <rsesek@bluestatic.org>
+Janwar Dinata <j.dinata@gmail.com>
+Will Hirsch <chromium@willhirsch.co.uk>
+Yoav Zilberberg <yoav.zilberberg@gmail.com>
+Joel Stanley <joel@jms.id.au>
+Jacob Mandelson <jacob@mandelson.org>
+Yuri Gorobets <yuri.gorobets@gmail.com>
+Paul Wicks <pwicks86@gmail.com>
+Thiago Farina <thiago.farina@gmail.com>
+Viet-Trung Luu <viettrungluu@gmail.com>
+Pierre-Antoine LaFayette <pierre.lafayette@gmail.com>
+Song YeWen <ffmpeg@gmail.com>
+Philippe Beauchamp <philippe.beauchamp@gmail.com>
+Vedran Šajatović <vedran.sajatovic@gmail.com>
+Randy Posynick <randy.posynick@gmail.com>
+Bruno Calvignac <bruno@flock.com>
+Jaime Soriano Pastor <jsorianopastor@gmail.com>
+Bryan Donlan <bdonlan@gmail.com>
+Ramkumar Ramachandra <artagnon@gmail.com>
+Dominic Jodoin <dominic.jodoin@gmail.com>
+Kaspar Brand <googlecontrib@velox.ch>
+Clemens Fruhwirth <clemens@endorphin.org>
+Kevin Lee Helpingstine <sig11@reprehensible.net>
+Bernard Cafarelli <voyageur@gentoo.org>
+Vernon Tang <vt@foilhead.net>
+Alexander Sulfrian <alexander@sulfrian.net>
+Philippe Beaudoin <philippe.beaudoin@gmail.com>
+Mark Hahnenberg <mhahnenb@andrew.cmu.edu>
+Alex Gartrell <agartrell@cmu.edu>
+Leith Bade <leith@leithalweapon.geek.nz>
+James Choi <jchoi42@pha.jhu.edu>
+Paul Kehrer <paul.l.kehrer@gmail.com>
+Chamal De Silva <chamalsl@yahoo.com>
+Jay Soffian <jaysoffian@gmail.com>
+Brian G. Merrell <bgmerrell@gmail.com>
+Matthew Willis <appamatto@gmail.com>
+Brian Merrell, Novell Inc. <bgmerrell@gmail.com>
+Ryan Sleevi <ryan-chromium-dev@sleevi.com>
+Satoshi Matsuzaki <satoshi.matsuzaki@gmail.com>
+Benjamin Jemlich <pcgod99@gmail.com>
+Ningxin Hu <ningxin.hu@intel.com>
+James Wei <james.wei@intel.com>
+Haitao Feng <haitao.feng@intel.com>
+Jared Wein <weinjared@gmail.com>
+Mingmin Xie <melvinxie@gmail.com>
+Michael Gilbert <floppymaster@gmail.com>
+Giuseppe Iuculano <giuseppe@iuculano.it>
+James Willcox <jwillcox@litl.com>
+Shreyas VA <v.a.shreyas@gmail.com>
+Steven Pennington <spenn@engr.uvic.ca>
+Jorge Villatoro <jorge@tomatocannon.com>
+Paul Nettleship <pnettleship@gmail.com>
+David Benjamin <davidben@mit.edu>
+Sevan Janiyan <venture37@geeklan.co.uk>
+Peter Beverloo <peter@chromium.org>
+Lauri Oherd <lauri.oherd@gmail.com>
+Ben Karel <eschew@gmail.com>
+Sam McDonald <sam@sammcd.com>
+Magnus Danielsson <fuzzac@gmail.com>
+Kushal Pisavadia <kushi.p@gmail.com>
+Maarten Lankhorst <m.b.lankhorst@gmail.com>
+Vipul Bhasin <vipul.bhasin@gmail.com>
+Ryan Norton <rnorton10@gmail.com>
+Dillon Sellars <dill.sellars@gmail.com>
+Seshadri Mahalingam <seshadri.mahalingam@gmail.com>
+Clement Scheelfeldt Skau <clementskau@gmail.com>
+David Futcher <david.mike.futcher@gmail.com>
+Ramkumar Gokarnesan <ramkumar.gokarnesan@gmail.com>
+Matt Arpidone <mma.public@gmail.com>
+ruben <chromium@hybridsource.org>
+NVIDIA Corporation <*@nvidia.com>
+Torsten Kurbad <google@tk-webart.de>
+Max Perepelitsyn <pph34r@gmail.com>
+Luke Zarko <lukezarko@gmail.com>
+Felix H. Dahlke <fhd@ubercode.de>
+Ali Vathi <ali.akbar@gmail.com>
+Mathias Bynens <mathias@qiwi.be>
+Mark Seaborn <mrs@mythic-beasts.com>
+Amruth Raj <amruthraj@motorola.com>
+Amruth Raj <ckqr36@motorola.com>
+Gajendra Singh <wxjg68@motorola.com>
+Ehsan Akhgari <ehsan.akhgari@gmail.com>
+Christopher Dale <chrelad@gmail.com>
+Sanjoy Pal <ncj674@motorola.com>
+Mike Tilburg <mtilburg@adobe.com>
+Peter Brophy <pbrophy@adobe.com>
+Robert Goldberg <goldberg@adobe.com>
+Don Woodward <woodward@adobe.com>
+Vinay Anantharaman <vinaya@adobe.com>
+Naveen Bobbili <naveenbobbili@motorola.com>
+Vamshikrishna Yellenki <vamshi@motorola.com>
+Robert Nagy <robert.nagy@gmail.com>
+Nayan Kumar K <qtc746@motorola.com>
+ShankarGanesh K <blr.bmlab@gmail.com>
+Goutham Jagannatha <wrm364@motorola.com>
+Rosen Dash <rosen.dash@gmail.com>
+Naveen Bobbili <qghc36@motorola.com>
+Ravi Phaneendra Kasibhatla <ravi.kasibhatla@motorola.com>
+Rosen Dash <nqk836@motorola.com>
+Parag Radke <nrqv63@motorola.com>
+Ted Vessenes <tedvessenes@gmail.com>
+Yair Yogev <progame@chromium.org>
+Chandra Shekar Vallala <brk376@motorola.com>
+Patrasciuc Sorin Cristian <cristian.patrasciuc@gmail.com>
+Halton Huo <halton.huo@intel.com>
+Shiliu Wang <aofdwsl@gmail.com>
+Gao Chun <gaochun.dev@gmail.com>
+Clinton Staley <clintstaley@gmail.com>
+Clinton Staley <clintstaley@chromium.org>
+Devlin Cronin <rdevlin.cronin@gmail.com>
+Junmin Zhu <junmin.zhu@intel.com>
+Cem Kocagil <cem.kocagil@gmail.com>
+YoungKi Hong <simon.hong81@gmail.com>
+Lu Guanqun <guanqun.lu@gmail.com>
+François Beaufort <beaufort.francois@gmail.com>
+Eriq Augustine <eriq.augustine@gmail.com>
+Francois Kritzinger <francoisk777@gmail.com>
+Erik Hill <erikghill@gmail.com>
+Mao Yujie <maojie0924@gmail.com>
+Pan Deng <pan.deng@intel.com>
+Aaron Leventhal <aaronlevbugs@gmail.com>
+Peter Collingbourne <peter@pcc.me.uk>
+Aaron Randolph <aaron.randolph@gmail.com>
+Yumikiyo Osanai <yumios.art@gmail.com>
+Matthew Robertson <matthewrobertson03@gmail.com>
+Mao Yujie <yujie.mao@intel.com>
+Xu Samuel <samuel.xu@intel.com>
+Jin Yang <jin.a.yang@intel.com>
+Xinchao He <hexinchao@gmail.com>
+Changbin Shao <changbin.shao@intel.com>
+Stephen Searles <stephen.searles@gmail.com>
+Arun Mankuzhi <arun.m@samsung.com>
+Christophe Dumez <ch.dumez@sisa.samsung.com>
+Taylor Price <trprice@gmail.com>
+Alexandru Chiculita <achicu@adobe.com>
+Eric Rescorla <ekr@rtfm.com>
+Alexandre Abreu <wiss1976@gmail.com>
+Erik Sjölund <erik.sjolund@gmail.com>
+Simon Arlott <simon.arlott@gmail.com>
+Alexey Korepanov <alexkorep@gmail.com>
+Mitchell Rosen <mitchellwrosen@chromium.org>
+Yongsheng Zhu <yongsheng.zhu@intel.com>
+Shouqun Liu <shouqun.liu@intel.com>
+Kangyuan Shu <kangyuan.shu@intel.com>
+Jake Helfert <jake@helfert.us>
+Hongbo Min <hongbo.min@intel.com>
+Anastasios Cassiotis <tom.cassiotis@gmail.com>
+Evangelos Foutras <evangelos@foutrelis.com>
+Pavel Ivanov <paivanof@gmail.com>
+Rene Bolldorf <rb@radix.io>
+Petar Jovanovic <petarj@mips.com>
+Sergio Carlos Morales Angeles <carloschilazo@gmail.com>
+Mihai Maerean <mmaerean@adobe.com>
+Kaustubh Atrawalkar <kaustubh.ra@gmail.com>
+Robert Bear Travis <betravis@adobe.com>
+Robert Bear Travis <bear.travis@gmail.com>
+Max Vujovic <mvujovic@adobe.com>
+Jakob Weigert <jakob.j.w@googlemail.com>
+Catalin Badea <badea@adobe.com>
+Joshua Lock <joshua.lock@intel.com>
+Dai Chunyang <chunyang.dai@intel.com>
+Joe Thomas <mhx348@motorola.com>
+Ruben Terrazas <rubentopo@gmail.com>
+Josh Triplett <josh.triplett@intel.com>
+Qiankun Miao <qiankun.miao@intel.com>
+Etienne Laurin <etienne@atnnn.com>
+Yang Gu <yang.gu@intel.com>
+Timo Reimann <ttr314@googlemail.com>
+Sungguk Lim <limasdf@gmail.com>
+Martin Bednorz <m.s.bednorz@gmail.com>
+Kamil Jiwa <kamil.jiwa@gmail.com>
+Keene Pan <keenepan@linpus.com>
+Trevor Perrin <unsafe@trevp.net>
+Ion Rosca <rosca@adobe.com>
+Sylvain Zimmer <sylvinus@gmail.com>
+Sungmann Cho <sungmann.cho@gmail.com>
+方觉 (Fang Jue) <fangjue23303@gmail.com>
+Evan Peterson <evan.peterson.ep@gmail.com>
+J. Ryan Stinnett <jryans@chromium.org>
+Matheus Bratfisch <matheusbrat@gmail.com>
+Horia Olaru <olaru@adobe.com>
+Horia Olaru <horia.olaru@gmail.com>
+Opera Software ASA <*@opera.com>
+Johannes Rudolph <johannes.rudolph@googlemail.com>
+Aaron Jacobs <samusaaron3@gmail.com>
+Sam Larison <qufighter@gmail.com>
+Jun Jiang <jun.a.jiang@intel.com>
+Bobby Powers <bobbypowers@gmail.com>
+Patrick Riordan <patrickriordan177@gmail.com>
+Kenneth Rohde Christiansen <kenneth.r.christiansen@intel.com>
+Raphael Kubo da Costa <raphael.kubo.da.costa@intel.com>
+Yandex LLC <*@yandex-team.ru>
+Yoshinori Sano <yoshinori.sano@gmail.com>
+Mrunal Kapade <mrunal.kapade@intel.com>
+Yael Aharon <yael.aharon@intel.com>
+Haojian Wu <hokein.wu@gmail.com>
+Sathish Kuppuswamy <sathish.kuppuswamy@intel.com>
+Joone Hur <joone.hur@intel.com>
+Sudarsana Babu Nagineni <sudarsana.nagineni@intel.com>
+Jared Shumway <jaredshumway94@gmail.com>
+Shez Baig <sbaig1@bloomberg.net>
