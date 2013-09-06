@@ -277,6 +277,7 @@ galera::TrxHandle::serial_size() const
             + (has_mac() ? mac_.serial_size() : 0));
 }
 
+
 void
 galera::TrxHandle::apply (void*                   recv_ctx,
                           wsrep_apply_cb_t        apply_cb,
@@ -287,6 +288,8 @@ galera::TrxHandle::apply (void*                   recv_ctx,
     if (new_version())
     {
         const DataSetIn& ws(write_set_in_.dataset());
+
+        ws.rewind(); // make sure we always start from the beginning
 
         for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
         {
