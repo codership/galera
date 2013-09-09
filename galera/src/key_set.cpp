@@ -59,9 +59,10 @@ KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
 
     assert (ann_size <= size);
 
-    *reinterpret_cast<ann_size_t*>(buf) = gu::htog(ann_size);
+    ann_size_t const tmp(gu::htog(ann_size));
+    size_t           off(sizeof(tmp));
 
-    size_t off(sizeof(ann_size_t));
+    ::memcpy(buf, &tmp, off);
 
     for (int i(0); i <= part_num && off < ann_size; ++i)
     {
