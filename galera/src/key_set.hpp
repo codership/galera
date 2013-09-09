@@ -79,20 +79,11 @@ public:
         {
             assert(ver >EMPTY && ver <= MAX_VERSION);
 
-            const uint64_t* from(reinterpret_cast<const uint64_t*>(hash.buf));
-            uint64_t*       to  (reinterpret_cast<uint64_t*>(tmp.buf));
+            /* 16 if ver in { FLAT16, FLAT16A }, 8 otherwise */
+            int const key_size
+                (8 << (static_cast<unsigned int>(ver - FLAT16) <= 1));
 
-            /* copy first 8 bytes of hash */
-            to[0] = from[0];
-
-            size_t ann_off(8);
-
-            if (static_cast<unsigned int>(ver - FLAT16) <= 1)
-            {
-                /* copy next 8 bytes of hash */
-                to[1] = from[1];
-                ann_off += 8;
-            }
+            memcpy (tmp.buf, hash.buf, key_size);
 
             /*  use lower bits for header:  */
 
@@ -109,8 +100,8 @@ public:
 
             if (annotated(ver))
             {
-                store_annotation (parts, part_num,
-                                  tmp.buf + ann_off, sizeof(tmp.buf) - ann_off);
+                store_annotation(parts, part_num,
+                                 tmp.buf + key_size,sizeof(tmp.buf) - key_size);
             }
         }
 
