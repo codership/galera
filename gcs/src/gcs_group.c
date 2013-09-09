@@ -823,8 +823,15 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
             else if (node->status >= status) {
                 return idx;
             }
-            else {
+            else if (node->status >= GCS_NODE_STATE_JOINER) {
+                /* will eventually become SYNCED */
                 return -EAGAIN;
+            }
+            else {
+                /* technically we could return -EDEADLK here, but as long as
+                 * it is not -EAGAIN, it does not matter. If the node is in a
+                 * PRIMARY state, it is as good as not found. */
+                break;
             }
         }
     }
@@ -862,16 +869,19 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
 
         int const idx = len > 0 ? /* consider empty name as "any" */
             group_find_node_by_name (group, joiner_idx, begin, len, status) :
-            group_find_node_by_state(group, status);
+            /* err == -EAGAIN here means that at least one of the nodes in the
+             * list will be available later, so don't try others. */
+            (err == -EAGAIN ?
+             err : group_find_node_by_state(group, status));
 
         if (idx >= 0) return idx;
 
-        if (-EAGAIN == idx)
-            err = -EAGAIN;
-        else if (-EHOSTDOWN == err) /* any error is better than EHOSTDOWN */
-            err = idx;
+        /* once we hit -EAGAIN, don't try to change error code: this means
+         * that at least one of the nodes in the list will become available. */
+        if (-EAGAIN != err) err = idx;
 
         begin = end + 1; /* skip comma */
+
     } while (end != NULL);
 
     return err;
@@ -1146,4 +1156,5 @@ gcs_group_get_state (gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
+
 
