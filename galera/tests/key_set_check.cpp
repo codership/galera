@@ -34,7 +34,9 @@ START_TEST (ver0)
     KeySet::Version const tk_ver(KeySet::FLAT16A);
     size_t const base_size(version_to_hash_size(tk_ver));
 
-    KeySetOut kso ("key_set_test", tk_ver);
+    gu::byte_t reserved[1024];
+    gu::String<> const str("key_set_test");
+    KeySetOut kso (reserved, sizeof(reserved), str, tk_ver);
 
     fail_if (kso.count() != 0);
     size_t total_size(kso.size());
@@ -144,15 +146,15 @@ START_TEST (ver0)
 
     log_info << "End size: " << kso.size();
 
-    std::vector<gu::Buf> out;
-    out.reserve(kso.page_count());
+    KeySetOut::GatherVector out;
+    out->reserve(kso.page_count());
     size_t const out_size(kso.gather(out));
 
-    log_info << "Gather size: " << out_size << ", buf count: " << out.size();
+    log_info << "Gather size: " << out_size << ", buf count: " << out->size();
 
     std::vector<gu::byte_t> in;
     in.reserve(out_size);
-    for (size_t i(0); i < out.size(); ++i)
+    for (size_t i(0); i < out->size(); ++i)
     {
         const gu::byte_t* ptr(reinterpret_cast<const gu::byte_t*>(out[i].ptr));
         in.insert (in.end(), ptr, ptr + out[i].size);

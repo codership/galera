@@ -24,7 +24,8 @@ START_TEST (ver3_basic)
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
 
-    WriteSetOut wso ("ver3_basic", KeySet::FLAT8A, flag1, WriteSetNG::VER3);
+    gu::String<> const str("ver3_basic");
+    WriteSetOut wso (str, KeySet::FLAT8A, flag1, WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 
@@ -46,10 +47,10 @@ START_TEST (ver3_basic)
 
     uint16_t const flags(flag1 | flag2);
 
-    std::vector<gu::Buf> out;
+    WriteSetNG::GatherVector out;
     size_t const out_size(wso.gather(source, conn, trx, out));
 
-    log_info << "Gather size: " << out_size << ", buf count: " << out.size();
+    log_info << "Gather size: " << out_size << ", buf count: " << out->size();
 
     wsrep_seqno_t const last_seen(1);
     wsrep_seqno_t const seqno(2);
@@ -60,7 +61,7 @@ START_TEST (ver3_basic)
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in;
     in.reserve(out_size);
-    for (size_t i(0); i < out.size(); ++i)
+    for (size_t i(0); i < out->size(); ++i)
     {
         const gu::byte_t* ptr(reinterpret_cast<const gu::byte_t*>(out[i].ptr));
         in.insert (in.end(), ptr, ptr + out[i].size);
@@ -167,7 +168,7 @@ START_TEST (ver3_basic)
     try
     {
         WriteSetIn tmp_wsi(in_buf);
-        std::vector<gu::Buf> out;
+        WriteSetIn::GatherVector out;
 
         mark_point();
         gu_trace(tmp_wsi.gather(out, false, false)); // no keys or unrd
@@ -175,7 +176,7 @@ START_TEST (ver3_basic)
         /* concatenate all out buffers */
         std::vector<gu::byte_t> in;
         in.reserve(out_size);
-        for (size_t i(0); i < out.size(); ++i)
+        for (size_t i(0); i < out->size(); ++i)
         {
             const gu::byte_t* ptr
                 (reinterpret_cast<const gu::byte_t*>(out[i].ptr));

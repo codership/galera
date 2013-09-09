@@ -183,8 +183,9 @@ namespace galera
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
             write_set_         (version_),
-            write_set_out_     (params.working_dir_ + '/' +
-                                gu::to_string(trx_id, std::hex),
+            write_set_out_     (gu::String<256>(params.working_dir_) << '/'
+                                << gu::Fmt("%016x")
+                                << static_cast<unsigned long long>(trx_id),
                                 KeySet::version(params.key_format_)),
             write_set_in_      (),
             write_set_flags_   (0),
@@ -535,7 +536,7 @@ namespace galera
         //
         friend class Wsdb;
         friend class Certification;
-//        typedef std::list<std::pair<KeyEntry*, std::pair<bool, bool> > > CertKeySet;
+
 public:
         typedef gu::UnorderedMap<KeyEntryOS*,
                                  std::pair<bool, bool>,

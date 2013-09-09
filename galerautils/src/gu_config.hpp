@@ -10,7 +10,7 @@
 #ifndef _gu_config_hpp_
 #define _gu_config_hpp_
 
-#include "gu_string.hpp"
+#include "gu_string_utils.hpp"
 #include "gu_exception.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"

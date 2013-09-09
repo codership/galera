@@ -23,8 +23,9 @@ apply_trx_ws(void*                    recv_ctx,
              const galera::TrxHandle& trx,
              const wsrep_trx_meta_t&  meta)
 {
-    static const size_t max_apply_attempts(10);
+    static const size_t max_apply_attempts(4);
     size_t attempts(1);
+
     do
     {
         try
@@ -33,7 +34,9 @@ apply_trx_ws(void*                    recv_ctx,
             {
                 log_debug << "Executing TO isolated action: " << trx;
             }
+
             gu_trace(trx.apply(recv_ctx, apply_cb, meta));
+
             if (trx.is_toi())
             {
                 log_debug << "Done executing TO isolated action: "
@@ -504,7 +507,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
-    WriteSetOut::BufferVector actv;
+    WriteSetNG::GatherVector actv;
 
     gcs_action act;
     act.type = GCS_ACT_TORDERED;
@@ -1076,8 +1079,7 @@ galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
     if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
         return WSREP_NOT_IMPLEMENTED;
 
-    WriteSetOut ws(trx_params_.working_dir_ + '/' +
-                   gu::to_string(data, std::hex),
+    WriteSetOut ws(gu::String<256>(trx_params_.working_dir_) << '/' << data,
                    /* key format is not essential since we're not adding keys */
                    KeySet::version(trx_params_.key_format_));
 
@@ -1094,9 +1096,8 @@ galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
      * wsrep_trx_id_t const trx_id(cert_.append_preordered(source, ws));
      *
      * begs to be here. */
-    wsrep_trx_id_t const      trx_id(preordered_id_.add_and_fetch(1));
-    WriteSetOut::BufferVector actv;
-
+    wsrep_trx_id_t const trx_id(preordered_id_.add_and_fetch(1));
+    WriteSetNG::GatherVector actv;
     size_t const actv_size(ws.gather(source, 0, trx_id, actv));
 
     ws.set_preordered (pa_range); // also adds CRC

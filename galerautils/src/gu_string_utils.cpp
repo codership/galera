@@ -1,7 +1,7 @@
 // Copyright (C) 2009-2010 Codership Oy <info@codership.com>
 
+#include "gu_string_utils.hpp"
 #include "gu_assert.hpp"
-#include "gu_string.hpp"
 
 #include <sys/types.h>
 

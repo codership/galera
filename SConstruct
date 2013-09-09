@@ -179,8 +179,9 @@ if extra_sysroot != '':
 #
 
 # Include paths
-env.Append(CPPPATH = Split('''#/common
+env.Append(CPPPATH = Split('''#
                               #/asio
+                              #/common
                               #/galerautils/src
                               #/gcomm/src
                               #/gcomm/src/gcomm
@@ -353,7 +354,7 @@ if boost == 1:
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)
-    
+
     libboost_program_options = check_boost_library('boost_program_options',
                                                    'boost/program_options.hpp',
                                                    LIBBOOST_PROGRAM_OPTIONS_A,

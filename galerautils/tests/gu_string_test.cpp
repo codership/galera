@@ -1,115 +1,98 @@
-// Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+/* Copyright (C) 2013 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
-#include "gu_string.hpp"
+#include "../src/gu_string.hpp"
+
 #include "gu_string_test.hpp"
 
-using std::string;
-using std::vector;
-
-START_TEST(test_strsplit)
+START_TEST (ctor_test)
 {
-    string str = "foo bar baz";
-    vector<string> vec = gu::strsplit(str, ' ');
-    fail_unless(vec.size() == 3);
-    fail_unless(vec[0] == "foo");
-    fail_unless(vec[1] == "bar");
-    fail_unless(vec[2] == "baz");
+    gu::String<8> str1;                                // default
+    fail_if (str1.size() != 0);
+    fail_if (strlen(str1.c_str()) != 0);
+
+    const char* const test_string1("test");
+
+    gu::String<8> str2(test_string1);                  // from char*
+    fail_if (str2.size() != strlen(test_string1));
+    fail_if (strcmp(str2.c_str(), test_string1));
+
+    gu::String<2> str3(str2);                          // copy ctor
+    fail_if (str3.size() != str2.size());
+    fail_if (strcmp(str2.c_str(), str3.c_str()));
+
+    std::string const std_string(str3.c_str());
+
+    gu::String<4> str4(std_string);                    // from std::string
+    fail_if (str4.size() != strlen(test_string1));
+    fail_if (strcmp(str4.c_str(), test_string1));
+
+    gu::String<5> str5(test_string1, 2);
+    fail_if (str5.size() != 2);
+    fail_if (strncmp(str5.c_str(), test_string1, 2));
 }
 END_TEST
 
-START_TEST(test_tokenize)
+START_TEST (func_test)
 {
-    vector<string> vec = gu::tokenize("", 'a', 'b', false);
-    fail_unless(vec.size() == 0);
+    gu::String<16> str;
+    fail_if (str.size() != 0);
+    fail_if (strlen(str.c_str()) != 0);
 
-    vec = gu::tokenize("", 'a', 'b', true);
-    fail_unless(vec.size() == 1);
-    fail_unless(vec[0] == "");
+    const char* const buf_ptr(str.c_str());
 
-    vec = gu::tokenize("a", 'a', 'b', false);
-    fail_unless(vec.size() == 0);
+    str = "one";
+    str << std::string("two") << gu::String<8>("three");
 
-    vec = gu::tokenize("a", 'a', 'b', true);
-    fail_unless(vec.size() == 2);
-    fail_unless(vec[0] == "");
-    fail_unless(vec[1] == "");
+    fail_if (strcmp(str.c_str(), "onetwothree"));
+    fail_if (str.c_str() != buf_ptr);
 
-    vec = gu::tokenize("foo bar baz");
-    fail_unless(vec.size() == 3);
-    fail_unless(vec[0] == "foo");
-    fail_unless(vec[1] == "bar");
-    fail_unless(vec[2] == "baz");
+    str += "blast!"; // this should spill to heap
 
-    vec = gu::tokenize("foo\\ bar baz");
-    fail_unless(vec.size() == 2);
-    fail_unless(vec[0] == "foo bar", "expected 'foo bar', found '%s'",
-                vec[0].c_str());
-    fail_unless(vec[1] == "baz");
+    fail_if (strcmp(str.c_str(), "onetwothreeblast!"),
+             "expected 'onetwothreeblast!' got '%s'", str.c_str());
+    fail_if (str.c_str() == buf_ptr);
 
-    vec = gu::tokenize("foo\\;;bar;;baz;", ';', '\\', false);
-    fail_unless(vec.size() == 3);
-    fail_unless(vec[0] == "foo;");
-    fail_unless(vec[1] == "bar");
-    fail_unless(vec[2] == "baz");
+    str = gu::String<2>("back to stack");
 
-    vec = gu::tokenize("foo\\;;bar;;baz;", ';', '\\', true);
-    fail_unless(vec.size() == 5, "vetor length %zu, expected 5", vec.size());
-    fail_unless(vec[0] == "foo;");
-    fail_unless(vec[1] == "bar");
-    fail_unless(vec[2] == "");
-    fail_unless(vec[3] == "baz");
-    fail_unless(vec[4] == "");
+    fail_if (str != "back to stack");
+    fail_if (str != gu::String<>("back to stack"));
+    fail_if (str != std::string("back to stack"));
+    fail_if (str.c_str() != buf_ptr);
+
+    typedef void* pointer;
+
+    // conversions
+    fail_if ((gu::String<>() << true)   != "true");
+    fail_if ((gu::String<>() << 0.0123) != "0.012300");
+    if (sizeof(pointer) == 4)
+        fail_if ((gu::String<>() << pointer(0xdeadbeef))!="0xdeadbeef");
+    else
+        fail_if ((gu::String<>() << pointer(0xdeadbeef))!="0x00000000deadbeef");
+
+    fail_if ((gu::String<>() << 1234567890) != "1234567890");
+    fail_if ((gu::String<>() << 12345U) != "12345");
+    fail_if ((gu::String<>() << 'a') != "a");
+
+    fail_if ((gu::String<>() << 0xdeadbeef) != "3735928559");
+    fail_if ((gu::String<>() << gu::Fmt("%010x") << 0xdeadbeef) !="00deadbeef");
 }
 END_TEST
 
-START_TEST(test_trim)
+Suite*
+gu_string_suite(void)
 {
-    string full1 = ".,wklerf joweji";
-    string full2 = full1;
+    Suite* s = suite_create ("gu::String");
 
-    gu::trim (full2);
-    fail_if (full1 != full2);
+    TCase* t = tcase_create ("ctor_test");
+    tcase_add_test (t, ctor_test);
+    suite_add_tcase (s, t);
 
-    string part = " part ";
-
-    gu::trim (part);
-    fail_if (part.length() != 4);
-    fail_if (0 != part.compare("part"));
-
-    string empty;
-
-    gu::trim (empty);
-    fail_if (!empty.empty());
-
-    empty += ' ';
-    empty += '\t';
-    empty += '\n';
-    empty += '\f';
-    fail_if (empty.empty());
-
-    gu::trim (empty);
-
-    fail_if (!empty.empty(), "string contents: '%s', expected empty",
-             empty.c_str());
-}
-END_TEST
-
-Suite* gu_string_suite(void)
-{
-    Suite* s = suite_create("galerautils++ String");
-    TCase* tc;
-
-    tc = tcase_create("strsplit");
-    tcase_add_test(tc, test_strsplit);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("tokenize");
-    tcase_add_test(tc, test_tokenize);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("trim");
-    tcase_add_test(tc, test_trim);
-    suite_add_tcase(s, tc);
+    t = tcase_create ("func_test");
+    tcase_add_test (t, func_test);
+    suite_add_tcase (s, t);
 
     return s;
 }

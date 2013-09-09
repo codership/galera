@@ -15,7 +15,7 @@
 #include "gu_assert.h"
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
-#include "gu_string.hpp"
+#include "gu_string_utils.hpp" // strsplit()
 
 #include "gu_uri.hpp"
 

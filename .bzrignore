@@ -77,3 +77,4 @@ Makefile.in
 garb/garbd
 gcs/src/.garb
 docs/build/
+gcomm/test/ssl_test

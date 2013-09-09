@@ -873,7 +873,6 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
                                 gcs_node_state_t const status)
 {
     assert (str != NULL);
-    assert (str_len > 0);
 
     const char* begin = str;
     const char* end;

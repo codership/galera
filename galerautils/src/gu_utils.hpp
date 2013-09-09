@@ -15,12 +15,12 @@
 #include <limits>
 
 #include "gu_exception.hpp"
-#include "gu_string.hpp"
+//#include "gu_string.hpp"
 
 namespace gu {
 
 /*
- * String conversion functions for primitive types 
+ * String conversion functions for primitive types
  */
 /*! Generic to_string() template function */
 template <typename T>
@@ -97,17 +97,15 @@ template <> inline void* from_string<void*>(const std::string& s,
     return ret;
 }
 
-extern "C" const char* gu_str2bool (const char* str, bool*   bl);
-//extern bool _to_bool (const std::string& s);
+extern "C" const char* gu_str2bool (const char* str, bool* bl);
 
 /*! Specialized template for reading bool. Tries both 1|0 and true|false
  * @throws NotFound */
 template <> inline bool from_string<bool> (const std::string& s,
                                            std::ios_base& (*f)(std::ios_base&))
 {
-    const char* const str(s.c_str());
     bool ret;
-    const char* endptr(gu_str2bool(str, &ret));
+    const char* endptr(gu_str2bool(s.c_str(), &ret));
     if (endptr == 0 || *endptr != '\0') throw NotFound();
     return ret;
 }

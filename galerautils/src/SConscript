@@ -42,7 +42,7 @@ libgalerautilsxx_sources = [
     'gu_logger.cpp',
     'gu_prodcons.cpp',
     'gu_regex.cpp',
-    'gu_string.cpp',
+    'gu_string_utils.cpp',
     'gu_uri.cpp',
     'gu_buffer.cpp',
     'gu_utils++.cpp',

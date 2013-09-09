@@ -13,6 +13,7 @@
 #ifndef _GU_RSET_HPP_
 #define _GU_RSET_HPP_
 
+#include "gu_vector.hpp"
 #include "gu_alloc.hpp"
 #include "gu_digest.hpp"
 
@@ -49,6 +50,8 @@ public:
 
     /*! return number of records in the record set */
     int    count() const { return count_; }
+
+    typedef gu::Vector<gu::Buf, 32> GatherVector;
 
 protected:
 
@@ -88,17 +91,19 @@ class RecordSetOutBase : public RecordSet
 public:
 
     /*! return number of disjoint pages in the record set */
-    ssize_t page_count() const { return bufs_.size(); }
+    ssize_t page_count() const { return bufs_->size(); }
 
-    /*! return vector of RecordSet fragments in adjucent order */
-    ssize_t gather (std::vector<Buf>& out);
+    /*! return vector of RecordSet fragments in adjusent order */
+    ssize_t gather (GatherVector& out);
 
 protected:
 
-    RecordSetOutBase (const std::string& base_name,     /* basename for on-disk
-                                                         * allocator */
-                      CheckType          ct,
-                      Version            version  = MAX_VERSION
+    RecordSetOutBase (byte_t*             reserved,
+                      size_t              reserved_size,
+                      const StringBase<>& base_name,     /* basename for on-disk
+                                                        * allocator */
+                      CheckType           ct,
+                      Version             version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
                       ,ssize_t            max_size = 0x7fffffff
 #endif
@@ -240,13 +245,13 @@ protected:
 private:
 
 #ifdef GU_RSET_CHECK_SIZE
-    ssize_t const    max_size_;
+    ssize_t const max_size_;
 #endif
 
-    Allocator        alloc_;
-    Hash             check_;
-    std::vector<Buf> bufs_;
-    bool             prev_stored_;
+    Allocator     alloc_;
+    Hash          check_;
+    gu::Vector<Buf, Allocator::INITIAL_VECTOR_SIZE> bufs_;
+    bool          prev_stored_;
 
     void
     post_alloc (bool const new_page, const byte_t* const ptr,
@@ -272,18 +277,21 @@ class RecordSetOut : public RecordSetOutBase
 {
 public:
 
-    RecordSetOut (const std::string& base_name,
-                  CheckType          ct,
-                  Version            version  = MAX_VERSION
+    RecordSetOut (byte_t*             reserved,
+                  size_t              reserved_size,
+                  const StringBase<>& base_name,
+                  CheckType           ct,
+                  Version             version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
-                  ,ssize_t           max_size = 0x7fffffff
+                  ,ssize_t            max_size = 0x7fffffff
 #endif
         )
-        : RecordSetOutBase (base_name, ct, version
+        : RecordSetOutBase (reserved, reserved_size, base_name, ct, version
 #ifdef GU_RSET_CHECK_SIZE
                             ,max_size
 #endif
-            ) {}
+            )
+    {}
 
     std::pair<const byte_t*, size_t>
     append (const R& r)

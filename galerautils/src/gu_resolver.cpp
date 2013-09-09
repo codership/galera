@@ -2,7 +2,6 @@
 
 #include "gu_resolver.hpp"
 #include "gu_logger.hpp"
-#include "gu_string.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
 #include "gu_uri.hpp"

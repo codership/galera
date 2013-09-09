@@ -2,17 +2,24 @@
 
 // $Id$
 
-#include "gu_alloc_test.hpp"
-
 #include "../src/gu_alloc.hpp"
+
+#include "gu_alloc_test.hpp"
 
 START_TEST (basic)
 {
-    const char test0[] = "test0";
-    const char test1[] = "test1";
+    ssize_t const extra_size(1 << 12); /* extra size to force new page */
+    gu::byte_t reserved[extra_size];
 
-    std::string test_name("gu_alloc_test");
-    gu::Allocator a(test_name, sizeof(test1), 1 << 16);
+    const char test0[] = "test0";
+    ssize_t const test0_size(sizeof(test0));
+
+    const char test1[] = "test1";
+    ssize_t const test1_size(sizeof(test1) + extra_size);
+
+    gu::String<> test_name("gu_alloc_test");
+    gu::Allocator a(reserved, sizeof(reserved),
+                    test_name, sizeof(test1), 1 << 16);
     mark_point();
     void*  p;
     size_t r, s = 0;
@@ -25,7 +32,7 @@ START_TEST (basic)
     fail_if (n);
     fail_if (a.size() != s);
 
-    r = sizeof(test0); s += r;
+    r = test0_size; s += r;
     mark_point();
     p = a.alloc(r, n);
     fail_if (0 == p);
@@ -33,12 +40,11 @@ START_TEST (basic)
     fail_if (a.size() != s);
     strcpy (reinterpret_cast<char*>(p), test0);
 
-    /* new page must be allocated */
-    r = sizeof(test1); s += r;
+    r = test1_size; s += r;
     mark_point();
     p = a.alloc(r, n);
     fail_if (0 == p);
-    fail_if (!n);
+    fail_if (!n);                            /* new page must be allocated */
     fail_if (a.size() != s);
     strcpy (reinterpret_cast<char*>(p), test1);
 
@@ -55,11 +61,11 @@ START_TEST (basic)
 
     size_t out_size = a.gather (out);
 
-    fail_if (out_size != (sizeof(test0) + sizeof(test1)));
+    fail_if (out_size != test0_size + test1_size);
     fail_if (out.size() != 2);
-    fail_if (out[0].size != sizeof(test0));
+    fail_if (out[0].size != test0_size);
     fail_if (strcmp(reinterpret_cast<const char*>(out[0].ptr), test0));
-    fail_if (out[1].size != sizeof(test1));
+    fail_if (out[1].size != test1_size);
     fail_if (strcmp(reinterpret_cast<const char*>(out[1].ptr), test1));
 }
 END_TEST

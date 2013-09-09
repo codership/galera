@@ -438,6 +438,8 @@ public:
         void
         print (std::ostream& os) const;
 
+        typedef gu::RecordSet::GatherVector GatherVector;
+
     private:
 
         gu::Hash          hash_;
@@ -452,10 +454,14 @@ public:
     }; /* class KeySetOut::KeyPart */
 
 
-    KeySetOut (const std::string&    base_name,
-               KeySet::Version const version)
+    KeySetOut (gu::byte_t*             reserved,
+               size_t                  reserved_size,
+               const gu::StringBase<>& base_name,
+               KeySet::Version const   version)
         :
         gu::RecordSetOut<KeySet::KeyPart> (
+            reserved,
+            reserved_size,
             base_name,
             check_type      (version),
             ks_to_rs_version(version)

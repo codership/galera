@@ -18,6 +18,7 @@
 #include "data_set.hpp"
 
 #include "gu_serialize.hpp"
+#include "gu_vector.hpp"
 
 #include <vector>
 #include <string>
@@ -73,6 +74,7 @@ namespace galera
             return ret;
         }
 
+        typedef gu::RecordSet::GatherVector GatherVector;
 
         /* TODO: separate metadata access from physical representation in
          *       future versions */
@@ -117,7 +119,7 @@ namespace galera
                            const wsrep_uuid_t&    source,
                            const wsrep_conn_id_t& conn,
                            const wsrep_trx_id_t&  trx,
-                           std::vector<gu::Buf>&  out);
+                           GatherVector&          out);
 
             /* records last_seen, timestamp and CRC before replication */
             void set_last_seen (const wsrep_seqno_t& ls);
@@ -360,20 +362,42 @@ namespace galera
     {
     public:
 
-        explicit
-        WriteSetOut (const std::string&  base_name,
-                     KeySet::Version     kver,
-                     uint16_t            flags    = 0,
-                     WriteSetNG::Version ver      = WriteSetNG::MAX_VERSION,
-                     DataSet::Version    dver     = DataSet::MAX_VERSION,
-                     DataSet::Version    uver     = DataSet::MAX_VERSION,
-                     size_t              max_size = WriteSetNG::MAX_SIZE)
+        /* Initial space allocation for the writeset. 16K should get us going.*/
+        static size_t const RESERVED_SIZE        = 1U << 14;
+        static size_t const RESERVED_CHUNK       = RESERVED_SIZE / 8;
+
+        static size_t const RESERVED_KEYS_OFFSET = 0;
+        static size_t const RESERVED_KEYS_SIZE   = 1 * RESERVED_CHUNK;
+
+        static size_t const RESERVED_DATA_OFFSET = RESERVED_KEYS_OFFSET +
+                                                   RESERVED_KEYS_SIZE;
+        static size_t const RESERVED_DATA_SIZE   = 4 * RESERVED_CHUNK;
+
+        static size_t const RESERVED_UNRD_OFFSET = RESERVED_DATA_OFFSET +
+                                                   RESERVED_DATA_SIZE;
+        static size_t const RESERVED_UNRD_SIZE   = 3 * RESERVED_CHUNK;
+
+
+        WriteSetOut (const gu::StringBase<>& base_name,
+                     KeySet::Version         kver,
+                     uint16_t                flags    = 0,
+                     WriteSetNG::Version     ver      = WriteSetNG::MAX_VERSION,
+                     DataSet::Version        dver     = DataSet::MAX_VERSION,
+                     DataSet::Version        uver     = DataSet::MAX_VERSION,
+                     size_t                  max_size = WriteSetNG::MAX_SIZE)
             :
+            reserved_(),
             ver_   (ver),
             header_(ver_),
-            keys_  (base_name + "_keys", kver),
-            data_  (base_name + "_data", dver),
-            unrd_  (base_name + "_unrd", uver),
+            keys_  (&reserved_[RESERVED_KEYS_OFFSET],
+                    RESERVED_KEYS_SIZE,
+                    gu::String<256>(base_name) << "_keys", kver),
+            data_  (&reserved_[RESERVED_DATA_OFFSET],
+                    RESERVED_DATA_SIZE,
+                    gu::String<256>(base_name) << "_data", dver),
+            unrd_  (&reserved_[RESERVED_UNRD_OFFSET],
+                    RESERVED_UNRD_SIZE,
+                    gu::String<256>(base_name) << "_unrd", uver),
             left_  (max_size - keys_.size() - data_.size() - unrd_.size()
                     - WriteSetNG::Header::size(ver_)),
             flags_ (flags)
@@ -404,19 +428,18 @@ namespace galera
             return ((data_.count() + keys_.count() + unrd_.count()) == 0);
         }
 
-        typedef std::vector<gu::Buf> BufferVector;
 
         /* !!! This returns header without checksum! *
          *     Use set_last_seen() to finalize it.   */
-        size_t gather(const wsrep_uuid_t&    source,
-                      const wsrep_conn_id_t& conn,
-                      const wsrep_trx_id_t&  trx,
-                      BufferVector&          out)
+        size_t gather(const wsrep_uuid_t&       source,
+                      const wsrep_conn_id_t&    conn,
+                      const wsrep_trx_id_t&     trx,
+                      WriteSetNG::GatherVector& out)
         {
             check_size();
 
-            out.reserve (out.size() + keys_.page_count() + data_.page_count()
-                         + unrd_.page_count() + 1 /* global header */);
+            out->reserve (out->size() + keys_.page_count() + data_.page_count()
+                          + unrd_.page_count() + 1 /* global header */);
 
 
             size_t out_size (header_.gather (ver_,
@@ -446,6 +469,7 @@ namespace galera
 
     private:
 
+        gu::byte_t          reserved_[RESERVED_SIZE];
         WriteSetNG::Version ver_;
         WriteSetNG::Header  header_;
         KeySetOut           keys_;
@@ -556,9 +580,11 @@ namespace galera
             header_.set_seqno (seqno, pa_range);
         }
 
+        typedef gu::Vector<gu::Buf, 8> GatherVector;
+
         /* can return pointer to internal storage: out can be used only
          * within object scope. */
-        size_t gather(std::vector<gu::Buf>& out,
+        size_t gather(GatherVector& out,
                       bool include_keys, bool include_unrd) const;
 
     private:

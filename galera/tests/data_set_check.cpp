@@ -113,7 +113,9 @@ START_TEST (ver0)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    DataSetOut dset_out("data_set_test", DataSet::VER1);
+    gu::byte_t reserved[1024];
+    gu::String<> str("data_set_test");
+    DataSetOut dset_out(reserved, sizeof(reserved), str, DataSet::VER1);
 
     size_t offset(dset_out.size());
 
@@ -144,8 +146,8 @@ START_TEST (ver0)
 
     fail_if (records.size() != size_t(dset_out.count()));
 
-    std::vector<gu::Buf> out_bufs;
-    out_bufs.reserve (dset_out.page_count());
+    DataSetOut::GatherVector out_bufs;
+    out_bufs().reserve (dset_out.page_count());
 
     size_t min_out_size(0);
     for (size_t i = 0; i < records.size(); ++i)
@@ -156,15 +158,15 @@ START_TEST (ver0)
     size_t const out_size (dset_out.gather (out_bufs));
 
     fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs.size() != static_cast<size_t>(dset_out.page_count()),
+    fail_if (out_bufs->size() != static_cast<size_t>(dset_out.page_count()),
              "Expected %zu buffers, got: %zd",
-             dset_out.page_count(), out_bufs.size());
+             dset_out.page_count(), out_bufs->size());
 
     /* concatenate all buffers into one */
     std::vector<gu::byte_t> in_buf;
     in_buf.reserve(out_size);
     mark_point();
-    for (size_t i = 0; i < out_bufs.size(); ++i)
+    for (size_t i = 0; i < out_bufs->size(); ++i)
     {
         fail_if (0 == out_bufs[i].ptr);
 

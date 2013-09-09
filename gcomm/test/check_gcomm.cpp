@@ -4,7 +4,7 @@
 
 #include "check_gcomm.hpp"
 
-#include "gu_string.hpp"
+#include "gu_string_utils.hpp" // strsplit()
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
 

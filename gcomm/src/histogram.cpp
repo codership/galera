@@ -8,7 +8,7 @@
 #include "gcomm/types.hpp"
 
 #include "gu_logger.hpp"
-#include "gu_string.hpp"
+#include "gu_string_utils.hpp" // strsplit()
 
 #include <sstream>
 #include <limits>

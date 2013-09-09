@@ -81,10 +81,14 @@ namespace galera
     {
     public:
 
-        DataSetOut (const std::string& base_name,
-                    DataSet::Version   version)
+        DataSetOut (gu::byte_t*             reserved,
+                    size_t                  reserved_size,
+                    const gu::StringBase<>& base_name,
+                    DataSet::Version        version)
             :
             gu::RecordSetOut<DataSet::RecordOut> (
+                reserved,
+                reserved_size,
                 base_name,
                 check_type      (version),
                 ds_to_rs_version(version)
@@ -111,6 +115,8 @@ namespace galera
 
         DataSet::Version
         version () const { return count() ? version_ : DataSet::EMPTY; }
+
+        typedef gu::RecordSet::GatherVector GatherVector;
 
     private:
 

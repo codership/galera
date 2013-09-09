@@ -20,10 +20,10 @@
 
 #include "gu_logger.hpp"
 
-#include <cstddef>  // for size_t, ptrdiff_t and NULL
-#include <cstdlib>  // for malloc() and free()
+#include <cstddef>  // size_t, ptrdiff_t and NULL
+#include <cstdlib>  // malloc() and free()
 #include <cassert>
-#include <new>      // for placement new and std::bad_alloc
+#include <new>      // placement new and std::bad_alloc
 
 namespace gu
 {

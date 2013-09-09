@@ -62,7 +62,7 @@ WriteSetNG::Header::gather (Version const          ver,
                             const wsrep_uuid_t&    source,
                             const wsrep_conn_id_t& conn,
                             const wsrep_trx_id_t&  trx,
-                            std::vector<gu::Buf>&  out)
+                            GatherVector&          out)
 {
     BOOST_STATIC_ASSERT(MAX_VERSION <= 255);
     BOOST_STATIC_ASSERT(KeySet::MAX_VERSION <= 15);
@@ -95,7 +95,7 @@ WriteSetNG::Header::gather (Version const          ver,
     *tx = gu::htog<uint64_t>(trx);
 
     gu::Buf const buf = { ptr_, size() };
-    out.push_back(buf);
+    out->push_back(buf);
 
     return buf.size;
 }
@@ -283,38 +283,38 @@ WriteSetIn::checksum()
 
 
 size_t
-WriteSetIn::gather(std::vector<gu::Buf>& out,
+WriteSetIn::gather(GatherVector& out,
                    bool include_keys, bool include_unrd) const
 {
     if (include_keys && include_unrd)
     {
         gu::Buf buf = { header_.ptr(), size_ };
-        out.push_back(buf);
+        out->push_back(buf);
         return size_;
     }
     else
     {
-        out.reserve(out.size() + 4);
+        out->reserve(out->size() + 4);
 
         gu::Buf buf(header_.copy(include_keys, include_unrd));
-        out.push_back(buf);
+        out->push_back(buf);
         size_t ret(buf.size);
 
         if (include_keys)
         {
             buf = keys_.buf();
-            out.push_back(buf);
+            out->push_back(buf);
             ret += buf.size;
         }
 
         buf = data_.buf();
-        out.push_back (buf);
+        out->push_back (buf);
         ret += buf.size;
 
         if (include_unrd)
         {
             buf = unrd_.buf();
-            out.push_back(buf);
+            out->push_back(buf);
             ret += buf.size;
         }
 

@@ -2,6 +2,7 @@
  *
  * $Id$
  */
+
 #ifndef __gu_vector_test__
 #define __gu_vector_test__
 

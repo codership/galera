@@ -97,7 +97,7 @@ START_TEST (ver0)
 {
     size_t const MB = 1 << 20;
 
-    // the choice of sizes below is based on default allocator memory page size
+    // the choice of sizes below is based on default allocator memory store size
     // of 4MB. If it is changed, these need to be changed too.
     TestRecord rout0(120,  "abc0");
     TestRecord rout1(121,  "abc1");
@@ -114,7 +114,9 @@ START_TEST (ver0)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    gu::RecordSetOut<TestRecord> rset_out("gu_rset_test",
+    gu::byte_t reserved[1024];
+    gu::String<> str("gu_rset_test");
+    gu::RecordSetOut<TestRecord> rset_out(reserved, sizeof(reserved), str,
                                           gu::RecordSet::CHECK_MMH64,
                                           gu::RecordSet::VER1);
 
@@ -181,8 +183,8 @@ START_TEST (ver0)
 
     fail_if (records.size() != size_t(rset_out.count()));
 
-    std::vector<gu::Buf> out_bufs;
-    out_bufs.reserve (rset_out.page_count());
+    gu::RecordSet::GatherVector out_bufs;
+    out_bufs->reserve (rset_out.page_count());
 
     size_t min_out_size(0);
     for (size_t i = 0; i < records.size(); ++i)
@@ -193,15 +195,15 @@ START_TEST (ver0)
     size_t const out_size (rset_out.gather (out_bufs));
 
     fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs.size() != static_cast<size_t>(rset_out.page_count()),
+    fail_if (out_bufs->size() != static_cast<size_t>(rset_out.page_count()),
              "Expected %zu buffers, got: %zd",
-             rset_out.page_count(), out_bufs.size());
+             rset_out.page_count(), out_bufs->size());
 
     /* concatenate all buffers into one */
     std::vector<gu::byte_t> in_buf;
     in_buf.reserve(out_size);
     mark_point();
-    for (size_t i = 0; i < out_bufs.size(); ++i)
+    for (size_t i = 0; i < out_bufs->size(); ++i)
     {
         fail_if (0 == out_bufs[i].ptr);
 

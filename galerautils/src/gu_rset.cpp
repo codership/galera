@@ -30,11 +30,11 @@ RecordSetOutBase::post_alloc (bool const          new_page,
     if (new_page)
     {
         Buf b = { ptr, size };
-        bufs_.push_back (b);
+        bufs_->push_back (b);
     }
     else
     {
-        bufs_.back().size += size;
+        bufs_->back().size += size;
     }
 
     size_ += size;
@@ -188,20 +188,20 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
 
 
 ssize_t
-RecordSetOutBase::gather (std::vector<Buf>& out)
+RecordSetOutBase::gather (GatherVector& out)
 {
     if (count_)
     {
         byte_t* const ptr =
-            reinterpret_cast<byte_t*>(const_cast<void*>(bufs_.front().ptr));
+            reinterpret_cast<byte_t*>(const_cast<void*>(bufs_->front().ptr));
 
-        ssize_t const offset = write_header (ptr, bufs_.front().size);
+        ssize_t const offset = write_header (ptr, bufs_->front().size);
 
-        bufs_.front().ptr   = ptr + offset;
-        bufs_.front().size -= offset;
+        bufs_->front().ptr   = ptr + offset;
+        bufs_->front().size -= offset;
         // size_ is taken care of in write_header()
 
-        out.insert (out.end(), bufs_.begin(), bufs_.end());
+        out->insert (out->end(), bufs_->begin(), bufs_->end());
 
         return size_;
     }
@@ -210,6 +210,7 @@ RecordSetOutBase::gather (std::vector<Buf>& out)
         return 0;
     }
 }
+
 
 RecordSet::RecordSet (Version ver, CheckType const ct)
     :
@@ -225,11 +226,13 @@ RecordSet::RecordSet (Version ver, CheckType const ct)
 }
 
 
-RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
-                                    CheckType const    ct,
-                                    Version const      version
+RecordSetOutBase::RecordSetOutBase (byte_t*                 reserved,
+                                    size_t                  reserved_size,
+                                    const gu::StringBase<>& base_name,
+                                    CheckType const         ct,
+                                    Version const           version
 #ifdef GU_RSET_CHECK_SIZE
-                                    ,ssize_t const     max_size
+                                    ,ssize_t const          max_size
 #endif
     )
 :
@@ -237,7 +240,7 @@ RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
 #ifdef GU_RSET_CHECK_SIZE
     max_size_   (max_size),
 #endif
-    alloc_      (base_name),
+    alloc_      (reserved, reserved_size, base_name),
     check_      (),
     bufs_       (),
     prev_stored_(true)
@@ -249,7 +252,7 @@ RecordSetOutBase::RecordSetOutBase (const std::string& base_name,
     byte_t* ptr = alloc_.alloc (size_, unused);
 
     Buf b = { ptr, size_ };
-    bufs_.push_back (b);
+    bufs_->push_back (b);
 }
 
 
@@ -303,16 +306,6 @@ header_check_type(RecordSet::Version ver, const byte_t* ptr, ssize_t const size)
     gu_throw_error (EPROTO) << "Unsupported RecordSet version: " << ver;
 }
 
-#if REMOVE
-RecordSet::RecordSet (const byte_t* const ptr, ssize_t const size)
-    :
-    version_   ((ptr && size) ? header_version (ptr, size) : EMPTY),
-    check_type_(version_ != EMPTY ?
-                header_check_type (version_, ptr, size) : CHECK_NONE),
-    size_      (0),
-    count_     (0)
-{}
-#endif // REMOVE
 
 void
 RecordSet::init (const byte_t* const ptr, ssize_t const size)
@@ -328,6 +321,7 @@ RecordSet::init (const byte_t* const ptr, ssize_t const size)
         check_type_ = header_check_type (version_, ptr, size);
     }
 }
+
 
 void
 RecordSetInBase::parse_header_v1 (size_t const size)

@@ -20,7 +20,7 @@
 #include "gu_macros.hpp"
 #include "gu_utils.hpp"
 #include "gu_convert.hpp"
-#include "gu_string.hpp"
+//#include "gu_string.hpp"
 #include "gu_config.hpp"
 #include "gu_prodcons.hpp"
 

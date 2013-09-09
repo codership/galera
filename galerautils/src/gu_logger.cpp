@@ -12,7 +12,7 @@
 #include <sys/time.h>
 
 #include "gu_logger.hpp"
-#include "gu_string.hpp"
+#include "gu_string_utils.hpp" // strsplit
 
 #include <string>
 #include <vector>
@@ -39,9 +39,9 @@ namespace gu
                 set_filter(::getenv("LOGGER_DEBUG_FILTER"));
             }
         }
-        
+
         ~DebugFilter() {}
-        
+
         void set_filter(const string& str)
         {
             vector<string> dvec = gu::strsplit(str, ',');
@@ -60,7 +60,7 @@ namespace gu
                 filter.find(str.substr(0, str.find_first_of(":"))) != filter.end();
         }
     };
-    
+
     static DebugFilter debug_filter;
 
     void

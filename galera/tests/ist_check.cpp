@@ -261,7 +261,7 @@ static void test_ist_common(int const version)
         }
         else
         {
-            std::vector<gu::Buf> bufs;
+            galera::WriteSetNG::GatherVector bufs;
             ssize_t trx_size(trx->write_set_out().gather(trx->source_id(),
                                                          trx->conn_id(),
                                                          trx->trx_id(),
@@ -271,7 +271,7 @@ static void test_ist_common(int const version)
 
             /* concatenate buffer vector */
             gu::byte_t* p(ptr);
-            for (size_t k(0); k < bufs.size(); ++k)
+            for (size_t k(0); k < bufs->size(); ++k)
             {
                 ::memcpy(p, bufs[k].ptr, bufs[k].size); p += bufs[k].size;
             }

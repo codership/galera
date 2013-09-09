@@ -13,9 +13,7 @@
 
 #include "check_gcomm.hpp"
 
-#include "gu_string.hpp"
 #include "gu_logger.hpp"
-
 
 #include <vector>
 #include <limits>

@@ -11,6 +11,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_serialize.hpp"
+#include "gu_vector.hpp"
 
 //
 // Sender                            Receiver
@@ -426,9 +427,9 @@ namespace galera
                         gu::Buf tmp = { buffer.ptr(), buffer.size() };
                         ws.read_buf (tmp, 0);
 
-                        std::vector<gu::Buf> out;
+                        WriteSetIn::GatherVector out;
                         payload_size = ws.gather (out, false, false);
-                        assert (2 == out.size());
+                        assert (2 == out->size());
                         cbs[1] = asio::const_buffer(out[0].ptr, out[0].size);
                         cbs[2] = asio::const_buffer(out[1].ptr, out[1].size);
                     }
