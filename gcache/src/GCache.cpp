@@ -106,6 +106,12 @@ void* gcache_realloc (gcache_t* gc, void* ptr, size_t size)
     return gcache->realloc (ptr, size);
 }
 
+int64_t gcache_seqno_min (gcache_t* gc)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    return gcache->seqno_min ();
+}
+
 #if DEPRECATED
 void  gcache_seqno_init   (gcache_t* gc, int64_t seqno)
 {
