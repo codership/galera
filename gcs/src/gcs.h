@@ -398,7 +398,7 @@ typedef struct gcs_act_conf {
     int              repl_proto_ver; //! replicator  protocol version to use
     int              appl_proto_ver; //! application protocol version to use
     char             data[1];  /*! member array (null-terminated ID, name,
-                                *  incoming address) */
+                                *  incoming address, 8-byte cached seqno) */
 } gcs_act_conf_t;
 
 struct gcs_stats

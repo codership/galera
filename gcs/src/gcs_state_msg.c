@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -11,7 +11,7 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_MSG_VER 2
+#define GCS_STATE_MSG_VER 3
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.h"
@@ -23,7 +23,8 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       const gu_uuid_t* prim_uuid,
                       gcs_seqno_t      prim_seqno,
                       gcs_seqno_t      received,
-                      long             prim_joined,
+                      gcs_seqno_t      cached,
+                      int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
                       const char*      name,
@@ -55,6 +56,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->prim_joined   = prim_joined;
         ret->prim_seqno    = prim_seqno;
         ret->received      = received;
+        ret->cached        = cached;
         ret->prim_state    = prim_state;
         ret->current_state = current_state;
         ret->version       = GCS_STATE_MSG_VER;
@@ -101,7 +103,10 @@ gcs_state_msg_len (gcs_state_msg_t* state)
         sizeof (int64_t)     +   // prim_seqno
         strlen (state->name) + 1 +
         strlen (state->inc_addr) + 1 +
-        sizeof (uint8_t)         // appl_proto_ver (in preparation for V1)
+// V1-2 stuff
+        sizeof (uint8_t)     +   // appl_proto_ver (in preparation for V1)
+// V3 stuff
+        sizeof (int64_t)         // cached
         );
 }
 
@@ -125,8 +130,9 @@ ssize_t
 gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
 {
     STATE_MSG_FIELDS_V0(,buf);
-    char*     inc_addr  = name + strlen (state->name) + 1;
+    char*     inc_addr       = name + strlen (state->name) + 1;
     uint8_t*  appl_proto_ver = (void*)(inc_addr + strlen(state->inc_addr) + 1);
+    int64_t*  cached         = (int64_t*)(appl_proto_ver + 1);
 
     *version        = GCS_STATE_MSG_VER;
     *flags          = state->flags;
@@ -143,21 +149,33 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
+    *cached         = htog64(state->cached);
 
-    return (appl_proto_ver + 1 - (uint8_t*)buf);
+    return ((uint8_t*)(cached + 1) - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
 gcs_state_msg_t*
-gcs_state_msg_read (const void* buf, size_t buf_len)
+gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
 {
+    assert (buf_len > 0);
+
     /* beginning of the message is always version 0 */
     STATE_MSG_FIELDS_V0(const,buf);
     const char* inc_addr = name + strlen (name) + 1;
 
-    int appl_proto_ver = 0;
+    int      appl_proto_ver = 0;
+    uint8_t* appl_ptr = (uint8_t*)(inc_addr + strlen(inc_addr) + 1);
     if (*version >= 1) {
-        appl_proto_ver = *(uint8_t*)(inc_addr + strlen(inc_addr) + 1);
+        assert(buf_len >= (uint8_t*)(appl_ptr + 1) - (uint8_t*)buf);
+        appl_proto_ver = *appl_ptr;
+    }
+
+    int64_t  cached = GCS_SEQNO_ILL;
+    int64_t* cached_ptr = (int64_t*)(appl_ptr + 1);
+    if (*version >= 3) {
+        assert(buf_len >= (uint8_t*)(cached_ptr + 1) - (uint8_t*)buf);
+        cached = gtoh64(*cached_ptr);
     }
 
     gcs_state_msg_t* ret = gcs_state_msg_create (
@@ -166,6 +184,7 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
         prim_uuid,
         gtoh64(*prim_seqno),
         gtoh64(*received),
+        cached,
         gtoh16(*prim_joined),
         *prim_state,
         *curr_state,
@@ -189,14 +208,15 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
     str[size - 1] = '\0'; // preventive termination
     return snprintf (str, size - 1,
                      "\n\tVersion      : %d"
-                     "\n\tFlags        : %u"
+                     "\n\tFlags        : %#02hhx"
                      "\n\tProtocols    : %d / %d / %d"
                      "\n\tState        : %s"
                      "\n\tPrim state   : %s"
                      "\n\tPrim UUID    : "GU_UUID_FORMAT
-                     "\n\tPrim seqno   : %lld"
-                     "\n\tLast seqno   : %lld"
-                     "\n\tPrim JOINED  : %ld"
+                     "\n\tPrim  seqno  : %lld"
+                     "\n\tFirst seqno  : %lld"
+                     "\n\tLast  seqno  : %lld"
+                     "\n\tPrim JOINED  : %d"
                      "\n\tState UUID   : "GU_UUID_FORMAT
                      "\n\tGroup UUID   : "GU_UUID_FORMAT
                      "\n\tName         : '%s'"
@@ -209,6 +229,7 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      gcs_node_state_to_str(state->prim_state),
                      GU_UUID_ARGS(&state->prim_uuid),
                      (long long)state->prim_seqno,
+                     (long long)state->cached,
                      (long long)state->received,
                      state->prim_joined,
                      GU_UUID_ARGS(&state->state_uuid),
@@ -237,6 +258,13 @@ gcs_seqno_t
 gcs_state_msg_received (const gcs_state_msg_t* state)
 {
     return state->received;
+}
+
+/* Get first cached action seqno */
+gcs_seqno_t
+gcs_state_msg_cached (const gcs_state_msg_t* state)
+{
+    return state->cached;
 }
 
 /* Get current node state */
@@ -329,7 +357,7 @@ state_report_uuids (char* buf, size_t buf_len,
             int written = gcs_state_msg_snprintf (buf, buf_len, states[j]);
             buf     += written;
             buf_len -= written;
-        }        
+        }
     }
 }
 
@@ -345,7 +373,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
                       gcs_state_quorum_t*    quorum)
 {
     /* They all must have the same group_uuid or otherwise quorum is impossible.
-     * Of those we need to find at least one that has complete state - 
+     * Of those we need to find at least one that has complete state -
      * status >= GCS_STATE_JOINED. If we find none - configuration is
      * non-primary.
      * Of those with the status >= GCS_STATE_JOINED we choose the most
@@ -693,7 +721,7 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
 #endif // 0
 
 /* Get quorum decision from state messages */
-long 
+long
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
                           long                   states_num,
                           gcs_state_quorum_t*    quorum)

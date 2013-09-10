@@ -1,4 +1,4 @@
-/* Copyright (C) 2011 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_GCS_HPP_
 #define _GARB_GCS_HPP_
@@ -14,6 +14,7 @@ class Gcs
 public:
 
     Gcs (gu::Config&        conf,
+         const std::string& name,
          const std::string& address,
          const std::string& group);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -798,6 +798,17 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
 }
 
+static inline bool
+group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
+{
+    if (group->quorum.version < 3) {
+        return strcmp (node->name, GCS_ARBITRATOR_NAME);
+    }
+    else {
+        return ((gcs_node_flags(node) & GCS_STATE_ARBITRATOR) == 0);
+    }
+}
+
 static int
 group_find_node_by_state (gcs_group_t*     const group,
                           int              const joiner_idx,
@@ -814,8 +825,7 @@ group_find_node_by_state (gcs_group_t*     const group,
 
         gcs_node_t* node = &group->nodes[idx];
 
-        if (node->status >= status &&
-            strcmp (node->name, GCS_ARBITRATOR_NAME)) /* avoid arbitrator */
+        if (node->status >= status && group_node_is_stateful (group, node))
             donor = idx; /* potential donor */
 
         if (segment == node->segment) {
@@ -1086,6 +1096,7 @@ group_memb_record_size (gcs_group_t* group)
         ret += strlen(group->nodes[idx].id) + 1;
         ret += strlen(group->nodes[idx].name) + 1;
         ret += strlen(group->nodes[idx].inc_addr) + 1;
+        ret += sizeof(gcs_seqno_t); // cached seqno
     }
 
     return ret;
@@ -1134,6 +1145,9 @@ gcs_group_act_conf (gcs_group_t*    group,
                 ptr += strlen(ptr) + 1;
                 strcpy (ptr, group->nodes[idx].inc_addr);
                 ptr += strlen(ptr) + 1;
+                gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
+                memcpy(ptr, &cached, sizeof(cached));
+                ptr += sizeof(cached);
             }
         }
         else {
@@ -1156,15 +1170,23 @@ gcs_group_act_conf (gcs_group_t*    group,
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)
 static gcs_state_msg_t*
-group_get_node_state (gcs_group_t* group, long node_idx)
+group_get_node_state (gcs_group_t* const group, long const node_idx)
 {
-    const gcs_node_t* node = &group->nodes[node_idx];
+    const gcs_node_t* const node = &group->nodes[node_idx];
 
     uint8_t flags = 0;
 
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
     if (node->bootstrap)          flags |= GCS_STATE_FBOOTSTRAP;
+#ifdef GCS_FOR_GARB
+    flags |= GCS_STATE_ARBITRATOR;
+
+    int64_t const cached = GCS_SEQNO_ILL;
+#else
+    int64_t const cached = /* group->cache check is needed for unit tests */
+        group->cache ? gcache_seqno_min(group->cache) : GCS_SEQNO_ILL;
+#endif /* GCS_FOR_GARB */
 
     return gcs_state_msg_create (
         &group->state_uuid,
@@ -1172,6 +1194,7 @@ group_get_node_state (gcs_group_t* group, long node_idx)
         &group->prim_uuid,
         group->prim_seqno,
         group->act_id,
+        cached,
         group->prim_num,
         group->prim_state,
         node->status,

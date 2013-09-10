@@ -1,7 +1,8 @@
-/* Copyright (C) 2011 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
+#include "gcs.h"
 
 #include <wsrep_api.h>
 
@@ -18,6 +19,7 @@ namespace garb
 
 Config::Config (int argc, char* argv[])
     : daemon_  (false),
+      name_    (GCS_ARBITRATOR_NAME),
       address_ (),
       group_   ("my_test_cluster"),
       sst_     (DEFAULT_SST),
@@ -36,6 +38,7 @@ Config::Config (int argc, char* argv[])
     po::options_description config ("Configuration");
     config.add_options()
         ("daemon,d", "Become daemon")
+        ("name,n",   po::value<std::string>(&name_),    "Node name")
         ("address,a",po::value<std::string>(&address_), "Group address")
         ("group,g",  po::value<std::string>(&group_),   "Group name")
         ("sst",      po::value<std::string>(&sst_),     "SST request string")
@@ -124,6 +127,7 @@ Config::Config (int argc, char* argv[])
 std::ostream& operator << (std::ostream& os, const Config& c)
 {
     os << "\n\tdaemon:  " << c.daemon()
+       << "\n\tname:    " << c.name()
        << "\n\taddress: " << c.address()
        << "\n\tgroup:   " << c.group()
        << "\n\tsst:     " << c.sst()

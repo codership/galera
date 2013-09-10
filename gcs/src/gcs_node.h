@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -41,7 +41,6 @@ struct gcs_node
     const gcs_state_msg_t* state_msg;// state message
 
     gcs_seqno_t      last_applied; // last applied action on that node
-//    long           queue_len;    // action queue length on that node
     int              gcs_proto_ver;// supported protocol versions
     int              repl_proto_ver;
     int              appl_proto_ver;
@@ -131,13 +130,30 @@ extern void
 gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum);
 
 static inline gcs_node_state_t
-gcs_node_get_status (gcs_node_t* node)
+gcs_node_get_status (const gcs_node_t* node)
 {
     return node->status;
 }
 
+static inline gcs_seqno_t
+gcs_node_cached (const gcs_node_t* node)
+{
+    /* node->state_msg check is needed in NON-PRIM situations, where no
+     * state message exchange happens */
+    if (node->state_msg)
+        return gcs_state_msg_cached(node->state_msg);
+    else
+        return GCS_SEQNO_ILL;
+}
+
+static inline uint8_t
+gcs_node_flags (const gcs_node_t* node)
+{
+    return gcs_state_msg_flags(node->state_msg);
+}
+
 static inline bool
-gcs_node_is_joined (gcs_node_state_t st)
+gcs_node_is_joined (const gcs_node_state_t st)
 {
     return (st >= GCS_NODE_STATE_DONOR);
 }

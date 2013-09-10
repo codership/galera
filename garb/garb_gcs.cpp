@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2013 Codership Oy <info@codership.com>
  */
 
 #include "garb_gcs.hpp"
@@ -11,12 +11,16 @@ static int const REPL_PROTO_VER(127);
 static int const APPL_PROTO_VER(127);
 
 Gcs::Gcs (gu::Config&        gconf,
+          const std::string& name,
           const std::string& address,
           const std::string& group)
 :
     closed_ (true),
-    gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf), NULL,
-                      GCS_ARBITRATOR_NAME, "", REPL_PROTO_VER, APPL_PROTO_VER))
+    gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf),
+                      NULL,
+                      name.c_str(),
+                      "",
+                      REPL_PROTO_VER, APPL_PROTO_VER))
 {
     if (!gcs_)
     {

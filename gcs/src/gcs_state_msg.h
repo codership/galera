@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -22,6 +22,7 @@
 #define GCS_STATE_FREP       0x01 // group representative
 #define GCS_STATE_FCLA       0x02 // count last applied (for JOINED node)
 #define GCS_STATE_FBOOTSTRAP 0x04 // part of prim bootstrap process
+#define GCS_STATE_ARBITRATOR 0x08 // arbitrator or otherwise incomplete node
 
 #ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg
@@ -31,15 +32,16 @@ typedef struct gcs_state_msg
     gu_uuid_t        prim_uuid;     // last PC state UUID
     gcs_seqno_t      prim_seqno;    // last PC state seqno
     gcs_seqno_t      received;      // last action seqno (received up to)
-    long             prim_joined;   // number of joined nodes in its last PC
-    gcs_node_state_t prim_state;    // state of the node in its last PC
-    gcs_node_state_t current_state; // current state of the node
+    gcs_seqno_t      cached;        // earliest action cached
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
     int              version;       // version of state message
     int              gcs_proto_ver;
     int              repl_proto_ver;
     int              appl_proto_ver;
+    int              prim_joined;   // number of joined nodes in its last PC
+    gcs_node_state_t prim_state;    // state of the node in its last PC
+    gcs_node_state_t current_state; // current state of the node
     uint8_t          flags;
 }
 gcs_state_msg_t;
@@ -50,10 +52,10 @@ typedef struct gcs_state_msg gcs_state_msg_t;
 /*! Quorum decisions */
 typedef struct gcs_state_quorum
 {
-    gu_uuid_t   group_uuid;     //! group UUID
-    gcs_seqno_t act_id;         //! next global seqno
-    gcs_seqno_t conf_id;        //! configuration id
-    bool        primary;        //! primary configuration or not
+    gu_uuid_t   group_uuid;   //! group UUID
+    gcs_seqno_t act_id;       //! next global seqno
+    gcs_seqno_t conf_id;      //! configuration id
+    bool        primary;      //! primary configuration or not
     int         version;      //! state excahnge version (max understood by all)
     int         gcs_proto_ver;
     int         repl_proto_ver;
@@ -75,7 +77,8 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       const gu_uuid_t* prim_uuid,
                       gcs_seqno_t      prim_seqno,
                       gcs_seqno_t      received,
-                      long             prim_joined,
+                      gcs_seqno_t      cached,
+                      int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
                       const char*      name,
@@ -98,7 +101,7 @@ gcs_state_msg_write (void* msg, const gcs_state_msg_t* state);
 
 /* De-serialize gcs_state_msg_t from message */
 extern gcs_state_msg_t*
-gcs_state_msg_read (const void* msg, size_t msg_len);
+gcs_state_msg_read (const void* msg, ssize_t msg_len);
 
 /* Get state uuid */
 extern const gu_uuid_t*
@@ -115,6 +118,10 @@ gcs_state_msg_group_uuid (const gcs_state_msg_t* state);
 /* Get last received action seqno */
 extern gcs_seqno_t
 gcs_state_msg_received (const gcs_state_msg_t* state);
+
+/* Get last received action seqno */
+extern gcs_seqno_t
+gcs_state_msg_cached (const gcs_state_msg_t* state);
 
 /* Get current node state */
 extern gcs_node_state_t
@@ -148,7 +155,7 @@ gcs_state_msg_flags (const gcs_state_msg_t* state);
  * @param[in]  states      array of state message pointers
  * @param[in]  states_num  length of array
  * @param[out] quorum      quorum calculations result
- * @retval 0 if there were no errors during processing. Quorum results are in 
+ * @retval 0 if there were no errors during processing. Quorum results are in
  *         quorum parameter */
 extern long
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],

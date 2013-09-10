@@ -17,8 +17,10 @@ docs/
 Documentation is dual licensed with the Creative Commons Attribution ShareAlike
 and GNU Free Documentation Licenses. See docs/COPYING for details.
 
-Following modules have their own, different licenses:
+Following modules have their own authors and licenses:
 
 asio/
 see asio/COPYING for details
 
+chromium/
+see chromium/LICENSE for details

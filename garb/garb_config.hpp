@@ -1,4 +1,4 @@
-/* Copyright (C) 2011 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_CONFIG_HPP_
 #define _GARB_CONFIG_HPP_
@@ -21,6 +21,7 @@ public:
     ~Config () {}
 
     bool               daemon()  const { return daemon_ ; }
+    const std::string& name()    const { return name_   ; }
     const std::string& address() const { return address_; }
     const std::string& group()   const { return group_  ; }
     const std::string& sst()     const { return sst_    ; }
@@ -32,6 +33,7 @@ public:
 private:
 
     bool        daemon_;
+    std::string name_;
     std::string address_;
     std::string group_;
     std::string sst_;

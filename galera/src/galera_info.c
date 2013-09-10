@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2013 Codership Oy <info@codership.com>
 
 #include "galera_info.h"
 #include <galerautils.h>
@@ -48,6 +48,8 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
             strncpy(member->incoming, str, sizeof(member->incoming) - 1);
             member->incoming[sizeof(member->incoming) - 1] = '\0';
             str = str + strlen(str) + 1;
+
+            str += sizeof(gcs_seqno_t); // skip cached seqno.
         }
     }
 
