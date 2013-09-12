@@ -84,7 +84,7 @@ test_function(void)
 
     CRC_APPEND(tail);
 
-    uint32_t ret = gu_crc32c_get (&crc);
+    uint32_t ret = gu_crc32c_get (crc);
 
     fail_if (ret != output, "Generated %#08x, expected %#08x\n", ret, output);
 }

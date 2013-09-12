@@ -84,12 +84,12 @@ arch = ARGUMENTS.get('arch', machine)
 print 'Target: ' + sysname + ' ' + arch
 
 if arch == 'i386' or arch == 'i686':
-    compile_arch = ' -m32 -march=i686'
+    compile_arch = ' -m32 -march=i686 -msse4'
     link_arth    = compile_arch
     if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86_64' or arch == 'amd64':
-    compile_arch = ' -m64'
+    compile_arch = ' -m64 -msse4'
     link_arth    = compile_arch
     if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_x86_64'

@@ -56,8 +56,6 @@ protected:
 
 private:
 
-    char size_; // max digest size in bytes. cannot be more than 32
-
     virtual void     my_append   (const void* in, size_t size) = 0;
 
     virtual int      my_gather   (void* out, size_t size) const = 0;
@@ -74,6 +72,8 @@ private:
     {
         return my_gather (buf, size);
     }
+
+    char size_; // max digest size in bytes. cannot be more than 32
 };
 
 template <> inline int
@@ -103,6 +103,14 @@ Digest::gather<4> (void* const out) const
     *(reinterpret_cast<uint32_t*>(out)) = htog32 (my_gather4()); return 4;
 }
 
+/* This pragma push is needed because GCC somehow managed to see virtual
+ * functions in MMH3 and demanded a virtual destructor there. */
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#endif
 
 class MMH3 : public Digest
 {
@@ -110,7 +118,12 @@ public:
 
     MMH3 () : Digest(16), ctx_() { gu_mmh128_init (&ctx_); }
 
-    virtual ~MMH3 () {}
+    /* This had to be made virtual due to
+     * error: 'class gu::MMH3' has virtual functions and accessible non-virtual
+     * destructor [-Werror=non-virtual-dtor]
+     *
+     * God only knows where I have virtual functions here. */
+    ~MMH3 () {}
 
     template <typename T> static int
     digest (const void* const in, size_t size, T& out)
@@ -145,13 +158,7 @@ private:
         gu_mmh128_append (&ctx_, buf, size);
     }
 
-    void     my_gather16 (void* const buf) const { gu_mmh128_get (&ctx_, buf); }
-
-    uint64_t my_gather8() const { return gu_mmh128_get64 (&ctx_);}
-
-    uint32_t my_gather4() const { return gu_mmh128_get32 (&ctx_);}
-
-    int      my_gather (void* const buf, size_t const size) const
+    int  my_gather (void* const buf, size_t const size) const
     {
         byte_t tmp[16];
         my_gather16 (tmp);
@@ -159,6 +166,12 @@ private:
         ::memcpy (buf, tmp, s);
         return s;
     }
+
+    void     my_gather16 (void* const buf) const { gu_mmh128_get (&ctx_, buf); }
+
+    uint64_t my_gather8() const { return gu_mmh128_get64 (&ctx_); }
+
+    uint32_t my_gather4() const { return gu_mmh128_get32 (&ctx_); }
 };
 
 template <> inline int
@@ -187,6 +200,11 @@ MMH3::digest (const void* const in, size_t size, uint64_t& out)
 
 typedef MMH3 Hash;
 
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#endif
 
 class FastHash
 {
@@ -240,8 +258,6 @@ FastHash::digest (const void* const in, size_t size, uint64_t& out)
 {
     out = gu_fast_hash64(in, size);  return sizeof(out);
 }
-
-typedef FastHash CRC;
 
 } /* namespace gu */
 

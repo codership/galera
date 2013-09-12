@@ -63,6 +63,7 @@ namespace
         }
         conf.set(gcomm::Conf::SocketSslCompression, compression);
     }
+
 }
 
 
@@ -95,8 +96,11 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     ssl_context_(io_service_, asio::ssl::context::sslv23),
 #endif // HAVE_ASIO_SSL_HPP
     mtu_(1 << 15),
-    checksum_(true)
+    checksum_(NetHeader::checksum_type(
+                  conf.get<int>(gcomm::Conf::SocketChecksum,
+                                NetHeader::CS_CRC32C)))
 {
+    conf.set(gcomm::Conf::SocketChecksum, checksum_);
 #ifdef HAVE_ASIO_SSL_HPP
     // use ssl if either private key or cert file is specified
     bool use_ssl(conf_.has(Conf::SocketSslPrivateKeyFile)    == true ||

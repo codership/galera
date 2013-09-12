@@ -323,12 +323,11 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         return ENOTCONN;
     }
 
-
-
     NetHeader hdr(static_cast<uint32_t>(dg.len()), net_.version_);
-    if (net_.checksum_ == true)
+
+    if (net_.checksum_ != NetHeader::CS_NONE)
     {
-        hdr.set_crc32(crc32(dg));
+        hdr.set_crc32(crc32(net_.checksum_, dg), net_.checksum_);
     }
 
     send_q_.push_back(dg); // makes copy of dg
@@ -409,23 +408,25 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                     new gu::Buffer(&recv_buf_[0] + NetHeader::serial_size_,
                                    &recv_buf_[0] + NetHeader::serial_size_
                                    + hdr.len())));
-            if (net_.checksum_ == true)
+            if (net_.checksum_ != NetHeader::CS_NONE)
             {
 #ifdef TEST_NET_CHECKSUM_ERROR
                 long rnd(rand());
                 if (rnd % 10000 == 0)
                 {
-                    hdr.set_crc32(static_cast<uint32_t>(rnd));
+                    hdr.set_crc32(net_.checksum_, static_cast<uint32_t>(rnd));
                 }
 #endif /* TEST_NET_CHECKSUM_ERROR */
 
-                if ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
-                    (hdr.has_crc32() == false && hdr.crc32() != 0))
+                if (check_cs (hdr, dg))
                 {
                     log_warn << "checksum failed, hdr: len=" << hdr.len()
-                             << " has_crc32=" << hdr.has_crc32()
+                             << " has_crc32="  << hdr.has_crc32()
+                             << " has_crc32c=" << hdr.has_crc32c()
                              << " crc32=" << hdr.crc32();
-                    FAILED_HANDLER(asio::error_code(EPROTO, asio::error::system_category));
+                    FAILED_HANDLER(asio::error_code(
+                                       EPROTO,
+                                       asio::error::system_category));
                     return;
                 }
             }

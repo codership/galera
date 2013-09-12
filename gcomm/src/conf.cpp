@@ -27,6 +27,8 @@ std::string const gcomm::Conf::SocketSslCipherList =
     "socket" + Delim + "ssl_cipher";
 std::string const gcomm::Conf::SocketSslCompression =
     "socket" + Delim + "ssl_compression";
+std::string const gcomm::Conf::SocketChecksum =
+    "socket" + Delim + "checksum";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";

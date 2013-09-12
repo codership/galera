@@ -65,12 +65,8 @@ protected:
     RecordSet (Version const version, CheckType const ct);
 
     /* ctor for RecordSetIn */
-#if REMOVE
-    RecordSet (const byte_t* buf, ssize_t size);
-#else
     RecordSet ()
         : version_(EMPTY), check_type_(CHECK_NONE), size_(0), count_(0) {}
-#endif
 
     void init (const byte_t* buf, ssize_t size);
 

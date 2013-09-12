@@ -101,6 +101,14 @@ namespace gcomm
         static std::string const SocketSslCompression;
 
         /*!
+         * @brief Algorithm for message checksums:
+         * 0 - none    (backward compatible)
+         * 1 - CRC-32  (backward compatible)
+         * 2 - CRC-32C (optimized and potentially HW-accelerated on Intel CPUs)
+         */
+        static std::string const SocketChecksum;
+
+        /*!
          * @brief GMCast scheme for transport URI ("gmcast")
          */
         static std::string const GMCastScheme;

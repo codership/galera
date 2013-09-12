@@ -50,6 +50,7 @@ START_TEST(test_gmcast_w_user_messages)
         Protostack pstack_;
         User(const User&);
         void operator=(User&);
+
     public:
 
         User(Protonet& pnet,
@@ -140,14 +141,12 @@ START_TEST(test_gmcast_w_user_messages)
             recvd_ = val;
         }
 
-
         Protostack& pstack() { return pstack_; }
 
         std::string listen_addr() const
         {
             return tp_->listen_addr();
         }
-
     };
 
     log_info << "START";
@@ -159,7 +158,6 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "u1 start";
     u1.start();
-
 
     pnet->event_loop(Sec/10);
 

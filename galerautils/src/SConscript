@@ -4,6 +4,7 @@ libgalerautils_env = env.Clone()
 
 # C part
 libgalerautils_sources = [
+    '#/www.evanjones.ca/crc32c.c',
     'gu_abort.c',
     'gu_dbug.c',
     'gu_fifo.c',
@@ -12,6 +13,7 @@ libgalerautils_sources = [
     'gu_mem.c',
     'gu_mmh3.c',
     'gu_spooky.c',
+    'gu_crc32c.c',
     'gu_rand.c',
     'gu_mutex.c',
     'gu_hexdump.c',
@@ -20,7 +22,8 @@ libgalerautils_sources = [
     'gu_uuid.c',
     'gu_backtrace.c',
     'gu_limits.c',
-    'gu_time.c'
+    'gu_time.c',
+    'gu_init.c'
 ]
 
 libgalerautils_env.StaticLibrary('galerautils', libgalerautils_sources)

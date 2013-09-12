@@ -26,7 +26,6 @@ namespace gcomm
     class AsioProtonet;
 }
 
-
 class gcomm::AsioProtonet : public gcomm::Protonet
 {
 public:
@@ -63,10 +62,10 @@ private:
     asio::deadline_timer        timer_;
 #ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::context          ssl_context_;
-#endif // HAVE_ASIO_SSL_HPP
+#endif /* HAVE_ASIO_SSL_HPP */
     size_t                      mtu_;
-    bool                        checksum_;
 
+    NetHeader::checksum_t       checksum_;
 };
 
 #endif // GCOMM_ASIO_PROTONET_HPP

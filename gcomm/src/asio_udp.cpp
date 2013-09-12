@@ -137,10 +137,12 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
     Critical<AsioProtonet> crit(net_);
     boost::array<asio::const_buffer, 3> cbs;
     NetHeader hdr(dg.len(), net_.version_);
-    if (net_.checksum_ == true)
+
+    if (net_.checksum_ != NetHeader::CS_NONE)
     {
-        hdr.set_crc32(crc32(dg));
+        hdr.set_crc32(crc32(net_.checksum_, dg), net_.checksum_);
     }
+
     gu::byte_t buf[NetHeader::serial_size_];
     serialize(hdr, buf, sizeof(buf), 0);
     cbs[0] = asio::const_buffer(buf, sizeof(buf));
@@ -195,12 +197,11 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
                     new gu::Buffer(&recv_buf_[0] + NetHeader::serial_size_,
                                    &recv_buf_[0] + NetHeader::serial_size_
                                    + hdr.len())));
-            if (net_.checksum_ == true &&
-                ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
-                 (hdr.has_crc32() == false && hdr.crc32() != 0)))
+            if (net_.checksum_ == true && check_cs(hdr, dg))
             {
                 log_warn << "checksum failed, hdr: len=" << hdr.len()
-                         << " has_crc32=" << hdr.has_crc32()
+                         << " has_crc32="  << hdr.has_crc32()
+                         << " has_crc32c=" << hdr.has_crc32c()
                          << " crc32=" << hdr.crc32();
             }
             else

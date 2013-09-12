@@ -12,6 +12,7 @@
 
 #include "replicator.hpp"
 
+#include "gu_init.h"
 #include "GCache.hpp"
 #include "gcs.hpp"
 #include "monitor.hpp"
@@ -368,13 +369,13 @@ namespace galera
                                      const void*         sst_req,
                                      ssize_t             sst_req_len);
 
-        class Logger
+        class InitLib /* Library initialization routines */
         {
         public:
-            Logger (gu_log_cb_t cb) { gu_conf_set_log_callback(cb); }
+            InitLib (gu_log_cb_t cb) { gu_init(cb); }
         };
 
-        Logger                 logger_;
+        InitLib                init_lib_;
         gu::Config             config_;
 
         struct SetDefaults

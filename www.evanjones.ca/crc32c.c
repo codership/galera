@@ -21,6 +21,10 @@
  * Concatenated crc32ctables.cc and crc32c.cc and stripped off C++ garbage.
  */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include "crc32c.h"
 
 #include <stdbool.h>
@@ -769,3 +773,7 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
 }
 
 #endif /* ARCH_x86 */
+
+#if defined(__cplusplus)
+}
+#endif

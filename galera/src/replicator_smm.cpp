@@ -120,7 +120,7 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 
 galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
-    logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
+    init_lib_           (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults, args->node_address),
     str_proto_ver_      (-1),

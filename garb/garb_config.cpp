@@ -1,5 +1,6 @@
 /* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
+#include "gu_crc32c.h"
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
 #include "gcs.h"
@@ -122,6 +123,8 @@ Config::Config (int argc, char* argv[])
         gu_conf_self_tstamp_off();
         set_syslog();
     }
+
+    gu_crc32c_configure();
 }
 
 std::ostream& operator << (std::ostream& os, const Config& c)

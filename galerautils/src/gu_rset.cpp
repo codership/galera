@@ -17,6 +17,8 @@
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
 
+#include "gu_hash.h"
+
 #include <iomanip>
 
 namespace gu
@@ -166,13 +168,9 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
     off += uleb128_encode(count_, buf + off, size - off);
 
     /* write header CRC */
-    uint32_t crc;
-    CRC::digest (buf + hdr_offset, off - hdr_offset, crc);
-//    uint32_t const crc(
-//        CRC::digest<uint32_t>(buf + hdr_offset, off - hdr_offset));
+    uint32_t const crc(gu_fast_hash32(buf + hdr_offset, off - hdr_offset));
     *(reinterpret_cast<uint32_t*>(buf + off)) = htog(crc);
-//    log_debug << "writing header CRC: " << std::showbase << std::internal
-//              << std::hex << std::setfill('0') << std::setw(10) << crc;
+
     off += VER1_CRC_SIZE;
 
     /* append payload checksum */
@@ -348,7 +346,7 @@ RecordSetInBase::parse_header_v1 (size_t const size)
     }
 
     /* verify header CRC */
-    uint32_t const crc_comp(CRC::digest<uint32_t>(head_, off));
+    uint32_t const crc_comp(gu_fast_hash32(head_, off));
     uint32_t const crc_orig(
         gtoh(*(reinterpret_cast<const uint32_t*>(head_ + off))));
 
@@ -396,34 +394,6 @@ RecordSetInBase::checksum() const
     }
 }
 
-#if REMOVE
-RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
-                                  size_t const        size,
-                                  bool const          check_now)
-    :
-    RecordSet   (ptr, size),
-    head_       (ptr),
-    begin_      (-1),
-    next_       (begin_)
-{
-    switch (version_)
-    {
-    case EMPTY: return;
-    case VER1:  parse_header_v1(size);
-    }
-
-    if (check_now) checksum();
-
-    next_ = begin_;
-
-    assert (size_  >  0);
-    assert (count_ >= 0);
-    assert (count_ <= size_);
-    assert (begin_ >  0);
-    assert (begin_ <= size_);
-    assert (next_  == begin_);
-}
-#else
 RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
                                   size_t const        size,
                                   bool const          check_now)
@@ -435,7 +405,6 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
 {
     init (ptr, size, check_now);
 }
-#endif // REMOVE
 
 void
 RecordSetInBase::init (const byte_t* const ptr,

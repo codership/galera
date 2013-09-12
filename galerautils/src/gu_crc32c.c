@@ -18,10 +18,10 @@ gu_crc32c_configure()
 
     if (gu_crc32c_func == crc32cHardware64 ||
         gu_crc32c_func == crc32cHardware32) {
-        gu_info ("CRC-32C: using HW-accelerated implementation.");
+        gu_info ("CRC-32C: using hardware acceleration.");
     }
     else if (gu_crc32c_func == crc32cSlicingBy8) {
-        gu_info ("CRC-32C: using \"slicing-by-8\" implementation.");
+        gu_info ("CRC-32C: using \"slicing-by-8\" algorithm.");
     }
     else {
         gu_warn ("unexpected CRC-32C implementation.");

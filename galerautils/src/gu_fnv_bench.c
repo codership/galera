@@ -4,14 +4,19 @@
  * @file Benchmark for different hash implementations:
  *       fnv32, fnv64, fnv128, mmh3, md5 from libssl and md5 from crypto++
  *
- * To compile:
- * g++ -DHAVE_ENDIAN_H -DHAVE_BYTESWAP_H -O3 -Wall -Werror -march=core2 \
- *     gu_fnv_bench.c gu_mmh3.c -lssl/-lcrypto -lcrypto++
+ * To compile on Ubuntu:
+  g++ -DHAVE_ENDIAN_H -DHAVE_BYTESWAP_H -DGALERA_LOG_H_ENABLE_CXX \
+  -O3 -march=native -msse4 -Wall -Werror -I../.. gu_fnv_bench.c gu_crc32c.c \
+  gu_mmh3.c gu_spooky.c gu_log.c ../../www.evanjones.ca/crc32c.c \
+  -lssl -lcrypto -lcrypto++ -o gu_fnv_bench
+ *
+ * on CentOS some play with -lcrypto++ may be needed (also see includes below)
  *
  * To run:
  * gu_fnv_bench <buffer size> <N loops>
  */
 
+#include "gu_crc32c.h"
 #include "gu_fnv.h"
 #include "gu_mmh3.h"
 #include "gu_spooky.h"
@@ -30,6 +35,8 @@
 
 enum algs
 {
+    CRC32sw,
+    CRC32hw,
     FNV32,
     FNV64,
     FNV128,
@@ -70,6 +77,17 @@ static int timer (const void* const buf, ssize_t const len,
 
     EXTERNAL_LOOP_BEGIN
     switch (type) {
+    case CRC32sw:
+    case CRC32hw:
+    {
+        if (CRC32sw == type) alg = "crc32sw"; else alg = "crc32hw";
+        INTERNAL_LOOP_BEGIN
+//            gu_crc32c_t crc = GU_CRC32C_INIT;
+            h = gu_crc32c (buf, len);
+//            h = hash;
+        INTERNAL_LOOP_END
+        break;
+    }
     case FNV32:
     {
         alg = "fnv32a";
@@ -207,15 +225,21 @@ int main (int argc, char* argv[])
     if (!buf) return ENOMEM;
     while (buf_size_int) buf[--buf_size_int] = rand();
 
+    timer (buf, buf_size, loops, CRC32sw);
+
+    CRC32CFunctionPtr const old = gu_crc32c_func;
+    gu_crc32c_configure();
+    if (old != gu_crc32c_func) timer(buf, buf_size, loops, CRC32hw);
+
     timer (buf, buf_size, loops, FNV32);
     timer (buf, buf_size, loops, FNV64);
     timer (buf, buf_size, loops, FNV128);
     timer (buf, buf_size, loops, MMH32);
     timer (buf, buf_size, loops, MMH128);
-    timer (buf, buf_size, loops, SPOOKYS);
+//    timer (buf, buf_size, loops, SPOOKYS);
     timer (buf, buf_size, loops, SPOOKY);
-    timer (buf, buf_size, loops, MD5SSL);
-    timer (buf, buf_size, loops, MD5CPP);
+//    timer (buf, buf_size, loops, MD5SSL);
+//    timer (buf, buf_size, loops, MD5CPP);
     timer (buf, buf_size, loops, FAST128);
     timer (buf, buf_size, loops, TABLE);
 

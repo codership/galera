@@ -5,6 +5,7 @@ Import('env')
 libgcomm_sources = [
     'conf.cpp',
     'defaults.cpp',
+    'datagram.cpp',
     'evs_consensus.cpp',
     'evs_input_map2.cpp',
     'evs_message2.cpp',

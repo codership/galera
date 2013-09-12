@@ -14,6 +14,7 @@
 #include "gu_fnv_test.h"
 #include "gu_mmh3_test.h"
 #include "gu_spooky_test.h"
+#include "gu_crc32c_test.h"
 #include "gu_hash_test.h"
 #include "gu_dbug_test.h"
 #include "gu_time_test.h"
@@ -33,6 +34,7 @@ static suite_creator_t suites[] =
         gu_fnv_suite,
         gu_mmh3_suite,
         gu_spooky_suite,
+        gu_crc32c_suite,
         gu_hash_suite,
         gu_dbug_suite,
         gu_time_suite,

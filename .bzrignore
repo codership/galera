@@ -78,3 +78,4 @@ garb/garbd
 gcs/src/.garb
 docs/build/
 gcomm/test/ssl_test
+galerautils/src/gu_fnv_bench

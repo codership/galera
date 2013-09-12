@@ -28,8 +28,6 @@ using namespace gcomm;
 
 using namespace gu;
 
-
-
 START_TEST(test_histogram)
 {
 
@@ -60,7 +58,7 @@ START_TEST(test_datagram)
     fail_unless(hdr.has_crc32() == false);
     fail_unless(hdr.version() == 0);
 
-    hdr.set_crc32(1234);
+    hdr.set_crc32(1234, NetHeader::CS_CRC32);
     fail_unless(hdr.has_crc32() == true);
     fail_unless(hdr.len() == 42);
 

@@ -278,7 +278,7 @@ namespace galera
                 static void
                 compute (const void* ptr, size_t size, type_t& value)
                 {
-                    gu::CRC::digest (ptr, size, value);
+                    gu::FastHash::digest (ptr, size, value);
                     value = gu::htog<type_t>(value);
                 }
 
