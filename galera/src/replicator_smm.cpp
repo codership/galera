@@ -335,13 +335,15 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     ++receivers_;
     as_ = &gcs_as_;
 
+    bool exit_loop(false);
     wsrep_status_t retval(WSREP_OK);
 
     while (WSREP_OK == retval && state_() != S_CLOSING)
     {
         ssize_t rc;
 
-        while ((rc = as_->process(recv_ctx)) == -ECANCELED)
+        while (gu_unlikely((rc = as_->process(recv_ctx, exit_loop))
+                           == -ECANCELED))
         {
             recv_IST(recv_ctx);
             // hack: prevent fast looping until ist controlling thread
@@ -349,13 +351,27 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             usleep(10000);
         }
 
-        if (rc <= 0)
+        if (gu_unlikely(rc <= 0))
         {
             retval = WSREP_CONN_FAIL;
         }
+        else if (gu_unlikely(exit_loop == true))
+        {
+            assert(WSREP_OK == retval);
+
+            if (receivers_.sub_and_fetch(1) > 0)
+            {
+                log_info << "Slave thread exiting on request.";
+                break;
+            }
+
+            ++receivers_;
+            log_warn << "Refusing exit for the last slave thread.";
+        }
     }
 
-    if (receivers_.sub_and_fetch(1) == 0)
+    /* exiting loop already did proper checks */
+    if (!exit_loop && receivers_.sub_and_fetch(1) == 0)
     {
         if (state_() != S_CLOSING)
         {
@@ -367,6 +383,8 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         }
         state_.shift_to(S_CLOSED);
     }
+
+    log_debug << "Slave thread exit. Return code: " << retval;
 
     return retval;
 }
@@ -447,33 +465,29 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
 
     wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
                              trx->depends_seqno()};
+
     gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx, meta));
-    // at this point any exception in apply_trx_ws() is fatal, not
-    // catching anything.
+    /* at this point any exception in apply_trx_ws() is fatal, not
+     * catching anything. */
+
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
         gu_trace(commit_monitor_.enter(co));
-        trx->set_state(TrxHandle::S_COMMITTING);
-
-        wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
-
-        if (gu_unlikely (rcode > 0))
-            gu_throw_fatal << "Commit failed. Trx: " << trx;
-
-        commit_monitor_.leave(co);
-        trx->set_state(TrxHandle::S_COMMITTED);
     }
-    else
+    trx->set_state(TrxHandle::S_COMMITTING);
+
+    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
+
+    if (gu_unlikely (rcode > 0))
+        gu_throw_fatal << "Commit failed. Trx: " << trx;
+
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
-        trx->set_state(TrxHandle::S_COMMITTING);
-
-        wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
-
-        if (gu_unlikely (rcode > 0))
-            gu_throw_fatal << "Commit failed. Trx: " << trx;
-
-        trx->set_state(TrxHandle::S_COMMITTED);
+        commit_monitor_.leave(co);
     }
+    trx->set_state(TrxHandle::S_COMMITTED);
+
+    apply_monitor_.leave(ao);
 
     if (trx->local_seqno() != -1)
     {
@@ -481,11 +495,15 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
         report_last_committed(cert_.set_trx_committed(trx));
     }
 
-    /* for now need to keep it inside apply monitor to ensure all processing
-     * end by the time monitors are drained. */
+    /* For now need to keep it inside apply monitor to ensure all processing
+     * ends by the time monitors are drained because of potential gcache
+     * cleanup (and loss of the writeset buffer). Perhaps unordered monitor
+     * is needed here. */
     trx->unordered(recv_ctx, unordered_cb_);
 
     apply_monitor_.leave(ao);
+
+    trx->set_exit_loop(WSREP_CB_RETURN == rcode);
 }
 
 

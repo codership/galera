@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_ACTION_SOURCE_HPP
@@ -12,7 +12,7 @@ namespace galera
     public:
         ActionSource() { }
         virtual ~ActionSource() { }
-        virtual ssize_t process(void* ctx) = 0;
+        virtual ssize_t process(void* ctx, bool& exit_loop) = 0;
     };
 }
 

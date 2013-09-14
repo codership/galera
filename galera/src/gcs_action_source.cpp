@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #include "replicator.hpp"
@@ -100,8 +100,9 @@ galera::GcsActionTrx::~GcsActionTrx()
 }
 
 
-void galera::GcsActionSource::dispatch(void*                    recv_ctx,
-                                       const struct gcs_action& act)
+void galera::GcsActionSource::dispatch(void* const              recv_ctx,
+                                       const struct gcs_action& act,
+                                       bool&                    exit_loop)
 {
     assert(recv_ctx != 0);
     assert(act.buf != 0);
@@ -115,6 +116,7 @@ void galera::GcsActionSource::dispatch(void*                    recv_ctx,
         GcsActionTrx trx(act);
         trx.trx()->set_state(TrxHandle::S_REPLICATING);
         replicator_.process_trx(recv_ctx, trx.trx());
+        exit_loop = trx.trx()->exit_loop(); // this is the end of trx lifespan
         break;
     }
     case GCS_ACT_COMMIT_CUT:
@@ -162,7 +164,7 @@ void galera::GcsActionSource::dispatch(void*                    recv_ctx,
 }
 
 
-ssize_t galera::GcsActionSource::process(void* recv_ctx)
+ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
 {
     struct gcs_action act;
 
@@ -172,7 +174,7 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx)
         Release release(act, gcache_);
         ++received_;
         received_bytes_ += rc;
-        dispatch(recv_ctx, act);
+        dispatch(recv_ctx, act, exit_loop);
     }
     return rc;
 }
