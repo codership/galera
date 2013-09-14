@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_ACTION_SOURCE_HPP
@@ -31,13 +31,13 @@ namespace galera
 
         ~GcsActionSource() { }
 
-        ssize_t   process(void*);
+        ssize_t   process(void*, bool& exit_loop);
         long long received()       const { return received_(); }
         long long received_bytes() const { return received_bytes_(); }
 
     private:
 
-        void dispatch(void*, const gcs_action&);
+        void dispatch(void*, const gcs_action&, bool& exit_loop);
 
         GCS_IMPL&             gcs_;
         Replicator&           replicator_;

@@ -165,6 +165,7 @@ namespace galera
             write_set_flags_   (0),
             certified_         (false),
             committed_         (false),
+            exit_loop_         (false),
             gcs_handle_        (-1),
             action_            (0),
             timestamp_         (gu_time_calendar()),
@@ -362,7 +363,8 @@ namespace galera
         void   unref()        { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
         size_t refcnt() const { return refcnt_(); }
 
-//        std::ostream& operator<<(std::ostream& os) const;
+        bool   exit_loop() const { return exit_loop_; }
+        void   set_exit_loop(bool x) { exit_loop_ |= x; }
 
     private:
 
@@ -387,6 +389,7 @@ namespace galera
         uint32_t               write_set_flags_;
         bool                   certified_;
         bool                   committed_;
+        bool                   exit_loop_;
         long                   gcs_handle_;
         const void*            action_;
         int64_t                timestamp_;
