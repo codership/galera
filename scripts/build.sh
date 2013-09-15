@@ -298,7 +298,7 @@ build_packages()
     elif [ "$OS" == "FreeBSD" ]; then
         mv -f $PKG_DIR/*.tbz ./
     else
-        mv -f $PKG_DIR/$ARCH/*.rpm ./
+        mv -f $PKG_DIR/*.rpm ./
     fi
     return $RET
 }
