@@ -54,9 +54,6 @@ apply_wscoll(void*                    recv_ctx,
 
             throw ae;
         }
-
-        /* WSREP_CB_RETRUN should be returned only from commit callback */
-        assert(WSREP_CB_RETURN != err);
     }
 
     assert(offset == buf_len);
@@ -103,7 +100,8 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (err > 0)
                 {
-                    int const rcode(commit_cb(recv_ctx, &meta, false));
+                    wsrep_bool_t unused;
+                    int const rcode(commit_cb(recv_ctx, &meta, &unused, false));
                     if (WSREP_OK != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
@@ -511,7 +509,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     }
     trx->set_state(TrxHandle::S_COMMITTING);
 
-    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
+    wsrep_bool_t exit_loop(false);
+    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, &exit_loop,true));
 
     if (gu_unlikely (rcode > 0))
         gu_throw_fatal << "Commit failed. Trx: " << trx;
@@ -530,7 +529,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
         report_last_committed(cert_.set_trx_committed(trx));
     }
 
-    trx->set_exit_loop(WSREP_CB_RETURN == rcode);
+    trx->set_exit_loop(exit_loop);
 }
 
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
@@ -863,7 +862,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
             gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx, meta));
 
-            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, true));
+            wsrep_bool_t unused;
+            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, &unused, true));
 
             if (gu_unlikely(rcode > 0))
                 gu_throw_fatal << "Commit failed. Trx: " << trx;
@@ -1262,18 +1262,19 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 
-    void* app_req(0);
-    int   app_req_len(0);
+    void*  app_req(0);
+    size_t app_req_len(0);
 
     const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
-    view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);
+    wsrep_cb_status_t const rcode(
+        view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len));
 
-    if (app_req_len < 0)
+    if (WSREP_CB_SUCCESS != rcode)
     {
+        assert(app_req_len <= 0);
         close();
-        gu_throw_fatal << "View callback failed: " << -app_req_len << " ("
-                       << strerror(-app_req_len) << "). This is unrecoverable, "
-                       << "restart required.";
+        gu_throw_fatal << "View callback failed. This is unrecoverable, "
+            "restart required.";
     }
     else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
     {

@@ -9,15 +9,16 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #ifndef WSREP_H
 #define WSREP_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
@@ -26,17 +27,44 @@
 extern "C" {
 #endif
 
-/*!
- *  wsrep replication API
- */
+/**************************************************************************
+ *                                                                        *
+ *                       wsrep replication API                            *
+ *                                                                        *
+ **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "24rc2"
+#define WSREP_INTERFACE_VERSION "24rc3"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
 
+
 /*!
- *  Certain provider capabilities application may need to know about
+ * @brief log severity levels, passed as first argument to log handler
+ */
+typedef enum wsrep_log_level
+{
+    WSREP_LOG_FATAL, //!< Unrecoverable error, application must quit.
+    WSREP_LOG_ERROR, //!< Operation failed, must be repeated.
+    WSREP_LOG_WARN,  //!< Unexpected condition, but no operational failure.
+    WSREP_LOG_INFO,  //!< Informational message.
+    WSREP_LOG_DEBUG  //!< Debug message. Shows only of compiled with debug.
+} wsrep_log_level_t;
+
+/*!
+ * @brief error log handler
+ *
+ *        All messages from wsrep provider are directed to this
+ *        handler, if present.
+ *
+ * @param level   log level
+ * @param message log message
+ */
+typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
+
+
+/*!
+ *  Certain provider capabilities application may want to know about
  */
 #define WSREP_CAP_MULTI_MASTER          ( 1ULL << 0 )
 #define WSREP_CAP_CERTIFICATION         ( 1ULL << 1 )
@@ -52,7 +80,8 @@ extern "C" {
 #define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 11 )
 #define WSREP_CAP_UNORDERED             ( 1ULL << 12 )
 #define WSREP_CAP_ANNOTATION            ( 1ULL << 13 )
-#define WSREP_CAP_ENCAPSULATE           ( 1ULL << 14 )
+#define WSREP_CAP_PREORDERED            ( 1ULL << 14 )
+
 
 /*!
  *  Writeset flags
@@ -78,14 +107,11 @@ extern "C" {
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
 typedef uint64_t wsrep_conn_id_t; //!< application connection ID
 typedef int64_t  wsrep_seqno_t;   //!< sequence number of a writeset, etc.
-#ifdef __cplusplus
-typedef bool     wsrep_bool_t;
-#else
-typedef _Bool    wsrep_bool_t;    //!< should be the same as standard bool
-#endif
+typedef _Bool    wsrep_bool_t;    //!< should be the same as standard (C99) bool
 
 /*! undefined seqno */
 #define WSREP_SEQNO_UNDEFINED (-1)
+
 
 /*! wsrep provider status codes */
 typedef enum wsrep_status
@@ -102,10 +128,10 @@ typedef enum wsrep_status
     WSREP_NOT_IMPLEMENTED  //!< feature not implemented
 } wsrep_status_t;
 
+
 /*! wsrep callbacks status codes */
 typedef enum wsrep_cb_status
 {
-    WSREP_CB_RETURN  = -1, //!< success, thread wants to return from wsrep::recv() call
     WSREP_CB_SUCCESS =  0, //!< success (as in "not critical failure")
     WSREP_CB_FAILURE       //!< critical failure (consistency violation)
     /* Technically, wsrep provider has no use for specific failure codes since
@@ -115,28 +141,6 @@ typedef enum wsrep_cb_status
      * in a group of nodes. */
 } wsrep_cb_status_t;
 
-/*!
- * @brief log severity levels, passed as first argument to log handler
- */
-typedef enum wsrep_log_level
-{
-    WSREP_LOG_FATAL, //!< Unrecoverable error, application must quit.
-    WSREP_LOG_ERROR, //!< Operation failed, must be repeated.
-    WSREP_LOG_WARN,  //!< Unexpected condition, but no operational failure.
-    WSREP_LOG_INFO,  //!< Informational message.
-    WSREP_LOG_DEBUG  //!< Debug message. Shows only of compiled with debug.
-} wsrep_log_level_t;
-
-/*!
- * @brief error log handler
- *
- *        All messages from wsrep library are directed to this
- *        handler, if present.
- *
- * @param level   log level
- * @param message log message
- */
-typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 
 /*!
  * UUID type - for all unique IDs
@@ -200,13 +204,15 @@ wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid);
 extern int
 wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
 
+
 /*!
  * Transaction meta data
  */
 typedef struct wsrep_trx_meta
 {
     wsrep_gtid_t  gtid;       /*!< Global transaction identifier */
-    wsrep_seqno_t depends_on; /*!< Sequence number part of the last transaction this transaction depends on */
+    wsrep_seqno_t depends_on; /*!< Sequence number part of the last transaction
+                                   this transaction depends on */
 } wsrep_trx_meta_t;
 
 
@@ -252,8 +258,8 @@ typedef struct wsrep_view_info {
     wsrep_bool_t        state_gap; //!< gap between global and local states
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
-    int                 proto_ver; //!< application protocol agreed on in the view
-    wsrep_member_info_t members[1]; //!< array of member information
+    int                 proto_ver; //!< application protocol agreed on the view
+    wsrep_member_info_t members[1];//!< array of member information
 } wsrep_view_info_t;
 
 /*!
@@ -290,7 +296,7 @@ typedef struct wsrep_view_info {
  * @param state       current state
  * @param state_len   lenght of current state
  * @param sst_req     location to store SST request
- * @param sst_req_len location to store SST request length or error code
+ * @param sst_req_len location to store SST request length or error code,
  *                    value of 0 means no SST.
  */
 typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
@@ -300,8 +306,9 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
     const char*              state,
     size_t                   state_len,
     void**                   sst_req,
-    int*                     sst_req_len
+    size_t*                  sst_req_len
 );
+
 
 /*!
  * @brief apply callback
@@ -326,6 +333,7 @@ typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
     const wsrep_trx_meta_t* meta
 );
 
+
 /*!
  * @brief commit callback
  *
@@ -333,6 +341,7 @@ typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
  *
  * @param recv_ctx receiver context pointer provided by the application
  * @param meta     transaction meta data of the writeset to be committed
+ * @param exit     set to true to exit recv loop
  * @param commit   true - commit writeset, false - rollback writeset
  *
  * @return success code:
@@ -342,8 +351,10 @@ typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
 typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
     const wsrep_trx_meta_t* meta,
+    wsrep_bool_t*           exit,
     wsrep_bool_t            commit
 );
+
 
 /*!
  * @brief unordered callback
@@ -354,14 +365,13 @@ typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
  * @param recv_ctx receiver context pointer provided by the application
  * @param data     data buffer containing the writeset
  * @param size     data buffer size
- *
- * @return success code:
- * @retval WSREP_OK
- * @retval WSREP_ERROR call failed
  */
-typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
-                                                      const void* data,
-                                                      size_t      size);
+typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (
+    void*       recv_ctx,
+    const void* data,
+    size_t      size
+);
+
 
 /*!
  * @brief a callback to donate state snapshot
@@ -380,16 +390,18 @@ typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (void*       recv_ctx,
  * @param state     current wsrep internal state buffer
  * @param state_len current wsrep internal state buffer len
  * @param bypass    bypass snapshot transfer, only transfer uuid:seqno pair
- * @return 0 for success or negative error code
  */
-typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
-                                      void*               recv_ctx,
-                                      const void*         msg,
-                                      size_t              msg_len,
-                                      const wsrep_gtid_t* state_id,
-                                      const char*         state,
-                                      size_t              state_len,
-                                      wsrep_bool_t        bypass);
+typedef enum wsrep_cb_status (*wsrep_sst_donate_cb_t) (
+    void*               app_ctx,
+    void*               recv_ctx,
+    const void*         msg,
+    size_t              msg_len,
+    const wsrep_gtid_t* state_id,
+    const char*         state,
+    size_t              state_len,
+    wsrep_bool_t        bypass
+);
+
 
 /*!
  * @brief a callback to signal application that wsrep state is synced
@@ -404,7 +416,7 @@ typedef void (*wsrep_synced_cb_t) (void* app_ctx);
 
 
 /*!
- * Initialization parameters for wsrep, used as arguments for wsrep_init()
+ * Initialization parameters for wsrep provider.
  */
 struct wsrep_init_args
 {
@@ -419,23 +431,24 @@ struct wsrep_init_args
     int         proto_ver;     //!< Max supported application protocol version
 
     /* Application initial state information. */
-    const wsrep_gtid_t* state_id;    //!< Application state ID
-    const char*         state;       //!< Initial state for wsrep implementation
+    const wsrep_gtid_t* state_id;    //!< Application state GTID
+    const char*         state;       //!< Initial state for wsrep provider
     size_t              state_len;   //!< Length of state buffer
 
     /* Application callbacks */
     wsrep_log_cb_t        logger_cb;       //!< logging handler
     wsrep_view_cb_t       view_handler_cb; //!< group view change handler
 
-    /* applier callbacks */
+    /* Applier callbacks */
     wsrep_apply_cb_t      apply_cb;        //!< apply  callback
     wsrep_commit_cb_t     commit_cb;       //!< commit callback
     wsrep_unordered_cb_t  unordered_cb;    //!< callback for unordered actions
 
-    /* state snapshot transfer callbacks */
+    /* State Snapshot Transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
     wsrep_synced_cb_t     synced_cb;       //!< synced with group
 };
+
 
 /*! Type of the stats variable value in struct wsrep_status_var */
 typedef enum wsrep_var_type
@@ -463,7 +476,7 @@ struct wsrep_stats_var
 typedef struct wsrep_buf
 {
     const void* ptr; /*!< Pointer to data buffer */
-    int         len; /*!< Length of buffer (2G max)*/
+    size_t      len; /*!< Length of buffer */
 } wsrep_buf_t;
 
 /*! Key struct used to pass certification keys for transaction handling calls.
@@ -471,7 +484,7 @@ typedef struct wsrep_buf
 typedef struct wsrep_key
 {
     const wsrep_buf_t* key_parts;     /*!< Array of key parts  */
-    int                key_parts_num; /*!< Number of key parts */
+    size_t             key_parts_num; /*!< Number of key parts */
 } wsrep_key_t;
 
 /*! Key type:
@@ -498,8 +511,9 @@ typedef enum wsrep_data_type
     WSREP_DATA_ANNOTATION
 } wsrep_data_type_t;
 
+
 /*! Transaction handle struct passed for wsrep transaction handling calls */
-typedef struct wsrep_ws_handle_
+typedef struct wsrep_ws_handle
 {
     wsrep_trx_id_t trx_id; //!< transaction ID
     void*          opaque; //!< opaque provider transaction context data
@@ -524,11 +538,21 @@ static inline wsrep_ws_handle_t* wsrep_ws_handle_for_trx(
     return ws_handle;
 }
 
-typedef struct wsrep_ wsrep_t;
+
+/*!
+ *  A handle for processing preordered actions.
+ *  Must be initialized to WSREP_PO_INITIALIZER before use.
+ */
+typedef struct wsrep_po_handle { void* opaque; } wsrep_po_handle_t;
+
+static const wsrep_po_handle_t WSREP_PO_INITIALIZER = { NULL };
+
+
+typedef struct wsrep wsrep_t;
 /*!
  * wsrep interface for dynamically loadable libraries
  */
-struct wsrep_ {
+struct wsrep {
 
     const char *version; //!< interface version string
 
@@ -622,8 +646,6 @@ struct wsrep_ {
    * @param wsrep      provider handle
    * @param ws_handle  writeset of committing transaction
    * @param conn_id    connection ID
-//   * @param data       array of application data buffers
-//   * @param count      buffer count
    * @param flags      fine tuning the replication WSREP_FLAG_*
    * @param meta       transaction meta data
    *
@@ -635,8 +657,6 @@ struct wsrep_ {
     wsrep_status_t (*pre_commit)(wsrep_t*                wsrep,
                                  wsrep_conn_id_t         conn_id,
                                  wsrep_ws_handle_t*      ws_handle,
-//                                 const struct wsrep_buf* data,
-//                                 int                     count,
                                  uint64_t                flags,
                                  wsrep_trx_meta_t*       meta);
 
@@ -721,7 +741,7 @@ struct wsrep_ {
     wsrep_status_t (*append_key)(wsrep_t*            wsrep,
                                  wsrep_ws_handle_t*  ws_handle,
                                  const wsrep_key_t*  keys,
-                                 int                 count,
+                                 size_t              count,
                                  enum wsrep_key_type type,
                                  wsrep_bool_t        copy);
 
@@ -743,7 +763,7 @@ struct wsrep_ {
     wsrep_status_t (*append_data)(wsrep_t*                wsrep,
                                   wsrep_ws_handle_t*      ws_handle,
                                   const struct wsrep_buf* data,
-                                  int                     count,
+                                  size_t                  count,
                                   enum wsrep_data_type    type,
                                   wsrep_bool_t            copy);
 
@@ -798,9 +818,9 @@ struct wsrep_ {
     wsrep_status_t (*to_execute_start)(wsrep_t*                wsrep,
                                        wsrep_conn_id_t         conn_id,
                                        const wsrep_key_t*      keys,
-                                       int                     keys_num,
+                                       size_t                  keys_num,
                                        const struct wsrep_buf* action,
-                                       int                     count,
+                                       size_t                  count,
                                        wsrep_trx_meta_t*       meta);
 
   /*!
@@ -819,34 +839,53 @@ struct wsrep_ {
     wsrep_status_t (*to_execute_end)(wsrep_t* wsrep, wsrep_conn_id_t conn_id);
 
   /*!
-   * @brief Submits preordered replication events to proveider.
+   * @brief Collects preordered replication events into a writeset.
    *
-   * The contract is that they will be committed in the same (partial) order
-   * this method was called
+   * @param wsrep   wsrep provider handle
+   * @param handle  a handle associated with a given writeset
+   * @param data    an array of data buffers.
+   * @param count   length of data buffer array.
+   * @param copy    whether provider needs to make a copy of events.
    *
-   * @param wsrep     provider handle
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   operation failed (e.g. trx size exceeded limit)
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*preordered_collect) (wsrep_t*                 wsrep,
+                                          wsrep_po_handle_t*       handle,
+                                          const struct wsrep_buf*  data,
+                                          size_t                   count,
+                                          wsrep_bool_t             copy);
+
+  /*!
+   * @brief "Commits" preordered writeset to cluster.
+   *
+   * The contract is that the writeset will be committed in the same (partial)
+   * order this method was called. Frees resources associated with the writeset
+   * handle and reinitializes the handle.
+   *
+   * @param wsrep     wsrep provider handle
+   * @param po_handle a handle associated with a given writeset
    * @param source_id ID of the event producer, also serves as the partial order
    *                  or stream ID - events with different source_ids won't be
    *                  ordered with respect to each other.
+   * @param flags     WSREP_FLAG_... flags
    * @param pa_range  the number of preceding events this event can be processed
    *                  in parallel with. A value of 0 means strict serial
-   *                  processing. Note: commits always happend in wsrep order.
-   * @param data      an array of data buffers.
-   * @param count     length of data buffer array.
-   * @param flags     WSREP_FLAG_... flags
-   * @param copy      whether provider needs to make a copy of event.
+   *                  processing. Note: commits always happen in wsrep order.
+   * @param commit    'true'  to commit writeset to cluster (replicate) or
+   *                  'false' to rollback (cancel) the writeset.
    *
-   * @retval WSREP_OK         cluster commit succeeded
-   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   operation failed (e.g. NON-PRIMARY component)
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*preordered)(wsrep_t*                wsrep,
-                                 const wsrep_uuid_t*     source_id,
-                                 int                     pa_range,
-                                 const struct wsrep_buf* data,
-                                 int                     count,
-                                 uint64_t                flags,
-                                 wsrep_bool_t            copy);
+    wsrep_status_t (*preordered_commit)  (wsrep_t*             wsrep,
+                                          wsrep_po_handle_t*   handle,
+                                          const wsrep_uuid_t*  source_id,
+                                          uint64_t             flags,
+                                          int                  pa_range,
+                                          wsrep_bool_t         commit);
 
   /*!
    * @brief Signals to wsrep provider that state snapshot has been sent to
@@ -893,7 +932,7 @@ struct wsrep_ {
    */
     wsrep_status_t (*snapshot)(wsrep_t*    wsrep,
                                const void* msg,
-                               int         msg_len,
+                               size_t      msg_len,
                                const char* donor_spec);
 
   /*!
