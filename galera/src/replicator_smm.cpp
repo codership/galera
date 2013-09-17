@@ -57,7 +57,8 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (err > 0)
                 {
-                    int const rcode(commit_cb(recv_ctx, &meta, false));
+                    wsrep_bool_t unused;
+                    int const rcode(commit_cb(recv_ctx, &meta, &unused, false));
                     if (WSREP_OK != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
@@ -476,7 +477,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     }
     trx->set_state(TrxHandle::S_COMMITTING);
 
-    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, true));
+    wsrep_bool_t exit_loop(false);
+    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, &exit_loop,true));
 
     if (gu_unlikely (rcode > 0))
         gu_throw_fatal << "Commit failed. Trx: " << trx;
@@ -501,7 +503,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
 
     apply_monitor_.leave(ao);
 
-    trx->set_exit_loop(WSREP_CB_RETURN == rcode);
+    trx->set_exit_loop(exit_loop);
 }
 
 
@@ -884,7 +886,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
             gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx, meta));
 
-            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, true));
+            wsrep_bool_t unused;
+            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, &unused, true));
 
             if (gu_unlikely(rcode > 0))
                 gu_throw_fatal << "Commit failed. Trx: " << trx;
@@ -1083,47 +1086,101 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     return WSREP_OK;
 }
 
+namespace galera
+{
+
+static WriteSetOut*
+writeset_from_handle (wsrep_po_handle_t& handle,
+                      const TrxHandle::Params& trx_params)
+{
+    WriteSetOut* ret = reinterpret_cast<WriteSetOut*>(handle.opaque);
+
+    if (NULL == ret)
+    {
+        try
+        {
+            ret = new WriteSetOut
+                (gu::String<256>(trx_params.working_dir_) << '/' << &handle,
+                 /* key format is not essential since we're not adding keys */
+                 KeySet::version(trx_params.key_format_));
+
+            handle.opaque = ret;
+        }
+        catch (std::bad_alloc& ba)
+        {
+            gu_throw_error(ENOMEM) << "Could not create WriteSetOut";
+        }
+    }
+
+    return ret;
+}
+
+} /* namespace galera */
 
 wsrep_status_t
-galera::ReplicatorSMM::handle_preordered(const wsrep_uuid_t&           source,
-                                         uint64_t                const flags,
-                                         const struct wsrep_buf* const data,
-                                         int                     const count,
-                                         int                     const pa_range,
-                                         bool                    const copy)
+galera::ReplicatorSMM::preordered_collect(wsrep_po_handle_t&            handle,
+                                          const struct wsrep_buf* const data,
+                                          size_t                  const count,
+                                          bool                    const copy)
 {
     if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
         return WSREP_NOT_IMPLEMENTED;
 
-    WriteSetOut ws(gu::String<256>(trx_params_.working_dir_) << '/' << data,
-                   /* key format is not essential since we're not adding keys */
-                   KeySet::version(trx_params_.key_format_));
+    WriteSetOut* const ws(writeset_from_handle(handle, trx_params_));
 
-    for (long i(0); i < count; ++i)
+    for (size_t i(0); i < count; ++i)
     {
-        ws.append_data(data[i].ptr, data[i].len, copy);
+        ws->append_data(data[i].ptr, data[i].len, copy);
     }
 
-    ws.set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags));
+    return WSREP_OK;
+}
 
-    /* by loooking at trx_id we should be able to detect gaps / lost events
-     * (however resending is not implemented yet). Something like
-     *
-     * wsrep_trx_id_t const trx_id(cert_.append_preordered(source, ws));
-     *
-     * begs to be here. */
-    wsrep_trx_id_t const trx_id(preordered_id_.add_and_fetch(1));
-    WriteSetNG::GatherVector actv;
-    size_t const actv_size(ws.gather(source, 0, trx_id, actv));
 
-    ws.set_preordered (pa_range); // also adds CRC
+wsrep_status_t
+galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
+                                         const wsrep_uuid_t&           source,
+                                         uint64_t                const flags,
+                                         int                     const pa_range,
+                                         bool                    const commit)
+{
+    if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
+        return WSREP_NOT_IMPLEMENTED;
 
-    int rcode;
-    do
+    WriteSetOut* const ws(writeset_from_handle(handle, trx_params_));
+
+    if (gu_likely(true == commit))
     {
-        rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false);
+        ws->set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags));
+
+        /* by loooking at trx_id we should be able to detect gaps / lost events
+         * (however resending is not implemented yet). Something like
+         *
+         * wsrep_trx_id_t const trx_id(cert_.append_preordered(source, ws));
+         *
+         * begs to be here. */
+        wsrep_trx_id_t const trx_id(preordered_id_.add_and_fetch(1));
+
+        WriteSetNG::GatherVector actv;
+
+        size_t const actv_size(ws->gather(source, 0, trx_id, actv));
+
+        ws->set_preordered (pa_range); // also adds CRC
+
+        int rcode;
+        do
+        {
+            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false);
+        }
+        while (rcode == -EAGAIN && (usleep(1000), true));
+
+        if (rcode < 0)
+            gu_throw_error(-rcode)
+                << "Replication of preordered writeset failed.";
     }
-    while (rcode == -EAGAIN && (usleep(1000), true));
+
+    delete ws;
+    handle.opaque = NULL;
 
     return WSREP_OK;
 }
@@ -1336,18 +1393,19 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 
-    void* app_req(0);
-    int   app_req_len(0);
+    void*  app_req(0);
+    size_t app_req_len(0);
 
     const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
-    view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);
+    wsrep_cb_status_t const rcode(
+        view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len));
 
-    if (app_req_len < 0)
+    if (WSREP_CB_SUCCESS != rcode)
     {
+        assert(app_req_len <= 0);
         close();
-        gu_throw_fatal << "View callback failed: " << -app_req_len << " ("
-                       << strerror(-app_req_len) << "). This is unrecoverable, "
-                       << "restart required.";
+        gu_throw_fatal << "View callback failed. This is unrecoverable, "
+            "restart required.";
     }
     else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
     {

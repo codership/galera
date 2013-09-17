@@ -80,12 +80,15 @@ namespace galera
         wsrep_status_t causal_read(wsrep_gtid_t*);
         wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*);
         wsrep_status_t to_isolation_end(TrxHandle* trx);
-        wsrep_status_t handle_preordered(const wsrep_uuid_t&     source,
+        wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
+                                          const struct wsrep_buf* data,
+                                          size_t                  count,
+                                          bool                    copy);
+        wsrep_status_t preordered_commit(wsrep_po_handle_t&      handle,
+                                         const wsrep_uuid_t&     source,
                                          uint64_t                flags,
-                                         const struct wsrep_buf* data,
-                                         int                     count,
                                          int                     pa_range,
-                                         bool                    copy);
+                                         bool                    commit);
         wsrep_status_t sst_sent(const wsrep_gtid_t& state_id, int rcode);
         wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
                                     const void*         state,

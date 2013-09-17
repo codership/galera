@@ -62,6 +62,7 @@ uint64_t galera_capabilities(wsrep_t* gh)
             WSREP_CAP_TRX_REPLAY        |
             WSREP_CAP_ISOLATION         |
             WSREP_CAP_PAUSE             |
+            WSREP_CAP_PREORDERED        |
             WSREP_CAP_CAUSAL_READS);
 }
 
@@ -394,11 +395,11 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
 static inline void
 append_data_array (TrxHandle*              const trx,
                    const struct wsrep_buf* const data,
-                   int                     const count,
+                   size_t                  const count,
                    wsrep_data_type_t       const type,
                    bool                    const copy)
 {
-    for (int i(0); i < count; ++i)
+    for (size_t i(0); i < count; ++i)
     {
         trx->append_data(data[i].ptr, data[i].len, type, copy);
     }
@@ -409,8 +410,6 @@ extern "C"
 wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
                                  wsrep_conn_id_t    const conn_id,
                                  wsrep_ws_handle_t* const trx_handle,
-//                                 const void*         rbr_data,
-//                                 size_t              rbr_data_len,
                                  uint64_t           const flags,
                                  wsrep_trx_meta_t*  const meta)
 {
@@ -478,7 +477,7 @@ extern "C"
 wsrep_status_t galera_append_key(wsrep_t*           const gh,
                                  wsrep_ws_handle_t* const trx_handle,
                                  const wsrep_key_t* const keys,
-                                 int                const keys_num,
+                                 size_t             const keys_num,
                                  wsrep_key_type_t   const key_type,
                                  wsrep_bool_t       const copy)
 {
@@ -494,7 +493,7 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
     try
     {
         TrxHandleLock lock(*trx);
-        for (int i(0); i < keys_num; ++i)
+        for (size_t i(0); i < keys_num; ++i)
         {
             galera::KeyData k (repl->trx_proto_ver(),
                                keys[i].key_parts,
@@ -524,7 +523,7 @@ extern "C"
 wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
                                   wsrep_ws_handle_t*      const trx_handle,
                                   const struct wsrep_buf* const data,
-                                  int                     const count,
+                                  size_t                  const count,
                                   wsrep_data_type_t       const type,
                                   wsrep_bool_t            const copy)
 {
@@ -626,9 +625,9 @@ extern "C"
 wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
                                        wsrep_conn_id_t         const conn_id,
                                        const wsrep_key_t*      const keys,
-                                       int                     const keys_num,
+                                       size_t                  const keys_num,
                                        const struct wsrep_buf* const data,
-                                       int                     const count,
+                                       size_t                  const count,
                                        wsrep_trx_meta_t*       const meta)
 {
     assert(gh != 0);
@@ -644,7 +643,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
     try
     {
         TrxHandleLock lock(*trx);
-        for (int i(0); i < keys_num; ++i)
+        for (size_t i(0); i < keys_num; ++i)
         {
             galera::KeyData k(repl->trx_proto_ver(),
                               keys[i].key_parts,
@@ -728,19 +727,16 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
 }
 
 
-extern "C"
-wsrep_status_t galera_preordered(wsrep_t* const gh,
-                                 const wsrep_uuid_t*     const source_id,
-                                 int                     const pa_range,
-                                 const struct wsrep_buf* const data,
-                                 int                     const count,
-                                 uint64_t                const flags,
-                                 wsrep_bool_t            const copy)
+extern "C" wsrep_status_t
+galera_preordered_collect (wsrep_t* const gh,
+                           wsrep_po_handle_t*      const handle,
+                           const struct wsrep_buf* const data,
+                           size_t                  const count,
+                           wsrep_bool_t            const copy)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
-    assert(source_id != 0);
-    assert(pa_range >= 0);
+    assert(handle != 0);
     assert(data != 0);
     assert(count > 0);
 
@@ -748,13 +744,46 @@ wsrep_status_t galera_preordered(wsrep_t* const gh,
 
     try
     {
-        return repl->handle_preordered(*source_id, flags, data, count, pa_range,
-                                       copy);
+        return repl->preordered_collect(*handle, data, count, copy);
     }
     catch (std::exception& e)
     {
         log_warn << e.what();
-        return WSREP_CONN_FAIL;
+        return WSREP_TRX_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        return WSREP_FATAL;
+    }
+}
+
+
+extern "C" wsrep_status_t
+galera_preordered_commit (wsrep_t* const gh,
+                          wsrep_po_handle_t*      const handle,
+                          const wsrep_uuid_t*     const source_id,
+                          uint64_t                const flags,
+                          int                     const pa_range,
+                          wsrep_bool_t            const commit)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    assert(handle != 0);
+    assert(source_id != 0 || false == commit);
+    assert(pa_range  >= 0 || false == commit);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    try
+    {
+        return repl->preordered_commit(*handle, *source_id, flags, pa_range,
+                                       commit);
+    }
+    catch (std::exception& e)
+    {
+        log_warn << e.what();
+        return WSREP_TRX_FAIL;
     }
     catch (...)
     {
@@ -803,7 +832,7 @@ wsrep_status_t galera_sst_received (wsrep_t*            const gh,
 extern "C"
 wsrep_status_t galera_snapshot(wsrep_t*    wsrep,
                                const void* msg,
-                               int         msg_len,
+                               size_t      msg_len,
                                const char* donor_spec)
 {
     return WSREP_NOT_IMPLEMENTED;
@@ -976,7 +1005,8 @@ static wsrep_t galera_str = {
     &galera_free_connection,
     &galera_to_execute_start,
     &galera_to_execute_end,
-    &galera_preordered,
+    &galera_preordered_collect,
+    &galera_preordered_commit,
     &galera_sst_sent,
     &galera_sst_received,
     &galera_snapshot,

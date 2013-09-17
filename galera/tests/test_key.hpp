@@ -20,7 +20,7 @@ class TestKey
 {
 public:
 
-    TestKey (int a, int         ver,
+    TestKey (int a, int  ver,
              bool        exclusive,
              std::vector<const char*> parts,
              bool        copy = true)
@@ -34,8 +34,7 @@ public:
 
         for (size_t i = 0; i < parts.size(); ++i)
         {
-            int p_len(parts[i] ? strlen(parts[i]) + 1 : 0);
-            if (p_len < 0) throw std::out_of_range("integer overflow");
+            size_t p_len(parts[i] ? strlen(parts[i]) + 1 : 0);
             wsrep_buf_t b = { parts[i], p_len };
             parts_.push_back(b);
         }
@@ -95,7 +94,7 @@ private:
     bool
     push_back (const char* const p)
     {
-        int p_len(-1);
+        size_t p_len(-1);
         if (p && (p_len = strlen(p) + 1) > 0)
         {
             wsrep_buf_t b = { p, p_len };

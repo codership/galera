@@ -335,9 +335,6 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         throw ae;
     }
 
-    /* WSREP_CB_RETRUN should be returned only from commit callback */
-    assert(WSREP_CB_RETURN != err);
-
     return;
 }
 
