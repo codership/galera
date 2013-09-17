@@ -487,8 +487,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     }
     trx->set_state(TrxHandle::S_COMMITTED);
 
-    apply_monitor_.leave(ao);
-
     if (trx->local_seqno() != -1)
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
