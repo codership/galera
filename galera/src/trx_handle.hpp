@@ -243,6 +243,10 @@ namespace galera
             action_       = action;
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
+            if (write_set_flags_ & F_PREORDERED)
+            {
+                last_seen_seqno_ = global_seqno_ - 1;
+            }
         }
 
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)

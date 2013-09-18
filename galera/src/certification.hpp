@@ -103,8 +103,9 @@ namespace galera
         bool index_purge_required()
         {
             register long const count(key_count_.fetch_and_zero());
-
-            return ((count > Certification::purge_interval_) ||
+            return ((count > Certification::purge_interval_ ||
+                     (trx_map_.size() + 1) % 128 == 0)
+                    ||
                     (key_count_ += count /* restore count */, false));
         }
 

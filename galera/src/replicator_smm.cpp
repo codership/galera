@@ -1228,7 +1228,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx != 0);
     assert(trx->local_seqno() > 0);
     assert(trx->global_seqno() > 0);
-    assert(trx->preordered() || trx->last_seen_seqno() >= 0);
+    assert(trx->last_seen_seqno() >= 0);
     assert(trx->depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATING);
 
@@ -1676,8 +1676,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 
     assert(trx->local_seqno()     != WSREP_SEQNO_UNDEFINED);
     assert(trx->global_seqno()    != WSREP_SEQNO_UNDEFINED);
-    assert(trx->preordered() || trx->last_seen_seqno() >= 0);
-    assert(trx->preordered() || trx->last_seen_seqno() < trx->global_seqno());
+    assert(trx->last_seen_seqno() >= 0);
+    assert(trx->last_seen_seqno() < trx->global_seqno());
 
     trx->set_state(TrxHandle::S_CERTIFYING);
 
