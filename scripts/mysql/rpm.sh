@@ -99,7 +99,8 @@ fi
 # patch freaks out on .bzrignore which doesn't exist in source dist and
 # returns error code
 patch -p1 -f < $WSREP_PATCH || :
-chmod a+x ./BUILD/*wsrep
+# need to fix permissions on 5.1
+[ $MYSQL_VERSION_MINOR -eq 1 ] && chmod a+x ./BUILD/*wsrep
 
 # update configure script for 5.1
 test $MYSQL_VERSION_MINOR -le 5 && ./BUILD/autorun.sh
@@ -113,10 +114,21 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 ##                                  ##
 ######################################
 
-time ./configure --with-wsrep > /dev/null
-
-[ $MYSQL_VERSION_MINOR -eq 1 ] && \
+if [ $MYSQL_VERSION_MINOR -eq 1 ]
+then
+    ./configure --with-wsrep > /dev/null
     pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd
+else
+    cmake \
+    -DBUILD_CONFIG=mysql_release \
+    -DWITH_WSREP=1 \
+    -DWITH_EXTRA_CHARSETS=all \
+    -DWITH_READLINE=yes \
+    -DWITH_SSL=system \
+    -DWITH_ZLIB=system \
+    $MYSQL_SRC \
+    && make -S
+fi
 
 ######################################
 ##                                  ##
