@@ -14,6 +14,36 @@
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+/*!
+  @file wsrep API declaration.
+
+  HOW TO READ THIS FILE.
+
+  Due to C language rules this header layout doesn't lend itself to intuitive
+  reading. So here's the scoop: in the end this header declares two main types:
+
+  * struct wsrep_init_args
+
+  and
+
+  * struct wsrep
+
+  wsrep_init_args contains initialization parameters for wsrep provider like
+  names, addresses, etc. and pointers to callbacks. The callbacks will be called
+  by provider when it needs to do something application-specific, like log a
+  message or apply a writeset. It should be passed to init() call from
+  wsrep API. It is an application part of wsrep API contract.
+
+  struct wsrep is the interface to wsrep provider. It contains all wsrep API
+  calls. It is a provider part of wsrep API contract.
+
+  Finally, wsrep_load() method loads (dlopens) wsrep provider library. It is
+  defined in wsrep_loader.c unit and is part of libwsrep.a (which is not a
+  wsrep provider, but a convenience library).
+
+  wsrep_unload() does the reverse.
+
+*/
 #ifndef WSREP_H
 #define WSREP_H
 
@@ -33,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "24rc3"
+#define WSREP_INTERFACE_VERSION "24"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -1052,7 +1082,6 @@ struct wsrep {
     void *ctx;    //!< reserved for implemetation private context
 };
 
-typedef int (*wsrep_loader_fun)(wsrep_t*);
 
 /*!
  *
