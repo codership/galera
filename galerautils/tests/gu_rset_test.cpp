@@ -22,6 +22,7 @@ public:
         str_(reinterpret_cast<const char*>(buf_ + sizeof(uint32_t))),
         own_(true)
     {
+        fail_if (size_ > 0x7fffffff);
         if (0 == buf_) throw std::runtime_error("failed to allocate record");
         gu::byte_t* tmp = const_cast<gu::byte_t*>(buf_);
         *reinterpret_cast<uint32_t*>(tmp) = htog32(size_);
@@ -100,6 +101,8 @@ START_TEST (ver0)
     // the choice of sizes below is based on default allocator memory store size
     // of 4MB. If it is changed, these need to be changed too.
     TestRecord rout0(120,  "abc0");
+    fail_if (rout0.serial_size() != 120);
+    fail_if (gtoh32(*reinterpret_cast<const uint32_t*>(rout0.buf())) != 120);
     TestRecord rout1(121,  "abc1");
     TestRecord rout2(122,  "012345");
     TestRecord rout3(123,  "defghij");
@@ -121,30 +124,42 @@ START_TEST (ver0)
                                           gu::RecordSet::VER1);
 
     size_t offset(rset_out.size());
-    ssize_t ret;
-
     fail_if (1 != rset_out.page_count());
 
+    std::pair<const gu::byte_t*, size_t> rp;
+    int rsize;
+    const void* rout_ptrs[7];
+
     // this should be allocated inside current page
-    ret = rset_out.append (rout0).second;
-    fail_if (ret != rout0.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout0);
+    rout_ptrs[0] = rp.first;
+    rsize = rp.second;
+    fail_if (rsize != rout0.serial_size());
+    fail_if (rsize < 0);
+    fail_if (rsize != TestRecord::serial_size(rp.first, rsize));
+    offset += rsize;
     fail_if (rset_out.size() != offset);
 
     fail_if (1 != rset_out.page_count());
 
     // this should trigger new page since not stored
-    ret = rset_out.append (rout1.buf(), rout1.serial_size(), false).second;
-    fail_if (ret != rout1.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout1.buf(), rout1.serial_size(), false);
+    rout_ptrs[1] = rp.first;
+    rsize = rp.second;
+    fail_if (rsize != rout1.serial_size());
+    offset += rsize;
     fail_if (rset_out.size() != offset);
 
     fail_if (2 != rset_out.page_count());
 
     // this should trigger new page since previous one was not stored
-    ret = rset_out.append (rout2).second;
-    fail_if (ret != rout2.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout2);
+    rout_ptrs[2] = rp.first;
+    rsize = rp.second;
+    fail_if (rsize != rout2.serial_size());
+    fail_if (rsize < 0);
+    fail_if (rsize != TestRecord::serial_size(rp.first, rsize));
+    offset += rsize;
     fail_if (rset_out.size() != offset);
 
     fail_if (3 != rset_out.page_count(),
@@ -152,30 +167,39 @@ START_TEST (ver0)
 
     //***** test partial record appending *****//
     // this should be allocated inside the current page.
-    ret = rset_out.append (rout3.buf(), 3).second;
+    rp = rset_out.append (rout3.buf(), 3);
+//    rout_ptrs[2] = rp.first;
+    rsize = rp.second;
+    offset += rp.second;
     fail_if (3 != rset_out.page_count());
 
     // this should trigger a new page, since not stored
-    ret += rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false,
-                            false).second;
-    fail_if (ret != rout3.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false,
+                            false);
+    rout_ptrs[3] = rp.first;
+    rsize += rp.second;
+    fail_if (rsize != rout3.serial_size());
+    offset += rp.second;
     fail_if (rset_out.size() != offset);
 
     fail_if (4 != rset_out.page_count());
 
     // this should trigger new page, because won't fit in the current page
-    ret = rset_out.append (rout4).second;
-    fail_if (ret != rout4.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout4);
+    rout_ptrs[4] = rp.first;
+    rsize = rp.second;
+    fail_if (rsize != rout4.serial_size());
+    offset += rsize;
     fail_if (rset_out.size() != offset);
 
     fail_if (5 != rset_out.page_count());
 
     // this should trigger new page, because 4MB RAM limit exceeded
-    ret = rset_out.append (rout5).second;
-    fail_if (ret != rout5.serial_size());
-    offset += ret;
+    rp = rset_out.append (rout5);
+    rout_ptrs[5] = rp.first;
+    rsize = rp.second;
+    fail_if (rsize != rout5.serial_size());
+    offset += rsize;
     fail_if (rset_out.size() != offset);
 
     fail_if (6 != rset_out.page_count(),
@@ -205,15 +229,21 @@ START_TEST (ver0)
     mark_point();
     for (size_t i = 0; i < out_bufs->size(); ++i)
     {
-        fail_if (0 == out_bufs[i].ptr);
+        // 0th fragment starts with header, so it it can't be used in this check
+        fail_if (i > 0 && rout_ptrs[i] != out_bufs[i].ptr,
+                 "Record pointers don't mathch after gather(). "
+                 "old: %p, new: %p", rout_ptrs[i],out_bufs[i].ptr);
 
         ssize_t size = gtoh32(
             *reinterpret_cast<const uint32_t*>(out_bufs[i].ptr));
 
-        fail_if (size <= 4);
-
         const char* str =
             reinterpret_cast<const char*>(out_bufs[i].ptr) + sizeof(uint32_t);
+
+        // 0th fragment starts with header, so it it can't be used in this check
+        fail_if (i > 0 && size <= ssize_t(sizeof(uint32_t)),
+                 "Expected size > 4, got %zd(%#010zx). i = %zu, buf = %s",
+                 size, size, i, str);
 
         // the above variables make have sense only on certain pages
         // hence ifs below
@@ -238,7 +268,7 @@ START_TEST (ver0)
 
         log_info << "\nadding buf " << i << ": "
                  << gu::Hexdump(out_bufs[i].ptr,
-                                std::min(out_bufs[i].size, 24L), true);
+                                std::min<ssize_t>(out_bufs[i].size, 24), true);
 
         size_t old_size = in_buf.size();
 

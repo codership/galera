@@ -172,7 +172,7 @@ START_TEST (ver0)
 
         log_info << "\nadding buf " << i << ": "
                  << gu::Hexdump(out_bufs[i].ptr,
-                                std::min(out_bufs[i].size, 24L), true);
+                                std::min<ssize_t>(out_bufs[i].size, 24), true);
 
         size_t old_size = in_buf.size();
 

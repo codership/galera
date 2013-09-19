@@ -97,7 +97,7 @@ START_TEST(service_thd3)
     // so far for empty GCache the following should be a noop.
     thd->release_seqno(-1);
     thd->release_seqno(2345);
-    thd->release_seqno(23464567686);
+    thd->release_seqno(234645676);
     delete thd;
 }
 END_TEST
