@@ -349,12 +349,13 @@ then
         tar -xzf $mysql_orig_tar_gz
         cd $mysql_tag/
         patch -p1 -f < $patch_file >/dev/null || :
-        chmod a+x ./BUILD/*wsrep
+        # chmod a+x ./BUILD/*wsrep
         CONFIGURE="yes"
     else
         cd $mysql_tag/
     fi
     MYSQL_SRC=$(pwd -P)
+    MYSQL_BUILD_DIR=$MYSQL_SRC
     if [ "$CONFIGURE" == "yes" ]
     then
         echo "Regenerating config files"
@@ -434,8 +435,11 @@ then
             [ "$DEBUG" = "yes" ] \
             && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
             || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
-            [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
-            [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
+           if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
+           then
+               [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
+               [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
+           fi
             pushd $MYSQL_BUILD_DIR
             cmake $BUILD_OPT \
                   ${CC:+-DCMAKE_C_COMPILER="$CC"} \
@@ -675,7 +679,15 @@ fi
 
 get_arch()
 {
-    if [ "$OS" == "Darwin" ]; then
+    if ! [ -z "$TARGET" ]
+    then
+       if [ "$TARGET" == "i686" ]
+       then
+           echo "i386"
+       else
+           echo "amd64"
+       fi
+    elif [ "$OS" == "Darwin" ]; then
         if file $MYSQL_SRC/sql/mysqld | grep "i386" >/dev/null 2>&1
         then
             echo "i386"

@@ -104,7 +104,7 @@ f 644 root root $SHAR_DST                      $MYSQL_SRC/support-files/my-*.cnf
 f 644 root root $SHAR_DST/mysql-log-rotate     $MYSQL_SRC/support-files/mysql-log-rotate
 f 755 root root $SHAR_DST/mysql.server         $MYSQL_SRC/support-files/mysql.server
 f 644 root root $SHAR_DST/mysqld_multi.server  $MYSQL_SRC/support-files/mysqld_multi.server
-f 644 root root $SHAR_DST/ndb-config-2-node.ini $MYSQL_SRC/support-files/ndb-config-2-node.ini
+# f 644 root root $SHAR_DST/ndb-config-2-node.ini $MYSQL_SRC/support-files/ndb-config-2-node.ini
 
 d 755 root root $SHAR_DST/charsets -
 f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
