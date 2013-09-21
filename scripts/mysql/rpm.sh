@@ -113,6 +113,8 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 ##                                  ##
 ######################################
 
+export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
+
 time ./configure --with-wsrep > /dev/null
 
 [ $MYSQL_VERSION_MINOR -eq 1 ] && \
@@ -123,8 +125,6 @@ time ./configure --with-wsrep > /dev/null
 ##       Build binary tar.gz        ##
 ##                                  ##
 ######################################
-
-export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
 [ $MYSQL_VERSION_MINOR -eq 1 ] && make bin-dist || make package
 
