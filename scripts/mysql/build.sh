@@ -434,14 +434,17 @@ then
         else # CMake build
             [ "$DEBUG" = "yes" ] \
             && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
-            || BUILD_OPT="-DBUILD_CONFIG=mysql_release"
-           if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
-           then
+            || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
+
+            if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
+            then
                [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
                [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
-           fi
+            fi
+
             pushd $MYSQL_BUILD_DIR
             cmake $BUILD_OPT \
+                  -DBUILD_CONFIG=mysql_release \
                   ${CC:+-DCMAKE_C_COMPILER="$CC"} \
                   ${CXX:+-DCMAKE_CXX_COMPILER="$CXX"} \
                   -DWITH_WSREP=1 \

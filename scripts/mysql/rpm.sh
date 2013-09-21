@@ -114,12 +114,15 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 ##                                  ##
 ######################################
 
+export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
+
 if [ $MYSQL_VERSION_MINOR -eq 1 ]
 then
     ./configure --with-wsrep > /dev/null
     pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd
 else
     cmake \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_CONFIG=mysql_release \
     -DWITH_WSREP=1 \
     -DWITH_EXTRA_CHARSETS=all \
@@ -135,8 +138,6 @@ fi
 ##       Build binary tar.gz        ##
 ##                                  ##
 ######################################
-
-export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
 [ $MYSQL_VERSION_MINOR -eq 1 ] && make bin-dist || make package
 

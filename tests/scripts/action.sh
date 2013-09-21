@@ -254,7 +254,8 @@ _cluster_up()
         then
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
-            "gcomm") $cmd "-g 'gcomm://:${NODE_GCS_PORT[$node]}$(extra_params $node)'" "$@" 0 ;;
+#            "gcomm") $cmd "-g 'gcomm://:${NODE_GCS_PORT[$node]}$(extra_params $node)'" "$@" 0 ;;
+            "gcomm") $cmd "-g $(gcs_address $node) --mysql-opt --wsrep-new-cluster" "$@" 0 ;;
             "vsbes") $cmd "-g 'vsbes://$VSBES_ADDRESS'" "$@" 0 ;;
             esac
         else
