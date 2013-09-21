@@ -568,7 +568,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
             if (!gu_uuid_compare(&group->state_uuid, state_uuid)) {
 
                 gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
-                         " from %ld (%s)", GU_UUID_ARGS(state_uuid),
+                         " from %d (%s)", GU_UUID_ARGS(state_uuid),
                          msg->sender_idx, gcs_state_msg_name(state));
 
                 if (gu_log_debug) group_print_state_debug(state);
