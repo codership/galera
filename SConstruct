@@ -103,7 +103,7 @@ else:
     link_arch    = ''
 
 boost      = int(ARGUMENTS.get('boost', 1))
-boost_pool = int(ARGUMENTS.get('boost_pool', 1))
+boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
