@@ -103,13 +103,13 @@ else:
     link_arch    = ''
 
 boost      = int(ARGUMENTS.get('boost', 1))
-boost_pool = int(ARGUMENTS.get('boost_pool', 1))
+boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '2.7dev')
+GALERA_VER = ARGUMENTS.get('version', '2.7')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')

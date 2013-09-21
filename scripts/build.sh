@@ -235,7 +235,15 @@ build_base=$(cd $(dirname $0)/..; pwd -P)
 
 get_arch()
 {
-    if [ "$OS" == "Darwin" ]; then
+    if ! [ -z "$TARGET" ]
+    then
+       if [ "$TARGET" == "i686" ]
+       then
+           echo "i386"
+       else
+           echo "amd64"
+       fi
+    elif [ "$OS" == "Darwin" ]; then
         if file $build_base/gcs/src/gcs.o | grep "i386" >/dev/null 2>&1
         then
             echo "i386"
