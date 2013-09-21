@@ -21,12 +21,7 @@ struct gu_rse
     long long   time;
     const void* heap_ptr;
     const void* stack_ptr;
-#ifdef WITH_VALGRIND
-    /* To suppress uninitialized memory valgrind error */
     long        pid;
-#else
-    pid_t       pid;
-#endif /* WITH_VALGRIND */
 };
 
 typedef struct gu_rse gu_rse_t;
