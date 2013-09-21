@@ -405,15 +405,17 @@ then
             [ $DEBIAN -ne 0 ] && \
                 MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
                 MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
+
             CMAKE_LAYOUT_OPTIONS=( \
-                -DCMAKE_INSTALL_PREFIX="/usr" \
                 -DINSTALL_LAYOUT=RPM \
+                -DCMAKE_INSTALL_PREFIX="/usr" \
                 -DINSTALL_SBINDIR="/usr/sbin" \
                 -DMYSQL_DATADIR="/var/lib/mysql" \
                 -DMYSQL_UNIX_ADDR=$MYSQL_SOCKET_PATH \
                 -DCMAKE_OSX_ARCHITECTURES=$(uname -m) \
             )
         fi
+
         [ -n "$EXTRA_SYSROOT" ] && \
             CMAKE_LAYOUT_OPTIONS+=( \
                 -DCMAKE_PREFIX_PATH="$EXTRA_SYSROOT" \
@@ -443,15 +445,15 @@ then
             fi
 
             pushd $MYSQL_BUILD_DIR
-            cmake $BUILD_OPT \
-                  -DBUILD_CONFIG=mysql_release \
+            cmake \
                   ${CC:+-DCMAKE_C_COMPILER="$CC"} \
                   ${CXX:+-DCMAKE_CXX_COMPILER="$CXX"} \
-                  -DWITH_WSREP=1 \
+                  -DBUILD_CONFIG=mysql_release \
                   "${CMAKE_LAYOUT_OPTIONS[@]}" \
+                  $BUILD_OPT \
+                  -DWITH_WSREP=1 \
                   -DWITH_EXTRA_CHARSETS=all \
-                  -DWITH_READLINE=yes \
-                  -DWITH_SSL=system \
+                  -DWITH_SSL=yes \
                   -DWITH_ZLIB=system \
                   $MYSQL_SRC \
             && make -S && popd || exit 1

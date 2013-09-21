@@ -126,8 +126,7 @@ else
     -DBUILD_CONFIG=mysql_release \
     -DWITH_WSREP=1 \
     -DWITH_EXTRA_CHARSETS=all \
-    -DWITH_READLINE=yes \
-    -DWITH_SSL=system \
+    -DWITH_SSL=yes \ # tries system then bundled
     -DWITH_ZLIB=system \
     $MYSQL_SRC \
     && make -S

@@ -526,7 +526,9 @@ case $1 in
 #            MYSQL_LOG="log"
             ;;
     --valgrind)
-            VALGRIND="valgrind --log-file=$MYSQL_DATA_DIR/vg.log --leak-check=full"
+            VALGRIND="valgrind --log-file=$MYSQL_DATA_DIR/vg.log --leak-check=full --track-origins=yes"
+            # to force deallocation in std::string and STL containers
+            export GLIBCXX_FORCE_NEW=1
             ;;
     --gdb)
             GDB="gdb"
