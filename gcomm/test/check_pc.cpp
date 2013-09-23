@@ -1673,6 +1673,7 @@ START_TEST(test_checksum)
 {
     log_info << "START (test_checksum)";
     gu::Config conf;
+    conf.set(Conf::PcChecksum, gu::to_string(true));
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
