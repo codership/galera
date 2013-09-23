@@ -12,6 +12,7 @@
 #include "gcomm/protolay.hpp"
 #include "gcomm/conf.hpp"
 #include "pc_message.hpp"
+#include "defaults.hpp"
 
 #include "gu_uri.hpp"
 
@@ -68,17 +69,21 @@ public:
         Protolay(conf),
         version_(
             check_range(Conf::PcVersion,
-                        param<int>(conf, uri, Conf::PcVersion, "0"),
+                        param<int>(conf, uri, Conf::PcVersion,
+                                   Defaults::PcVersion),
                         0, max_version_ + 1)),
         my_uuid_       (uuid),
         start_prim_    (),
-        npvo_          (param<bool>(conf, uri, Conf::PcNpvo, "false")),
-        ignore_sb_     (param<bool>(conf, uri, Conf::PcIgnoreSb, "false")),
-        ignore_quorum_ (param<bool>(conf, uri, Conf::PcIgnoreQuorum, "false")),
+        npvo_          (param<bool>(conf, uri, Conf::PcNpvo, Defaults::PcNpvo)),
+        ignore_quorum_ (param<bool>(conf, uri, Conf::PcIgnoreQuorum,
+                                    Defaults::PcIgnoreQuorum)),
+        ignore_sb_     (param<bool>(conf, uri, Conf::PcIgnoreSb,
+                                    gu::to_string(ignore_quorum_))),
         closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
-        checksum_      (param<bool>(conf, uri, Conf::PcChecksum, "true")),
+        checksum_      (param<bool>(conf, uri, Conf::PcChecksum,
+                                    Defaults::PcChecksum)),
         instances_     (),
         self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
         state_msgs_    (),
@@ -87,7 +92,8 @@ public:
         views_         (),
         mtu_           (std::numeric_limits<int32_t>::max()),
         weight_        (check_range(Conf::PcWeight,
-                                    param<int>(conf, uri, Conf::PcWeight, "1"),
+                                    param<int>(conf, uri, Conf::PcWeight,
+                                               Defaults::PcWeight),
                                     0, 0xff))
     {
         log_info << "PC version " << version_;
@@ -96,8 +102,8 @@ public:
 
         conf.set(Conf::PcVersion,      gu::to_string(version_));
         conf.set(Conf::PcNpvo,         gu::to_string(npvo_));
-        conf.set(Conf::PcIgnoreSb,     gu::to_string(ignore_sb_));
         conf.set(Conf::PcIgnoreQuorum, gu::to_string(ignore_quorum_));
+        conf.set(Conf::PcIgnoreSb,     gu::to_string(ignore_sb_));
         conf.set(Conf::PcChecksum,     gu::to_string(checksum_));
         conf.set(Conf::PcWeight,       gu::to_string(weight_));
     }
@@ -198,8 +204,8 @@ private:
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              npvo_;          // Newer prim view overrides
-    bool              ignore_sb_;     // Ignore split-brain condition
     bool              ignore_quorum_; // Ignore lack of quorum
+    bool              ignore_sb_;     // Ignore split-brain condition
     bool              closing_;       // Protocol is in closing stage
     State             state_;         // State
     uint32_t          last_sent_seq_; // Msg seqno of last sent message
