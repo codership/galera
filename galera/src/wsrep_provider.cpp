@@ -56,14 +56,17 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 extern "C"
 uint64_t galera_capabilities(wsrep_t* gh)
 {
-    return (WSREP_CAP_MULTI_MASTER      |
-            WSREP_CAP_CERTIFICATION     |
-            WSREP_CAP_PARALLEL_APPLYING |
-            WSREP_CAP_TRX_REPLAY        |
-            WSREP_CAP_ISOLATION         |
-            WSREP_CAP_PAUSE             |
-            WSREP_CAP_PREORDERED        |
-            WSREP_CAP_CAUSAL_READS);
+    return (WSREP_CAP_MULTI_MASTER         |
+            WSREP_CAP_CERTIFICATION        |
+            WSREP_CAP_PARALLEL_APPLYING    |
+            WSREP_CAP_TRX_REPLAY           |
+            WSREP_CAP_ISOLATION            |
+            WSREP_CAP_PAUSE                |
+            WSREP_CAP_CAUSAL_READS         |
+            WSREP_CAP_INCREMENTAL_WRITESET |
+            WSREP_CAP_UNORDERED            |
+            WSREP_CAP_PREORDERED
+            );
 }
 
 

@@ -104,7 +104,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_CAP_PAUSE                 ( 1ULL << 5 )
 #define WSREP_CAP_CAUSAL_READS          ( 1ULL << 6 )
 #define WSREP_CAP_CAUSAL_TRX            ( 1ULL << 7 )
-#define WSREP_CAP_WRITE_SET_INCREMENTS  ( 1ULL << 8 )
+#define WSREP_CAP_INCREMENTAL_WRITESET  ( 1ULL << 8 )
 #define WSREP_CAP_SESSION_LOCKS         ( 1ULL << 9 )
 #define WSREP_CAP_DISTRIBUTED_LOCKS     ( 1ULL << 10 )
 #define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 11 )
