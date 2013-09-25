@@ -172,9 +172,6 @@ private:
         Page* my_new_page (size_t const size);
     };
 
-    byte_t     buf_[ 1U << 12 ]; /* 4K buffer optimistically preallocated
-                                  * together with the object in hopes to avoid
-                                  * additional allocations. */
     Page       first_page_;
     Page*      current_page_;
 

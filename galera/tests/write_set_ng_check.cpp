@@ -122,18 +122,18 @@ START_TEST (ver3_basic)
 
         mark_point();
         const DataSetIn& dsi(wsi.dataset());
-        fail_if (dsi.count() != 2);
+        fail_if (dsi.count() != 1);
 
         mark_point();
-        gu::Buf const d1(dsi.next());
-        fail_if (d1.size != sizeof(data_out_volatile));
-        fail_if (*(reinterpret_cast<const uint64_t*>(d1.ptr)) !=
+        gu::Buf const d(dsi.next());
+        fail_if (d.size !=
+                 sizeof(data_out_volatile) + sizeof(data_out_persistent));
+
+        const char* dptr = reinterpret_cast<const char*>(d.ptr);
+        fail_if (*(reinterpret_cast<const uint64_t*>(dptr)) !=
                  data_out_volatile);
-
-        mark_point();
-        gu::Buf const d2(dsi.next());
-        fail_if (d2.size != sizeof(data_out_persistent));
-        fail_if (*(reinterpret_cast<const uint32_t*>(d2.ptr)) !=
+        fail_if (*(reinterpret_cast<const uint32_t*>
+                                    (dptr + sizeof(data_out_volatile))) !=
                  data_out_persistent);
 
         mark_point();

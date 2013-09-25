@@ -109,7 +109,7 @@ public:
 
         if (n <= max_size())
         {
-            log_warn << "Using HEAP for " << n << " objects\n";
+//            log_warn << "Using HEAP for " << n << " objects\n";
             void* ret = malloc(n * sizeof(T));
             if (NULL != ret) return static_cast<T*>(ret);
         }

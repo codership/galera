@@ -44,17 +44,14 @@ namespace galera
             static size_t serial_size (const gu::byte_t* const buf,
                                        size_t const            size)
             {
-                size_t payload_size;
-                size_t off = gu::uleb128_decode(buf, size, payload_size);
-                return (payload_size + off);
+                /* There's a single record in a dataset */
+                return size;
             }
 
-            size_t serial_size () const { return off_ + size_; }
+            size_t serial_size () const { return size_; }
 
             RecordIn (const gu::byte_t* buf, size_t size)
-                : size_(),
-                  off_ (gu::uleb128_decode (buf, size, size_)),
-                  buf_ (buf + off_)
+                  : size_(size), buf_(buf)
             {}
 
             gu::Buf buf() { gu::Buf ret = { buf_, size_ }; return ret; }
@@ -62,7 +59,6 @@ namespace galera
         private:
 
             ssize_t           size_;
-            ssize_t const     off_;
             const gu::byte_t* buf_;
 
         }; /* class RecordIn */
@@ -99,18 +95,12 @@ namespace galera
         size_t
         append (const void* const src, size_t const size, bool const store)
         {
-            gu::byte_t serial_size[8]; // this allows to encode 56-bits, any
-                                       // size that does not fit in is unreal
-            size_t const size_size (gu::uleb128_encode(size, serial_size,
-                                                       sizeof(serial_size)));
-
-            /* first - size of record */
-            gu::RecordSetOut<DataSet::RecordOut>::append (&serial_size, size_size, true);
-            /* then record itself, don't count as a new record */
-            gu::RecordSetOut<DataSet::RecordOut>::append (src, size, store, false);
+            /* append data as is, don't count as a new record */
+            gu::RecordSetOut<DataSet::RecordOut>::append (src, size, store,
+                                                          false);
             /* this will be deserialized using DataSet::RecordIn in DataSetIn */
 
-            return size_size + size;
+            return size;
         }
 
         DataSet::Version
@@ -121,7 +111,7 @@ namespace galera
     private:
 
         // depending on version we may pack data differently
-        DataSet::Version version_;
+        DataSet::Version const version_;
 
         static gu::RecordSet::CheckType
         check_type (DataSet::Version ver)
@@ -157,7 +147,9 @@ namespace galera
             version_(ver)
         {}
 
-        DataSetIn () : gu::RecordSetIn<DataSet::RecordIn>(), version_(DataSet::EMPTY) {}
+        DataSetIn () : gu::RecordSetIn<DataSet::RecordIn>(),
+                       version_(DataSet::EMPTY)
+        {}
 
         void init (DataSet::Version ver, const gu::byte_t* buf, size_t size)
         {
@@ -165,7 +157,10 @@ namespace galera
             version_ = ver;
         }
 
-        gu::Buf next () const { return gu::RecordSetIn<DataSet::RecordIn>::next().buf(); }
+        gu::Buf next () const
+        {
+            return gu::RecordSetIn<DataSet::RecordIn>::next().buf();
+        }
 
     private:
 

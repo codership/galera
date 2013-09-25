@@ -105,64 +105,6 @@ protected:
 #endif
         );
 
-    /*! return total size of a RecordSet */
-#if 0 // this has code duplication
-    template <class R>
-    ssize_t append_base (const R& record)
-    {
-        ssize_t const size(record.serial_size());
-
-#ifdef GU_RSET_CHECK_SIZE
-        if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
-#endif
-
-        bool new_page;
-
-        byte_t* const ptr(alloc_.alloc (size, new_page));
-
-        new_page = (new_page || !prev_stored_);
-
-        ssize_t const ssize (record.serialize_to (ptr, size));
-
-        assert (ssize == size);
-
-        prev_stored_ = true;
-        count++;
-
-        return post_append (new_page, ptr, ssize);
-    }
-
-    ssize_t append_base (const void* const src, ssize_t const size,
-                         bool const store = true, bool const new_record = true)
-    {
-        assert (src);
-        assert (size);
-
-#ifdef GU_RSET_CHECK_SIZE
-        if (gu_unlikely(size > max_size_ - size_)) gu_throw_error(EMSGSIZE);
-#endif
-
-        bool new_page(!store);
-        const byte_t* ptr(reinterpret_cast<const byte_t*>(src));
-
-        if (store)
-        {
-            ptr = alloc_.alloc (size, new_page);
-            assert (0 != ptr); // alloc should throw
-
-            new_page = (new_page || !prev_stored_);
-
-            ::memcpy (const_cast<byte_t*>(ptr), src, size);
-        }
-
-        prev_stored_ = store;
-        count_ += new_record;
-
-        return post_append (new_page, ptr, size);
-    }
-
-#else // OLD - the following has no code duplication
-
     /* this is to emulate partial specialization of function template through
      * overloading by parameter */
     template <bool store> struct HasPtr{};
@@ -229,14 +171,13 @@ protected:
         process (record, ptr, new_page, size, store, HasPtr<has_ptr>());
 
         prev_stored_ = store;
-        count_ += new_record;
+        // make sure there is at least one record
+        count_ += new_record || (0 == count_);
 
         post_append (new_page, ptr, size);
 
         return std::pair<const byte_t*, size_t>(ptr, size);
     }
-
-#endif /* OLD */
 
 private:
 

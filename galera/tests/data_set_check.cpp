@@ -144,7 +144,7 @@ START_TEST (ver0)
     offset += dset_out.append (rout5.buf(), rout5.serial_size(), false);
     fail_if (dset_out.size() != offset);
 
-    fail_if (records.size() != size_t(dset_out.count()));
+    fail_if (1 != size_t(dset_out.count()));
 
     DataSetOut::GatherVector out_bufs;
     out_bufs().reserve (dset_out.page_count());
