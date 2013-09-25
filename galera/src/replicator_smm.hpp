@@ -50,6 +50,7 @@ namespace galera
         ~ReplicatorSMM();
 
         int trx_proto_ver() const { return trx_params_.version_; }
+        int repl_proto_ver() const{ return protocol_version_; }
 
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,

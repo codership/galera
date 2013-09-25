@@ -49,6 +49,7 @@ namespace galera
         virtual wsrep_status_t async_recv(void* recv_ctx) = 0;
 
         virtual int trx_proto_ver() const = 0;
+        virtual int repl_proto_ver() const = 0;
         virtual TrxHandle* local_trx(wsrep_trx_id_t) = 0;
         virtual TrxHandle* local_trx(wsrep_ws_handle_t*, bool) = 0;
         virtual void unref_local_trx(TrxHandle* trx) = 0;
