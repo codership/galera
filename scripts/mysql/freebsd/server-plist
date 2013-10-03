@@ -1,18 +1,28 @@
 @comment PKG_FORMAT_REVISION:1.1
-@name mysql-server-5.5.31_wsrep_%{VERSION}
-@comment ORIGIN:databases/mysql55-server_wsrep
+@name mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}
+@comment ORIGIN:databases/mysql%{MAJORMINOR}-server_wsrep
 @cwd /usr/local
 @srcdir %{SRCDIR}
 @comment "=== dependencies ==="
-@comment "require /usr/local/lib/gcc44/libstdc++.so"
-@comment // @pkgdep gcc-4.4.7,1
-@comment DEPORIGIN:lang/gcc44
+@comment "require /usr/local/lib/gcc48/libstdc++.so"
+@comment // @pkgdep gcc-4.8.2.s20130808
+@comment DEPORIGIN:lang/gcc48
+@comment // @pkgdep openssl-1.0.1_8
+@comment DEPORIGIN:security/openssl
 @comment // @pkgdep libexecinfo-1.1_3
 @comment DEPORIGIN:devel/libexecinfo
-@pkgdep mysql-client-5.5.31_wsrep_%{VERSION}
-@comment DEPORIGIN:databases/mysql55-client_wsrep
-@conflicts mysql-server-[345].*
+@comment // @pkgdep lsof-4.88.d,8
+@comment DEPORIGIN:sysutils/lsof
+@comment // @pkgdep sudo-1.8.7_1
+@comment DEPORIGIN:security/sudo
+@comment // @pkgdep rsync-3.0.9_3
+@comment DEPORIGIN:net/rsync
+@pkgdep mysql-client-%{MYSQL_VER}_wsrep_%{RELEASE}
+@comment DEPORIGIN:databases/mysql%{MAJORMINOR}-client_wsrep
+@conflicts mysql-server-[34].*
 @conflicts mysql-server-5.[0-46-9].*
+@conflicts mariadb-server-5.*
+@conflicts percona-server-5.*
 @comment "=== preinstall stage ==="
 @exec echo "===> Linking /usr/local/bin/bash to /bin/bash"
 @exec [ -x /bin/bash ] && echo "Using existing /bin/bash." || ln -s ../usr/local/bin/bash /bin/bash
@@ -26,33 +36,38 @@
 @owner root
 @group wheel
 @mode 0444
-@comment // man/man1/my_print_defaults.1.gz
-@comment // man/man1/myisam_ftdump.1.gz
-@comment // man/man1/myisamchk.1.gz
-@comment // man/man1/myisamlog.1.gz
-@comment // man/man1/myisampack.1.gz
-@comment // man/man1/mysql.server.1.gz
-@comment // man/man1/mysql_convert_table_format.1.gz
-@comment // man/man1/mysql_fix_extensions.1.gz
-@comment // man/man1/mysql_install_db.1.gz
-@comment // man/man1/mysql_plugin.1.gz
-@comment // man/man1/mysql_secure_installation.1.gz
-@comment // man/man1/mysql_setpermission.1.gz
-@comment // man/man1/mysql_tzinfo_to_sql.1.gz
-@comment // man/man1/mysql_upgrade.1.gz
-@comment // man/man1/mysql_zap.1.gz
-@comment // man/man1/mysqlbug.1.gz
-@comment // man/man1/mysqld_multi.1.gz
-@comment // man/man1/mysqld_safe.1.gz
-@comment // man/man1/mysqldumpslow.1.gz
-@comment // man/man1/mysqlhotcopy.1.gz
+share/licenses/mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}/catalog.mk
+share/licenses/mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}/LICENSE
+share/licenses/mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}/GPLv3
+@comment "added: man/man1/innochecksum.1.gz"
+man/man1/innochecksum.1.gz
+man/man1/my_print_defaults.1.gz
+man/man1/myisam_ftdump.1.gz
+man/man1/myisamchk.1.gz
+man/man1/myisamlog.1.gz
+man/man1/myisampack.1.gz
+man/man1/mysql.server.1.gz
+man/man1/mysql_convert_table_format.1.gz
+man/man1/mysql_fix_extensions.1.gz
+man/man1/mysql_install_db.1.gz
+man/man1/mysql_plugin.1.gz
+man/man1/mysql_secure_installation.1.gz
+man/man1/mysql_setpermission.1.gz
+man/man1/mysql_tzinfo_to_sql.1.gz
+man/man1/mysql_upgrade.1.gz
+man/man1/mysql_zap.1.gz
+man/man1/mysqlbug.1.gz
+man/man1/mysqld_multi.1.gz
+man/man1/mysqld_safe.1.gz
+man/man1/mysqldumpslow.1.gz
+man/man1/mysqlhotcopy.1.gz
 man/man1/mysqlman.1.gz
-@comment // man/man1/mysqltest.1.gz
-@comment // man/man1/perror.1.gz
-@comment // man/man1/replace.1.gz
-@comment // man/man1/resolve_stack_dump.1.gz
-@comment // man/man1/resolveip.1.gz
-@comment // man/man8/mysqld.8.gz
+man/man1/mysqltest.1.gz
+man/man1/perror.1.gz
+man/man1/replace.1.gz
+man/man1/resolve_stack_dump.1.gz
+man/man1/resolveip.1.gz
+man/man8/mysqld.8.gz
 @mode 0555
 bin/innochecksum
 bin/my_print_defaults
@@ -180,18 +195,17 @@ bin/wsrep_sst_rsync
 bin/wsrep_sst_rsync_wan
 bin/wsrep_sst_xtrabackup
 @mode 0444
-share/mysql/wsrep.cnf
+share/mysql/my_wsrep.cnf
 share/mysql/wsrep_notify
-share/doc/mysql/LICENSE.mysql
-share/doc/mysql/LICENSE.wsrep
-share/doc/mysql/README.wsrep
-share/doc/mysql/QUICK_START.wsrep
+share/doc/mysql%{MAJORMINOR}-server_wsrep/README
+share/doc/mysql%{MAJORMINOR}-server_wsrep/QUICK_START
 @mode 0555
 etc/rc.d/mysql-server
-@comment // info/mysql.info
+info/mysql.info
 @comment "=== postinstall stage ==="
-@comment // @exec && install-info --quiet %D/info/mysql.info %D/info/dir
+@exec install-info --quiet %D/info/mysql.info %D/info/dir
 @comment "=== postremove stage ==="
+@dirrm share/licenses/mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}
 @dirrm lib/mysql/plugin
 @unexec rmdir "%D/lib/mysql" 2>/dev/null || true
 @dirrm share/mysql/charsets
@@ -219,7 +233,7 @@ etc/rc.d/mysql-server
 @dirrm share/mysql/swedish
 @dirrm share/mysql/ukrainian
 @dirrm share/mysql
-@comment // @unexec [ -f %D/info/mysql.info ] && install-info --quiet --delete %D/info/mysql.info %D/info/dir
-@comment // @unexec if [ -f %D/info/dir ]; then if sed -e '1,/Menu:/d' %D/info/dir | grep -q '^[*] '; then true; else rm %D/info/dir; fi; fi
+@unexec [ -f %D/info/mysql.info ] && install-info --quiet --delete %D/info/mysql.info %D/info/dir || true
+@unexec if [ -f %D/info/dir ]; then if sed -e '1,/Menu:/d' %D/info/dir | grep -q '^[*] '; then true; else rm %D/info/dir; fi; fi
 @unexec if /usr/sbin/pw user show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" user. "; fi
 @unexec if /usr/sbin/pw group show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" group. "; fi
