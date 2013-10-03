@@ -1,12 +1,14 @@
 @comment PKG_FORMAT_REVISION:1.1
-@name galera-%{VERSION}
+@name galera-%{RELEASE}
 @comment ORIGIN:databases/galera
 @cwd /usr/local
 @srcdir %{SRCDIR}
 @comment "=== dependencies ==="
-@comment "require /usr/local/lib/gcc44/libstdc++.so"
-@comment // @pkgdep gcc-4.4.7,1
-@comment DEPORIGIN:lang/gcc44
+@comment "require /usr/local/lib/gcc48/libstdc++.so"
+@comment // @pkgdep gcc-4.8.2.s20130808
+@comment DEPORIGIN:lang/gcc48
+@comment // @pkgdep openssl-1.0.1_8
+@comment DEPORIGIN:security/openssl
 @comment // @pkgdep libexecinfo-1.1_3
 @comment DEPORIGIN:devel/libexecinfo
 @comment "=== preinstall stage ==="
@@ -15,18 +17,22 @@
 @comment "=== file section ==="
 @owner root
 @group wheel
+@mode 0444
+share/licenses/galera-%{RELEASE}/catalog.mk
+share/licenses/galera-%{RELEASE}/LICENSE
+share/licenses/galera-%{RELEASE}/GPLv3
 @mode 0555
 etc/rc.d/garb
 bin/garbd
 @mode 0444
 lib/galera/libgalera_smm.so
-share/doc/galera/COPYING
 share/doc/galera/README
 share/doc/galera/README-MySQL
 libdata/ldconfig/galera
 @comment "=== postinstall stage ==="
 @exec /sbin/ldconfig -m /usr/local/lib/galera
 @comment "=== postremove stage ==="
+@dirrm share/licenses/galera-%{RELEASE}
 @dirrm share/doc/galera
 @comment // @unexec rm -f $(find /usr/local/lib/galera -type l)"
 @dirrm lib/galera

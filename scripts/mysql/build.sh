@@ -311,9 +311,9 @@ then
         debug_opt="-d"
     fi
     scripts/build.sh $debug_opt # options are passed via environment variables
-    GALERA_REV=$(bzr revno 2>/dev/null)     || \
-    GALERA_REV=$(svnversion | sed s/\:/,/g) || \
-    GALERA_REV=$(echo "xxxx")
+    GALERA_REV=$(bzr revno --tree -q) || \
+    GALERA_REV=$(svn info >&/dev/null && svnversion | sed s/\:/,/g) || \
+    GALERA_REV=$(echo "XXXX")
 fi
 
 ######################################
@@ -323,14 +323,14 @@ fi
 ######################################
 # Obtain MySQL version and revision number
 cd $MYSQL_SRC
-WSREP_REV=$(bzr revno) || \
+WSREP_REV=$(bzr revno --tree -q) || \
 WSREP_REV="XXXX"
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 
 if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
     # fetch and patch pristine sources
-    cd /tmp
+    cd ${TMPDIR:-/tmp}
     mysql_tag=mysql-$MYSQL_VER
     if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
     then
@@ -573,9 +573,9 @@ install_mysql_5.5_demo()
     unset DESTDIR
     pushd $MYSQL_DIST_DIR
     mv usr/local/* ./ && rmdir usr/local # FreeBSD
-    [ -d libexec -a ! -a sbin ] && mv libexec sbin # FreeBSD
+    [ -d libexec -a ! -d sbin ] && mv libexec sbin # FreeBSD
     mv usr/* ./ && rmdir usr
-    [ -d lib64 -a ! -a lib ] && mv lib64 lib
+    [ -d lib64 -a ! -d lib ] && mv lib64 lib
     popd
 }
 
@@ -753,8 +753,11 @@ build_freebsd_packages()
     # Create build directory structure
     DIST_DIR=$BUILD_ROOT/dist/mysql
     MYSQL_DIST_DIR=$DIST_DIR/usr/local
-    MYSQL_DIST_CNF=$MYSQL_DIST_DIR/etc/my.cnf
+    MYSQL_DIST_CNF=$MYSQL_DIST_DIR/share/mysql/my_wsrep.cnf
     MYSQL_BINS=$MYSQL_DIST_DIR/bin
+    MYSQL_CLIENT_LICENSE_DIR=$MYSQL_DIST_DIR/share/licenses/mysql-client-${MYSQL_VER}_wsrep_${RELEASE}
+    MYSQL_SERVER_LICENSE_DIR=$MYSQL_DIST_DIR/share/licenses/mysql-server-${MYSQL_VER}_wsrep_${RELEASE}
+    MYSQL_SERVER_DOC_DIR=$MYSQL_DIST_DIR/share/doc/mysql${MYSQL_MAJOR_VER}${MYSQL_MINOR_VER}-server_wsrep
 
     cd $BUILD_ROOT
     rm -rf $BUILD_ROOT/dist
@@ -766,12 +769,20 @@ build_freebsd_packages()
     cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
-    install -m 755 -d $MYSQL_DIST_DIR/share/doc/mysql
-    install -m 644 LICENSE.mysql $MYSQL_DIST_DIR/share/doc/mysql
 
-    install -m 644 LICENSE     $DIST_DIR/usr/local/share/doc/mysql/LICENSE.wsrep
-    install -m 644 README      $DIST_DIR/usr/local/share/doc/mysql/README.wsrep
-    install -m 644 QUICK_START $DIST_DIR/usr/local/share/doc/mysql/QUICK_START.wsrep
+    install -m 755 -d "$MYSQL_CLIENT_LICENSE_DIR"
+    install -m 644 ../../LICENSE "$MYSQL_CLIENT_LICENSE_DIR/GPLv3"
+    install -m 644 freebsd/LICENSE "$MYSQL_CLIENT_LICENSE_DIR"
+    install -m 644 freebsd/catalog.mk "$MYSQL_CLIENT_LICENSE_DIR"
+
+    install -m 755 -d "$MYSQL_SERVER_LICENSE_DIR"
+    install -m 644 ../../LICENSE "$MYSQL_SERVER_LICENSE_DIR/GPLv3"
+    install -m 644 freebsd/LICENSE "$MYSQL_SERVER_LICENSE_DIR"
+    install -m 644 freebsd/catalog.mk "$MYSQL_SERVER_LICENSE_DIR"
+
+    install -m 755 -d "$MYSQL_SERVER_DOC_DIR"
+    install -m 644 README      "$MYSQL_SERVER_DOC_DIR"
+    install -m 644 QUICK_START "$MYSQL_SERVER_DOC_DIR"
 
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
