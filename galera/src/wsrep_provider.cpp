@@ -1035,7 +1035,7 @@ static wsrep_t galera_str = {
     &galera_unlock,
     &galera_is_locked,
     "Galera",
-    GALERA_VER"(r"GALERA_REV")",
+    GALERA_VER "(r" GALERA_REV ")",
     "Codership Oy <info@codership.com>",
     &galera_tear_down,
     NULL,

@@ -61,20 +61,23 @@ START_TEST(service_thd2)
     thd->flush();
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
-             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
+             "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
+             seqno);
 
     seqno = 5;
     thd->report_last_committed (seqno);
     thd->flush();
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
-             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
+             "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
+             seqno);
 
     thd->report_last_committed (3);
     thd->flush();
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
-             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
+             "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
+             seqno);
 
     thd->reset();
 
@@ -83,7 +86,8 @@ START_TEST(service_thd2)
     thd->flush();
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
-             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
+             "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
+             seqno);
 
     delete thd;
 }

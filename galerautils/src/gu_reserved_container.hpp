@@ -70,7 +70,7 @@ public:
     // Storage allocated from this can't be deallocated from other
     bool operator==(const ReservedAllocator& other) const
     {
-        return (this->buffer == other.buffer);
+        return (this->buffer_ == other.buffer_);
     }
 
     bool operator!=(const ReservedAllocator& other) const

@@ -225,9 +225,9 @@ SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s)
         const gu_uuid_t* const uu(reinterpret_cast<const gu_uuid_t*>(&u));
         int state_len = snprintf (buf, MAX_SIZE - 1,
                                   "# GALERA saved state"
-                                  "\nversion: "VERSION
-                                  "\nuuid:    "GU_UUID_FORMAT
-                                  "\nseqno:   %"PRId64"\ncert_index:\n",
+                                  "\nversion: " VERSION
+                                  "\nuuid:    " GU_UUID_FORMAT
+                                  "\nseqno:   %" PRId64 "\ncert_index:\n",
                                   GU_UUID_ARGS(uu), s);
 
         int write_size;

@@ -77,7 +77,7 @@ public:
             )
             : data_(tmp.buf)
         {
-            assert(ver >EMPTY && ver <= MAX_VERSION);
+            assert(ver > EMPTY && ver <= MAX_VERSION);
 
             /* 16 if ver in { FLAT16, FLAT16A }, 8 otherwise */
             int const key_size
