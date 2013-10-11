@@ -438,6 +438,10 @@ then
             && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
             || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
+            [ "$MYSQL_MAJOR_VER$MYSQL_MINOR_VER" -ge "56" ] \
+            && MEMCACHED_OPT="-DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON" \
+            || MEMCACHED_OPT=""
+
             if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
             then
                [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
@@ -455,6 +459,7 @@ then
                   -DWITH_EXTRA_CHARSETS=all \
                   -DWITH_SSL=yes \
                   -DWITH_ZLIB=system \
+                  $MEMCACHED_OPT \
                   $MYSQL_SRC \
             && make -S && popd || exit 1
         fi

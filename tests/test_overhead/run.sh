@@ -17,12 +17,8 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/jobs.sh
 . $SCRIPTS/action.sh
 
-restart
-
-for node in $(seq 1 $NODE_MAX)
-do
-    stop_node $node
-done
+stop
+start_node -g gcomm:// --mysql-opt --wsrep-new-cluster 0
 
 declare -r SQL="$(dirname $0)/tmp.sql"
 declare -r TABLE="overhead"
