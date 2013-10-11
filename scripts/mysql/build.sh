@@ -292,7 +292,7 @@ then
 else
     [ "$DEBUG" == "yes" ] \
     && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
-    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_install"
+    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
 fi
 
 
