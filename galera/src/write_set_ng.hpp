@@ -362,8 +362,8 @@ namespace galera
     {
     public:
 
-        /* Initial space allocation for the writeset. 16K should get us going.*/
-        static size_t const RESERVED_SIZE        = 1U << 14;
+        /* Initial space allocation for the writeset. 4K should get us going.*/
+        static size_t const RESERVED_SIZE        = 1U << 12;
         static size_t const RESERVED_CHUNK       = RESERVED_SIZE / 8;
 
         static size_t const RESERVED_KEYS_OFFSET = 0;

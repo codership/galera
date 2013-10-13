@@ -42,7 +42,7 @@ namespace gu
  * NOTE2: it won't work with containers that require allocator to have default
  *        constructor, like std::basic_string
  */
-template <typename T, size_t reserved>
+template <typename T, size_t reserved, bool diagnostic = false>
 class ReservedAllocator
 {
 public:
@@ -58,7 +58,7 @@ public:
     typedef ptrdiff_t difference_type;
 
     template <typename U>
-    struct rebind { typedef ReservedAllocator<U, reserved> other; };
+    struct rebind { typedef ReservedAllocator<U, reserved, diagnostic> other; };
 
           T*  address(T& t)       const { return &t; }
     const T*  address(const T& t) const { return &t; }
@@ -78,8 +78,7 @@ public:
         return !(*this == other);
     }
 
-    ReservedAllocator(Buffer& buf)
-    : buffer_(&buf), used_(false) {}
+    ReservedAllocator(Buffer& buf, size_type n = 0) : buffer_(&buf), used_(n) {}
 
     ReservedAllocator(const ReservedAllocator& other)
     : buffer_(other.buffer_), used_(other.used_)
@@ -87,9 +86,9 @@ public:
 //        log_debug << "Copy ctor\n";
     }
 
-    template <typename U, size_t c>
-    ReservedAllocator(const ReservedAllocator<U, c>&)
-        : buffer_(NULL), used_(true)
+    template <typename U, size_t c, bool d>
+    ReservedAllocator(const ReservedAllocator<U, c, d>&)
+        : buffer_(NULL), used_(reserved)
     {
 //        log_debug << "Rebinding ctor\n";
     }
@@ -100,16 +99,22 @@ public:
     {
         if (n == 0) return NULL;
 
-        if (!used_ && buffer_ != NULL && n <= reserved)
+        if (reserved - used_ >= n && buffer_ != NULL)
         {
-//            log_debug << "allocation from buffer\n";
-            used_ = true;
-            return buffer_->base_ptr();
+            if (diagnostic)
+            { log_info << "Allocating " << n << '/' << (reserved - used_)
+                       << " from reserve"; }
+
+            T* const ret(buffer_->base_ptr() + used_);
+            used_ += n;
+            return ret;
         }
 
         if (n <= max_size())
         {
-//            log_warn << "Using HEAP for " << n << " objects\n";
+            if (diagnostic)
+            { log_warn << "Allocating " << n << " from heap"; }
+
             void* ret = malloc(n * sizeof(T));
             if (NULL != ret) return static_cast<T*>(ret);
         }
@@ -121,16 +126,17 @@ public:
     {
         if (size_type(p - buffer_->base_ptr()) < reserved)
         {
-            assert (true == used_);
+            assert (used_ > 0);
 
-            if (buffer_->base_ptr() == p)
+            if (buffer_->base_ptr() + used_ == p + n)
             {
-                assert (n == reserved);
-                used_ = false;
+                /* last allocated buffer, can shrink */
+                used_ -= n;
             }
             else
             {
-                assert(0); // attempt to free ptr inside reserved buffer
+                /* cannot recycle reserved space in this case */
+                assert(p + n <= buffer_->base_ptr() + used_);
             }
         }
         else
@@ -139,10 +145,12 @@ public:
         }
     }
 
+    size_type used() const { return used_; }
+
 private:
 
-    Buffer* buffer_;
-    bool    used_;
+    Buffer*   buffer_;
+    size_type used_;
 
     ReservedAllocator& operator=(const ReservedAllocator&);
 
@@ -211,7 +219,8 @@ private:
 
     ReservedContainer(const ReservedContainer&);
     ReservedContainer& operator=(const ReservedContainer&);
-};
+
+}; /* class ReservedContainer */
 
 } /* namespace gu */
 

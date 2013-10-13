@@ -186,7 +186,7 @@ namespace galera
             write_set_out_     (gu::String<256>(params.working_dir_) << '/'
                                 << gu::Fmt("%016x")
                                 << static_cast<unsigned long long>(trx_id),
-                                KeySet::version(params.key_format_)),
+                                params.key_format_),
             write_set_in_      (),
             write_set_flags_   (0),
             certified_         (false),

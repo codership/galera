@@ -52,7 +52,8 @@ RecordSetOutBase::post_append (bool const          new_page,
 }
 
 
-static int check_size (RecordSet::CheckType const ct)
+static int
+check_size (RecordSet::CheckType const ct)
 {
     switch (ct)
     {
@@ -60,6 +61,7 @@ static int check_size (RecordSet::CheckType const ct)
     case RecordSet::CHECK_MMH32:  return 4;
     case RecordSet::CHECK_MMH64:  return 8;
     case RecordSet::CHECK_MMH128: return 16;
+#define MAX_CHECKSUM_SIZE                16
     }
 
     log_fatal << "Non-existing RecordSet::CeckType value: " << ct;
@@ -379,16 +381,17 @@ RecordSetInBase::checksum() const
         check.append (head_ + begin_, size_ - begin_); /* records */
         check.append (head_, begin_ - cs);             /* header  */
 
-        std::vector<byte_t> const result (cs, 0);
-        check.serialize_to (const_cast<byte_t*>(result.data()), cs);
+        assert(cs <= MAX_CHECKSUM_SIZE);
+        byte_t result[MAX_CHECKSUM_SIZE];
+        check.serialize_to (result, sizeof(result));
 
         const byte_t* const stored_checksum(head_ + begin_ - cs);
 
-        if (gu_unlikely(memcmp (result.data(), stored_checksum, cs)))
+        if (gu_unlikely(memcmp (result, stored_checksum, cs)))
         {
             gu_throw_error(EINVAL)
                 << "RecordSet checksum does not match:"
-                << "\ncomputed: " << gu::Hexdump(result.data(), cs)
+                << "\ncomputed: " << gu::Hexdump(result, cs)
                 << "\nfound:    " << gu::Hexdump(stored_checksum, cs);
         }
     }

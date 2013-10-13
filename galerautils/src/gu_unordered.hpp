@@ -75,6 +75,7 @@ namespace gu
         typedef typename type::const_iterator const_iterator;
 
         UnorderedSet() : impl_() { }
+        explicit UnorderedSet(A a) : impl_(a) { }
 
         iterator begin() { return impl_.begin(); }
         const_iterator begin() const { return impl_.begin(); }

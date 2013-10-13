@@ -184,13 +184,17 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     KeySet::KeyPart kp(ts, hd, ver_, exclusive, kd.parts, part_num);
 
+#if 0 /* find() way */
+    /* the reason to use find() first, instead of going straight to insert()
+     * is that we need to insert the part that was persistently stored in the
+     * key set. At the same time we can't yet store the key part in the key set
+     * before we can be sure that it is not a duplicate. Sort of 2PC. */
     KeyParts::iterator found(added.find(kp));
 
     if (added.end() != found)
     {
         if (exclusive && found->shared())
         {       /* need to ditch shared and add exclusive version of the key */
-            assert (found->shared());
             added.erase(found);
             found = added.end();
         }
@@ -215,6 +219,48 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
     }
 
     part_ = &(*found);
+#else /* insert() way */
+    std::pair<KeyParts::iterator, bool> const inserted(added.insert(kp));
+
+    if (inserted.second)
+    {
+        /* The key part was successfully inserted, store it in the key set
+           buffer */
+        inserted.first->store (store);
+    }
+    else
+    {
+        /* A matching key part instance is already present in the set,
+           check constraints */
+        if (exclusive && inserted.first->shared())
+        {
+            /* The key part instance present in the set has weaker constraint,
+               store this instance as well and update inserted to point there.
+               (we can't update already stored data - it was checksummed, so we
+               have to store a duplicate with a stronger constraint) */
+            kp.store (store);
+            inserted.first->update_ptr(kp.ptr());
+            /* It is a hack, but it should be safe to modify key part already
+               inserted into unordered set, as long as modification does not
+               change hash and equality test results. And we get it to point to
+               a duplicate here.*/
+        }
+        else if (leaf || inserted.first->exclusive())
+        {
+            /* we don't throw DUPLICATE for branch parts, just ignore them.
+               DUPLICATE is thrown only when the whole key is a duplicate. */
+#ifndef NDEBUG
+            if (leaf)
+                log_debug << "KeyPart ctor: full duplicate of " << *found;
+            else
+                log_debug << "Duplicate of exclusive: " << *found;
+#endif
+            throw DUPLICATE();
+        }
+    }
+
+    part_ = &(*inserted.first);
+#endif /* insert() way */
 }
 
 void
@@ -303,7 +349,7 @@ KeySetOut::append (const KeyData& kd)
             }
             else
             {
-                new_.push_back (kp);
+                new_().push_back (kp);
             }
             parent = &new_[j];
 #else
@@ -333,8 +379,8 @@ KeySetOut::append (const KeyData& kd)
 
 #ifdef CHECK_PREVIOUS_KEY
     /* copy new parts to prev_ */
-    prev_.resize(1 + kd.parts_num);
-    std::copy(new_.begin(), new_.begin() + j, prev_.begin() + anc + 1);
+    prev_().resize(1 + kd.parts_num);
+    std::copy(new_().begin(), new_().begin() + j, prev_().begin() + anc + 1);
 
     /* acquire key part value if it is volatile */
     if (kd.copy)

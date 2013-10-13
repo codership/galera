@@ -16,6 +16,9 @@
 namespace galera
 {
 
+/* forward declarations for KeySet::KeyPart */
+class KeySetOut;
+
 class KeySet
 {
 public:
@@ -114,7 +117,7 @@ public:
             throw_buffer_too_short (serial_size(), size);
         }
 
-        KeyPart () : data_(0) {}
+        explicit KeyPart (const gu::byte_t* ptr = NULL) : data_(ptr) {}
 
         Key::Prefix prefix() const
         {
@@ -209,13 +212,6 @@ public:
         serial_size () const { return KeyPart::serial_size(data_, -1U); }
 
         void
-        store (gu::RecordSetOut<KeyPart>& rs)
-        {
-            data_ = rs.append(data_, serial_size(), true, true).first;
-//            log_info << "Stored key of size: " << serial_size();
-        }
-
-        void
         print (std::ostream& os) const;
 
         void
@@ -223,6 +219,22 @@ public:
         {
             using std::swap;
             swap(data_, other.data_);
+        }
+
+        const gu::byte_t* ptr() const { return data_; }
+
+    protected:
+
+        friend class KeySetOut;
+
+        /* update data pointer */
+        void update_ptr(const gu::byte_t* ptr) const { data_ = ptr; }
+
+        /* update storage of KeyPart already inserted in unordered set */
+        void store(gu::RecordSetOut<KeyPart>& rs) const
+        {
+            data_ = rs.append(data_, serial_size(), true, true).first;
+//            log_info << "Stored key of size: " << serial_size();
         }
 
     private:
@@ -234,6 +246,7 @@ public:
         static unsigned int const HEADER_BITS  = PREFIX_BITS + VERSION_BITS;
         static gu::byte_t   const HEADER_MASK  = (1 << HEADER_BITS)  - 1;
 
+        mutable /* to be able to store const object */
         const gu::byte_t* data_; // it never owns the buffer
 
         static size_t
@@ -333,11 +346,162 @@ operator << (std::ostream& os, const KeySet::KeyPart& kp)
 class KeySetOut : public gu::RecordSetOut<KeySet::KeyPart>
 {
 public:
-
     typedef gu::UnorderedSet <
-    KeySet::KeyPart, KeySet::KeyPartHash, KeySet::KeyPartEqual
+        KeySet::KeyPart, KeySet::KeyPartHash, KeySet::KeyPartEqual
     >
+    /* This #if decides whether we use straight gu::UnorderedSet for appended
+     * key parts (0), or go for an optimized version (1). Don't remove it. */
+#if 0
     KeyParts;
+#else
+    KeyPartSet;
+
+    /* This is a naive mock up of an "unordered set" that first tries to use
+     * preallocated set of buckets and falls back to a "real" heap-based
+     * unordered set from STL/TR1 when preallocated one is exhausted.
+     * The goal is to make sure that at least 3 keys can be inserted wihout
+     * the need for dynamic allocation.
+     * In practice, with 64 "buckets" and search depth of 3, the average
+     * number of inserted keys before there is a need to go for heap is 25.
+     * 128 buckets will give you 45 and 256 - around 80. */
+    class KeyParts
+    {
+    public:
+        KeyParts() : first_(), second_(NULL), first_size_(0)
+        { ::memset(first_, 0, sizeof(first_)); }
+
+        ~KeyParts() { delete second_; }
+
+        /* This iterator class is declared for compatibility with
+         * unordered_set. We may actually use a more simple interface here. */
+        class iterator
+        {
+        public:
+            iterator(const KeySet::KeyPart* kp) : kp_(kp) {}
+            /* This is sort-of a dirty hack to ensure that first_ array
+             * of KeyParts class can be treated like a POD array.
+             * It uses the fact that the only non-static member of
+             * KeySet::KeyPart is gu::byte_t* and so does direct casts between
+             * pointers. I wish someone could make it cleaner. */
+            iterator(const gu::byte_t** kp)
+                : kp_(reinterpret_cast<const KeySet::KeyPart*>(kp)) {}
+            const KeySet::KeyPart* operator -> () const { return kp_; }
+            const KeySet::KeyPart& operator *  () const { return *kp_; }
+            bool operator == (const iterator& i) const
+            {
+                return (kp_ == i.kp_);
+            }
+            bool operator != (const iterator& i) const
+            {
+                return (kp_ != i.kp_);
+            }
+        private:
+            const KeySet::KeyPart* kp_;
+        };
+
+        const iterator end()
+        {
+            return iterator(static_cast<const KeySet::KeyPart*>(NULL));
+        }
+
+        const iterator find(const KeySet::KeyPart& kp)
+        {
+            unsigned int idx(kp.hash());
+
+            for (unsigned int i(0); i < FIRST_DEPTH; ++i, ++idx)
+            {
+                idx &= FIRST_MASK;
+
+                if (0 !=first_[idx] && KeySet::KeyPart(first_[idx]).matches(kp))
+                {
+                    return iterator(&first_[idx]);
+                }
+            }
+
+            if (second_ && second_->size() > 0)
+            {
+                KeyPartSet::iterator i2(second_->find(kp));
+                if (i2 != second_->end()) return iterator(&(*i2));
+            }
+
+            return end();
+        }
+
+        std::pair<iterator, bool> insert(const KeySet::KeyPart& kp)
+        {
+            unsigned int idx(kp.hash());
+
+            for (unsigned int i(0); i < FIRST_DEPTH; ++i, ++idx)
+            {
+                idx &= FIRST_MASK;
+
+                if (0 == first_[idx])
+                {
+                    first_[idx] = kp.ptr();
+                    ++first_size_;
+                    return
+                        std::pair<iterator, bool>(iterator(&first_[idx]), true);
+                }
+
+                if (KeySet::KeyPart(first_[idx]).matches(kp))
+                {
+                    return
+                        std::pair<iterator, bool>(iterator(&first_[idx]),false);
+                }
+            }
+
+            if (!second_)
+            {
+                second_ = new KeyPartSet();
+//                log_info << "Requesting heap at load factor "
+//                         << first_size_ << '/' << FIRST_SIZE << " = "
+//                         << (double(first_size_)/FIRST_SIZE);
+            }
+
+            std::pair<KeyPartSet::iterator, bool> res = second_->insert(kp);
+            return std::pair<iterator, bool>(iterator(&(*res.first)),
+                                             res.second);
+        }
+
+        iterator erase(iterator it)
+        {
+            unsigned int idx(it->hash());
+
+            for (unsigned int i(0); i < FIRST_DEPTH; ++i, ++idx)
+            {
+                idx &= FIRST_MASK;
+
+                if (first_[idx] && KeySet::KeyPart(first_[idx]).matches(*it))
+                {
+                    first_[idx] = 0;
+                    --first_size_;
+                    return iterator(&first_[(idx + 1) & FIRST_MASK]);
+                }
+            }
+
+            if (second_ && second_->size() > 0)
+            {
+                KeyPartSet::iterator it2(second_->erase(second_->find(*it)));
+
+                if (it2 != second_->end()) return iterator(&(*it2));
+            }
+
+            return end();
+        }
+
+        size_t size() const { return (first_size_ + second_->size()); }
+
+    private:
+
+        static unsigned int const FIRST_MASK  = 0x3f; // 63
+        static unsigned int const FIRST_SIZE  = FIRST_MASK + 1;
+        static unsigned int const FIRST_DEPTH = 3;
+
+        const gu::byte_t* first_[FIRST_SIZE];
+        KeyPartSet*       second_;
+        unsigned int      first_size_;
+    };
+#endif /* 1 */
 
     class KeyPart
     {
@@ -464,7 +628,7 @@ public:
     {
         assert (version_);
         KeyPart zero(version_);
-        prev_.push_back(zero);
+        prev_().push_back(zero);
     }
 
     ~KeySetOut () {}
@@ -478,10 +642,10 @@ public:
 private:
 
     // depending on version we may pack data differently
-    KeySet::Version      version_;
-    KeyParts             added_;
-    std::vector<KeyPart> prev_;
-    std::vector<KeyPart> new_;
+    KeySet::Version       version_;
+    KeyParts              added_;
+    gu::Vector<KeyPart,8> prev_;
+    gu::Vector<KeyPart,8> new_;
 
 
     static gu::RecordSet::CheckType

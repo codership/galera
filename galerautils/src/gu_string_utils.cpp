@@ -31,7 +31,7 @@ vector<string> gu::strsplit(const string& s, char sep)
 vector<string> gu::tokenize(const string& s,
                             const char sep, const char esc, const bool empty)
 {
-    vector<string> ret;    
+    vector<string> ret;
     size_t pos, prev_pos, search_pos;
 
     prev_pos = search_pos = 0;

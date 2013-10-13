@@ -661,7 +661,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         {
             galera::KeyData k(repl->trx_proto_ver(),
                               keys[i].key_parts,
-                              keys[i].key_parts_num, WSREP_KEY_EXCLUSIVE, false);
+                              keys[i].key_parts_num, WSREP_KEY_EXCLUSIVE,false);
             trx->append_key(k);
         }
 
