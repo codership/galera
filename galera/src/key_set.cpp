@@ -251,9 +251,10 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
                DUPLICATE is thrown only when the whole key is a duplicate. */
 #ifndef NDEBUG
             if (leaf)
-                log_debug << "KeyPart ctor: full duplicate of " << *found;
+                log_debug << "KeyPart ctor: full duplicate of "
+                          << *inserted.first;
             else
-                log_debug << "Duplicate of exclusive: " << *found;
+                log_debug << "Duplicate of exclusive: " << *inserted.first;
 #endif
             throw DUPLICATE();
         }
