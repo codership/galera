@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
  */
 
 #include "wsdb.hpp"
@@ -13,8 +13,9 @@
 galera::Wsdb::Wsdb()
     :
     trx_map_(),
+    trx_mutex_(),
     conn_map_(),
-    mutex_()
+    conn_mutex_()
 { }
 
 
@@ -29,127 +30,122 @@ galera::Wsdb::~Wsdb()
 std::ostream& galera::Wsdb::operator<<(std::ostream& os) const
 {
     os << "trx map: ";
-    for (TrxMap::const_iterator i = trx_map_.begin(); i != trx_map_.end();
-         ++i)
     {
-        os << i->first << " ";
+        gu::Lock lock(trx_mutex_);
+        for (TrxMap::const_iterator i = trx_map_.begin(); i != trx_map_.end();
+             ++i)
+        {
+            os << i->first << " ";
+        }
     }
     os << "\n conn query map: ";
-    for (ConnMap::const_iterator i = conn_map_.begin();
-         i != conn_map_.end();
-         ++i)
     {
-        os << i->first << " ";
+        gu::Lock lock(conn_mutex_);
+        for (ConnMap::const_iterator i = conn_map_.begin();i != conn_map_.end();
+             ++i)
+        {
+            os << i->first << " ";
+        }
     }
     os << "\n";
+
     return os;
 }
 
 
-galera::TrxHandle*
-galera::Wsdb::create_trx(int                 version,
-                         const wsrep_uuid_t& source_id,
-                         wsrep_trx_id_t      trx_id)
+inline galera::TrxHandle*
+galera::Wsdb::find_trx(wsrep_trx_id_t const trx_id)
 {
-    std::pair<TrxMap::iterator, bool> i = trx_map_.insert(
-        std::make_pair(trx_id,
-                       new TrxHandle(version, source_id, -1, trx_id, true)));
-    if (i.second == false)
-        gu_throw_fatal;
+    gu::Lock lock(trx_mutex_);
+
+    TrxMap::iterator const i(trx_map_.find(trx_id));
+
+    return (trx_map_.end() == i ? 0 : i->second);
+}
+
+inline galera::TrxHandle*
+galera::Wsdb::create_trx(int const            version,
+                         const wsrep_uuid_t&  source_id,
+                         wsrep_trx_id_t const trx_id)
+{
+    TrxHandle* trx(new TrxHandle(version, source_id, -1, trx_id, true));
+
+    gu::Lock lock(trx_mutex_);
+
+    std::pair<TrxMap::iterator, bool> i
+        (trx_map_.insert(std::make_pair(trx_id, trx)));
+
+    if (gu_unlikely(i.second == false)) gu_throw_fatal;
+
     return i.first->second;
 }
 
 
-galera::Wsdb::Conn&
-galera::Wsdb::create_conn(wsrep_conn_id_t conn_id)
-{
-    std::pair<ConnMap::iterator, bool> i = conn_map_.insert(
-        std::make_pair(conn_id, Conn(conn_id)));
-    if (i.second == false)
-        gu_throw_fatal;
-    return i.first->second;
-}
-
-
 galera::TrxHandle*
-galera::Wsdb::get_trx(int                 version,
-                      const wsrep_uuid_t& source_id,
-                      wsrep_trx_id_t      trx_id,
-                      bool                create)
+galera::Wsdb::get_trx(int const            version,
+                      const wsrep_uuid_t&  source_id,
+                      wsrep_trx_id_t const trx_id,
+                      bool const           create)
 {
-    gu::Lock lock(mutex_);
-    TrxMap::iterator i;
-    TrxHandle* retval;
-    if ((i = trx_map_.find(trx_id)) == trx_map_.end())
-    {
-        if (create == true)
-        {
-            retval = create_trx(version, source_id, trx_id);
-        }
-        else
-        {
-            retval = 0;
-        }
-    }
-    else
-    {
-        retval = i->second;
-    }
-    if (retval != 0)
-    {
-        retval->ref();
-    }
+    TrxHandle* retval(find_trx(trx_id));
+
+    if (0 == retval && create) retval = create_trx(version, source_id, trx_id);
+
+    if (retval != 0) retval->ref();
+
     return retval;
 }
 
 
-void galera::Wsdb::unref_trx(TrxHandle* trx)
+galera::Wsdb::Conn*
+galera::Wsdb::get_conn(wsrep_conn_id_t const conn_id, bool const create)
 {
-    gu::Lock lock(mutex_);
-    assert(trx->refcnt() > 1);
-    trx->unref();
+    gu::Lock lock(conn_mutex_);
 
+    ConnMap::iterator i(conn_map_.find(conn_id));
+
+    if (conn_map_.end() == i)
+    {
+        if (create == true)
+        {
+            std::pair<ConnMap::iterator, bool> p
+                (conn_map_.insert(std::make_pair(conn_id, Conn(conn_id))));
+
+            if (gu_unlikely(p.second == false)) gu_throw_fatal;
+
+            return &p.first->second;
+        }
+
+        return 0;
+    }
+
+    return &(i->second);
 }
 
 
 galera::TrxHandle*
-galera::Wsdb::get_conn_query(int                 version,
-                             const wsrep_uuid_t& source_id,
-                             wsrep_trx_id_t      conn_id,
-                             bool                create)
+galera::Wsdb::get_conn_query(int const            version,
+                             const wsrep_uuid_t&  source_id,
+                             wsrep_trx_id_t const conn_id,
+                             bool const           create)
 {
-    gu::Lock lock(mutex_);
-    ConnMap::iterator i;
+    Conn* const conn(get_conn(conn_id, create));
 
-    if ((i = conn_map_.find(conn_id)) == conn_map_.end())
-    {
-        if (create == true)
-        {
-            Conn& conn(create_conn(conn_id));
-            TrxHandle* trx(new TrxHandle(
-                               version, source_id, conn_id, -1, true));
-            conn.assign_trx(trx);
-            return trx;
-        }
-        else
-        {
-            return 0;
-        }
-    }
+    if (0 == conn) return 0;
 
-    if (i->second.get_trx() == 0 && create == true)
+    if (conn->get_trx() == 0 && create == true)
     {
         TrxHandle* trx(new TrxHandle(version, source_id, conn_id, -1, true));
-        i->second.assign_trx(trx);
+        conn->assign_trx(trx);
     }
 
-    return i->second.get_trx();
+    return conn->get_trx();
 }
 
 
 void galera::Wsdb::discard_trx(wsrep_trx_id_t trx_id)
 {
-    gu::Lock lock(mutex_);
+    gu::Lock lock(trx_mutex_);
     TrxMap::iterator i;
     if ((i = trx_map_.find(trx_id)) != trx_map_.end())
     {
@@ -161,7 +157,7 @@ void galera::Wsdb::discard_trx(wsrep_trx_id_t trx_id)
 
 void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
 {
-    gu::Lock lock(mutex_);
+    gu::Lock lock(conn_mutex_);
     ConnMap::iterator i;
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
@@ -171,7 +167,7 @@ void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
 
 void galera::Wsdb::discard_conn(wsrep_conn_id_t conn_id)
 {
-    gu::Lock lock(mutex_);
+    gu::Lock lock(conn_mutex_);
     ConnMap::iterator i;
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {

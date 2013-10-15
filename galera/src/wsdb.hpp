@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 //
 #ifndef GALERA_WSDB_HPP
 #define GALERA_WSDB_HPP
@@ -61,34 +61,41 @@ namespace galera
         public:
             size_t operator()(const wsrep_conn_id_t& key) const { return key; }
         };
+
         typedef gu::UnorderedMap<wsrep_conn_id_t, Conn, ConnHash> ConnMap;
 
     public:
         TrxHandle* get_trx(int version,
                            const wsrep_uuid_t& source_id,
                            wsrep_trx_id_t trx_id, bool create = false);
-        void unref_trx(TrxHandle* trx);
+
+        void discard_trx(wsrep_trx_id_t trx_id);
+
         TrxHandle* get_conn_query(int version,
                                   const wsrep_uuid_t&,
                                   wsrep_conn_id_t conn_id,
                                   bool create = false);
-        // Discard trx handle
-        void discard_trx(wsrep_trx_id_t trx_id);
+
         void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
+
         std::ostream& operator<<(std::ostream& os) const;
+
         Wsdb();
         ~Wsdb();
 
     private:
-        // Create new trx handle
+        // Find existing trx handle in the map
+        TrxHandle* find_trx(wsrep_trx_id_t trx_id);
+        // Create new trx handle and add to map
         TrxHandle* create_trx(int, const wsrep_uuid_t&, wsrep_trx_id_t trx_id);
-        Conn& create_conn(wsrep_conn_id_t conn_id);
+        Conn*      get_conn(wsrep_conn_id_t conn_id, bool create);
 
         static const size_t trx_mem_limit_ = 1 << 20;
         TrxMap       trx_map_;
+        gu::Mutex    trx_mutex_;
         ConnMap      conn_map_;
-        gu::Mutex    mutex_;
+        gu::Mutex    conn_mutex_;
     };
 
 }

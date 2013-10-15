@@ -453,7 +453,8 @@ galera::ReplicatorSMM::local_trx(wsrep_ws_handle_t* handle, bool create)
 
 void galera::ReplicatorSMM::unref_local_trx(TrxHandle* trx)
 {
-    wsdb_.unref_trx(trx);
+    assert(trx->refcnt() > 1);
+    trx->unref();
 }
 
 
