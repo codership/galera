@@ -68,7 +68,7 @@ namespace galera
 
         void apply_trx(void* recv_ctx, TrxHandle* trx);
 
-        wsrep_status_t replicate(TrxHandle* trx);
+        wsrep_status_t replicate(TrxHandle* trx, wsrep_trx_meta_t*);
         void abort_trx(TrxHandle* trx) ;
         wsrep_status_t pre_commit(TrxHandle*  trx, wsrep_trx_meta_t*);
         wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);

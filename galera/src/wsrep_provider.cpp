@@ -438,7 +438,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 //        append_data_array (trx, rbr_data, rbr_data_len, false, false);
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
 
-        retval = repl->replicate(trx);
+        retval = repl->replicate(trx, meta);
 
         assert((!(retval == WSREP_OK || retval == WSREP_BF_ABORT) ||
                 trx->global_seqno() > 0));
@@ -651,7 +651,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
                            WSREP_FLAG_COMMIT |
                            WSREP_FLAG_ISOLATION));
 
-        retval = repl->replicate(trx);
+        retval = repl->replicate(trx, meta);
 
         assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
                (retval != WSREP_OK && trx->global_seqno() < 0));

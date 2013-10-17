@@ -533,7 +533,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     trx->set_exit_loop(exit_loop);
 }
 
-wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
+                                                wsrep_trx_meta_t* meta)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
@@ -630,6 +631,12 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
             local_monitor_.self_cancel(lo);
             apply_monitor_.self_cancel(ao);
             if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+        }
+        else if (meta != 0)
+        {
+            meta->gtid.uuid  = state_uuid_;
+            meta->gtid.seqno = trx->global_seqno();
+            meta->depends_on = trx->depends_seqno();
         }
 
         if (trx->state() == TrxHandle::S_MUST_ABORT) goto must_abort;
