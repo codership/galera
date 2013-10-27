@@ -79,12 +79,11 @@ namespace galera
         void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
 
-        std::ostream& operator<<(std::ostream& os) const;
-
         Wsdb();
         ~Wsdb();
 
     private:
+        friend std::ostream& galera::operator<<(std::ostream& os, const Wsdb&);
         // Find existing trx handle in the map
         TrxHandle* find_trx(wsrep_trx_id_t trx_id);
         // Create new trx handle and add to map
@@ -97,7 +96,6 @@ namespace galera
         ConnMap      conn_map_;
         gu::Mutex    conn_mutex_;
     };
-
 }
 
 
