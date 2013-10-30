@@ -11,6 +11,16 @@
 #include "gu_logger.hpp"
 #include "gu_hexdump.hpp"
 
+class TestBaseName : public gu::Allocator::BaseName
+{
+    std::string str_;
+
+public:
+
+    TestBaseName(const char* name) : str_(name) {}
+    void print(std::ostream& os) const { os << str_; }
+};
+
 class TestRecord : public gu::Serializable
 {
 public:
@@ -118,7 +128,7 @@ START_TEST (ver0)
     records.push_back (&rout5);
 
     gu::byte_t reserved[1024];
-    gu::String<> str("gu_rset_test");
+    TestBaseName str("gu_rset_test");
     gu::RecordSetOut<TestRecord> rset_out(reserved, sizeof(reserved), str,
                                           gu::RecordSet::CHECK_MMH64,
                                           gu::RecordSet::VER1);

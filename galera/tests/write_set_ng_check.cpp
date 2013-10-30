@@ -24,8 +24,9 @@ START_TEST (ver3_basic)
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
 
-    gu::String<> const str("ver3_basic");
-    WriteSetOut wso (str, KeySet::FLAT8A, flag1, WriteSetNG::VER3);
+    std::string const dir(".");
+    wsrep_trx_id_t trx_id(1);
+    WriteSetOut wso (dir, trx_id, KeySet::FLAT8A, 0, 0, flag1,WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 
@@ -63,7 +64,7 @@ START_TEST (ver3_basic)
     in.reserve(out_size);
     for (size_t i(0); i < out->size(); ++i)
     {
-        const gu::byte_t* ptr(reinterpret_cast<const gu::byte_t*>(out[i].ptr));
+        const gu::byte_t* ptr(static_cast<const gu::byte_t*>(out[i].ptr));
         in.insert (in.end(), ptr, ptr + out[i].size);
     }
 
@@ -82,6 +83,7 @@ START_TEST (ver3_basic)
                  ls, last_seen);
         fail_if (wsi.flags() != flags);
         fail_if (0 == wsi.timestamp());
+        fail_if (wsi.annotated());
 
         mark_point();
         const KeySetIn& ksi(wsi.keyset());
@@ -129,7 +131,7 @@ START_TEST (ver3_basic)
         fail_if (d.size !=
                  sizeof(data_out_volatile) + sizeof(data_out_persistent));
 
-        const char* dptr = reinterpret_cast<const char*>(d.ptr);
+        const char* dptr = static_cast<const char*>(d.ptr);
         fail_if (*(reinterpret_cast<const uint64_t*>(dptr)) !=
                  data_out_volatile);
         fail_if (*(reinterpret_cast<const uint32_t*>
@@ -179,7 +181,7 @@ START_TEST (ver3_basic)
         for (size_t i(0); i < out->size(); ++i)
         {
             const gu::byte_t* ptr
-                (reinterpret_cast<const gu::byte_t*>(out[i].ptr));
+                (static_cast<const gu::byte_t*>(out[i].ptr));
             in.insert (in.end(), ptr, ptr + out[i].size);
         }
 
@@ -248,10 +250,82 @@ START_TEST (ver3_basic)
 }
 END_TEST
 
+START_TEST (ver3_annotation)
+{
+    uint16_t const flag1(0xabcd);
+    wsrep_uuid_t source;
+    gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
+    wsrep_conn_id_t const conn(652653);
+    wsrep_trx_id_t const  trx(99994952);
+
+    std::string const dir(".");
+    wsrep_trx_id_t trx_id(1);
+
+    WriteSetOut wso (dir, trx_id, KeySet::FLAT16, 0, 0, flag1,WriteSetNG::VER3);
+
+    fail_unless (wso.is_empty());
+
+    TestKey tk0(KeySet::MAX_VERSION, SHARED, true, "key0");
+    wso.append_key(tk0());
+    fail_if (wso.is_empty());
+
+    uint64_t const data(0xaabbccdd);
+    std::string const annotation("0xaabbccdd");
+    uint16_t const flag2(0x1234);
+
+    wso.append_data (&data, sizeof(data), true);
+    wso.append_annotation (annotation.c_str(), annotation.size(), true);
+    wso.add_flags (flag2);
+
+    uint16_t const flags(flag1 | flag2);
+    WriteSetNG::GatherVector out;
+    size_t const out_size(wso.gather(source, conn, trx, out));
+
+    log_info << "Gather size: " << out_size << ", buf count: " << out->size();
+
+    wsrep_seqno_t const last_seen(1);
+    wso.set_last_seen(last_seen);
+
+    /* concatenate all out buffers */
+    std::vector<gu::byte_t> in;
+    in.reserve(out_size);
+    for (size_t i(0); i < out->size(); ++i)
+    {
+        const gu::byte_t* ptr(static_cast<const gu::byte_t*>(out[i].ptr));
+        in.insert (in.end(), ptr, ptr + out[i].size);
+    }
+
+    fail_if (in.size() != out_size);
+
+    gu::Buf const in_buf = { in.data(), static_cast<ssize_t>(in.size()) };
+
+    /* read buffer into WriteSetIn */
+    mark_point();
+    WriteSetIn wsi(in_buf);
+
+    mark_point();
+    wsrep_seqno_t const ls(wsi.last_seen());
+    fail_if (ls != last_seen, "Found last seen: %lld, expected: %lld",
+             ls, last_seen);
+    fail_if (wsi.flags() != flags);
+    fail_if (0 == wsi.timestamp());
+    fail_if (!wsi.annotated());
+
+    /* check that annotation has survived */
+    std::ostringstream os;
+    wsi.write_annotation(os);
+    std::string const res(os.str());
+
+    fail_if(annotation.length() != res.length());
+    fail_if(annotation != res);
+}
+END_TEST
+
 Suite* write_set_ng_suite ()
 {
     TCase* t = tcase_create ("WriteSet");
     tcase_add_test (t, ver3_basic);
+    tcase_add_test (t, ver3_annotation);
     tcase_set_timeout(t, 60);
 
     Suite* s = suite_create ("WriteSet");

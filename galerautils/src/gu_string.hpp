@@ -189,7 +189,7 @@ public:
 
 protected:
 
-    pointer     str_; // points to the adequately sized memory area
+    pointer     str_; // points to an adequately sized memory area
     const char* fmt_;
     size_type   size_;
 

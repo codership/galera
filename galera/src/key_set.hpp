@@ -359,7 +359,7 @@ public:
     /* This is a naive mock up of an "unordered set" that first tries to use
      * preallocated set of buckets and falls back to a "real" heap-based
      * unordered set from STL/TR1 when preallocated one is exhausted.
-     * The goal is to make sure that at least 3 keys can be inserted wihout
+     * The goal is to make sure that at least 3 keys can be inserted without
      * the need for dynamic allocation.
      * In practice, with 64 "buckets" and search depth of 3, the average
      * number of inserted keys before there is a need to go for heap is 25.
@@ -601,7 +601,7 @@ public:
         const KeySet::KeyPart* part_;
         mutable
         const gu::byte_t* value_;
-        size_t            size_;
+        unsigned int      size_;
         KeySet::Version   ver_;
         mutable
         bool              own_;
@@ -609,9 +609,18 @@ public:
     }; /* class KeySetOut::KeyPart */
 
 
+    KeySetOut () // empty ctor for slave TrxHandle
+        :
+        gu::RecordSetOut<KeySet::KeyPart>(),
+        added_(),
+        prev_ (),
+        new_  (),
+        version_()
+    {}
+
     KeySetOut (gu::byte_t*             reserved,
                size_t                  reserved_size,
-               const gu::StringBase<>& base_name,
+               const BaseName&         base_name,
                KeySet::Version const   version)
         :
         gu::RecordSetOut<KeySet::KeyPart> (
@@ -621,10 +630,10 @@ public:
             check_type      (version),
             ks_to_rs_version(version)
             ),
-        version_(version),
         added_(),
         prev_ (),
-        new_  ()
+        new_  (),
+        version_(version)
     {
         assert (version_);
         KeyPart zero(version_);
@@ -642,11 +651,10 @@ public:
 private:
 
     // depending on version we may pack data differently
-    KeySet::Version       version_;
     KeyParts              added_;
-    gu::Vector<KeyPart,8> prev_;
-    gu::Vector<KeyPart,8> new_;
-
+    gu::Vector<KeyPart,5> prev_;
+    gu::Vector<KeyPart,5> new_;
+    KeySet::Version       version_;
 
     static gu::RecordSet::CheckType
     check_type (KeySet::Version ver)

@@ -15,9 +15,11 @@
 #include "gu_vector.hpp"
 
 #include "gu_macros.h" // gu_likely()
+#include "gu_limits.h" // GU_PAGE_SIZE
 
 #include <cstdlib>     // realloc(), free()
 #include <string>
+#include <iostream>
 
 namespace gu
 {
@@ -26,16 +28,29 @@ class Allocator
 {
 public:
 
-    Allocator (byte_t*             reserved,
-               size_t              reserved_size,
-               const StringBase<>& base_name,
-               size_t              max_ram        = (1U << 22),   /* 4M  */
-               size_t              disk_page_size = (1U << 26));  /* 64M */
+    class BaseName
+    {
+    public:
+        virtual void print(std::ostream& os) const = 0;
+        virtual ~BaseName() {}
+    };
+
+    // this questionable optimization reduces Allocator size by 8
+    // probably not worth the loss of generality.
+    typedef unsigned int   page_size_type; // max page size
+    typedef page_size_type heap_size_type; // max heap store size
+
+    explicit
+    Allocator (const BaseName&     base_name      = BASE_NAME_DEFAULT,
+               byte_t*             reserved       = NULL,
+               page_size_type      reserved_size  = 0,
+               heap_size_type      max_heap       = (1U << 22),   /* 4M  */
+               page_size_type      disk_page_size = (1U << 26));  /* 64M */
 
     ~Allocator ();
 
     /*! @param new_page - true if not adjucent to previous allocation */
-    byte_t* alloc (size_t const size, bool& new_page);
+    byte_t* alloc (page_size_type const size, bool& new_page);
 
     /* Total allocated size */
     size_t size () const { return size_; }
@@ -43,10 +58,12 @@ public:
     /* Total count of pages */
     size_t count() const { return pages_->size(); }
 
+#ifdef GU_ALLOCATOR_DEBUG
     /* appends own vector of Buf structures to the passed one,
      * should be called only after all allocations have been made.
      * returns sum of all appended buffers' sizes (same as size())  */
     size_t gather (std::vector<Buf>& out) const;
+#endif /* GU_ALLOCATOR_DEBUG */
 
     /* After we allocated 3 heap pages, spilling vector into heap should not
      * be an issue. */
@@ -85,9 +102,9 @@ private:
 
     protected:
 
-        byte_t* base_ptr_;
-        byte_t* ptr_;
-        size_t  left_;
+        byte_t*        base_ptr_;
+        byte_t*        ptr_;
+        page_size_type left_;
 
         Page& operator=(const Page&);
         Page (const Page&);
@@ -97,7 +114,7 @@ private:
     {
     public:
 
-        HeapPage (size_t max_size);
+        HeapPage (page_size_type max_size);
 
         ~HeapPage () { free (base_ptr_); }
     };
@@ -106,7 +123,7 @@ private:
     {
     public:
 
-        FilePage (const std::string& name, size_t size);
+        FilePage (const std::string& name, page_size_type size);
 
         ~FilePage () { fd_.unlink(); }
 
@@ -120,7 +137,7 @@ private:
     {
     public:
 
-        Page* new_page (size_t size) { return my_new_page(size); }
+        Page* new_page (page_size_type size) { return my_new_page(size); }
 
     protected:
 
@@ -128,48 +145,52 @@ private:
 
     private:
 
-        virtual Page* my_new_page (size_t size) = 0;
+        virtual Page* my_new_page (page_size_type size) = 0;
     };
 
     class HeapStore : public PageStore
     {
     public:
 
-        HeapStore (size_t max) : PageStore(), left_(max) {}
+        HeapStore (heap_size_type max) : PageStore(), left_(max) {}
 
         ~HeapStore () {}
 
     private:
 
         /* to avoid too frequent allocation, make it 64K */
-        static size_t const PAGE_SIZE = 1U << 16;
+        static page_size_type const PAGE_SIZE = GU_PAGE_SIZE * 16;
 
-        size_t left_;
+        heap_size_type left_;
 
-        Page* my_new_page (size_t const size);
+        Page* my_new_page (page_size_type const size);
     };
 
     class FileStore : public PageStore
     {
     public:
 
-        FileStore (const StringBase<>& base_name,
-                   size_t              page_size)
-            : PageStore(),
-              base_name_(base_name),
-              page_size_(page_size),
-              n_        (0)
+        FileStore (const BaseName& base_name,
+                   page_size_type  page_size)
+            :
+            PageStore(),
+            base_name_(base_name),
+            page_size_(page_size),
+            n_        (0)
         {}
 
         ~FileStore() {}
 
     private:
 
-        const String<256> base_name_;
-        size_t const      page_size_;
-        int               n_;
+        const BaseName&      base_name_;
+        page_size_type const page_size_;
+        int                  n_;
 
-        Page* my_new_page (size_t const size);
+        Page* my_new_page (page_size_type const size);
+
+        FileStore (const FileStore&);
+        FileStore& operator= (const FileStore&);
     };
 
     Page       first_page_;
@@ -180,16 +201,33 @@ private:
     PageStore* current_store_;
 
     gu::Vector<Page*, INITIAL_VECTOR_SIZE> pages_;
+
+#ifdef GU_ALLOCATOR_DEBUG
     gu::Vector<Buf,   INITIAL_VECTOR_SIZE> bufs_;
+    void add_current_to_bufs();
+#endif /* GU_ALLOCATOR_DEBUG */
 
     size_t     size_;
 
-    void add_current_to_bufs();
-
     Allocator(const gu::Allocator&);
     const Allocator& operator=(const gu::Allocator&);
-};
 
+    class BaseNameDefault : public BaseName
+    {
+    public:
+        void print(std::ostream& os) const { os << "alloc"; }
+    };
+
+    static BaseNameDefault const BASE_NAME_DEFAULT;
+
+}; /* class Allocator */
+
+inline
+std::ostream& operator<< (std::ostream& os, const Allocator::BaseName& bn)
+{
+    bn.print(os); return os;
 }
 
-#endif /* _GU_BUF_HPP_ */
+} /* namespace gu */
+
+#endif /* _GU_ALLOC_HPP_ */

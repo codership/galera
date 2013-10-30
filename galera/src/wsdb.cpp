@@ -71,7 +71,8 @@ galera::Wsdb::create_trx(const TrxHandle::Params& params,
                          const wsrep_uuid_t&  source_id,
                          wsrep_trx_id_t const trx_id)
 {
-    TrxHandle* trx(new TrxHandle(params, source_id, -1, trx_id, true));
+    TrxHandle* trx
+        ((new TrxHandleWithStore(params, source_id, -1, trx_id))->handle());
 
     gu::Lock lock(trx_mutex_);
 
@@ -138,7 +139,9 @@ galera::Wsdb::get_conn_query(const TrxHandle::Params& params,
 
     if (conn->get_trx() == 0 && create == true)
     {
-        TrxHandle* trx(new TrxHandle(params, source_id, conn_id, -1, true));
+        TrxHandle* trx
+            ((new TrxHandleWithStore(params, source_id, conn_id, -1))->
+             handle());
         conn->assign_trx(trx);
     }
 

@@ -38,6 +38,10 @@ static inline size_t gu_phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
 static inline size_t gu_avphys_pages() { return sysconf(_SC_AVPHYS_PAGES); }
 #endif /* !__APPLE__ && !__FreeBSD__ */
 
+/* We need this as a compile-time constant. Runtime check is implemented
+ * in gu_init.c */
+#define GU_PAGE_SIZE 4096
+
 static inline size_t gu_avphys_bytes()
 {
     // to detect overflow on systems with >4G of RAM, see #776

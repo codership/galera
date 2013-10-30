@@ -575,6 +575,7 @@ wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;

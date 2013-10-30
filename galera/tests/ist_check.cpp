@@ -222,6 +222,7 @@ static void test_ist_common(int const version)
 {
     using galera::KeyData;
     using galera::TrxHandle;
+    using galera::TrxHandleWithStore;
     using galera::KeyOS;
     int const trx_version(select_trx_version(version));
     galera::TrxHandle::Params const trx_params("", trx_version,
@@ -239,7 +240,8 @@ static void test_ist_common(int const version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid, 1234, 5678, false));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid, 1234, 5678));
+
         const wsrep_buf_t key[2] = {
             {"key1", 4},
             {"key2", 4}
@@ -256,7 +258,7 @@ static void test_ist_common(int const version)
         {
             trx->set_last_seen_seqno(last_seen);
             size_t trx_size(trx->serial_size());
-            ptr = reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size));
+            ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
             trx->serialize(ptr, trx_size, 0);
         }
         else
@@ -267,7 +269,7 @@ static void test_ist_common(int const version)
                                                          trx->trx_id(),
                                                          bufs));
             trx->set_last_seen_seqno(last_seen);
-            ptr = reinterpret_cast<gu::byte_t*>(gcache->malloc(trx_size));
+            ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
 
             /* concatenate buffer vector */
             gu::byte_t* p(ptr);

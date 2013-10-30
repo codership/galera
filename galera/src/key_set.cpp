@@ -167,8 +167,8 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
     own_  (false)
 {
     assert (ver_);
-//            uint32_t const s(gu::htog(size_));
-    hash_.append (uint32_t(gu::htog(size_)));
+    uint32_t const s(gu::htog(size_));
+    hash_.append (&s, sizeof(s));
     hash_.append (value_, size_);
 
     KeySet::KeyPart::TmpStore ts;

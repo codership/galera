@@ -6,6 +6,16 @@
 
 #include "gu_alloc_test.hpp"
 
+class TestBaseName : public gu::Allocator::BaseName
+{
+    std::string str_;
+
+public:
+
+    TestBaseName(const char* name) : str_(name) {}
+    void print(std::ostream& os) const { os << str_; }
+};
+
 START_TEST (basic)
 {
     ssize_t const extra_size(1 << 12); /* extra size to force new page */
@@ -17,9 +27,9 @@ START_TEST (basic)
     const char test1[] = "test1";
     ssize_t const test1_size(sizeof(test1) + extra_size);
 
-    gu::String<> test_name("gu_alloc_test");
-    gu::Allocator a(reserved, sizeof(reserved),
-                    test_name, sizeof(test1), 1 << 16);
+    TestBaseName test_name("gu_alloc_test");
+    gu::Allocator a(test_name, reserved, sizeof(reserved),
+                    sizeof(test1), 1 << 16);
     mark_point();
     void*  p;
     size_t r, s = 0;
@@ -55,6 +65,7 @@ START_TEST (basic)
     fail_if (n);
     fail_if (a.size() != s);
 
+#ifdef GU_ALLOCATOR_DEBUG
     std::vector<gu::Buf> out;
     out.reserve (a.count());
     mark_point();
@@ -67,6 +78,7 @@ START_TEST (basic)
     fail_if (strcmp(reinterpret_cast<const char*>(out[0].ptr), test0));
     fail_if (out[1].size != test1_size);
     fail_if (strcmp(reinterpret_cast<const char*>(out[1].ptr), test1));
+#endif /* GU_ALLOCATOR_DEBUG */
 }
 END_TEST
 

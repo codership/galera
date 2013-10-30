@@ -51,19 +51,28 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    return (os << "source: "  << th.source_id_
-            << " version: "   << th.version_
-            << " local: "     << th.local_
-            << " state: "     << th.state_()
-            << " flags: "     << th.write_set_flags_
-            << " conn_id: "   << int64_t(th.conn_id_)
-            << " trx_id: "    << int64_t(th.trx_id_) // for readability
-            << " seqnos (l: " << th.local_seqno_
-            << ", g: "        << th.global_seqno_
-            << ", s: "        << th.last_seen_seqno_
-            << ", d: "        << th.depends_seqno_
-            << ", ts: "       << th.timestamp_
-            << ")");
+    os << "source: "  << th.source_id_
+       << " version: "   << th.version_
+       << " local: "     << th.local_
+       << " state: "     << th.state_()
+       << " flags: "     << th.write_set_flags_
+       << " conn_id: "   << int64_t(th.conn_id_)
+       << " trx_id: "    << int64_t(th.trx_id_) // for readability
+       << " seqnos (l: " << th.local_seqno_
+       << ", g: "        << th.global_seqno_
+       << ", s: "        << th.last_seen_seqno_
+       << ", d: "        << th.depends_seqno_
+       << ", ts: "       << th.timestamp_
+       << ")";
+
+    if (th.write_set_in().annotated())
+    {
+        os << "\nAnnotation:\n";
+        th.write_set_in().write_annotation(os);
+        os << std::endl;
+    }
+
+    return os;
 }
 
 
@@ -187,20 +196,18 @@ size_t
 galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
                                size_t offset)
 {
-    uint32_t hdr;
-
     try
     {
-        offset = gu::unserialize4(buf, buflen, offset, hdr);
-        write_set_flags_ = hdr & 0xff;
-        version_ = hdr >> 24;
-        write_set_.set_version(version_);
+        version_ = WriteSetNG::version(buf, buflen);
 
         switch (version_)
         {
         case 0:
         case 1:
         case 2:
+            write_set_flags_ = buf[0];
+            write_set_.set_version(version_);
+            offset = 4;
             offset = galera::unserialize(buf, buflen, offset, source_id_);
             offset = gu::unserialize8(buf, buflen, offset, conn_id_);
             offset = gu::unserialize8(buf, buflen, offset, trx_id_);
@@ -353,4 +360,6 @@ galera::TrxHandle::unordered(void*                recv_ctx,
         }
     }
 }
+
+
 

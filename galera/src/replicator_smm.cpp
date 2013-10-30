@@ -1107,10 +1107,11 @@ writeset_from_handle (wsrep_po_handle_t& handle,
     {
         try
         {
-            ret = new WriteSetOut
-                (gu::String<256>(trx_params.working_dir_) << '/' << &handle,
-                 /* key format is not essential since we're not adding keys */
-                 KeySet::version(trx_params.key_format_));
+            ret = new WriteSetOut(
+//                gu::String<256>(trx_params.working_dir_) << '/' << &handle,
+                trx_params.working_dir_, wsrep_trx_id_t(&handle),
+                /* key format is not essential since we're not adding keys */
+                KeySet::version(trx_params.key_format_), NULL, 0);
 
             handle.opaque = ret;
         }

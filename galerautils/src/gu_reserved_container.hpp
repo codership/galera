@@ -42,7 +42,7 @@ namespace gu
  * NOTE2: it won't work with containers that require allocator to have default
  *        constructor, like std::basic_string
  */
-template <typename T, size_t reserved, bool diagnostic = false>
+template <typename T, int reserved, bool diagnostic = false>
 class ReservedAllocator
 {
 public:
@@ -55,6 +55,7 @@ public:
     typedef const T&  const_reference;
     typedef T         value_type;
     typedef size_t    size_type;
+    // making size_type unsigned int does not seem to reduce footprint
     typedef ptrdiff_t difference_type;
 
     template <typename U>
@@ -62,7 +63,7 @@ public:
 
           T*  address(T& t)       const { return &t; }
     const T*  address(const T& t) const { return &t; }
-    size_type max_size()          const { return size_type(-1)/sizeof(T); }
+    size_type max_size()          const { return size_type(-1)/2/sizeof(T); }
 
     void construct (T* const p, const T& t) const { new (p) T(t); }
     void destroy   (T* const p)             const { p->~T();      }
@@ -70,7 +71,7 @@ public:
     // Storage allocated from this can't be deallocated from other
     bool operator==(const ReservedAllocator& other) const
     {
-        return (this->buffer_ == other.buffer_);
+        return (buffer_ == other.buffer_);
     }
 
     bool operator!=(const ReservedAllocator& other) const
@@ -78,17 +79,25 @@ public:
         return !(*this == other);
     }
 
-    ReservedAllocator(Buffer& buf, size_type n = 0) : buffer_(&buf), used_(n) {}
+    ReservedAllocator(Buffer& buf, size_type n = 0)
+        :
+        buffer_(&buf),
+        used_(n)
+    {}
 
     ReservedAllocator(const ReservedAllocator& other)
-    : buffer_(other.buffer_), used_(other.used_)
+    :
+    buffer_(other.buffer_),
+    used_(other.used_)
     {
 //        log_debug << "Copy ctor\n";
     }
 
-    template <typename U, size_t c, bool d>
+    template <typename U, size_type c, bool d>
     ReservedAllocator(const ReservedAllocator<U, c, d>&)
-        : buffer_(NULL), used_(reserved)
+        :
+        buffer_(NULL),
+        used_(reserved)
     {
 //        log_debug << "Rebinding ctor\n";
     }
@@ -99,8 +108,10 @@ public:
     {
         if (n == 0) return NULL;
 
-        if (reserved - used_ >= n && buffer_ != NULL)
+        if (reserved - used_ >= n /* && buffer_ != NULL */)
         {
+            assert (buffer_ != NULL);
+
             if (diagnostic)
             { log_info << "Allocating " << n << '/' << (reserved - used_)
                        << " from reserve"; }
@@ -149,6 +160,9 @@ public:
 
 private:
 
+    /* even though we initially allocate buffer in ReservedContainer directly
+     * before this, STL containers insist on copying allocators, so we need
+     * a pointer to buffer to be an explicit member (and waste another 8 bytes*/
     Buffer*   buffer_;
     size_type used_;
 
@@ -165,7 +179,7 @@ private:
  * the point is to have a container allocated on the stack to use stack buffer
  * for element storage.
  */
-template <typename ContainerType, size_t reserved>
+template <typename ContainerType, int reserved>
 class ReservedContainer
 {
 public:
@@ -191,8 +205,10 @@ public:
      * and therefore the same stack buffer as the original. Use std::copy to
      * copy into a "real" container for longer-lived objects.
      */
-          ContainerType& container()       { return container_; }
-    const ContainerType& container() const { return container_; }
+          ContainerType& container()        { return container_; }
+    const ContainerType& container() const  { return container_; }
+          ContainerType& operator()()       { return container_; }
+    const ContainerType& operator()() const { return container_; }
 
     /*
      * Support operator-> to get to the container.

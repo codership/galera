@@ -14,6 +14,16 @@
 
 using namespace galera;
 
+class TestBaseName : public gu::Allocator::BaseName
+{
+    std::string str_;
+
+public:
+
+    TestBaseName(const char* name) : str_(name) {}
+    void print(std::ostream& os) const { os << str_; }
+};
+
 class TestRecord
 {
 public:
@@ -114,7 +124,7 @@ START_TEST (ver0)
     records.push_back (&rout5);
 
     gu::byte_t reserved[1024];
-    gu::String<> str("data_set_test");
+    TestBaseName str("data_set_test");
     DataSetOut dset_out(reserved, sizeof(reserved), str, DataSet::VER1);
 
     size_t offset(dset_out.size());

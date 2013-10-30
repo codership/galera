@@ -12,117 +12,19 @@
 #include "gu_vec16.h"
 #include "gu_byteswap.hpp"
 #include "gu_serializable.hpp"
+#include "gu_macros.hpp"
 
 namespace gu
 {
 
-class Digest : public Serializable
+/* Just making MMH3 not derive from Digest reduced TrxHandle size from
+ * 4560 bytes to 4256. 304 bytes of vtable pointers... */
+class MMH3
 {
 public:
 
-    /* size of digest in bytes */
-    Digest (size_t size) : Serializable(), size_(size) {}
+    MMH3 () : ctx_() { gu_mmh128_init (&ctx_); }
 
-    void
-    append (const void* const buf, size_t const size)
-    {
-        my_append (buf, size);
-    }
-
-    void
-    append (const std::vector<byte_t>& v, size_t const offset)
-    {
-        append (&v[offset], v.size() - offset);
-    }
-
-    void
-    append (const std::vector<byte_t>& v) { append (v, 0); }
-
-    template <typename T> void
-    append (const T& obj) { append (&obj, sizeof(obj)); }
-
-    template <size_t size> int
-    gather (void* const out) const { return my_gather (out, size); }
-
-    template <typename T> int
-    gather (T& out) const { return my_gather(&out, sizeof(T)); }
-
-    template <typename T> int
-    operator() (T& out) const { return gather(out); }
-
-protected:
-
-    ~Digest () {}
-
-private:
-
-    virtual void     my_append   (const void* in, size_t size) = 0;
-
-    virtual int      my_gather   (void* out, size_t size) const = 0;
-
-    virtual void     my_gather16 (void* out) const = 0;
-
-    virtual uint64_t my_gather8  ()          const = 0;
-
-    virtual uint32_t my_gather4  ()          const = 0;
-
-    ssize_t  my_serial_size  () const { return size_; }
-
-    ssize_t  my_serialize_to (void* buf, ssize_t size) const
-    {
-        return my_gather (buf, size);
-    }
-
-    char size_; // max digest size in bytes. cannot be more than 32
-};
-
-template <> inline int
-Digest::gather (uint8_t&  out) const { out = my_gather4(); return sizeof(out); }
-
-template <> inline int
-Digest::gather (uint16_t& out) const { out = my_gather4(); return sizeof(out); }
-
-template <> inline int
-Digest::gather (uint32_t& out) const { out = my_gather4(); return sizeof(out); }
-
-template <> inline int
-Digest::gather (uint64_t& out) const { out = my_gather8(); return sizeof(out); }
-
-template <> inline int
-Digest::gather<16> (void* const out) const { my_gather16(out); return 16; }
-
-template <> inline int
-Digest::gather<8> (void* const out) const
-{
-    *(reinterpret_cast<uint64_t*>(out)) = htog64 (my_gather8()); return 8;
-}
-
-template <> inline int
-Digest::gather<4> (void* const out) const
-{
-    *(reinterpret_cast<uint32_t*>(out)) = htog32 (my_gather4()); return 4;
-}
-
-/* This pragma push is needed because GCC somehow managed to see virtual
- * functions in MMH3 and demanded a virtual destructor there. */
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic push
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-#endif
-
-class MMH3 : public Digest
-{
-public:
-
-    MMH3 () : Digest(16), ctx_() { gu_mmh128_init (&ctx_); }
-
-    /* This had to be made virtual due to
-     * error: 'class gu::MMH3' has virtual functions and accessible non-virtual
-     * destructor [-Werror=non-virtual-dtor]
-     *
-     * God only knows where I have virtual functions here. */
     ~MMH3 () {}
 
     template <typename T> static int
@@ -149,30 +51,43 @@ public:
         throw;
     }
 
-private:
-
-    gu_mmh128_ctx_t ctx_;
-
-    void my_append (const void* const buf, size_t const size)
+    void append (const void* const buf, size_t const size)
     {
         gu_mmh128_append (&ctx_, buf, size);
     }
 
-    int  my_gather (void* const buf, size_t const size) const
+    template <size_t size>
+    int  gather (void* const buf) const
+    {
+        GU_COMPILE_ASSERT(size >= 16, wrong_buf_size);
+        gather16 (buf);
+        return 16;
+    }
+
+    int  gather (void* const buf, size_t const size) const
     {
         byte_t tmp[16];
-        my_gather16 (tmp);
+        gather16(tmp);
         int const s(std::min(size, sizeof(tmp)));
         ::memcpy (buf, tmp, s);
         return s;
     }
 
-    void     my_gather16 (void* const buf) const { gu_mmh128_get (&ctx_, buf); }
+    void     gather16 (void* const buf) const { gu_mmh128_get (&ctx_, buf); }
 
-    uint64_t my_gather8() const { return gu_mmh128_get64 (&ctx_); }
+    uint64_t gather8() const { return gu_mmh128_get64 (&ctx_); }
 
-    uint32_t my_gather4() const { return gu_mmh128_get32 (&ctx_); }
-};
+    uint32_t gather4() const { return gu_mmh128_get32 (&ctx_); }
+
+    // a questionable feature
+    template <typename T> int
+    operator() (T& out) const { return gather<sizeof(out)>(&out); }
+
+private:
+
+    gu_mmh128_ctx_t ctx_;
+
+}; /* class MMH3 */
 
 template <> inline int
 MMH3::digest (const void* const in, size_t size, uint8_t& out)
@@ -198,13 +113,20 @@ MMH3::digest (const void* const in, size_t size, uint64_t& out)
     out = gu_mmh128_64(in, size); return sizeof(out);
 }
 
+template <> inline int
+MMH3::gather<8> (void* const out) const
+{
+    *(reinterpret_cast<uint64_t*>(out)) = htog64(gather8()); return 8;
+}
+
+template <> inline int
+MMH3::gather<4> (void* const out) const
+{
+    *(reinterpret_cast<uint32_t*>(out)) = htog32(gather4()); return 4;
+}
+
 typedef MMH3 Hash;
 
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic pop
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#endif
 
 class FastHash
 {
@@ -233,7 +155,7 @@ public:
         }
         throw;
     }
-};
+}; /* FastHash */
 
 template <> inline int
 FastHash::digest (const void* const in, size_t size, uint8_t& out)

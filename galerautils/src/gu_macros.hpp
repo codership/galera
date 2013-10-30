@@ -21,10 +21,10 @@ extern "C" { static const void* const GU_MAP_FAILED = MAP_FAILED; }
 
 namespace gu
 {
-    template <bool>struct CompileAssert {};
+    template<bool> struct CompileAssert {};
 } /* namespace gu */
 
-#define GU_COMPILE_ASSERT(expr, msg) \
+#define GU_COMPILE_ASSERT(expr,msg) \
     typedef gu::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1]
 
 #endif /* _gu_macros_hpp_ */

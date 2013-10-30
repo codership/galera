@@ -19,6 +19,7 @@
 #include "gu_datetime.hpp"
 #include "gu_unordered.hpp"
 #include "gu_utils.hpp"
+#include "gu_macros.hpp"
 
 #include <set>
 
@@ -32,6 +33,12 @@ namespace galera
     class TrxHandle
     {
     public:
+
+        /* signed int here is to detect SIZE < sizeof(TrxHandle) */
+        static int const SIZE = GU_PAGE_SIZE * 2; // 8K
+
+#define TRX_HANDLE_STORE_SIZE \
+        (TrxHandle::SIZE - static_cast<int>(sizeof(TrxHandle)))
 
         struct Params
         {
@@ -161,19 +168,50 @@ namespace galera
             size_t serial_size() const;
         };
 
-
-        explicit
-        TrxHandle(const Params&       params    = Defaults,
-                  const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
-                  wsrep_conn_id_t     conn_id   = -1,
-                  wsrep_trx_id_t      trx_id    = -1,
-                  bool                local     = false)
+        /* slave trx ctor */
+        TrxHandle()
             :
-            version_           (params.version_),
+            source_id_         (WSREP_UUID_UNDEFINED),
+            conn_id_           (-1),
+            trx_id_            (-1),
+            mutex_             (),
+            write_set_collection_(Defaults.working_dir_),
+            state_             (&trans_map_, S_EXECUTING),
+            local_seqno_       (WSREP_SEQNO_UNDEFINED),
+            global_seqno_      (WSREP_SEQNO_UNDEFINED),
+            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
+            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
+            timestamp_         (),
+            write_set_         (Defaults.version_),
+            write_set_out_     (),
+            write_set_in_      (),
+            annotation_        (),
+            cert_keys_         (),
+            write_set_buffer_  (0, 0),
+            action_            (0),
+            gcs_handle_        (-1),
+            version_           (Defaults.version_),
+            refcnt_            (1),
+            write_set_flags_   (0),
+            local_             (false),
+            certified_         (false),
+            committed_         (false),
+            exit_loop_         (false),
+            mac_               ()
+        {}
+
+        /* local trx ctor */
+        explicit
+        TrxHandle(const Params&       params,
+                  const wsrep_uuid_t& source_id,
+                  wsrep_conn_id_t     conn_id,
+                  wsrep_trx_id_t      trx_id,
+                  gu::byte_t*         reserved      = NULL,
+                  size_t              reserved_size = 0)
+            :
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
-            local_             (local),
             mutex_             (),
             write_set_collection_(params.working_dir_),
             state_             (&trans_map_, S_EXECUTING),
@@ -181,24 +219,24 @@ namespace galera
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
-            refcnt_            (1),
-            write_set_         (version_),
-            write_set_out_     (gu::String<256>(params.working_dir_) << '/'
-                                << gu::Fmt("%016x")
-                                << static_cast<unsigned long long>(trx_id),
-                                params.key_format_),
+            timestamp_         (gu_time_calendar()),
+            write_set_         (params.version_),
+            write_set_out_     (params.working_dir_, trx_id, params.key_format_,
+                                reserved, reserved_size),
             write_set_in_      (),
+            annotation_        (),
+            cert_keys_         (),
+            write_set_buffer_  (0, 0),
+            action_            (0),
+            gcs_handle_        (-1),
+            version_           (params.version_),
+            refcnt_            (1),
             write_set_flags_   (0),
+            local_             (true),
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
-            gcs_handle_        (-1),
-            action_            (0),
-            timestamp_         (gu_time_calendar()),
-            mac_               (),
-            annotation_        (),
-            write_set_buffer_  (0, 0),
-            cert_keys_         ()
+            mac_               ()
         {}
 
         void lock()   const { mutex_.lock();   }
@@ -327,7 +365,7 @@ namespace galera
                     write_set_out_.append_unordered(data, data_len, store);
                     break;
                 case WSREP_DATA_ANNOTATION:
-                    assert(0);
+                    write_set_out_.append_annotation(data, data_len, store);
                     break;
                 }
             }
@@ -477,8 +515,8 @@ namespace galera
         void   unref() { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
         size_t refcnt() const { return refcnt_(); }
 
-        WriteSetOut&  write_set_out() { return write_set_out_; }
-        WriteSetIn&   write_set_in () { return write_set_in_;  }
+              WriteSetOut& write_set_out()       { return write_set_out_; }
+        const WriteSetIn&  write_set_in () const { return write_set_in_;  }
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
@@ -507,46 +545,6 @@ namespace galera
         bool   exit_loop() const { return exit_loop_; }
         void   set_exit_loop(bool x) { exit_loop_ |= x; }
 
-    private:
-
-        ~TrxHandle() { }
-        TrxHandle(const TrxHandle&);
-        void operator=(const TrxHandle& other);
-
-        int version_;
-        wsrep_uuid_t           source_id_;
-        wsrep_conn_id_t        conn_id_;
-        wsrep_trx_id_t         trx_id_;
-        bool                   local_;
-        mutable gu::Mutex      mutex_;
-        MappedBuffer           write_set_collection_;
-        FSM<State, Transition> state_;
-        wsrep_seqno_t          local_seqno_;
-        wsrep_seqno_t          global_seqno_;
-        wsrep_seqno_t          last_seen_seqno_;
-        wsrep_seqno_t          depends_seqno_;
-        gu::Atomic<size_t>     refcnt_;
-        WriteSet               write_set_;
-        WriteSetOut            write_set_out_;
-        WriteSetIn             write_set_in_;
-        uint32_t               write_set_flags_;
-        bool                   certified_;
-        bool                   committed_;
-        bool                   exit_loop_;
-        long                   gcs_handle_;
-        const void*            action_;
-        int64_t                timestamp_;
-        Mac                    mac_;
-        gu::Buffer             annotation_;
-
-        // Write set buffer location if stored outside TrxHandle.
-        std::pair<const gu::byte_t*, size_t> write_set_buffer_;
-
-        //
-        friend class Wsdb;
-        friend class Certification;
-
-public:
         typedef gu::UnorderedMap<KeyEntryOS*,
                                  std::pair<bool, bool>,
                                  KeyEntryPtrHash,
@@ -558,11 +556,49 @@ public:
         size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
 
-private:
-        CertKeySet cert_keys_;
+    private:
 
+        ~TrxHandle() { }
+        TrxHandle(const TrxHandle&);
+        void operator=(const TrxHandle& other);
+
+        wsrep_uuid_t           source_id_;
+        wsrep_conn_id_t        conn_id_;
+        wsrep_trx_id_t         trx_id_;
+        mutable gu::Mutex      mutex_;
+        MappedBuffer           write_set_collection_;
+        FSM<State, Transition> state_;
+        wsrep_seqno_t          local_seqno_;
+        wsrep_seqno_t          global_seqno_;
+        wsrep_seqno_t          last_seen_seqno_;
+        wsrep_seqno_t          depends_seqno_;
+        int64_t                timestamp_;
+        WriteSet               write_set_;
+        WriteSetOut            write_set_out_;
+        WriteSetIn             write_set_in_;
+        gu::Buffer             annotation_;
+        CertKeySet             cert_keys_;
+
+        // Write set buffer location if stored outside TrxHandle.
+        std::pair<const gu::byte_t*, size_t> write_set_buffer_;
+
+        const void*            action_;
+        long                   gcs_handle_;
+        int                    version_;
+        gu::Atomic<int>        refcnt_;
+        uint32_t               write_set_flags_;
+        bool                   local_;
+        bool                   certified_;
+        bool                   committed_;
+        bool                   exit_loop_;
+        Mac                    mac_;
+
+        friend class Wsdb;
+        friend class Certification;
         friend std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
-    };
+        friend class TrxHandleWithStore;
+
+    }; /* class TrxHandle */
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
 
@@ -573,7 +609,8 @@ private:
         ~TrxHandleLock() { trx_.unlock(); }
     private:
         TrxHandle& trx_;
-    };
+
+    }; /* class TrxHnadleLock */
 
     template <typename T>
     class Unref2nd
@@ -582,6 +619,35 @@ private:
         void operator()(T& t) const { t.second->unref(); }
     };
 
-}
+    /* Normally this should have been simply DERIVED from TrxHandle and have
+     * a proper initialization order. However to do it properly would require
+     * more refactoring than is desirable ATM. Postponing this for 4.x */
+    class TrxHandleWithStore
+    {
+    public:
+
+        TrxHandleWithStore(const TrxHandle::Params& params,
+                           const wsrep_uuid_t&      source_id,
+                           wsrep_conn_id_t          conn_id,
+                           wsrep_trx_id_t           trx_id) :
+            trx_  (params, source_id, conn_id, trx_id, store_, sizeof(store_)),
+            store_()
+        {}
+
+        TrxHandle* handle() { return &trx_; }
+
+    private:
+
+        TrxHandle  trx_;
+        gu::byte_t store_[TRX_HANDLE_STORE_SIZE];
+    }; /* class TrxHandleWithStore */
+
+    struct TrxHandleCompileAssert
+    {
+        GU_COMPILE_ASSERT(
+            (sizeof(TrxHandleWithStore) == TrxHandle::SIZE), size_match);
+    };
+
+} /* namespace galera*/
 
 #endif // GALERA_TRX_HANDLE_HPP

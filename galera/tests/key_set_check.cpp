@@ -15,6 +15,16 @@
 
 using namespace galera;
 
+class TestBaseName : public gu::Allocator::BaseName
+{
+    std::string str_;
+
+public:
+
+    TestBaseName(const char* name) : str_(name) {}
+    void print(std::ostream& os) const { os << str_; }
+};
+
 static size_t version_to_hash_size (KeySet::Version const ver)
 {
     switch (ver)
@@ -35,7 +45,7 @@ START_TEST (ver0)
     size_t const base_size(version_to_hash_size(tk_ver));
 
     gu::byte_t reserved[1024];
-    gu::String<> const str("key_set_test");
+    TestBaseName const str("key_set_test");
     KeySetOut kso (reserved, sizeof(reserved), str, tk_ver);
 
     fail_if (kso.count() != 0);

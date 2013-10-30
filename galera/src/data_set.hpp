@@ -77,9 +77,14 @@ namespace galera
     {
     public:
 
+        DataSetOut () // empty ctor for slave TrxHandle
+            :
+            gu::RecordSetOut<DataSet::RecordOut>(), version_()
+        {}
+
         DataSetOut (gu::byte_t*             reserved,
                     size_t                  reserved_size,
-                    const gu::StringBase<>& base_name,
+                    const BaseName&         base_name,
                     DataSet::Version        version)
             :
             gu::RecordSetOut<DataSet::RecordOut> (

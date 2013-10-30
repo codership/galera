@@ -9,6 +9,10 @@
 #include "gu_logger.hpp"
 #include "gu_throw.hpp"
 
+extern "C" {
+#include "gu_limits.h"
+}
+
 #if !defined(_XOPEN_SOURCE) && !defined(__APPLE__)
 #define _XOPEN_SOURCE 600
 #endif
@@ -154,10 +158,8 @@ namespace gu
     void
     FileDescriptor::write_file (off_t const start)
     {
-        off_t const page_size (sysconf (_SC_PAGE_SIZE));
-
         // last byte of the start page
-        off_t offset = (start / page_size + 1) * page_size - 1;
+        off_t offset = (start / GU_PAGE_SIZE + 1) * GU_PAGE_SIZE - 1;
 //        off_t const diff (size - offset);
 
 //        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
@@ -165,7 +167,7 @@ namespace gu
 
         while (offset < size_ && write_byte (offset))
         {
-            offset += page_size;
+            offset += GU_PAGE_SIZE;
         }
 
         if (offset > size_ && write_byte (size_ - 1) && fsync (fd_) == 0) {

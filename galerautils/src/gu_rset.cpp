@@ -180,7 +180,7 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
     {
         assert (csize <= size - off);
         check_.append (buf + hdr_offset, off - hdr_offset); /* append header */
-        check_.serialize_to (buf + off, csize);
+        check_.gather (buf + off, csize);
     }
 
     return hdr_offset;
@@ -214,10 +214,10 @@ RecordSetOutBase::gather (GatherVector& out)
 
 RecordSet::RecordSet (Version ver, CheckType const ct)
     :
-    version_   (ver),
-    check_type_(ct),
     size_      (0),
-    count_     (0)
+    count_     (0),
+    version_   (ver),
+    check_type_(ct)
 {
     if (gu_unlikely(uint(version_) > MAX_VERSION))
     {
@@ -228,7 +228,7 @@ RecordSet::RecordSet (Version ver, CheckType const ct)
 
 RecordSetOutBase::RecordSetOutBase (byte_t*                 reserved,
                                     size_t                  reserved_size,
-                                    const gu::StringBase<>& base_name,
+                                    const BaseName&         base_name,
                                     CheckType const         ct,
                                     Version const           version
 #ifdef GU_RSET_CHECK_SIZE
@@ -240,7 +240,7 @@ RecordSetOutBase::RecordSetOutBase (byte_t*                 reserved,
 #ifdef GU_RSET_CHECK_SIZE
     max_size_   (max_size),
 #endif
-    alloc_      (reserved, reserved_size, base_name),
+    alloc_      (base_name, reserved, reserved_size),
     check_      (),
     bufs_       (),
     prev_stored_(true)
@@ -383,7 +383,7 @@ RecordSetInBase::checksum() const
 
         assert(cs <= MAX_CHECKSUM_SIZE);
         byte_t result[MAX_CHECKSUM_SIZE];
-        check.serialize_to (result, sizeof(result));
+        check.gather<sizeof(result)>(result);
 
         const byte_t* const stored_checksum(head_ + begin_ - cs);
 
@@ -402,9 +402,9 @@ RecordSetInBase::RecordSetInBase (const byte_t* const ptr,
                                   bool const          check_now)
     :
     RecordSet   (),
-    head_       (NULL),
-    begin_      (0),
-    next_       (begin_)
+    head_       (),
+    next_       (),
+    begin_      ()
 {
     init (ptr, size, check_now);
 }
@@ -423,7 +423,7 @@ RecordSetInBase::init (const byte_t* const ptr,
     switch (version_)
     {
     case EMPTY: return;
-    case VER1:  parse_header_v1(size);
+    case VER1:  parse_header_v1(size); // should set begin_
     }
 
     if (check_now) checksum();

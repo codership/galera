@@ -51,22 +51,22 @@ public:
     /*! return number of records in the record set */
     int    count() const { return count_; }
 
-    typedef gu::Vector<gu::Buf, 32> GatherVector;
+    typedef gu::Vector<gu::Buf, 16> GatherVector;
 
 protected:
 
+    ssize_t   size_;
+    int       count_;
+
     Version   version_;
     CheckType check_type_;
-
-    ssize_t size_;
-    ssize_t count_;
 
     /* ctor for RecordSetOut */
     RecordSet (Version const version, CheckType const ct);
 
     /* ctor for RecordSetIn */
     RecordSet ()
-        : version_(EMPTY), check_type_(CHECK_NONE), size_(0), count_(0) {}
+        : size_(0), count_(0), version_(EMPTY), check_type_(CHECK_NONE) {}
 
     void init (const byte_t* buf, ssize_t size);
 
@@ -86,6 +86,8 @@ class RecordSetOutBase : public RecordSet
 {
 public:
 
+    typedef Allocator::BaseName BaseName;
+
     /*! return number of disjoint pages in the record set */
     ssize_t page_count() const { return bufs_->size(); }
 
@@ -94,14 +96,16 @@ public:
 
 protected:
 
-    RecordSetOutBase (byte_t*             reserved,
-                      size_t              reserved_size,
-                      const StringBase<>& base_name,     /* basename for on-disk
+    RecordSetOutBase() : RecordSet() {}
+
+    RecordSetOutBase (byte_t*           reserved,
+                      size_t            reserved_size,
+                      const BaseName&   base_name,     /* basename for on-disk
                                                         * allocator */
-                      CheckType           ct,
-                      Version             version  = MAX_VERSION
+                      CheckType         ct,
+                      Version           version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
-                      ,ssize_t            max_size = 0x7fffffff
+                      ,ssize_t          max_size = 0x7fffffff
 #endif
         );
 
@@ -187,7 +191,7 @@ private:
 
     Allocator     alloc_;
     Hash          check_;
-    gu::Vector<Buf, Allocator::INITIAL_VECTOR_SIZE> bufs_;
+    Vector<Buf, Allocator::INITIAL_VECTOR_SIZE> bufs_;
     bool          prev_stored_;
 
     void
@@ -214,9 +218,13 @@ class RecordSetOut : public RecordSetOutBase
 {
 public:
 
+    typedef RecordSetOutBase::BaseName BaseName;
+
+    RecordSetOut() : RecordSetOutBase() {}
+
     RecordSetOut (byte_t*             reserved,
                   size_t              reserved_size,
-                  const StringBase<>& base_name,
+                  const BaseName&     base_name,
                   CheckType           ct,
                   Version             version  = MAX_VERSION
 #ifdef GU_RSET_CHECK_SIZE
@@ -355,8 +363,8 @@ protected:
 private:
 
     const byte_t*   head_;        /* pointer to header        */
-    ssize_t         begin_;       /* offset to first record   */
     ssize_t mutable next_;        /* offset to next record    */
+    short           begin_;       /* offset to first record   */
     /* size_ from parent class is offset past all records */
 
     /* takes total size of the supplied buffer */
@@ -375,16 +383,16 @@ private:
     :
     RecordSet   (r),
     head_       (r.head_),
-    begin_      (r.begin_),
-    next_       (r.next_)
+    next_       (r.next_),
+    begin_      (r.begin_)
     {}
 
     RecordSetInBase& operator= (const RecordSetInBase r);
 #if 0
     {
         std::swap(head_, r.head_);
-        std::swap(begin, r.begin_);
         std::swap(next_, r.next_);
+        std::swap(begin, r.begin_);
     }
 #endif
 }; /* class RecordSetInBase */

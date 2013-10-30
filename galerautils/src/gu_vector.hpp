@@ -39,7 +39,7 @@ public:
     typedef T        value_type;
     typedef T&       reference;
     typedef const T& const_reference;
-    typedef size_t   size_type;
+    typedef typename ReservedAllocator<value_type,0>::size_type size_type;
 
     virtual       reference operator[] (size_type i)       = 0;
     virtual const_reference operator[] (size_type i) const = 0;
@@ -56,16 +56,17 @@ protected:
     virtual ~VectorBase() {}
 };
 
+/* a base class to be used as a member of other classes */
 template <typename T, typename VectorBase<T>::size_type capacity>
-class Vector : public VectorBase<T>
+class Vector
 {
 public:
 
-    Vector() : VectorBase<T>(), rv_() {}
+    Vector() : rv_() {}
 
-    Vector(const Vector& other) : VectorBase<T>(), rv_()
+    Vector(const Vector& other) : rv_()
     {
-        rv_.container().assign(other->begin(), other->end());
+        rv_().assign(other().begin(), other().end());
     }
 
     Vector& operator= (Vector other)
@@ -109,6 +110,41 @@ private:
     ReservedContainer<ContainerType, capacity> rv_;
 
 }; /* class Vector*/
+
+/* Vector class derived from VectorBase - to be passed as a parameter */
+template <typename T, typename VectorBase<T>::size_type capacity>
+class VectorDerived : public VectorBase<T>
+{
+public:
+
+    typedef typename VectorBase<T>::size_type       size_type;
+    typedef typename VectorBase<T>::value_type      value_type;
+    typedef typename VectorBase<T>::reference       reference;
+    typedef typename VectorBase<T>::const_reference const_reference;
+
+    VectorDerived() : VectorBase<T>(), v_() {}
+
+    template <typename VectorBase<T>::size_type C>
+    VectorDerived(const Vector<T,C>& other) : VectorBase<T>(), v_()
+    {
+        v_().assign(other().begin(), other().end());
+    }
+
+          reference operator[] (size_type i)       { return v_[i]; }
+    const_reference operator[] (size_type i) const { return v_[i]; }
+
+    size_type size    () const { return v_.size(); }
+    void      reserve (size_type n) { v_.reserve(); }
+    void      resize  (size_type n, value_type val = value_type())
+    {
+        v_.resize();
+    }
+
+private:
+
+    Vector<T, capacity> v_;
+
+}; /* class VectorDerived */
 
 } /* namespace gu */
 

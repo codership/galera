@@ -362,7 +362,7 @@ namespace galera
                 Ctrl       ctrl(version_, code);
                 gu::Buffer buf(ctrl.serial_size());
                 size_t offset(ctrl.serialize(&buf[0], buf.size(), 0));
-                size_t n(asio::write(socket, asio::buffer(&buf[0], buf.size())));
+                size_t n(asio::write(socket, asio::buffer(&buf[0],buf.size())));
                 if (n != offset)
                 {
                     gu_throw_error(EPROTO) << "error sending ctrl message";
@@ -532,8 +532,6 @@ namespace galera
                         }
 
                         trx->unserialize(&wbuf[0], wbuf.size(), 0);
-// trx->unserialize should do the job                        trx->append_write_set(&buf[0]    + offset,
-//                                              buf.size() - offset);
                     }
 
                     trx->set_received(0, -1, seqno_g);
