@@ -63,6 +63,7 @@ MYSQLD_USER=$(whoami)
 ##
 # use mysqld server directly, better not have automatic restarting
 MYSQLD="$MYSQL_BASE_DIR/sbin/mysqld"
+[ ! -x "$MYSQLD" -a -x "${MYSQLD}-debug" ] && MYSQLD=${MYSQLD}-debug 
 MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
 # Port, socket and pid files
 MYSQL_PORT=${MYSQL_PORT:-3306}
@@ -90,8 +91,8 @@ INNODB_OPTS=" --default-storage-engine=InnoDB "
 SKIP_RECOVERY=0
 START_POSITION=""
 
-err_log="$MYSQL_DATA_DIR/$(hostname).err"
-mysql_log="$MYSQL_DATA_DIR/$(hostname).log"
+err_log="$MYSQL_DATA_DIR/mysqld.err"
+mysql_log="$MYSQL_DATA_DIR/mysqld.log"
 
 
 usage() { cat - << EOF
@@ -502,7 +503,9 @@ WS_LEVEL=""
 #DB="test" # use 'test' database if none given
 # in 5.6 the following tables are non-deterministic
 IGNORE_TABLES=\
-"--ignore-table=mysql.innodb_table_stats --ignore-table=mysql.innodb_index_stats"
+"--ignore-table=mysql.innodb_table_stats --ignore-table=mysql.innodb_index_stats "\
+"--ignore-table=mysql.slave_master_info --ignore-table=mysql.slave_relay_log_info "\
+"--ignore-table=mysql.slave_worker_info"
 
 # to use innodb plugin or not
 PLUGIN_OPTS=""
