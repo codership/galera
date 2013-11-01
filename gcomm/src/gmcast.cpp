@@ -1211,7 +1211,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                 p->set_tstamp(gu::datetime::Date::now());
                 send_up(Datagram(dg, dg.offset() + msg.serial_size()),
                         ProtoUpMeta(msg.source_uuid()));
-                p = 0; /* p should not be used after that: #803 */
+                return;
             }
             else
             {
@@ -1241,7 +1241,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                 }
             }
 
-            if (p && prev_state != Proto::S_OK && p->state() == Proto::S_OK)
+            if (prev_state != Proto::S_OK && p->state() == Proto::S_OK)
             {
                 handle_established(p);
             }
