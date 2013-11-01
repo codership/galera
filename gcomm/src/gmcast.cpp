@@ -1208,16 +1208,17 @@ void gcomm::GMCast::handle_up(const void*        id,
                           Datagram(dg, dg.offset() + msg.serial_size()),
                           id);
                 }
+                p->set_tstamp(gu::datetime::Date::now());
                 send_up(Datagram(dg, dg.offset() + msg.serial_size()),
                         ProtoUpMeta(msg.source_uuid()));
-                p->set_tstamp(gu::datetime::Date::now());
+                return;
             }
             else
             {
                 try
                 {
-                    gu_trace(p->handle_message(msg));
                     p->set_tstamp(gu::datetime::Date::now());
+                    gu_trace(p->handle_message(msg));
                 }
                 catch (gu::Exception& e)
                 {
