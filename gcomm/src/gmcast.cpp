@@ -1208,16 +1208,17 @@ void gcomm::GMCast::handle_up(const void*        id,
                           Datagram(dg, dg.offset() + msg.serial_size()),
                           id);
                 }
+                p->set_tstamp(gu::datetime::Date::now());
                 send_up(Datagram(dg, dg.offset() + msg.serial_size()),
                         ProtoUpMeta(msg.source_uuid()));
-                p->set_tstamp(gu::datetime::Date::now());
+                p = 0; /* p should not be used after that: #803 */
             }
             else
             {
                 try
                 {
-                    gu_trace(p->handle_message(msg));
                     p->set_tstamp(gu::datetime::Date::now());
+                    gu_trace(p->handle_message(msg));
                 }
                 catch (gu::Exception& e)
                 {
@@ -1240,7 +1241,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                 }
             }
 
-            if (prev_state != Proto::S_OK && p->state() == Proto::S_OK)
+            if (p && prev_state != Proto::S_OK && p->state() == Proto::S_OK)
             {
                 handle_established(p);
             }
