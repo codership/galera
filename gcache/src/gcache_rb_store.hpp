@@ -54,6 +54,7 @@ namespace gcache
         static ssize_t pad_size()
         {
             RingBuffer* rb(0);
+            // cppcheck-suppress nullPounter
             return (PREAMBLE_LEN * sizeof(*(rb->preamble_)) +
                     HEADER_LEN * sizeof(*(rb->header_)));
         }
@@ -77,9 +78,6 @@ namespace gcache
         ssize_t            size_free_;
         ssize_t            size_used_;
         ssize_t            size_trail_;
-
-//        long long       mallocs_;
-//        long long       reallocs_;
 
         typedef std::map<int64_t, const void*> seqno2ptr_t;
 

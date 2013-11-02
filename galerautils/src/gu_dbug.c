@@ -2021,7 +2021,7 @@ dbug_flush(CODE_STATE * state)
 #if defined(MSDOS) || defined(__WIN__)
 	if (_gu_db_fp_ != stdout && _gu_db_fp_ != stderr) {
 	    if (!(freopen(_gu_db_stack->name, "a", _gu_db_fp_))) {
-		(void) fprintf(stderr, ERR_OPEN, _gu_db_process_);
+		(void) fprintf(stderr, ERR_OPEN, _gu_db_process_,_gu_db_stack->name);
 		fflush(stderr);
 		_gu_db_fp_ = stdout;
 		_gu_db_stack->out_file = _gu_db_fp_;

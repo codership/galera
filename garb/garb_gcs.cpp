@@ -83,7 +83,7 @@ Gcs::request_state_transfer (const std::string& request,
     ssize_t req_len = request.length() + 1 /* \0 */;
     char* const req_str(reinterpret_cast<char*>(::malloc(
                         req_len + 1 /* potentially need one more \0 */)));
-
+    // cppcheck-suppress nullPointer
     if (!req_str)
     {
         gu_throw_error (ENOMEM) << "Cannot allocate " << req_len

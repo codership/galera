@@ -100,11 +100,12 @@ void galera_tear_down(wsrep_t* gh)
 extern "C"
 wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
 {
-    assert(gh != 0);
+    assert(gh != 0); // cppcheck-suppress nullPointer
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
+    // cppcheck-suppress nullPointer
     if (gh)
     {
         try

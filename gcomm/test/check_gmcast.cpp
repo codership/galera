@@ -48,7 +48,7 @@ START_TEST(test_gmcast_w_user_messages)
         Transport* tp_;
         size_t recvd_;
         Protostack pstack_;
-        User(const User&);
+        explicit User(const User&);
         void operator=(User&);
 
     public:
@@ -108,7 +108,7 @@ START_TEST(test_gmcast_w_user_messages)
         void handle_timer()
         {
             byte_t buf[16];
-            memset(buf, 'a', sizeof(buf));
+            memset(buf, 0xa5, sizeof(buf));
 
             Datagram dg(Buffer(buf, buf + sizeof(buf)));
 
@@ -123,7 +123,8 @@ START_TEST(test_gmcast_w_user_messages)
                 gu_throw_fatal << "offset error";
             }
             char buf[16];
-            memset(buf, 'a', sizeof(buf));
+            memset(buf, 0xa5, sizeof(buf));
+            // cppcheck-suppress uninitstring
             if (memcmp(buf, &rb.payload()[0] + rb.offset(), 16) != 0)
             {
                 gu_throw_fatal << "content mismatch";
