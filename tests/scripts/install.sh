@@ -6,8 +6,8 @@ untar_cmd()
 {
     local node=${@:$#}
     local path="${NODE_TEST_DIR[$node]}"
-    local hst=$(hostname)
-    echo -n "mkdir -p \"$path\" && tar --strip 1 -C \"$path\" -xzf - && > \"$path/mysql/var/$hst.err\" && exit 0"
+    local hst=$(hostname -s)
+    echo -n "mkdir -p \"$path\" && tar --strip 1 -C \"$path\" -xzf - && > \"$path/mysql/var/mysqld.err\" && exit 0"
 }
 
 copy_config()
