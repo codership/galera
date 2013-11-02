@@ -30,7 +30,7 @@ namespace gu
         {
 
             int err = pthread_mutex_lock (value);
-            if (err)
+            if (gu_unlikely(err))
             {
                 std::string msg = "Mutex lock failed: ";
                 msg = msg + strerror(err);
@@ -41,11 +41,11 @@ namespace gu
         virtual ~Lock ()
         {
             int err = pthread_mutex_unlock (value);
-            if (err)
+            if (gu_unlikely(err))
             {
-                std::string msg = "Mutex unlock failed: ";
-                msg = msg + strerror(err);
-                throw Exception(msg.c_str(), err);
+                log_fatal << "Mutex unlock failed: " << err << " ("
+                          << strerror(err) << "), Aborting.";
+                ::abort();
             }
             // log_debug << "Unlocked mutex " << value;
         }

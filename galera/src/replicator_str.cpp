@@ -466,6 +466,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
     char* str = strdup (os.str().c_str());
 
+    // cppcheck-suppress nullPointer
     if (!str) gu_throw_error (ENOMEM) << "Failed to allocate IST buffer.";
 
     len = strlen(str) + 1;
