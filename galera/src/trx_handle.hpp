@@ -41,7 +41,7 @@ namespace galera
             F_PA_UNSAFE   = 1 << 7
         };
 
-        static inline uint64_t wsrep_flags_to_trx_flags (uint64_t flags)
+        static inline uint32_t wsrep_flags_to_trx_flags (uint32_t flags)
         {
             uint64_t ret(0);
 
@@ -49,6 +49,18 @@ namespace galera
             if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
             if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
+
+            return ret;
+        }
+
+        static inline uint32_t trx_flags_to_wsrep_flags (uint32_t flags)
+        {
+            uint64_t ret(0);
+
+            if (flags & F_COMMIT)      ret |= WSREP_FLAG_COMMIT;
+            if (flags & F_ROLLBACK)    ret |= WSREP_FLAG_ROLLBACK;
+            if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
+            if (flags & F_ISOLATION)   ret |= WSREP_FLAG_ISOLATION;
 
             return ret;
         }

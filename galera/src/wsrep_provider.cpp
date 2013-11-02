@@ -407,7 +407,7 @@ extern "C"
 wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
                                  wsrep_conn_id_t    const conn_id,
                                  wsrep_ws_handle_t* const trx_handle,
-                                 uint64_t           const flags,
+                                 uint32_t           const flags,
                                  wsrep_trx_meta_t*  const meta)
 {
     assert(gh != 0);
@@ -742,7 +742,7 @@ extern "C" wsrep_status_t
 galera_preordered_commit (wsrep_t* const gh,
                           wsrep_po_handle_t*      const handle,
                           const wsrep_uuid_t*     const source_id,
-                          uint64_t                const flags,
+                          uint32_t                const flags,
                           int                     const pa_range,
                           wsrep_bool_t            const commit)
 {
