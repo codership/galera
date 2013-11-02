@@ -23,6 +23,7 @@ apply_trx_ws(void*                    recv_ctx,
              const galera::TrxHandle& trx,
              const wsrep_trx_meta_t&  meta)
 {
+    using galera::TrxHandle;
     static const size_t max_apply_attempts(4);
     size_t attempts(1);
 
@@ -57,8 +58,14 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (err > 0)
                 {
-                    wsrep_bool_t unused;
-                    int const rcode(commit_cb(recv_ctx, &meta, &unused, false));
+                    wsrep_bool_t unused(false);
+                    int const rcode(
+                        commit_cb(
+                            recv_ctx,
+                            TrxHandle::trx_flags_to_wsrep_flags(trx.flags()),
+                            &meta,
+                            &unused,
+                            false));
                     if (WSREP_OK != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
@@ -479,7 +486,13 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     trx->set_state(TrxHandle::S_COMMITTING);
 
     wsrep_bool_t exit_loop(false);
-    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, &meta, &exit_loop,true));
+    wsrep_cb_status_t const rcode(
+        commit_cb_(
+            recv_ctx,
+            TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
+            &meta,
+            &exit_loop,
+            true));
 
     if (gu_unlikely (rcode > 0))
         gu_throw_fatal << "Commit failed. Trx: " << trx;
@@ -894,8 +907,14 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
             gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *trx, meta));
 
-            wsrep_bool_t unused;
-            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, &meta, &unused, true));
+            wsrep_bool_t unused(false);
+            wsrep_cb_status_t rcode(
+                commit_cb_(
+                    trx_ctx,
+                    TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
+                    &meta,
+                    &unused,
+                    true));
 
             if (gu_unlikely(rcode > 0))
                 gu_throw_fatal << "Commit failed. Trx: " << trx;
