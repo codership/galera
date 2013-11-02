@@ -302,7 +302,8 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         {
             gu::Buf buf = ws.next();
 
-            err = apply_cb (recv_ctx, buf.ptr, buf.size, &meta);
+            err = apply_cb (recv_ctx, buf.ptr, buf.size,
+                            trx_flags_to_wsrep_flags(flags()), &meta);
         }
     }
     else
@@ -322,7 +323,8 @@ galera::TrxHandle::apply (void*                   recv_ctx,
                 galera::WriteSet::segment(buf, buf_len, offset));
             offset = d.first + d.second;
 
-            err = apply_cb (recv_ctx, buf + d.first, d.second, &meta);
+            err = apply_cb (recv_ctx, buf + d.first, d.second,
+                            trx_flags_to_wsrep_flags(flags()), &meta);
         }
 
         assert(offset == buf_len);
