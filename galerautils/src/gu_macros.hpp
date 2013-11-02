@@ -25,6 +25,6 @@ namespace gu
 } /* namespace gu */
 
 #define GU_COMPILE_ASSERT(expr,msg) \
-    typedef gu::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1]
+    typedef gu::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1] __attribute__((unused))
 
 #endif /* _gu_macros_hpp_ */
