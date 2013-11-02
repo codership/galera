@@ -33,8 +33,10 @@ namespace gcache
         virtual ~Mutex ()
         {
             int err = pthread_mutex_destroy (&value);
-            if (err != 0) {
-                throw Exception (strerror(err), err);
+            if (gu_unlikely(err != 0)) {
+                log_fatal << "pthread_mutex_destroy() failed: " << err
+                          << " (" << strerror(err) << "). Aborting.";
+                ::abort();
             }
             log_debug << "Destroyed mutex " << &value;
         };

@@ -69,7 +69,7 @@ namespace gu
             Exception e(base.os.str(), err);
 
             e.trace (base.file, base.func, base.line);
-
+            // cppcheck-suppress exceptThrowInDestructor
             throw e;
         }
 
@@ -81,7 +81,7 @@ namespace gu
         int const err;
     };
 
-    /* final*/ class ThrowFatal //: public ThrowBase
+    /* final*/ class ThrowFatal
     {
     public:
 
@@ -97,7 +97,7 @@ namespace gu
             Exception e(base.os.str(), ENOTRECOVERABLE);
 
             e.trace (base.file, base.func, base.line);
-
+            // cppcheck-suppress exceptThrowInDestructor
             throw e;
         }
 

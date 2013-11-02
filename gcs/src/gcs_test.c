@@ -204,6 +204,7 @@ test_log_open (gcs_test_log_t **log, const char *name)
     if (!l) return errno;
 
     snprintf (real_name, 1024, "%s.%lld", name, (long long)getpid());
+    // cppcheck-suppress memleak
     if (!(l->file = fopen (real_name, "w"))) return errno;
     pthread_mutex_init (&l->lock, NULL);
     *log = l;

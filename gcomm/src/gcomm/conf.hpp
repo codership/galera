@@ -425,12 +425,14 @@ namespace gcomm
         }
         catch (gu::NotFound& e)
         {
+            // cppcheck-suppress nullPointer
             if (default_value == 0)
             {
                 gu_throw_error(EINVAL)
                     << "param " << param << " not found from uri "
                     << uri.to_string();
             }
+            // cppcheck-suppress nullPointer
             ret = *default_value;
         }
 

@@ -37,17 +37,21 @@ namespace gu
 
         ~Cond ()
         {
-            register int ret;
+            int ret;
             while (EBUSY == (ret = pthread_cond_destroy(&cond)))
                 { usleep (100); }
             if (gu_unlikely(ret != 0))
-                throw Exception("pthread_cond_destroy() failed", ret);
+            {
+                log_fatal << "pthread_cond_destroy() failed: " << ret
+                          << " (" << strerror(ret) << ". Aborting.";
+                ::abort();
+            }
         }
 
         inline void signal () const
         {
             if (ref_count > 0) {
-                register int ret = pthread_cond_signal (&cond);
+                int ret = pthread_cond_signal (&cond);
                 if (gu_unlikely(ret != 0))
                     throw Exception("pthread_cond_signal() failed", ret);
             }
@@ -56,7 +60,7 @@ namespace gu
         inline void broadcast () const
         {
             if (ref_count > 0) {
-                register int ret = pthread_cond_broadcast (&cond);
+                int ret = pthread_cond_broadcast (&cond);
                 if (gu_unlikely(ret != 0))
                     throw Exception("pthread_cond_broadcast() failed", ret);
             }

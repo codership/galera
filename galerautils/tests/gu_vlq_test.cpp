@@ -11,7 +11,7 @@
 #include <vector>
 #include <limits>
 
-static struct valarr
+static struct valval
 {
     const unsigned long long val;
     const size_t             size;
@@ -43,7 +43,7 @@ static struct valarr
 
 START_TEST(test_uleb128_size)
 {
-    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valarr); ++i)
+    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valval); ++i)
     {
         size_t size(gu::uleb128_size(valarr[i].val));
         fail_unless(size == valarr[i].size,
@@ -57,7 +57,7 @@ END_TEST
 START_TEST(test_uleb128_encode)
 {
     std::vector<gu::byte_t> buf;
-    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valarr); ++i)
+    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valval); ++i)
     {
         buf.resize(valarr[i].size);
         size_t offset(gu::uleb128_encode(valarr[i].val, &buf[0],
@@ -73,7 +73,7 @@ END_TEST
 START_TEST(test_uleb128_decode)
 {
     std::vector<gu::byte_t> buf;
-    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valarr); ++i)
+    for (size_t i(0); i < sizeof(valarr)/sizeof(struct valval); ++i)
     {
         buf.resize(valarr[i].size);
         size_t offset(gu::uleb128_encode(valarr[i].val, &buf[0],
