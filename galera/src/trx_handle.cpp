@@ -230,9 +230,7 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             break;
         case 3:
             write_set_in_.read_buf (buf, buflen);
-            write_set_flags_ = write_set_in_.flags() & 0x07;
-            if (write_set_in_.is_toi())    write_set_flags_ |= F_ISOLATION;
-            if (write_set_in_.pa_unsafe()) write_set_flags_ |= F_PA_UNSAFE;
+            write_set_flags_ = wsng_flags_to_trx_flags(write_set_in_.flags());
             source_id_       = write_set_in_.source_id();
             conn_id_         = write_set_in_.conn_id();
             trx_id_          = write_set_in_.trx_id();

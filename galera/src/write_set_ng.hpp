@@ -92,30 +92,22 @@ namespace galera
             gu_throw_error (EPROTO) << "Unrecognized writeset version: " << v;
         }
 
+        /* These flags should be fixed to wire protocol version and so
+         * technically can't be initialized to WSREP_FLAG_xxx macros as the
+         * latter may arbitrarily change. */
         enum Flags
         {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
-            F_PA_UNSAFE   = 1 << 2,
-            F_TOI         = 1 << 3,
+            F_TOI         = 1 << 2,
+            F_PA_UNSAFE   = 1 << 3,
             F_COMMUTATIVE = 1 << 4,
             F_NATIVE      = 1 << 5
         };
 
-        static inline uint64_t
-        wsrep_flags_to_ws_flags (uint64_t const flags)
-        {
-            uint64_t ret(0);
-
-            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
-            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
-            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
-            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_TOI;
-            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
-            if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
-
-            return ret;
-        }
+        /* this takes care of converting wsrep API flags to on-the-wire flags */
+        static uint32_t
+        wsrep_flags_to_ws_flags (uint32_t const flags);
 
         typedef gu::RecordSet::GatherVector GatherVector;
 
@@ -431,8 +423,51 @@ namespace galera
                 Checksum::compute (ptr, size, cval);
                 *reinterpret_cast<Checksum::type_t*>(ptr + size) = cval;
             }
-        };
-    };
+        }; /* class Header */
+
+    private:
+
+        static bool const WRITESET_FLAGS_MATCH_API_FLAGS =
+                           (WSREP_FLAG_COMMIT      == F_COMMIT       &&
+                            WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
+                            WSREP_FLAG_ISOLATION   == F_TOI          &&
+                            WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
+                            WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
+                            WSREP_FLAG_NATIVE      == F_NATIVE);
+
+        /* this assert should be removed when wsrep API flags become
+         * explicitly incompatible with wirteset flags */
+        GU_COMPILE_ASSERT(WRITESET_FLAGS_MATCH_API_FLAGS, flags_incompatible);
+
+        template<bool>
+        static inline uint32_t
+        wsrep_flags_to_ws_flags_tmpl (uint32_t const flags)
+        {
+            uint32_t ret(0);
+
+            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
+            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_TOI;
+            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
+            if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
+
+            return ret;
+        }
+
+    }; /* class WriteSetNG */
+
+    /* specialization for the case when WS flags fully match API flags */
+    template <> inline uint32_t
+    WriteSetNG::wsrep_flags_to_ws_flags_tmpl<true>(uint32_t const flags)
+    { return flags; }
+
+    inline uint32_t
+    WriteSetNG::wsrep_flags_to_ws_flags (uint32_t const flags)
+    {
+        return wsrep_flags_to_ws_flags_tmpl<WRITESET_FLAGS_MATCH_API_FLAGS>
+            (flags);
+    }
 
     class WriteSetOut
     {

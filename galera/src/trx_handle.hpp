@@ -52,7 +52,7 @@ namespace galera
 
         static const Params Defaults;
 
-        enum
+        enum Flags
         {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
@@ -67,24 +67,45 @@ namespace galera
 
         static inline uint32_t wsrep_flags_to_trx_flags (uint32_t flags)
         {
-            uint64_t ret(0);
+            GU_COMPILE_ASSERT(
+                WSREP_FLAG_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
+                WSREP_FLAG_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
+                flags_dont_match1);
 
-            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
-            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
-            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
+
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
+            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
 
             return ret;
         }
 
         static inline uint32_t trx_flags_to_wsrep_flags (uint32_t flags)
         {
-            uint64_t ret(0);
+            GU_COMPILE_ASSERT(
+                WSREP_FLAG_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
+                WSREP_FLAG_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
+                flags_dont_match2);
 
-            if (flags & F_COMMIT)      ret |= WSREP_FLAG_COMMIT;
-            if (flags & F_ROLLBACK)    ret |= WSREP_FLAG_ROLLBACK;
-            if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
+            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
+
             if (flags & F_ISOLATION)   ret |= WSREP_FLAG_ISOLATION;
+            if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
+
+            return ret;
+        }
+
+        static inline uint32_t wsng_flags_to_trx_flags (uint32_t flags)
+        {
+            GU_COMPILE_ASSERT(
+                WriteSetNG::F_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
+                WriteSetNG::F_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
+                flags_dont_match3);
+
+            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
+
+            if (flags & WriteSetNG::F_TOI)       ret |= F_ISOLATION;
+            if (flags & WriteSetNG::F_PA_UNSAFE) ret |= F_PA_UNSAFE;
 
             return ret;
         }
