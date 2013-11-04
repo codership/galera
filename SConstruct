@@ -84,12 +84,14 @@ arch = ARGUMENTS.get('arch', machine)
 print 'Target: ' + sysname + ' ' + arch
 
 if arch == 'i386' or arch == 'i686':
-    compile_arch = ' -m32 -march=i686 -msse4'
+    #compile_arch = ' -m32 -march=i686 -msse4'
+    compile_arch = ' -m32 -march=i686 '
     link_arth    = compile_arch
     if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86_64' or arch == 'amd64':
-    compile_arch = ' -m64 -msse4'
+    #compile_arch = ' -m64 -msse4'
+    compile_arch = ' -m64 '
     link_arth    = compile_arch
     if sysname != 'darwin' and sysname != 'freebsd':
         link_arch    = compile_arch + ' -Wl,-melf_x86_64'
@@ -393,7 +395,7 @@ if strict_build_flags == 1:
    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-Export('env', 'sysname', 'libboost_program_options')
+Export('arch', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
@@ -423,10 +425,6 @@ if not conf.CheckLib('check'):
     Exit(1)
 
 conf.Finish()
-
-# Note: Don't do this, glibc does not like static linking
-# Link unit tests statically
-# check_env.Append(LINKFLAGS = ' -static')
 
 #
 # this follows recipes from http://www.scons.org/wiki/UnitTests

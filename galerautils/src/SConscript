@@ -1,10 +1,9 @@
-Import('env')
+Import('env', 'arch')
 
 libgalerautils_env = env.Clone()
 
 # C part
 libgalerautils_sources = [
-    '#/www.evanjones.ca/crc32c.c',
     'gu_abort.c',
     'gu_dbug.c',
     'gu_fifo.c',
@@ -26,11 +25,22 @@ libgalerautils_sources = [
     'gu_init.c'
 ]
 
-libgalerautils_env.StaticLibrary('galerautils', libgalerautils_sources)
+libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
-env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
-           libgalerautils_sources))
+crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
+crc32c_env = env.Clone()
+if arch == 'i386' or arch == 'i686' or arch == 'x86_64' or arch == 'amd64':
+    crc32c_env.Append(CFLAGS = ' -msse4')
+crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
+crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
 
+libgalerautils_env.StaticLibrary('galerautils',
+                                 libgalerautils_objs + crc32c_objs)
+
+env.Append(LIBGALERA_OBJS = libgalerautils_objs + crc32c_objs)
+#env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
+#           libgalerautils_sources))
+#env.Append(LIBGALERA_OBJS = crc32c_objs)
 
 libgalerautilsxx_env = env.Clone()
 
@@ -73,10 +83,7 @@ libgalerautilsxx_sobjs += hexdump_sobj
 #    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
 #                                'gu_resolver.cpp']
 
-
 libgalerautilsxx_env.StaticLibrary('galerautils++',
                                    libgalerautilsxx_sobjs)
 
-#env.Append(LIBGALERA_OBJS = libgalerautilsxx_env.SharedObject(
-#           libgalerautilsxx_sources))
 env.Append(LIBGALERA_OBJS = libgalerautilsxx_sobjs)

@@ -17,7 +17,7 @@
  */
 
 /*
- * Copyright (c) 2013 Codership Oy <infor@codership.com>
+ * Copyright (c) 2013 Codership Oy <info@codership.com>
  * Concatenated crc32ctables.cc and crc32c.cc and stripped off C++ garbage.
  */
 
