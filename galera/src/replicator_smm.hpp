@@ -474,7 +474,6 @@ namespace galera
         gu::Atomic<long long> local_commits_;
         gu::Atomic<long long> local_rollbacks_;
         gu::Atomic<long long> local_cert_failures_;
-        gu::Atomic<long long> local_bf_aborts_;
         gu::Atomic<long long> local_replays_;
         gu::Atomic<long long> causal_reads_;
 

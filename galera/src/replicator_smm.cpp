@@ -186,7 +186,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_commits_      (),
     local_rollbacks_    (),
     local_cert_failures_(),
-    local_bf_aborts_    (),
     local_replays_      (),
     causal_reads_       (),
     preordered_id_      (),
@@ -692,7 +691,6 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
 
     log_debug << "aborting trx " << *trx << " " << trx;
 
-    ++local_bf_aborts_;
 
     switch (trx->state())
     {
