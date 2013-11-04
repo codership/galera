@@ -403,18 +403,21 @@ typedef struct gcs_act_conf {
 
 struct gcs_stats
 {
-    double send_q_len_avg;  //! average send queue length per send call
-    double recv_q_len_avg;  //! average recv queue length per queued action
-    double fc_paused;       //! faction of time paused due to flow control
-    size_t recv_q_size;     //! current recv queue size
-    long   recv_q_len;      //! current recv queue length
-    long   send_q_len;      //! current send queue length
-    long   fc_sent;         //! flow control stops sent
-    long   fc_received;     //! flow control stops received
+    double    send_q_len_avg; //! average send queue length per send call
+    double    recv_q_len_avg; //! average recv queue length per queued action
+    long long fc_paused_ns;   //! total nanoseconds spent in paused state
+    double    fc_paused_avg;  //! faction of time paused due to flow control
+    long long fc_sent;        //! flow control stops sent
+    long long fc_received;    //! flow control stops received
+    size_t    recv_q_size;    //! current recv queue size
+    int       recv_q_len;     //! current recv queue length
+    int       send_q_len;     //! current send queue length
 };
 
-/*! Fills stats struct and resets stats counters */
+/*! Fills stats struct */
 extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
+/*! flushes stats counters */
+extern void gcs_flush_stats(gcs_conn_t *conn);
 
 /*! A node with this name will be treated as a stateless arbitrator */
 #define GCS_ARBITRATOR_NAME "garb"

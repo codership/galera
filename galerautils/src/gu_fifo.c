@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * Queue (FIFO) class implementation
  *
@@ -10,7 +10,7 @@
  *
  * When needed this FIFO can be made very big, holding
  * millions or even billions of items while taking up
- * minimum space when there are few items in the queue. 
+ * minimum space when there are few items in the queue.
  */
 
 #define _BSD_SOURCE
@@ -33,20 +33,20 @@ struct gu_fifo
     ulong col_shift;
     ulong col_mask;
     ulong rows_num;
-    ulong item_size;
     ulong head;
     ulong tail;
     ulong row_size;
     ulong length;
     ulong length_mask;
-    ulong used;
     ulong alloc;
     long  get_wait;
     long  put_wait;
-    long  q_len;
-    long  q_len_samples;
-    bool  closed;
+    long long  q_len;
+    long long  q_len_samples;
+    uint  item_size;
+    uint  used;
     int   get_err;
+    bool  closed;
 
     gu_mutex_t   lock;
     gu_cond_t    get_cond;
@@ -383,17 +383,14 @@ long gu_fifo_length (gu_fifo_t* q)
 }
 
 /*! returns how many items were in the queue per push_tail() */
-void gu_fifo_stats (gu_fifo_t* q, long* q_len, double* q_len_avg)
+void gu_fifo_stats_get (gu_fifo_t* q, int* q_len, double* q_len_avg)
 {
     fifo_lock (q);
 
     *q_len = q->used;
 
-    long len     = q->q_len;
-    long samples = q->q_len_samples;
-
-    q->q_len = 0;
-    q->q_len_samples = 0;
+    long long len     = q->q_len;
+    long long samples = q->q_len_samples;
 
     fifo_unlock (q);
 
@@ -411,6 +408,16 @@ void gu_fifo_stats (gu_fifo_t* q, long* q_len, double* q_len_avg)
     else {
         *q_len_avg = -1.0;
     }
+}
+
+void gu_fifo_stats_flush(gu_fifo_t* q)
+{
+    fifo_lock (q);
+
+    q->q_len = 0;
+    q->q_len_samples = 0;
+
+    fifo_unlock (q);
 }
 
 /* destructor - would block until all members are dequeued */
@@ -468,7 +475,7 @@ char *gu_fifo_print (gu_fifo_t *queue)
               "\tlength  = %lu\n"
               "\trows    = %lu\n"
               "\tcolumns = %lu\n"
-              "\tused    = %lu (%lu bytes)\n"
+              "\tused    = %u (%zu bytes)\n"
               "\talloctd = %lu bytes\n"
               "\thead    = %lu, tail = %lu\n"
               "\tavg.len = %f"
@@ -478,7 +485,7 @@ char *gu_fifo_print (gu_fifo_t *queue)
               queue->length,
               queue->rows_num,
               queue->col_mask + 1,
-              queue->used, queue->used * queue->item_size,
+              queue->used, (size_t)queue->used * queue->item_size,
               queue->alloc,
               queue->head, queue->tail,
               queue->q_len_samples > 0 ?

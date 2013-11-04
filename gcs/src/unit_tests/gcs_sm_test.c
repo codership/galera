@@ -1,4 +1,4 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -211,9 +211,10 @@ static void* pausing_thread (void* data)
 
 START_TEST (gcs_sm_test_pause)
 {
-    long   q_len;
-    double q_len_avg;
-    double paused_for;
+    int       q_len;
+    double    q_len_avg;
+    long long paused_ns;
+    double    paused_avg;
 
     gcs_sm_t* sm = gcs_sm_create(4, 1);
 
@@ -226,10 +227,11 @@ START_TEST (gcs_sm_test_pause)
 
     gu_thread_t thr;
 
-    gcs_sm_stats (sm, &q_len, &q_len_avg, &paused_for);
-    fail_if (paused_for != 0.0);
-    fail_if (q_len_avg != 0.0);
-    fail_if (q_len != 0);
+    gcs_sm_stats_get (sm, &q_len, &q_len_avg, &paused_ns, &paused_avg);
+    fail_if (paused_ns  != 0.0);
+    fail_if (paused_avg != 0.0);
+    fail_if (q_len_avg  != 0.0);
+    fail_if (q_len      != 0);
 
     // Test attempt to enter paused monitor
     pause_order = 0;
@@ -241,9 +243,10 @@ START_TEST (gcs_sm_test_pause)
     pause_order = 2;
 
     // testing taking stats in the middle of the pause pt. 1
-    gcs_sm_stats (sm, &q_len, &q_len_avg, &paused_for);
-    fail_if (paused_for <= 0.0);
-    fail_if (q_len_avg != 0.0);
+    gcs_sm_stats_get (sm, &q_len, &q_len_avg, &paused_ns, &paused_avg);
+    fail_if (paused_ns  <= 0.0);
+    fail_if (paused_avg <= 0.0);
+    fail_if (q_len_avg  != 0.0);
 
     gu_info ("Calling gcs_sm_continue()");
     gcs_sm_continue (sm);
@@ -256,9 +259,12 @@ START_TEST (gcs_sm_test_pause)
             sm->wait_q_tail);
 
     // testing taking stats in the middle of the pause pt. 2
-    gcs_sm_stats (sm, &q_len, &q_len_avg, &paused_for);
-    fail_if (paused_for <= 0.0);
-    fail_if (q_len_avg != 0.0);
+    long long tmp;
+    gcs_sm_stats_get (sm, &q_len, &q_len_avg, &tmp, &paused_avg);
+    fail_if (tmp <= paused_ns); paused_ns = tmp;
+    fail_if (paused_avg <= 0.0);
+    fail_if (q_len_avg  != 0.0);
+    gcs_sm_stats_flush(sm);
 
     // Testing scheduling capability
     gcs_sm_schedule (sm);
@@ -283,11 +289,13 @@ START_TEST (gcs_sm_test_pause)
     fail_if(3 != sm->wait_q_tail, "wait_q_tail = %lu, expected 3",
             sm->wait_q_tail);
 
-    gcs_sm_stats (sm, &q_len, &q_len_avg, &paused_for);
-    fail_if (paused_for != 0.0);
+    gcs_sm_stats_get (sm, &q_len, &q_len_avg, &tmp, &paused_avg);
+    fail_if (tmp < paused_ns); paused_ns = tmp;
+    fail_if (paused_avg != 0.0);
     fail_if (q_len != sm->users, "found q_len %d, expected = %d",
              q_len, sm->users);
     fail_if ((q_len_avg - 0.5) > 0.0000001 || (q_len_avg - 0.5) < -0.0000001);
+    gcs_sm_stats_flush(sm);
 
     gu_info ("Started pause thread, users = %ld", sm->users);
 
@@ -322,9 +330,10 @@ START_TEST (gcs_sm_test_pause)
     WAIT_FOR(3 == pause_order);
     fail_if (pause_order != 3, "pause_order = %d, expected 3");
 
-    gcs_sm_stats (sm, &q_len, &q_len_avg, &paused_for);
-    fail_if (paused_for <= 0.0);
-    fail_if (q_len_avg != 0.0);
+    gcs_sm_stats_get (sm, &q_len, &q_len_avg, &tmp, &paused_avg);
+    fail_if (tmp <= paused_ns); paused_ns = tmp;
+    fail_if (paused_avg <= 0.0);
+    fail_if (q_len_avg  != 0.0);
 
     gcs_sm_enter (sm, &cond, false); // by now paused thread exited monitor
     fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);

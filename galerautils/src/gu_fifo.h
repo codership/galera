@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
  *
  * Queue (FIFO) class definition
  *
@@ -25,13 +25,13 @@ typedef struct gu_fifo gu_fifo_t;
 /*! constructor */
 extern gu_fifo_t* gu_fifo_create (size_t length, size_t unit);
 /*! puts FIFO into closed state, waking up waiting threads */
-extern void gu_fifo_close (gu_fifo_t *queue);
+extern void gu_fifo_close   (gu_fifo_t *queue);
 /*! (re)opens FIFO */
-extern void gu_fifo_open (gu_fifo_t *queue);
+extern void gu_fifo_open    (gu_fifo_t *queue);
 /*! destructor - would block until all members are dequeued */
 extern void gu_fifo_destroy (gu_fifo_t *queue);
 /*! for logging purposes */
-extern char* gu_fifo_print (gu_fifo_t *queue);
+extern char* gu_fifo_print  (gu_fifo_t *queue);
 
 /*! Lock FIFO */
 extern void  gu_fifo_lock      (gu_fifo_t *q);
@@ -52,7 +52,9 @@ extern void  gu_fifo_push_tail (gu_fifo_t* q);
 /*! Return how many items are in the queue (unprotected) */
 extern long  gu_fifo_length    (gu_fifo_t* q);
 /*! Return how many items were in the queue on average per push_tail() */
-extern void  gu_fifo_stats     (gu_fifo_t* q, long* q_len, double* q_len_avg);
+extern void  gu_fifo_stats_get (gu_fifo_t* q, int* q_len, double* q_len_avg);
+/*! Flush stats counters */
+extern void  gu_fifo_stats_flush(gu_fifo_t* q);
 
 /*! Cancel getters (must be called while holding a FIFO lock) */
 extern int gu_fifo_cancel_gets (gu_fifo_t* q);

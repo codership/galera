@@ -17,7 +17,8 @@ sm_init_stats (gcs_sm_stats_t* stats)
 {
     stats->sample_start   = gu_time_monotonic();
     stats->pause_start    = 0;
-    stats->paused_for     = 0;
+    stats->paused_ns      = 0;
+    stats->paused_sample  = 0;
     stats->send_q_samples = 0;
     stats->send_q_len     = 0;
 }
@@ -130,7 +131,11 @@ gcs_sm_destroy (gcs_sm_t* sm)
 }
 
 void
-gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for)
+gcs_sm_stats_get (gcs_sm_t*  sm,
+                  int*       q_len,
+                  double*    q_len_avg,
+                  long long* paused_ns,
+                  double*    paused_avg)
 {
     gcs_sm_stats_t tmp;
     long long      now;
@@ -143,28 +148,23 @@ gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for)
     now    = gu_time_monotonic();
     paused = sm->pause;
 
-    sm->stats.sample_start = now;
-    sm->stats.pause_start  = now; // if we are in paused state this is true
-                                  // and if not - gcs_sm_pause() will correct it
-    sm->stats.paused_for     = 0;
-    sm->stats.send_q_samples = 0;
-    sm->stats.send_q_len     = 0;
-
     gu_mutex_unlock (&sm->lock);
 
     if (paused) { // taking sample in a middle of a pause
-        tmp.paused_for += now - tmp.pause_start;
+        tmp.paused_ns += now - tmp.pause_start;
     }
+    *paused_ns = tmp.paused_ns;
 
-    if (tmp.paused_for >= 0) {
-        *paused_for = ((double)tmp.paused_for) / (now - tmp.sample_start);
+    if (gu_likely(tmp.paused_ns >= 0)) {
+        *paused_avg = ((double)(tmp.paused_ns - tmp.paused_sample)) /
+                       (now - tmp.sample_start);
     }
     else {
-        *paused_for = -1.0;
+        *paused_avg = -1.0;
     }
 
-    if (tmp.send_q_len >= 0 && tmp.send_q_samples >= 0){
-        if (tmp.send_q_samples > 0) {
+    if (gu_likely(tmp.send_q_len >= 0 && tmp.send_q_samples >= 0)){
+        if (gu_likely(tmp.send_q_samples > 0)) {
             *q_len_avg = ((double)tmp.send_q_len) / tmp.send_q_samples;
         }
         else {
@@ -175,3 +175,26 @@ gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for)
         *q_len_avg = -1.0;
     }
 }
+
+void
+gcs_sm_stats_flush(gcs_sm_t* sm)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    long long const now = gu_time_monotonic();
+
+    sm->stats.sample_start = now;
+
+    sm->stats.paused_sample = sm->stats.paused_ns;
+
+    if (sm->pause) // append elapsed pause time
+    {
+        sm->stats.paused_sample  += now - sm->stats.pause_start;
+    }
+
+    sm->stats.send_q_len     = 0;
+    sm->stats.send_q_samples = 0;
+
+    gu_mutex_unlock (&sm->lock);
+}
+

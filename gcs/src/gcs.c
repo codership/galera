@@ -1817,19 +1817,29 @@ gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 void
 gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 {
-    gu_fifo_stats (conn->recv_q,
-                   &stats->recv_q_len,
-                   &stats->recv_q_len_avg);
+    gu_fifo_stats_get (conn->recv_q,
+                       &stats->recv_q_len,
+                       &stats->recv_q_len_avg);
 
     stats->recv_q_size = conn->recv_q_size;
 
-    gcs_sm_stats  (conn->sm,
-                   &stats->send_q_len,
-                   &stats->send_q_len_avg,
-                   &stats->fc_paused);
+    gcs_sm_stats_get (conn->sm,
+                      &stats->send_q_len,
+                      &stats->send_q_len_avg,
+                      &stats->fc_paused_ns,
+                      &stats->fc_paused_avg);
 
-    stats->fc_sent     = conn->stats_fc_sent;     conn->stats_fc_sent     = 0;
-    stats->fc_received = conn->stats_fc_received; conn->stats_fc_received = 0;
+    stats->fc_sent     = conn->stats_fc_sent;
+    stats->fc_received = conn->stats_fc_received;
+}
+
+void
+gcs_flush_stats(gcs_conn_t* conn)
+{
+    gu_fifo_stats_flush(conn->recv_q);
+    gcs_sm_stats_flush (conn->sm);
+    conn->stats_fc_sent     = 0;
+    conn->stats_fc_received = 0;
 }
 
 static long

@@ -91,7 +91,8 @@ typedef enum status_vars
     STATS_LOCAL_SEND_QUEUE_AVG,
     STATS_LOCAL_RECV_QUEUE,
     STATS_LOCAL_RECV_QUEUE_AVG,
-    STATS_FC_PAUSED,
+    STATS_FC_PAUSED_NS,
+    STATS_FC_PAUSED_AVG,
     STATS_FC_SENT,
     STATS_FC_RECEIVED,
     STATS_CERT_DEPS_DISTANCE,
@@ -111,41 +112,42 @@ typedef enum status_vars
 
 static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
 {
-    { "local_state_uuid",     WSREP_VAR_STRING, { 0 }  },
-    { "protocol_version",     WSREP_VAR_INT64,  { 0 }  },
-    { "last_committed",       WSREP_VAR_INT64,  { -1 } },
-    { "replicated",           WSREP_VAR_INT64,  { 0 }  },
-    { "replicated_bytes",     WSREP_VAR_INT64,  { 0 }  },
-    { "repl_keys",            WSREP_VAR_INT64,  { 0 }  },
-    { "repl_keys_bytes",      WSREP_VAR_INT64,  { 0 }  },
-    { "repl_data_bytes",      WSREP_VAR_INT64,  { 0 }  },
-    { "repl_other_bytes",     WSREP_VAR_INT64,  { 0 }  },
-    { "received",             WSREP_VAR_INT64,  { 0 }  },
-    { "received_bytes",       WSREP_VAR_INT64,  { 0 }  },
-    { "local_commits",        WSREP_VAR_INT64,  { 0 }  },
-    { "local_cert_failures",  WSREP_VAR_INT64,  { 0 }  },
+    { "local_state_uuid",         WSREP_VAR_STRING, { 0 }  },
+    { "protocol_version",         WSREP_VAR_INT64,  { 0 }  },
+    { "last_committed",           WSREP_VAR_INT64,  { -1 } },
+    { "replicated",               WSREP_VAR_INT64,  { 0 }  },
+    { "replicated_bytes",         WSREP_VAR_INT64,  { 0 }  },
+    { "repl_keys",                WSREP_VAR_INT64,  { 0 }  },
+    { "repl_keys_bytes",          WSREP_VAR_INT64,  { 0 }  },
+    { "repl_data_bytes",          WSREP_VAR_INT64,  { 0 }  },
+    { "repl_other_bytes",         WSREP_VAR_INT64,  { 0 }  },
+    { "received",                 WSREP_VAR_INT64,  { 0 }  },
+    { "received_bytes",           WSREP_VAR_INT64,  { 0 }  },
+    { "local_commits",            WSREP_VAR_INT64,  { 0 }  },
+    { "local_cert_failures",      WSREP_VAR_INT64,  { 0 }  },
 //    { "local_bf_aborts",      WSREP_VAR_INT64,  { 0 }  },
-    { "local_replays",        WSREP_VAR_INT64,  { 0 }  },
-    { "local_send_queue",     WSREP_VAR_INT64,  { 0 }  },
-    { "local_send_queue_avg", WSREP_VAR_DOUBLE, { 0 }  },
-    { "local_recv_queue",     WSREP_VAR_INT64,  { 0 }  },
-    { "local_recv_queue_avg", WSREP_VAR_DOUBLE, { 0 }  },
-    { "flow_control_paused",  WSREP_VAR_DOUBLE, { 0 }  },
-    { "flow_control_sent",    WSREP_VAR_INT64,  { 0 }  },
-    { "flow_control_recv",    WSREP_VAR_INT64,  { 0 }  },
-    { "cert_deps_distance",   WSREP_VAR_DOUBLE, { 0 }  },
-    { "apply_oooe",           WSREP_VAR_DOUBLE, { 0 }  },
-    { "apply_oool",           WSREP_VAR_DOUBLE, { 0 }  },
-    { "apply_window",         WSREP_VAR_DOUBLE, { 0 }  },
-    { "commit_oooe",          WSREP_VAR_DOUBLE, { 0 }  },
-    { "commit_oool",          WSREP_VAR_DOUBLE, { 0 }  },
-    { "commit_window",        WSREP_VAR_DOUBLE, { 0 }  },
-    { "local_state",          WSREP_VAR_INT64,  { 0 }  },
-    { "local_state_comment",  WSREP_VAR_STRING, { 0 }  },
-    { "cert_index_size",      WSREP_VAR_INT64,  { 0 }  },
-    { "causal_reads",         WSREP_VAR_INT64,  { 0 }  },
-    { "incoming_addresses",   WSREP_VAR_STRING, { 0 }  },
-    { 0,                      WSREP_VAR_STRING, { 0 }  }
+    { "local_replays",            WSREP_VAR_INT64,  { 0 }  },
+    { "local_send_queue",         WSREP_VAR_INT64,  { 0 }  },
+    { "local_send_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
+    { "local_recv_queue",         WSREP_VAR_INT64,  { 0 }  },
+    { "local_recv_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
+    { "flow_control_paused_ns",   WSREP_VAR_INT64,  { 0 }  },
+    { "flow_control_paused",      WSREP_VAR_DOUBLE, { 0 }  },
+    { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
+    { "flow_control_recv",        WSREP_VAR_INT64,  { 0 }  },
+    { "cert_deps_distance",       WSREP_VAR_DOUBLE, { 0 }  },
+    { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
+    { "apply_oool",               WSREP_VAR_DOUBLE, { 0 }  },
+    { "apply_window",             WSREP_VAR_DOUBLE, { 0 }  },
+    { "commit_oooe",              WSREP_VAR_DOUBLE, { 0 }  },
+    { "commit_oool",              WSREP_VAR_DOUBLE, { 0 }  },
+    { "commit_window",            WSREP_VAR_DOUBLE, { 0 }  },
+    { "local_state",              WSREP_VAR_INT64,  { 0 }  },
+    { "local_state_comment",      WSREP_VAR_STRING, { 0 }  },
+    { "cert_index_size",          WSREP_VAR_INT64,  { 0 }  },
+    { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
+    { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
+    { 0,                          WSREP_VAR_STRING, { 0 }  }
 };
 
 void
@@ -192,7 +194,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
     sv[STATS_LOCAL_RECV_QUEUE    ].value._int64  = stats.recv_q_len;
     sv[STATS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
-    sv[STATS_FC_PAUSED           ].value._double = stats.fc_paused;
+    sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;
+    sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
 
