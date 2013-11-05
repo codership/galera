@@ -110,6 +110,7 @@ namespace galera
         void process_sync(wsrep_seqno_t seqno_l);
 
         const struct wsrep_stats_var* stats_get()  const;
+        void                          stats_reset();
         static void                   stats_free(struct wsrep_stats_var*);
 
         /*! @throws NotFound */

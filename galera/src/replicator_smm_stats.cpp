@@ -228,7 +228,7 @@ galera::ReplicatorSMM::stats_get() const
     size_t const inc_size(incoming_list_.size() + 1);
     size_t const vec_size(sv.size()*sizeof(struct wsrep_stats_var));
     struct wsrep_stats_var* const buf(
-        reinterpret_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
+        static_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
 
     if (buf)
     {
@@ -248,6 +248,18 @@ galera::ReplicatorSMM::stats_get() const
     }
 
     return buf;
+}
+
+void
+galera::ReplicatorSMM::stats_reset()
+{
+    if (S_DESTROYED == state_()) return;
+
+    gcs_.flush_stats ();
+
+    apply_monitor_.flush_stats();
+
+    commit_monitor_.flush_stats();
 }
 
 void

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy
+// Copyright (C) 2010-2013 Codership Oy
 //
 
 #ifndef GALERA_MONITOR_HPP
@@ -359,7 +359,11 @@ namespace galera
             {
                 *oooe = .0; *oool = .0; *win_size = .0;
             }
+        }
 
+        void flush_stats()
+        {
+            gu::Lock lock(mutex_);
             oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
         }
 

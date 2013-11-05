@@ -52,6 +52,7 @@ namespace galera
         virtual ssize_t desync(gcs_seqno_t* seqno_l) = 0;
         virtual void    join(gcs_seqno_t seqno) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
+        virtual void    flush_stats() = 0;
 
         /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
@@ -179,6 +180,11 @@ namespace galera
         void get_stats(gcs_stats* stats) const
         {
             return gcs_get_stats(conn_, stats);
+        }
+
+        void flush_stats()
+        {
+            return gcs_flush_stats(conn_);
         }
 
         void param_set (const std::string& key, const std::string& value)
@@ -330,6 +336,8 @@ namespace galera
         {
             memset (stats, 0, sizeof(*stats));
         }
+
+        void flush_stats() {}
 
         void  param_set (const std::string& key, const std::string& value)
         {}
