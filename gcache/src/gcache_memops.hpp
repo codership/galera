@@ -11,7 +11,7 @@
 
 namespace gcache
 {
-    class BufferHeader;
+    struct BufferHeader;
 
     class MemOps
     {

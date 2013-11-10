@@ -385,9 +385,12 @@ if ssl == 1:
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
-   conf.env.Append(CPPFLAGS = ' -Werror ')
-   conf.env.Append(CCFLAGS  = ' -pedantic')
-   conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+    conf.env.Append(CPPFLAGS = ' -Werror')
+    conf.env.Append(CCFLAGS  = ' -pedantic')
+    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+
+#    if 'clang' in cc:
+#        conf.env.Append(CPPFLAGS = ' -Qunused-arguments -Wno-tautological-compare -D_Bool=bool')
 
 env = conf.Finish()
 Export('env', 'sysname', 'libboost_program_options')
