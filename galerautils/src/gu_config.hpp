@@ -54,6 +54,7 @@ public:
         case 1: return overflow_char  (ret);
         case 2: return overflow_short (ret);
         case 4: return overflow_int   (ret);
+        case 8: ; // can't detect an overflow
         }
 
         return ret;

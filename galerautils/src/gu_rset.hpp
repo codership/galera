@@ -318,14 +318,14 @@ protected:
     {
         if (gu_likely (next_ < size_))
         {
-            size_t const tmp_size(R::serial_size(n.ptr, size_ - next_));
+            size_t const next_size(R::serial_size(head_ + next_, size_ -next_));
 
             /* sanity check */
-            if (gu_likely (next_ + tmp_size <= size_t(size_)))
+            if (gu_likely (next_ + next_size <= size_t(size_)))
             {
-                n.ptr  = next_ + next_;
-                n.size = tmp_size;
-                next_ += tmp_size;
+                n.ptr  = head_ + next_;
+                n.size = next_size;
+                next_ += next_size;
                 return;
             }
 

@@ -1,6 +1,1 @@
-%if MYSQL_5_1
-%include 5.1.list
-%elseif MYSQL_5_5
-%include 5.5.list
-%endif
-
+%include ${MYSQL_MAJOR}.list

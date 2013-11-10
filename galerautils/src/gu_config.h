@@ -11,6 +11,7 @@
 #define _gu_config_h_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <unistd.h> // for ssize_t
 
 #ifdef __cplusplus

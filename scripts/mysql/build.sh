@@ -9,7 +9,7 @@ fi
 use_mysql_5.1_sources()
 {
     MYSQL_MAJOR="5.1"
-    export MYSQL_5_1=$MYSQL_MAJOR # for DEB build
+    export MYSQL_MAJOR # for DEB build
     export MYSQL_MAJOR_VER="5"
     export MYSQL_MINOR_VER="1"
     MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
@@ -26,7 +26,7 @@ use_mysql_5.5_sources()
     export MYSQL_MINOR_VER=`grep MYSQL_VERSION_MINOR $MYSQL_SRC/VERSION | cut -d = -f 2`
     export MYSQL_PATCH_VER=`grep MYSQL_VERSION_PATCH $MYSQL_SRC/VERSION | cut -d = -f 2`
     MYSQL_MAJOR=$MYSQL_MAJOR_VER.$MYSQL_MINOR_VER
-    export MYSQL_5_5=$MYSQL_MAJOR # for DEB build
+    export MYSQL_MAJOR # for DEB build
     MYSQL_VER=$MYSQL_MAJOR.$MYSQL_PATCH_VER
 }
 
@@ -61,6 +61,8 @@ SCRATCH=no
 SCONS="yes"
 JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+TARGET=""
+MYSQLD_BINARY="mysqld"
 
 OS=$(uname)
 case "$OS" in
@@ -267,7 +269,7 @@ then
 fi
 
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; MYSQLD_BINARY="mysqld-debug"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
@@ -691,12 +693,12 @@ get_arch()
 {
     if ! [ -z "$TARGET" ]
     then
-       if [ "$TARGET" == "i686" ]
-       then
-           echo "i386"
-       else
-           echo "amd64"
-       fi
+        if [ "$TARGET" == "i686" ]
+        then
+            echo "i386"
+        else
+            echo "amd64"
+        fi
     elif [ "$OS" == "Darwin" ]; then
         if file $MYSQL_SRC/sql/mysqld | grep "i386" >/dev/null 2>&1
         then
@@ -729,7 +731,7 @@ build_linux_packages()
     local STRIP_OPT=""
     [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
-    export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
+    export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME MYSQLD_BINARY
     export WSREP_VER=${RELEASE:-"$WSREP_REV"}
 
     echo $MYSQL_SRC $MYSQL_VER $ARCH
