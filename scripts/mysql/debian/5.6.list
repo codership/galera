@@ -5,11 +5,10 @@
 %requires    libaio1
 %requires    mysql-client
 
-%replaces    mysql-server-core-5.5 0.0.0 ${mysql_version}
-%replaces    mysql-server-5.5      0.0.0 ${mysql_version}
+%replaces    mysql-server-5.6 0.0.0 ${mysql_version}
+%replaces    mysql-server-5.5 0.0.0 ${mysql_version}
 
-%provides    mysql-server-core-5.5
-%provides    mysql-server-5.5
+%provides    mysql-server-5.6
 
 ##############################################
 # Below files sorted into paragraphs         #
@@ -50,13 +49,16 @@ f 755 root root $PLUGIN_DST/adt_null.so          $MYSQL_SRC/plugin/audit_null/ad
 f 755 root root $PLUGIN_DST/auth.so              $MYSQL_SRC/plugin/auth/auth.so
 f 755 root root $PLUGIN_DST/auth_socket.so       $MYSQL_SRC/plugin/auth/auth_socket.so
 f 755 root root $PLUGIN_DST/auth_test_plugin.so  $MYSQL_SRC/plugin/auth/auth_test_plugin.so
+f 755 root root $PLUGIN_DST/innodb_engine.so     $MYSQL_SRC/plugin/innodb_memcached/innodb_memcache/innodb_engine.so
 f 755 root root $PLUGIN_DST/libdaemon_example.so $MYSQL_SRC/plugin/daemon_example/libdaemon_example.so
+f 755 root root $PLUGIN_DST/libmemcached.so      $MYSQL_SRC/plugin/innodb_memcached/daemon_memcached/libmemcached.so
 f 755 root root $PLUGIN_DST/mypluglib.so         $MYSQL_SRC/plugin/fulltext/mypluglib.so
 f 755 root root $PLUGIN_DST/qa_auth_client.so    $MYSQL_SRC/plugin/auth/qa_auth_client.so
 f 755 root root $PLUGIN_DST/qa_auth_interface.so $MYSQL_SRC/plugin/auth/qa_auth_interface.so
 f 755 root root $PLUGIN_DST/qa_auth_server.so    $MYSQL_SRC/plugin/auth/qa_auth_server.so
 f 755 root root $PLUGIN_DST/semisync_master.so   $MYSQL_SRC/plugin/semisync/semisync_master.so
 f 755 root root $PLUGIN_DST/semisync_slave.so    $MYSQL_SRC/plugin/semisync/semisync_slave.so
+f 755 root root $PLUGIN_DST/validate_password.so $MYSQL_SRC/plugin/password_validation/validate_password.so
 
 d 755 root root $SBIN_DST -
 f 755 root root $SBIN_DST/$MYSQLD_BINARY   $MYSQL_SRC/sql/$MYSQLD_BINARY

@@ -46,6 +46,7 @@ $prefix=/usr
 
 $CONF_DST=/etc/mysql
 $LIBS_DST=${prefix}/lib/mysql
+$PLUGIN_DST=${LIBS_DST}/plugin
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin

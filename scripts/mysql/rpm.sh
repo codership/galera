@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 if test -z "$MYSQL_SRC"
 then
@@ -116,6 +116,11 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 
 export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
+[ "$MYSQL_VERSION_MAJOR$MYSQL_VERSION_MINOR" -ge "56" ] \
+&& MEMCACHED_OPT="-DWITH_LIBEVENT=system -DWITH_INNODB_MEMCACHED=ON" \
+|| MEMCACHED_OPT=""
+export MEMCACHED_OPT # for RPM build
+
 if [ $MYSQL_VERSION_MINOR -eq 1 ]
 then
     ./configure --with-wsrep > /dev/null
@@ -126,8 +131,9 @@ else
     -DBUILD_CONFIG=mysql_release \
     -DWITH_WSREP=1 \
     -DWITH_EXTRA_CHARSETS=all \
-    -DWITH_SSL=yes \ # tries system then bundled
+    -DWITH_SSL=system \
     -DWITH_ZLIB=system \
+    $MEMCACHED_OPT
     $MYSQL_SRC \
     && make -S
 fi
@@ -176,16 +182,20 @@ fi
 
 RPMBUILD()
 {
-[ $MYSQL_VERSION_MINOR -lt 5 ]                             && \
-    WSREP_RPM_OPTIONS=(--with wsrep --with yassl \
-                       --define "optflags $RPM_OPT_FLAGS") || \
-    WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
-                       --define='distro_specific 1' \
-                       --define='runselftest 0' \
-                       --define='mysql_packager Codership Oy <info@codership.com>')
+    if [ $MYSQL_VERSION_MINOR -lt 5 ]
+    then
+        WSREP_RPM_OPTIONS=(--with wsrep --with yassl \
+                           --define "optflags $RPM_OPT_FLAGS")
+    else
+        WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
+                           --define='distro_specific 1' \
+                           --define='runselftest 0' \
+                           --define='with_ssl system' \
+                           --define='mysql_packager Codership Oy <info@codership.com>')
+    fi
 
-$(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \
-                  "${WSREP_RPM_OPTIONS[@]}" -ba $WSREP_SPEC
+    $(which rpmbuild) --rmsource --define "_topdir $RPM_BUILD_ROOT" \
+                      "${WSREP_RPM_OPTIONS[@]}" -ba $WSREP_SPEC
 }
 
 pushd "$RPM_BUILD_ROOT"
