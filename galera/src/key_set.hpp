@@ -67,7 +67,7 @@ public:
         static size_t const MAX_HASH_SIZE  = 16;
 
         struct TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; };
-        struct HashData { gu::byte_t buf[MAX_HASH_SIZE];  };
+        union  HashData { gu::byte_t buf[MAX_HASH_SIZE]; uint64_t align; };
 
         /* This ctor creates a serialized representation of a key in tmp store
          * from a key hash and optional annotation. */
