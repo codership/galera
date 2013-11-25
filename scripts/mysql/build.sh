@@ -63,6 +63,7 @@ JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 TARGET=""
 MYSQLD_BINARY="mysqld"
+SYNC_BEFORE_PACK=${SYNC_BEFORE_PACK:-""}
 
 OS=$(uname)
 case "$OS" in
@@ -675,9 +676,12 @@ if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]; then
     mv $DIST_DIR $RELEASE_NAME
 
     # Hack to avoid 'file changed as we read it'-error
-    sync
-    sleep 1
-
+    if test -n "$SYNC_BEFORE_PACK"
+    then
+        echo "syncing disks"
+        sync
+        sleep 1
+    fi
     # Pack the release
     tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
 
