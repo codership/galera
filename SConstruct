@@ -419,6 +419,14 @@ if not conf.CheckLib('check'):
     print 'Error: check library not found or not usable'
     Exit(1)
 
+if not conf.CheckLib('m'):
+    print 'Error: math library not found or not usable'
+    Exit(1)
+
+if not conf.CheckLib('rt'):
+    print 'Error: realtime library not found or not usable'
+    Exit(1)
+
 conf.Finish()
 
 # Note: Don't do this, glibc does not like static linking
