@@ -478,14 +478,14 @@ namespace galera
         WriteSetOut () // empty ctor for slave TrxHandle
             :
             header_(),
-            base_name_(),
-            kbn_   (),
+            base_name_(EMPTY_DIR_NAME, 0),
+            kbn_   (base_name_),
             keys_  (),
-            dbn_   (),
+            dbn_   (base_name_),
             data_  (),
-            ubn_   (),
+            ubn_   (base_name_),
             unrd_  (),
-            abn_   (),
+            abn_   (base_name_),
             annt_  (NULL),
             left_  (),
             flags_ ()
@@ -614,45 +614,36 @@ namespace galera
 
         struct BaseNameCommon
         {
-            const std::string* const dir_name_;
+            const std::string&       dir_name_;
             unsigned long long const id_;
 
-            BaseNameCommon() : dir_name_(), id_() {}
             BaseNameCommon(const std::string& dir_name, unsigned long long id)
                 :
-                dir_name_(&dir_name),
+                dir_name_(dir_name),
                 id_      (id)
             {}
-
-        private:
-
-            BaseNameCommon (const BaseNameCommon&);
-            BaseNameCommon& operator= (const BaseNameCommon&);
-
         };
 
         template <const char* suffix_>
         class BaseNameImpl : public BaseName
         {
-            const BaseNameCommon* const data_;
-
-            BaseNameImpl (const BaseNameImpl&);
-            BaseNameImpl& operator= (const BaseNameImpl&);
+            const BaseNameCommon data_;
 
         public:
 
-            BaseNameImpl () : data_  () {}
-
-            BaseNameImpl (const BaseNameCommon& data) : data_  (&data) {}
+            BaseNameImpl (const BaseNameCommon& data) : data_(data) {}
 
             void print(std::ostream& os) const
             {
-                os << data_->dir_name_ << '/'
-                   << std::hex << std::setfill('0') << std::setw(16)
-                   << data_->id_ << suffix_;
+                os << data_.dir_name_ << '/'
+                   << std::hex << std::setfill('0') << std::setw(10)
+                   << data_.id_ << suffix_;
             }
 
         }; /* class BaseNameImpl */
+
+        /* remove this when we no longer need default WriteSetOut ctor */
+        static const std::string EMPTY_DIR_NAME;
 
         static const char keys_suffix[];
         static const char data_suffix[];

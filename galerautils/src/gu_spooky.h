@@ -4,7 +4,8 @@
  * @file Spooky hash by Bob Jenkins:
  *       http://www.burtleburtle.net/bob/c/spooky.h
  *
- * Original author comments preserved in C++ style
+ * Original author comments preserved in C++ style.
+ * Original code is public domain
  *
  * $Id$
  */

@@ -181,6 +181,9 @@ private:
 
         ~FileStore() {}
 
+        const BaseName& base_name() const { return base_name_; }
+        int             size() const { return n_; }
+
     private:
 
         const BaseName&      base_name_;

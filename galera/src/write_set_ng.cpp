@@ -179,6 +179,7 @@ WriteSetNG::Header::Checksum::verify (Version           ver,
                             << hcheck;
 }
 
+const std::string WriteSetOut::EMPTY_DIR_NAME;
 
 const char WriteSetOut::keys_suffix[] = "_keys";
 const char WriteSetOut::data_suffix[] = "_data";
