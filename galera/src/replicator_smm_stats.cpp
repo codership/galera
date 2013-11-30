@@ -90,6 +90,7 @@ typedef enum status_vars
     STATS_LOCAL_SEND_QUEUE_AVG,
     STATS_LOCAL_RECV_QUEUE,
     STATS_LOCAL_RECV_QUEUE_AVG,
+    STATS_LOCAL_CACHED_DOWNTO,
     STATS_FC_PAUSED_NS,
     STATS_FC_PAUSED_AVG,
     STATS_FC_SENT,
@@ -129,6 +130,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_send_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
     { "local_recv_queue",         WSREP_VAR_INT64,  { 0 }  },
     { "local_recv_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
+    { "local_cached_downto",      WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_paused_ns",   WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_paused",      WSREP_VAR_DOUBLE, { 0 }  },
     { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
@@ -191,6 +193,7 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
     sv[STATS_LOCAL_RECV_QUEUE    ].value._int64  = stats.recv_q_len;
     sv[STATS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
+    sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  = gcache_.seqno_min();
     sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;

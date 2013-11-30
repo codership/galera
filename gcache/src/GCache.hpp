@@ -76,7 +76,7 @@ namespace gcache
         /*!
          * Returns smallest seqno present in history
          */
-        int64_t seqno_min()
+        int64_t seqno_min() const
         {
             gu::Lock lock(mtx);
             if (gu_likely(!seqno2ptr.empty()))
