@@ -28,6 +28,7 @@ install -m 444 "$PBD/scripts/packages/README-MySQL"   "$PBR/share/doc/galera/"
 install -m 755 -d "$GALERA_LICENSE_DIR"
 install -m 444 "$PBD/LICENSE"                             "$GALERA_LICENSE_DIR/GPLv2"
 install -m 444 "$PBD/scripts/packages/freebsd/LICENSE"    "$GALERA_LICENSE_DIR"
+install -m 444 "$PBD/asio/LICENSE_1_0.txt"                "$GALERA_LICENSE_DIR/LICENSE.asio"
 install -m 444 "$PBD/scripts/packages/freebsd/catalog.mk" "$GALERA_LICENSE_DIR"
 
 install -m 644 "$SCRIPT_ROOT/freebsd/galera-"{plist,descr,comment,message} "$PBR"
