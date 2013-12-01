@@ -240,7 +240,8 @@ static void test_ist_common(int const version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid, 1234, 5678));
+        TrxHandle* trx((new TrxHandleWithStore(
+                            trx_params, uuid, 1234+i, 5678+i))->handle());
 
         const wsrep_buf_t key[2] = {
             {"key1", 4},

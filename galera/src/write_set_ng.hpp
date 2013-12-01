@@ -475,22 +475,6 @@ namespace galera
 
         typedef gu::RecordSetOutBase::BaseName BaseName;
 
-        WriteSetOut () // empty ctor for slave TrxHandle
-            :
-            header_(),
-            base_name_(EMPTY_DIR_NAME, 0),
-            kbn_   (base_name_),
-            keys_  (),
-            dbn_   (base_name_),
-            data_  (),
-            ubn_   (base_name_),
-            unrd_  (),
-            abn_   (base_name_),
-            annt_  (NULL),
-            left_  (),
-            flags_ ()
-        {}
-
         WriteSetOut (const std::string&      dir_name,
                      wsrep_trx_id_t          id,
                      KeySet::Version         kver,
@@ -504,9 +488,11 @@ namespace galera
             :
             header_(ver),
             base_name_(dir_name, id),
-            /* 1/8 of reserved goes to key set  */
+            /* 1/8 of reserved (aligned by 8) goes to key set  */
             kbn_   (base_name_),
-            keys_  (reserved, (reserved_size /= 8, reserved_size), kbn_, kver),
+            keys_  (reserved,
+                    (reserved_size >>= 6, reserved_size <<= 3, reserved_size),
+                    kbn_, kver),
             /* 5/8 of reserved goes to data set  */
             dbn_   (base_name_),
             data_  (reserved + reserved_size, reserved_size*5, dbn_, dver),
@@ -627,7 +613,7 @@ namespace galera
         template <const char* suffix_>
         class BaseNameImpl : public BaseName
         {
-            const BaseNameCommon data_;
+            const BaseNameCommon& data_;
 
         public:
 
@@ -635,15 +621,12 @@ namespace galera
 
             void print(std::ostream& os) const
             {
-                os << data_.dir_name_ << '/'
-                   << std::hex << std::setfill('0') << std::setw(10)
+                os << data_.dir_name_ << "/0x"
+                   << std::hex << std::setfill('0') << std::setw(8)
                    << data_.id_ << suffix_;
             }
 
         }; /* class BaseNameImpl */
-
-        /* remove this when we no longer need default WriteSetOut ctor */
-        static const std::string EMPTY_DIR_NAME;
 
         static const char keys_suffix[];
         static const char data_suffix[];

@@ -59,14 +59,37 @@ namespace galera
         wsrep_status_t close();
         wsrep_status_t async_recv(void* recv_ctx);
 
-        TrxHandle* local_trx(wsrep_trx_id_t);
-        TrxHandle* local_trx(wsrep_ws_handle_t*, bool);
-        void unref_local_trx(TrxHandle* trx);
-        void discard_local_trx(wsrep_trx_id_t trx_id);
+        TrxHandle* get_local_trx(wsrep_trx_id_t trx_id, bool create = false)
+        {
+            return wsdb_.get_trx(trx_params_, uuid_, trx_id, create);
+        }
 
-        TrxHandle* local_conn_trx(wsrep_conn_id_t, bool);
-        void discard_local_conn_trx(wsrep_conn_id_t conn_id);
-        void discard_local_conn(wsrep_conn_id_t conn_id);
+        void unref_local_trx(TrxHandle* trx)
+        {
+            assert(trx->refcnt() > 1);
+            trx->unref();
+        }
+
+        void discard_local_trx(TrxHandle* trx)
+        {
+            trx->release_write_set_out();
+            wsdb_.discard_trx(trx->trx_id());
+        }
+
+        TrxHandle* local_conn_trx(wsrep_conn_id_t conn_id, bool create)
+        {
+            return wsdb_.get_conn_query(trx_params_, uuid_, conn_id, create);
+        }
+
+        void discard_local_conn_trx(wsrep_conn_id_t conn_id)
+        {
+            wsdb_.discard_conn_query(conn_id);
+        }
+
+        void discard_local_conn(wsrep_conn_id_t conn_id)
+        {
+            wsdb_.discard_conn(conn_id);
+        }
 
         void apply_trx(void* recv_ctx, TrxHandle* trx);
 

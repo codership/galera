@@ -396,66 +396,6 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     return retval;
 }
 
-galera::TrxHandle*
-galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
-{
-    return wsdb_.get_trx(trx_params_, uuid_, trx_id, false);
-}
-
-galera::TrxHandle*
-galera::ReplicatorSMM::local_trx(wsrep_ws_handle_t* handle, bool create)
-{
-    TrxHandle* trx;
-    assert(handle != 0);
-
-    if (handle->opaque != 0)
-    {
-        trx = reinterpret_cast<TrxHandle*>(handle->opaque);
-        assert(trx->trx_id() == handle->trx_id ||
-               wsrep_trx_id_t(-1) == handle->trx_id);
-        trx->ref();
-    }
-    else
-    {
-        trx = wsdb_.get_trx(trx_params_, uuid_, handle->trx_id, create);
-        handle->opaque = trx;
-    }
-
-    return trx;
-}
-
-
-void galera::ReplicatorSMM::unref_local_trx(TrxHandle* trx)
-{
-    assert(trx->refcnt() > 1);
-    trx->unref();
-}
-
-
-void galera::ReplicatorSMM::discard_local_trx(wsrep_trx_id_t trx_id)
-{
-    wsdb_.discard_trx(trx_id);
-}
-
-
-galera::TrxHandle*
-galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
-{
-    return wsdb_.get_conn_query(trx_params_, uuid_, conn_id, create);
-}
-
-
-void galera::ReplicatorSMM::discard_local_conn_trx(wsrep_conn_id_t conn_id)
-{
-    wsdb_.discard_conn_query(conn_id);
-}
-
-
-void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
-{
-    wsdb_.discard_conn(conn_id);
-}
-
 
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
 {
@@ -644,7 +584,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
 
     if (trx->new_version())
     {
-        gu_trace(trx->unserialize(reinterpret_cast<const gu::byte_t*>(act.buf),
+        gu_trace(trx->unserialize(static_cast<const gu::byte_t*>(act.buf),
                                   act.size, 0));
         trx->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
     }

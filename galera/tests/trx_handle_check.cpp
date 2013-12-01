@@ -18,7 +18,7 @@ START_TEST(test_states)
     // 1) initial state is executing
     // 2) invalid state changes are caught
     // 3) valid state changes change state
-    TrxHandle* trx(new TrxHandle(TrxHandle::Defaults, uuid, -1, 1));
+    TrxHandle* trx(new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0));
 
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
@@ -40,14 +40,14 @@ START_TEST(test_states)
     trx->unref();
 
     // abort before replication
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
     trx->unref();
 
     // aborted during replication and does not certify
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
@@ -56,7 +56,7 @@ START_TEST(test_states)
 
     // aborted during replication and certifies but does not certify
     // during replay (is this even possible?)
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
@@ -67,7 +67,7 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted during replication, certifies and commits
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
@@ -80,7 +80,7 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted during certification, replays and commits
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_CERTIFYING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
@@ -94,7 +94,7 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted while waiting applying, replays and commits
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_CERTIFYING);
     trx->set_state(TrxHandle::S_APPLYING);
@@ -107,7 +107,7 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted while waiting for commit order, replays and commits
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_CERTIFYING);
     trx->set_state(TrxHandle::S_APPLYING);
@@ -121,7 +121,7 @@ START_TEST(test_states)
 
 
     // smooth operation
-    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1);
+    trx = new TrxHandle(TrxHandle::Defaults, uuid, -1, 1, NULL, 0);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_CERTIFYING);
     trx->set_state(TrxHandle::S_APPLYING);
@@ -140,7 +140,8 @@ START_TEST(test_serialization)
     galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
-    TrxHandle* trx(new TrxHandle(trx_params, uuid, 4567, 8910));
+    TrxHandle* trx
+        ((new TrxHandleWithStore(trx_params, uuid, 4567, 8910))->handle());
 
     fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 

@@ -389,7 +389,7 @@ START_TEST(test_cert_hierarchical_v1)
     for (size_t i(0); i < nws; ++i)
     {
         TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
-                                     wsi[i].conn_id, wsi[i].trx_id));
+                                     wsi[i].conn_id, wsi[i].trx_id, NULL, 0));
         trx->append_key(KeyData(1, wsi[i].key, wsi[i].iov_len,
                                 WSREP_KEY_EXCLUSIVE, true));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
@@ -511,7 +511,7 @@ START_TEST(test_cert_hierarchical_v2)
     for (size_t i(0); i < nws; ++i)
     {
         TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
-                                     wsi[i].conn_id, wsi[i].trx_id));
+                                     wsi[i].conn_id, wsi[i].trx_id, NULL, 0));
         trx->append_key(KeyData(version, wsi[i].key, wsi[i].iov_len,
                                 (wsi[i].shared ?
                                  WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE),
@@ -562,7 +562,7 @@ START_TEST(test_trac_726)
     wsrep_buf_t key2 = {void_cast("2"), 1};
 
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid1, 0, 0));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid1, 0, 0, NULL, 0));
 
         trx->append_key(KeyData(version, &key1, 1, WSREP_KEY_EXCLUSIVE, true));
         trx->set_last_seen_seqno(0);
@@ -585,7 +585,7 @@ START_TEST(test_trac_726)
     }
 
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid2, 0, 0));
+        TrxHandle* trx(new TrxHandle(trx_params, uuid2, 0, 0, NULL, 0));
 
         trx->append_key(KeyData(version, &key2, 1, WSREP_KEY_EXCLUSIVE, true));
         trx->append_key(KeyData(version, &key2, 1, WSREP_KEY_SHARED,    true));

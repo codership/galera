@@ -50,10 +50,10 @@ namespace galera
 
         virtual int trx_proto_ver() const = 0;
         virtual int repl_proto_ver() const = 0;
-        virtual TrxHandle* local_trx(wsrep_trx_id_t) = 0;
-        virtual TrxHandle* local_trx(wsrep_ws_handle_t*, bool) = 0;
+
+        virtual TrxHandle* get_local_trx(wsrep_trx_id_t, bool) = 0;
         virtual void unref_local_trx(TrxHandle* trx) = 0;
-        virtual void discard_local_trx(wsrep_trx_id_t trx_id) = 0;
+        virtual void discard_local_trx(TrxHandle* trx_id) = 0;
 
         virtual TrxHandle* local_conn_trx(wsrep_conn_id_t conn_id,
                                           bool create) = 0;

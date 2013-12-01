@@ -635,7 +635,7 @@ public:
         new_  (),
         version_(version)
     {
-        assert (version_);
+        assert (version_ != KeySet::EMPTY);
         KeyPart zero(version_);
         prev_().push_back(zero);
     }

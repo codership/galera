@@ -216,7 +216,6 @@ namespace galera
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             timestamp_         (),
             write_set_         (Defaults.version_),
-            write_set_out_     (),
             write_set_in_      (),
             annotation_        (),
             cert_keys_         (),
@@ -230,6 +229,7 @@ namespace galera
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
+            wso_               (false),
             mac_               ()
         {}
 
@@ -239,8 +239,8 @@ namespace galera
                   const wsrep_uuid_t& source_id,
                   wsrep_conn_id_t     conn_id,
                   wsrep_trx_id_t      trx_id,
-                  gu::byte_t*         reserved      = NULL,
-                  size_t              reserved_size = 0)
+                  gu::byte_t*         reserved,
+                  size_t              reserved_size)
             :
             source_id_         (source_id),
             conn_id_           (conn_id),
@@ -254,8 +254,6 @@ namespace galera
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             timestamp_         (gu_time_calendar()),
             write_set_         (params.version_),
-            write_set_out_     (params.working_dir_, trx_id, params.key_format_,
-                                reserved, reserved_size),
             write_set_in_      (),
             annotation_        (),
             cert_keys_         (),
@@ -269,8 +267,14 @@ namespace galera
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
+            wso_               (new_version()),
             mac_               ()
-        {}
+        {
+            /* Can't do this now as TrxHandleWithStore initializes store AFTER
+             * this ctor, ruining everything.
+             * Move it here after converting to memory pool. */
+            // init_write_set_out(params, reserved, reserved_size);
+        }
 
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
@@ -324,7 +328,7 @@ namespace galera
         {
             assert (last_seen_seqno >= 0);
             if (new_version())
-                write_set_out_.set_last_seen(last_seen_seqno);
+                write_set_out().set_last_seen(last_seen_seqno);
             last_seen_seqno_ = last_seen_seqno;
         }
 
@@ -360,7 +364,7 @@ namespace galera
                 uint16_t ws_flags(flags & 0x07);
                 if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
                 if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
-                write_set_out_.set_flags(ws_flags);
+                write_set_out().set_flags(ws_flags);
             }
         }
 
@@ -376,7 +380,7 @@ namespace galera
 
             if (new_version())
             {
-                write_set_out_.append_key(key);
+                write_set_out().append_key(key);
             }
             else
             {
@@ -392,13 +396,13 @@ namespace galera
                 switch (type)
                 {
                 case WSREP_DATA_ORDERED:
-                    write_set_out_.append_data(data, data_len, store);
+                    write_set_out().append_data(data, data_len, store);
                     break;
                 case WSREP_DATA_UNORDERED:
-                    write_set_out_.append_unordered(data, data_len, store);
+                    write_set_out().append_unordered(data, data_len, store);
                     break;
                 case WSREP_DATA_ANNOTATION:
-                    write_set_out_.append_annotation(data, data_len, store);
+                    write_set_out().append_annotation(data, data_len, store);
                     break;
                 }
             }
@@ -513,7 +517,7 @@ namespace galera
         {
             if (new_version())
             {
-                return write_set_out_.is_empty();
+                return write_set_out().is_empty();
             }
             else
             {
@@ -548,7 +552,20 @@ namespace galera
         void   unref() { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
         size_t refcnt() const { return refcnt_(); }
 
-              WriteSetOut& write_set_out()       { return write_set_out_; }
+        WriteSetOut& write_set_out()
+        {
+            /* WriteSetOut is a temporary object needed only at the writeset
+             * collection stage. Since it may allocate considerable resources
+             * we dont't want it to linger as long as TrxHandle is needed and
+             * want to destroy it ASAP. So it is located immediately after
+             * TrxHandle in the buffer allocated by TrxHandleWithStore.
+             * I'll be damned if this+1 is not sufficiently well aligned. */
+            assert(new_version());
+            assert(wso_);
+            return *reinterpret_cast<WriteSetOut*>(this + 1);
+        }
+        const WriteSetOut& write_set_out() const { return write_set_out(); }
+
         const WriteSetIn&  write_set_in () const { return write_set_in_;  }
 
         void apply(void*                   recv_ctx,
@@ -589,9 +606,40 @@ namespace galera
         size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
 
+        void release_write_set_out()
+        {
+            if (gu_likely(new_version()))
+            {
+                assert(wso_);
+                write_set_out().~WriteSetOut();
+                wso_ = false;
+            }
+        }
+
     private:
 
-        ~TrxHandle() { }
+        ~TrxHandle() { if (wso_) release_write_set_out(); }
+
+        void
+        init_write_set_out(const Params& params,
+                           gu::byte_t*   store,
+                           size_t        store_size)
+        {
+            if (wso_)
+            {
+                assert(store);
+                assert(store_size > sizeof(WriteSetOut));
+
+                WriteSetOut* wso = &write_set_out();
+                assert(static_cast<void*>(wso) == static_cast<void*>(store));
+
+                new (wso) WriteSetOut (params.working_dir_,
+                                       trx_id_, params.key_format_,
+                                       store      + sizeof(WriteSetOut),
+                                       store_size - sizeof(WriteSetOut));
+            }
+        }
+
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
 
@@ -607,7 +655,6 @@ namespace galera
         wsrep_seqno_t          depends_seqno_;
         int64_t                timestamp_;
         WriteSet               write_set_;
-        WriteSetOut            write_set_out_;
         WriteSetIn             write_set_in_;
         gu::Buffer             annotation_;
         CertKeySet             cert_keys_;
@@ -624,6 +671,7 @@ namespace galera
         bool                   certified_;
         bool                   committed_;
         bool                   exit_loop_;
+        bool                   wso_;
         Mac                    mac_;
 
         friend class Wsdb;
@@ -665,7 +713,9 @@ namespace galera
                            wsrep_trx_id_t           trx_id) :
             trx_  (params, source_id, conn_id, trx_id, store_, sizeof(store_)),
             store_()
-        {}
+        {
+            trx_.init_write_set_out(params, store_, sizeof(store_));
+        }
 
         TrxHandle* handle() { return &trx_; }
 
