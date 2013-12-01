@@ -107,6 +107,9 @@ rm -f $(find %{libs} -type l)
 
 %attr(0755,root,root) %dir %{docs}
 %doc %attr(0644,root,root) %{docs}/COPYING
+%doc %attr(0644,root,root) %{docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
 
