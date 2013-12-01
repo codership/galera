@@ -1,7 +1,7 @@
 # This is Galera package description for ESP package manager
 
 %product     Galera Replication Framework
-%copyright   2007-2011 by Codership Oy, All Rights Reserved
+%copyright   2007-2013 by Codership Oy, All Rights Reserved
 %vendor      Codership Oy
 %license     COPYING
 %readme      README

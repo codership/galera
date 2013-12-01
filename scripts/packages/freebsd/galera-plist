@@ -20,7 +20,8 @@
 @mode 0444
 share/licenses/galera-%{RELEASE}/catalog.mk
 share/licenses/galera-%{RELEASE}/LICENSE
-share/licenses/galera-%{RELEASE}/GPLv3
+share/licenses/galera-%{RELEASE}/GPLv2
+share/licenses/galera-%{RELEASE}/LICENSE.asio
 @mode 0555
 etc/rc.d/garb
 bin/garbd

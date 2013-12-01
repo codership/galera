@@ -16,9 +16,14 @@ All trademarks are the property of their respective owners.
 
 Licensing Information.
 
+Galera is copyright (c) 2007-2013 Codership Oy
 Please see COPYING file that came with this distribution.
 
-Source code can be found at http://www.codership.com/en/downloads/galera
+This product uses asio C++ library which is
+Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+licensed under Boost Software License.
+
+Source code can be found at https://launchpad.net/galera
 
 
                         GALERA v2.x

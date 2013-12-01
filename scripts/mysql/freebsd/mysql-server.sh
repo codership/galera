@@ -48,7 +48,11 @@ startup_sleep=1
 sst_progress_file=${mysql_dbdir}/sst_in_progress
 extra_commands="bootstrap"
 bootstrap_cmd="mysql_bootstrap"
-export LD_LIBRARY_PATH=/usr/local/lib/gcc44
+for gcc in gcc44 gcc48
+do
+    gcc_dir=/usr/local/lib/${gcc}
+    [ -d "${gcc_dir}" ] && export LD_LIBRARY_PATH="${gcc_dir}:$LD_LIBRARY_PATH"
+done
 
 mysql_bootstrap()
 {
