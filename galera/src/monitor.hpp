@@ -255,6 +255,7 @@ namespace galera
             cond_.broadcast();
         }
 
+#ifdef TO_BE_ELIMINATED
         /*! Locks the monitor and/or increments lock counter;
          *  throws EALREADY if the monitor is already locked */
         void lock()
@@ -323,6 +324,7 @@ namespace galera
                 gu_throw_error(EBUSY);
             }
         }
+#endif // TO_BE_ELIMINATED
 
         void wait(wsrep_seqno_t seqno)
         {
