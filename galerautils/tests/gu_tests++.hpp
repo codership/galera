@@ -12,8 +12,9 @@
 
 #include "gu_vector_test.hpp"
 #include "gu_string_test.hpp"
-#include "gu_digest_test.hpp"
 #include "gu_vlq_test.hpp"
+#include "gu_digest_test.hpp"
+#include "gu_mem_pool_test.hpp"
 #include "gu_alloc_test.hpp"
 #include "gu_rset_test.hpp"
 #include "gu_string_utils_test.hpp"
@@ -29,6 +30,7 @@ static suite_creator_t suites[] =
     gu_string_suite,
     gu_vlq_suite,
     gu_digest_suite,
+    gu_mem_pool_suite,
     gu_alloc_suite,
     gu_rset_suite,
     gu_string_utils_suite,

@@ -38,6 +38,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_string_test.cpp
                               gu_vlq_test.cpp
                               gu_digest_test.cpp
+                              gu_mem_pool_test.cpp
                               gu_alloc_test.cpp
                               gu_rset_test.cpp
                               gu_string_utils_test.cpp
