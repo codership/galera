@@ -139,9 +139,9 @@ namespace gcomm
         void add_members (NodeList::const_iterator begin,
                           NodeList::const_iterator end);
 
-        void add_joined      (const UUID& pid, const std::string& name);
-        void add_left        (const UUID& pid, const std::string& name);
-        void add_partitioned (const UUID& pid, const std::string& name);
+        void add_joined      (const UUID& pid, const std::string& name = "");
+        void add_left        (const UUID& pid, const std::string& name = "");
+        void add_partitioned (const UUID& pid, const std::string& name = "");
 
         const NodeList& members     () const;
         const NodeList& joined      () const;

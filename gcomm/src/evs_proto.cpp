@@ -849,20 +849,21 @@ void gcomm::evs::Proto::set_inactive(const UUID& node_uuid)
 }
 
 
-void gcomm::evs::Proto::cleanup_unoperational()
+void gcomm::evs::Proto::cleanup_foreign(const InstallMessage& im)
 {
     NodeMap::iterator i, i_next;
     for (i = known_.begin(); i != known_.end(); i = i_next)
     {
+        const UUID& uuid(NodeMap::key(i));
         i_next = i, ++i_next;
-        if (NodeMap::value(i).installed() == false)
+        const MessageNodeList::const_iterator mni(im.node_list().find(uuid));
+        if (mni == im.node_list().end() ||
+            MessageNodeList::value(mni).operational() == false)
         {
-            evs_log_debug(D_STATE) << "erasing " << NodeMap::key(i);
             known_.erase(i);
         }
     }
 }
-
 
 void gcomm::evs::Proto::cleanup_views()
 {
@@ -895,119 +896,127 @@ size_t gcomm::evs::Proto::n_operational() const
     return ret;
 }
 
-void gcomm::evs::Proto::deliver_reg_view()
+void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
+                                         const View& prev_view)
 {
-    if (install_message_ == 0)
+
+    View view(im.install_view_id());
+    for (MessageNodeList::const_iterator i(im.node_list().begin());
+         i != im.node_list().end(); ++i)
     {
-        gu_throw_fatal
-            << "Protocol error: no install message in deliver reg view";
-    }
+        const UUID& uuid(MessageNodeList::key(i));
+        const MessageNode& mn(MessageNodeList::value(i));
 
-    if (previous_views_.size() == 0) gu_throw_fatal << "Zero-size view";
-
-    const View& prev_view (previous_view_);
-    View view (install_message_->install_view_id());
-
-    for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
-    {
-        if (NodeMap::value(i).installed() == true)
+        // 1) Operational nodes will be members of new view
+        // 2) Operational nodes that were not present in previous
+        //    view are going also to joined set
+        // 3) Leaving nodes go to left set
+        // 4) All other nodes present in previous view but not in
+        //    member of left set are considered partitioned
+        if (mn.operational() == true)
         {
-            view.add_member(NodeMap::key(i), "");
-            if (prev_view.members().find(NodeMap::key(i)) ==
-                prev_view.members().end())
+            view.add_member(uuid);
+            if (prev_view.is_member(uuid) == false)
             {
-                view.add_joined(NodeMap::key(i), "");
+                view.add_joined(uuid);
             }
         }
-        else if (NodeMap::value(i).installed() == false)
+        else if (mn.leaving() == true)
         {
-            const MessageNodeList& instances = install_message_->node_list();
-            MessageNodeList::const_iterator inst_i;
-            if ((inst_i = instances.find(NodeMap::key(i))) != instances.end())
-            {
-                if (MessageNodeList::value(inst_i).leaving() == true)
-                {
-                    view.add_left(NodeMap::key(i), "");
-                }
-                else
-                {
-                    view.add_partitioned(NodeMap::key(i), "");
-                }
-            }
-            gcomm_assert(NodeMap::key(i) != uuid());
-            gcomm_assert(NodeMap::value(i).operational() == false);
+            view.add_left(uuid);
+        }
+        else
+        {
+            // Partitioned set is constructed after this loop
+        }
+    }
+
+    // Loop over previous view and add each node not in new view
+    // member of left set as partitioned.
+    for (NodeList::const_iterator i(prev_view.members().begin());
+         i != prev_view.members().end(); ++i)
+    {
+        const UUID& uuid(NodeList::key(i));
+        if (view.is_member(uuid)  == false &&
+            view.is_leaving(uuid) == false)
+        {
+            view.add_partitioned(uuid);
         }
     }
 
     evs_log_info(I_VIEWS) << "delivering view " << view;
+
+    // This node must be a member of the view it delivers and
+    // view id UUID must be of one of the members.
+    gcomm_assert(view.is_member(uuid()) == true);
+    gcomm_assert(view.is_member(view.id().uuid()) == true)
+        << "view id UUID " << view.id().uuid()
+        << " not found from reg view members "
+        << view.members()
+        << " must abort to avoid possibility of two groups "
+        << "with the same view id";
 
     set_stable_view(view);
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     send_up(Datagram(), up_meta);
 }
 
-void gcomm::evs::Proto::deliver_trans_view(bool local)
+void gcomm::evs::Proto::deliver_trans_view(const InstallMessage& im,
+                                           const View& curr_view)
 {
-    if (local == false && install_message_ == 0)
-    {
-        gu_throw_fatal
-            << "Protocol error: no install message in deliver trans view";
-    }
+
+    // Trans view is intersection of members in curr_view
+    // and members going to be in the next view that come from
+    // curr_view according to install message
 
     View view(ViewId(V_TRANS,
-                     current_view_.id().uuid(),
-                     current_view_.id().seq()));
+                     curr_view.id().uuid(),
+                     curr_view.id().seq()));
 
-    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    for (MessageNodeList::const_iterator i(im.node_list().begin());
+         i != im.node_list().end(); ++i)
     {
-        const UUID& uuid(NodeMap::key(i));
-        const Node& inst(NodeMap::value(i));
+        const UUID& uuid(MessageNodeList::key(i));
+        const MessageNode& mn(MessageNodeList::value(i));
 
-        if (inst.installed() == true &&
-            current_view_.members().find(uuid) !=
-            current_view_.members().end() &&
-            (local == true ||
-             MessageNodeList::value(install_message_->node_list().find_checked(uuid)).view_id() == current_view_.id()))
+        if (curr_view.id()            == mn.view_id() &&
+            curr_view.is_member(uuid) == true)
         {
-            view.add_member(NodeMap::key(i), "");
-        }
-        else if (inst.installed() == false)
-        {
-            if (local == false)
+            // 1) Operational nodes go to next view
+            // 2) Leaving nodes go to left set
+            // 3) All other nodes present in previous view but not in
+            //    member of left set are considered partitioned
+            if (mn.operational() == true)
             {
-                const MessageNodeList& instances(install_message_->node_list());
-                MessageNodeList::const_iterator inst_i;
-                if ((inst_i = instances.find(NodeMap::key(i))) != instances.end())
-                {
-                    if (MessageNodeList::value(inst_i).leaving())
-                    {
-                        view.add_left(NodeMap::key(i), "");
-                    }
-                    else
-                    {
-                        view.add_partitioned(NodeMap::key(i), "");
-                    }
-                }
-                else if (current_view_.is_member(NodeMap::key(i)) == true)
-                {
-                    view.add_partitioned(NodeMap::key(i), "");
-                }
+                view.add_member(uuid);
+            }
+            else if (mn.leaving() == true)
+            {
+                view.add_left(uuid);
             }
             else
             {
-                // Just assume others have partitioned, it does not matter
-                // for leaving node anyway and it is not guaranteed if
-                // the others get the leave message, so it is not safe
-                // to assume then as left.
-                view.add_partitioned(NodeMap::key(i), "");
+                // Partitioned set is constructed after this loop
             }
-        }
-        else
-        {
-            // merging nodes, these won't be visible in trans view
         }
     }
 
+    // Loop over current view and add each node not in new view
+    // member of left set as partitioned.
+    for (NodeList::const_iterator i(curr_view.members().begin());
+         i != curr_view.members().end(); ++i)
+    {
+        const UUID& uuid(NodeList::key(i));
+        if (view.is_member(uuid)  == false &&
+            view.is_leaving(uuid) == false)
+        {
+            view.add_partitioned(uuid);
+        }
+    }
+
+    // This node must be a member of the view it delivers and
+    // if the view is the last transitional, view must have
+    // exactly one member and no-one in left set.
     gcomm_assert(view.is_member(uuid()) == true);
 
     evs_log_info(I_VIEWS) << " delivering view " << view;
@@ -2193,12 +2202,34 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     }
     switch (s) {
     case S_CLOSED:
+    {
         gcomm_assert(state() == S_LEAVING);
         gu_trace(deliver());
         gu_trace(deliver_local());
         setall_installed(false);
         NodeMap::value(self_i_).set_installed(true);
-        gu_trace(deliver_trans_view(true));
+        // Construct install message containing only one node for
+        // last trans view.
+        MessageNodeList node_list;
+        (void)node_list.insert_unique(
+            std::make_pair(uuid(),
+                           MessageNode(true,
+                                       false,
+                                       -1,
+                                       current_view_.id(),
+                                       input_map_->safe_seq(
+                                           NodeMap::value(self_i_).index()),
+                                       input_map_->range(
+                                           NodeMap::value(self_i_).index()))));
+        InstallMessage im(version_,
+                          uuid(),
+                          current_view_.id(),
+                          ViewId(V_REG, uuid(), current_view_.id().seq() + 1),
+                          input_map_->safe_seq(),
+                          input_map_->aru_seq(),
+                          ++fifo_seq_,
+                          node_list);
+        gu_trace(deliver_trans_view(im, current_view_));
         gu_trace(deliver_trans());
         gu_trace(deliver_local(true));
         gcomm_assert(causal_queue_.empty() == true);
@@ -2207,11 +2238,12 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             handle_stats_timer();
         }
         gu_trace(deliver_empty_view());
-        cleanup_unoperational();
+        cleanup_foreign(im);
         cleanup_views();
         timers_.clear();
         state_ = S_CLOSED;
         break;
+    }
     case S_JOINING:
         state_ = S_JOINING;
         break;
@@ -2279,7 +2311,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
         gu_trace(deliver_local());
-        gu_trace(deliver_trans_view(false));
+        gu_trace(deliver_trans_view(*install_message_, current_view_));
         gu_trace(deliver_trans());
         gu_trace(deliver_local(true));
         gcomm_assert(causal_queue_.empty() == true);
@@ -2288,34 +2320,49 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         {
             handle_stats_timer();
         }
+        // End of previous view
+
+        // Construct new view and shift to S_OPERATIONAL before calling
+        // deliver_reg_view(). Reg view delivery may trigger message
+        // exchange on upper layer and operating view is needed to
+        // handle messages.
 
         previous_view_ = current_view_;
         previous_views_.push_back(
             std::make_pair(current_view_.id(), gu::datetime::Date::now()));
 
-        const MessageNodeList& imap(install_message_->node_list());
-
-        for (MessageNodeList::const_iterator i = imap.begin();
-             i != imap.end(); ++i)
-        {
-            previous_views_.push_back(
-                std::make_pair(MessageNodeList::value(i).view_id(),
-                               gu::datetime::Date::now()));
-        }
         current_view_ = View(install_message_->install_view_id());
         size_t idx = 0;
-        for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
+
+        const MessageNodeList& imnl(install_message_->node_list());
+
+        for (MessageNodeList::const_iterator i(imnl.begin());
+             i != imnl.end(); ++i)
         {
-            if (NodeMap::value(i).installed() == true)
+            const UUID& uuid(MessageNodeList::key(i));
+            const MessageNode& n(MessageNodeList::value(i));
+
+            // Collect list of previous view identifiers to filter out
+            // delayed messages from previous views.
+            previous_views_.push_back(
+                std::make_pair(n.view_id(),
+                               gu::datetime::Date::now()));
+
+            // Add operational nodes to new view, assign input map index
+            NodeMap::iterator nmi(known_.find(uuid));
+            gcomm_assert(nmi != known_.end()) << "node " << uuid
+                                            << " not found from known map";
+            if (n.operational() == true)
             {
-                gu_trace(current_view_.add_member(NodeMap::key(i), ""));
-                NodeMap::value(i).set_index(idx++);
+                current_view_.add_member(uuid);
+                NodeMap::value(nmi).set_index(idx++);
             }
             else
             {
-                NodeMap::value(i).set_index(
+                NodeMap::value(nmi).set_index(
                     std::numeric_limits<size_t>::max());
             }
+
         }
 
         if (previous_view_.id().type() == V_REG &&
@@ -2328,9 +2375,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         input_map_->reset(current_view_.members().size());
         last_sent_ = -1;
         state_ = S_OPERATIONAL;
-        deliver_reg_view();
+        deliver_reg_view(*install_message_, previous_view_);
 
-        cleanup_unoperational();
+        cleanup_foreign(*install_message_);
         cleanup_views();
         cleanup_joins();
 
