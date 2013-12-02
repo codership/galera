@@ -556,6 +556,7 @@ namespace galera
                                            << msg.type();
                 }
                 gu_throw_fatal;
+                return 0; // keep compiler happy
             }
 
         private:

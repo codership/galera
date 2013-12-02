@@ -84,4 +84,5 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 #endif /* HAVE_ASIO_HPP */
     gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
                    << "' not supported";
+    return 0; // keep compiler happy
 }
