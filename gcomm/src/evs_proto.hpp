@@ -143,7 +143,8 @@ public:
 
     void set_inactive(const UUID&);
     void check_inactive();
-    void cleanup_unoperational();
+    // Clean up foreign nodes according to install message.
+    void cleanup_foreign(const InstallMessage&);
     void cleanup_views();
     void cleanup_joins();
 
@@ -156,8 +157,8 @@ public:
     void deliver_causal(uint8_t user_type, seqno_t seqno, const Datagram&);
     void validate_trans_msg(const UserMessage&);
     void deliver_trans();
-    void deliver_reg_view();
-    void deliver_trans_view(bool local);
+    void deliver_reg_view(const InstallMessage&, const View&);
+    void deliver_trans_view(const InstallMessage&, const View&);
     void deliver_empty_view();
 
     void setall_committed(bool val);

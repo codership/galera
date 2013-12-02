@@ -563,6 +563,7 @@ namespace galera
                 }
 
                 gu_throw_fatal; throw;
+                return 0; // keep compiler happy
             }
 
         private:
