@@ -10,7 +10,7 @@
 
 START_TEST (unsafe)
 {
-    gu::MemPool<false> mp(1, 1, "unsafe");
+    gu::MemPool<10, 1, false> mp("unsafe");
 
     void* const buf0(mp.acquire());
     fail_if(NULL == buf0);
@@ -34,7 +34,7 @@ END_TEST
 
 START_TEST (safe)
 {
-    gu::MemPool<true> mp(1, 1, "safe");
+    gu::MemPool<10, 1, true> mp("safe");
 
     void* const buf0(mp.acquire());
     fail_if(NULL == buf0);
@@ -48,6 +48,8 @@ START_TEST (safe)
     void* const buf2(mp.acquire());
     fail_if(NULL == buf2);
     fail_if(buf0 != buf2);
+
+    log_info << mp;
 
     mp.recycle(buf1);
     mp.recycle(buf2);

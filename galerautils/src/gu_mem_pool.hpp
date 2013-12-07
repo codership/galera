@@ -24,25 +24,27 @@
 
 namespace gu
 {
-    /* There is template specialization for thread_safe = true, so it makes
-     * this implicit false specialization. */
-    template <bool thread_safe>
+    typedef std::vector<void*> MemPoolVector;
+
+    /* Since we specialize this template iwth thread_safe=true parameter below,
+     * this makes it implicit thread_safe=false specialization. */
+    template <size_t                   buf_size,
+              MemPoolVector::size_type reserve,
+              bool                     thread_safe>
     class MemPool
     {
     public:
 
-        MemPool(int buf_size, int min_count, const char* name = "")
+        explicit
+        MemPool(const char* name = "")
             : pool_     (),
+              name_     (name),
               hits_     (0),
               misses_   (0),
-              allocd_   (0),
-              name_     (name),
-              buf_size_ (buf_size),
-              min_count_(min_count)
+              allocd_   (0)
         {
-            assert(buf_size_  >  0);
-            assert(min_count_ >= 0);
-            pool_.reserve(min_count_);
+            GU_COMPILE_ASSERT(buf_size  >  0, non_positive_buf_size);
+            pool_.reserve(reserve);
         }
 
         ~MemPool()
@@ -81,9 +83,11 @@ namespace gu
                 hr /= hits_ + misses_;
             }
 
-            os << "MemPool(" << name_ << "): hit ratio: " << hr
-               << ", allocated: " << allocd_ << ", pool count: "
-               << pool_.size();
+            os << "MemPool("       << name_
+               << "): hit ratio: " << hr
+               << ", misses: "     << misses_
+               << ", in use: "     << allocd_ - pool_.size()
+               << ", in pool: "    << pool_.size();
         }
 
     protected:
@@ -116,7 +120,7 @@ namespace gu
         {
             assert(buf);
 
-            bool const ret(allocd_/2 + min_count_ > pool_.size());
+            bool const ret(reserve + allocd_/2 > pool_.size());
 
             if (ret)
             {
@@ -133,7 +137,7 @@ namespace gu
 
         void* alloc()
         {
-            return (operator new(buf_size_));
+            return (operator new(buf_size));
         }
 
         void free(void* const buf)
@@ -142,33 +146,31 @@ namespace gu
             operator delete(buf);
         }
 
-        friend class MemPool<true>;
+        friend class MemPool<buf_size, reserve, true>;
 
     private:
 
-        std::vector<void*> pool_;
+        MemPoolVector pool_;
+        const char* const name_;
         size_t hits_;
         size_t misses_;
         size_t allocd_;
-        const char* const name_;
-        int const buf_size_;
-        int const min_count_;
 
         MemPool (const MemPool&);
         MemPool operator= (const MemPool&);
 
-    }; /* class MemPool<false>: thread-unsafe */
+    }; /* class MemPool: thread-unsafe */
 
-    /* thread-unsa */
-    template <>
-    class MemPool<true>
+
+    /* Thread-safe MemPool specialization */
+    template <size_t                   buf_size,
+              MemPoolVector::size_type reserve>
+    class MemPool<buf_size, reserve, true>
     {
     public:
 
-        MemPool(int buf_size, int min_count, const char* name = "")
-            : base_(buf_size, min_count, name),
-              mtx_ ()
-        {}
+        explicit
+        MemPool(const char* name = "") : base_(name), mtx_ () {}
 
         ~MemPool() {}
 
@@ -198,7 +200,7 @@ namespace gu
             if (!pooled) base_.free(buf);
         }
 
-        void print(std::ostream& os)
+        void print(std::ostream& os) const
         {
             Lock lock(mtx_);
             base_.print(os);
@@ -206,17 +208,23 @@ namespace gu
 
     private:
 
-        MemPool<false> base_;
-        Mutex          mtx_;
+        typedef MemPool<buf_size, reserve, false> MemPoolBase;
 
-    }; /* class MemPool<true>: thread-safe */
+        MemPoolBase base_;
+        Mutex       mtx_;
+
+    }; /* class MemPool: thread-safe */
+
+    template <size_t                   s,
+              MemPoolVector::size_type r,
+              bool                     b>
+    std::ostream& operator << (std::ostream& os,
+                               const MemPool<s, r, b>& mp)
+    {
+        mp.print(os); return os;
+    }
 
 } /* namespace gu */
 
-template <bool ts>
-std::ostream& operator << (std::ostream& os, const gu::MemPool<ts>& mp)
-{
-    mp.print(os); return os;
-}
 
 #endif /* _GU_MEM_POOL_HPP_ */
