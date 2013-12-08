@@ -28,23 +28,24 @@ namespace gu
 
     /* Since we specialize this template iwth thread_safe=true parameter below,
      * this makes it implicit thread_safe=false specialization. */
-    template <size_t                   buf_size,
-              MemPoolVector::size_type reserve,
-              bool                     thread_safe>
+    template <bool thread_safe>
     class MemPool
     {
     public:
 
         explicit
-        MemPool(const char* name = "")
+        MemPool(int buf_size, int reserve = 0, const char* name = "")
             : pool_     (),
-              name_     (name),
               hits_     (0),
               misses_   (0),
-              allocd_   (0)
+              allocd_   (0),
+              name_     (name),
+              buf_size_ (buf_size),
+              reserve_  (reserve)
         {
-            GU_COMPILE_ASSERT(buf_size  >  0, non_positive_buf_size);
-            pool_.reserve(reserve);
+            assert(buf_size >  0);
+            assert(reserve  >= 0);
+            pool_.reserve(reserve_);
         }
 
         ~MemPool()
@@ -90,6 +91,8 @@ namespace gu
                << ", in pool: "    << pool_.size();
         }
 
+        size_t buf_size() const { return buf_size_; }
+
     protected:
 
         /* from_pool() and to_pool() will need to be called under mutex
@@ -120,7 +123,7 @@ namespace gu
         {
             assert(buf);
 
-            bool const ret(reserve + allocd_/2 > pool_.size());
+            bool const ret(reserve_ + allocd_/2 > pool_.size());
 
             if (ret)
             {
@@ -137,7 +140,7 @@ namespace gu
 
         void* alloc()
         {
-            return (operator new(buf_size));
+            return (operator new(buf_size_));
         }
 
         void free(void* const buf)
@@ -146,31 +149,36 @@ namespace gu
             operator delete(buf);
         }
 
-        friend class MemPool<buf_size, reserve, true>;
+        friend class MemPool<true>;
 
     private:
 
-        MemPoolVector pool_;
-        const char* const name_;
-        size_t hits_;
-        size_t misses_;
-        size_t allocd_;
+        MemPoolVector      pool_;
+        size_t             hits_;
+        size_t             misses_;
+        size_t             allocd_;
+        const char*  const name_;
+        unsigned int const buf_size_;
+        unsigned int const reserve_;
 
         MemPool (const MemPool&);
         MemPool operator= (const MemPool&);
 
-    }; /* class MemPool: thread-unsafe */
+    }; /* class MemPool<false>: thread-unsafe */
 
 
-    /* Thread-safe MemPool specialization */
-    template <size_t                   buf_size,
-              MemPoolVector::size_type reserve>
-    class MemPool<buf_size, reserve, true>
+    /* Thread-safe MemPool specialization.
+     * Even though MemPool<true> technically IS-A MemPool<false>, the need to
+     * overload nearly all public methods and practical uselessness of
+     * polymorphism in this case make inheritance undesirable. */
+    template <>
+    class MemPool<true>
     {
     public:
 
         explicit
-        MemPool(const char* name = "") : base_(name), mtx_ () {}
+        MemPool(int buf_size, int reserve = 0, const char* name = "")
+            : base_(buf_size, reserve, name), mtx_ () {}
 
         ~MemPool() {}
 
@@ -206,23 +214,24 @@ namespace gu
             base_.print(os);
         }
 
+        size_t buf_size() const { return base_.buf_size(); }
+
     private:
 
-        typedef MemPool<buf_size, reserve, false> MemPoolBase;
+        MemPool<false> base_;
+        Mutex          mtx_;
 
-        MemPoolBase base_;
-        Mutex       mtx_;
+    }; /* class MemPool<true>: thread-safe */
 
-    }; /* class MemPool: thread-safe */
-
-    template <size_t                   s,
-              MemPoolVector::size_type r,
-              bool                     b>
+    template <bool thread_safe>
     std::ostream& operator << (std::ostream& os,
-                               const MemPool<s, r, b>& mp)
+                               const MemPool<thread_safe>& mp)
     {
         mp.print(os); return os;
     }
+
+    typedef MemPool<false> MemPoolUnsafe;
+    typedef MemPool<true>  MemPoolSafe;
 
 } /* namespace gu */
 
