@@ -69,6 +69,8 @@ MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
 MYSQL_PORT=${MYSQL_PORT:-3306}
 MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
 MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
+# Startup wait timeout.
+MYSQL_STARTUP_WAIT=${MYSQL_STARTUP_WAIT:-1}
 # Shutdown wait timeout.
 MYSQL_SHUTDOWN_WAIT=60
 #============= Nothing servicable below ================================
@@ -362,12 +364,18 @@ galera_start()
     [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
 #    echo "Waiting for pid file"
+    second=0
     while ! test -r $MYSQL_PID
     do
         sleep 1
+        second=$(($second + 1))
         if find_pid $my_pid
         then
             # process is alive, wait for pid file
+            echo -n "."
+        elif test $second -lt $MYSQL_STARTUP_WAIT
+        then
+            # process is not yet alive, wait for it to start
             echo -n "."
         else
             failed="yes"
