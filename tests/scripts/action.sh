@@ -127,6 +127,8 @@ check()
     local prev=""
     local fail=""
 
+    wait_sync $NODE_LIST
+
     for node in $NODE_LIST
     do
         local node_id="${NODE_ID[$node]}"
