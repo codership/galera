@@ -404,7 +404,7 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_w_user_messages");
     tcase_add_test(tc, test_gmcast_w_user_messages);
-    tcase_set_timeout(tc, 20);
+    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     if (run_all_tests == true)
