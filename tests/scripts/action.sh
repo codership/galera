@@ -167,6 +167,19 @@ check()
     return 1
 }
 
+# Query each node with causal reads on to make sure that slave
+# queue has been fully processed.
+# Arguments: list of nodes
+wait_sync()
+{
+    local node
+    for node in "$@"
+    do
+        mysql_query "$node" "set wsrep_causal_reads=1; select 0;" 1>/dev/null
+    done
+}
+
+
 start_node()
 {
     node_job "start_cmd" "$@"
