@@ -119,6 +119,9 @@ dump()
 
 check()
 {
+    wait_sync $NODE_LIST || true
+
+
     cmd="check_cmd"
     ! action "$cmd" "$@" # ! - to ignore possible connection error
 
@@ -126,8 +129,6 @@ check()
     local node
     local prev=""
     local fail=""
-
-    wait_sync $NODE_LIST
 
     for node in $NODE_LIST
     do
