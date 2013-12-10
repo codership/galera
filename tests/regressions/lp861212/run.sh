@@ -14,7 +14,7 @@
 # PARAMETERS
 #
 # Duration of test run
-DURATION=${DURATION:-"600"}
+DURATION=${DURATION:-"300"}
 #
 #
 
@@ -48,6 +48,7 @@ $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
         --stat-interval 30 --rows 1000 --ac-frac 10 --rollbacks 0.1 \
         --alters 0.001
 
+wait_sync $NODE_LIST
 echo "checking consistency"
 check || (sleep 5 && check)
 
