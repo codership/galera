@@ -1008,12 +1008,12 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             break;
         case GCS_MSG_COMPONENT:
             ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
-            assert (ret >= 0); // hang on error in debug mode
-            assert (ret == recv_act->act.buf_len);
+            // assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
         case GCS_MSG_STATE_UUID:
             ret = core_handle_uuid_msg (conn, recv_msg);
-            assert (ret >= 0); // hang on error in debug mode
+            // assert (ret >= 0); // hang on error in debug mode
             ret = 0;           // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:
