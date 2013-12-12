@@ -64,7 +64,10 @@ sqlgen_load()
     local port=$1
 
     echo "running sqlgen..."
-    $sqlgen --user=root --password=rootpass --host=0 --port=$port --create=1 --tables=1 --rows=20 --users=1 --selects=0 --inserts=0 --updates=100 --ac-frac=100 --duration=600 > /dev/null
+    $sqlgen --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD \
+        --host=${NODE_INCOMING_HOST[0]} --port=$port \
+        --create=1 --tables=1 --rows=20 --users=1 --selects=0 --inserts=0 \
+        --updates=100 --ac-frac=100 --duration=600 > /dev/null
 }
 
 deadlock_test()
