@@ -19,4 +19,12 @@ extern "C" { static void (* const GU_SIG_IGN)(int) = SIG_IGN; }
 extern "C" { static const void* const GU_MAP_FAILED = MAP_FAILED; }
 #endif
 
+namespace gu
+{
+    template<bool> struct CompileAssert {};
+} /* namespace gu */
+
+#define GU_COMPILE_ASSERT(expr,msg) \
+    typedef gu::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1] __attribute__((unused))
+
 #endif /* _gu_macros_hpp_ */
