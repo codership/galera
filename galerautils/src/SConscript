@@ -1,4 +1,4 @@
-Import('env', 'arch')
+Import('env', 'arch', 'x86', 'sysname')
 
 libgalerautils_env = env.Clone()
 
@@ -29,10 +29,23 @@ libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_env = env.Clone()
-if arch == 'i386' or arch == 'i686' or arch == 'x86_64' or arch == 'amd64':
-    crc32c_env.Append(CFLAGS = ' -msse4')
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
+
+if x86 != 0:
+    crc32c_env.Append(CFLAGS = ' -mcrc32')
+    if sysname == 'sunos':
+        # Ideally we want to simply strip SSE4.2 flag from the resulting
+        # crc32.pic.o
+        # (see http://ffmpeg.org/pipermail/ffmpeg-user/2013-March/013977.html)
+        # but that requires some serious scons-fu, so we just don't
+        # compile hardware support in if host CPU does not have it.
+        from subprocess import check_call
+        try:
+            check_call("isainfo -v | grep sse4.2 >/dev/null 2>&1", shell=True);
+        except:
+            libgalerautils_env.Append(CPPFLAGS = ' -DCRC32C_NO_HARDWARE')
+            crc32c_env.Append(CPPFLAGS = ' -DCRC32C_NO_HARDWARE')
 
 libgalerautils_env.StaticLibrary('galerautils',
                                  libgalerautils_objs + crc32c_objs)
