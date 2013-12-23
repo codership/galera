@@ -330,7 +330,6 @@ galera_start()
             --socket=$MYSQL_SOCKET \
             --skip-external-locking \
             --log_error=$err_log \
-            $MYSQLD_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \
@@ -338,6 +337,7 @@ galera_start()
             $RBR_OPTS \
             $PLUGIN_OPTS \
             $wsrep_start_position_opt \
+            $MYSQLD_OPTS \
             1>/dev/null 2>>$err_log &
     else
         $GDB --args $MYSQLD \
@@ -351,14 +351,14 @@ galera_start()
             --socket=$MYSQL_SOCKET \
             --skip-external-locking \
             --log_error=$err_log \
-            $MYSQLD_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \
             $LOGGING_OPTS \
             $RBR_OPTS \
             $PLUGIN_OPTS \
-            $wsrep_start_position_opt
+            $wsrep_start_position_opt \
+            $MYSQLD_OPTS
     fi
     my_pid=$!
     [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
