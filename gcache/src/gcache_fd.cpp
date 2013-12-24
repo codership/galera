@@ -157,19 +157,17 @@ namespace gcache
 
         // last byte of the start page
         off_t offset = (start / page_size + 1) * page_size - 1;
-//        off_t const diff (size - offset);
 
-//        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
-//                 << name << "'...";
+        log_info << "Preallocating " << (size - start) << '/' << size
+                 << " bytes in '" << name << "'...";
 
         while (offset < size && write_byte (offset))
         {
             offset += page_size;
         }
 
-        if (offset > size && write_byte (size - 1) && fsync (value) == 0) {
-//            log_info << "Preallocating " << diff << '/' << size
-//                     << " bytes in '" << name << "' done.";
+        if (offset >= size && write_byte (size - 1) && fsync (value) == 0)
+        {
             return;
         }
 
