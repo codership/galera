@@ -20,7 +20,7 @@ extern "C" {
 #include <cerrno>
 #include <sys/stat.h>
 #include <fcntl.h>
-//#include <unistd.h>
+#include <unistd.h>
 
 #ifndef O_CLOEXEC // CentOS < 6.0 does not have it
 #define O_CLOEXEC 0
@@ -160,19 +160,17 @@ namespace gu
     {
         // last byte of the start page
         off_t offset = (start / GU_PAGE_SIZE + 1) * GU_PAGE_SIZE - 1;
-//        off_t const diff (size - offset);
 
-//        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
-//                 << name << "'...";
+        log_info << "Preallocating " << (size_ - start) << '/' << size_
+                 << " bytes in '" << name_ << "'...";
 
         while (offset < size_ && write_byte (offset))
         {
             offset += GU_PAGE_SIZE;
         }
 
-        if (offset > size_ && write_byte (size_ - 1) && fsync (fd_) == 0) {
-//            log_info << "Preallocating " << diff << '/' << size
-//                     << " bytes in '" << name << "' done.";
+        if (offset >= size_ && write_byte (size_ - 1) && fsync (fd_) == 0)
+        {
             return;
         }
 
