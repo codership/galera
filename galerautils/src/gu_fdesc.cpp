@@ -20,7 +20,6 @@ extern "C" {
 #include <cerrno>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 
 #ifndef O_CLOEXEC // CentOS < 6.0 does not have it
 #define O_CLOEXEC 0
