@@ -368,23 +368,33 @@ START_TEST(test_trac_380)
     tp1->close();
     delete tp1;
     pnet->event_loop(0);
+}
+END_TEST
 
 
+START_TEST(test_trac_828)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (test_trac_828)";
+    gu::Config conf;
+    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+
+    // If the bug is present, this will throw because of own address being
+    // in address list.
     try
     {
-        tp1 = gcomm::Transport::create(
-            *pnet,
-            "gmcast://127.0.0.1:4567?"
-            "gmcast.group=test&"
-            "gmcast.listen_addr=tcp://127.0.0.1:4567");
+        Transport* tp(gcomm::Transport::create(
+                          *pnet,
+                          "gmcast://127.0.0.1:4567?"
+                          "gmcast.group=test&"
+                          "gmcast.listen_addr=tcp://127.0.0.1:4567"));
+        delete tp;
     }
     catch (gu::Exception& e)
     {
-        fail_unless(e.get_errno() == EINVAL,
-                    "unexpected errno: %d, cause %s",
-                    e.get_errno(), e.what());
+        fail("test_trac_828, expcetion thrown because of having own address "
+             "in address list");
     }
-    pnet->event_loop(0);
 }
 END_TEST
 
@@ -427,6 +437,11 @@ Suite* gmcast_suite()
         tcase_add_test(tc, test_trac_380);
         suite_add_tcase(s, tc);
     }
+
+
+    tc = tcase_create("test_trac_828");
+    tcase_add_test(tc, test_trac_828);
+    suite_add_tcase(s, tc);
 
     return s;
 

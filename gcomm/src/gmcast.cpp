@@ -165,13 +165,12 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
         listen_addr_.replace(0, 3, gcomm::SSL_SCHEME);
     }
 
-    if (initial_addrs_.find(listen_addr_) != initial_addrs_.end())
+    std::set<std::string>::iterator iaself(initial_addrs_.find(listen_addr_));
+    if (iaself != initial_addrs_.end())
     {
-        gu_throw_error(EINVAL) << "connect address points to listen address '"
-                               << listen_addr_
-                               << "', check that cluster address '"
-                               << uri.get_host() << ":" << port
-                               << "' is correct";
+        log_debug << "removing own listen address '" << *iaself
+                  << "' from initial address list";
+        initial_addrs_.erase(iaself);
     }
 
     if (mcast_addr_ != "")
@@ -520,9 +519,12 @@ void gcomm::GMCast::handle_established(Proto* est)
         AddrList::iterator i(pending_addrs_.find(est->remote_addr()));
         if (i != pending_addrs_.end())
         {
-            log_warn << self_string()
-                     << " address '" << est->remote_addr()
-                     << "' points to own listening address, blacklisting";
+            if (addr_blacklist_.find(est->remote_addr()) == addr_blacklist_.end())
+            {
+                log_warn << self_string()
+                         << " address '" << est->remote_addr()
+                         << "' points to own listening address, blacklisting";
+            }
             pending_addrs_.erase(i);
             addr_blacklist_.insert(make_pair(est->remote_addr(),
                                              AddrEntry(gu::datetime::Date::now(),
