@@ -56,8 +56,7 @@ namespace galera
             entered_(0),
             oooe_(0),
             oool_(0),
-            win_size_(0),
-            locked_(false)
+            win_size_(0)
         { }
 
         ~Monitor()
@@ -255,77 +254,6 @@ namespace galera
             cond_.broadcast();
         }
 
-#ifdef TO_BE_ELIMINATED
-        /*! Locks the monitor and/or increments lock counter;
-         *  throws EALREADY if the monitor is already locked */
-        void lock()
-        {
-            gu::Lock lock(mutex_);
-
-            assert(locked_ >= 0);
-
-            if (locked_ > 0)
-            {
-                log_warn << "Attempt to lock an already locked monitor.";
-                locked_++;
-                if (locked_ > 0)
-                {
-                    gu_throw_error(EALREADY);
-                }
-                else
-                {
-                    gu_throw_fatal << "More than " << (locked_ - 1)
-                                   << " concurrent locks.";
-                }
-            }
-
-            if (last_entered_ != -1)
-            {
-                while (drain_seqno_ != LLONG_MAX) lock.wait(cond_);
-                /*! @note: last_entered_ probably changed since last check */
-                drain_common(last_entered_, lock);
-                /* would_block() should return true when drain_seqno_ is set
-                 * so the monitor should be totally empty at this point. */
-            }
-
-            locked_ = 1;
-
-            log_debug << "Locked local monitor at " << (last_left_ + 1);
-        }
-
-        /*! Decrements lock counter and unlocks monitor if counter is 0;
-         *  throws EBUSY if lock counter is not 0 */
-        void unlock()
-        {
-            gu::Lock lock(mutex_);
-
-            assert (locked_ >= 0);
-
-            if (0 == locked_)
-            {
-                assert (locked_ != 0);
-                gu_throw_error(EALREADY)
-                    << "Attempt to unlock an already unlocked monitor";
-            }
-
-            locked_--;
-
-            if (0 == locked_)
-            {
-                update_last_left();
-
-                drain_seqno_ = LLONG_MAX;
-                cond_.broadcast();
-
-                log_debug << "Unlocked local monitor at " << last_left_;
-            }
-            else
-            {
-                gu_throw_error(EBUSY);
-            }
-        }
-#endif // TO_BE_ELIMINATED
-
         void wait(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
@@ -509,7 +437,6 @@ namespace galera
         long oooe_;     // out of order entered
         long oool_;     // out of order left
         long win_size_; // window between last_left_ and last_entered_
-        int  locked_;
     };
 }
 
