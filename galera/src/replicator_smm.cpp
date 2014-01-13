@@ -148,6 +148,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
     cc_seqno_           (WSREP_SEQNO_UNDEFINED),
+    pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
     apply_cb_           (args->apply_cb),
@@ -1535,18 +1536,19 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
 
 wsrep_seqno_t galera::ReplicatorSMM::pause()
 {
-    try
-    {
-        gu_trace(local_monitor_.lock());
-    }
-    catch (gu::Exception& e)
-    {
-        if (e.get_errno() == EALREADY) return cert_.position();
-        throw;
-    }
+    // Grab local seqno for local_monitor_
+    wsrep_seqno_t const local_seqno(
+        static_cast<wsrep_seqno_t>(gcs_.local_sequence()));
+    LocalOrder lo(local_seqno);
+    local_monitor_.enter(lo);
 
+    // Local monitor should take care that concurrent
+    // pause requests are enqueued
+    assert(pause_seqno_ == WSREP_SEQNO_UNDEFINED);
+    pause_seqno_ = local_seqno;
+
+    // Get drain seqno from cert index
     wsrep_seqno_t const ret(cert_.position());
-
     apply_monitor_.drain(ret);
     assert (apply_monitor_.last_left() >= ret);
 
@@ -1558,30 +1560,25 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 
     st_.set(state_uuid_, ret);
 
-    log_info << "Provider paused at " << state_uuid_ << ':' << ret;
+    log_info << "Provider paused at " << state_uuid_ << ':' << ret
+             << " (" << pause_seqno_ << ")";
 
     return ret;
 }
 
 void galera::ReplicatorSMM::resume()
 {
+    assert(pause_seqno_ != WSREP_SEQNO_UNDEFINED);
+    if (pause_seqno_ == WSREP_SEQNO_UNDEFINED)
+    {
+        gu_throw_error(EALREADY) << "tried to resume unpaused provider";
+    }
+
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
-
-    try
-    {
-        gu_trace(local_monitor_.unlock());
-    }
-    catch (gu::Exception& e)
-    {
-        if (e.get_errno() == EBUSY)
-        {
-            /* monitor is still locked, restore saved state */
-            st_.set(state_uuid_, cert_.position());
-            return;
-        }
-        throw;
-    }
-
+    log_info << "resuming provider at " << pause_seqno_;
+    LocalOrder lo(pause_seqno_);
+    pause_seqno_ = WSREP_SEQNO_UNDEFINED;
+    local_monitor_.leave(lo);
     log_info << "Provider resumed.";
 }
 

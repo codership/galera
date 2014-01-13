@@ -448,6 +448,7 @@ namespace galera
         wsrep_uuid_t const    state_uuid_;
         const char            state_uuid_str_[37];
         wsrep_seqno_t         cc_seqno_; // seqno of last CC
+        wsrep_seqno_t         pause_seqno_; // local seqno of last pause call
 
         // application callbacks
         void*                 app_ctx_;

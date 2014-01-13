@@ -327,6 +327,14 @@ extern long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* seqno);
  */
 extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
 
+/*! @brief Allocate local seqno for accessing local resources.
+ *
+ *
+ * @param conn connection to group
+ * @return local seqno, negative error code in case of error
+ */
+extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -334,7 +342,6 @@ extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
 
 /*! Informs group about the last applied action on this node */
 extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
-
 
 /* GCS Configuration */
 
