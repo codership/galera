@@ -1156,7 +1156,7 @@ static void *gcs_recv_thread (void *arg)
         if (gu_likely (rcvd.act.type != GCS_ACT_TORDERED ||
                        (rcvd.id > 0 && (conn->global_seqno = rcvd.id)))) {
             /* successful delivery - increment local order */
-            this_act_id = conn->local_act_id++;
+            this_act_id = gu_sync_fetch_and_add(&conn->local_act_id, 1);
         }
 
         if (NULL != rcvd.repl_buf                                       &&
@@ -1809,6 +1809,11 @@ gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
     conn->need_to_join = true;
 
     return _join (conn, seqno);
+}
+
+gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)
+{
+    return gu_sync_fetch_and_add(&conn->local_act_id, 1);
 }
 
 void

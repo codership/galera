@@ -27,5 +27,6 @@
 #include "gu_config.h"
 #include "gu_abort.h"
 #include "gu_errno.h"
+#include "gu_atomic.h"
 
 #endif /* _galerautils_h_ */
