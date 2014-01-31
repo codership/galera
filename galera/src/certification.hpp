@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -20,17 +20,10 @@ namespace galera
     class Certification
     {
     public:
-        struct Param
-        {
-#define CERTIFICATION_PARAM_LOG_CONFLICTS_STR "cert.log_conflicts"
-            static const std::string log_conflicts;
-        };
 
-        struct Defaults
-        {
-#define CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR "no"
-            static const std::string log_conflicts;
-        };
+        static std::string const PARAM_LOG_CONFLICTS;
+
+        static void register_params(gu::Config&);
 
         typedef gu::UnorderedSet<KeyEntry*,
                                  KeyEntryPtrHash, KeyEntryPtrEqual> CertIndex;
@@ -169,21 +162,19 @@ namespace galera
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
 
+        gu::Atomic<long>    key_count_;
+
         /* The only reason those are not static constants is because
          * there might be a need to thange them without recompilation.
          * see #454 */
-        long          const max_length_; /* Purge trx_map_ when it exceeds this
+        int          const max_length_; /* Purge trx_map_ when it exceeds this
                                           * NOTE: this effectively sets a limit
                                           * on trx certification interval */
-        static long   const max_length_default;
 
-        unsigned long const max_length_check_; /* Mask how often to check */
-        static unsigned long  const max_length_check_default;
+        unsigned int const max_length_check_; /* Mask how often to check */
+        static int   const purge_interval_ = (1UL<<10);
 
-        bool                log_conflicts_;
-
-        static long   const purge_interval_ = (1UL<<10);
-        gu::Atomic<long>    key_count_;
+        bool               log_conflicts_;
     };
 }
 

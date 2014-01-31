@@ -12,6 +12,7 @@ libgaleraxx_srcs = [
     'certification.cpp',
     'galera_service_thd.cpp',
     'wsrep_params.cpp',
+    'replicator_smm_params.cpp',
     'gcs_action_source.cpp',
     'galera_info.c',
     'replicator.cpp',
@@ -38,8 +39,7 @@ env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
 env.Append(LIBMMGALERA_OBJS = mmlib_env.SharedObject([
             'replicator_smm.cpp',
             'replicator_str.cpp',
-            'replicator_smm_stats.cpp',
-            'replicator_smm_params.cpp',
+            'replicator_smm_stats.cpp'
             ]))
 env.Append(LIBMMGALERA_OBJS = mmprovider_env.SharedObject([
             'wsrep_provider.cpp'

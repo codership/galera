@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
@@ -15,22 +15,54 @@ static const bool cert_debug_on(false);
     if (cert_debug_on == false) { }             \
     else log_info << "cert debug: "
 
-std::string const
-galera::Certification::Param::log_conflicts =
-                     CERTIFICATION_PARAM_LOG_CONFLICTS_STR;
+#define CERT_PARAM_LOG_CONFLICTS galera::Certification::PARAM_LOG_CONFLICTS
 
-std::string const
-galera::Certification::Defaults::log_conflicts =
-                     CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR;
+static std::string const CERT_PARAM_PREFIX("cert.");
+
+std::string const galera::Certification::PARAM_LOG_CONFLICTS(CERT_PARAM_PREFIX +
+                                                             "log_conflicts");
+
+static std::string const CERT_PARAM_MAX_LENGTH   (CERT_PARAM_PREFIX +
+                                                  "max_length");
+static std::string const CERT_PARAM_LENGTH_CHECK (CERT_PARAM_PREFIX +
+                                                  "length_check");
+
+static std::string const CERT_PARAM_LOG_CONFLICTS_DEFAULT("no");
 
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/
-long const
-galera::Certification::max_length_default = 16384;
+static std::string const CERT_PARAM_MAX_LENGTH_DEFAULT("16384");
+static std::string const CERT_PARAM_LENGTH_CHECK_DEFAULT("127");
 
-unsigned long const
-galera::Certification::max_length_check_default = 127;
+void
+galera::Certification::register_params(gu::Config& cnf)
+{
+    cnf.add(CERT_PARAM_LOG_CONFLICTS, CERT_PARAM_LOG_CONFLICTS_DEFAULT);
+    /* The defaults below are deliberately not reflected in conf: people
+     * should not know about these dangerous setting unless they read RTFM. */
+    cnf.add(CERT_PARAM_MAX_LENGTH);
+    cnf.add(CERT_PARAM_LENGTH_CHECK);
+}
 
+/* a function to get around unset defaults in ctor initialization list */
+static int
+max_length(const gu::Config& conf)
+{
+    if (conf.is_set(CERT_PARAM_MAX_LENGTH))
+        return conf.get<int>(CERT_PARAM_MAX_LENGTH);
+    else
+        return gu::Config::from_config<int>(CERT_PARAM_MAX_LENGTH_DEFAULT);
+}
+
+/* a function to get around unset defaults in ctor initialization list */
+static int
+length_check(const gu::Config& conf)
+{
+    if (conf.is_set(CERT_PARAM_LENGTH_CHECK))
+        return conf.get<int>(CERT_PARAM_LENGTH_CHECK);
+    else
+        return gu::Config::from_config<int>(CERT_PARAM_LENGTH_CHECK_DEFAULT);
+}
 
 void
 galera::Certification::purge_for_trx(TrxHandle* trx)
@@ -470,26 +502,12 @@ galera::Certification::Certification(gu::Config& conf)
     last_pa_unsafe_        (-1),
     n_certified_           (0),
     deps_dist_             (0),
+    key_count_             (0),
 
-    /* The defaults below are deliberately not reflected in conf: people
-     * should not know about these dangerous setting unless they read RTFM. */
-    max_length_           (conf.get<long>("cert.max_length",
-                                          max_length_default)),
-    max_length_check_     (conf.get<unsigned long>("cert.max_length_check",
-                                                   max_length_check_default)),
-    log_conflicts_        (false),
-    key_count_            (0)
-{
-    try // this is for unit tests where conf may lack some parameters
-    {
-        log_conflicts_ = conf.get<bool>(Param::log_conflicts);
-    }
-    catch (gu::NotFound& e)
-    {
-        conf.set(Param::log_conflicts, Defaults::log_conflicts);
-        log_conflicts_ = conf.get<bool>(Param::log_conflicts);
-    }
-}
+    max_length_            (max_length(conf)),
+    max_length_check_      (length_check(conf)),
+    log_conflicts_         (conf.get<bool>(CERT_PARAM_LOG_CONFLICTS))
+{}
 
 
 galera::Certification::~Certification()
@@ -714,7 +732,7 @@ galera::Certification::set_log_conflicts(const std::string& str)
     try
     {
         bool const old(log_conflicts_);
-        log_conflicts_ = gu::from_string<bool>(str);
+        log_conflicts_ = gu::Config::from_config<bool>(str);
         if (old != log_conflicts_)
         {
             log_info << (log_conflicts_ ? "Enabled" : "Disabled")
@@ -725,7 +743,7 @@ galera::Certification::set_log_conflicts(const std::string& str)
     {
         gu_throw_error(EINVAL) << "Bad value '" << str
                                << "' for boolean parameter '"
-                               << Param::log_conflicts << '\'';
+                               << CERT_PARAM_LOG_CONFLICTS << '\'';
     }
 }
 

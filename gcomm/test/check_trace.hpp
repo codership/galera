@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -23,8 +23,7 @@
 #include <deque>
 #include <functional>
 
-extern gu::Config check_trace_conf;
-
+gu::Config& check_trace_conf();
 
 namespace gcomm
 {
@@ -120,7 +119,7 @@ namespace gcomm
         {
             return (view_.members().find(uuid) != view_.members().end() ||
                     view_.left().find(uuid)    != view_.left().end() ||
-                    view_.partitioned().find(uuid) != view_.partitioned().end());
+                    view_.partitioned().find(uuid) !=view_.partitioned().end());
         }
 
         View       view_;
@@ -146,7 +145,8 @@ namespace gcomm
         }
         void insert_msg(const TraceMsg& msg)
         {
-            gcomm_assert(current_view_ != views_.end()) << "no view set before msg delivery";
+            gcomm_assert(current_view_ != views_.end())
+                << "no view set before msg delivery";
             gu_trace(ViewTraceMap::value(current_view_).insert_msg(msg));
         }
         const ViewTraceMap& view_traces() const { return views_; }
@@ -170,11 +170,13 @@ namespace gcomm
         UUID uuid_;
         std::deque<Datagram*> out_;
         bool queue_;
+
     public:
+
         DummyTransport(const UUID& uuid = UUID::nil(), bool queue = true,
                        const gu::URI& uri = gu::URI("dummy:")) :
-            Transport(*std::auto_ptr<Protonet>(Protonet::create(check_trace_conf)),
-                      uri),
+            Transport(*std::auto_ptr<Protonet>
+                      (Protonet::create(check_trace_conf())), uri),
             uuid_(uuid),
             out_(),
             queue_(queue)
@@ -534,7 +536,7 @@ namespace gcomm
         void propagate_n(size_t n);
         void propagate_until_empty();
         void propagate_until_cvi(bool handle_timers);
-        friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
+        friend std::ostream& operator<<(std::ostream&,const PropagationMatrix&);
     private:
         void expire_timers();
 

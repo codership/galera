@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -28,6 +28,7 @@ extern "C"
 #include "gu_backtrace.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
+#include "gcomm/conf.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
@@ -312,9 +313,11 @@ public:
         }
         return tp_->mtu();
     }
+
     Protonet&   get_pnet()                { return *net_; }
     gu::Config& get_conf()                { return conf_; }
     int         get_error() const         { return error_; }
+
     class Ref
     {
     public:
@@ -826,6 +829,12 @@ static
 GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
 {
     return NULL;
+}
+
+
+GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
+{
+    gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
 }
 
 

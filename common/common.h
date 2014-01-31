@@ -1,5 +1,5 @@
 /*
- *Copyright (C) 2012 Codership Oy <info@codership.com>
+ *Copyright (C) 2012-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file Stores some common definitions to be known throughout the modules */
@@ -17,5 +17,10 @@
 #define COMMON_BASE_PORT_DEFAULT "4567"
 
 #define COMMON_STATE_FILE "grastate.dat"
+
+#define COMMON_CONF_SSL_KEY       "socket.ssl_key"
+#define COMMON_CONF_SSL_CERT      "socket.ssl_cert"
+#define COMMON_CONF_SSL_CA        "socket.ssl_ca"
+#define COMMON_CONF_SSL_PSWD_FILE "socket.ssl_password_file"
 
 #endif // COMMON_DEFS_H

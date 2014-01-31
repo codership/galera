@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -290,7 +290,7 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     if (!(dummy = GU_CALLOC(1, dummy_t)))
         goto out0;
 
-    dummy->state         = DUMMY_CLOSED;
+    dummy->state = DUMMY_CLOSED;
     *(size_t*)(&dummy->max_pkt_size)  = (size_t) sysconf (_SC_PAGESIZE);
     *(size_t*)(&dummy->hdr_size)      = sizeof(dummy_msg_t);
     *(size_t*)(&dummy->max_send_size) = dummy->max_pkt_size - dummy->hdr_size;
@@ -309,6 +309,8 @@ out0:
     backend->conn = NULL;
     return ret;
 }
+
+GCS_BACKEND_REGISTER_FN(gcs_dummy_register) {}
 
 /*! Injects a message in the message queue to produce a desired msg sequence. */
 long

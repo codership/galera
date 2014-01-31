@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "gu_logger.hpp"
 #include "certification.hpp"
+#include "replicator_smm.hpp"
 #include "wsdb.cpp"
 #include "gcs_action_source.hpp"
 #include <cstdlib>
@@ -295,6 +296,7 @@ END_TEST
 START_TEST(test_cert_hierarchical_v1)
 {
     log_info << "test_cert_hierarchical_v1";
+
     struct wsinfo_ {
         wsrep_uuid_t     uuid;
         wsrep_conn_id_t  conn_id;
@@ -353,6 +355,8 @@ START_TEST(test_cert_hierarchical_v1)
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
     gu::Config conf;
+    mark_point();
+    galera::Certification::register_params(conf);
     galera::Certification cert(conf);
     cert.assign_initial_position(0, 1);
 
@@ -472,6 +476,7 @@ START_TEST(test_cert_hierarchical_v2)
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
     gu::Config conf;
+    galera::Certification::register_params(conf);
     galera::Certification cert(conf);
     cert.assign_initial_position(0, version);
 
@@ -517,6 +522,7 @@ START_TEST(test_trac_726)
     log_info << "test_trac_726";
     const int version(2);
     gu::Config conf;
+    galera::Certification::register_params(conf);
     galera::Certification cert(conf);
     wsrep_uuid_t uuid1 = {{1, }};
     wsrep_uuid_t uuid2 = {{2, }};
