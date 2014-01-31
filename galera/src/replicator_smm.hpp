@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -118,6 +118,11 @@ namespace galera
 
         void          desync();
         void          resync();
+
+        struct InitConfig
+        {
+            InitConfig(gu::Config&, const char* node_address);
+        };
 
     private:
 
@@ -367,13 +372,17 @@ namespace galera
         };
 
         Logger                 logger_;
+
         gu::Config             config_;
 
-        struct SetDefaults
+        InitConfig
+            init_config_; // registers configurable parameters and defaults
+
+        struct ParseOptions
         {
-            SetDefaults(gu::Config&, const Defaults&, const char* base_addr);
+            ParseOptions(gu::Config&, const char* opts);
         }
-            set_defaults_; // sets missing parameters to default values
+            parse_options_; // parse oprtion string supplied on initialization
 
         static const int       MAX_PROTO_VER = 4;
         /*

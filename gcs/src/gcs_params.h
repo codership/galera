@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -31,7 +31,11 @@ extern const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT;
 extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
 extern const char* const GCS_PARAMS_MAX_THROTTLE;
 
-/*! Initializes parameters from config or defaults (and updates config)
+/*! Register configuration parameters */
+extern void
+gcs_params_register(gu_config_t* config);
+
+/*! Initializes parameters from config
  *
  * @return 0 in case of success,
  *         -EINVAL if some values were set incorrectly in config */

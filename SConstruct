@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -353,7 +353,7 @@ if boost == 1:
         else:
             print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
             Exit(1)
-    
+
     libboost_program_options = check_boost_library('boost_program_options',
                                                    'boost/program_options.hpp',
                                                    LIBBOOST_PROGRAM_OPTIONS_A,

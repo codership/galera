@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -9,16 +9,35 @@
  */
 
 #include "check_trace.hpp"
+#include "gcomm/conf.hpp"
 
 using namespace std;
 using namespace gu;
 using namespace gcomm;
 
-gu::Config check_trace_conf;
+struct CheckTraceConfInit
+{
+    explicit CheckTraceConfInit(gu::Config& conf)
+    {
+        gcomm::Conf::register_params(conf);
+    }
+};
+
+// This is to avoid static initialization fiasco with gcomm::Conf static members
+// Ideally it is the latter which should be wrapped in a function, but, unless
+// this is used to initialize another static object, it should be fine.
+gu::Config& check_trace_conf()
+{
+    static gu::Config conf;
+    static CheckTraceConfInit const check_trace_conf_init(conf);
+
+    return conf;
+}
 
 ostream& gcomm::operator<<(ostream& os, const TraceMsg& msg)
 {
-    return (os << "(" << msg.source() << "," << msg.source_view_id() << "," << msg.seq() << ")");
+    return (os << "(" << msg.source() << "," << msg.source_view_id() << ","
+            << msg.seq() << ")");
 }
 
 ostream& gcomm::operator<<(ostream& os, const ViewTrace& vtr)
@@ -76,12 +95,12 @@ public:
             gu_trace(ii = prop_.insert_unique(
                          make_pair(MatrixElem(node_.index(),
                                               NodeMap::key(l)),
-                                   new Channel(check_trace_conf))));
+                                   new Channel(check_trace_conf()))));
             gcomm::connect(ChannelMap::value(ii), node_.protos().front());
             gu_trace(ii = prop_.insert_unique(
                          make_pair(MatrixElem(NodeMap::key(l),
                                               node_.index()),
-                                   new Channel(check_trace_conf))));
+                                   new Channel(check_trace_conf()))));
             gcomm::connect(ChannelMap::value(ii),
                            NodeMap::value(l)->protos().front());
         }

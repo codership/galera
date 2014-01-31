@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -61,14 +61,8 @@ bool gcomm::Protonet::set_param(const std::string& key, const std::string& val)
 
 gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 {
-#ifdef HAVE_ASIO_HPP
-    static const std::string& default_backend("asio");
-#endif // HAVE_ASIO_HPP
-    const std::string backend(conf.get(Conf::ProtonetBackend, default_backend));
-    conf.set(Conf::ProtonetBackend, backend);
-
-    const int version(conf.get<int>(Conf::ProtonetVersion, 0));
-    conf.set(Conf::ProtonetVersion, version);
+    const std::string backend(conf.get(Conf::ProtonetBackend));
+    const int version(conf.get<int>(Conf::ProtonetVersion));
 
     if (version > max_version_)
     {
@@ -76,13 +70,12 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
     }
 
     log_info << "protonet " << backend << " version " << version;
-#ifdef HAVE_ASIO_HPP
+
     if (backend == "asio")
         return new AsioProtonet(conf, version);
-#else
-#error "No protonet backends defined"
-#endif /* HAVE_ASIO_HPP */
+
     gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
                    << "' not supported";
+
     return 0; // keep compiler happy
 }

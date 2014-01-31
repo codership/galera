@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -20,6 +20,12 @@
 #include "gcs_fifo_lite.h"
 #include "gcs_group.h"
 #include "gcs_gcache.h"
+
+void
+gcs_core_register (gu_config_t* conf)
+{
+    gcs_backend_register(conf);
+}
 
 const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = (1 << 16); // 65K - IP packet size

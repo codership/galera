@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -26,6 +26,10 @@ typedef struct gcs_backend      gcs_backend_t;
  * (kind of function signatures)
  */
 
+/*! Registers configuration parameters with config */
+#define GCS_BACKEND_REGISTER_FN(fn)       \
+void fn (gu_config_t* cnf)
+
 /*! Allocates backend context and sets up the backend structure */
 #define GCS_BACKEND_CREATE_FN(fn)         \
 long fn (gcs_backend_t*     backend,      \
@@ -39,7 +43,7 @@ long fn (gcs_backend_t*    backend)
 /*! Puts backend handle into operating state */
 #define GCS_BACKEND_OPEN_FN(fn)           \
 long fn (gcs_backend_t*    backend,       \
-	 const char* const channel)
+         const char* const channel)
 
 /*! Puts backend handle into non-operating state */
 #define GCS_BACKEND_CLOSE_FN(fn)          \
@@ -63,9 +67,9 @@ long fn (gcs_backend_t*    backend)
  */
 #define GCS_BACKEND_SEND_FN(fn)           \
 long fn (gcs_backend_t* const backend,    \
-	 const void*    const buf,        \
-	 size_t         const len,        \
-	 gcs_msg_type_t const msg_type)
+         const void*    const buf,        \
+         size_t         const len,        \
+         gcs_msg_type_t const msg_type)
 
 /*!
  * Receive a message from the backend.
@@ -171,12 +175,18 @@ struct gcs_backend
 };
 
 /*!
+ * Registers backends' parameters with config.
+ */
+void
+gcs_backend_register(gu_config_t* conf);
+
+/*!
  * Initializes preallocated backend object and opens backend connection
  * (sort of like 'new')
  */
 long
 gcs_backend_init (gcs_backend_t* bk,
-		  const char*    uri,
-		  gu_config_t*   cnf);
+                  const char*    uri,
+                  gu_config_t*   cnf);
 
 #endif /* _gcs_backend_h_ */

@@ -36,9 +36,11 @@ gcs_tests_sources = Split('''
 
 
 
-env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
+#env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
+env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
 
 env.Append(LIBS = File('#/gcache/src/libgcache.a'))
+env.Append(LIBS = File('#/gcomm/src/libgcomm.a'))
 env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
 env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
 env.Append(LIBS = ['m'])

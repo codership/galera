@@ -1,4 +1,4 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 
 /**
  * @file
@@ -20,27 +20,38 @@ extern "C" {
 typedef struct gu_config gu_config_t;
 
 gu_config_t*
-gu_config_create (const char* params);
+gu_config_create ();
 
 void
 gu_config_destroy (gu_config_t* cnf);
 
-/* Getters return 0 on success, 1 when key not found, negative error code
- * in case of other errors (conversion failed and such) */
+bool
+gu_config_has (gu_config_t* cnf, const char* key);
 
-long
+bool
+gu_config_is_set (gu_config_t* cnf, const char* key);
+
+/* before setting a parameter, it must be added to a known parameter list*/
+void
+gu_config_add (gu_config_t* cnf, const char* key,
+               const char* val /*can be NULL*/);
+
+/* Getters/setters return 0 on success, 1 when key not set/not found,
+ * negative error code in case of other errors (conversion failed and such) */
+
+int
 gu_config_get_string (gu_config_t* cnf, const char* key, const char** val);
 
-long
+int
 gu_config_get_int64  (gu_config_t* cnf, const char* key, int64_t* val);
 
-long
+int
 gu_config_get_double (gu_config_t* cnf, const char* key, double* val);
 
-long
+int
 gu_config_get_ptr    (gu_config_t* cnf, const char* key, void** val);
 
-long
+int
 gu_config_get_bool   (gu_config_t* cnf, const char* key, bool* val);
 
 void
