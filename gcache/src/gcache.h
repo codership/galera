@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 /*!
  * @file C-interface to GCache.
@@ -18,14 +18,14 @@ extern "C" {
 
 typedef struct _gcache gcache_t;
 
-extern gcache_t* gcache_create   (gu_config_t* conf, const char* data_dir);
-extern void      gcache_destroy  (gcache_t* gc);
+extern gcache_t* gcache_create  (gu_config_t* conf, const char* data_dir);
+extern void      gcache_destroy (gcache_t* gc);
 
-extern void* gcache_malloc       (gcache_t* gc, size_t size);
-extern void  gcache_free         (gcache_t* gc, const void* ptr);
-extern void* gcache_realloc      (gcache_t* gc, void* ptr, size_t size);
+extern void* gcache_malloc      (gcache_t* gc, size_t size);
+extern void  gcache_free        (gcache_t* gc, const void* ptr);
+extern void* gcache_realloc     (gcache_t* gc, void* ptr, size_t size);
 
-extern int64_t gcache_seqno_min  (gcache_t* gc);
+extern int64_t gcache_seqno_min (gcache_t* gc);
 
 #ifdef __cplusplus
 }

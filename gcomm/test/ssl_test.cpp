@@ -1,7 +1,8 @@
+/* Copyrignt (C) 2014 Codership Oy <info@codership.com> */
 
 #include "gcomm/protonet.hpp"
 #include "gcomm/util.hpp"
-
+#include "gcomm/conf.hpp"
 
 #include <map>
 #include <stdexcept>
@@ -152,15 +153,18 @@ private:
 
 int main(int argc, char* argv[])
 {
-
     if (argc != 4)
     {
         std::cerr << "usage: " << argv[0] << " <-s|-c> <conf> <uri>"
                   << std::endl;
         return 1;
     }
-    conf = gu::Config(argv[2]);
+
+    gu::Config conf;
+    gcomm::Conf::register_params(conf);
+    conf.parse(argv[2]);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+
     if (std::string("-s") == argv[1])
     {
         Server server(*pnet, argv[3]);

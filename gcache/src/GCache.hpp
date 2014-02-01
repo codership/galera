@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -24,8 +24,12 @@ namespace gcache
 
     class GCache : public MemOps
     {
-
     public:
+
+        static void register_params(gu::Config& cfg)
+        {
+            Params::register_params(cfg);
+        }
 
         /*!
          * Creates a new gcache file in "gcache.name" conf parameter or
@@ -205,13 +209,31 @@ namespace gcache
         class Params
         {
         public:
+
+            static void register_params(gu::Config&);
+
             Params(gu::Config&, const std::string&);
-            std::string const rb_name;
-            std::string const dir_name;
-            ssize_t           mem_size;
-            ssize_t     const rb_size;
-            ssize_t           page_size;
-            ssize_t           keep_pages_size;
+
+            const std::string& rb_name()  const { return rb_name_;  }
+            const std::string& dir_name() const { return dir_name_; }
+
+            ssize_t mem_size()            const { return mem_size_;        }
+            ssize_t rb_size()             const { return rb_size_;         }
+            ssize_t page_size()           const { return page_size_;       }
+            ssize_t keep_pages_size()     const { return keep_pages_size_; }
+
+            void mem_size        (ssize_t s) { mem_size_        = s; }
+            void page_size       (ssize_t s) { page_size_       = s; }
+            void keep_pages_size (ssize_t s) { keep_pages_size_ = s; }
+
+        private:
+
+            std::string const rb_name_;
+            std::string const dir_name_;
+            ssize_t           mem_size_;
+            ssize_t     const rb_size_;
+            ssize_t           page_size_;
+            ssize_t           keep_pages_size_;
         }
             params;
 

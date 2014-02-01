@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -80,10 +80,13 @@ START_TEST (gcs_backend_test)
 //    no longer use global gcs_dummy_create() symbol because linking with real
 //    gcs_dummy.o
 
-    ret = gcs_backend_init (&backend,
-                  "gcomm://0.0.0.0:4567", config);
+    ret = gcs_backend_init (&backend, "gcomm://0.0.0.0:4567", config);
+#ifdef GCS_USE_GCOMM
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_gcomm_name);
+#else
+    fail_if (ret != -ESOCKTNOSUPPORT);
+#endif
 
 //    ret = gcs_backend_init (&backend, "vsbes://kkk");
 //    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));

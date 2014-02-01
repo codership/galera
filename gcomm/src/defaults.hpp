@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_DEFAULTS_HPP
@@ -11,7 +11,13 @@ namespace gcomm
 {
     struct Defaults
     {
+        static std::string const ProtonetBackend          ;
+        static std::string const ProtonetVersion          ;
+        static std::string const SocketUseSsl             ;
+        static std::string const SocketChecksum           ;
+        static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
+        static std::string const GMCastSegment            ;
         static std::string const EvsViewForgetTimeout     ;
         static std::string const EvsViewForgetTimeoutMin  ;
         static std::string const EvsInactiveCheckPeriod   ;
@@ -19,7 +25,6 @@ namespace gcomm
         static std::string const EvsSuspectTimeoutMin     ;
         static std::string const EvsInactiveTimeout       ;
         static std::string const EvsInactiveTimeoutMin    ;
-        static std::string const EvsInstallTimeout        ;
         static std::string const EvsRetransPeriod         ;
         static std::string const EvsRetransPeriodMin      ;
         static std::string const EvsJoinRetransPeriod     ;

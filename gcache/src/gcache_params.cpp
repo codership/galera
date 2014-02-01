@@ -1,84 +1,66 @@
 /*
- * Copyright (C) 2009-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
 
 static const std::string GCACHE_PARAMS_DIR        ("gcache.dir");
+static const std::string GCACHE_DEFAULT_DIR       ("");
 static const std::string GCACHE_PARAMS_RB_NAME    ("gcache.name");
-static const std::string GCACHE_DEFAULT_BASENAME  ("galera.cache");
+static const std::string GCACHE_DEFAULT_RB_NAME   ("galera.cache");
 static const std::string GCACHE_PARAMS_MEM_SIZE   ("gcache.mem_size");
-static const ssize_t     GCACHE_DEFAULT_MEM_SIZE  (0);
+static const std::string GCACHE_DEFAULT_MEM_SIZE  ("0");
 static const std::string GCACHE_PARAMS_RB_SIZE    ("gcache.size");
-static const ssize_t     GCACHE_DEFAULT_RB_SIZE   (128 << 20); // 128Mb
+static const std::string GCACHE_DEFAULT_RB_SIZE   ("128M");
 static const std::string GCACHE_PARAMS_PAGE_SIZE  ("gcache.page_size");
-static const ssize_t     GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
+static const std::string GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
 static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size");
-static const ssize_t     GCACHE_DEFAULT_KEEP_PAGES_SIZE(0);
+static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
+
+void
+gcache::GCache::Params::register_params(gu::Config& cfg)
+{
+    cfg.add(GCACHE_PARAMS_DIR,             GCACHE_DEFAULT_DIR);
+    cfg.add(GCACHE_PARAMS_RB_NAME,         GCACHE_DEFAULT_RB_NAME);
+    cfg.add(GCACHE_PARAMS_MEM_SIZE,        GCACHE_DEFAULT_MEM_SIZE);
+    cfg.add(GCACHE_PARAMS_RB_SIZE,         GCACHE_DEFAULT_RB_SIZE);
+    cfg.add(GCACHE_PARAMS_PAGE_SIZE,       GCACHE_DEFAULT_PAGE_SIZE);
+    cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE, GCACHE_DEFAULT_KEEP_PAGES_SIZE);
+}
 
 static const std::string&
 name_value (gu::Config& cfg, const std::string& data_dir)
 {
-    std::string dir("");
+    std::string dir(cfg.get(GCACHE_PARAMS_DIR));
 
-    if (cfg.has(GCACHE_PARAMS_DIR))
+    /* fallback to data_dir if gcache dir is not set */
+    if (GCACHE_DEFAULT_DIR == dir && !data_dir.empty())
     {
-        dir = cfg.get(GCACHE_PARAMS_DIR);
-    }
-    else
-    {
-        if (!data_dir.empty()) dir = data_dir;
-
+        dir = data_dir;
         cfg.set (GCACHE_PARAMS_DIR, dir);
     }
 
-    try
+    std::string rb_name(cfg.get (GCACHE_PARAMS_RB_NAME));
+
+    /* prepend directory name to RB file name if the former is not empty and
+     * the latter is not an absolute path */
+    if ('/' != rb_name[0] && !dir.empty())
     {
-        return cfg.get (GCACHE_PARAMS_RB_NAME);
-    }
-    catch (gu::NotFound&)
-    {
-        if (dir.empty())
-        {
-            cfg.set (GCACHE_PARAMS_RB_NAME, GCACHE_DEFAULT_BASENAME);
-        }
-        else
-        {
-            cfg.set (GCACHE_PARAMS_RB_NAME,
-                     dir + '/' + GCACHE_DEFAULT_BASENAME);
-        }
+        rb_name = dir + '/' + GCACHE_DEFAULT_RB_NAME;
+        cfg.set (GCACHE_PARAMS_RB_NAME, rb_name);
     }
 
-    return cfg.get (GCACHE_PARAMS_RB_NAME);
-}
-
-static ssize_t
-size_value (gu::Config& cfg, const std::string& key, ssize_t def)
-{
-    try
-    {
-        return cfg.get<ssize_t> (key);
-    }
-    catch (gu::NotFound&)
-    {
-        cfg.set<ssize_t> (key, def);
-    }
-
-    return cfg.get<ssize_t> (key);
+    return cfg.get(GCACHE_PARAMS_RB_NAME);
 }
 
 gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     :
-    rb_name   (name_value (cfg, data_dir)),
-    dir_name  (cfg.get(GCACHE_PARAMS_DIR)),
-    mem_size  (size_value (cfg,
-                           GCACHE_PARAMS_MEM_SIZE, GCACHE_DEFAULT_MEM_SIZE)),
-    rb_size   (size_value (cfg,
-                           GCACHE_PARAMS_RB_SIZE, GCACHE_DEFAULT_RB_SIZE)),
-    page_size (size_value (cfg,
-                           GCACHE_PARAMS_PAGE_SIZE, GCACHE_DEFAULT_PAGE_SIZE)),
-    keep_pages_size (size_value (cfg, GCACHE_PARAMS_KEEP_PAGES_SIZE,
-                                      GCACHE_DEFAULT_KEEP_PAGES_SIZE))
+    rb_name_  (name_value (cfg, data_dir)),
+    dir_name_ (cfg.get(GCACHE_PARAMS_DIR)),
+    mem_size_ (cfg.get<ssize_t>(GCACHE_PARAMS_MEM_SIZE)),
+    rb_size_  (cfg.get<ssize_t>(GCACHE_PARAMS_RB_SIZE)),
+    page_size_(cfg.get<ssize_t>(GCACHE_PARAMS_PAGE_SIZE)),
+    keep_pages_size_(cfg.get<ssize_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
 {}
 
 void
@@ -104,8 +86,8 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
          * and params.ram_size and syncs with malloc() method */
 
         config.set<ssize_t>(key, tmp_size);
-        params.mem_size = tmp_size;
-        mem.set_max_size (params.mem_size);
+        params.mem_size(tmp_size);
+        mem.set_max_size(params.mem_size());
     }
     else if (key == GCACHE_PARAMS_RB_SIZE)
     {
@@ -123,8 +105,8 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
          * and params.ram_size and syncs with malloc() method */
 
         config.set<ssize_t>(key, tmp_size);
-        params.page_size = tmp_size;
-        ps.set_page_size (params.page_size);
+        params.page_size(tmp_size);
+        ps.set_page_size(params.page_size());
     }
     else if (key == GCACHE_PARAMS_KEEP_PAGES_SIZE)
     {
@@ -138,8 +120,8 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
          * and params.ram_size and syncs with malloc() method */
 
         config.set<ssize_t>(key, tmp_size);
-        params.keep_pages_size = tmp_size;
-        ps.set_keep_size (params.keep_pages_size);
+        params.keep_pages_size(tmp_size);
+        ps.set_keep_size(params.keep_pages_size());
     }
     else
     {

@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
 #include "mapped_buffer.hpp"
 #include "gu_logger.hpp"
 #include "certification.hpp"
+#include "replicator_smm.hpp"
 #include "wsdb.cpp"
 #include "gcs_action_source.hpp"
 #include "galera_service_thd.hpp"
@@ -21,6 +22,7 @@ namespace
 
         TestEnv() :
             conf_   (),
+            init_   (conf_, NULL),
             gcache_ (conf_, "."),
             gcs_    (conf_, gcache_),
             thd_    (gcs_,  gcache_)
@@ -33,7 +35,9 @@ namespace
 
     private:
 
+// REMOVE    galera::Certification::register_params(conf);
         gu::Config         conf_;
+        galera::ReplicatorSMM::InitConfig init_;
         gcache::GCache     gcache_;
         galera::DummyGcs   gcs_;
         galera::ServiceThd thd_;
@@ -321,6 +325,7 @@ END_TEST
 START_TEST(test_cert_hierarchical_v1)
 {
     log_info << "test_cert_hierarchical_v1";
+
     struct wsinfo_ {
         wsrep_uuid_t     uuid;
         wsrep_conn_id_t  conn_id;

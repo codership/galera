@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -195,12 +195,13 @@ class gcomm::Protolay
     CtxList     up_context_;
     CtxList     down_context_;
 
-
     Protolay (const Protolay&);
     Protolay& operator=(const Protolay&);
 
 protected:
+
     gu::Config& conf_;
+
     Protolay(gu::Config& conf)
         :
         up_context_(0),
@@ -209,6 +210,7 @@ protected:
     { }
 
 public:
+
     virtual ~Protolay() {}
 
     virtual void connect(bool) { }
@@ -221,30 +223,30 @@ public:
 
     void set_up_context(Protolay *up)
     {
-	if (std::find(up_context_.begin(),
+        if (std::find(up_context_.begin(),
                       up_context_.end(),
                       up) != up_context_.end())
         {
             gu_throw_fatal << "up context already exists";
         }
-	up_context_.push_back(up);
+        up_context_.push_back(up);
     }
 
     void set_down_context(Protolay *down)
     {
-	if (std::find(down_context_.begin(),
+        if (std::find(down_context_.begin(),
                       down_context_.end(),
                       down) != down_context_.end())
         {
             gu_throw_fatal << "down context already exists";
         }
-	down_context_.push_back(down);
+        down_context_.push_back(down);
     }
 
     void unset_up_context(Protolay* up)
     {
         CtxList::iterator i;
-	if ((i = std::find(up_context_.begin(),
+        if ((i = std::find(up_context_.begin(),
                            up_context_.end(),
                            up)) == up_context_.end())
         {
@@ -257,7 +259,7 @@ public:
     void unset_down_context(Protolay* down)
     {
         CtxList::iterator i;
-	if ((i = std::find(down_context_.begin(),
+        if ((i = std::find(down_context_.begin(),
                            down_context_.end(),
                            down)) == down_context_.end())
         {
@@ -269,10 +271,10 @@ public:
     /* apparently passed data buffer to the upper layer */
     void send_up(const Datagram& dg, const ProtoUpMeta& up_meta)
     {
-	if (up_context_.empty() == true)
+        if (up_context_.empty() == true)
         {
-	    gu_throw_fatal << this << " up context(s) not set";
-	}
+            gu_throw_fatal << this << " up context(s) not set";
+        }
 
         CtxList::iterator i, i_next;
         for (i = up_context_.begin(); i != up_context_.end(); i = i_next)
@@ -285,13 +287,13 @@ public:
     /* apparently passes data buffer to lower layer, what is return value? */
     int send_down(Datagram& dg, const ProtoDownMeta& down_meta)
     {
-	if (down_context_.empty() == true)
+        if (down_context_.empty() == true)
         {
             log_warn << this << " down context(s) not set";
             return ENOTCONN;
-	}
+        }
 
-	int    ret         = 0;
+        int    ret         = 0;
         for (CtxList::iterator i = down_context_.begin();
              i != down_context_.end(); ++i)
         {
@@ -308,7 +310,7 @@ public:
                 ret = err;
             }
         }
-	return ret;
+        return ret;
     }
 
     virtual void handle_stable_view(const View& view) { }

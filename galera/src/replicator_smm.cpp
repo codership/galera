@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -129,8 +129,9 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
     init_lib_           (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
-    config_             (args->options),
-    set_defaults_       (config_, defaults, args->node_address),
+    config_             (),
+    init_config_        (config_, args->node_address),
+    parse_options_      (config_, args->options),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
     proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),

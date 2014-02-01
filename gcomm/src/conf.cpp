@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/conf.hpp"
+#include "defaults.hpp"
+#include "common.h"
 
 static std::string const Delim = ".";
 
@@ -11,98 +13,173 @@ std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
 std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 
 // TCP
+static std::string const SocketPrefix("socket" + Delim);
 std::string const gcomm::Conf::TcpNonBlocking =
-    "socket" + Delim + "non_blocking";
+    SocketPrefix + "non_blocking";
 std::string const gcomm::Conf::SocketUseSsl =
-    "socket" + Delim + "ssl";
+    SocketPrefix + "ssl";
 std::string const gcomm::Conf::SocketSslVerifyFile =
-    "socket" + Delim + "ssl_ca";
+    COMMON_CONF_SSL_CA;
 std::string const gcomm::Conf::SocketSslCertificateFile =
-    "socket" + Delim + "ssl_cert";
+    COMMON_CONF_SSL_CERT;
 std::string const gcomm::Conf::SocketSslPrivateKeyFile =
-    "socket" + Delim + "ssl_key";
+    COMMON_CONF_SSL_KEY;
 std::string const gcomm::Conf::SocketSslPasswordFile =
-    "socket" + Delim + "ssl_password_file";
+    COMMON_CONF_SSL_PSWD_FILE;
 std::string const gcomm::Conf::SocketSslCipherList =
-    "socket" + Delim + "ssl_cipher";
+    SocketPrefix + "ssl_cipher";
 std::string const gcomm::Conf::SocketSslCompression =
-    "socket" + Delim + "ssl_compression";
+    SocketPrefix + "ssl_compression";
 std::string const gcomm::Conf::SocketChecksum =
-    "socket" + Delim + "checksum";
+    SocketPrefix + "checksum";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
+static std::string const GMCastPrefix(gcomm::Conf::GMCastScheme + Delim);
 std::string const gcomm::Conf::GMCastVersion =
-    GMCastScheme + Delim + "version";
+    GMCastPrefix + "version";
 std::string const gcomm::Conf::GMCastGroup =
-    GMCastScheme + Delim + "group";
+    GMCastPrefix + "group";
 std::string const gcomm::Conf::GMCastListenAddr =
-    GMCastScheme + Delim + "listen_addr";
+    GMCastPrefix + "listen_addr";
 std::string const gcomm::Conf::GMCastMCastAddr =
-    GMCastScheme + Delim + "mcast_addr";
+    GMCastPrefix + "mcast_addr";
 std::string const gcomm::Conf::GMCastMCastPort =
-    GMCastScheme + Delim + "mcast_port";
+    GMCastPrefix + "mcast_port";
 std::string const gcomm::Conf::GMCastMCastTTL =
-    GMCastScheme + Delim + "mcast_ttl";
+    GMCastPrefix + "mcast_ttl";
 std::string const gcomm::Conf::GMCastTimeWait =
-    GMCastScheme + Delim + "time_wait";
+    GMCastPrefix + "time_wait";
 std::string const gcomm::Conf::GMCastPeerTimeout =
-    GMCastScheme + Delim + "peer_timeout";
+    GMCastPrefix + "peer_timeout";
 std::string const gcomm::Conf::GMCastMaxInitialReconnectAttempts =
-    GMCastScheme + Delim + "mira";
+    GMCastPrefix + "mira";
 std::string const gcomm::Conf::GMCastPeerAddr =
-    GMCastScheme + Delim + "peer_addr";
+    GMCastPrefix + "peer_addr";
 std::string const gcomm::Conf::GMCastIsolate =
-    GMCastScheme + Delim + "isolate";
+    GMCastPrefix + "isolate";
 std::string const gcomm::Conf::GMCastSegment =
-    GMCastScheme + Delim + "segment";
+    GMCastPrefix + "segment";
 
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
+static std::string const EvsPrefix(gcomm::Conf::EvsScheme + Delim);
 std::string const gcomm::Conf::EvsVersion =
-    EvsScheme + Delim + "version";
+    EvsPrefix + "version";
 std::string const gcomm::Conf::EvsViewForgetTimeout =
-    EvsScheme + Delim + "view_forget_timeout";
+    EvsPrefix + "view_forget_timeout";
 std::string const gcomm::Conf::EvsInactiveTimeout =
-    EvsScheme + Delim + "inactive_timeout";
+    EvsPrefix + "inactive_timeout";
 std::string const gcomm::Conf::EvsSuspectTimeout =
-    EvsScheme + Delim + "suspect_timeout";
+    EvsPrefix + "suspect_timeout";
 std::string const gcomm::Conf::EvsInactiveCheckPeriod =
-    EvsScheme + Delim + "inactive_check_period";
+    EvsPrefix + "inactive_check_period";
 std::string const gcomm::Conf::EvsInstallTimeout =
-    EvsScheme + Delim + "install_timeout";
+    EvsPrefix + "install_timeout";
 std::string const gcomm::Conf::EvsKeepalivePeriod =
-    EvsScheme + Delim + "keepalive_period";
+    EvsPrefix + "keepalive_period";
 std::string const gcomm::Conf::EvsJoinRetransPeriod =
-    EvsScheme + Delim + "join_retrans_period";
+    EvsPrefix + "join_retrans_period";
 std::string const gcomm::Conf::EvsStatsReportPeriod =
-    EvsScheme + Delim + "stats_report_period";
+    EvsPrefix + "stats_report_period";
 std::string const gcomm::Conf::EvsDebugLogMask =
-    EvsScheme + Delim + "debug_log_mask";
+    EvsPrefix + "debug_log_mask";
 std::string const gcomm::Conf::EvsInfoLogMask =
-    EvsScheme + Delim + "info_log_mask";
+    EvsPrefix + "info_log_mask";
 std::string const gcomm::Conf::EvsSendWindow =
-    EvsScheme + Delim + "send_window";
+    EvsPrefix + "send_window";
 std::string const gcomm::Conf::EvsUserSendWindow =
-    EvsScheme + Delim + "user_send_window";
+    EvsPrefix + "user_send_window";
 std::string const gcomm::Conf::EvsUseAggregate =
-    EvsScheme + Delim + "use_aggregate";
+    EvsPrefix + "use_aggregate";
 std::string const gcomm::Conf::EvsCausalKeepalivePeriod =
-    EvsScheme + Delim + "causal_keepalive_period";
+    EvsPrefix + "causal_keepalive_period";
 std::string const gcomm::Conf::EvsMaxInstallTimeouts =
-    EvsScheme + Delim + "max_install_timeouts";
+    EvsPrefix + "max_install_timeouts";
+
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
-std::string const gcomm::Conf::PcVersion = PcScheme + Delim + "version";
-std::string const gcomm::Conf::PcIgnoreSb = PcScheme + Delim + "ignore_sb";
-std::string const gcomm::Conf::PcIgnoreQuorum = PcScheme + Delim + "ignore_quorum";
-std::string const gcomm::Conf::PcChecksum = PcScheme + Delim + "checksum";
-std::string const gcomm::Conf::PcLinger = PcScheme + Delim + "linger";
+static std::string const PcPrefix(gcomm::Conf::PcScheme + Delim);
+std::string const gcomm::Conf::PcVersion = PcPrefix + "version";
+std::string const gcomm::Conf::PcIgnoreSb = PcPrefix + "ignore_sb";
+std::string const gcomm::Conf::PcIgnoreQuorum =
+    PcPrefix + "ignore_quorum";
+std::string const gcomm::Conf::PcChecksum = PcPrefix + "checksum";
+std::string const gcomm::Conf::PcLinger = PcPrefix + "linger";
 std::string const gcomm::Conf::PcAnnounceTimeout =
-    PcScheme + Delim + "announce_timeout";
-std::string const gcomm::Conf::PcNpvo = PcScheme + Delim + "npvo";
-std::string const gcomm::Conf::PcBootstrap = PcScheme + Delim + "bootstrap";
-std::string const gcomm::Conf::PcWaitPrim = PcScheme + Delim + "wait_prim";
+    PcPrefix + "announce_timeout";
+std::string const gcomm::Conf::PcNpvo = PcPrefix + "npvo";
+std::string const gcomm::Conf::PcBootstrap = PcPrefix + "bootstrap";
+std::string const gcomm::Conf::PcWaitPrim = PcPrefix + "wait_prim";
 std::string const gcomm::Conf::PcWaitPrimTimeout =
-    PcScheme + Delim + "wait_prim_timeout";
-std::string const gcomm::Conf::PcWeight = PcScheme + Delim + "weight";
+    PcPrefix + "wait_prim_timeout";
+std::string const gcomm::Conf::PcWeight = PcPrefix + "weight";
+
+void
+gcomm::Conf::register_params(gu::Config& cnf)
+{
+#define GCOMM_CONF_ADD(_x_) cnf.add(_x_);
+#define GCOMM_CONF_ADD_DEFAULT(_x_) cnf.add(_x_, Defaults::_x_);
+
+    GCOMM_CONF_ADD (COMMON_BASE_HOST_KEY);
+    GCOMM_CONF_ADD (COMMON_BASE_PORT_KEY);
+
+    GCOMM_CONF_ADD_DEFAULT(ProtonetBackend);
+    GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
+
+    GCOMM_CONF_ADD        (TcpNonBlocking);
+    GCOMM_CONF_ADD_DEFAULT(SocketUseSsl);
+    GCOMM_CONF_ADD        (SocketSslVerifyFile);
+    GCOMM_CONF_ADD        (SocketSslCertificateFile);
+    GCOMM_CONF_ADD        (SocketSslPrivateKeyFile);
+    GCOMM_CONF_ADD        (SocketSslPasswordFile);
+    GCOMM_CONF_ADD        (SocketSslCipherList);
+    GCOMM_CONF_ADD        (SocketSslCompression);
+    GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
+
+    GCOMM_CONF_ADD_DEFAULT(GMCastVersion);
+    GCOMM_CONF_ADD        (GMCastGroup);
+    GCOMM_CONF_ADD        (GMCastListenAddr);
+    GCOMM_CONF_ADD        (GMCastMCastAddr);
+    GCOMM_CONF_ADD        (GMCastMCastPort);
+    GCOMM_CONF_ADD        (GMCastMCastTTL);
+    GCOMM_CONF_ADD        (GMCastMCastAddr);
+    GCOMM_CONF_ADD        (GMCastTimeWait);
+    GCOMM_CONF_ADD        (GMCastPeerTimeout);
+    GCOMM_CONF_ADD        (GMCastMaxInitialReconnectAttempts);
+    GCOMM_CONF_ADD        (GMCastPeerAddr);
+    GCOMM_CONF_ADD        (GMCastIsolate);
+    GCOMM_CONF_ADD_DEFAULT(GMCastSegment);
+
+    GCOMM_CONF_ADD        (EvsVersion);
+    GCOMM_CONF_ADD_DEFAULT(EvsViewForgetTimeout);
+    GCOMM_CONF_ADD_DEFAULT(EvsSuspectTimeout);
+    GCOMM_CONF_ADD_DEFAULT(EvsInactiveTimeout);
+    GCOMM_CONF_ADD_DEFAULT(EvsInactiveCheckPeriod);
+    GCOMM_CONF_ADD        (EvsInstallTimeout);
+    GCOMM_CONF_ADD        (EvsKeepalivePeriod);
+    GCOMM_CONF_ADD_DEFAULT(EvsJoinRetransPeriod);
+    GCOMM_CONF_ADD_DEFAULT(EvsStatsReportPeriod);
+    GCOMM_CONF_ADD        (EvsDebugLogMask);
+    GCOMM_CONF_ADD        (EvsInfoLogMask);
+    GCOMM_CONF_ADD_DEFAULT(EvsSendWindow);
+    GCOMM_CONF_ADD_DEFAULT(EvsUserSendWindow);
+    GCOMM_CONF_ADD        (EvsUseAggregate);
+    GCOMM_CONF_ADD        (EvsCausalKeepalivePeriod);
+    GCOMM_CONF_ADD_DEFAULT(EvsMaxInstallTimeouts);
+
+    GCOMM_CONF_ADD_DEFAULT(PcVersion);
+    GCOMM_CONF_ADD_DEFAULT(PcIgnoreSb);
+    GCOMM_CONF_ADD_DEFAULT(PcIgnoreQuorum);
+    GCOMM_CONF_ADD_DEFAULT(PcChecksum);
+    GCOMM_CONF_ADD_DEFAULT(PcAnnounceTimeout);
+    GCOMM_CONF_ADD        (PcLinger);
+    GCOMM_CONF_ADD_DEFAULT(PcNpvo);
+    GCOMM_CONF_ADD        (PcBootstrap);
+    GCOMM_CONF_ADD_DEFAULT(PcWaitPrim);
+    GCOMM_CONF_ADD_DEFAULT(PcWaitPrimTimeout);
+    GCOMM_CONF_ADD_DEFAULT(PcWeight);
+
+#undef GCOMM_CONF_ADD
+#undef GCOMM_CONF_ADD_DEFAULT
+}

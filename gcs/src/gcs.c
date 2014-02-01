@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -2041,6 +2041,12 @@ _set_max_throttle (gcs_conn_t* conn, const char* value)
     else {
         return -EINVAL;
     }
+}
+
+void gcs_register_params (gu_config_t* const conf)
+{
+    gcs_params_register (conf);
+    gcs_core_register   (conf);
 }
 
 long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
