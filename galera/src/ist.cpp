@@ -249,7 +249,7 @@ IST_determine_recv_addr (gu::Config& conf)
             std::string ssl_key = conf.get(CONF_SSL_KEY);
             if (ssl_key.length() != 0) ssl = true;
         }
-        catch (gu::NotFound&) {}
+        catch (gu::NotSet&) {}
 
         if (ssl)
             recv_addr.insert(0, "ssl://");

@@ -14,6 +14,7 @@
 #include "gu_exception.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 #include <map>
 
 #include <climits>
@@ -82,6 +83,9 @@ public:
         }
         else
         {
+#ifndef NDEBUG
+            log_error << key << " not recognized.";
+#endif
             throw NotFound();
         }
     }
@@ -118,6 +122,9 @@ public:
         param_map_t::const_iterator const i(params_.find(key));
         if (i == params_.end()) throw NotFound();
         if (i->second.is_set()) return i->second.value();
+#ifndef NDEBUG
+        log_error << key << " not set.";
+#endif
         throw NotSet();
     }
 
