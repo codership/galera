@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 #define __STDC_FORMAT_MACROS
 
 #include "../src/galera_service_thd.hpp"
+#include "../src/replicator_smm.hpp"
 #include <check.h>
 #include <errno.h>
 
@@ -17,6 +18,7 @@ namespace
 
         TestEnv() :
             conf_   (),
+            init_   (conf_, NULL),
             gcache_ (conf_, "."),
             gcs_    (conf_, gcache_)
         {}
@@ -27,6 +29,7 @@ namespace
     private:
 
         gu::Config       conf_;
+        galera::ReplicatorSMM::InitConfig init_;
         gcache::GCache   gcache_;
         galera::DummyGcs gcs_;
     };

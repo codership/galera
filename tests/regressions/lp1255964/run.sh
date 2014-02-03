@@ -50,7 +50,7 @@ load()
         begin=$SECONDS
         $MYSQL -e "INSERT INTO $TABLE(c2) SELECT c2 FROM $TABLE;"
         seconds=$(( $SECONDS - $begin ))
-        echo -en "$seconds\t"; ps --no-headers -C mysqld -o rss
+        echo -en "$seconds\t"; ps --no-headers -C mysqld -o rss || ps --no-headers -C mysqld-debug -o rss
     done
 }
 

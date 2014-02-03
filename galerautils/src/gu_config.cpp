@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 
 /**
  * @file
@@ -18,11 +18,15 @@ const char gu::Config::KEY_VALUE_SEP = '=';  // key-value separator
 const char gu::Config::ESCAPE        = '\\'; // escape symbol
 
 void
-gu::Config::parse (param_map_t& pmap, const std::string& params)
+gu::Config::parse (
+    std::vector<std::pair<std::string, std::string> >& params_vector,
+    const std::string& param_list)
 {
-    if (0 == params[0]) return;
+    assert(params_vector.empty()); // we probably want a clean list
 
-    std::vector<std::string> pv = gu::tokenize (params, PARAM_SEP, ESCAPE);
+    if (param_list.empty()) return;
+
+    std::vector<std::string> pv = gu::tokenize (param_list, PARAM_SEP, ESCAPE);
 
     for (size_t i = 0; i < pv.size(); ++i)
     {
@@ -53,17 +57,7 @@ gu::Config::parse (param_map_t& pmap, const std::string& params)
             gu::trim(kvv[1]);
             std::string& value = kvv[1];
 
-            param_map_t::iterator pi = pmap.find(key);
-
-            if (pi != pmap.end())
-            {
-                log_warn << "Element " << pv[i] << " overwrites previous value"
-                         << " '" << pi->second << "' of '" << key << "' by '"
-                         << value << "'";
-            }
-
-            log_debug << "Found param '" << key << "' = '" << value << "'";
-            pmap[key] = value;
+            params_vector.push_back(std::make_pair(key, value));
         }
         else if (kvv.size() > 1)
         {
@@ -73,12 +67,40 @@ gu::Config::parse (param_map_t& pmap, const std::string& params)
     }
 }
 
-gu::Config::Config() : params_() {}
-
-gu::Config::Config (const std::string& params) : params_()
+void
+gu::Config::parse (const std::string& param_list)
 {
-    Config::parse (params_, params);
+    if (param_list.empty()) return;
+
+    std::vector<std::pair<std::string, std::string> > pv;
+
+    parse (pv, param_list);
+
+    bool not_found(false);
+
+    for (size_t i = 0; i < pv.size(); ++i)
+    {
+        const std::string& key  (pv[i].first);
+        const std::string& value(pv[i].second);
+
+        try
+        {
+            set(key, value);
+        }
+        catch (NotFound& e)
+        {
+            log_error << "Unrecognized parameter '" << key << '\'';
+            /* Throw later so that all invalid parameters get logged.*/
+            not_found = true;
+        }
+
+        log_debug << "Set parameter '" << key << "' = '" << value << "'";
+    }
+
+    if (not_found) throw gu::NotFound();
 }
+
+gu::Config::Config() : params_() {}
 
 void
 gu::Config::set_longlong (const std::string& key, long long val)
@@ -93,7 +115,7 @@ gu::Config::set_longlong (const std::string& key, long long val)
             val >>= 40;
             num_mod = "T";
         }
-        if (!(val & ((1 << 30) - 1)))
+        else if (!(val & ((1 << 30) - 1)))
         {
             val >>= 30;
             num_mod = "G";
@@ -154,32 +176,43 @@ gu::Config::overflow_int(long long ret)
                               << " too large for requested type (int).";
 }
 
-std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)
+void
+gu::Config::print (std::ostream& os, bool const notset) const
 {
-    const gu::Config::param_map_t& pmap = c.params();
-    gu::Config::param_map_t::const_iterator pi = pmap.begin();
-
-    if (pi != pmap.end())
+    struct _print_param
     {
-        ost << pi->first << " = " << pi->second;
-        ++pi;
-        for (; pi != pmap.end(); ++pi)
+        void operator() (std::ostream& os, bool const notset,
+                         param_map_t::const_iterator& pi)
         {
-//        ost << "'" << pi->first << "' = '" << pi->second << "'\n";
-            ost << "; " << pi->first << " = " << pi->second;
+            const Parameter& p(pi->second);
+
+            if (p.is_set() || notset)
+            {
+                os << pi->first << " = " << p.value() << "; ";
+            }
         }
     }
+    print_param;
 
+    for (param_map_t::const_iterator pi(params_.begin());
+         pi != params_.end(); ++pi)
+    {
+        print_param(os, notset, pi);
+    }
+}
+
+std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)
+{
+    c.print(ost);
     return ost;
 }
 
 gu_config_t*
-gu_config_create (const char* params)
+gu_config_create ()
 {
     try
     {
-        const std::string& ps(params ? params : "");
-        return (reinterpret_cast<gu_config_t*>(new gu::Config(ps)));
+        return (reinterpret_cast<gu_config_t*>(new gu::Config()));
     }
     catch (gu::Exception& e)
     {
@@ -203,7 +236,7 @@ gu_config_destroy (gu_config_t* cnf)
     }
 }
 
-static long
+static int
 config_check_set_args (gu_config_t* cnf, const char* key, const char* func)
 {
     if (cnf && key && key[0] != '\0') return 0;
@@ -217,7 +250,7 @@ config_check_set_args (gu_config_t* cnf, const char* key, const char* func)
     return -EINVAL;
 }
 
-static long
+static int
 config_check_get_args (gu_config_t* cnf, const char* key, const void* val_ptr,
                        const char* func)
 {
@@ -243,7 +276,30 @@ gu_config_has (gu_config_t* cnf, const char* key)
     return (conf->has (key));
 }
 
-long
+bool
+gu_config_is_set (gu_config_t* cnf, const char* key)
+{
+    if (config_check_set_args (cnf, key, __FUNCTION__)) return false;
+
+    gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
+
+    return (conf->is_set (key));
+}
+
+void
+gu_config_add (gu_config_t* cnf, const char* key, const char* const val)
+{
+    if (config_check_set_args (cnf, key, __FUNCTION__)) gu_throw_error(EINVAL);
+
+    gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
+
+    if (val != NULL)
+        conf->add (key, val);
+    else
+        conf->add (key);
+}
+
+int
 gu_config_get_string (gu_config_t* cnf, const char* key, const char** val)
 {
     if (config_check_get_args (cnf, key, val, __FUNCTION__)) return -EINVAL;
@@ -261,7 +317,7 @@ gu_config_get_string (gu_config_t* cnf, const char* key, const char** val)
     }
 }
 
-long
+int
 gu_config_get_int64  (gu_config_t* cnf, const char* key, int64_t* val)
 {
     if (config_check_get_args (cnf, key, val, __FUNCTION__)) return -EINVAL;
@@ -277,6 +333,10 @@ gu_config_get_int64  (gu_config_t* cnf, const char* key, int64_t* val)
     {
         return 1;
     }
+    catch (gu::NotSet&)
+    {
+        return 1;
+    }
     catch (gu::Exception& e)
     {
         log_error << "Failed to parse parameter '" << key << "': " << e.what();
@@ -284,7 +344,7 @@ gu_config_get_int64  (gu_config_t* cnf, const char* key, int64_t* val)
     }
 }
 
-long
+int
 gu_config_get_double (gu_config_t* cnf, const char* key, double* val)
 {
     if (config_check_get_args (cnf, key, val, __FUNCTION__)) return -EINVAL;
@@ -300,6 +360,10 @@ gu_config_get_double (gu_config_t* cnf, const char* key, double* val)
     {
         return 1;
     }
+    catch (gu::NotSet&)
+    {
+        return 1;
+    }
     catch (gu::Exception& e)
     {
         log_error << "Failed to parse parameter '" << key << "': " << e.what();
@@ -307,7 +371,7 @@ gu_config_get_double (gu_config_t* cnf, const char* key, double* val)
     }
 }
 
-long
+int
 gu_config_get_ptr    (gu_config_t* cnf, const char* key, void** val)
 {
     if (config_check_get_args (cnf, key, val, __FUNCTION__)) return -EINVAL;
@@ -323,6 +387,10 @@ gu_config_get_ptr    (gu_config_t* cnf, const char* key, void** val)
     {
         return 1;
     }
+    catch (gu::NotSet&)
+    {
+        return 1;
+    }
     catch (gu::Exception& e)
     {
         log_error << "Failed to parse parameter '" << key << "': " << e.what();
@@ -330,7 +398,7 @@ gu_config_get_ptr    (gu_config_t* cnf, const char* key, void** val)
     }
 }
 
-long
+int
 gu_config_get_bool   (gu_config_t* cnf, const char* key, bool* val)
 {
     if (config_check_get_args (cnf, key, val, __FUNCTION__)) return -EINVAL;
@@ -343,6 +411,10 @@ gu_config_get_bool   (gu_config_t* cnf, const char* key, bool* val)
         return 0;
     }
     catch (gu::NotFound&)
+    {
+        return 1;
+    }
+    catch (gu::NotSet&)
     {
         return 1;
     }

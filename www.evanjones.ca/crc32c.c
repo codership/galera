@@ -18,7 +18,8 @@
 
 /*
  * Copyright (c) 2013 Codership Oy <info@codership.com>
- * Concatenated crc32ctables.cc and crc32c.cc and stripped off C++ garbage.
+ * Concatenated crc32ctables.cc and crc32c.cc, stripped off C++ garbage,
+ * fixed PIC.
  */
 
 #if defined(__cplusplus)
@@ -498,91 +499,6 @@ const uint32_t crc_tableil8_o88[256] =
  * end of the CRC lookup table crc_tableil8_o88
  */
 
-static uint32_t crc32c_CPUDetection(uint32_t crc, const void* data, size_t length) {
-    // Avoid issues that could potentially be caused by multiple threads: use a local variable
-    CRC32CFunctionPtr best = detectBestCRC32C();
-    crc32c = best;
-    return best(crc, data, length);
-}
-
-CRC32CFunctionPtr crc32c = crc32c_CPUDetection;
-
-#if defined(__x86_64) || defined(_M_AMD64) || defined(_M_X64)
-#define ARCH_x86_64
-#endif
-
-#if defined(ARCH_x86_64) || defined(__i386) || defined(_M_X86)
-#define ARCH_x86
-#endif
-
-#if defined(ARCH_x86) /* CPUID staff below makes sense only for x86 */
-
-static uint32_t cpuid(uint32_t functionInput) {
-    uint32_t eax;
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-#if ORIGINAL /* The PIC code below does not compile on 64-bit platforms */
-#if defined(__PIC__)
-    // PIC: Need to save and restore ebx See:
-    // http://sam.zoy.org/blog/2007-04-13-shlib-with-non-pic-code-have-inline-assembly-and-pic-mix-well
-    asm("pushl %%ebx\n\t" /* save %ebx */
-            "cpuid\n\t"
-            "movl %%ebx, %[ebx]\n\t" /* save what cpuid just put in %ebx */
-            "popl %%ebx" : "=a"(eax), [ebx] "=r"(ebx), "=c"(ecx), "=d"(edx) : "a" (functionInput)
-            : "cc");
-#else
-    asm("cpuid" : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx) : "a" (functionInput));
-#endif
-#else /* !ORIGINAL */
-    /* The code below adapted from http://en.wikipedia.org/wiki/CPUID
-     * and seems to work for both PIC and non-PIC cases */
-    __asm__ __volatile__(
-#if defined(ARCH_x86_64)
-        "pushq %%rbx     \n\t" /* save %rbx */
-#else /* 32-bit */
-        "pushl %%ebx     \n\t" /* save %ebx */
-#endif
-
-        "cpuid              \n\t"
-        "movl %%ebx, %[ebx] \n\t" /* copy %ebx contents into output var */
-
-#if defined(ARCH_x86_64)
-        "popq %%rbx \n\t"      /* restore %rbx */
-#else /* 32-bit */
-        "popl %%ebx \n\t"      /* restore %ebx */
-#endif
-        : "=a"(eax), [ebx] "=r"(ebx), "=c"(ecx), "=d"(edx)
-        : "a"(functionInput)
-    );
-#endif /* ORIGINAL */
-    return ecx;
-}
-
-CRC32CFunctionPtr detectBestCRC32C() {
-    static const int SSE42_BIT = 20;
-    uint32_t ecx = cpuid(1);
-    bool hasSSE42 = ecx & (1 << SSE42_BIT);
-    if (hasSSE42) {
-#ifdef __LP64__
-        return crc32cHardware64;
-#else
-        return crc32cHardware32;
-#endif
-    } else {
-        return crc32cSlicingBy8;
-    }
-}
-
-#else /* non-x86 architectures */
-
-CRC32CFunctionPtr detectBestCRC32C() {
-    /* this actually requires some benchmarking... */
-    return crc32cSlicingBy8;
-}
-
-#endif /* ARCH_x86 */
-
 // Implementations adapted from Intel's Slicing By 8 Sourceforge Project
 // http://sourceforge.net/projects/slicing-by-8/
 /*++
@@ -678,7 +594,54 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
     return crc;
 }
 
-#if defined(ARCH_x86)
+
+#if !defined(CRC32C_NO_HARDWARE)
+
+static uint32_t cpuid(uint32_t functionInput) {
+    uint32_t eax;
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+
+    /* The code below adapted from http://en.wikipedia.org/wiki/CPUID
+     * and seems to work for both PIC and non-PIC cases */
+    __asm__ __volatile__(
+#if defined(CRC32C_x86_64)
+        "pushq %%rbx     \n\t" /* save %rbx */
+#else /* 32-bit */
+        "pushl %%ebx     \n\t" /* save %ebx */
+#endif
+
+        "cpuid              \n\t"
+        "movl %%ebx, %[ebx] \n\t" /* copy %ebx contents into output var */
+
+#if defined(CRC32C_x86_64)
+        "popq %%rbx \n\t"      /* restore %rbx */
+#else /* 32-bit */
+        "popl %%ebx \n\t"      /* restore %ebx */
+#endif
+        : "=a"(eax), [ebx] "=r"(ebx), "=c"(ecx), "=d"(edx)
+        : "a"(functionInput)
+    );
+
+    return ecx;
+}
+
+CRC32CFunctionPtr detectBestCRC32C() {
+    static const int SSE42_BIT = 20;
+    uint32_t ecx = cpuid(1);
+    bool hasSSE42 = ecx & (1 << SSE42_BIT);
+    if (hasSSE42) {
+#if defined(CRC32C_x86_64)
+        return crc32cHardware64;
+#else
+        return crc32cHardware32;
+#endif
+    } else {
+        return crc32cSlicingBy8;
+    }
+}
+
 
 #include <assert.h>
 
@@ -772,7 +735,24 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
 #endif /* __LP64__ */
 }
 
-#endif /* ARCH_x86 */
+#else /* no CRC32C HW acceleration */
+
+CRC32CFunctionPtr detectBestCRC32C() {
+    /* this actually requires some benchmarking... */
+    return crc32cSlicingBy8;
+}
+
+#endif /* CRC32C_NO_HARDWARE */
+
+static uint32_t crc32c_CPUDetection(uint32_t crc, const void* data, size_t length) {
+    // Avoid issues that could potentially be caused by multiple threads: use a local variable
+    CRC32CFunctionPtr best = detectBestCRC32C();
+    crc32c = best;
+    return best(crc, data, length);
+}
+
+CRC32CFunctionPtr crc32c = crc32c_CPUDetection;
+
 
 #if defined(__cplusplus)
 }

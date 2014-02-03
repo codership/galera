@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -41,6 +41,10 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     catch (std::exception& e)
     {
         log_error << e.what();
+    }
+    catch (gu::NotFound& e)
+    {
+        /* Unrecognized parameter (logged by gu::Config::set()) */
     }
 #ifdef NDEBUG
     catch (...)

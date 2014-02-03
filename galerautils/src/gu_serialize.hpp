@@ -31,8 +31,8 @@
 #include "gu_throw.hpp"
 #include "gu_byteswap.hpp"
 #include "gu_buffer.hpp"
+#include "gu_macros.hpp"
 
-#include <boost/static_assert.hpp>
 #include <limits>
 
 namespace gu
@@ -63,9 +63,9 @@ namespace gu
     __private_serialize(const FROM& f, void* const buf, size_t const buflen,
                         size_t const offset)
     {
-        BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
-        BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
-        BOOST_STATIC_ASSERT(sizeof(FROM) == sizeof(TO));
+        GU_COMPILE_ASSERT(std::numeric_limits<TO>::is_integer, not_integer1);
+        GU_COMPILE_ASSERT(std::numeric_limits<FROM>::is_integer, not_integer2);
+        GU_COMPILE_ASSERT(sizeof(FROM) == sizeof(TO), size_differs);
         size_t const ret = offset + sizeof(TO);
         if (gu_unlikely(ret > buflen))
         {
@@ -82,9 +82,9 @@ namespace gu
     __private_unserialize(const void* const buf, size_t const buflen,
                           size_t const offset, TO& t)
     {
-        BOOST_STATIC_ASSERT(std::numeric_limits<TO>::is_integer);
-        BOOST_STATIC_ASSERT(std::numeric_limits<FROM>::is_integer);
-        BOOST_STATIC_ASSERT(sizeof(FROM) == sizeof(TO));
+        GU_COMPILE_ASSERT(std::numeric_limits<TO>::is_integer, not_integer1);
+        GU_COMPILE_ASSERT(std::numeric_limits<FROM>::is_integer, not_integer2);
+        GU_COMPILE_ASSERT(sizeof(FROM) == sizeof(TO), size_differs);
         size_t const ret = offset + sizeof(t);
         if (gu_unlikely(ret > buflen))
         {
@@ -170,7 +170,7 @@ namespace gu
     template <typename ST>
     inline size_t __private_serial_size(const Buffer& sb)
     {
-        BOOST_STATIC_ASSERT(std::numeric_limits<ST>::is_integer);
+        GU_COMPILE_ASSERT(std::numeric_limits<ST>::is_integer, must_be_integer);
         if (sb.size() > std::numeric_limits<ST>::max())
             gu_throw_error(ERANGE) << sb.size() << " unrepresentable in "
                                    << sizeof(ST) << " bytes.";
@@ -222,7 +222,7 @@ namespace gu
                                         size_t            offset,
                                         Buffer&           b)
     {
-        BOOST_STATIC_ASSERT(std::numeric_limits<ST>::is_integer);
+        GU_COMPILE_ASSERT(std::numeric_limits<ST>::is_integer, must_be_integer);
         ST len(0);
         size_t ret = offset + sizeof(len);
 

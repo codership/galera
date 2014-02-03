@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
 //
 
 
@@ -10,7 +10,7 @@
 #include "monitor.hpp"
 #include "GCache.hpp"
 #include "gu_arch.h"
-
+#include "replicator_smm.hpp"
 #include <check.h>
 
 using namespace galera;
@@ -138,11 +138,15 @@ struct trx_thread_args
 
 extern "C" void* sender_thd(void* arg)
 {
+    mark_point();
+
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
     gu::Config conf;
+    galera::ReplicatorSMM::InitConfig(conf, NULL);
     pthread_barrier_wait(&start_barrier);
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
+    mark_point();
     sender.send(sargs->first_, sargs->last_);
     return 0;
 }
@@ -172,14 +176,21 @@ extern "C" void* trx_thread(void* arg)
 
 extern "C" void* receiver_thd(void* arg)
 {
+    mark_point();
 
     receiver_args* rargs(reinterpret_cast<receiver_args*>(arg));
 
     gu::Config conf;
+    galera::ReplicatorSMM::InitConfig(conf, NULL);
+
+    mark_point();
+
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, rargs->trx_pool_, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
+
+    mark_point();
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);
@@ -236,6 +247,7 @@ static void test_ist_common(int const version)
     TrxHandle::Params const trx_params("", trx_version,
                                        galera::KeySet::MAX_VERSION);
     gu::Config conf;
+    galera::ReplicatorSMM::InitConfig(conf, NULL);
     std::string gcache_file("ist_check.cache");
     conf.set("gcache.name", gcache_file);
     std::string dir(".");
@@ -244,6 +256,8 @@ static void test_ist_common(int const version)
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
 
     gcache::GCache* gcache = new gcache::GCache(conf, dir);
+
+    mark_point();
 
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
@@ -254,6 +268,7 @@ static void test_ist_common(int const version)
             {"key1", 4},
             {"key2", 4}
         };
+
         trx->append_key(KeyData(trx_version, key, 2, WSREP_KEY_EXCLUSIVE,true));
         trx->append_data("bar", 3, WSREP_DATA_ORDERED, true);
         assert (i > 0);
@@ -300,17 +315,24 @@ static void test_ist_common(int const version)
         trx->unref();
     }
 
+    mark_point();
+
     receiver_args rargs(receiver_addr, 1, 10, 1, sp, version);
     sender_args sargs(*gcache, rargs.listen_addr_, 1, 10, version);
 
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
 
     pthread_t sender_thread, receiver_thread;
+
     pthread_create(&sender_thread, 0, &sender_thd, &sargs);
+    mark_point();
+    usleep(100000);
     pthread_create(&receiver_thread, 0, &receiver_thd, &rargs);
+    mark_point();
 
     pthread_join(sender_thread, 0);
     pthread_join(receiver_thread, 0);
+
     mark_point();
 
     delete gcache;

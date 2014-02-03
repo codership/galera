@@ -119,6 +119,9 @@ dump()
 
 check()
 {
+    wait_sync $NODE_LIST || true
+
+
     cmd="check_cmd"
     ! action "$cmd" "$@" # ! - to ignore possible connection error
 
@@ -169,6 +172,7 @@ check()
 # Arguments: list of nodes
 wait_sync()
 {
+    local node
     for node in "$@"
     do
         mysql_query "$node" "set wsrep_causal_reads=1; select 0;" 1>/dev/null

@@ -35,7 +35,22 @@ static inline uint32_t crc32cFinish(uint32_t crc) {
 uint32_t crc32cSarwate   (uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy4(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
+
+#if defined(__x86_64) || defined(_M_AMD64) || defined(_M_X64)
+#define CRC32C_x86_64
+#endif
+
+#if defined(CRC32C_x86_64) || defined(__i386) || defined(_M_X86)
+#define CRC32C_x86
+#endif
+
+#if !defined(CRC32C_x86)
+#define CRC32C_NO_HARDWARE
+#endif
+
+#if !defined(CRC32C_NO_HARDWARE)
 uint32_t crc32cHardware32(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length);
+#endif /* !CRC32C_NO_HARDWARE */
 
 #endif /* __CRC32C_H__ */

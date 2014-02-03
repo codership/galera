@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "check_gcomm.hpp"
 #include "gcomm/protostack.hpp"
+#include "gcomm/conf.hpp"
 
 #include "gmcast.hpp"
 #include "gmcast_message.hpp"
@@ -29,6 +30,7 @@ START_TEST(test_gmcast_multicast)
 
     string uri1("gmcast://?gmcast.group=test&gmcast.mcast_addr=239.192.0.11");
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* gm1(Transport::create(*pnet, uri1));
 
@@ -42,7 +44,6 @@ END_TEST
 
 START_TEST(test_gmcast_w_user_messages)
 {
-
     class User : public Toplay
     {
         Transport* tp_;
@@ -152,8 +153,10 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "START";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
+    mark_point();
     auto_ptr<Protonet> pnet(Protonet::create(conf));
-
+    mark_point();
     User u1(*pnet, "127.0.0.1:0", "");
     pnet->insert(&u1.pstack());
 
@@ -252,9 +255,11 @@ START_TEST(test_gmcast_auto_addr)
 {
     log_info << "START";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
-    Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
+    Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567"
+              "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
 
     pnet->insert(&tp1->pstack());
     pnet->insert(&tp2->pstack());
@@ -285,8 +290,10 @@ START_TEST(test_gmcast_forget)
     gu_conf_self_tstamp_on();
     log_info << "START";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
-    Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
+    Transport* tp1 = Transport::create(*pnet, "gmcast://"
+                    "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
     pnet->insert(&tp1->pstack());
     tp1->connect();
 
@@ -294,12 +301,12 @@ START_TEST(test_gmcast_forget)
                                        std::string("gmcast://")
                                        + tp1->listen_addr().erase(
                                            0, strlen("tcp://"))
-                                       + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
+                  + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
     Transport* tp3 = Transport::create(*pnet,
                                        std::string("gmcast://")
                                        + tp1->listen_addr().erase(
                                            0, strlen("tcp://"))
-                                       + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
+                  + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
 
 
     pnet->insert(&tp2->pstack());
@@ -345,6 +352,7 @@ START_TEST(test_trac_380)
     gu_conf_self_tstamp_on();
     log_info << "START";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
     // caused either assertion or exception
@@ -368,23 +376,34 @@ START_TEST(test_trac_380)
     tp1->close();
     delete tp1;
     pnet->event_loop(0);
+}
+END_TEST
 
 
+START_TEST(test_trac_828)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (test_trac_828)";
+    gu::Config conf;
+    gcomm::Conf::register_params(conf);
+    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+
+    // If the bug is present, this will throw because of own address being
+    // in address list.
     try
     {
-        tp1 = gcomm::Transport::create(
-            *pnet,
-            "gmcast://127.0.0.1:4567?"
-            "gmcast.group=test&"
-            "gmcast.listen_addr=tcp://127.0.0.1:4567");
+        Transport* tp(gcomm::Transport::create(
+                          *pnet,
+                          "gmcast://127.0.0.1:4567?"
+                          "gmcast.group=test&"
+                          "gmcast.listen_addr=tcp://127.0.0.1:4567"));
+        delete tp;
     }
     catch (gu::Exception& e)
     {
-        fail_unless(e.get_errno() == EINVAL,
-                    "unexpected errno: %d, cause %s",
-                    e.get_errno(), e.what());
+        fail("test_trac_828, expcetion thrown because of having own address "
+             "in address list");
     }
-    pnet->event_loop(0);
 }
 END_TEST
 
@@ -404,7 +423,7 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_w_user_messages");
     tcase_add_test(tc, test_gmcast_w_user_messages);
-    tcase_set_timeout(tc, 20);
+    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     if (run_all_tests == true)
@@ -427,6 +446,11 @@ Suite* gmcast_suite()
         tcase_add_test(tc, test_trac_380);
         suite_add_tcase(s, tc);
     }
+
+
+    tc = tcase_create("test_trac_828");
+    tcase_add_test(tc, test_trac_828);
+    suite_add_tcase(s, tc);
 
     return s;
 

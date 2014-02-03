@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -29,6 +29,10 @@
 #include "gcs.h"
 #include "gcs_act.h"
 #include <gcache.h>
+
+/* 'static' method to register configuration variables */
+extern void
+gcs_core_register (gu_config_t* conf);
 
 struct gcs_core;
 typedef struct gcs_core gcs_core_t;

@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/util.hpp"
 #include "histogram.hpp"
 #include "gcomm/protonet.hpp"
 #include "gcomm/datagram.hpp"
+#include "gcomm/conf.hpp"
 
 #ifdef HAVE_ASIO_HPP
 #include "asio_protonet.hpp"
@@ -27,6 +28,7 @@ using std::string;
 using namespace gcomm;
 
 using namespace gu;
+
 
 START_TEST(test_histogram)
 {
@@ -151,6 +153,7 @@ END_TEST
 START_TEST(test_asio)
 {
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     AsioProtonet pn(conf);
     string uri_str("tcp://127.0.0.1:0");
 
@@ -187,6 +190,7 @@ END_TEST
 START_TEST(test_protonet)
 {
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     Protonet* pn(Protonet::create(conf));
     pn->event_loop(1);
 }

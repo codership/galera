@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"
@@ -19,12 +19,13 @@ namespace
     static std::string const CONF_KEEP_KEYS     ("ist.keep_keys");
     static bool        const CONF_KEEP_KEYS_DEFAULT (true);
 
-    static std::string const CONF_SSL_KEY       ("socket.ssl_key");
-    static std::string const CONF_SSL_CERT      ("socket.ssl_cert");
-    static std::string const CONF_SSL_CA        ("socket.ssl_ca");
-    static std::string const CONF_SSL_PSWD_FILE ("socket.ssl_password_file");
+    static std::string const CONF_SSL_KEY       (COMMON_CONF_SSL_KEY);
+    static std::string const CONF_SSL_CERT      (COMMON_CONF_SSL_CERT);
+    static std::string const CONF_SSL_CA        (COMMON_CONF_SSL_CA);
+    static std::string const CONF_SSL_PSWD_FILE (COMMON_CONF_SSL_PSWD_FILE);
 
-    std::string escape_addr(const asio::ip::address& addr)
+
+    static std::string escape_addr(const asio::ip::address& addr)
     {
         if (addr.is_v4())
         {
@@ -36,7 +37,8 @@ namespace
         }
     }
 
-    static inline std::string unescape_addr(const std::string& addr)
+
+    static std::string unescape_addr(const std::string& addr)
     {
         std::string ret(addr);
         size_t pos(ret.find('['));
@@ -58,28 +60,33 @@ namespace
     }
 
 
-
     class SSLPasswordCallback
     {
     public:
         SSLPasswordCallback(const gu::Config& conf) : conf_(conf) { }
+
         std::string get_password() const
         {
             std::string   file(conf_.get(CONF_SSL_PSWD_FILE));
             std::ifstream ifs(file.c_str(), std::ios_base::in);
+
             if (ifs.good() == false)
             {
                 gu_throw_error(errno) <<
                     "could not open password file '" << file
                                                      << "'";
             }
+
             std::string ret;
             std::getline(ifs, ret);
             return ret;
         }
+
     private:
+
         const gu::Config& conf_;
     };
+
 
     static void prepare_ssl_ctx(const gu::Config& conf, asio::ssl::context& ctx)
     {
@@ -146,6 +153,17 @@ namespace galera
 std::string const
 galera::ist::Receiver::RECV_ADDR("ist.recv_addr");
 
+void
+galera::ist::register_params(gu::Config& conf)
+{
+    conf.add(Receiver::RECV_ADDR);
+    conf.add(CONF_KEEP_KEYS);
+    conf.add(CONF_SSL_KEY);
+    conf.add(CONF_SSL_CERT);
+    conf.add(CONF_SSL_CA);
+    conf.add(CONF_SSL_PSWD_FILE);
+}
+
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandle::SlavePool& sp,
                                 const char*           addr)
@@ -174,8 +192,9 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
         recv_addr = conf_.get(RECV_ADDR);
         return;
     }
-    catch (gu::NotFound& e) {} /* if not, check the alternative.
+    catch (gu::NotSet& e) {} /* if not, check the alternative.
                                 TODO: try to find from system. */
+
     if (addr)
     {
         try
@@ -232,7 +251,7 @@ IST_determine_recv_addr (gu::Config& conf)
             std::string ssl_key = conf.get(CONF_SSL_KEY);
             if (ssl_key.length() != 0) ssl = true;
         }
-        catch (gu::NotFound&) {}
+        catch (gu::NotSet&) {}
 
         if (ssl)
             recv_addr.insert(0, "ssl://");

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -20,6 +20,12 @@
 
 #include <string.h> // for mempcpy
 #include <errno.h>
+
+void
+gcs_core_register (gu_config_t* conf)
+{
+    gcs_backend_register(conf);
+}
 
 const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = (1 << 16); // 65K - IP packet size
@@ -1055,12 +1061,12 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             break;
         case GCS_MSG_COMPONENT:
             ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
-            assert (ret >= 0); // hang on error in debug mode
-            assert (ret == recv_act->act.buf_len);
+            // assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
         case GCS_MSG_STATE_UUID:
             ret = core_handle_uuid_msg (conn, recv_msg);
-            assert (ret >= 0); // hang on error in debug mode
+            // assert (ret >= 0); // hang on error in debug mode
             ret = 0;           // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:

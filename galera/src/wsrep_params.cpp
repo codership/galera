@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "wsrep_params.hpp"
@@ -9,17 +9,19 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
 {
     if (!params) return;
 
-    gu::Config::param_map_t pm;
-    gu::Config::parse (pm, params);
+    std::vector<std::pair<std::string, std::string> > pv;
+    gu::Config::parse (pv, params);
 
-    for (gu::Config::param_map_t::const_iterator i = pm.begin();
-         i != pm.end(); ++i)
+    for (size_t i(0); i < pv.size(); ++i)
     {
+        const std::string& key(pv[i].first);
+        const std::string& value(pv[i].second);
+
         try
         {
-            if (i->first == "debug")
+            if (key == "debug")
             {
-                bool val(gu::from_string<bool>(i->second));
+                bool val(gu::from_string<bool>(value));
                 if (val == true)
                 {
                     log_info << "enabling debug logging";
@@ -34,20 +36,20 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
             else
             {
                 log_debug << "Setting param '"
-                          << i->first << "' = '" << i->second << "'";
-                repl.param_set(i->first, i->second);
+                          << key << "' = '" << value << '\'';
+                repl.param_set(key, value);
             }
 
         }
         catch (gu::NotFound&)
         {
-            log_warn << "Unknown parameter '" << i->first << "'";
-            gu_throw_error(EINVAL) << "Unknown parameter' " << i->first << "'";
+            log_warn << "Unknown parameter '" << key << "'";
+            gu_throw_error(EINVAL) << "Unknown parameter' " << key << "'";
         }
         catch (gu::Exception& e)
         {
-            log_warn << "Setting parameter '" << i->first << "' to '"
-                     << i->second << "' failed: " << e.what();
+            log_warn << "Setting parameter '" << key << "' to '"
+                     << value << "' failed: " << e.what();
             throw;
         }
     }

@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 
 /**
  * @file
@@ -14,6 +14,7 @@
 #include "gu_exception.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 #include <map>
 
 #include <climits>
@@ -33,11 +34,122 @@ public:
     static const char KEY_VALUE_SEP; // key-value separator
     static const char ESCAPE;        // escape symbol
 
-    typedef std::map <std::string, std::string> param_map_t;
+    Config ();
 
+    bool
+    has (const std::string& key) const
+    {
+        return (params_.find(key) != params_.end());
+    }
+
+    bool
+    is_set (const std::string& key) const
+    {
+        param_map_t::const_iterator const i(params_.find(key));
+
+        if (i != params_.end())
+        {
+            return i->second.is_set();
+        }
+        else
+        {
+            throw NotFound();
+        }
+    }
+
+    /* adds parameter to the known parameter list */
+    void
+    add (const std::string& key)
+    {
+        if (!has(key)) { params_[key] = Parameter(); }
+    }
+
+    /* adds parameter to the known parameter list and sets its value */
+    void
+    add (const std::string& key, const std::string& value)
+    {
+        if (!has(key)) { params_[key] = Parameter(value); }
+    }
+
+    /* sets a known parameter to some value, otherwise throws NotFound */
+    void
+    set (const std::string& key, const std::string& value)
+    {
+        param_map_t::iterator const i(params_.find(key));
+
+        if (i != params_.end())
+        {
+            i->second.set(value);
+        }
+        else
+        {
+#ifndef NDEBUG
+            log_error << key << " not recognized.";
+#endif
+            throw NotFound();
+        }
+    }
+
+    void
+    set (const std::string& key, const char* value)
+    {
+        set(key, std::string(value));
+    }
+
+    /* Parse a string of semicolumn separated key=value pairs into a vector.
+     * Throws Exception in case of parsing error. */
     static void
-    parse (param_map_t& list, const std::string& params);
+    parse (std::vector<std::pair<std::string, std::string> >& params_vector,
+           const std::string& params_string);
 
+    /* Parse a string of semicolumn separated key=value pairs and
+     * set the values.
+     * Throws NotFound if key was not explicitly added before. */
+    void
+    parse (const std::string& params_string);
+
+    /* General template for integer types */
+    template <typename T> void
+    set (const std::string& key, T val)
+    {
+        set_longlong (key, val);
+    }
+
+    /*! @throws NotSet, NotFound */
+    const std::string&
+    get (const std::string& key) const
+    {
+        param_map_t::const_iterator const i(params_.find(key));
+        if (i == params_.end()) throw NotFound();
+        if (i->second.is_set()) return i->second.value();
+#ifndef NDEBUG
+        log_error << key << " not set.";
+#endif
+        throw NotSet();
+    }
+
+    const std::string&
+    get (const std::string& key, const std::string& def) const
+    {
+        try             { return get(key); }
+        catch (NotSet&) { return def     ; }
+    }
+
+    /*! @throws NotFound */
+    template <typename T> inline T
+    get (const std::string& key) const
+    {
+        return from_config <T> (get(key));
+    }
+
+    template <typename T> inline T
+    get(const std::string& key, const T& def) const
+    {
+        try { return get<T>(key); }
+        catch (NotSet&) { return def; }
+    }
+
+    void print (std::ostream& os, bool include_not_set = false) const;
     /*! Convert string configuration values to other types.
      *  General template for integers, specialized templates follow below. */
     template <typename T> static inline T
@@ -54,71 +166,41 @@ public:
         case 1: return overflow_char  (ret);
         case 2: return overflow_short (ret);
         case 4: return overflow_int   (ret);
-        case 8: ; // can't detect an overflow
         }
 
         return ret;
     }
 
-    Config ();
-    Config (const std::string& params);
+    /* iterator stuff */
 
-    bool
-    has (const std::string& key) const
+    class Parameter
     {
-        return (params_.find(key) != params_.end());
-    }
+    public:
 
-    void
-    set (const std::string& key, const std::string& value)
-    {
-        params_[key] = value;
-    }
+        explicit
+        Parameter(const std::string& value) : value_(value), set_(true)  {}
+        Parameter()                         : value_(),      set_(false) {}
 
-    void
-    set (const std::string& key, const char* value)
-    {
-        params_[key] = value;
-    }
+        const std::string& value()  const { return value_; }
+        bool               is_set() const { return set_  ; }
 
-    /* General template for integer types */
-    template <typename T> void
-    set (const std::string& key, T val)
-    {
-        set_longlong (key, val);
-    }
+        void set(const std::string& value)
+        {
+            value_ = value;
+            set_   = true;
+        }
 
-    /*! @throws NotFound */
-    const std::string&
-    get (const std::string& key) const
-    {
-        param_map_t::const_iterator i = params_.find(key);
-        if (i == params_.end()) throw NotFound();
-        return i->second;
-    }
+    private:
 
-    const std::string&
-    get (const std::string& key, const std::string& def) const
-    {
-        try               { return get(key); }
-        catch (NotFound&) { return def     ; }
-    }
+        std::string value_;
+        bool        set_;
+    };
 
-    /*! @throws NotFound */
-    template <typename T> inline T
-    get (const std::string& key) const
-    {
-        return from_config <T> (get(key));
-    }
+    typedef std::map <std::string, Parameter> param_map_t;
+    typedef param_map_t::const_iterator const_iterator;
 
-    template <typename T> inline T
-    get(const std::string& key, const T& def) const
-    {
-        try { return get<T>(key); }
-        catch (NotFound&) { return def; }
-    }
-
-    const param_map_t& params () const { return params_; }
+    const_iterator begin() const { return params_.begin(); }
+    const_iterator end()   const { return params_.end();   }
 
 private:
 
@@ -147,6 +229,7 @@ extern "C" const char* gu_str2ptr  (const char* str, void**  ptr);
 namespace gu
 {
     std::ostream& operator<<(std::ostream&, const gu::Config&);
+
     /*! Specialized templates for "funny" types */
 
     template <> inline double

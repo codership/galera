@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include <cerrno>
@@ -41,13 +41,13 @@ namespace gcache
         mtx       (),
         cond      (),
         seqno2ptr (),
-        mem       (params.mem_size, seqno2ptr),
-        rb        (params.rb_name, params.rb_size, seqno2ptr),
-        ps        (params.dir_name,
-                   params.keep_pages_size,
-                   params.page_size,
+        mem       (params.mem_size(), seqno2ptr),
+        rb        (params.rb_name(), params.rb_size(), seqno2ptr),
+        ps        (params.dir_name(),
+                   params.keep_pages_size(),
+                   params.page_size(),
                    /* keep last page if PS is the only storage */
-                   !((params.mem_size + params.rb_size) > 0)),
+                   !((params.mem_size() + params.rb_size()) > 0)),
         mallocs   (0),
         reallocs  (0),
         frees     (0),

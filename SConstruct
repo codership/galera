@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -84,22 +84,27 @@ arch = ARGUMENTS.get('arch', machine)
 print 'Target: ' + sysname + ' ' + arch
 
 if arch == 'i386' or arch == 'i686':
-    #compile_arch = ' -m32 -march=i686 -msse4'
-    compile_arch = ' -m32 -march=i686 '
-    link_arth    = compile_arch
-    if sysname != 'darwin' and sysname != 'freebsd':
-        link_arch    = compile_arch + ' -Wl,-melf_i386'
-elif arch == 'x86_64' or arch == 'amd64':
-    #compile_arch = ' -m64 -msse4'
-    compile_arch = ' -m64 '
-    link_arth    = compile_arch
-    if sysname != 'darwin' and sysname != 'freebsd':
-        link_arch    = compile_arch + ' -Wl,-melf_x86_64'
+    x86 = 32
+elif arch == 'x86_64' or arch == 'amd64' or arch == 'i86pc':
+    x86 = 64
+else:
+    x86 = 0
+
+if x86 == 32:
+    compile_arch = ' -m32 -march=i686'
+    link_arch    = compile_arch
+    if sysname == 'linux':
+        link_arch = link_arch + ' -Wl,-melf_i386'
+elif x86 == 64 and sysname != 'sunos':
+    compile_arch = ' -m64'
+    link_arch    = compile_arch
+    if sysname == 'linux':
+        link_arch = link_arch + ' -Wl,-melf_x86_64'
 elif arch == 'ppc64':
     compile_arch = ' -mtune=native'
     link_arch    = ''
 elif sysname == 'sunos':
-    compile_arch = ''
+    compile_arch = ' -mtune=native'
     link_arch    = ''
 else:
     compile_arch = ''
@@ -398,7 +403,7 @@ if strict_build_flags == 1:
 #        conf.env.Append(CPPFLAGS = ' -Qunused-arguments -Wno-tautological-compare -D_Bool=bool')
 
 env = conf.Finish()
-Export('arch', 'env', 'sysname', 'libboost_program_options')
+Export('arch', 'x86', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

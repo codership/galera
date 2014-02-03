@@ -127,7 +127,7 @@ echo "applier check: $threads"
 echo "Creating database..."
 createdb
 
-for i in {1..20}; do
+for i in {1..200}; do
     echo
     echo "### round $i ###"
 

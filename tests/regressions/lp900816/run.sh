@@ -1,9 +1,25 @@
-#!/bin/sh -uex
+#!/bin/bash -ue
 
-PORT=3306
-HOST=127.0.0.1
-USER=root
-PSWD=rootpass
+declare -r DIST_BASE=$(cd $(dirname $0)/../..; pwd -P)
+TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
+
+. $TEST_BASE/conf/main.conf
+declare -r SCRIPTS="$DIST_BASE/scripts"
+. $SCRIPTS/jobs.sh
+. $SCRIPTS/action.sh
+. $SCRIPTS/kill.sh
+. $SCRIPTS/misc.sh
+
+echo "##################################################################"
+echo "##             regression test for lp:900816"
+echo "##################################################################"
+echo "restarting cluster"
+$SCRIPTS/command.sh restart
+
+PORT=${NODE_INCOMING_PORT[0]}
+HOST=${NODE_INCOMING_HOST[0]}
+USER=$DBMS_TEST_USER
+PSWD=$DBMS_TEST_PSWD
 DB=test
 TABLE=nopk
 TRIES=1000
@@ -30,3 +46,6 @@ do
 done
 
 echo "$i tries passed"
+
+$SCRIPTS/command.sh check
+$SCRIPTS/command.sh stop

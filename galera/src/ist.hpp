@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
 //
 
 
@@ -33,6 +33,8 @@ namespace galera
 
     namespace ist
     {
+        void register_params(gu::Config& conf);
+
         class Receiver
         {
         public:

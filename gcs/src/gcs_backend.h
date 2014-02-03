@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -25,6 +25,10 @@ typedef struct gcs_backend      gcs_backend_t;
  * The macros below are declarations of backend functions
  * (kind of function signatures)
  */
+
+/*! Registers configuration parameters with config */
+#define GCS_BACKEND_REGISTER_FN(fn)       \
+void fn (gu_config_t* cnf)
 
 /*! Allocates backend context and sets up the backend structure */
 #define GCS_BACKEND_CREATE_FN(fn)         \
@@ -170,6 +174,12 @@ struct gcs_backend
     gcs_backend_param_set_t param_set;
     gcs_backend_param_get_t param_get;
 };
+
+/*!
+ * Registers backends' parameters with config.
+ */
+void
+gcs_backend_register(gu_config_t* conf);
 
 /*!
  * Initializes preallocated backend object and opens backend connection
