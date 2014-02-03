@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #if defined(GALERA_MULTIMASTER)
@@ -38,6 +38,10 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     catch (std::exception& e)
     {
         log_error << e.what();
+    }
+    catch (gu::NotFound& e)
+    {
+        /* Unrecognized parameter (logged by gu::Config::set()) */
     }
 #ifdef NDEBUG
     catch (...)
@@ -82,11 +86,12 @@ void galera_tear_down(wsrep_t* gh)
 extern "C"
 wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
 {
-    assert(gh != 0);
+    assert(gh != 0); // cppcheck-suppress nullPointer
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
+    // cppcheck-suppress nullPointer
     if (gh)
     {
         try
@@ -197,7 +202,8 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 #ifdef NDEBUG
     try
     {
-#endif // NDEBUG
+#endif /* NDEBUG */
+
         return repl->async_recv(recv_ctx);
 
 #ifdef NDEBUG
@@ -390,9 +396,9 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
         assert((!(retval == WSREP_OK || retval == WSREP_BF_ABORT) ||
                 trx->global_seqno() > 0));
 
+        *global_seqno = trx->global_seqno();
         if (retval == WSREP_OK)
         {
-            *global_seqno = trx->global_seqno();
             retval = repl->pre_commit(trx);
         }
 

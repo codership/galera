@@ -1,12 +1,12 @@
-/* Copyright (C) 2012 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2012-2014 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
 #include "gcs.hpp"
 #include "galera_common.hpp"
 
-#include <gu_uri.hpp>
+#include "gu_uri.hpp"
 
-static const std::string common_prefix = "replicator.";
+static const std::string common_prefix = "repl.";
 
 const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
@@ -19,23 +19,27 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::commit_order, "3"));
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
-    map_.insert(Default(CERTIFICATION_PARAM_LOG_CONFLICTS_STR,
-                        CERTIFICATION_DEFAULTS_LOG_CONFLICTS_STR));
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 
-galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
-                                                const Defaults& def,
-                                                const char* const node_address)
+
+galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
+                                              const char* const node_address)
 {
     std::map<std::string, std::string>::const_iterator i;
 
-    for (i = def.map_.begin(); i != def.map_.end(); ++i)
+    for (i = defaults.map_.begin(); i != defaults.map_.end(); ++i)
     {
-        if (!conf.has(i->first)) conf.set(i->first, i->second);
+        if (i->second.empty())
+            conf.add(i->first);
+        else
+            conf.add(i->first, i->second);
     }
+
+    conf.add(COMMON_BASE_HOST_KEY);
+    conf.add(COMMON_BASE_PORT_KEY);
 
     if (node_address && strlen(node_address) > 0)
     {
@@ -53,15 +57,29 @@ galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
 
             conf.set(BASE_HOST_KEY, host);
         }
-        catch (gu::NotSet&) {}
+        catch (gu::NotSet& e) {}
 
         try
         {
             conf.set(BASE_PORT_KEY, na.get_port());
         }
-        catch (gu::NotSet&) {}
+        catch (gu::NotSet& e) {}
     }
+
+    /* register variables and defaults from other modules */
+    gcache::GCache::register_params(conf);
+    gcs_register_params(reinterpret_cast<gu_config_t*>(&conf));
+    Certification::register_params(conf);
+    ist::register_params(conf);
 }
+
+
+galera::ReplicatorSMM::ParseOptions::ParseOptions(gu::Config&       conf,
+                                                  const char* const opts)
+{
+    conf.parse(opts);
+}
+
 
 void
 galera::ReplicatorSMM::set_param (const std::string& key,
@@ -76,10 +94,6 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     else if (key == Param::causal_read_timeout)
     {
         causal_read_timeout_ = gu::datetime::Period(value);
-    }
-    else if (key == Certification::Param::log_conflicts)
-    {
-        cert_.set_log_conflicts(value);
     }
     else if (key == Param::base_host ||
              key == Param::base_port)
@@ -117,7 +131,12 @@ galera::ReplicatorSMM::param_set (const std::string& key,
         config_.set (key, value);
     }
 
-    if (0 != key.find(common_prefix)) // this key might be for another module
+    if (key == Certification::PARAM_LOG_CONFLICTS)
+    {
+        cert_.set_log_conflicts(value);
+    }
+    // this key might be for another module
+    else if (0 != key.find(common_prefix))
     {
         try
         {

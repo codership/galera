@@ -21,14 +21,6 @@ namespace galera
         {
             Process() : obj_(0), cond_(), wait_cond_(), state_(S_IDLE) { }
 
-            Process(const Process& other)
-                :
-                obj_  (other.obj_),
-                cond_ (other.cond_),
-                wait_cond_(other.wait_cond_),
-                state_(other.state_)
-            { }
-
             const C* obj_;
             gu::Cond cond_;
             gu::Cond wait_cond_;
@@ -43,6 +35,8 @@ namespace galera
 
         private:
 
+            // non-copyable
+            Process(const Process& other);
             void operator=(const Process&);
         };
 
@@ -58,16 +52,16 @@ namespace galera
             last_entered_(-1),
             last_left_(-1),
             drain_seqno_(LLONG_MAX),
-            process_(process_size_),
+            process_(new Process[process_size_]),
             entered_(0),
             oooe_(0),
             oool_(0),
-            win_size_(0),
-            locked_(false)
+            win_size_(0)
         { }
 
         ~Monitor()
         {
+            delete[] process_;
             if (entered_ > 0)
             {
                 log_info << "mon: entered " << entered_
@@ -151,7 +145,7 @@ namespace galera
         {
 #ifndef NDEBUG
             size_t   idx(indexof(obj.seqno()));
-#endif // NDEBUG
+#endif /* NDEBUG */
             gu::Lock lock(mutex_);
 
             assert(process_[idx].state_ == Process::S_APPLYING ||
@@ -258,50 +252,6 @@ namespace galera
 
             drain_seqno_ = LLONG_MAX;
             cond_.broadcast();
-        }
-
-        void lock()
-        {
-            gu::Lock lock(mutex_);
-
-            if (locked_)
-            {
-                const char* msg = "Attempt to lock an already locked monitor.";
-                log_error << msg;
-                gu_throw_error(EDEADLK) << msg;
-            }
-
-            if (last_entered_ != -1)
-            {
-                while (drain_seqno_ != LLONG_MAX) lock.wait(cond_);
-                /*! @note: last_entered_ probably changed since last check */
-                drain_common(last_entered_, lock);
-                /* would_block() should return true when drain_seqno_ is set
-                 * so the monitor should be totally empty at this point. */
-            }
-
-            locked_ = true;
-
-            log_debug << "Locked local monitor at " << (last_left_ + 1);
-        }
-
-        void unlock()
-        {
-            gu::Lock lock(mutex_);
-
-            if (!locked_)
-            {
-                log_warn << "Attempt to unlock an already unlocked monitor.";
-                return;
-            }
-
-            locked_ = false;
-            update_last_left();
-
-            drain_seqno_ = LLONG_MAX;
-            cond_.broadcast();
-
-            log_debug << "Unlocked local monitor at " << last_left_;
         }
 
         void wait(wsrep_seqno_t seqno)
@@ -478,12 +428,11 @@ namespace galera
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         wsrep_seqno_t drain_seqno_;
-        std::vector<Process> process_;
+        Process*      process_;
         long entered_;  // entered
         long oooe_;     // out of order entered
         long oool_;     // out of order left
         long win_size_; // window between last_left_ and last_entered_
-        bool locked_;
     };
 }
 

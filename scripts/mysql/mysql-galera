@@ -63,11 +63,14 @@ MYSQLD_USER=$(whoami)
 ##
 # use mysqld server directly, better not have automatic restarting
 MYSQLD="$MYSQL_BASE_DIR/sbin/mysqld"
+[ ! -x "$MYSQLD" -a -x "${MYSQLD}-debug" ] && MYSQLD=${MYSQLD}-debug
 MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
 # Port, socket and pid files
 MYSQL_PORT=${MYSQL_PORT:-3306}
 MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
 MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
+# Startup wait timeout.
+MYSQL_STARTUP_WAIT=${MYSQL_STARTUP_WAIT:-1}
 # Shutdown wait timeout.
 MYSQL_SHUTDOWN_WAIT=60
 #============= Nothing servicable below ================================
@@ -90,8 +93,8 @@ INNODB_OPTS=" --default-storage-engine=InnoDB "
 SKIP_RECOVERY=0
 START_POSITION=""
 
-err_log="$MYSQL_DATA_DIR/$(hostname).err"
-mysql_log="$MYSQL_DATA_DIR/$(hostname).log"
+err_log="$MYSQL_DATA_DIR/mysqld.err"
+mysql_log="$MYSQL_DATA_DIR/mysqld.log"
 
 
 usage() { cat - << EOF
@@ -200,10 +203,12 @@ wsrep_start_position_opt=""
 # Position will be stored in wsrep_start_position_opt global.
 wsrep_recovery() {
   cmd="$@"
-  wr_logfile=$(mktemp)
+  wr_logfile=$(mktemp -t wsrep.XXXXXXXXXX)
   echo "WSREP: Running position recovery"
   set +e
+  [ "$OS" == "Darwin" ] && export LD_LIBRARY_PATH
   $cmd --log_error=$wr_logfile --wsrep-recover
+  [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
   rp=$(grep "WSREP: Recovered position:" $wr_logfile)
   if [ -z "$rp" ]; then
     skipped=$(grep WSREP $wr_logfile | grep "skipping position recovery")
@@ -251,7 +256,6 @@ galera_start()
     fi
 
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
-
     if test -f $WSREP || test $WSREP == "none"
     then
         WSREP_OPTS="--wsrep_provider=$WSREP"
@@ -312,6 +316,7 @@ galera_start()
         fi
     fi
 
+    [ "$OS" == "Darwin" ] && export LD_LIBRARY_PATH
     if test -z $GDB
     then
         nohup $VALGRIND $MYSQLD \
@@ -325,7 +330,6 @@ galera_start()
             --socket=$MYSQL_SOCKET \
             --skip-external-locking \
             --log_error=$err_log \
-            $MYSQLD_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \
@@ -333,6 +337,7 @@ galera_start()
             $RBR_OPTS \
             $PLUGIN_OPTS \
             $wsrep_start_position_opt \
+            $MYSQLD_OPTS \
             1>/dev/null 2>>$err_log &
     else
         $GDB --args $MYSQLD \
@@ -340,29 +345,37 @@ galera_start()
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
+            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
             --skip-external-locking \
             --log_error=$err_log \
-            $MYSQLD_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \
             $LOGGING_OPTS \
             $RBR_OPTS \
             $PLUGIN_OPTS \
-            $wsrep_start_position_opt
+            $wsrep_start_position_opt \
+            $MYSQLD_OPTS
     fi
     my_pid=$!
+    [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
 #    echo "Waiting for pid file"
+    second=0
     while ! test -r $MYSQL_PID
     do
         sleep 1
+        second=$(($second + 1))
         if find_pid $my_pid
         then
             # process is alive, wait for pid file
+            echo -n "."
+        elif test $second -lt $MYSQL_STARTUP_WAIT
+        then
+            # process is not yet alive, wait for it to start
             echo -n "."
         else
             failed="yes"
@@ -480,7 +493,11 @@ checksum()
 wait_for_last_committed
 
 set -o pipefail
-CS=$(dump | md5sum) || return $?
+if [ "$OS" == "Darwin" -o "$OS" == "FreeBSD" ]; then
+    CS=$(dump | md5)"  -" || return $?
+else
+    CS=$(dump | md5sum) || return $?
+fi
 
 echo $CS
 }
@@ -492,7 +509,9 @@ VALGRIND=${VALGRIND:-""}
 WS_LEVEL=""
 
 #DB="test" # use 'test' database if none given
-IGNORE_TABLES=""
+# in 5.6 the following tables are non-deterministic
+IGNORE_TABLES=\
+"--ignore-table=mysql.innodb_table_stats --ignore-table=mysql.innodb_index_stats"
 
 # to use innodb plugin or not
 PLUGIN_OPTS=""
@@ -516,7 +535,9 @@ case $1 in
 #            MYSQL_LOG="log"
             ;;
     --valgrind)
-            VALGRIND="valgrind --log-file=$MYSQL_DATA_DIR/vg.log --leak-check=full"
+            VALGRIND="valgrind --log-file=$MYSQL_DATA_DIR/vg.log --leak-check=full --track-origins=yes"
+            # to force deallocation in std::string and STL containers
+            export GLIBCXX_FORCE_NEW=1
             ;;
     --gdb)
             GDB="gdb"
@@ -620,7 +641,10 @@ then
     exit 1
 fi
 
-export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql
+OS=$(uname)
+export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql:$LD_LIBRARY_PATH
+[ "$OS" == "FreeBSD" ] && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/gcc48
+[ "$OS" == "Darwin"  ] && export -n LD_LIBRARY_PATH
 export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
 $COMMAND

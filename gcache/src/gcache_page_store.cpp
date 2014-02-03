@@ -97,7 +97,7 @@ gcache::PageStore::delete_page ()
                               file_name);
     if (0 != err)
     {
-        delete_thr_ = -1;
+        delete_thr_ = pthread_t(-1);
         gu_throw_error(err) << "Failed to create page file deletion thread";
     }
 
@@ -148,7 +148,7 @@ gcache::PageStore::PageStore (const std::string& dir_name,
     total_size_(0),
     delete_page_attr_()
 #ifndef GCACHE_DETACH_THREAD
-    , delete_thr_(-1)
+    , delete_thr_(pthread_t(-1))
 #endif /* GCACHE_DETACH_THREAD */
 {
     int err = pthread_attr_init (&delete_page_attr_);

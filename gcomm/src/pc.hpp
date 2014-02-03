@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/transport.hpp"
@@ -7,10 +7,12 @@
 namespace gcomm
 {
     class GMCast;
+
     namespace evs
     {
         class Proto;
-    } // namespace gcomm
+    }
+
     namespace pc
     {
         class Proto;

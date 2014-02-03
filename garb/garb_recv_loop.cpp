@@ -1,4 +1,4 @@
-/* Copyright (C) 2011 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2014 Codership Oy <info@codership.com> */
 
 #include "garb_recv_loop.hpp"
 
@@ -21,7 +21,9 @@ signal_handler (int signum)
 RecvLoop::RecvLoop (const Config& config)
     :
     config_(config),
-    gconf_ (config_.options()),
+    gconf_ (),
+    params_(gconf_),
+    parse_ (gconf_, config_.options()),
     gcs_   (gconf_, config_.address(), config_.group())
 {
     /* set up signal handlers */

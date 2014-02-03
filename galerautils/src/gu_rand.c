@@ -21,7 +21,7 @@ struct gu_rse
     long long   time;
     const void* heap_ptr;
     const void* stack_ptr;
-    pid_t       pid;
+    long        pid;
 };
 
 typedef struct gu_rse gu_rse_t;

@@ -1,0 +1,8 @@
+MySQL is a very fast, multi-threaded, multi-user and robust SQL
+(Structured Query Language) database server.
+
+WWW: http://www.mysql.com/
+
+Built with wsrep patch %{RELEASE}.
+
+WWW: http://www.codership.com/

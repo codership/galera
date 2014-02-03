@@ -792,34 +792,10 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
 }
 
-static long
-group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name,
-                         gcs_node_state_t status)
-{
-    long idx;
-
-    for (idx = 0; idx < group->num; idx++) {
-        gcs_node_t* node = &group->nodes[idx];
-        if (!strcmp(node->name, name)) {
-            if (joiner_idx == idx) {
-                return -EHOSTDOWN;
-            }
-            else if (node->status >= status) {
-                return idx;
-            }
-            else {
-                return -EAGAIN;
-            }
-        }
-    }
-
-    return -EHOSTUNREACH;
-}
-
-static long
+static int
 group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
 {
-    long idx;
+    int idx;
 
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
@@ -831,6 +807,85 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
     return -EAGAIN;
 }
 
+static int
+group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
+                         const char* const name, int const name_len,
+                         gcs_node_state_t const status)
+{
+    int idx;
+
+    for (idx = 0; idx < group->num; idx++) {
+        gcs_node_t* node = &group->nodes[idx];
+        if (!strncmp(node->name, name, name_len)) {
+            if (joiner_idx == idx) {
+                return -EHOSTDOWN;
+            }
+            else if (node->status >= status) {
+                return idx;
+            }
+            else if (node->status >= GCS_NODE_STATE_JOINER) {
+                /* will eventually become SYNCED */
+                return -EAGAIN;
+            }
+            else {
+                /* technically we could return -EDEADLK here, but as long as
+                 * it is not -EAGAIN, it does not matter. If the node is in a
+                 * PRIMARY state, it is as good as not found. */
+                break;
+            }
+        }
+    }
+
+    return -EHOSTUNREACH;
+}
+
+/* Calls group_find_node_by_name() for each name in comma-separated list,
+ * falls back to group_find_node_by_state() if name (or list) is empty. */
+static int
+group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
+                                const char* const str, int const str_len,
+                                gcs_node_state_t const status)
+{
+    assert (str != NULL);
+
+    const char* begin = str;
+    const char* end;
+    int err = -EHOSTDOWN; /* worst error */
+
+    do {
+        end = strchr(begin, ',');
+
+        int len;
+
+        if (NULL == end) {
+            len = str_len - (begin - str);
+        }
+        else {
+            len = end - begin;
+        }
+
+        assert (len >= 0);
+
+        int const idx = len > 0 ? /* consider empty name as "any" */
+            group_find_node_by_name (group, joiner_idx, begin, len, status) :
+            /* err == -EAGAIN here means that at least one of the nodes in the
+             * list will be available later, so don't try others. */
+            (err == -EAGAIN ?
+             err : group_find_node_by_state(group, status));
+
+        if (idx >= 0) return idx;
+
+        /* once we hit -EAGAIN, don't try to change error code: this means
+         * that at least one of the nodes in the list will become available. */
+        if (-EAGAIN != err) err = idx;
+
+        begin = end + 1; /* skip comma */
+
+    } while (end != NULL);
+
+    return err;
+}
+
 /*!
  * Selects and returns the index of state transfer donor, if available.
  * Updates donor and joiner status if state transfer is possible
@@ -840,31 +895,29 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
  *         -EHOSTUNREACH if reqiested donor is not available
  *         -EAGAIN       if there were no nodes in the proper state.
  */
-static long
+static int
 group_select_donor (gcs_group_t* group, long const joiner_idx,
-                    const char* const donor_name, bool const desync)
+                    const char* const donor_string, bool const desync)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
 
-    long donor_idx;
-    bool required_donor = (strlen(donor_name) > 0);
+    int  donor_idx;
+    int  const donor_len = strlen(donor_string);
+    bool const required_donor = (donor_len > 0);
 
-    if (required_donor) {
-        if (desync) { // sender wants to become "donor" itself
-            gcs_node_state_t const st = group->nodes[joiner_idx].status;
-            if (st >= min_donor_state)
-                donor_idx = joiner_idx;
-            else
-                donor_idx = -EAGAIN;
-        }
-        else {
-            donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
-                                                 min_donor_state);
-        }
+    if (desync) { /* sender wants to become "donor" itself */
+        assert(donor_len > 0);
+        gcs_node_state_t const st = group->nodes[joiner_idx].status;
+        if (st >= min_donor_state)
+            donor_idx = joiner_idx;
+        else
+            donor_idx = -EAGAIN;
     }
     else {
-        assert (!desync);
-        donor_idx = group_find_node_by_state (group, min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, joiner_idx,
+                                                    donor_string, donor_len,
+                                                    min_donor_state);
     }
 
     if (donor_idx >= 0) {
@@ -874,13 +927,13 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
         assert(donor_idx != joiner_idx || desync);
 
         if (desync) {
-            gu_info ("Node %ld (%s) desyncs itself from group",
+            gu_info ("Node %d (%s) desyncs itself from group",
                      donor_idx, donor->name);
         }
         else {
-            gu_info ("Node %ld (%s) requested state transfer from '%s'. "
-                     "Selected %ld (%s)(%s) as donor.", joiner_idx,joiner->name,
-                     required_donor ? donor_name :"*any*",donor_idx,donor->name,
+            gu_info ("Node %d (%s) requested state transfer from '%s'. "
+                     "Selected %d (%s)(%s) as donor.", joiner_idx,joiner->name,
+                     required_donor ?donor_string:"*any*",donor_idx,donor->name,
                      gcs_node_state_to_str(donor->status));
         }
 
@@ -892,7 +945,7 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
     }
     else {
 #if 0
-        gu_warn ("Node %ld (%s) requested state transfer from '%s', "
+        gu_warn ("Node %d (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
                  joiner_idx, group->nodes[joiner_idx].name,
                  required_donor ? donor_name : "*any*", strerror (-donor_idx));
@@ -1102,4 +1155,5 @@ gcs_group_get_state (gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
+
 

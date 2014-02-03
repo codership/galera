@@ -4,12 +4,13 @@
 
 get_cores()
 {
-    OS=$(uname)
     case $OS in
         "Linux")
             echo "$(grep -c ^processor /proc/cpuinfo)" ;;
         "SunOS")
             echo "$(psrinfo | wc -l)" ;;
+        "Darwin" | "FreeBSD")
+            echo "$(sysctl -n hw.ncpu)" ;;
         *)
             echo "CPU information not available: unsupported OS: '$OS'" >/dev/stderr
             echo 1
@@ -43,6 +44,7 @@ Options:
 EOF
 }
 
+OS=$(uname)
 # disable building vsbes by default
 DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
 DISABLE_GCOMM=${DISABLE_GCOMM:-"no"}
@@ -51,7 +53,7 @@ SKIP_BUILD=${SKIP_BUILD:-"no"}
 RELEASE=${RELEASE:-""}
 SOURCE=${SOURCE:-"no"}
 DEBUG=${DEBUG:-"no"}
-DEBUG_LEVEL=${DEBUG_LEVEL:-"1"}
+DEBUG_LEVEL=${DEBUG_LEVEL:-"0"}
 SCONS=${SCONS:-"yes"}
 SCONS_OPTS=${SCONS_OPTS:-""}
 JOBS=${JOBS:-"$(get_cores)"}
@@ -59,17 +61,44 @@ SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
 NO_STRIP=${NO_STRIP:-"no"}
 WITH_SPREAD="no"
+if [ "$OS" == "FreeBSD" ]; then
+  chown=/usr/sbin/chown
+  true=/usr/bin/true
+  epm=/usr/local/bin/epm
+else
+  chown=/bin/chown
+  true=/bin/true
+  epm=/usr/bin/epm
+fi
+EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
+if [ "$OS" == "Darwin" ]; then
+  if which -s port && test -x /opt/local/bin/port; then
+    EXTRA_SYSROOT=/opt/local
+  elif which -s brew && test -x /usr/local/bin/brew; then
+    EXTRA_SYSROOT=/usr/local
+  elif which -s fink && test -x /sw/bin/fink; then
+    EXTRA_SYSROOT=/sw
+  fi
+elif [ "$OS" == "FreeBSD" ]; then
+  EXTRA_SYSROOT=/usr/local
+fi
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
-if ccache -V > /dev/null 2>&1
-then
+if [ "$OS" == "FreeBSD" ]; then
+    CC=${CC:-"gcc48"}
+    CXX=${CXX:-"g++48"}
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-"/usr/local/lib/$(basename $CC)"}
+else
     CC=${CC:-"gcc"}
     CXX=${CXX:-"g++"}
+fi
+if ccache -V > /dev/null 2>&1
+then
     echo "$CC"  | grep "ccache" > /dev/null || CC="ccache $CC"
     echo "$CXX" | grep "ccache" > /dev/null || CXX="ccache $CXX"
-    export CC CXX
 fi
+export CC CXX LD_LIBRARY_PATH
 
 CFLAGS=${CFLAGS:-"-O2"}
 CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
@@ -83,88 +112,88 @@ TARGET=${TARGET:-""} # default target
 while test $# -gt 0 
 do
     case $1 in 
-	--stage)
-	    initial_stage=$2
-	    shift
-	    ;;
-	--last-stage)
-	    last_stage=$2
-	    shift
-	    ;;
-	--gainroot)
-	    gainroot=$2
-	    shift
-	    ;;
-	-b|--bootstrap)
-	    BOOTSTRAP="yes" # Bootstrap the build system
-	    ;;
-	-c|--configure)
-	    CONFIGURE="yes" # Reconfigure the build system
-	    ;;
-	-s|--scratch)
-	    SCRATCH="yes"   # Build from scratch (run make clean)
-	    ;;
-	-o|--opt)
-	    OPT="yes"       # Compile without debug
-	    ;;
-	-d|--debug)
-	    DEBUG="yes"     # Compile with debug
-	    NO_STRIP="yes"
-	    ;;
-	-r|--release)
-	    RELEASE="$2"
-	    shift
-	    ;;
-	-m32)
-	    CFLAGS="$CFLAGS -m32"
-	    CXXFLAGS="$CXXFLAGS -m32"
-	    SCRATCH="yes"
-	    TARGET="i686"
-	    ;;
-	-m64)
-	    CFLAGS="$CFLAGS -m64"
-	    CXXFLAGS="$CXXFLAGS -m64"
-	    SCRATCH="yes"
-	    TARGET="x86_64"
-	    ;;
-	-p|--package)
-	    PACKAGE="yes"   # build binary packages
-	    ;;
-	--with*-spread)
-	    WITH_SPREAD="$1"
-	    ;;
-	--help)
-	    usage
-	    exit 0
-	    ;;
-	--source)
-	    SOURCE="yes"
-	    ;;
-	--sb)
-	    SKIP_BUILD="yes"
-	    ;;
-	--scons)
-	    SCONS="yes"
-	    ;;
-	--so)
-	    SCONS_OPTS="$SCONS_OPTS $2"
-	    shift
-	    ;;
-	-j|--jobs)
-	    JOBS=$2
-	    shift
-	    ;;
-	--dl)
-	    DEBUG_LEVEL=$2
-	    shift
-	    ;;
-	*)
-	    if test ! -z "$1"; then
-	       echo "Unrecognized option: $1"
-	    fi
-	    usage
-	    exit 1
-	    ;;
+        --stage)
+            initial_stage=$2
+            shift
+            ;;
+        --last-stage)
+            last_stage=$2
+            shift
+            ;;
+        --gainroot)
+            gainroot=$2
+            shift
+            ;;
+        -b|--bootstrap)
+            BOOTSTRAP="yes" # Bootstrap the build system
+            ;;
+        -c|--configure)
+            CONFIGURE="yes" # Reconfigure the build system
+            ;;
+        -s|--scratch)
+            SCRATCH="yes"   # Build from scratch (run make clean)
+            ;;
+        -o|--opt)
+            OPT="yes"       # Compile without debug
+            ;;
+        -d|--debug)
+            DEBUG="yes"     # Compile with debug
+            NO_STRIP="yes"
+            ;;
+        -r|--release)
+            RELEASE="$2"
+            shift
+            ;;
+        -m32)
+            CFLAGS="$CFLAGS -m32"
+            CXXFLAGS="$CXXFLAGS -m32"
+            SCRATCH="yes"
+            TARGET="i686"
+            ;;
+        -m64)
+            CFLAGS="$CFLAGS -m64"
+            CXXFLAGS="$CXXFLAGS -m64"
+            SCRATCH="yes"
+            TARGET="x86_64"
+            ;;
+        -p|--package)
+            PACKAGE="yes"   # build binary packages
+            ;;
+        --with*-spread)
+            WITH_SPREAD="$1"
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        --source)
+            SOURCE="yes"
+            ;;
+        --sb)
+            SKIP_BUILD="yes"
+            ;;
+        --scons)
+            SCONS="yes"
+            ;;
+        --so)
+            SCONS_OPTS="$SCONS_OPTS $2"
+            shift
+            ;;
+        -j|--jobs)
+            JOBS=$2
+            shift
+            ;;
+        --dl)
+            DEBUG_LEVEL=$2
+            shift
+            ;;
+        *)
+            if test ! -z "$1"; then
+               echo "Unrecognized option: $1"
+            fi
+            usage
+            exit 1
+            ;;
     esac
     shift
 done
@@ -173,7 +202,7 @@ done
 if [ "$PACKAGE" == "yes" ]
 then
     echo "testing sudo"
-    if sudo -E /bin/true >/dev/null 2>&1
+    if sudo -E $true >/dev/null 2>&1
     then
         echo "sudo accepts -E"
         SUDO="sudo -E"
@@ -206,11 +235,28 @@ build_base=$(cd $(dirname $0)/..; pwd -P)
 
 get_arch()
 {
-    if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
+    if ! [ -z "$TARGET" ]
     then
-        echo "i386"
+       if [ "$TARGET" == "i686" ]
+       then
+           echo "i386"
+       else
+           echo "amd64"
+       fi
+    elif [ "$OS" == "Darwin" ]; then
+        if file $build_base/gcs/src/gcs.o | grep "i386" >/dev/null 2>&1
+        then
+            echo "i386"
+        else
+            echo "amd64"
+        fi
     else
-        echo "amd64"
+        if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
+        then
+            echo "i386"
+        else
+            echo "amd64"
+        fi
     fi
 }
 
@@ -235,14 +281,18 @@ build_packages()
     local STRIP_OPT=""
     [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
-    rm -rf $ARCH
+    $SUDO rm -rf $ARCH
 
     set +e
-    if [ $DEBIAN -ne 0 ]
-    then # build DEB
+    if [ $DEBIAN -ne 0 ]; then # build DEB
         $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
         $SUDO /bin/chown -R $WHOAMI.users $ARCH
+    elif [ "$OS" == "FreeBSD" ]; then
+        if test "$NO_STRIP" != "yes"; then
+            strip $build_base/{garb/garbd,libgalera_smm.so}
+        fi
+        ./freebsd.sh $GALERA_VER
     else # build RPM
         ./rpm.sh $GALERA_VER
     fi
@@ -251,11 +301,12 @@ build_packages()
     set -e
 
     popd
-    if [ $DEBIAN -ne 0 ]
-    then
+    if [ $DEBIAN -ne 0 ]; then
         mv -f $PKG_DIR/$ARCH/*.deb ./
+    elif [ "$OS" == "FreeBSD" ]; then
+        mv -f $PKG_DIR/*.tbz ./
     else
-        mv -f $PKG_DIR/$ARCH/*.rpm ./
+        mv -f $PKG_DIR/*.rpm ./
     fi
     return $RET
 }
@@ -302,9 +353,9 @@ pushd "$build_base"
 #GALERA_REV="$(svnversion | sed s/\:/,/g)"
 #if [ "$GALERA_REV" == "exported" ]
 #then
-    GALERA_REV=$(bzr revno 2>/dev/null)     || \
-    GALERA_REV=$(svnversion | sed s/\:/,/g) || \
-    GALERA_REV=$(echo "xxxx")
+    GALERA_REV=$(bzr revno --tree -q)     || \
+    GALERA_REV=$(svn info >&/dev/null && svnversion | sed s/\:/,/g) || \
+    GALERA_REV=$(echo "XXXX")
     export GALERA_REV
 #fi
 popd
@@ -320,9 +371,10 @@ then
     export SCONS_VD=$build_base
     scons_args="-C $build_base revno=$GALERA_REV"
 
-    [ -n "$TARGET"      ] && scons_args="$scons_args arch=$TARGET"
-    [ -n "$RELEASE"     ] && scons_args="$scons_args version=$RELEASE"
-    [ "$DEBUG" == "yes" ] && scons_args="$scons_args debug=$DEBUG_LEVEL"
+    [ -n "$TARGET"        ] && scons_args="$scons_args arch=$TARGET"
+    [ -n "$RELEASE"       ] && scons_args="$scons_args version=$RELEASE"
+    [ "$DEBUG" == "yes"   ] && scons_args="$scons_args debug=$DEBUG_LEVEL"
+    [ -n "$EXTRA_SYSROOT" ] && scons_args="$scons_args extra_sysroot=$EXTRA_SYSROOT"
 
     if [ "$SCRATCH" == "yes" ]
     then

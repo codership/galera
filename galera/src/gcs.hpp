@@ -41,6 +41,7 @@ namespace galera
                                                gcs_seqno_t* seqno_l) = 0;
         virtual ssize_t desync(gcs_seqno_t* seqno_l) = 0;
         virtual void    join(gcs_seqno_t seqno) = 0;
+        virtual gcs_seqno_t local_sequence() = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
 
         /*! @throws NotFound */
@@ -151,6 +152,11 @@ namespace galera
             {
                 gu_throw_error (-err) << "gcs_join(" << seqno << ") failed";
             }
+        }
+
+        gcs_seqno_t local_sequence()
+        {
+            return gcs_local_sequence(conn_);
         }
 
         void get_stats(gcs_stats* stats) const
@@ -301,6 +307,12 @@ namespace galera
         void join(gcs_seqno_t seqno)
         {
             gu_throw_error(ENOTCONN);
+        }
+
+        gcs_seqno_t local_sequence()
+        {
+            gu::Lock lock(mtx_);
+            return ++local_seqno_;
         }
 
         void get_stats(gcs_stats* stats) const

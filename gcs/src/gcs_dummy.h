@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -12,6 +12,8 @@
 
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
+
+extern GCS_BACKEND_REGISTER_FN (gcs_dummy_register);
 
 extern GCS_BACKEND_CREATE_FN (gcs_dummy_create);
 

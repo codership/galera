@@ -56,7 +56,7 @@ namespace gu
         ThrowError (const char* file_,
                     const char* func_,
                     int         line_,
-                    int         err_ = Exception::E_UNSPEC)
+                    int         err_)
             :
             base (file_, func_, line_),
             err  (err_)
@@ -69,7 +69,7 @@ namespace gu
             Exception e(base.os.str(), err);
 
             e.trace (base.file, base.func, base.line);
-
+            // cppcheck-suppress exceptThrowInDestructor
             throw e;
         }
 
@@ -81,7 +81,7 @@ namespace gu
         int const err;
     };
 
-    /* final*/ class ThrowFatal //: public ThrowBase
+    /* final*/ class ThrowFatal
     {
     public:
 
@@ -94,10 +94,10 @@ namespace gu
         {
             base.os << " (FATAL)";
 
-            Exception e(base.os.str(), Exception::E_NOTRECOVERABLE);
+            Exception e(base.os.str(), ENOTRECOVERABLE);
 
             e.trace (base.file, base.func, base.line);
-
+            // cppcheck-suppress exceptThrowInDestructor
             throw e;
         }
 

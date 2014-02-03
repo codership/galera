@@ -119,6 +119,9 @@ dump()
 
 check()
 {
+    wait_sync $NODE_LIST || true
+
+
     cmd="check_cmd"
     ! action "$cmd" "$@" # ! - to ignore possible connection error
 
@@ -163,6 +166,19 @@ check()
 
     return 1
 }
+
+# Query each node with causal reads on to make sure that slave
+# queue has been fully processed.
+# Arguments: list of nodes
+wait_sync()
+{
+    local node
+    for node in "$@"
+    do
+        mysql_query "$node" "set wsrep_causal_reads=1; select 0;" 1>/dev/null
+    done
+}
+
 
 start_node()
 {
@@ -243,6 +259,7 @@ _cluster_up()
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
             "gcomm") $cmd "-g 'gcomm://:${NODE_GCS_PORT[$node]}$(extra_params $node)'" "$@" 0 ;;
+#            "gcomm") $cmd "-g $(gcs_address $node) --mysql-opt --wsrep-new-cluster" "$@" 0 ;;
             "vsbes") $cmd "-g 'vsbes://$VSBES_ADDRESS'" "$@" 0 ;;
             esac
         else

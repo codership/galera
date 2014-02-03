@@ -44,9 +44,25 @@ static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 
 #if defined(HAVE_BYTESWAP_H)
 #  include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x)
+#elif defined(__APPLE__)
+#  include <libkern/OSByteOrder.h> // for OSSwapInt16(x), etc.
 #endif /* HAVE_BYTESWAP_H */
 
-#if defined(bswap16)
+#if defined(__APPLE__)
+/* do not use OSSwapIntXX, because gcc44 gives old-style cast warnings */
+#  define gu_bswap16 _OSSwapInt16
+#  define gu_bswap32 _OSSwapInt32
+#  define gu_bswap64 _OSSwapInt64
+#elif defined(__FreeBSD__)
+/* do not use bswapXX, because gcc44 gives old-style cast warnings */
+#  define gu_bswap16 __bswap16_var
+#  define gu_bswap32 __bswap32_var
+#  define gu_bswap64 __bswap64_var
+#elif defined(__sun__) /* BSWAP macros inherited from gu_arch.h */
+#  define gu_bswap16 BSWAP_16
+#  define gu_bswap32 BSWAP_32
+#  define gu_bswap64 BSWAP_64
+#elif defined(bswap16)
 #  define gu_bswap16 bswap16
 #  define gu_bswap32 bswap32
 #  define gu_bswap64 bswap64
@@ -54,10 +70,6 @@ static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 #  define gu_bswap16 bswap_16
 #  define gu_bswap32 bswap_32
 #  define gu_bswap64 bswap_64
-#elif defined(__sun__) /* BSWAP macros inherited from gu_arch.h */
-#  define gu_bswap16 BSWAP_16
-#  define gu_bswap32 BSWAP_32
-#  define gu_bswap64 BSWAP_64
 #else
 #  error "No byteswap macros are defined"
 #endif

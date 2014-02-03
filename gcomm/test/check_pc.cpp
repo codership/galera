@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
-
 
 #include "check_gcomm.hpp"
 
@@ -12,6 +11,7 @@
 #include "check_templ.hpp"
 #include "check_trace.hpp"
 #include "gcomm/conf.hpp"
+#include "gu_errno.h"
 
 #include <check.h>
 
@@ -204,6 +204,7 @@ START_TEST(test_pc_view_changes_single)
 {
     log_info << "START (test_pc_view_changes_single)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(0, 0);
     Proto pc1(conf, uuid1);
     DummyTransport tp1;
@@ -396,6 +397,7 @@ START_TEST(test_pc_view_changes_double)
 {
     log_info << "START (test_pc_view_changes_double)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -465,6 +467,7 @@ START_TEST(test_pc_view_changes_reverse)
 {
     log_info << "START (test_pc_view_changes_reverse)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -489,6 +492,7 @@ START_TEST(test_pc_state1)
 {
     log_info << "START (test_pc_state1)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -509,7 +513,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu1.pc()->state() == Proto::S_PRIM);
     fail_unless(pu2.pc()->state() == Proto::S_PRIM);
 
-    // PRIM -> TRANS -> STATES_EXCH -> RTR -> TRANS -> STATES_EXCH -> RTR -> PRIM
+    // PRIM -> TRANS -> STATES_EXCH -> RTR -> TRANS -> STATES_EXCH -> RTR ->PRIM
     View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr1.add_member(uuid1, "n1");
     tr1.add_member(uuid2, "n2");
@@ -627,6 +631,7 @@ START_TEST(test_pc_state2)
 {
     log_info << "START (test_pc_state2)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -749,6 +754,7 @@ START_TEST(test_pc_state3)
 {
     log_info << "START (test_pc_state3)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -873,6 +879,7 @@ START_TEST(test_pc_conflicting_prims)
 {
     log_info << "START (test_pc_conflicting_prims)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -946,6 +953,7 @@ START_TEST(test_pc_conflicting_prims_npvo)
 {
     log_info << "START (test_pc_conflicting_npvo)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1, URI("pc://?pc.npvo=true"));
@@ -1045,7 +1053,19 @@ static void set_cvi(vector<DummyNode*>& nvec, size_t i_begin, size_t i_end,
     }
 }
 
-static gu::Config gu_conf;
+struct InitGuConf
+{
+    explicit InitGuConf(gu::Config& conf) { gcomm::Conf::register_params(conf); }
+};
+
+static gu::Config&
+static_gu_conf()
+{
+    static gu::Config conf;
+    static InitGuConf init(conf);
+
+    return conf;
+}
 
 static DummyNode* create_dummy_node(size_t idx,
                                     const string& suspect_timeout = "PT1H",
@@ -1053,6 +1073,8 @@ static DummyNode* create_dummy_node(size_t idx,
                                     const string& retrans_period = "PT1H",
                                     int weight = 1)
 {
+    gu::Config& gu_conf(static_gu_conf());
+    gcomm::Conf::register_params(gu_conf);
     const string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
         + Conf::EvsSuspectTimeout + "=" + suspect_timeout + "&"
@@ -1104,6 +1126,8 @@ START_TEST(test_pc_split_merge)
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
+    mark_point();
+
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn.push_back(create_dummy_node(i + 1, suspect_timeout,
@@ -1112,6 +1136,8 @@ START_TEST(test_pc_split_merge)
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
     }
+
+    mark_point();
 
     for (size_t i = 1; i < n_nodes; ++i)
     {
@@ -1127,7 +1153,7 @@ START_TEST(test_pc_split_merge)
         ++view_seq;
         log_info << "split " << i << " view seq " << view_seq;
         set_cvi(dn, 0, i - 1, view_seq, view_type(0, i - 1, n_nodes));
-        set_cvi(dn, i, n_nodes - 1, view_seq, view_type(i, n_nodes - 1, n_nodes));
+        set_cvi(dn, i, n_nodes - 1, view_seq, view_type(i,n_nodes - 1,n_nodes));
         gu_trace(prop.propagate_until_cvi(true));
 
         for (size_t j = 0; j < i; ++j)
@@ -1142,6 +1168,9 @@ START_TEST(test_pc_split_merge)
         set_cvi(dn, 0, n_nodes - 1, view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(true));
     }
+
+    mark_point();
+
     check_trace(dn);
     for_each(dn.begin(), dn.end(), DeleteObject());
 }
@@ -1379,6 +1408,7 @@ START_TEST(test_pc_transport)
 {
     log_info << "START (test_pc_transport)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
                 "pc://?"
@@ -1436,6 +1466,7 @@ START_TEST(test_trac_191)
 {
     log_info << "START (test_trac_191)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
     Proto p(conf, uuid4);
     DummyTransport tp(uuid4, true);
@@ -1477,6 +1508,7 @@ END_TEST
 START_TEST(test_trac_413)
 {
     log_info << "START (test_trac_413)";
+
     class TN : gcomm::Toplay // test node
     {
     public:
@@ -1503,6 +1535,8 @@ START_TEST(test_trac_413)
     };
 
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
+
     TN n1(conf, 1), n2(conf, 2), n3(conf, 3);
 
 
@@ -1656,6 +1690,7 @@ START_TEST(test_fifo_violation)
 {
     log_info << "START (test_fifo_violation)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -1689,6 +1724,8 @@ START_TEST(test_checksum)
 {
     log_info << "START (test_checksum)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
+    conf.set(Conf::PcChecksum, gu::to_string(true));
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf, uuid1);
@@ -1727,6 +1764,7 @@ START_TEST(test_set_param)
 {
     log_info << "START (test_pc_transport)";
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
                 "pc://?"
@@ -1794,13 +1832,13 @@ START_TEST(test_trac_599)
         }
     };
 
-
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     D d(conf);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
     std::auto_ptr<gcomm::Transport> tp(
-        gcomm::Transport::create(*pnet,
-                                 "pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"));
+        gcomm::Transport::create
+        (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"));
     gcomm::connect(tp.get(), &d);
     gu::Buffer buf(10);
     Datagram dg(buf);
@@ -1825,6 +1863,7 @@ END_TEST
 START_TEST(test_trac_620)
 {
     gu::Config conf;
+    gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     Transport* tp(Transport::create(*net, "pc://?"
 				    "evs.info_log_mask=0xff&"
@@ -2019,6 +2058,7 @@ START_TEST(test_weighted_partitioning_1)
 {
     log_info << "START (test_weighted_partitioning_1)";
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
@@ -2028,6 +2068,7 @@ START_TEST(test_weighted_partitioning_1)
     single_boot(&pu3);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2038,6 +2079,7 @@ START_TEST(test_weighted_partitioning_1)
     double_boot(&pu3, &pu2);
 
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2173,6 +2215,7 @@ START_TEST(test_weighted_partitioning_2)
 {
     log_info << "START (test_weighted_partitioning_2)";
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
@@ -2182,6 +2225,7 @@ START_TEST(test_weighted_partitioning_2)
     single_boot(&pu3);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2192,6 +2236,7 @@ START_TEST(test_weighted_partitioning_2)
     double_boot(&pu3, &pu2);
 
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2357,6 +2402,7 @@ START_TEST(test_weight_change_partitioning_1)
 {
     log_info << "START (test_weight_change_partitioning_1)";
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2366,6 +2412,7 @@ START_TEST(test_weight_change_partitioning_1)
     single_boot(&pu1);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2376,6 +2423,7 @@ START_TEST(test_weight_change_partitioning_1)
     double_boot(&pu1, &pu2);
 
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
@@ -2482,6 +2530,7 @@ START_TEST(test_weight_change_partitioning_2)
 {
     log_info << "START (test_weight_change_partitioning_2)";
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2491,6 +2540,7 @@ START_TEST(test_weight_change_partitioning_2)
     single_boot(&pu1);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2501,6 +2551,7 @@ START_TEST(test_weight_change_partitioning_2)
     double_boot(&pu1, &pu2);
 
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
@@ -2597,6 +2648,7 @@ START_TEST(test_weight_change_joining)
 {
     log_info << "START (test_weight_change_joining)";
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2606,6 +2658,7 @@ START_TEST(test_weight_change_joining)
     single_boot(&pu1);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2616,6 +2669,7 @@ START_TEST(test_weight_change_joining)
     double_boot(&pu1, &pu2);
 
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);
@@ -2732,6 +2786,7 @@ START_TEST(test_weight_change_leaving)
 {
     log_info << "START (test_weight_change_leaving)";
     gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -2741,6 +2796,7 @@ START_TEST(test_weight_change_leaving)
     single_boot(&pu1);
 
     gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "2");
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
@@ -2751,6 +2807,7 @@ START_TEST(test_weight_change_leaving)
     double_boot(&pu1, &pu2);
 
     gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
     ProtoUpMeta pum3(uuid3);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2012-2014 Codership Oy <info@codership.com>
  */
 
 #include "defaults.hpp"
@@ -8,8 +8,17 @@
 
 namespace gcomm
 {
+#ifdef HAVE_ASIO_HPP
+    std::string const Defaults::ProtonetBackend         = "asio";
+#else
+#error "Only asio protonet backend is currently supported"
+#endif /* HAVE_ASIO_HPP */
+
+    std::string const Defaults::ProtonetVersion         = "0";
+    std::string const Defaults::SocketUseSsl            = "no";
+    std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
-    std::string const Defaults::EvsViewForgetTimeout    = "PT5M";
+    std::string const Defaults::EvsViewForgetTimeout    = "PT24H";
     std::string const Defaults::EvsViewForgetTimeoutMin = "PT1S";
     std::string const Defaults::EvsInactiveCheckPeriod  = "PT0.5S";
     std::string const Defaults::EvsSuspectTimeout       = "PT5S";
@@ -27,6 +36,12 @@ namespace gcomm
     std::string const Defaults::EvsUserSendWindowMin    = "1";
     std::string const Defaults::EvsMaxInstallTimeouts   = "1";
     std::string const Defaults::PcAnnounceTimeout       = "PT3S";
+    std::string const Defaults::PcChecksum              = "false";
+    std::string const Defaults::PcIgnoreQuorum          = "false";
+    std::string const Defaults::PcIgnoreSb              = PcIgnoreQuorum;
+    std::string const Defaults::PcNpvo                  = "false";
+    std::string const Defaults::PcVersion               = "0";
     std::string const Defaults::PcWaitPrim              = "true";
     std::string const Defaults::PcWaitPrimTimeout       = "P30S";
+    std::string const Defaults::PcWeight                = "1";
 }

@@ -1,7 +1,7 @@
 #!/bin/bash -e
 #
-# lp:861212
-# https://bugs.launchpad.net/codership-mysql/+bug/861212
+# lp:1073220
+# https://bugs.launchpad.net/codership-mysql/+bug/1073220
 #
 # TEST SETUP
 #
@@ -14,7 +14,7 @@
 # PARAMETERS
 #
 # Number of test rounds
-ROUNDS=${ROUNDS:-"200"}
+ROUNDS=${ROUNDS:-"100"}
 # Duration of single iteration
 DURATION=${DURATION:-"3"}
 #
@@ -32,7 +32,7 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/misc.sh
 
 echo "##################################################################"
-echo "##             regression test for lp:861212"
+echo "##             regression test for lp:1073220"
 echo "##################################################################"
 
 echo "restarting cluster to clean state"
@@ -46,11 +46,14 @@ round=0
 while test $round -lt $ROUNDS
 do
     LD_PRELOAD=$GLB_PRELOAD \
+    DYLD_INSERT_LIBRARIES=$GLB_PRELOAD \
+    DYLD_FORCE_FLAT_NAMESPACE=1 \
     $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
             --port $DBMS_PORT --users $DBMS_CLIENTS --duration $DURATION \
             --stat-interval 30 --rows 1000 --ac-frac 10 --rollbacks 0.1 \
             --alters 1
 
+    wait_sync $NODE_LIST
     echo "checking consistency"
     check || (sleep 5 && check)
     round=$(($round + 1))

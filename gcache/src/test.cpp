@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  *
  */
 
@@ -21,7 +21,9 @@ main (int argc, char* argv[])
     log_debug << "DEBUG output enabled";
 
     if (argc > 1) fname.assign(argv[1]); // take supplied file name if any
-    gu::Config conf("gcache.name = test.cache; gcache.size = 16K");
+    gu::Config conf;
+    GCache::register_params(conf);
+    conf.parse("gcache.name = test.cache; gcache.size = 16K");
     GCache* cache = new GCache (conf, "");
 
     log_info  << "";
@@ -33,7 +35,7 @@ main (int argc, char* argv[])
     log_info  << "Exit: " << ret;
 
     try {
-        throw gu::Exception ("My test exception");
+        throw gu::Exception ("My test exception", EINVAL);
     }
     catch (gu::Exception& e) {
         log_info << "Exception caught: " << e.what() << ", errno: "

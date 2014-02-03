@@ -7,7 +7,7 @@
 #include "gcache_page.hpp"
 
 // for posix_fadvise()
-#ifndef _XOPEN_SOURCE
+#if !defined(_XOPEN_SOURCE)
 #define _XOPEN_SOURCE 600
 #endif
 #include <fcntl.h>
@@ -40,6 +40,7 @@ gcache::Page::drop_fs_cache() const
 {
     mmap_.dont_need();
 
+#if !defined(__APPLE__)
     int const err (posix_fadvise (fd_.get(), 0, fd_.get_size(),
                                   POSIX_FADV_DONTNEED));
     if (err != 0)
@@ -47,6 +48,7 @@ gcache::Page::drop_fs_cache() const
         log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.get_name()
                  << ": " << err << " (" << strerror(err) << ")";
     }
+#endif
 }
 
 gcache::Page::Page (const std::string& name, ssize_t size)

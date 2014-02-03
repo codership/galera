@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -24,8 +24,6 @@
 #include <stdexcept>
 #include <vector>
 #include <set>
-
-
 
 #include "check.h"
 
@@ -442,10 +440,7 @@ class DummyUser : public Toplay
 {
 public:
     DummyUser(gu::Config& conf) : Toplay(conf) { }
-    void handle_up(const void*, const Datagram&, const ProtoUpMeta&)
-    {
-
-    }
+    void handle_up(const void*, const Datagram&, const ProtoUpMeta&) { }
 private:
 };
 
@@ -454,10 +449,15 @@ START_TEST(test_proto_single_join)
 {
     log_info << "START";
     gu::Config conf;
+    mark_point();
+    gcomm::Conf::register_params(conf);
     UUID uuid(1);
     DummyTransport t(uuid);
+    mark_point();
     DummyUser u(conf);
+    mark_point();
     Proto p(conf, uuid);
+    mark_point();
     gcomm::connect(&t, &p);
     gcomm::connect(&p, &u);
     single_join(&t, &p);
@@ -587,9 +587,13 @@ START_TEST(test_proto_double_join)
 {
     log_info << "START";
     gu::Config conf;
+    mark_point();
+    gcomm::Conf::register_params(conf);
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
+    mark_point();
     DummyUser u1(conf), u2(conf);
+    mark_point();
     Proto p1(conf, uuid1), p2(conf, uuid2);
 
     gcomm::connect(&t1, &p1);
@@ -613,6 +617,7 @@ static DummyNode* create_dummy_node(size_t idx,
 {
     // reset conf to avoid stale config in case of nofork
     gu_conf = gu::Config();
+    gcomm::Conf::register_params(gu_conf);
     string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
         + Conf::EvsSuspectTimeout + "=" + suspect_timeout + "&"

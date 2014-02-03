@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -22,6 +22,7 @@ extern "C" {
 
 #include "gu_config.h"
 #include "gcache.h"
+#include "gu_errno.h"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -142,7 +143,8 @@ extern long gcs_wait (gcs_conn_t *conn);
 typedef enum gcs_act_type
 {
 /* ordered actions */
-    GCS_ACT_TORDERED,   //! action representing state change, will be assigned global seqno
+    GCS_ACT_TORDERED,   //! action representing state change, will be assigned
+                        //  global seqno
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
@@ -300,6 +302,14 @@ extern long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* seqno);
  */
 extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
 
+/*! @brief Allocate local seqno for accessing local resources.
+ *
+ *
+ * @param conn connection to group
+ * @return local seqno, negative error code in case of error
+ */
+extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -308,17 +318,20 @@ extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
 /*! Informs group about the last applied action on this node */
 extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
 
-
 /* GCS Configuration */
 
+/*! Registers configurable parameters with conf object */
+extern void
+gcs_register_params (gu_config_t* conf);
+
 /*! sets the key to a given value
- * 
+ *
  * @return 0 in case of success, 1 if key not found or negative error code */
 extern long
 gcs_param_set (gcs_conn_t* conn, const char* key, const char *value);
 
 /*! returns the value of the key
- * 
+ *
  * @return NULL if key not found */
 extern const char*
 gcs_param_get (gcs_conn_t* conn, const char* key);

@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
-/* 
+/*
  * Dummy backend implementation
  *
  */
@@ -49,7 +49,7 @@ dummy_msg_create (gcs_msg_type_t const type,
         msg->type       = type;
         msg->sender_idx = sender;
     }
-    
+
     return msg;
 }
 
@@ -91,7 +91,7 @@ static
 GCS_BACKEND_DESTROY_FN(dummy_destroy)
 {
     dummy_t*      dummy = backend->conn;
-    
+
     if (!dummy || dummy->state != DUMMY_CLOSED) return -EBADFD;
 
 //    gu_debug ("Deallocating message queue (serializer)");
@@ -209,7 +209,7 @@ GCS_BACKEND_OPEN_FN(dummy_open)
     }
 
     comp = gcs_comp_msg_new (true, false, 0, 1);
- 
+
     if (comp) {
 	ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555");
 	assert (0 == ret); // we have only one member, index = 0
@@ -234,7 +234,7 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
     long     ret   = -ENOMEM;
     dummy_t* dummy = backend->conn;
     gcs_comp_msg_t* comp;
-    
+
     if (!dummy) return -EBADFD;
 
     comp = gcs_comp_msg_leave ();
@@ -290,7 +290,7 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     if (!(dummy = GU_CALLOC(1, dummy_t)))
 	goto out0;
 
-    dummy->state         = DUMMY_CLOSED;
+    dummy->state = DUMMY_CLOSED;
     *(size_t*)(&dummy->max_pkt_size)  = (size_t) sysconf (_SC_PAGESIZE);
     *(size_t*)(&dummy->hdr_size)      = sizeof(dummy_msg_t);
     *(size_t*)(&dummy->max_send_size) = dummy->max_pkt_size - dummy->hdr_size;
@@ -309,6 +309,8 @@ out0:
     backend->conn = NULL;
     return ret;
 }
+
+GCS_BACKEND_REGISTER_FN(gcs_dummy_register) {}
 
 /*! Injects a message in the message queue to produce a desired msg sequence. */
 long

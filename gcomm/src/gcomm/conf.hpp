@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -406,11 +406,11 @@ namespace gcomm
          */
         static std::string const PcWeight;
 
+        static void register_params(gu::Config&);
     };
 
 
     // Helper templates to read configuration parameters.
-
 
     template <typename T> T _conf_param(const gu::URI& uri,
                                         const std::string& param,
@@ -425,12 +425,14 @@ namespace gcomm
         }
         catch (gu::NotFound& e)
         {
+            // cppcheck-suppress nullPointer
             if (default_value == 0)
             {
                 gu_throw_error(EINVAL)
                     << "param " << param << " not found from uri "
                     << uri.to_string();
             }
+            // cppcheck-suppress nullPointer
             ret = *default_value;
         }
 
@@ -486,7 +488,8 @@ namespace gcomm
                                                const T& max_value)
 
     {
-        return _conf_param(uri, param, &default_value, reinterpret_cast<const T*>(0), &max_value);
+        return _conf_param(uri, param, &default_value,
+                           reinterpret_cast<const T*>(0), &max_value);
     }
 
     template <typename T> T conf_param_def_range(const gu::URI& uri,

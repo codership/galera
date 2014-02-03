@@ -50,6 +50,7 @@ void* gu_malloc_dbg  (size_t size,
 	    ret->used      = size;
 	    ret->file      = file;
 	    ret->line      = line;
+	    // cppcheck-suppress memleak
 	    return TAIL(ret);
 	}
     }

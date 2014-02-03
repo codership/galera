@@ -10,6 +10,27 @@
 #include "gu_throw.hpp"
 
 
+std::ostream& galera::operator<<(std::ostream& os, const galera::Wsdb& wsdb)
+{
+    os << "trx map:\n";
+    for (galera::Wsdb::TrxMap::const_iterator i = wsdb.trx_map_.begin();
+         i != wsdb.trx_map_.end();
+         ++i)
+    {
+        os << i->first << " " << *i->second << "\n";
+    }
+    os << "conn query map:\n";
+    for (galera::Wsdb::ConnMap::const_iterator i = wsdb.conn_map_.begin();
+         i != wsdb.conn_map_.end();
+         ++i)
+    {
+        os << i->first << " ";
+    }
+    os << "\n";
+    return os;
+}
+
+
 galera::Wsdb::Wsdb()
     :
     trx_map_(),
@@ -22,27 +43,14 @@ galera::Wsdb::~Wsdb()
 {
     log_info << "wsdb trx map usage " << trx_map_.size()
              << " conn query map usage " << conn_map_.size();
+
+    // With debug builds just print trx and query maps to stderr
+    // and don't clean up to let valgrind etc to detect leaks.
+#ifndef NDEBUG
+    std::cerr << *this;
+#else
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
-}
-
-
-std::ostream& galera::Wsdb::operator<<(std::ostream& os) const
-{
-    os << "trx map: ";
-    for (TrxMap::const_iterator i = trx_map_.begin(); i != trx_map_.end();
-         ++i)
-    {
-        os << i->first << " ";
-    }
-    os << "\n conn query map: ";
-    for (ConnMap::const_iterator i = conn_map_.begin();
-         i != conn_map_.end();
-         ++i)
-    {
-        os << i->first << " ";
-    }
-    os << "\n";
-    return os;
+#endif // !NDEBUG
 }
 
 

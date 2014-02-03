@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2014 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -12,6 +12,7 @@
 
 #include "gu_string_test.hpp"
 #include "gu_uri_test.hpp"
+#include "gu_config_test.hpp"
 #include "gu_net_test.hpp"
 #include "gu_datetime_test.hpp"
 #include "gu_vlq_test.hpp"
@@ -22,6 +23,7 @@ static suite_creator_t suites[] =
 {
     gu_string_suite,
     gu_uri_suite,
+    gu_config_suite,
     gu_net_suite,
     gu_datetime_suite,
     gu_vlq_suite,

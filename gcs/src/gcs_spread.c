@@ -629,7 +629,9 @@ GCS_BACKEND_OPEN_FN(spread_open)
     return err;
 }
 
+#if defined(__linux__)
 extern char *program_invocation_short_name;
+#endif
 
 GCS_BACKEND_CREATE_FN(gcs_spread_create)
 {
@@ -650,7 +652,15 @@ GCS_BACKEND_CREATE_FN(gcs_spread_create)
     do
     {   /* Try to generate unique name */
 	if (spread_priv_name (spread->priv_name,
+#if defined(__sun__)
+                              getexecname (),
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+                              getprogname (),
+#elif defined(__linux__)
                               program_invocation_short_name,
+#else
+                              "unknown",
+#endif
                               n++))
 	{
 	    /* Failed to generate a name in the form

@@ -160,6 +160,7 @@ namespace gcomm
 
         gmcast::ProtoMap*  proto_map_;
         std::list<Socket*> mcast_tree_;
+        std::set<Socket*>  relay_set_;
 
         gu::datetime::Period time_wait_;
         gu::datetime::Period check_period_;

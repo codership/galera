@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -119,6 +119,11 @@ namespace galera
         void          desync();
         void          resync();
 
+        struct InitConfig
+        {
+            InitConfig(gu::Config&, const char* node_address);
+        };
+
     private:
 
         ReplicatorSMM(const ReplicatorSMM&);
@@ -149,11 +154,10 @@ namespace galera
                    commit_monitor_.last_left() : apply_monitor_.last_left();
         }
 
-        void report_last_committed()
+        void report_last_committed(wsrep_seqno_t purge_seqno)
         {
-            if (gu_unlikely(cert_.index_purge_required()))
+            if (gu_unlikely(purge_seqno != -1))
             {
-                wsrep_seqno_t const purge_seqno(cert_.get_safe_to_discard_seqno());
                 service_thd_.report_last_committed(purge_seqno);
             }
         }
@@ -368,13 +372,17 @@ namespace galera
         };
 
         Logger                 logger_;
+
         gu::Config             config_;
 
-        struct SetDefaults
+        InitConfig
+            init_config_; // registers configurable parameters and defaults
+
+        struct ParseOptions
         {
-            SetDefaults(gu::Config&, const Defaults&, const char* base_addr);
+            ParseOptions(gu::Config&, const char* opts);
         }
-            set_defaults_; // sets missing parameters to default values
+            parse_options_; // parse oprtion string supplied on initialization
 
         static const int       MAX_PROTO_VER = 4;
         /*
@@ -408,6 +416,7 @@ namespace galera
         wsrep_uuid_t const    state_uuid_;
         const char            state_uuid_str_[37];
         wsrep_seqno_t         cc_seqno_; // seqno of last CC
+        wsrep_seqno_t         pause_seqno_; // local seqno of last pause call
 
         // application callbacks
         void*                 app_ctx_;
@@ -453,7 +462,6 @@ namespace galera
         gu::Atomic<long long> local_commits_;
         gu::Atomic<long long> local_rollbacks_;
         gu::Atomic<long long> local_cert_failures_;
-        gu::Atomic<long long> local_bf_aborts_;
         gu::Atomic<long long> local_replays_;
         gu::Atomic<long long> causal_reads_;
 

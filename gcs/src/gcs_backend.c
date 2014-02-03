@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -23,6 +23,18 @@
 #ifdef    GCS_USE_GCOMM
 #include "gcs_gcomm.h"
 #endif /* GCS_USE_GCOMM */
+
+void gcs_backend_register(gu_config_t* const conf)
+{
+#ifdef    GCS_USE_GCOMM
+    gcs_gcomm_register(conf);
+#endif /* GCS_USE_GCOMM */
+#ifdef    GCS_USE_VS
+#endif /* GCS_USE_VS */
+#ifdef    GCS_USE_SPREAD
+#endif /* GCS_USE_SPREAD */
+    gcs_dummy_register(conf);
+}
 
 /* Static array describing backend ID - open() pairs */
 static
