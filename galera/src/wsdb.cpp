@@ -33,17 +33,19 @@ std::ostream& galera::operator<<(std::ostream& os, const galera::Wsdb& wsdb)
 
 galera::Wsdb::Wsdb()
     :
-    trx_map_(),
-    trx_mutex_(),
-    conn_map_(),
+    trx_pool_  (TrxHandle::LOCAL_STORAGE_SIZE, 512, "LocalTrxHandle"),
+    trx_map_   (),
+    trx_mutex_ (),
+    conn_map_  (),
     conn_mutex_()
-{ }
+{}
 
 
 galera::Wsdb::~Wsdb()
 {
     log_info << "wsdb trx map usage " << trx_map_.size()
              << " conn query map usage " << conn_map_.size();
+    log_info << trx_pool_;
 
     // With debug builds just print trx and query maps to stderr
     // and don't clean up to let valgrind etc to detect leaks.
@@ -71,8 +73,7 @@ galera::Wsdb::create_trx(const TrxHandle::Params& params,
                          const wsrep_uuid_t&  source_id,
                          wsrep_trx_id_t const trx_id)
 {
-    TrxHandle* trx
-        ((new TrxHandleWithStore(params, source_id, -1, trx_id))->handle());
+    TrxHandle* trx(TrxHandle::New(trx_pool_, params, source_id, -1, trx_id));
 
     gu::Lock lock(trx_mutex_);
 
@@ -140,8 +141,7 @@ galera::Wsdb::get_conn_query(const TrxHandle::Params& params,
     if (conn->get_trx() == 0 && create == true)
     {
         TrxHandle* trx
-            ((new TrxHandleWithStore(params, source_id, conn_id, -1))->
-             handle());
+            (TrxHandle::New(trx_pool_, params, source_id, conn_id, -1));
         conn->assign_trx(trx);
     }
 

@@ -224,12 +224,13 @@ namespace galera
         {
         public:
 
-            Proto(int version, bool keep_keys)
+            Proto(TrxHandle::SlavePool& sp, int version, bool keep_keys)
                 :
-                version_(version),
-                keep_keys_(keep_keys),
-                raw_sent_(0),
-                real_sent_(0)
+                trx_pool_ (sp),
+                raw_sent_ (0),
+                real_sent_(0),
+                version_  (version),
+                keep_keys_(keep_keys)
             { }
 
             ~Proto()
@@ -505,7 +506,7 @@ namespace galera
                     offset = gu::unserialize8(&buf[0], buf.size(), offset,
                                               seqno_d);
 
-                    galera::TrxHandle* trx(new galera::TrxHandle);
+                    galera::TrxHandle* trx(galera::TrxHandle::New(trx_pool_));
 
                     if (seqno_d == WSREP_SEQNO_UNDEFINED)
                     {
@@ -567,10 +568,13 @@ namespace galera
             }
 
         private:
-            int  version_;
-            bool keep_keys_;
+
+            TrxHandle::SlavePool& trx_pool_;
+
             uint64_t raw_sent_;
             uint64_t real_sent_;
+            int      version_;
+            bool     keep_keys_;
         };
     }
 }

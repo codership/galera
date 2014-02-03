@@ -473,10 +473,12 @@ namespace galera
         ServiceThd     service_thd_;
 
         // action sources
-        ActionSource*   as_;
-        GcsActionSource gcs_as_;
-        ist::Receiver   ist_receiver_;
-        ist::AsyncSenderMap ist_senders_;
+        TrxHandle::SlavePool slave_pool_;
+        ActionSource*        as_;
+        GcsActionSource      gcs_as_;
+        ist::Receiver        ist_receiver_;
+        ist::AsyncSenderMap  ist_senders_;
+
         // trx processing
         Wsdb            wsdb_;
         Certification   cert_;

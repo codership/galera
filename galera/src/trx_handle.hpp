@@ -20,6 +20,7 @@
 #include "gu_unordered.hpp"
 #include "gu_utils.hpp"
 #include "gu_macros.hpp"
+#include "gu_mem_pool.hpp"
 
 #include <set>
 
@@ -35,10 +36,7 @@ namespace galera
     public:
 
         /* signed int here is to detect SIZE < sizeof(TrxHandle) */
-        static int const SIZE = GU_PAGE_SIZE * 2; // 8K
-
-#define TRX_HANDLE_STORE_SIZE \
-        (TrxHandle::SIZE - static_cast<int>(sizeof(TrxHandle)))
+        static int const LOCAL_STORAGE_SIZE = GU_PAGE_SIZE * 2; // 8K
 
         struct Params
         {
@@ -201,79 +199,35 @@ namespace galera
             size_t serial_size() const;
         };
 
-        /* slave trx ctor */
-        TrxHandle()
-            :
-            source_id_         (WSREP_UUID_UNDEFINED),
-            conn_id_           (-1),
-            trx_id_            (-1),
-            mutex_             (),
-            write_set_collection_(Defaults.working_dir_),
-            state_             (&trans_map_, S_EXECUTING),
-            local_seqno_       (WSREP_SEQNO_UNDEFINED),
-            global_seqno_      (WSREP_SEQNO_UNDEFINED),
-            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
-            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
-            timestamp_         (),
-            write_set_         (Defaults.version_),
-            write_set_in_      (),
-            annotation_        (),
-            cert_keys_         (),
-            write_set_buffer_  (0, 0),
-            action_            (0),
-            gcs_handle_        (-1),
-            version_           (Defaults.version_),
-            refcnt_            (1),
-            write_set_flags_   (0),
-            local_             (false),
-            certified_         (false),
-            committed_         (false),
-            exit_loop_         (false),
-            wso_               (false),
-            mac_               ()
-        {}
-
-        /* local trx ctor */
-        explicit
-        TrxHandle(const Params&       params,
-                  const wsrep_uuid_t& source_id,
-                  wsrep_conn_id_t     conn_id,
-                  wsrep_trx_id_t      trx_id,
-                  gu::byte_t*         reserved,
-                  size_t              reserved_size)
-            :
-            source_id_         (source_id),
-            conn_id_           (conn_id),
-            trx_id_            (trx_id),
-            mutex_             (),
-            write_set_collection_(params.working_dir_),
-            state_             (&trans_map_, S_EXECUTING),
-            local_seqno_       (WSREP_SEQNO_UNDEFINED),
-            global_seqno_      (WSREP_SEQNO_UNDEFINED),
-            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
-            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
-            timestamp_         (gu_time_calendar()),
-            write_set_         (params.version_),
-            write_set_in_      (),
-            annotation_        (),
-            cert_keys_         (),
-            write_set_buffer_  (0, 0),
-            action_            (0),
-            gcs_handle_        (-1),
-            version_           (params.version_),
-            refcnt_            (1),
-            write_set_flags_   (0),
-            local_             (true),
-            certified_         (false),
-            committed_         (false),
-            exit_loop_         (false),
-            wso_               (new_version()),
-            mac_               ()
+        /* slave trx factory */
+        typedef gu::MemPool<true> SlavePool;
+        static TrxHandle* New(SlavePool& pool)
         {
-            /* Can't do this now as TrxHandleWithStore initializes store AFTER
-             * this ctor, ruining everything.
-             * Move it here after converting to memory pool. */
-            // init_write_set_out(params, reserved, reserved_size);
+            assert(pool.buf_size() == sizeof(TrxHandle));
+
+            void* const buf(pool.acquire());
+
+            return new(buf) TrxHandle(pool);
+        }
+
+        /* local trx factory */
+        typedef gu::MemPool<true> LocalPool;
+        static TrxHandle* New(LocalPool&          pool,
+                              const Params&       params,
+                              const wsrep_uuid_t& source_id,
+                              wsrep_conn_id_t     conn_id,
+                              wsrep_trx_id_t      trx_id)
+        {
+            size_t const buf_size(pool.buf_size());
+
+            assert(buf_size >= (sizeof(TrxHandle) + sizeof(WriteSetOut)));
+
+            void* const buf(pool.acquire());
+
+            return new(buf)
+                TrxHandle(pool, params, source_id, conn_id, trx_id,
+                          static_cast<gu::byte_t*>(buf) + sizeof(TrxHandle),
+                          buf_size - sizeof(TrxHandle));
         }
 
         void lock()   const { mutex_.lock();   }
@@ -549,7 +503,17 @@ namespace galera
         }
 
         void   ref()   { ++refcnt_; }
-        void   unref() { if (refcnt_.sub_and_fetch(1) == 0) delete this; }
+        void   unref()
+        {
+            if (refcnt_.sub_and_fetch(1) == 0) // delete and return to pool
+            {
+                void* const ptr(this);
+                gu::MemPool<true>& mp(mem_pool_);
+                this->~TrxHandle();
+                mp.recycle(ptr);
+            }
+        }
+
         size_t refcnt() const { return refcnt_(); }
 
         WriteSetOut& write_set_out()
@@ -618,6 +582,81 @@ namespace galera
 
     private:
 
+        /* slave trx ctor */
+        explicit
+        TrxHandle(gu::MemPool<true>& mp)
+            :
+            source_id_         (WSREP_UUID_UNDEFINED),
+            conn_id_           (-1),
+            trx_id_            (-1),
+            mutex_             (),
+            write_set_collection_(Defaults.working_dir_),
+            state_             (&trans_map_, S_EXECUTING),
+            local_seqno_       (WSREP_SEQNO_UNDEFINED),
+            global_seqno_      (WSREP_SEQNO_UNDEFINED),
+            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
+            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
+            timestamp_         (),
+            write_set_         (Defaults.version_),
+            write_set_in_      (),
+            annotation_        (),
+            cert_keys_         (),
+            write_set_buffer_  (0, 0),
+            mem_pool_          (mp),
+            action_            (0),
+            gcs_handle_        (-1),
+            version_           (Defaults.version_),
+            refcnt_            (1),
+            write_set_flags_   (0),
+            local_             (false),
+            certified_         (false),
+            committed_         (false),
+            exit_loop_         (false),
+            wso_               (false),
+            mac_               ()
+        {}
+
+        /* local trx ctor */
+        TrxHandle(gu::MemPool<true>&  mp,
+                  const Params&       params,
+                  const wsrep_uuid_t& source_id,
+                  wsrep_conn_id_t     conn_id,
+                  wsrep_trx_id_t      trx_id,
+                  gu::byte_t*         reserved,
+                  size_t              reserved_size)
+            :
+            source_id_         (source_id),
+            conn_id_           (conn_id),
+            trx_id_            (trx_id),
+            mutex_             (),
+            write_set_collection_(params.working_dir_),
+            state_             (&trans_map_, S_EXECUTING),
+            local_seqno_       (WSREP_SEQNO_UNDEFINED),
+            global_seqno_      (WSREP_SEQNO_UNDEFINED),
+            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
+            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
+            timestamp_         (gu_time_calendar()),
+            write_set_         (params.version_),
+            write_set_in_      (),
+            annotation_        (),
+            cert_keys_         (),
+            write_set_buffer_  (0, 0),
+            mem_pool_          (mp),
+            action_            (0),
+            gcs_handle_        (-1),
+            version_           (params.version_),
+            refcnt_            (1),
+            write_set_flags_   (0),
+            local_             (true),
+            certified_         (false),
+            committed_         (false),
+            exit_loop_         (false),
+            wso_               (new_version()),
+            mac_               ()
+        {
+            init_write_set_out(params, reserved, reserved_size);
+        }
+
         ~TrxHandle() { if (wso_) release_write_set_out(); }
 
         void
@@ -662,6 +701,7 @@ namespace galera
         // Write set buffer location if stored outside TrxHandle.
         std::pair<const gu::byte_t*, size_t> write_set_buffer_;
 
+        gu::MemPool<true>&     mem_pool_;
         const void*            action_;
         long                   gcs_handle_;
         int                    version_;
@@ -698,37 +738,6 @@ namespace galera
     {
     public:
         void operator()(T& t) const { t.second->unref(); }
-    };
-
-    /* Normally this should have been simply DERIVED from TrxHandle and have
-     * a proper initialization order. However to do it properly would require
-     * more refactoring than is desirable ATM. Postponing this for 4.x */
-    class TrxHandleWithStore
-    {
-    public:
-
-        TrxHandleWithStore(const TrxHandle::Params& params,
-                           const wsrep_uuid_t&      source_id,
-                           wsrep_conn_id_t          conn_id,
-                           wsrep_trx_id_t           trx_id) :
-            trx_  (params, source_id, conn_id, trx_id, store_, sizeof(store_)),
-            store_()
-        {
-            trx_.init_write_set_out(params, store_, sizeof(store_));
-        }
-
-        TrxHandle* handle() { return &trx_; }
-
-    private:
-
-        TrxHandle  trx_;
-        gu::byte_t store_[TRX_HANDLE_STORE_SIZE];
-    }; /* class TrxHandleWithStore */
-
-    struct TrxHandleCompileAssert
-    {
-        GU_COMPILE_ASSERT(
-            (sizeof(TrxHandleWithStore) == TrxHandle::SIZE), size_match);
     };
 
 } /* namespace galera*/

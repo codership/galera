@@ -10,6 +10,7 @@
 
 #include "wsrep_api.h"
 #include "gcs.hpp"
+#include "trx_handle.hpp"
 #include "gu_config.hpp"
 #include "gu_lock.hpp"
 #include "gu_monitor.hpp"
@@ -37,58 +38,68 @@ namespace galera
         public:
             static std::string const RECV_ADDR;
 
-            Receiver(gu::Config& conf, const char* addr);
+            Receiver(gu::Config& conf, TrxHandle::SlavePool&, const char* addr);
             ~Receiver();
-            std::string prepare(wsrep_seqno_t, wsrep_seqno_t, int);
-            void ready();
-            int recv(TrxHandle** trx);
+
+            std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
+            void          ready();
+            int           recv(TrxHandle** trx);
             wsrep_seqno_t finished();
-            void run();
+            void          run();
+
         private:
+
             void interrupt();
-            gu::Config&                                   conf_;
+
             std::string                                   recv_addr_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
             asio::ssl::context                            ssl_ctx_;
-            pthread_t                                     thread_;
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
+
             class Consumer
             {
             public:
-                Consumer()
-                    :
-                    cond_(),
-                    trx_(0)
-                { }
+
+                Consumer() : cond_(), trx_(0) { }
                 ~Consumer() { }
-                gu::Cond& cond() { return cond_; }
-                void trx(TrxHandle* trx) { trx_ = trx; }
-                TrxHandle* trx() const { return trx_; }
+
+                gu::Cond&  cond()              { return cond_; }
+                void       trx(TrxHandle* trx) { trx_ = trx;   }
+                TrxHandle* trx() const         { return trx_;  }
+
             private:
+
                 gu::Cond   cond_;
                 TrxHandle* trx_;
             };
+
             std::stack<Consumer*> consumers_;
-            bool running_;
-            bool ready_;
-            int error_code_;
-            wsrep_seqno_t current_seqno_;
-            wsrep_seqno_t last_seqno_;
-            bool use_ssl_;
-            int version_;
+            wsrep_seqno_t         current_seqno_;
+            wsrep_seqno_t         last_seqno_;
+            gu::Config&           conf_;
+            TrxHandle::SlavePool& trx_pool_;
+            pthread_t             thread_;
+            int                   error_code_;
+            int                   version_;
+            bool                  use_ssl_;
+            bool                  running_;
+            bool                  ready_;
         };
 
         class Sender
         {
         public:
+
             Sender(const gu::Config& conf,
                    gcache::GCache& gcache,
                    const std::string& peer,
                    int version);
             ~Sender();
+
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
+
             void cancel()
             {
                 if (use_ssl_ == true)
@@ -100,17 +111,20 @@ namespace galera
                     socket_.close();
                 }
             }
+
         private:
-            Sender(const Sender&);
-            void operator=(const Sender&);
-            const gu::Config&                        conf_;
+
             asio::io_service                         io_service_;
             asio::ip::tcp::socket                    socket_;
             asio::ssl::context                       ssl_ctx_;
             asio::ssl::stream<asio::ip::tcp::socket> ssl_stream_;
-            bool                                     use_ssl_;
+            const gu::Config&                        conf_;
             gcache::GCache&                          gcache_;
             int                                      version_;
+            bool                                     use_ssl_;
+
+            Sender(const Sender&);
+            void operator=(const Sender&);
         };
 
 
