@@ -3076,6 +3076,7 @@ START_TEST(test_trac_762)
         pc2->handle_view(reg);
         pc3->handle_view(reg);
 
+        // State msgs
         Datagram* dg(tp1->out());
         fail_unless(dg != 0);
         pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
@@ -3097,7 +3098,16 @@ START_TEST(test_trac_762)
         pc3->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
         delete dg;
 
+        // Install msg
+        dg = tp1->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
 
+        fail_unless(tp1->out() == 0);
+        fail_unless(tp2->out() == 0);
+        fail_unless(tp3->out() == 0);
     }
 
 }
