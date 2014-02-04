@@ -122,9 +122,7 @@ public:
         param_map_t::const_iterator const i(params_.find(key));
         if (i == params_.end()) throw NotFound();
         if (i->second.is_set()) return i->second.value();
-#ifndef NDEBUG
-        log_error << key << " not set.";
-#endif
+        log_debug << key << " not set.";
         throw NotSet();
     }
 
