@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash -eu
 ##
 #
 # lp:1019473
@@ -64,7 +64,7 @@ insert()
 	for i in $(seq 1 $ROWS); do
 	    $MYSQL --port=$PORT -e "
                DELETE FROM lp1019473 WHERE fid=$i AND uid=$i; 
-               INSERT INTO lp1019473 VALUES ($i,$i,'C-$1')";
+               INSERT INTO lp1019473 VALUES ($i,$i,'C-$1')" || true
 	done;
     done
 }
@@ -116,7 +116,7 @@ wait
 
 ../../scripts/command.sh check
 
-cleandb $PORT_0
+cleandb $port_0
 
 echo
 echo "Done!"
