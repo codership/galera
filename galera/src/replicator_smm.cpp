@@ -1695,9 +1695,10 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             {
                 if (gu_unlikely(trx->is_toi())) // small sanity check
                 {
-                    log_error << "Certification failed for TO isolated action: "
-                              << *trx;
-                    assert(0); // should never happen
+                    // may happen on configuration change
+                    log_warn << "Certification failed for TO isolated action: "
+                             << *trx;
+                    assert(0);
                 }
                 apply_monitor_.self_cancel(ao);
                 if (co_mode_ != CommitOrder::BYPASS)

@@ -270,7 +270,8 @@ then
 fi
 
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; MYSQLD_BINARY="mysqld-debug"; fi
+#if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; MYSQLD_BINARY="mysqld-debug"; fi
+if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 

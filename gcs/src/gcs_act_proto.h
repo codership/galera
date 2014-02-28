@@ -50,7 +50,7 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len);
 static inline long
 gcs_act_proto_inc (void* buf)
 {
-    register uint32_t frag_no = gtohl(((uint32_t*)buf)[3]) + 1;
+    uint32_t frag_no = gtohl(((uint32_t*)buf)[3]) + 1;
 #ifdef GCS_DEBUG_PROTO
     if (!frag_no) return -EOVERFLOW;
 #endif
