@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2014 Codership Oy <info@codership.com>
 
 /**
  * @file Logging functions definitions
@@ -55,14 +55,14 @@ int
 gu_conf_debug_on ()
 {
     gu_log_max_level = GU_LOG_DEBUG;
-    gu_debug ("Turning debug on");
+    gu_debug ("Turning debug logging on");
     return 0;
 }
 
 int
 gu_conf_debug_off ()
 {
-    gu_debug ("Turning debug off");
+    gu_debug ("Turning debug logging off");
     gu_log_max_level = GU_LOG_INFO;
     return 0;
 }

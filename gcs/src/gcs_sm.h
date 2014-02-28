@@ -161,7 +161,7 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
     assert(tail == sm->wait_q_head || false == sm->wait_q[tail].wait);
     assert(sm->wait_q[tail].cond == cond || false == sm->wait_q[tail].wait);
     sm->wait_q[tail].cond = NULL;
-    register bool ret = sm->wait_q[tail].wait;
+    bool ret = sm->wait_q[tail].wait;
     sm->wait_q[tail].wait = false;
     return ret;
 }

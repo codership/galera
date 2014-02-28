@@ -131,10 +131,10 @@ namespace galera
 
         struct Param
         {
-            static const std::string commit_order;
-            static const std::string causal_read_timeout;
             static const std::string base_host;
             static const std::string base_port;
+            static const std::string commit_order;
+            static const std::string causal_read_timeout;
         };
 
         typedef std::pair<std::string, std::string> Default;

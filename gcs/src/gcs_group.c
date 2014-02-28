@@ -121,7 +121,7 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
 static void
 group_nodes_free (gcs_group_t* group)
 {
-    register int i;
+    int i;
 
     /* cleanup after disappeared members */
     for (i = 0; i < group->num; i++) {
@@ -147,7 +147,7 @@ gcs_group_free (gcs_group_t* group)
 static inline void
 group_nodes_reset (gcs_group_t* group)
 {
-    register long i;
+    int i;
     /* reset recv_acts at the nodes */
     for (i = 0; i < group->num; i++) {
         if (i != group->my_idx) {

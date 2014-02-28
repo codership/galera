@@ -6,20 +6,21 @@
 
 #include "gu_uri.hpp"
 
+const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
+const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
+
 static const std::string common_prefix = "repl.";
 
 const std::string galera::ReplicatorSMM::Param::commit_order =
     common_prefix + "commit_order";
 const std::string galera::ReplicatorSMM::Param::causal_read_timeout =
     common_prefix + "causal_read_timeout";
-const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
-const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
+    map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
     map_.insert(Default(Param::commit_order, "3"));
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
-    map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -28,6 +29,8 @@ const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
                                               const char* const node_address)
 {
+    Replicator::register_params(conf);
+
     std::map<std::string, std::string>::const_iterator i;
 
     for (i = defaults.map_.begin(); i != defaults.map_.end(); ++i)
