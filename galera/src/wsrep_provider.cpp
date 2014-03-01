@@ -99,6 +99,11 @@ wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
             wsrep_set_params (*repl, params);
             return WSREP_OK;
         }
+        catch (gu::NotFound&)
+        {
+            log_warn << "Unrecognized parameter in '" << params << "'";
+            return WSREP_WARNING;
+        }
         catch (std::exception& e)
         {
             log_debug << e.what(); // better logged in wsrep_set_params
