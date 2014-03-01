@@ -117,7 +117,7 @@ galera::ReplicatorSMM::param_set (const std::string& key,
     {
         if (config_.get(key) == value) return;
     }
-    catch (gu::NotFound&) {}
+    catch (gu::NotSet&) {}
 
     bool found(false);
 
