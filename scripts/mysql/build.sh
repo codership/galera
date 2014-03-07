@@ -270,7 +270,6 @@ then
 fi
 
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
-#if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; MYSQLD_BINARY="mysqld-debug"; fi
 if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
@@ -439,7 +438,7 @@ then
             BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
         else # CMake build
             [ "$DEBUG" = "yes" ] \
-            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
+            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
             || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
             [ "$MYSQL_MAJOR_VER$MYSQL_MINOR_VER" -ge "56" ] \
