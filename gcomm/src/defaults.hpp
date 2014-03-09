@@ -13,7 +13,6 @@ namespace gcomm
     {
         static std::string const ProtonetBackend          ;
         static std::string const ProtonetVersion          ;
-        static std::string const SocketUseSsl             ;
         static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
         static std::string const EvsViewForgetTimeout     ;
