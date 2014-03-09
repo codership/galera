@@ -15,7 +15,6 @@ namespace gcomm
 #endif /* HAVE_ASIO_HPP */
 
     std::string const Defaults::ProtonetVersion         = "0";
-    std::string const Defaults::SocketUseSsl            = "no";
     std::string const Defaults::SocketChecksum          = "2";
     std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;

@@ -32,7 +32,7 @@ namespace
         {
             return conf.get(fname);
         }
-        catch (gu::NotFound& e)
+        catch (gu::NotSet& e)
         {
             log_error << "could not find '" << fname << "' from configuration";
             throw;
@@ -103,14 +103,14 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     conf.set(gcomm::Conf::SocketChecksum, checksum_);
 #ifdef HAVE_ASIO_SSL_HPP
     // use ssl if either private key or cert file is specified
-    bool use_ssl(conf_.has(Conf::SocketSslPrivateKeyFile)    == true ||
-                 conf_.has(Conf::SocketSslCertificateFile)   == true);
+    bool use_ssl(conf_.is_set(Conf::SocketSslPrivateKeyFile)  == true ||
+                 conf_.is_set(Conf::SocketSslCertificateFile) == true);
     try
     {
-        // overrides use_ssl is given explicitly
+        // overrides use_ssl if set explicitly
         use_ssl = conf_.get<bool>(Conf::SocketUseSsl);
     }
-    catch (gu::NotFound& nf) { }
+    catch (gu::NotSet& nf) {}
 
     if (use_ssl == true)
     {
@@ -125,6 +125,7 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
         // private key file (required)
         const std::string private_key_file(
             get_file(conf_, Conf::SocketSslPrivateKeyFile));
+
         try
         {
             ssl_context_.use_private_key_file(
