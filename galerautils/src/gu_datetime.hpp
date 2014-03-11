@@ -71,6 +71,9 @@ namespace gu
             bool operator<(const Period& cmp) const
             { return (nsecs < cmp.nsecs); }
 
+            bool operator>=(const Period& cmp) const
+            { return !(*this < cmp); }
+
             Period operator+(const long long add) const
             { return (nsecs + add); }
 

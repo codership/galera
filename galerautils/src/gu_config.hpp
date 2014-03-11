@@ -164,9 +164,8 @@ public:
         case 1: return overflow_char  (ret);
         case 2: return overflow_short (ret);
         case 4: return overflow_int   (ret);
+        default: return ret;
         }
-
-        return ret;
     }
 
     /* iterator stuff */

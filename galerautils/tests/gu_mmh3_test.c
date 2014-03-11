@@ -9,13 +9,13 @@
 #include "../src/gu_hexdump.h"
 
 /* This is to verify all tails plus block + all tails. Max block is 16 bytes */
-static const char const test_input[] = "0123456789ABCDEF0123456789abcde";
+static const char test_input[] = "0123456789ABCDEF0123456789abcde";
 
 typedef struct hash32 { uint8_t h[4]; } hash32_t;
 
 #define NUM_32_TESTS 8 /* 0 to 7 bytes */
 
-static const hash32_t const
+static const hash32_t
 test_output32[NUM_32_TESTS] =
 {
     {{ 0x0b, 0x7c, 0x3e, 0xab }}, /* ''        */
@@ -32,7 +32,7 @@ typedef struct hash128 { uint8_t h[16]; } hash128_t;
 
 #define NUM_128_TESTS 32 /* 0 to 31 bytes */
 
-static const hash128_t const
+static const hash128_t
 test_output128[NUM_128_TESTS] =
 {
     {{ 0xa9,0xce,0x5a,0x56,0x0c,0x0b,0xf7,0xd6,0x63,0x4f,0x6f,0x81,0x0e,0x0b,0xf2,0x0a }},

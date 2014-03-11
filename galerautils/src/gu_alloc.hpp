@@ -218,6 +218,7 @@ private:
     class BaseNameDefault : public BaseName
     {
     public:
+        BaseNameDefault() {} // this is seemingly required by the standard
         void print(std::ostream& os) const { os << "alloc"; }
     };
 

@@ -32,13 +32,16 @@ public:
 
     std::ostream& to_stream (std::ostream& os) const;
 
+    // according to clang C++98 wants copy ctor to be public for temporaries
+    Hexdump (const Hexdump& h) : buf_(h.buf_), size_(h.size_), alpha_(h.alpha_)
+    {}
+
 private:
 
     const byte_t* const buf_;
     size_t const        size_;
     bool const          alpha_;
 
-    Hexdump (const Hexdump&);
     Hexdump& operator = (const Hexdump&);
 };
 

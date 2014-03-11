@@ -30,6 +30,7 @@ START_TEST (ver3_basic)
 
     fail_unless (wso.is_empty());
 
+    // keep SHARED here, see loop below
     TestKey tk0(KeySet::MAX_VERSION, SHARED, true, "a0");
     wso.append_key(tk0());
     fail_if (wso.is_empty());
@@ -90,12 +91,14 @@ START_TEST (ver3_basic)
         fail_if (ksi.count() != 1);
 
         mark_point();
+        int shared(0);
         for (int i(0); i < ksi.count(); ++i)
         {
             KeySet::KeyPart kp(ksi.next());
+            shared += kp.shared();
         }
+        fail_unless(shared > 0);
 
-        mark_point();
         wsi.verify_checksum();
 
         wsi.set_seqno (seqno, pa_range);
@@ -114,12 +117,14 @@ START_TEST (ver3_basic)
         fail_if (ksi.count() != 1);
 
         mark_point();
+        int shared(0);
         for (int i(0); i < ksi.count(); ++i)
         {
             KeySet::KeyPart kp(ksi.next());
+            shared += kp.shared();
         }
+        fail_unless(shared > 0);
 
-        mark_point();
         wsi.verify_checksum();
 
         mark_point();
