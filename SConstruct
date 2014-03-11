@@ -400,7 +400,6 @@ if strict_build_flags == 1:
     conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 if 'clang' in cc:
-    conf.env.Append(CXXFLAGS = ' -D_Bool=bool')
     conf.env.Append(CPPFLAGS = ' -Wno-overloaded-virtual')
 
 env = conf.Finish()
