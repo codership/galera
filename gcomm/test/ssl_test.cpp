@@ -32,7 +32,7 @@ public:
         socket_->close();
     }
 
-    void connect()
+    void connect(bool f = false)
     {
         socket_->connect(uri_);
     }

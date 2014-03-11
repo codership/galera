@@ -174,7 +174,7 @@ public:
         shift_to(S_NON_PRIM);
     }
 
-    void close() { closing_ = true; }
+    void close(bool force = false) { closing_ = true; }
 
     void handle_view (const View&);
 

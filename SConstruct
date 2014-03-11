@@ -399,9 +399,6 @@ if strict_build_flags == 1:
     conf.env.Append(CCFLAGS  = ' -pedantic')
     conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
-if 'clang' in cc:
-    conf.env.Append(CPPFLAGS = ' -Wno-overloaded-virtual')
-
 env = conf.Finish()
 Export('arch', 'x86', 'env', 'sysname', 'libboost_program_options')
 

@@ -208,6 +208,8 @@ public:
         return 0;
     }
 
+    void connect(bool) { }
+
     void connect(const string& channel, bool const bootstrap)
     {
         if (tp_ != 0)
@@ -259,7 +261,7 @@ public:
         log_info << "gcomm: connected";
     }
 
-    void close()
+    void close(bool force = false)
     {
         if (tp_ == 0)
         {

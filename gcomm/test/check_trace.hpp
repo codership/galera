@@ -292,7 +292,7 @@ namespace gcomm
                                        std::mem_fun(&Protolay::connect), first)));
         }
 
-        void close()
+        void close(bool force = false)
         {
             for (std::list<Protolay*>::iterator i = protos_.begin();
                  i != protos_.end(); ++i)
