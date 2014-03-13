@@ -464,11 +464,11 @@ then
                   -DWITH_ZLIB=system \
                   $MEMCACHED_OPT \
                   $MYSQL_SRC \
-            && make -S && popd || exit 1
+            && make -j $JOBS -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
         [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
-        make -S > /dev/null
+        make -j $JOBS -S > /dev/null
         [ $MYSQL_MAJOR != "5.1" ] && popd
     fi
 fi # SKIP_BUILD
