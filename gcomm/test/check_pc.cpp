@@ -1121,7 +1121,7 @@ START_TEST(test_pc_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -1184,7 +1184,7 @@ START_TEST(test_pc_split_merge_w_user_msg)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -1245,7 +1245,7 @@ START_TEST(test_pc_complete_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -1897,7 +1897,7 @@ START_TEST(test_trac_277)
     size_t n_nodes(3);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -1960,7 +1960,7 @@ START_TEST(test_trac_622_638)
     log_info << "START (test_trac_622_638)";
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -2012,7 +2012,7 @@ START_TEST(test_weighted_quorum)
     size_t n_nodes(3);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -2889,7 +2889,7 @@ START_TEST(test_trac_762)
     size_t n_nodes(3);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string suspect_timeout("PT0.3S");
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
