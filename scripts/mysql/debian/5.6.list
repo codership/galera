@@ -72,7 +72,6 @@ f 644 root root $DOCS_DST/INFO_SRC          $MYSQL_SRC/Docs/INFO_SRC
 f 644 root root $DOCS_DST/INSTALL-BINARY    $MYSQL_SRC/Docs/INSTALL-BINARY
 f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
 f 644 root root $DOCS_DST/myisam.txt        $MYSQL_SRC/Docs/myisam.txt
-f 644 root root $DOCS_DST/mysql.info        $MYSQL_SRC/Docs/mysql.info
 f 644 root root $DOCS_DST/sp-imp-spec.txt   $MYSQL_SRC/Docs/sp-imp-spec.txt
 
 # manpages
