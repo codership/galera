@@ -285,6 +285,16 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
             >> c >> istr.group_seqno_ >> c >> istr.peer_);
 }
 
+static void
+get_ist_request(const ReplicatorSMM::StateRequest* str, IST_request* istr)
+{
+  assert(str->ist_len());
+  std::string ist_str(reinterpret_cast<const char*>(str->ist_req()),
+                      str->ist_len());
+  std::istringstream is(ist_str);
+  is >> *istr;
+}
+
 static bool
 sst_is_trivial (const void* const req, size_t const len)
 {
@@ -340,10 +350,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         if (streq->ist_len())
         {
             IST_request istr;
-            std::string ist_str(reinterpret_cast<const char*>(streq->ist_req()),
-                                streq->ist_len());
-            std::istringstream is(ist_str);
-            is >> istr;
+            get_ist_request(streq, &istr);
 
             if (istr.uuid() == state_uuid_)
             {
@@ -530,7 +537,6 @@ retry_str(int ret)
     return (ret == -EAGAIN || ret == -ENOTCONN);
 }
 
-
 void
 ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
                                    wsrep_seqno_t const       group_seqno,
@@ -539,6 +545,17 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
     long ret;
     long tries = 0;
 
+    gu_uuid_t ist_uuid = {{0, }};
+    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
+
+    if (req->ist_len())
+    {
+      IST_request istr;
+      get_ist_request(req, &istr);
+      ist_uuid = to_gu_uuid(istr.uuid());
+      ist_seqno = istr.last_applied();
+    }
+
     do
     {
         tries++;
@@ -546,6 +563,7 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
         gcs_seqno_t seqno_l;
 
         ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
+                                          ist_uuid, ist_seqno,
                                           &seqno_l);
 
         if (ret < 0)

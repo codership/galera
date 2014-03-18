@@ -22,6 +22,11 @@ inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
     return !(a == b);
 }
 
+inline const gu_uuid_t& to_gu_uuid(const wsrep_uuid_t& uuid)
+{
+    return *reinterpret_cast<const gu_uuid_t*>(&uuid);
+}
+
 
 namespace galera
 {

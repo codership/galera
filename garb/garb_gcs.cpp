@@ -106,7 +106,10 @@ Gcs::request_state_transfer (const std::string& request,
     ssize_t ret;
     do
     {
+        gu_uuid_t ist_uuid = {{0, }};
+        gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
         ret = gcs_request_state_transfer (gcs_, req_str, req_len, donor.c_str(),
+                                          &ist_uuid, ist_seqno,
                                           &order);
     }
     while (-EAGAIN == ret && (usleep(1000000), true));
