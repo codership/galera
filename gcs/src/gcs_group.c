@@ -935,8 +935,7 @@ group_find_node_by_state_v1 (gcs_group_t*     const group,
                 hc_donor_idx = idx;
             }
         }
-        else // diff segment.
-        {
+        else { // diff segment.
             if (node->last_applied <= ds_threshold) {
                 if (lc_ds_donor_idx == -1 ||
                     (node->last_applied >
@@ -977,8 +976,7 @@ group_find_node_by_state (gcs_group_t*     const group,
                                            ist_uuid, ist_seqno,
                                            status);
     }
-    else
-    {
+    else {
         return group_find_node_by_state_v1(group, joiner_idx,
                                            ist_uuid, ist_seqno,
                                            status);
@@ -1102,8 +1100,7 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
                                           ist_uuid, ist_seqno,
                                           status);
     }
-    else
-    {
+    else {
         return group_find_node_by_name_v1(group, joiner_idx,
                                           name, name_len,
                                           ist_uuid, ist_seqno,

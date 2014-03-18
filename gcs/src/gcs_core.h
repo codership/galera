@@ -127,6 +127,10 @@ gcs_core_recv (gcs_core_t*          conn,
                struct gcs_act_rcvd* recv_act,
                long long            timeout);
 
+/* group protocol version */
+extern gcs_proto_t
+gcs_core_group_protocol_version (const gcs_core_t* conn);
+
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size.
  * In case of failure returns negative error code, in case of success -

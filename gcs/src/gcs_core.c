@@ -1192,6 +1192,13 @@ long gcs_core_destroy (gcs_core_t* core)
     return 0;
 }
 
+gcs_proto_t
+gcs_core_group_protocol_version (const gcs_core_t* conn)
+{
+    return conn->group.gcs_proto_ver;
+}
+
+
 long
 gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
 {
