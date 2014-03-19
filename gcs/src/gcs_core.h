@@ -28,6 +28,7 @@
 
 #include "gcs.h"
 #include "gcs_act.h"
+#include "gcs_act_proto.h"
 #include <gcache.h>
 
 /* 'static' method to register configuration variables */
