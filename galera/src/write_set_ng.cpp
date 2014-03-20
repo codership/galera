@@ -213,7 +213,9 @@ WriteSetIn::init (ssize_t const st)
 
         if (gu_unlikely(err != 0))
         {
-            gu_throw_error(err) << "Starting checksum thread failed";
+            log_warn << "Starting checksum thread failed";
+            checksum();
+            checksum_fin();
         }
     }
     else

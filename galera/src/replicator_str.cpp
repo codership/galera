@@ -736,6 +736,9 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             {
                 assert(trx != 0);
                 TrxHandleLock lock(*trx);
+                // Verify checksum before applying. This is also required
+                // to synchronize with possible background checksum thread.
+                trx->verify_checksum();
                 if (trx->depends_seqno() == -1)
                 {
                     ApplyOrder ao(*trx);
