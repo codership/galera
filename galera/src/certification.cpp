@@ -351,6 +351,11 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
+        /* we don't want to go any further unless the writeset checksum is ok */
+        trx->verify_checksum();
+        /* if checksum failed we need to abort ASAP, let the caller catch it,
+         * flush monitors, save state and abort. */
+
         for (TrxHandle::CertKeySet::iterator i(key_list.begin());
              i != key_list.end();)
         {
@@ -599,6 +604,11 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
+        /* we don't want to go any further unless the writeset checksum is ok */
+        trx->verify_checksum(); // throws
+        /* if checksum failed we need to throw ASAP, let the caller catch it,
+         * flush monitors, save state and abort. */
+
         assert (key_count == processed);
 
         key_set.rewind();
@@ -761,6 +771,11 @@ galera::Certification::do_test_preordered(TrxHandle* trx)
     assert(trx->new_version());
     assert(trx->preordered());
 
+    /* we don't want to go any further unless the writeset checksum is ok */
+    trx->verify_checksum(); // throws
+    /* if checksum failed we need to throw ASAP, let the caller catch it,
+     * flush monitors, save state and abort. */
+
     /* This is a primitive certification test for preordered actions:
      * it does not handle gaps and relies on general apply monitor for
      * parallel applying. Ideally there should be a certification object
@@ -883,14 +898,6 @@ galera::Certification::TestResult
 galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
-
-    // Note: Checksum verification must be done here. Background write set
-    // checksumming also assigns write set data and it must be finished
-    // before scanning write set keys.
-    // we don't want to go any further unless the writeset checksum is ok
-    trx->verify_checksum();
-    // if checksum failed we need to abort ASAP, let the caller catch it,
-    // flush monitors, save state and abort.
 
     const TestResult ret
         (trx->preordered() ? do_test_preordered(trx) : do_test(trx, bval));
