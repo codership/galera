@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -29,18 +29,19 @@ namespace gcache
 
         void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr);
+        void  free    (BufferHeader* bh);
 
         void* realloc (void* ptr, ssize_t size);
 
-        void  discard (BufferHeader* bh)
+        void  discard (BufferHeader* const bh)
         {
+            assert (BH_is_released(bh));
+            assert (SEQNO_ILL == bh->seqno_g);
             size_free_ += bh->size;
+            assert (size_free_ <= size_cache_);
         }
 
         ssize_t size      () const { return size_cache_; }
-
-        ssize_t rb_size   () const { return fd_.get_size(); }
 
         const std::string& rb_name() const { return fd_.get_name(); }
 
@@ -48,14 +49,36 @@ namespace gcache
 
         void  seqno_reset();
 
-        void  discard_seqno  (int64_t seqno);
+        /* returns true when successfully discards all seqnos up to s */
+        bool  discard_seqno  (int64_t s);
+
+        void print (std::ostream& os) const;
 
         static ssize_t pad_size()
         {
             RingBuffer* rb(0);
             // cppcheck-suppress nullPounter
             return (PREAMBLE_LEN * sizeof(*(rb->preamble_)) +
-                    HEADER_LEN * sizeof(*(rb->header_)));
+                    HEADER_LEN   * sizeof(*(rb->header_)));
+        }
+
+        void assert_size_free() const
+        {
+#ifndef NDEBUG
+            if (next_ > first_)
+            {
+                /* start_  first_      next_    end_
+                 *   |       |###########|       |      */
+                assert(size_free_ >= (size_cache_ - (next_ - first_)));
+            }
+            else
+            {
+                /* start_  next_       first_   end_
+                 *   |#######|           |#####| |      */
+                assert(size_free_ >= (first_ - next_));
+            }
+            assert (size_free_ <= size_cache_);
+#endif
         }
 
     private:
@@ -82,17 +105,20 @@ namespace gcache
 
         seqno2ptr_t&    seqno2ptr_;
 
-        BufferHeader* get_new_buffer (ssize_t size);
+        BufferHeader*   get_new_buffer (ssize_t size);
 
-        void  constructor_common();
+        void            constructor_common();
 
         RingBuffer(const gcache::RingBuffer&);
         RingBuffer& operator=(const gcache::RingBuffer&);
-
-        friend std::ostream& operator<< (std::ostream&, const RingBuffer&);
     };
 
-    std::ostream& operator<< (std::ostream&, const RingBuffer&);
-}
+    inline std::ostream& operator<< (std::ostream& os, const RingBuffer& rb)
+    {
+        rb.print(os);
+        return os;
+    }
+
+} /* namespace gcache */
 
 #endif /* _gcache_rb_store_hpp_ */

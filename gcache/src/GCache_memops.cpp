@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -8,27 +8,39 @@
 
 namespace gcache
 {
-    void
+    bool
     GCache::discard_seqno (int64_t seqno)
     {
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {
-            seqno2ptr_t::iterator j = i; ++i;
-            BufferHeader* bh = ptr2BH (j->second);
-            seqno2ptr.erase (j);
-            bh->seqno_g = SEQNO_ILL; // should never be reused
+            seqno2ptr_t::iterator j(i); ++i;
+            BufferHeader* bh(ptr2BH (j->second));
 
             if (gu_likely(BH_is_released(bh)))
             {
+                assert (bh->seqno_g <= seqno);
+
+                seqno2ptr.erase (j);
+                bh->seqno_g = SEQNO_ILL; // will never be reused
+
                 switch (bh->store)
                 {
                 case BUFFER_IN_MEM:  mem.discard (bh); break;
                 case BUFFER_IN_RB:   rb.discard  (bh); break;
-                case BUFFER_IN_PAGE: break;
+                case BUFFER_IN_PAGE: ps.discard  (bh); break;
+                default:
+                    log_fatal << "Corrupt buffer header: " << bh;
+                    abort();
                 }
             }
+            else
+            {
+                return false;
+            }
         }
+
+        return true;
     }
 
     void*
@@ -54,7 +66,44 @@ namespace gcache
     }
 
     void
-    GCache::free (const void* ptr)
+    GCache::free_common (BufferHeader* const bh)
+    {
+        assert(bh->seqno_g != SEQNO_ILL);
+        BH_release(bh);
+
+#ifndef NDEBUG
+        std::set<const void*>::iterator it = buf_tracker.find(ptr);
+        if (it == buf_tracker.end())
+        {
+            log_fatal << "Have not allocated this ptr: " << ptr;
+            abort();
+        }
+        buf_tracker.erase(it);
+#endif
+        frees++;
+
+        switch (bh->store)
+        {
+        case BUFFER_IN_MEM:  mem.free (bh); break;
+        case BUFFER_IN_RB:   rb.free  (bh); break;
+        case BUFFER_IN_PAGE:
+            if (gu_likely(bh->seqno_g > 0))
+            {
+                discard_seqno (bh->seqno_g);
+            }
+            else
+            {
+                assert(bh->seqno_g != SEQNO_ILL);
+                bh->seqno_g = SEQNO_ILL;
+                ps.discard (bh);
+            }
+            break;
+        }
+        rb.assert_size_free();
+    }
+
+    void
+    GCache::free (void* ptr)
     {
         if (gu_likely(0 != ptr))
         {
@@ -75,8 +124,8 @@ namespace gcache
     {
         size += sizeof(BufferHeader);
 
-        void*         new_ptr = 0;
-        BufferHeader* bh      = ptr2BH(ptr);
+        void*               new_ptr(0);
+        BufferHeader* const bh(ptr2BH(ptr));
 
         if (gu_unlikely(bh->seqno_g > 0)) // sanity check
         {
@@ -111,7 +160,7 @@ namespace gcache
             if (0 != new_ptr)
             {
                 memcpy (new_ptr, ptr, bh->size - sizeof(BufferHeader));
-                store->free (ptr);
+                store->free (bh);
             }
         }
 

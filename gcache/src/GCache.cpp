@@ -96,7 +96,7 @@ void* gcache_malloc  (gcache_t* gc, size_t size)
 void  gcache_free    (gcache_t* gc, const void* ptr)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
-    gcache->free (ptr);
+    gcache->free (const_cast<void*>(ptr));
 }
 
 void* gcache_realloc (gcache_t* gc, void* ptr, size_t size)

@@ -19,7 +19,7 @@
             df->tail = df->head;                                \
         else {                                                  \
             gu_error ("Could not allocate memory for new "      \
-                      "action of size: %z", df->size);          \
+                      "action of size: %zd", df->size);         \
             assert(0);                                          \
             return -ENOMEM;                                     \
         }                                                       \

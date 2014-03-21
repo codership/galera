@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -72,20 +72,14 @@ namespace gcache
             return 0;
         }
 
-        void  free (const void* ptr)
+        void  free (BufferHeader* bh)
         {
-            if (gu_likely (0 != ptr))
-            {
-                BufferHeader* const bh(ptr2BH(ptr));
+            assert(bh->size > 0);
+            assert(bh->size <= size_);
+            assert(bh->store == BUFFER_IN_MEM);
+            assert(bh->ctx == this);
 
-                assert(bh->size > 0);
-                assert(bh->size <= size_);
-                assert(bh->store == BUFFER_IN_MEM);
-                assert(bh->ctx == this);
-
-                BH_release (bh);
-                if (SEQNO_NONE == bh->seqno_g) discard (bh);
-            }
+            if (SEQNO_NONE == bh->seqno_g) discard (bh);
         }
 
         void* realloc (void* ptr, ssize_t size)

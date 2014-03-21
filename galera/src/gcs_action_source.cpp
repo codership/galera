@@ -31,7 +31,7 @@ public:
         {
         case GCS_ACT_TORDERED:
         case GCS_ACT_STATE_REQ:
-            gcache_.free(act_.buf);
+            gcache_.free(const_cast<void*>(act_.buf));
             break;
         default:
             free(const_cast<void*>(act_.buf));

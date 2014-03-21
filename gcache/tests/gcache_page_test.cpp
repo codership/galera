@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -7,6 +7,15 @@
 #include "gcache_page_store.hpp"
 #include "gcache_bh.hpp"
 #include "gcache_page_test.hpp"
+
+using namespace gcache;
+
+void ps_free (void* ptr)
+{
+    BufferHeader* const bh(ptr2BH(ptr));
+    BH_release (bh);
+    bh->seqno_g = SEQNO_ILL;
+}
 
 START_TEST(test1)
 {
@@ -32,7 +41,8 @@ START_TEST(test1)
     fail_if (0 == tmp);
     fail_if (buf == tmp);
 
-    ps.free (tmp);
+    ps_free(tmp);
+    ps.discard (ptr2BH(tmp));
 }
 END_TEST
 
@@ -58,7 +68,8 @@ START_TEST(test2)
 
     mark_point();
 
-    ps.free (buf);
+    ps_free(buf);
+    ps.discard (ptr2BH(buf));
 }
 END_TEST
 
