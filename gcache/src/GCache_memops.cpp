@@ -72,6 +72,7 @@ namespace gcache
         BH_release(bh);
 
 #ifndef NDEBUG
+        void* const ptr(bh + 1);
         std::set<const void*>::iterator it = buf_tracker.find(ptr);
         if (it == buf_tracker.end())
         {

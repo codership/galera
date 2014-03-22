@@ -28,8 +28,9 @@ namespace gcache
         void  free    (BufferHeader* bh)
         {
             assert (bh >= mmap_.ptr);
-            assert (bh <= (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size -
-                           sizeof(BufferHeader)));
+            assert (static_cast<void*>(bh) <=
+                    (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size -
+                     sizeof(BufferHeader)));
             assert (used_ > 0);
             used_--;
         }
