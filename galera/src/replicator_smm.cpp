@@ -1021,7 +1021,6 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
         trx->set_state(TrxHandle::S_ABORTING);
-        // Called now from cert(): report_last_committed();
         break;
     default:
         log_error << "unrecognized retval "
@@ -1648,6 +1647,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     LocalOrder  lo(*trx);
     ApplyOrder  ao(*trx);
     CommitOrder co(*trx, co_mode_);
+
     bool interrupted(false);
 
     try
@@ -1711,9 +1711,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             break;
         }
 
-        // we probably want to do it 'in order' for std::map reasons, so keeping
+        // we must do it 'in order' for std::map reasons, so keeping
         // it inside the monitor
-        /*! @todo: benchmark both variants on SMP */
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
                               trx->depends_seqno());
@@ -1737,28 +1736,31 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     return retval;
 }
 
-
+/* This must be called BEFORE local_monitor_.self_cancel() due to
+ * gcache_.seqno_assign() */
 wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
 {
-    wsrep_status_t retval(WSREP_OK);
-    switch (cert_.test(trx, false))
+    Certification::TestResult const res(cert_.test(trx, false));
+
+    switch (res)
     {
     case Certification::TEST_OK:
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-        retval = WSREP_BF_ABORT;
-        break;
+        return WSREP_BF_ABORT;
+
     case Certification::TEST_FAILED:
         if (trx->state() != TrxHandle::S_MUST_ABORT)
         {
             trx->set_state(TrxHandle::S_MUST_ABORT);
         }
-        retval = WSREP_TRX_FAIL;
-
         gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
+        return WSREP_TRX_FAIL;
 
-        break;
+    default:
+        log_fatal << "Unexpected return value from Certification::test(): "
+                  << res;
+        abort();
     }
-    return retval;
 }
 
 

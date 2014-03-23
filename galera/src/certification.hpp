@@ -105,6 +105,7 @@ namespace galera
         void set_log_conflicts(const std::string& str);
 
     private:
+
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v1to2(TrxHandle*, bool);
         TestResult do_test_v3(TrxHandle*, bool);
