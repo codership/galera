@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file memory operations interface */
@@ -23,7 +23,7 @@ namespace gcache
         malloc  (ssize_t size)            = 0;
 
         virtual void
-        free    (const void* ptr)         = 0;
+        free    (BufferHeader* bh)        = 0;
 
         virtual void*
         realloc (void* ptr, ssize_t size) = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file page store class */
@@ -26,13 +26,23 @@ namespace gcache
 
         ~PageStore ();
 
+        static PageStore* page_store(const Page* p)
+        {
+            return static_cast<PageStore*>(p->parent());
+        }
+
         void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr);
+        void  free    (BufferHeader* bh) { assert(0); }
 
         void* realloc (void* ptr, ssize_t size);
 
-        void  discard (BufferHeader* bh) {};
+        void  discard (BufferHeader* bh)
+        {
+            assert(BH_is_released(bh));
+            assert(SEQNO_ILL == bh->seqno_g);
+            free_page_ptr(static_cast<Page*>(bh->ctx), bh);
+        }
 
         void  reset();
 
@@ -68,9 +78,9 @@ namespace gcache
         void* malloc_new (ssize_t size) ;
 
         void
-        free_page_ptr (Page* page, const void* ptr)
+        free_page_ptr (Page* page, BufferHeader* bh)
         {
-            page->free(ptr);
+            page->free(bh);
             if (0 == page->used()) cleanup();
         }
 

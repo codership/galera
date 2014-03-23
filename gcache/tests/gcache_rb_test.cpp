@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -40,15 +40,17 @@ START_TEST(test1)
     fail_if (BH_is_released(bh2));
 
     void* tmp = rb.realloc (buf1, 2 + bh_size);
+    fail_if (bh2->seqno_g != SEQNO_NONE);
     fail_if (NULL != tmp);
 
-    rb.free (buf2);
-    fail_if (!BH_is_released(bh2));
+    BH_release(bh2);
+    rb.free (bh2);
 
     tmp = rb.realloc (buf1, 2 + bh_size);
     fail_if (NULL != tmp);
 
-    rb.free (buf1);
+    BH_release(bh1);
+    rb.free (bh1);
     fail_if (!BH_is_released(bh1));
 
     buf1 = rb.malloc (1 + bh_size);
@@ -68,11 +70,11 @@ START_TEST(test1)
     tmp = rb.malloc (1 + bh_size);
     fail_if (NULL != tmp);
 
-    rb.free(buf1);
-    fail_if (!BH_is_released(ptr2BH(buf1)));
+    BH_release(ptr2BH(buf1));
+    rb.free(ptr2BH(buf1));
 
-    rb.free(buf2);
-    fail_if (!BH_is_released(ptr2BH(buf2)));
+    BH_release(ptr2BH(buf2));
+    rb.free(ptr2BH(buf2));
 
     tmp = rb.malloc (2 + bh_size);
     fail_if (NULL == tmp);
