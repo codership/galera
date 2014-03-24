@@ -102,6 +102,13 @@ namespace galera
                     (key_count_ += count /* restore count */, false));
         }
 
+        double get_avg_test_interval() const
+        {
+            gu::Lock lock(mutex_);
+            return (test_count_ == 0 ? 0 :
+                    double(test_interval_) / test_count_);
+        }
+
         void set_log_conflicts(const std::string& str);
 
     private:
@@ -177,6 +184,8 @@ namespace galera
         wsrep_trx_id_t last_preordered_id_;
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
+        size_t        test_count_;
+        wsrep_seqno_t test_interval_;
 
         gu::Atomic<long>    key_count_;
 

@@ -106,6 +106,7 @@ typedef enum status_vars
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
     STATS_CAUSAL_READS,
+    STATS_CERT_TEST_INTERVAL,
     STATS_INCOMING_LIST,
     STATS_MAX
 } StatusVars;
@@ -146,6 +147,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_state_comment",      WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",          WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
+    { "cert_test_interval",       WSREP_VAR_DOUBLE, { 0 }  },
     { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
     { 0,                          WSREP_VAR_STRING, { 0 }  }
 };
@@ -200,6 +202,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
 
     sv[STATS_CERT_DEPS_DISTANCE  ].value._double = cert_.get_avg_deps_dist();
+    sv[STATS_CERT_TEST_INTERVAL  ].value._double = cert_.
+            get_avg_test_interval();
 
     double oooe;
     double oool;

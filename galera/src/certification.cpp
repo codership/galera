@@ -814,6 +814,8 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     last_preordered_id_    (0),
     n_certified_           (0),
     deps_dist_             (0),
+    test_count_            (0),
+    test_interval_         (0),
     key_count_             (0),
 
     max_length_            (max_length(conf)),
@@ -893,6 +895,9 @@ galera::Certification::TestResult
 galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
+
+    test_count_ ++;
+    test_interval_ += (trx->global_seqno() - trx->last_seen_seqno());
 
     const TestResult ret
         (trx->preordered() ? do_test_preordered(trx) : do_test(trx, bval));
