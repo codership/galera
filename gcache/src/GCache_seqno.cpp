@@ -131,7 +131,7 @@ namespace gcache
 #endif
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {
-                assert (seqno_released + 1 == it->first);
+                assert (seqno_released + 1 == it->first || seqno_released == 0);
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
                 seqno_released = it->first;
