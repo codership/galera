@@ -671,7 +671,7 @@ namespace galera
               annt_  (NULL),
               check_thr_id_(),
               check_thr_(false),
-              check_ (st <= 0) /* st <= 0 means no checksumming is performed */
+              check_ (false)
         {
             init (st);
         }
@@ -696,7 +696,6 @@ namespace galera
 
             header_.read_buf (buf);
             size_ = buf.size;
-            check_ = (st <= 0);
             init (st);
         }
 
@@ -785,7 +784,7 @@ namespace galera
         bool mutable       check_thr_;
         bool               check_;
 
-        static size_t const SIZE_THRESHOLD = 1 << 2; /* 1Mb */
+        static size_t const SIZE_THRESHOLD = 1 << 22; /* 4Mb */
 
         void checksum (); /* checksums writeset, stores result in check_ */
 
