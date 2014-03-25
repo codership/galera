@@ -757,8 +757,11 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true && res == TEST_OK)
     {
+        gu::Lock lock(stats_mutex_);
         ++n_certified_;
         deps_dist_ += (trx->global_seqno() - trx->depends_seqno());
+        cert_interval_ += (trx->global_seqno() - trx->last_seen_seqno() - 1);
+        index_size_ = (cert_index_.size() + cert_index_ng_.size());
     }
 
     return res;
@@ -812,10 +815,11 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     last_pa_unsafe_        (-1),
     last_preordered_seqno_ (position_),
     last_preordered_id_    (0),
+    stats_mutex_           (),
     n_certified_           (0),
     deps_dist_             (0),
-    test_count_            (0),
-    test_interval_         (0),
+    cert_interval_         (0),
+    index_size_            (0),
     key_count_             (0),
 
     max_length_            (max_length(conf)),
@@ -829,7 +833,14 @@ galera::Certification::~Certification()
     log_info << "cert index usage at exit "   << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
     log_info << "deps set usage at exit "     << deps_set_.size();
-    log_info << "avg deps dist "              << get_avg_deps_dist();
+
+    double avg_cert_interval(0);
+    double avg_deps_dist(0);
+    size_t index_size(0);
+    stats_get(avg_cert_interval, avg_deps_dist, index_size);
+    log_info << "avg deps dist "              << avg_deps_dist;
+    log_info << "avg cert interval "          << avg_cert_interval;
+    log_info << "cert index size "            << index_size;
 
     gu::Lock lock(mutex_);
 
@@ -895,9 +906,6 @@ galera::Certification::TestResult
 galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
-
-    test_count_ ++;
-    test_interval_ += (trx->global_seqno() - trx->last_seen_seqno());
 
     const TestResult ret
         (trx->preordered() ? do_test_preordered(trx) : do_test(trx, bval));

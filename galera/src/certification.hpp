@@ -81,16 +81,28 @@ namespace galera
         TrxHandle* get_trx(wsrep_seqno_t);
 
         // statistics section
-        double get_avg_deps_dist() const
+        void stats_get(double& avg_cert_interval,
+                       double& avg_deps_dist,
+                       size_t& index_size) const
         {
-            gu::Lock lock(mutex_);
-            return (n_certified_ == 0 ? 0 : double(deps_dist_)/n_certified_);
+            gu::Lock lock(stats_mutex_);
+            avg_cert_interval = 0;
+            avg_deps_dist = 0;
+            if (n_certified_)
+            {
+                avg_cert_interval = double(cert_interval_) / n_certified_;
+                avg_deps_dist = double(deps_dist_) / n_certified_;
+            }
+            index_size = index_size_;
         }
 
-        size_t index_size() const
+        void stats_reset()
         {
-            gu::Lock lock(mutex_);
-            return cert_index_.size() + cert_index_ng_.size();
+            gu::Lock lock(stats_mutex_);
+            cert_interval_ = 0;
+            deps_dist_ = 0;
+            n_certified_ = 0;
+            index_size_ = 0;
         }
 
         bool index_purge_required()
@@ -100,13 +112,6 @@ namespace galera
                      (trx_map_.size() + 1) % 128 == 0)
                     ||
                     (key_count_ += count /* restore count */, false));
-        }
-
-        double get_avg_test_interval() const
-        {
-            gu::Lock lock(mutex_);
-            return (test_count_ == 0 ? 0 :
-                    double(test_interval_) / test_count_);
         }
 
         void set_log_conflicts(const std::string& str);
@@ -182,10 +187,11 @@ namespace galera
         wsrep_seqno_t last_pa_unsafe_;
         wsrep_seqno_t last_preordered_seqno_;
         wsrep_trx_id_t last_preordered_id_;
+        gu::Mutex     stats_mutex_;
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
-        size_t        test_count_;
-        wsrep_seqno_t test_interval_;
+        wsrep_seqno_t cert_interval_;
+        size_t        index_size_;
 
         gu::Atomic<long>    key_count_;
 

@@ -106,7 +106,7 @@ typedef enum status_vars
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
     STATS_CAUSAL_READS,
-    STATS_CERT_TEST_INTERVAL,
+    STATS_CERT_INTERVAL,
     STATS_INCOMING_LIST,
     STATS_MAX
 } StatusVars;
@@ -147,7 +147,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_state_comment",      WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",          WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
-    { "cert_test_interval",       WSREP_VAR_DOUBLE, { 0 }  },
+    { "cert_interval",            WSREP_VAR_DOUBLE, { 0 }  },
     { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
     { 0,                          WSREP_VAR_STRING, { 0 }  }
 };
@@ -201,9 +201,15 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
 
-    sv[STATS_CERT_DEPS_DISTANCE  ].value._double = cert_.get_avg_deps_dist();
-    sv[STATS_CERT_TEST_INTERVAL  ].value._double = cert_.
-            get_avg_test_interval();
+
+    double avg_cert_interval(0);
+    double avg_deps_dist(0);
+    size_t index_size(0);
+    cert_.stats_get(avg_cert_interval, avg_deps_dist, index_size);
+
+    sv[STATS_CERT_DEPS_DISTANCE  ].value._double = avg_deps_dist;
+    sv[STATS_CERT_INTERVAL       ].value._double = avg_cert_interval;
+    sv[STATS_CERT_INDEX_SIZE     ].value._int64 = index_size;
 
     double oooe;
     double oool;
@@ -226,7 +232,6 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_STATE         ].value._int64  = state2stats(state_());
     sv[STATS_LOCAL_STATE_COMMENT ].value._string = state2stats_str(state_(),
                                                                    sst_state_);
-    sv[STATS_CERT_INDEX_SIZE].value._int64 = cert_.index_size();
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
     /* Create a buffer to be passed to the caller. */
@@ -267,6 +272,8 @@ galera::ReplicatorSMM::stats_reset()
     apply_monitor_.flush_stats();
 
     commit_monitor_.flush_stats();
+
+    cert_.stats_reset();
 }
 
 void
