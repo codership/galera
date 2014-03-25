@@ -669,7 +669,8 @@ namespace galera
               data_  (),
               unrd_  (),
               annt_  (NULL),
-              check_thr_(),
+              check_thr_id_(),
+              check_thr_(false),
               check_ (st <= 0) /* st <= 0 means no checksumming is performed */
         {
             init (st);
@@ -682,7 +683,8 @@ namespace galera
               data_  (),
               unrd_  (),
               annt_  (NULL),
-              check_thr_(),
+              check_thr_id_(),
+              check_thr_(false),
               check_ (false)
         {}
 
@@ -708,10 +710,10 @@ namespace galera
 
         ~WriteSetIn ()
         {
-            if (gu_unlikely(false == check_ && size_ != 0))
+            if (gu_unlikely(check_thr_))
             {
                 /* checksum was performed in a parallel thread */
-                pthread_join (check_thr_, NULL);
+                pthread_join (check_thr_id_, NULL);
             }
 
             delete annt_;
@@ -743,10 +745,11 @@ namespace galera
          * and before it is finalized. */
         void verify_checksum() const /* throws */
         {
-            if (gu_unlikely(false == check_ && size_ != 0))
+            if (gu_unlikely(check_thr_))
             {
                 /* checksum was performed in a parallel thread */
-                pthread_join (check_thr_, NULL);
+                pthread_join (check_thr_id_, NULL);
+                check_thr_ = false;
                 checksum_fin();
             }
         }
@@ -778,10 +781,11 @@ namespace galera
         DataSetIn          data_;
         DataSetIn          unrd_;
         DataSetIn*         annt_;
-        pthread_t          check_thr_;
+        pthread_t          check_thr_id_;
+        bool mutable       check_thr_;
         bool               check_;
 
-        static size_t const SIZE_THRESHOLD = 1 << 20; /* 1Mb */
+        static size_t const SIZE_THRESHOLD = 1 << 2; /* 1Mb */
 
         void checksum (); /* checksums writeset, stores result in check_ */
 

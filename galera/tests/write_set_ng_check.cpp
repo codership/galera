@@ -314,6 +314,8 @@ START_TEST (ver3_annotation)
              ls, last_seen);
     fail_if (wsi.flags() != flags);
     fail_if (0 == wsi.timestamp());
+
+    wsi.verify_checksum();
     fail_if (!wsi.annotated());
 
     /* check that annotation has survived */

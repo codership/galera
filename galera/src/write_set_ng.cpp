@@ -189,6 +189,8 @@ const char WriteSetOut::annt_suffix[] = "_annt";
 void
 WriteSetIn::init (ssize_t const st)
 {
+    assert(false == check_thr_);
+
     const gu::byte_t* const pptr (header_.payload());
     ssize_t           const psize(size_ - header_.size());
 
@@ -208,7 +210,8 @@ WriteSetIn::init (ssize_t const st)
                      // performed.
     {
         assert (false == check_);
-        int err = pthread_create (&check_thr_, NULL,
+
+        int err = pthread_create (&check_thr_id_, NULL,
                                   checksum_thread, this);
 
         if (gu_unlikely(err != 0))
@@ -217,6 +220,7 @@ WriteSetIn::init (ssize_t const st)
             checksum();
             checksum_fin();
         }
+        else check_thr_ = true;
     }
     else
     {
