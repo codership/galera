@@ -605,6 +605,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
             local_monitor_.self_cancel(lo);
             apply_monitor_.self_cancel(ao);
             if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+            trx->verify_checksum(); // to sync with checksum thread
         }
         else if (meta != 0)
         {
@@ -1686,7 +1687,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                report_last_committed(cert_.set_trx_committed(trx));
                 retval = WSREP_TRX_FAIL;
             }
             break;
@@ -1700,15 +1700,16 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                              << *trx;
                     assert(0);
                 }
-                apply_monitor_.self_cancel(ao);
-                if (co_mode_ != CommitOrder::BYPASS)
-                    commit_monitor_.self_cancel(co);
             }
-            trx->set_state(TrxHandle::S_MUST_ABORT);
             local_cert_failures_ += trx->is_local();
-            report_last_committed(cert_.set_trx_committed(trx));
+            trx->set_state(TrxHandle::S_MUST_ABORT);
             retval = WSREP_TRX_FAIL;
             break;
+        }
+
+        if (gu_unlikely(WSREP_TRX_FAIL == retval))
+        {
+            report_last_committed(cert_.set_trx_committed(trx));
         }
 
         // we must do it 'in order' for std::map reasons, so keeping
@@ -1723,14 +1724,22 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     {
         retval = cert_for_aborted(trx);
 
-        if (retval != WSREP_BF_ABORT)
+        if (WSREP_TRX_FAIL == retval)
         {
             local_monitor_.self_cancel(lo);
-            apply_monitor_.self_cancel(ao);
-
-            if (co_mode_ != CommitOrder::BYPASS)
-                commit_monitor_.self_cancel(co);
         }
+        else
+        {
+            assert(WSREP_BF_ABORT == retval);
+        }
+    }
+
+    if (gu_unlikely(WSREP_TRX_FAIL == retval))
+    {
+        apply_monitor_.self_cancel(ao);
+        if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+        // this is needed to sync with potential checksum thread
+        trx->verify_checksum();
     }
 
     return retval;
