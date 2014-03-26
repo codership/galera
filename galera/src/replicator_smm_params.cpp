@@ -5,6 +5,7 @@
 #include "galera_common.hpp"
 
 #include "gu_uri.hpp"
+#include "write_set_ng.hpp"
 
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
@@ -20,6 +21,8 @@ const std::string galera::ReplicatorSMM::Param::proto_max =
     common_prefix + "proto_max";
 const std::string galera::ReplicatorSMM::Param::key_format =
     common_prefix + "key_format";
+const std::string galera::ReplicatorSMM::Param::max_write_set_size =
+    common_prefix + "max_write_set_size";
 
 int const galera::ReplicatorSMM::MAX_PROTO_VER(5);
 
@@ -30,6 +33,9 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
     map_.insert(Default(Param::key_format, "FLAT8"));
     map_.insert(Default(Param::commit_order, "3"));
     map_.insert(Default(Param::causal_read_timeout, "PT30S"));
+    const int max_write_set_size(galera::WriteSetNG::MAX_SIZE);
+    map_.insert(Default(Param::max_write_set_size,
+                        gu::to_string(max_write_set_size)));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -127,6 +133,10 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     else if (key == Param::key_format)
     {
         trx_params_.key_format_ = KeySet::version(value);
+    }
+    else if (key == Param::max_write_set_size)
+    {
+        trx_params_.max_write_set_size_ = gu::from_string<int>(value);
     }
     else
     {
