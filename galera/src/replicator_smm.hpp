@@ -200,6 +200,7 @@ namespace galera
         }
 
         wsrep_status_t cert(TrxHandle* trx);
+        wsrep_status_t cert_and_catch(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
 
         void update_state_uuid (const wsrep_uuid_t& u);
