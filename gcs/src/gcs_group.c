@@ -734,7 +734,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         else {
             if (sender_idx == peer_idx) {
-                gu_info ("Node %d.%d (%s) resyncs itself to group",
+                gu_info ("Member %d.%d (%s) resyncs itself to group",
                          sender_idx, sender->segment, sender->name);
             }
             else {
@@ -780,19 +780,19 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         group_redo_last_applied (group);//from now on this node must be counted
 
-        gu_info ("Member %d (%s) synced with group.",
-                 sender_idx, sender->name);
+        gu_info ("Member %d.%d (%s) synced with group.",
+                 sender_idx, sender->segment, sender->name);
 
         return (sender_idx == group->my_idx);
     }
     else {
         if (GCS_NODE_STATE_SYNCED != sender->status) {
-            gu_warn ("SYNC message sender from non-JOINED %d (%s). Ignored.",
-                     sender_idx, sender->name);
+            gu_warn ("SYNC message sender from non-JOINED %d.%d (%s). Ignored.",
+                     sender_idx, sender->segment, sender->name);
         }
         else {
-            gu_debug ("Redundant SYNC message from %d (%s).",
-                      sender_idx, sender->name);
+            gu_debug ("Redundant SYNC message from %d.%d (%s).",
+                      sender_idx, sender->segment, sender->name);
         }
         return 0;
     }
@@ -970,11 +970,11 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
         gcs_node_t* const donor  = &group->nodes[donor_idx];
 
         if (desync) {
-            gu_info ("Node %d (%s) desyncs itself from group",
-                     donor_idx, donor->name);
+            gu_info ("Member %d.%d (%s) desyncs itself from group",
+                     donor_idx, donor->segment, donor->name);
         }
         else {
-            gu_info ("Node %d.%d (%s) requested state transfer from '%s'. "
+            gu_info ("Member %d.%d (%s) requested state transfer from '%s'. "
                      "Selected %d.%d (%s)(%s) as donor.",
                      joiner_idx, joiner->segment, joiner->name,
                      required_donor ? donor_string : "*any*",
@@ -990,9 +990,9 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
     }
     else {
 #if 0
-        gu_warn ("Node %d (%s) requested state transfer from '%s', "
+        gu_warn ("Member %d.%d (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
-                 joiner_idx, group->nodes[joiner_idx].name,
+                 joiner_idx, joiner->seqment, group->nodes[joiner_idx].name,
                  required_donor ? donor_name : "*any*", strerror (-donor_idx));
 #endif
     }
@@ -1050,9 +1050,10 @@ gcs_group_handle_state_request (gcs_group_t*         group,
             return act->act.buf_len;
         }
         else {
-            gu_error ("Node %d (%s) requested state transfer, "
+            gu_error ("Member %d.%d (%s) requested state transfer, "
                       "but its state is %s. Ignoring.",
-                      joiner_idx, joiner_name, joiner_status_string);
+                      joiner_idx, group->nodes[joiner_idx].segment, joiner_name,
+                      joiner_status_string);
             gcs_group_ignore_action (group, act);
             return 0;
         }
