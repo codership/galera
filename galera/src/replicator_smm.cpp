@@ -605,7 +605,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
             local_monitor_.self_cancel(lo);
             apply_monitor_.self_cancel(ao);
             if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
-            trx->verify_checksum(); // to sync with checksum thread
         }
         else if (meta != 0)
         {
@@ -1730,7 +1729,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 
         if (WSREP_TRX_FAIL == retval)
         {
-            trx->verify_checksum();
             local_monitor_.self_cancel(lo);
         }
         else
@@ -1784,6 +1782,9 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
         {
             trx->set_state(TrxHandle::S_MUST_ABORT);
         }
+        // Mext step will be monitors release. Make sure that ws was not
+        // corrupted and cert failure is real before procedeing with that.
+        trx->verify_checksum();
         gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
         return WSREP_TRX_FAIL;
 
