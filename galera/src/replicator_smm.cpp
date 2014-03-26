@@ -144,7 +144,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
                          data_dir_+'/'+GALERA_STATE_FILE : GALERA_STATE_FILE),
     st_                 (state_file_),
     trx_params_         (data_dir_, -1,
-                         KeySet::version(config_.get(Param::key_format))),
+                         KeySet::version(config_.get(Param::key_format)),
+                         gu::from_string<int>(config_.get(
+                             Param::max_write_set_size))),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
@@ -1069,7 +1071,9 @@ writeset_from_handle (wsrep_po_handle_t& handle,
 //                gu::String<256>(trx_params.working_dir_) << '/' << &handle,
                 trx_params.working_dir_, wsrep_trx_id_t(&handle),
                 /* key format is not essential since we're not adding keys */
-                KeySet::version(trx_params.key_format_), NULL, 0);
+                KeySet::version(trx_params.key_format_), NULL, 0,
+                0, WriteSetNG::MAX_VERSION, DataSet::MAX_VERSION, DataSet::MAX_VERSION,
+                trx_params.max_write_set_size_);
 
             handle.opaque = ret;
         }
