@@ -1671,11 +1671,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         switch (cert_.append_trx(trx))
         {
         case Certification::TEST_OK:
-            // at this point we have populated certificaqtion index and
-            // trx map and are about to leave local_monitor_. Make sure
-            // trx checksum is alright before that.
-            trx->verify_checksum();
-
             if (gu_likely(applicable))
             {
                 if (trx->state() == TrxHandle::S_CERTIFYING)
@@ -1717,6 +1712,10 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             report_last_committed(cert_.set_trx_committed(trx));
         }
 
+        // at this point we are about to leave local_monitor_. Make sure
+        // trx checksum was alright before that.
+        trx->verify_checksum();
+
         // we must do it 'in order' for std::map reasons, so keeping
         // it inside the monitor
         gcache_.seqno_assign (trx->action(),
@@ -1731,6 +1730,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 
         if (WSREP_TRX_FAIL == retval)
         {
+            trx->verify_checksum();
             local_monitor_.self_cancel(lo);
         }
         else
@@ -1744,8 +1744,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         // applicable but failed certification: self-cancel monitors
         apply_monitor_.self_cancel(ao);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
-        // this is needed to sync with potential checksum thread
-        trx->verify_checksum();
     }
 
     return retval;
