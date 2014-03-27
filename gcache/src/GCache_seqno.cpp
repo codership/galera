@@ -108,8 +108,11 @@ namespace gcache
                 /* this means that there are no element with
                  * seqno following seqno_released - and this should never happen */
 // this kills some other unit tests: assert(0);
-                log_warn << "Releasing seqno " << seqno << " before "
-                         << seqno_released + 1 << " was assigned.";
+                if (0 != seqno_released)
+                {
+                    log_warn << "Releasing seqno " << seqno << " before "
+                             << seqno_released + 1 << " was assigned.";
+                }
                 return;
             }
 
