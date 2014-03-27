@@ -508,6 +508,15 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
                retval == WSREP_BF_ABORT);
     }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+
+        if (e.get_errno() == EMSGSIZE)
+            retval = WSREP_SIZE_EXCEEDED;
+        else
+            retval = WSREP_NODE_FAIL;
+    }
     catch (std::exception& e)
     {
         log_error << e.what();
