@@ -79,6 +79,7 @@ START_TEST (ver3_basic)
         WriteSetIn wsi(in_buf);
 
         mark_point();
+        wsi.verify_checksum();
         wsrep_seqno_t const ls(wsi.last_seen());
         fail_if (ls != last_seen, "Found last seen: %lld, expected: %lld",
                  ls, last_seen);
@@ -107,6 +108,8 @@ START_TEST (ver3_basic)
     /* repeat reading buffer after "certification" */
     {
         WriteSetIn wsi(in_buf);
+        mark_point();
+        wsi.verify_checksum();
         fail_unless(wsi.certified());
         fail_if (wsi.seqno() != seqno);
         fail_if (wsi.flags() != flags);
@@ -178,6 +181,7 @@ START_TEST (ver3_basic)
         WriteSetIn::GatherVector out;
 
         mark_point();
+        tmp_wsi.verify_checksum();
         gu_trace(tmp_wsi.gather(out, false, false)); // no keys or unrd
 
         /* concatenate all out buffers */
@@ -215,13 +219,16 @@ START_TEST (ver3_basic)
     try /* this is to test payload corruption */
     {
         WriteSetIn wsi(in_buf);
+        mark_point();
+        wsi.verify_checksum();
+        fail("payload corruption slipped through 1");
     }
     catch (gu::Exception& e)
     {
         fail_if (e.get_errno() != EINVAL);
     }
 
-    try /* this is to test postponed checksumming + corruption */
+    try /* this is to test background checksumming + corruption */
     {
         WriteSetIn wsi(in_buf, 2);
 
@@ -229,7 +236,7 @@ START_TEST (ver3_basic)
 
         try {
             wsi.verify_checksum();
-            fail("payload corruption slipped through");
+            fail("payload corruption slipped through 2");
         }
         catch (gu::Exception& e)
         {
@@ -246,6 +253,7 @@ START_TEST (ver3_basic)
     try /* this is to test header corruption */
     {
         WriteSetIn wsi(in_buf, 2 /* this should postpone payload checksum */);
+        wsi.verify_checksum();
         fail("header corruption slipped through");
     }
     catch (gu::Exception& e)
@@ -309,11 +317,14 @@ START_TEST (ver3_annotation)
     WriteSetIn wsi(in_buf);
 
     mark_point();
+    wsi.verify_checksum();
     wsrep_seqno_t const ls(wsi.last_seen());
     fail_if (ls != last_seen, "Found last seen: %lld, expected: %lld",
              ls, last_seen);
     fail_if (wsi.flags() != flags);
     fail_if (0 == wsi.timestamp());
+
+    wsi.verify_checksum();
     fail_if (!wsi.annotated());
 
     /* check that annotation has survived */

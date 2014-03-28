@@ -389,6 +389,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         // of istr.group_seqno() in case there are CCs between
                         // sending and delivering STR. If there are no
                         // intermediate CCs, cc_seqno_ == istr.group_seqno().
+                        // Then duplicate message concern in #746 will be
+                        // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
                                          istr.last_applied() + 1,
@@ -754,6 +756,9 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             {
                 assert(trx != 0);
                 TrxHandleLock lock(*trx);
+                // Verify checksum before applying. This is also required
+                // to synchronize with possible background checksum thread.
+                trx->verify_checksum();
                 if (trx->depends_seqno() == -1)
                 {
                     ApplyOrder ao(*trx);

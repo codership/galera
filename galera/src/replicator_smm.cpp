@@ -714,7 +714,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
     // it has to be certified and potentially applied. #528
     // if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
-    wsrep_status_t retval(cert(trx));
+    wsrep_status_t retval(cert_and_catch(trx));
 
     if (gu_unlikely(retval != WSREP_OK))
     {
@@ -812,7 +812,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
     switch (trx->state())
     {
     case TrxHandle::S_MUST_CERT_AND_REPLAY:
-        retval = cert(trx);
+        retval = cert_and_catch(trx);
         if (retval != WSREP_OK)
         {
             // apply monitor is self canceled in cert
@@ -996,7 +996,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     assert(trx->global_seqno() > apply_monitor_.last_left());
 
     wsrep_status_t retval;
-    switch ((retval = cert(trx)))
+    switch ((retval = cert_and_catch(trx)))
     {
     case WSREP_OK:
     {
@@ -1023,7 +1023,6 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
         trx->set_state(TrxHandle::S_ABORTING);
-        // Called now from cert(): report_last_committed();
         break;
     default:
         log_error << "unrecognized retval "
@@ -1204,7 +1203,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx->depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATING);
 
-    wsrep_status_t const retval(cert(trx));
+    wsrep_status_t const retval(cert_and_catch(trx));
 
     switch (retval)
     {
@@ -1637,6 +1636,8 @@ void galera::ReplicatorSMM::resync()
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+/* don't use this directly, use cert_and_catch() instead */
+inline
 wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_REPLICATING ||
@@ -1652,6 +1653,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     LocalOrder  lo(*trx);
     ApplyOrder  ao(*trx);
     CommitOrder co(*trx, co_mode_);
+
     bool interrupted(false);
 
     try
@@ -1665,13 +1667,14 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     }
 
     wsrep_status_t retval(WSREP_OK);
+    bool const applicable(trx->global_seqno() > apply_monitor_.last_left());
 
     if (gu_likely (!interrupted))
     {
         switch (cert_.append_trx(trx))
         {
         case Certification::TEST_OK:
-            if (trx->global_seqno() > apply_monitor_.last_left())
+            if (gu_likely(applicable))
             {
                 if (trx->state() == TrxHandle::S_CERTIFYING)
                 {
@@ -1690,34 +1693,34 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                report_last_committed(cert_.set_trx_committed(trx));
                 retval = WSREP_TRX_FAIL;
             }
             break;
         case Certification::TEST_FAILED:
-            if (trx->global_seqno() > apply_monitor_.last_left())
+            if (gu_unlikely(trx->is_toi() && applicable)) // small sanity check
             {
-                if (gu_unlikely(trx->is_toi())) // small sanity check
-                {
-                    // may happen on configuration change
-                    log_warn << "Certification failed for TO isolated action: "
-                             << *trx;
-                    assert(0);
-                }
-                apply_monitor_.self_cancel(ao);
-                if (co_mode_ != CommitOrder::BYPASS)
-                    commit_monitor_.self_cancel(co);
+                // may happen on configuration change
+                log_warn << "Certification failed for TO isolated action: "
+                         << *trx;
+                assert(0);
             }
-            trx->set_state(TrxHandle::S_MUST_ABORT);
             local_cert_failures_ += trx->is_local();
-            report_last_committed(cert_.set_trx_committed(trx));
+            trx->set_state(TrxHandle::S_MUST_ABORT);
             retval = WSREP_TRX_FAIL;
             break;
         }
 
-        // we probably want to do it 'in order' for std::map reasons, so keeping
+        if (gu_unlikely(WSREP_TRX_FAIL == retval))
+        {
+            report_last_committed(cert_.set_trx_committed(trx));
+        }
+
+        // at this point we are about to leave local_monitor_. Make sure
+        // trx checksum was alright before that.
+        trx->verify_checksum();
+
+        // we must do it 'in order' for std::map reasons, so keeping
         // it inside the monitor
-        /*! @todo: benchmark both variants on SMP */
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
                               trx->depends_seqno());
@@ -1728,41 +1731,72 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     {
         retval = cert_for_aborted(trx);
 
-        if (retval != WSREP_BF_ABORT)
+        if (WSREP_TRX_FAIL == retval)
         {
             local_monitor_.self_cancel(lo);
-            apply_monitor_.self_cancel(ao);
-
-            if (co_mode_ != CommitOrder::BYPASS)
-                commit_monitor_.self_cancel(co);
         }
+        else
+        {
+            assert(WSREP_BF_ABORT == retval);
+        }
+    }
+
+    if (gu_unlikely(WSREP_TRX_FAIL == retval && applicable))
+    {
+        // applicable but failed certification: self-cancel monitors
+        apply_monitor_.self_cancel(ao);
+        if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
     }
 
     return retval;
 }
 
+/* pretty much any exception in cert() is fatal as it blocks local_monitor_ */
+wsrep_status_t galera::ReplicatorSMM::cert_and_catch(TrxHandle* trx)
+{
+    try
+    {
+        return cert(trx);
+    }
+    catch (std::exception& e)
+    {
+        log_fatal << "Certification exception: " << e.what();
+    }
+    catch (...)
+    {
+        log_fatal << "Unknown certification exception";
+    }
+    abort();
+}
 
+/* This must be called BEFORE local_monitor_.self_cancel() due to
+ * gcache_.seqno_assign() */
 wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
 {
-    wsrep_status_t retval(WSREP_OK);
-    switch (cert_.test(trx, false))
+    Certification::TestResult const res(cert_.test(trx, false));
+
+    switch (res)
     {
     case Certification::TEST_OK:
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-        retval = WSREP_BF_ABORT;
-        break;
+        return WSREP_BF_ABORT;
+
     case Certification::TEST_FAILED:
         if (trx->state() != TrxHandle::S_MUST_ABORT)
         {
             trx->set_state(TrxHandle::S_MUST_ABORT);
         }
-        retval = WSREP_TRX_FAIL;
-
+        // Mext step will be monitors release. Make sure that ws was not
+        // corrupted and cert failure is real before procedeing with that.
+        trx->verify_checksum();
         gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
+        return WSREP_TRX_FAIL;
 
-        break;
+    default:
+        log_fatal << "Unexpected return value from Certification::test(): "
+                  << res;
+        abort();
     }
-    return retval;
 }
 
 

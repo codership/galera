@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -21,18 +21,19 @@ namespace gcache
     {
     public:
 
-        Page (const std::string& name, ssize_t size);
+        Page (void* ps, const std::string& name, ssize_t size);
         ~Page () {}
 
         void* malloc  (ssize_t size);
 
-        void  free    (const void* ptr)
+        void  free    (BufferHeader* bh)
         {
-            assert (ptr > mmap_.ptr);
-            assert (ptr <= (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size));
+            assert (bh >= mmap_.ptr);
+            assert (static_cast<void*>(bh) <=
+                    (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size -
+                     sizeof(BufferHeader)));
             assert (used_ > 0);
             used_--;
-            BH_release (ptr2BH(ptr));
         }
 
         void* realloc (void* ptr, ssize_t size);
@@ -51,10 +52,13 @@ namespace gcache
         /* Drop filesystem cache on the file */
         void drop_fs_cache() const;
 
+        void* parent() const { return ps_; }
+
     private:
 
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
+        void* const        ps_;
         uint8_t*           next_;
         ssize_t            space_;
         ssize_t            used_;

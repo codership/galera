@@ -123,19 +123,25 @@ galera::Certification::purge_for_trx_v3(TrxHandle* trx)
         KeyEntryNG ke(kp);
         CertIndexNG::iterator const ci(cert_index_ng_.find(&ke));
 
-        assert(ci != cert_index_ng_.end());
+//        assert(ci != cert_index_ng_.end());
+        if (gu_unlikely(cert_index_ng_.end() == ci))
+        {
+            log_warn << "Missing key";
+            continue;
+        }
 
         KeyEntryNG* const kep(*ci);
+        assert(kep->referenced());
 
         if (kep->ref_trx(p) == trx)
         {
             kep->unref(p, trx);
-        }
 
-        if (kep->referenced() == false)
-        {
-            cert_index_ng_.erase(ci);
-            delete kep;
+            if (kep->referenced() == false)
+            {
+                cert_index_ng_.erase(ci);
+                delete kep;
+            }
         }
     }
 }
@@ -351,11 +357,6 @@ galera::Certification::do_test_v1to2(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
-        /* we don't want to go any further unless the writeset checksum is ok */
-        trx->verify_checksum();
-        /* if checksum failed we need to abort ASAP, let the caller catch it,
-         * flush monitors, save state and abort. */
-
         for (TrxHandle::CertKeySet::iterator i(key_list.begin());
              i != key_list.end();)
         {
@@ -604,11 +605,6 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
-        /* we don't want to go any further unless the writeset checksum is ok */
-        trx->verify_checksum(); // throws
-        /* if checksum failed we need to throw ASAP, let the caller catch it,
-         * flush monitors, save state and abort. */
-
         assert (key_count == processed);
 
         key_set.rewind();
@@ -774,6 +770,11 @@ galera::Certification::do_test_preordered(TrxHandle* trx)
     assert(trx->new_version());
     assert(trx->preordered());
 
+    /* we don't want to go any further unless the writeset checksum is ok */
+    trx->verify_checksum(); // throws
+    /* if checksum failed we need to throw ASAP, let the caller catch it,
+     * flush monitors, save state and abort. */
+
     /* This is a primitive certification test for preordered actions:
      * it does not handle gaps and relies on general apply monitor for
      * parallel applying. Ideally there should be a certification object
@@ -845,6 +846,8 @@ galera::Certification::~Certification()
     gu::Lock lock(mutex_);
 
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+    service_thd_.release_seqno(position_);
+    service_thd_.flush();
 }
 
 
@@ -888,6 +891,8 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     }
 
     trx_map_.clear();
+    service_thd_.release_seqno(position_);
+    service_thd_.flush();
 
     log_info << "Assign initial position for certification: " << seqno
              << ", protocol version: " << version;
@@ -941,25 +946,24 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
                                         bool const          handle_gcache)
 {
     assert (seqno > 0);
-    TrxMap::iterator    lower_bound(trx_map_.lower_bound(seqno));
-    wsrep_seqno_t const purge_seqno(lower_bound != trx_map_.end() ?
-                                    lower_bound->first : seqno);
 
-    cert_debug << "purging index up to " << purge_seqno;
+    TrxMap::iterator purge_bound(trx_map_.upper_bound(seqno));
 
-    for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
-    trx_map_.erase(trx_map_.begin(), lower_bound);
+    cert_debug << "purging index up to " << seqno;
 
-    if (handle_gcache) service_thd_.release_seqno(purge_seqno);
+    for_each(trx_map_.begin(), purge_bound, PurgeAndDiscard(*this));
+    trx_map_.erase(trx_map_.begin(), purge_bound);
+
+    if (handle_gcache) service_thd_.release_seqno(seqno);
 
     if (0 == ((trx_map_.size() + 1) % 10000))
     {
         log_debug << "trx map after purge: length: " << trx_map_.size()
                   << ", requested purge seqno: " << seqno
-                  << ", real purge seqno: " << purge_seqno;
+                  << ", real purge seqno: " << trx_map_.begin()->first - 1;
     }
 
-    return purge_seqno;
+    return seqno;
 }
 
 

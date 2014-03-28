@@ -189,6 +189,8 @@ const char WriteSetOut::annt_suffix[] = "_annt";
 void
 WriteSetIn::init (ssize_t const st)
 {
+    assert(false == check_thr_);
+
     const gu::byte_t* const pptr (header_.payload());
     ssize_t           const psize(size_ - header_.size());
 
@@ -198,27 +200,35 @@ WriteSetIn::init (ssize_t const st)
 
     if (kver != KeySet::EMPTY) gu_trace(keys_.init (kver, pptr, psize));
 
-    if (size_ < st)
+    assert (false == check_);
+    assert (false == check_thr_);
+
+    if (gu_likely(st > 0)) /* checksum enforced */
     {
-        assert (false == check_);
+        if (size_ >= st)
+        {
+            /* buffer too big, start checksumming in background */
+            int const err(pthread_create (&check_thr_id_, NULL,
+                                          checksum_thread, this));
+
+            if (gu_likely(0 == err))
+            {
+                check_thr_ = true;
+                return;
+            }
+
+            log_warn << "Starting checksum thread failed: " << err
+                     << '(' << ::strerror(err) << ')';
+
+            /* fall through to checksum in foreground */
+        }
+
         checksum();
         checksum_fin();
     }
-    else if (st > 0) // st <= 0 means no checksumming (except for header) is
-                     // performed.
+    else /* checksum skipped, pretend it's alright */
     {
-        assert (false == check_);
-        int err = pthread_create (&check_thr_, NULL,
-                                  checksum_thread, this);
-
-        if (gu_unlikely(err != 0))
-        {
-            gu_throw_error(err) << "Starting checksum thread failed";
-        }
-    }
-    else
-    {
-        assert (true == check_);
+        check_ = true;
     }
 }
 

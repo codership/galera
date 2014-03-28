@@ -21,8 +21,7 @@
 
 namespace gcache
 {
-
-    class GCache : public MemOps
+    class GCache
     {
     public:
 
@@ -40,14 +39,14 @@ namespace gcache
         virtual ~GCache();
 
         /*! prints object properties */
-        void print (std::ostream& os);
+        void  print (std::ostream& os);
 
         /* Resets storage */
-        void reset();
+        void  reset();
 
         /* Memory allocation functions */
         void* malloc  (ssize_t size);
-        void  free    (const void* ptr);
+        void  free    (void* ptr);
         void* realloc (void* ptr, ssize_t size);
 
         /* Seqno related functions */
@@ -70,13 +69,6 @@ namespace gcache
          */
         void seqno_release (int64_t seqno);
 
-#if DEPRECATED
-        /*!
-         * Get the smallest seqno present in the cache.
-         * Locks seqno from removal.
-         */
-        int64_t seqno_get_min ();
-#endif
         /*!
          * Returns smallest seqno present in history
          */
@@ -93,7 +85,7 @@ namespace gcache
          * Move lock to a given seqno.
          * @throws gu::NotFound if seqno is not in the cache.
          */
-        void    seqno_lock (int64_t const seqno_g);
+        void  seqno_lock (int64_t const seqno_g);
 
         /*!          DEPRECATED
          * Get pointer to buffer identified by seqno.
@@ -174,35 +166,7 @@ namespace gcache
 
     private:
 
-        void discard (BufferHeader*) {}
-
-        void free_common (BufferHeader* bh)
-        {
-            void* const ptr(bh + 1);
-
-#ifndef NDEBUG
-            std::set<const void*>::iterator it = buf_tracker.find(ptr);
-            if (it == buf_tracker.end())
-            {
-                log_fatal << "Have not allocated this ptr: " << ptr;
-                abort();
-            }
-            buf_tracker.erase(it);
-#endif
-            frees++;
-
-            switch (bh->store)
-            {
-            case BUFFER_IN_MEM:  mem.free (ptr); break;
-            case BUFFER_IN_RB:   rb.free  (ptr); break;
-            case BUFFER_IN_PAGE:
-                if (gu_likely(bh->seqno_g > 0))
-                {
-                    discard_seqno (bh->seqno_g);
-                }
-                ps.free (ptr); break;
-            }
-        }
+        void free_common (BufferHeader*);
 
         gu::Config&     config;
 
@@ -263,7 +227,9 @@ namespace gcache
 #endif
 
         void constructor_common();
-        void discard_seqno (int64_t);
+
+        /* returns true when successfully discards all seqnos up to s */
+        bool discard_seqno (int64_t s);
 
         // disable copying
         GCache (const GCache&);

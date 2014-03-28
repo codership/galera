@@ -116,6 +116,7 @@ Options:
     -m32/-m64         build 32/64-bit binaries on x86
     -d|--debug        configure build with debug enabled (implies -c)
     -dl|--debug-level set debug level (1, implies -c)
+    --gd|--galera-debug only galera debug build (optimized mysqld)
     --with-spread     configure build with Spread (implies -c)
     --no-strip        prevent stripping of release binaries
     -j|--jobs         number of parallel compilation jobs (${JOBS})

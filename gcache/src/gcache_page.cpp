@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class implementation */
@@ -51,10 +51,11 @@ gcache::Page::drop_fs_cache() const
 #endif
 }
 
-gcache::Page::Page (const std::string& name, ssize_t size)
+gcache::Page::Page (void* ps, const std::string& name, ssize_t size)
     :
     fd_   (name, check_size(size), false, false),
     mmap_ (fd_),
+    ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
     space_(mmap_.size),
     used_ (0)
