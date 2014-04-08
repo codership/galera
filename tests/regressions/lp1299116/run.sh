@@ -11,6 +11,8 @@ MYSQL="mysql -utest -ptestpass -hgw -Dtest"
 MYSQL0="$MYSQL $NODE0"
 MYSQL1="$MYSQL $NODE1"
 
+$SCRIPTS/command.sh restart
+
 $MYSQL0 -e "drop table if exists uniq;"
 $MYSQL0 -e "create table uniq (u varchar(10), unique key unique_key(u));"
 
@@ -21,5 +23,8 @@ do
     wait
 done
 
+$SCRIPTS/command.sh wait_sync 0 1
+
 $SCRIPTS/command.sh check | wc -l
 
+$SCRIPTS/command.sh stop
