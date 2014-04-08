@@ -371,6 +371,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
                     ist_sst_ = true; // gcs_.join() shall be called by IST
+                    gcs_.join(donor_seq);
 
                     wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
 

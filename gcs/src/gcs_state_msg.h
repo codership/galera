@@ -119,7 +119,7 @@ gcs_state_msg_group_uuid (const gcs_state_msg_t* state);
 extern gcs_seqno_t
 gcs_state_msg_received (const gcs_state_msg_t* state);
 
-/* Get last received action seqno */
+/* Get last cached action seqno */
 extern gcs_seqno_t
 gcs_state_msg_cached (const gcs_state_msg_t* state);
 
