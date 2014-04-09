@@ -702,9 +702,12 @@ int main (int argc, char *argv[])
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
-    gu_config_t* gconf = gu_config_create ("gcache.size=0; "
-                                           "gcache.page_size=1M");
+    gu_config_t* gconf = gu_config_create ();
     if (!gconf) goto out;
+
+    if (gu_config_add(gconf, "gcache.size", "0")) goto out;
+    if (gu_config_add(gconf, "gcache.page_size", "1M")) goto out;
+
     if (!(gcache = gcache_create (gconf, ""))) goto out;
     if (!(gcs = gcs_create (gconf, gcache, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);

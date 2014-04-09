@@ -322,8 +322,9 @@ extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
 
 /* GCS Configuration */
 
-/*! Registers configurable parameters with conf object */
-extern void
+/*! Registers configurable parameters with conf object
+ * @return false if success, true if error happened */
+extern bool
 gcs_register_params (gu_config_t* conf);
 
 /*! sets the key to a given value

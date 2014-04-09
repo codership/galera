@@ -65,7 +65,7 @@ START_TEST (gcs_backend_test)
     gcs_backend_t backend;
     long ret;
 
-    gu_config_t* config = gu_config_create ("");
+    gu_config_t* config = gu_config_create ();
     fail_if (config == NULL);
 
     ret = gcs_backend_init (&backend, "wrong://kkk", config);

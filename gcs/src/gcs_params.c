@@ -29,26 +29,34 @@ static ssize_t const GCS_PARAMS_RECV_Q_HARD_LIMIT_DEFAULT     = SSIZE_MAX;
 static const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT = "0.25";
 static const char* const GCS_PARAMS_MAX_THROTTLE_DEFAULT      = "0.25";
 
-void
+bool
 gcs_params_register(gu_config_t* conf)
 {
-    gu_config_add (conf, GCS_PARAMS_FC_FACTOR, GCS_PARAMS_FC_FACTOR_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_FC_LIMIT, GCS_PARAMS_FC_LIMIT_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_FC_MASTER_SLAVE,
-                   GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_FC_DEBUG, GCS_PARAMS_FC_DEBUG_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_SYNC_DONOR, GCS_PARAMS_SYNC_DONOR_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_MAX_PKT_SIZE,
-                   GCS_PARAMS_MAX_PKT_SIZE_DEFAULT);
+    bool ret = 0;
+
+    ret |= gu_config_add (conf, GCS_PARAMS_FC_FACTOR,
+                          GCS_PARAMS_FC_FACTOR_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_FC_LIMIT,
+                          GCS_PARAMS_FC_LIMIT_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_FC_MASTER_SLAVE,
+                          GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_FC_DEBUG,
+                          GCS_PARAMS_FC_DEBUG_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_SYNC_DONOR,
+                          GCS_PARAMS_SYNC_DONOR_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_MAX_PKT_SIZE,
+                          GCS_PARAMS_MAX_PKT_SIZE_DEFAULT);
 
     char tmp[32] = { 0, };
     snprintf (tmp, sizeof(tmp) - 1, "%zd",GCS_PARAMS_RECV_Q_HARD_LIMIT_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_RECV_Q_HARD_LIMIT,tmp);
+    ret |= gu_config_add (conf, GCS_PARAMS_RECV_Q_HARD_LIMIT, tmp);
 
-    gu_config_add (conf, GCS_PARAMS_RECV_Q_SOFT_LIMIT,
-                   GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT);
-    gu_config_add (conf, GCS_PARAMS_MAX_THROTTLE,
-                   GCS_PARAMS_MAX_THROTTLE_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_RECV_Q_SOFT_LIMIT,
+                          GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_MAX_THROTTLE,
+                          GCS_PARAMS_MAX_THROTTLE_DEFAULT);
+
+    return ret;
 }
 
 static long

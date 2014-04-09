@@ -31,7 +31,7 @@
 #include <gcache.h>
 
 /* 'static' method to register configuration variables */
-extern void
+extern bool
 gcs_core_register (gu_config_t* conf);
 
 struct gcs_core;

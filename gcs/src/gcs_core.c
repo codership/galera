@@ -21,10 +21,10 @@
 #include "gcs_group.h"
 #include "gcs_gcache.h"
 
-void
+bool
 gcs_core_register (gu_config_t* conf)
 {
-    gcs_backend_register(conf);
+    return gcs_backend_register(conf);
 }
 
 const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)

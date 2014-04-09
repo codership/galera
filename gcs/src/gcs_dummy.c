@@ -310,7 +310,7 @@ out0:
     return ret;
 }
 
-GCS_BACKEND_REGISTER_FN(gcs_dummy_register) {}
+GCS_BACKEND_REGISTER_FN(gcs_dummy_register) { return false; }
 
 /*! Injects a message in the message queue to produce a desired msg sequence. */
 long

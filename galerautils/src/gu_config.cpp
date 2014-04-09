@@ -208,7 +208,7 @@ std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)
 }
 
 gu_config_t*
-gu_config_create ()
+gu_config_create (void)
 {
     try
     {
@@ -286,17 +286,32 @@ gu_config_is_set (gu_config_t* cnf, const char* key)
     return (conf->is_set (key));
 }
 
-void
+int
 gu_config_add (gu_config_t* cnf, const char* key, const char* const val)
 {
-    if (config_check_set_args (cnf, key, __FUNCTION__)) gu_throw_error(EINVAL);
+    if (config_check_set_args (cnf, key, __FUNCTION__)) return -EINVAL;
 
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
-    if (val != NULL)
-        conf->add (key, val);
-    else
-        conf->add (key);
+    try
+    {
+        if (val != NULL)
+            conf->add (key, val);
+        else
+            conf->add (key);
+
+        return 0;
+    }
+    catch (std::exception& e)
+    {
+        log_error << "Error adding parameter '" << key << "': " << e.what();
+        return -1;
+    }
+    catch (...)
+    {
+        log_error << "Unknown exception adding parameter '" << key << "'";
+        return -1;
+    }
 }
 
 int

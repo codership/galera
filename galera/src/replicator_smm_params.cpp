@@ -5,6 +5,7 @@
 #include "galera_common.hpp"
 
 #include "gu_uri.hpp"
+#include "gu_throw.hpp"
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
@@ -71,7 +72,10 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
 
     /* register variables and defaults from other modules */
     gcache::GCache::register_params(conf);
-    gcs_register_params(reinterpret_cast<gu_config_t*>(&conf));
+    if (gcs_register_params(reinterpret_cast<gu_config_t*>(&conf)))
+    {
+        gu_throw_fatal << "Error intializing GCS parameters";
+    }
     Certification::register_params(conf);
     ist::register_params(conf);
 }
