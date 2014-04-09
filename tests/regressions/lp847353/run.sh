@@ -81,6 +81,9 @@ done
 echo "waiting sqlgens ($sqlgen1_pid $sqlgen2_pid) to complete"
 wait
 
+echo "waiting for nodes to process all transactions"
+../../scripts/command.sh wait_sync 0 1
+
 echo "Done!"
 ../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1
