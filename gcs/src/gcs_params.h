@@ -32,7 +32,7 @@ extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
 extern const char* const GCS_PARAMS_MAX_THROTTLE;
 
 /*! Register configuration parameters */
-extern void
+extern bool
 gcs_params_register(gu_config_t* config);
 
 /*! Initializes parameters from config

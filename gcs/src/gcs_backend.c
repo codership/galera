@@ -24,16 +24,19 @@
 #include "gcs_gcomm.h"
 #endif /* GCS_USE_GCOMM */
 
-void gcs_backend_register(gu_config_t* const conf)
+bool gcs_backend_register(gu_config_t* const conf)
 {
+    bool ret = false;
 #ifdef    GCS_USE_GCOMM
-    gcs_gcomm_register(conf);
+    ret |= gcs_gcomm_register(conf);
 #endif /* GCS_USE_GCOMM */
 #ifdef    GCS_USE_VS
 #endif /* GCS_USE_VS */
 #ifdef    GCS_USE_SPREAD
 #endif /* GCS_USE_SPREAD */
-    gcs_dummy_register(conf);
+    ret |= gcs_dummy_register(conf);
+
+    return ret;
 }
 
 /* Static array describing backend ID - open() pairs */

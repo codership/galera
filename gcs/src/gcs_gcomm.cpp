@@ -837,7 +837,15 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
 
 GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
 {
-    gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
+    try
+    {
+        gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
+        return false;
+    }
+    catch (...)
+    {
+        return true;
+    }
 }
 
 

@@ -191,7 +191,7 @@ _init_params (gcs_conn_t* conn, gu_config_t* conf)
     conn->config_is_local = false;
 
     if (!conn->config) {
-        conn->config = gu_config_create("");
+        conn->config = gu_config_create();
 
         if (conn->config) {
             conn->config_is_local = true;
@@ -2043,10 +2043,9 @@ _set_max_throttle (gcs_conn_t* conn, const char* value)
     }
 }
 
-void gcs_register_params (gu_config_t* const conf)
+bool gcs_register_params (gu_config_t* const conf)
 {
-    gcs_params_register (conf);
-    gcs_core_register   (conf);
+    return (gcs_params_register (conf) | gcs_core_register (conf));
 }
 
 long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)

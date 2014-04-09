@@ -21,7 +21,7 @@ extern "C" {
 typedef struct gu_config gu_config_t;
 
 gu_config_t*
-gu_config_create ();
+gu_config_create (void);
 
 void
 gu_config_destroy (gu_config_t* cnf);
@@ -33,7 +33,7 @@ bool
 gu_config_is_set (gu_config_t* cnf, const char* key);
 
 /* before setting a parameter, it must be added to a known parameter list*/
-void
+int
 gu_config_add (gu_config_t* cnf, const char* key,
                const char* val /*can be NULL*/);
 

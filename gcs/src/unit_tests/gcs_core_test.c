@@ -308,7 +308,7 @@ core_test_init ()
 
     mark_point();
 
-    gu_config_t* config = gu_config_create ("");
+    gu_config_t* config = gu_config_create ();
     fail_if (config == NULL);
 
     Core = gcs_core_create (config, NULL, "core_test",
