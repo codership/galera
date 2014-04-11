@@ -950,8 +950,7 @@ group_lowest_cached_seqno(gcs_group_t* const group)
     int idx = 0;
     for (idx = 0; idx < group->num; idx++) {
         gcs_seqno_t seq = NODE_CACHED_SEQNO(&group->nodes[idx]);
-        if (seq != GCS_SEQNO_ILL &&
-            seq != GCS_SEQNO_NIL)
+        if (seq != GCS_SEQNO_ILL)
         {
             if (ret == GCS_SEQNO_ILL ||
                 seq < ret)
@@ -975,11 +974,13 @@ group_find_ist_donor_by_name (gcs_group_t* const group,
     for (idx = 0; idx < group->num; idx++)
     {
         gcs_node_t* node = &group->nodes[idx];
+        gcs_seqno_t cached = NODE_CACHED_SEQNO(node);
         if (strncmp(node->name, name, name_len) == 0 &&
             joiner_idx != idx &&
             node->status >= status &&
+            cached != GCS_SEQNO_ILL &&
             // ist potentially possible
-            (ist_seqno + 1) >= NODE_CACHED_SEQNO(node))
+            (ist_seqno + 1) >= cached)
         {
             return idx;
         }
@@ -1049,8 +1050,11 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
 {
     gcs_seqno_t conf_seqno = group->quorum.act_id;
     gcs_seqno_t lowest_cached_seqno = group_lowest_cached_seqno(group);
-    assert(lowest_cached_seqno != GCS_SEQNO_ILL &&
-           lowest_cached_seqno != GCS_SEQNO_NIL);
+    if (lowest_cached_seqno == GCS_SEQNO_ILL)
+    {
+        gu_debug("not found. lowest_cached_seqno == GCS_SEQNO_ILL");
+        return -1;
+    }
     gcs_seqno_t safe_ist_seqno =
             conf_seqno - (conf_seqno - lowest_cached_seqno) *
             IST_SAFETY_FACTOR;
@@ -1076,7 +1080,8 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
             if (joiner_idx == idx) continue;
             gcs_node_t* node = &group->nodes[idx];
             if (node->status >= status &&
-                group_node_is_stateful(group, node))
+                group_node_is_stateful(group, node) &&
+                NODE_CACHED_SEQNO(node) != GCS_SEQNO_ILL)
             {
                 if (segment == node->segment &&
                     (ist_seqno + 1) >= NODE_CACHED_SEQNO(node))
