@@ -1,8 +1,9 @@
 /*
- * Copyright (C) 2010-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 #include "gcache_mem_store.hpp"
+#include "gcache_page_store.hpp"
 
 namespace gcache
 {
@@ -19,17 +20,31 @@ MemStore::have_free_space (ssize_t size)
         if (BH_is_released(bh)) /* discard buffer */
         {
             seqno2ptr_.erase(i);
-            bh->seqno_g = SEQNO_NONE;
+            bh->seqno_g = SEQNO_ILL;
 
             switch (bh->store)
             {
-            case BUFFER_IN_RB:
-                bh->ctx->discard(bh);
-                break;
             case BUFFER_IN_MEM:
                 discard(bh);
                 break;
+            case BUFFER_IN_RB:
+                bh->ctx->discard(bh);
+                break;
+            case BUFFER_IN_PAGE:
+            {
+                Page*      const page (static_cast<Page*>(bh->ctx));
+                PageStore* const ps   (PageStore::page_store(page));
+                ps->discard(bh);
+                break;
             }
+            default:
+                log_fatal << "Corrupt buffer header: " << bh;
+                abort();
+            }
+        }
+        else
+        {
+            break;
         }
     }
 
@@ -49,9 +64,10 @@ MemStore::seqno_reset()
         {
             assert (BH_is_released(bh));
 
+            allocd_.erase (tmp);
+
             size_ -= bh->size;
             ::free (bh);
-            allocd_.erase (tmp);
         }
     }
 }

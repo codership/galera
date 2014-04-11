@@ -5,8 +5,11 @@
 #include "galera_common.hpp"
 
 #include "gu_uri.hpp"
+#include "write_set_ng.hpp"
+#include "gu_throw.hpp"
 
-int const galera::ReplicatorSMM::MAX_PROTO_VER(5);
+const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
+const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
 
 static const std::string common_prefix = "repl.";
 
@@ -18,17 +21,21 @@ const std::string galera::ReplicatorSMM::Param::proto_max =
     common_prefix + "proto_max";
 const std::string galera::ReplicatorSMM::Param::key_format =
     common_prefix + "key_format";
+const std::string galera::ReplicatorSMM::Param::max_write_set_size =
+    common_prefix + "max_ws_size";
 
-const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
-const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
+int const galera::ReplicatorSMM::MAX_PROTO_VER(5);
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
-    map_.insert(Default(Param::commit_order, "3"));
-    map_.insert(Default(Param::causal_read_timeout, "PT30S"));
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
     map_.insert(Default(Param::proto_max,  gu::to_string(MAX_PROTO_VER)));
     map_.insert(Default(Param::key_format, "FLAT8"));
+    map_.insert(Default(Param::commit_order, "3"));
+    map_.insert(Default(Param::causal_read_timeout, "PT30S"));
+    const int max_write_set_size(galera::WriteSetNG::MAX_SIZE);
+    map_.insert(Default(Param::max_write_set_size,
+                        gu::to_string(max_write_set_size)));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -37,6 +44,8 @@ const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
                                               const char* const node_address)
 {
+    Replicator::register_params(conf);
+
     std::map<std::string, std::string>::const_iterator i;
 
     for (i = defaults.map_.begin(); i != defaults.map_.end(); ++i)
@@ -86,7 +95,10 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
 
     /* register variables and defaults from other modules */
     gcache::GCache::register_params(conf);
-    gcs_register_params(reinterpret_cast<gu_config_t*>(&conf));
+    if (gcs_register_params(reinterpret_cast<gu_config_t*>(&conf)))
+    {
+        gu_throw_fatal << "Error intializing GCS parameters";
+    }
     Certification::register_params(conf);
     ist::register_params(conf);
 }
@@ -125,6 +137,10 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     {
         trx_params_.key_format_ = KeySet::version(value);
     }
+    else if (key == Param::max_write_set_size)
+    {
+        trx_params_.max_write_set_size_ = gu::from_string<int>(value);
+    }
     else
     {
         log_warn << "parameter '" << "' not found";
@@ -141,7 +157,7 @@ galera::ReplicatorSMM::param_set (const std::string& key,
     {
         if (config_.get(key) == value) return;
     }
-    catch (gu::NotFound&) {}
+    catch (gu::NotSet&) {}
 
     bool found(false);
 

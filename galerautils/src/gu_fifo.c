@@ -224,7 +224,7 @@ void gu_fifo_open (gu_fifo_t* q)
 /* lock the queue and wait if it is empty */
 static inline int fifo_lock_get (gu_fifo_t *q)
 {
-    register int ret = 0;
+    int ret = 0;
 
     fifo_lock(q);
 
@@ -252,7 +252,7 @@ static inline int fifo_unlock_get (gu_fifo_t *q)
 /* lock the queue and wait if it is full */
 static inline int fifo_lock_put (gu_fifo_t *q)
 {
-    register int ret = 0;
+    int ret = 0;
 
     fifo_lock(q);
     while (0 == ret && q->used == q->length && !q->closed) {
@@ -306,7 +306,7 @@ void gu_fifo_pop_head (gu_fifo_t* q)
 {
     if (FIFO_COL(q, q->head) == q->col_mask) {
         /* removing last unit from the row */
-        register ulong row = FIFO_ROW (q, q->head);
+        ulong row = FIFO_ROW (q, q->head);
         assert (q->rows[row] != NULL);
         gu_free (q->rows[row]);
         q->rows[row] = NULL;

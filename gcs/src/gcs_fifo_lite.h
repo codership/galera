@@ -76,7 +76,7 @@ _gcs_fifo_lite_head (gcs_fifo_lite_t* f)
 static inline void*
 gcs_fifo_lite_get_tail (gcs_fifo_lite_t* fifo)
 {
-    register void* ret = NULL;
+    void* ret = NULL;
 
     GCS_FIFO_LITE_LOCK;
 
@@ -119,7 +119,7 @@ gcs_fifo_lite_push_tail (gcs_fifo_lite_t* fifo)
 static inline void*
 gcs_fifo_lite_get_head (gcs_fifo_lite_t* fifo)
 {
-    register void* ret = NULL;
+    void* ret = NULL;
 
     GCS_FIFO_LITE_LOCK;
 
@@ -167,7 +167,7 @@ gcs_fifo_lite_release (gcs_fifo_lite_t* fifo)
 static inline bool
 gcs_fifo_lite_remove (gcs_fifo_lite_t* const fifo)
 {
-    register bool ret = false;
+    bool ret = false;
     assert (fifo);
 
     GCS_FIFO_LITE_LOCK;

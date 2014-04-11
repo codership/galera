@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
  */
 
 /*! @file page store implementation */
@@ -107,7 +107,7 @@ gcache::PageStore::delete_page ()
 /* Deleting pages only from the beginning kinda means that some free pages
  * can be locked in the middle for a while. Leaving it like that for simplicity
  * for now. */
-inline void
+void
 gcache::PageStore::cleanup ()
 {
     while (total_size_   > keep_size_ &&
@@ -125,7 +125,7 @@ gcache::PageStore::reset ()
 inline void
 gcache::PageStore::new_page (ssize_t size)
 {
-    Page* const page = new Page (make_page_name (base_name_, count_), size);
+    Page* const page(new Page(this, make_page_name (base_name_, count_), size));
 
     pages_.push_back (page);
     total_size_ += size;
@@ -230,22 +230,15 @@ gcache::PageStore::malloc (ssize_t size)
     return malloc_new (size);
 }
 
-void
-gcache::PageStore::free (const void* ptr)
-{
-    Page* page = static_cast<Page*>((ptr2BH(ptr))->ctx);
-
-    free_page_ptr(page, ptr);
-}
-
 void*
 gcache::PageStore::realloc (void* ptr, ssize_t size)
 {
-    void* ret = 0;
+    assert(ptr != 0);
 
-    Page* page = static_cast<Page*>((ptr2BH(ptr))->ctx);
+    BufferHeader* const bh(ptr2BH(ptr));
+    Page* const page(static_cast<Page*>(bh->ctx));
 
-    ret = page->realloc (ptr, size);
+    void* ret(page->realloc(ptr, size));
 
     if (0 != ret) return ret;
 
@@ -253,10 +246,10 @@ gcache::PageStore::realloc (void* ptr, ssize_t size)
 
     if (gu_likely(0 != ret))
     {
-        ssize_t ptr_size = (ptr2BH(ptr))->size - sizeof(BufferHeader);
+        ssize_t const ptr_size(bh->size - sizeof(BufferHeader));
 
         memcpy (ret, ptr, size > ptr_size ? ptr_size : size);
-        free_page_ptr (page, ptr);
+        free_page_ptr (page, bh);
     }
 
     return ret;

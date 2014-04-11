@@ -188,9 +188,12 @@ START_TEST (ver0)
         fail("%s", e.what());
     }
 
+    int shared(0); // to stiffle clang complaints about unused variables
+
     for (int i(0); i < ksi.count(); ++i)
     {
         KeySet::KeyPart kp(ksi.next());
+        shared += kp.shared();
     }
 
     KeySetIn ksi_empty;
@@ -219,6 +222,7 @@ START_TEST (ver0)
     for (int i(0); i < ksi_empty.count(); ++i)
     {
         KeySet::KeyPart kp(ksi_empty.next());
+        shared += kp.shared();
     }
 
     ksi_empty.rewind();
@@ -226,7 +230,10 @@ START_TEST (ver0)
     for (int i(0); i < ksi_empty.count(); ++i)
     {
         KeySet::KeyPart kp(ksi_empty.next());
+        shared += kp.shared();
     }
+
+    fail_if(0 == shared);
 }
 END_TEST
 

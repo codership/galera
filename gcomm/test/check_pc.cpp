@@ -1068,6 +1068,7 @@ static_gu_conf()
 }
 
 static DummyNode* create_dummy_node(size_t idx,
+                                    const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT1H",
                                     int weight = 1)
@@ -1075,7 +1076,8 @@ static DummyNode* create_dummy_node(size_t idx,
     gu::Config& gu_conf(static_gu_conf());
     gcomm::Conf::register_params(gu_conf);
     const string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
-        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
+        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
+        + Conf::EvsSuspectTimeout + "=" + suspect_timeout + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
@@ -1097,6 +1099,15 @@ static DummyNode* create_dummy_node(size_t idx,
     }
 }
 
+namespace
+{
+    gcomm::pc::Proto* pc_from_dummy(DummyNode* dn)
+    {
+        return reinterpret_cast<Proto*>(dn->protos().back());
+    }
+}
+
+
 static ViewType view_type(const size_t i_begin, const size_t i_end,
                           const size_t n_nodes)
 {
@@ -1110,6 +1121,7 @@ START_TEST(test_pc_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
@@ -1118,7 +1130,8 @@ START_TEST(test_pc_split_merge)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, inactive_timeout,retrans_period));
+        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+                                       inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
@@ -1171,13 +1184,15 @@ START_TEST(test_pc_split_merge_w_user_msg)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
+        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+                                       inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
@@ -1230,13 +1245,15 @@ START_TEST(test_pc_complete_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
+        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+                                       inactive_timeout, retrans_period));
         log_info << "i " << i;
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1880,13 +1897,15 @@ START_TEST(test_trac_277)
     size_t n_nodes(3);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
+        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+                                       inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
@@ -1941,18 +1960,21 @@ START_TEST(test_trac_622_638)
     log_info << "START (test_trac_622_638)";
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
     // Create two node cluster and make it split. First node is
     // considered crashed after split (stay isolated in non-prim).
-    dn.push_back(create_dummy_node(1, inactive_timeout, retrans_period));
+    dn.push_back(create_dummy_node(1, suspect_timeout,
+                                   inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[0], true));
     set_cvi(dn, 0, 0, ++view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(false));
 
-    dn.push_back(create_dummy_node(2, inactive_timeout, retrans_period));
+    dn.push_back(create_dummy_node(2, suspect_timeout,
+                                   inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[1], false));
     set_cvi(dn, 0, 1, ++view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(false));
@@ -1971,7 +1993,8 @@ START_TEST(test_trac_622_638)
 
     // Add third node which will be connected with node 2. This will
     // be started with prim status.
-    dn.push_back(create_dummy_node(3, inactive_timeout, retrans_period));
+    dn.push_back(create_dummy_node(3, suspect_timeout,
+                                   inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[2], true));
     prop.split(1, 3); // avoid 1 <-> 3 communication
     ++view_seq;
@@ -1989,13 +2012,15 @@ START_TEST(test_weighted_quorum)
     size_t n_nodes(3);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
     const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, inactive_timeout,
+        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+                                       inactive_timeout,
                                        retrans_period, i));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -2858,6 +2883,236 @@ START_TEST(test_weight_change_leaving)
 END_TEST
 
 
+START_TEST(test_trac_762)
+{
+    log_info << "START (trac_762)";
+    size_t n_nodes(3);
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    const string suspect_timeout("PT0.35S");
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
+    uint32_t view_seq = 0;
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1,
+                                       suspect_timeout,
+                                       inactive_timeout,
+                                       retrans_period));
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, ++view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    log_info << "split 1";
+    // split group so that node 3 becomes isolated
+    prop.split(1, 3);
+    prop.split(2, 3);
+    ++view_seq;
+    set_cvi(dn, 0, 1, view_seq, V_PRIM);
+    set_cvi(dn, 2, 2, view_seq, V_NON_PRIM);
+    gu_trace(prop.propagate_until_cvi(true));
+
+    mark_point();
+    log_info << "remerge 1";
+
+    // detach PC layer from EVS and lower layers, attach to DummyTransport
+    for (size_t i(0); i < n_nodes; ++i)
+    {
+        std::list<Protolay*>::iterator li0(dn[i]->protos().begin());
+        std::list<Protolay*>::iterator li1(li0);
+        ++li1;
+        assert(li1 != dn[i]->protos().end());
+        std::list<Protolay*>::iterator li2(li1);
+        ++li2;
+        assert(li2 != dn[i]->protos().end());
+        gcomm::disconnect(*li0, *li1);
+        gcomm::disconnect(*li1, *li2);
+        delete *li0;
+        delete *li1;
+        dn[i]->protos().pop_front();
+        dn[i]->protos().pop_front();
+
+        DummyTransport* tp(new DummyTransport(dn[i]->uuid(), true));
+        dn[i]->protos().push_front(tp);
+        gcomm::connect(tp, *li2);
+    }
+
+    Proto* pc1(pc_from_dummy(dn[0]));
+    DummyTransport* tp1(reinterpret_cast<DummyTransport*>(
+                            dn[0]->protos().front()));
+    Proto* pc2(pc_from_dummy(dn[1]));
+    DummyTransport* tp2(reinterpret_cast<DummyTransport*>(
+                            dn[1]->protos().front()));
+    Proto* pc3(pc_from_dummy(dn[2]));
+    DummyTransport* tp3(reinterpret_cast<DummyTransport*>(
+                            dn[2]->protos().front()));
+
+
+    // remerge group, process event by event so that nodes 1 and 2 handle
+    // install message in reg view and reach prim view, node 3 partitions and
+    // handles install in trans view and marks nodes 1 and 2 to have un state
+    {
+        View tr1(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        tr1.add_member(tp1->uuid(), 0);
+        tr1.add_member(tp2->uuid(), 0);
+        pc1->handle_view(tr1);
+        pc2->handle_view(tr1);
+
+        View tr2(ViewId(V_TRANS, tp3->uuid(), view_seq));
+        tr2.add_member(tp3->uuid(), 0);
+        pc3->handle_view(tr2);
+
+        ++view_seq;
+        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        reg.add_member(tp1->uuid(), 0);
+        reg.add_member(tp2->uuid(), 0);
+        reg.add_member(tp3->uuid(), 0);
+
+        pc1->handle_view(reg);
+        pc2->handle_view(reg);
+        pc3->handle_view(reg);
+
+        // states exch
+        Datagram* dg(tp1->out());
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        delete dg;
+
+        dg = tp2->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        delete dg;
+
+        dg = tp3->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        delete dg;
+
+        // install message
+        dg = tp1->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+
+        View tr3(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        tr3.add_member(tp1->uuid(), 0);
+        tr3.add_member(tp2->uuid(), 0);
+        tr3.add_partitioned(tp3->uuid(), 0);
+
+        pc1->handle_view(tr3);
+        pc2->handle_view(tr3);
+
+        View tr4(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        tr4.add_member(tp3->uuid(), 0);
+        tr4.add_partitioned(tp1->uuid(), 0);
+        tr4.add_partitioned(tp2->uuid(), 0);
+        pc3->handle_view(tr4);
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        delete dg;
+    }
+
+    ++view_seq;
+    // ... intermediate reg/trans views
+    // 1 and 2
+    {
+
+        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        reg.add_member(tp1->uuid(), 0);
+        reg.add_member(tp2->uuid(), 0);
+        pc1->handle_view(reg);
+        pc2->handle_view(reg);
+
+        View tr(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        tr.add_member(tp1->uuid(), 0);
+        tr.add_member(tp2->uuid(), 0);
+        pc1->handle_view(tr);
+        pc2->handle_view(tr);
+
+        Datagram* dg(tp1->out());
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        delete dg;
+
+        dg = tp2->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        delete dg;
+    }
+    // 3
+    {
+        View reg(ViewId(V_REG, tp3->uuid(), view_seq));
+        reg.add_member(tp3->uuid(), 0);
+        pc3->handle_view(reg);
+
+        Datagram* dg(tp3->out());
+        fail_unless(dg != 0);
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        delete dg;
+
+        View tr(ViewId(V_TRANS, tp3->uuid(), view_seq));
+        tr.add_member(tp3->uuid(), 0);
+        pc3->handle_view(tr);
+    }
+
+    // Remerge and PC crash should occur if bug is present.
+    ++view_seq;
+    {
+        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        reg.add_member(tp1->uuid(), 0);
+        reg.add_member(tp2->uuid(), 0);
+        reg.add_member(tp3->uuid(), 0);
+
+        pc1->handle_view(reg);
+        pc2->handle_view(reg);
+        pc3->handle_view(reg);
+
+        // State msgs
+        Datagram* dg(tp1->out());
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        delete dg;
+
+        dg = tp2->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp2->uuid()));
+        delete dg;
+
+        dg = tp3->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
+        delete dg;
+
+        // Install msg
+        dg = tp1->out();
+        fail_unless(dg != 0);
+        pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+        pc3->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
+
+        fail_unless(tp1->out() == 0);
+        fail_unless(tp2->out() == 0);
+        fail_unless(tp3->out() == 0);
+    }
+
+}
+END_TEST
+
 
 Suite* pc_suite()
 {
@@ -2985,6 +3240,10 @@ Suite* pc_suite()
     tcase_add_test(tc, test_weight_change_leaving);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_trac_762");
+    tcase_add_test(tc, test_trac_762);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
     return s;
 }

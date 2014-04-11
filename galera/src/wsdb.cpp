@@ -10,24 +10,23 @@
 #include "gu_throw.hpp"
 
 
-std::ostream& galera::operator<<(std::ostream& os, const galera::Wsdb& wsdb)
+void galera::Wsdb::print(std::ostream& os) const
 {
     os << "trx map:\n";
-    for (galera::Wsdb::TrxMap::const_iterator i = wsdb.trx_map_.begin();
-         i != wsdb.trx_map_.end();
+    for (galera::Wsdb::TrxMap::const_iterator i = trx_map_.begin();
+         i != trx_map_.end();
          ++i)
     {
         os << i->first << " " << *i->second << "\n";
     }
     os << "conn query map:\n";
-    for (galera::Wsdb::ConnMap::const_iterator i = wsdb.conn_map_.begin();
-         i != wsdb.conn_map_.end();
+    for (galera::Wsdb::ConnMap::const_iterator i = conn_map_.begin();
+         i != conn_map_.end();
          ++i)
     {
         os << i->first << " ";
     }
     os << "\n";
-    return os;
 }
 
 

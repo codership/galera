@@ -225,7 +225,7 @@ public:
         gu_trace(send_join(first));
     }
 
-    void close()
+    void close(bool force = false)
     {
         // shifting to S_LEAVING from S_INSTALL is troublesome,
         // instead of that raise a boolean flag to indicate that

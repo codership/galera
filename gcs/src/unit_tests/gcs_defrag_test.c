@@ -31,7 +31,7 @@ START_TEST (gcs_defrag_test)
     ssize_t ret;
 
     // The Action
-    const char   act_buf[]  = "Test action smuction";
+    char         act_buf[]  = "Test action smuction";
     size_t       act_len    = sizeof (act_buf);
 
     // lengths of three fragments of the action

@@ -18,7 +18,7 @@
 # use "rpmbuild --define 'version xxxx'" to define version
 %{!?version: %define version 3.x}
 %{!?release: %define release 1}
-%define copyright Copyright 2007-2013 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
+%define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
@@ -99,7 +99,6 @@ rm -f $(find %{libs} -type l)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
 
-%attr(0755,root,root) %dir %{_bindir}
 %attr(0755,root,root) %{_bindir}/garbd
 
 %attr(0755,root,root) %dir %{libs}

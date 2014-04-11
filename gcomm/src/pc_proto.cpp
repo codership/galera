@@ -932,10 +932,13 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
                                  << NodeMap::key(local_node_i);
                         local_node.set_weight(sm_node.weight());
                     }
-                    if (sm_node.un() == true)
+                    if (prim() == false && sm_node.un() == true)
                     {
-                        // set local instance status to unknown if any of the
-                        // state messages has it marked unknown
+                        // If coming from non-prim, set local instance status
+                        // to unknown if any of the state messages has it
+                        // marked unknown. If coming from prim, there is
+                        // no need to set this as it is known if the node
+                        // corresponding to local instance is in primary.
                         local_node.set_un(true);
                     }
                 }
@@ -1224,6 +1227,9 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
             log_info << "Trans install leads to non-prim";
             mark_non_prim();
             deliver_view();
+            // Mark all nodes in install msg node map but not in current
+            // view with unknown status. It is not known if they delivered
+            // install message in reg view and so formed new PC.
             for (NodeMap::const_iterator i(msg.node_map().begin());
                  i != msg.node_map().end(); ++i)
             {

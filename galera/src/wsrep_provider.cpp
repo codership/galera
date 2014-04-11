@@ -117,6 +117,11 @@ wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
             wsrep_set_params (*repl, params);
             return WSREP_OK;
         }
+        catch (gu::NotFound&)
+        {
+            log_warn << "Unrecognized parameter in '" << params << "'";
+            return WSREP_WARNING;
+        }
         catch (std::exception& e)
         {
             log_debug << e.what(); // better logged in wsrep_set_params
@@ -502,6 +507,15 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
         assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
                retval == WSREP_BF_ABORT);
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+
+        if (e.get_errno() == EMSGSIZE)
+            retval = WSREP_SIZE_EXCEEDED;
+        else
+            retval = WSREP_NODE_FAIL;
     }
     catch (std::exception& e)
     {

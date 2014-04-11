@@ -106,7 +106,7 @@ static inline size_t gu_str_table_get_n_rows(const char* str)
 static inline char* gu_str_table_set_cols(char* str, 
                                                 size_t *off,
                                                 size_t n, 
-                                                const char const* cols[])
+                                                const char* cols[])
 {
     size_t i;
     for (i = 0; i < n; ++i)
@@ -119,7 +119,7 @@ static inline char* gu_str_table_set_cols(char* str,
 static inline char* gu_str_table_append_row(char* str, 
                                             size_t *off,
                                             size_t n, 
-                                            const char const* row[])
+                                            const char* row[])
 {
     size_t i;
     for (i = 0; i < n; ++i)

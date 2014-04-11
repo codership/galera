@@ -43,9 +43,11 @@ namespace galera
             std::string     working_dir_;
             int             version_;
             KeySet::Version key_format_;
-
-            Params (const std::string& wdir, int ver, KeySet::Version kformat) :
-                working_dir_(wdir), version_(ver), key_format_(kformat) {}
+            int             max_write_set_size_;
+            Params (const std::string& wdir, int ver, KeySet::Version kformat,
+                    int max_write_set_size = WriteSetNG::MAX_SIZE) :
+                working_dir_(wdir), version_(ver), key_format_(kformat),
+                max_write_set_size_(max_write_set_size) {}
         };
 
         static const Params Defaults;
@@ -675,7 +677,12 @@ namespace galera
                 new (wso) WriteSetOut (params.working_dir_,
                                        trx_id_, params.key_format_,
                                        store      + sizeof(WriteSetOut),
-                                       store_size - sizeof(WriteSetOut));
+                                       store_size - sizeof(WriteSetOut),
+                                       0,
+                                       WriteSetNG::MAX_VERSION,
+                                       DataSet::MAX_VERSION,
+                                       DataSet::MAX_VERSION,
+                                       params.max_write_set_size_);
             }
         }
 

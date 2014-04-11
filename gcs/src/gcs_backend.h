@@ -17,6 +17,7 @@
 
 #include <galerautils.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct gcs_backend_conn gcs_backend_conn_t;
 typedef struct gcs_backend      gcs_backend_t;
@@ -28,7 +29,7 @@ typedef struct gcs_backend      gcs_backend_t;
 
 /*! Registers configuration parameters with config */
 #define GCS_BACKEND_REGISTER_FN(fn)       \
-void fn (gu_config_t* cnf)
+bool fn (gu_config_t* cnf)
 
 /*! Allocates backend context and sets up the backend structure */
 #define GCS_BACKEND_CREATE_FN(fn)         \
@@ -178,7 +179,7 @@ struct gcs_backend
 /*!
  * Registers backends' parameters with config.
  */
-void
+bool
 gcs_backend_register(gu_config_t* conf);
 
 /*!

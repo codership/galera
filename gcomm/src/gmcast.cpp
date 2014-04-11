@@ -145,7 +145,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
         {
             port = conf_.get(BASE_PORT_KEY);
         }
-        catch (gu::NotFound&)
+        catch (gu::NotSet&)
         {
             // if no base port configured, try port from the connection address
             try { port = uri_.get_port(); } catch (gu::NotSet&) {}
@@ -154,11 +154,9 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
         listen_addr_ += ":" + port;
     }
 
-    // if (!conf_.has(BASE_PORT_KEY)) {
-        conf_.set(BASE_PORT_KEY, port);
-    // }
+    conf_.set(BASE_PORT_KEY, port);
 
-        listen_addr_ = gu::net::resolve(listen_addr_).to_string();
+    listen_addr_ = gu::net::resolve(listen_addr_).to_string();
     // resolving sets scheme to tcp, have to rewrite for ssl
     if (use_ssl_ == true)
     {

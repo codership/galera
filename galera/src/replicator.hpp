@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_REPLICATOR_HPP
@@ -24,6 +24,11 @@ namespace galera
     class Replicator
     {
     public:
+
+        struct Param
+        {
+            static std::string const debug_log;
+        };
 
         static const char* const TRIVIAL_SST;
 
@@ -121,6 +126,11 @@ namespace galera
 
         virtual void          desync() = 0;
         virtual void          resync() = 0;
+
+    protected:
+
+        static void register_params(gu::Config&);
+
     };
 }
 

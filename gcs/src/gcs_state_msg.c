@@ -470,8 +470,8 @@ state_match_candidate (const gcs_state_msg_t* const s,
 
 /* try to find representative remerge candidate */
 static const struct candidate*
-state_rep_candidate (const struct candidate const c[],
-                     int                    const c_num)
+state_rep_candidate (const struct candidate c[],
+                     int const              c_num)
 {
     assert (c_num > 0);
 

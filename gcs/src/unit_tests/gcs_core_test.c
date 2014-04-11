@@ -113,8 +113,8 @@ core_recv_thread (void* arg)
 // this macro logs errors from within a function
 #define FAIL_IF(expr, format, ...)                            \
     if (expr) {                                               \
-        gu_fatal ("FAIL: "format, ## __VA_ARGS__, NULL);      \
-        fail_if (true, format, ## __VA_ARGS__, NULL); \
+        gu_fatal ("FAIL: "format, __VA_ARGS__, NULL);         \
+        fail_if (true, format, __VA_ARGS__, NULL);            \
         return true;                                          \
     }
 
@@ -308,7 +308,7 @@ core_test_init ()
 
     mark_point();
 
-    gu_config_t* config = gu_config_create ("");
+    gu_config_t* config = gu_config_create ();
     fail_if (config == NULL);
 
     Core = gcs_core_create (config, NULL, "core_test",

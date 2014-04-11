@@ -166,12 +166,13 @@ namespace galera
 
         struct Param
         {
-            static const std::string commit_order;
-            static const std::string causal_read_timeout;
             static const std::string base_host;
             static const std::string base_port;
             static const std::string proto_max;
             static const std::string key_format;
+            static const std::string commit_order;
+            static const std::string causal_read_timeout;
+            static const std::string max_write_set_size;
         };
 
         typedef std::pair<std::string, std::string> Default;
@@ -200,6 +201,7 @@ namespace galera
         }
 
         wsrep_status_t cert(TrxHandle* trx);
+        wsrep_status_t cert_and_catch(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
 
         void update_state_uuid (const wsrep_uuid_t& u);

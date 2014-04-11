@@ -33,10 +33,10 @@ public:
         case GCS_ACT_TORDERED:
             break;
         case GCS_ACT_STATE_REQ:
-            gcache_.free(act_.buf);
+            gcache_.free(const_cast<void*>(act_.buf));
             break;
         default:
-            free(const_cast<void*>(act_.buf));
+            ::free(const_cast<void*>(act_.buf));
             break;
         }
     }
@@ -123,16 +123,14 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     case GCS_ACT_COMMIT_CUT:
     {
         wsrep_seqno_t seq;
-        gu::unserialize8(reinterpret_cast<const gu::byte_t*>(act.buf),
-                         act.size, 0, seq);
+        gu::unserialize8(static_cast<const gu::byte_t*>(act.buf), act.size, 0,
+                         seq);
         replicator_.process_commit_cut(seq, act.seqno_l);
         break;
     }
     case GCS_ACT_CONF:
     {
-        const gcs_act_conf_t* conf(
-            reinterpret_cast<const gcs_act_conf_t*>(act.buf)
-            );
+        const gcs_act_conf_t* conf(static_cast<const gcs_act_conf_t*>(act.buf));
 
         wsrep_view_info_t* view_info(
             galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
@@ -151,7 +149,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     case GCS_ACT_JOIN:
     {
         wsrep_seqno_t seq;
-        gu::unserialize8(reinterpret_cast<const gu::byte_t*>(act.buf),
+        gu::unserialize8(static_cast<const gu::byte_t*>(act.buf),
                          act.size, 0, seq);
         replicator_.process_join(seq, act.seqno_l);
         break;

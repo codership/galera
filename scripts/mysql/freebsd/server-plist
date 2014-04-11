@@ -192,9 +192,7 @@ share/doc/mysql%{MAJORMINOR}-server_wsrep/README
 share/doc/mysql%{MAJORMINOR}-server_wsrep/QUICK_START
 @mode 0555
 etc/rc.d/mysql-server
-info/mysql.info
 @comment "=== postinstall stage ==="
-@exec install-info --quiet %D/info/mysql.info %D/info/dir
 @comment "=== postremove stage ==="
 @dirrm share/licenses/mysql-server-%{MYSQL_VER}_wsrep_%{RELEASE}
 @dirrm lib/mysql/plugin
@@ -225,7 +223,6 @@ info/mysql.info
 @dirrm share/mysql/swedish
 @dirrm share/mysql/ukrainian
 @dirrm share/mysql
-@unexec [ -f %D/info/mysql.info ] && install-info --quiet --delete %D/info/mysql.info %D/info/dir || true
 @unexec if [ -f %D/info/dir ]; then if sed -e '1,/Menu:/d' %D/info/dir | grep -q '^[*] '; then true; else rm %D/info/dir; fi; fi
 @unexec if /usr/sbin/pw user show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" user. "; fi
 @unexec if /usr/sbin/pw group show mysql >/dev/null 2>&1; then  echo "==> You should manually remove the \"mysql\" group. "; fi

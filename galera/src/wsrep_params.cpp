@@ -19,17 +19,15 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
 
         try
         {
-            if (key == "debug")
+            if (key == galera::Replicator::Param::debug_log)
             {
                 bool val(gu::from_string<bool>(value));
                 if (val == true)
                 {
-                    log_info << "enabling debug logging";
                     gu_conf_debug_on();
                 }
                 else
                 {
-                    log_info << "disabling debug logging";
                     gu_conf_debug_off();
                 }
             }

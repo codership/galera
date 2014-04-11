@@ -128,7 +128,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
 
     GCOMM_CONF_ADD        (TcpNonBlocking);
-    GCOMM_CONF_ADD_DEFAULT(SocketUseSsl);
+    GCOMM_CONF_ADD        (SocketUseSsl);
     GCOMM_CONF_ADD        (SocketSslVerifyFile);
     GCOMM_CONF_ADD        (SocketSslCertificateFile);
     GCOMM_CONF_ADD        (SocketSslPrivateKeyFile);

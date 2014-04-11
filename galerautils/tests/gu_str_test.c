@@ -69,14 +69,14 @@ START_TEST(test_str_table)
         "col1", "column2", "foo", "bar", "zzz"
     };
     size_t n_rows = 255;
-    const char const* row[5] = {"dddd", "asdfasdf", "sadfdf", "", "a"};
-    
+    const char* row[5] = {"dddd", "asdfasdf", "sadfdf", "", "a"};
+
     const char* name = "test_table";
-    
+
     char* str = NULL;
     size_t off = 0;
     size_t i;
-    
+
     str = gu_str_table_set_name(str, &off, name);
     fail_unless(strcmp(gu_str_table_get_name(str), name) == 0);
 
@@ -85,9 +85,9 @@ START_TEST(test_str_table)
 
     str = gu_str_table_set_n_rows(str, &off, n_rows);
     fail_unless(gu_str_table_get_n_rows(str) == n_rows);
-    
+
     str = gu_str_table_set_cols(str, &off, n_cols, col_names);
-    
+
     for (i = 0; i < n_rows; ++i)
     {
         str = gu_str_table_append_row(str, &off, n_cols, row);

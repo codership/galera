@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "SeqnoNone.hpp"
@@ -105,9 +105,14 @@ namespace gcache
 
             if (gu_unlikely(it == seqno2ptr.end()))
             {
-                /* this means that there are no elements with
-                 * seqno > seqno_released - and this should never happen */
+                /* this means that there are no element with
+                 * seqno following seqno_released - and this should never happen */
 // this kills some other unit tests: assert(0);
+                if (0 != seqno_released)
+                {
+                    log_warn << "Releasing seqno " << seqno << " before "
+                             << seqno_released + 1 << " was assigned.";
+                }
                 return;
             }
 
@@ -125,10 +130,11 @@ namespace gcache
 #if 0
             log_info << "############ releasing " << (seqno - start)
                      << " buffers, batch_size: " << batch_size
-                     << ", seqno_max: " << seqno_max;
+                     << ", end: " << end;
 #endif
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {
+                assert (seqno_released + 1 == it->first || seqno_released == 0);
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
                 seqno_released = it->first;
@@ -143,29 +149,6 @@ namespace gcache
         }
         while(loop);
     }
-
-#if DEPRECATED
-    /*!
-     * Get the smallest seqno present in the cache.
-     * Locks seqno from removal.
-     */
-    int64_t GCache::seqno_get_min ()
-    {
-        gu::Lock lock(mtx);
-
-        // This is a protection against concurrent history locking.
-        // I don't envision the need for concurrent history access, so I don't
-        // implement anything fancier.
-        while (seqno_locked != SEQNO_NONE) lock.wait(cond);
-
-        if (!seqno2ptr.empty()) {
-            seqno_locked = seqno2ptr.begin()->first;
-            return seqno_locked;
-        }
-
-        return SEQNO_NONE;
-    }
-#endif
 
     /*!
      * Move lock to a given seqno. Throw gu::NotFound if seqno is not in cache.

@@ -208,6 +208,8 @@ public:
         return 0;
     }
 
+    void connect(bool) { }
+
     void connect(const string& channel, bool const bootstrap)
     {
         if (tp_ != 0)
@@ -259,7 +261,7 @@ public:
         log_info << "gcomm: connected";
     }
 
-    void close()
+    void close(bool force = false)
     {
         if (tp_ == 0)
         {
@@ -835,7 +837,15 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
 
 GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
 {
-    gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
+    try
+    {
+        gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
+        return false;
+    }
+    catch (...)
+    {
+        return true;
+    }
 }
 
 

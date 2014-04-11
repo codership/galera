@@ -287,6 +287,7 @@ galera_start()
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
     ulimit -n 4096 # This is normally allowed for non-privileged users
+    echo 0x3f > /proc/self/coredump_filter # dump mmapped memory as well
 
     if test $SKIP_RECOVERY = 0
     then

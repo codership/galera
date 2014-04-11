@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2014 Codership Oy <info@codership.com>
 
 /**
  * @file Logging API
@@ -9,6 +9,7 @@
 #ifndef _gu_log_h_
 #define _gu_log_h_
 
+#include "gu_macros.h"
 #include <stdlib.h> /* For NULL */
 
 #if defined(__cplusplus)
@@ -59,6 +60,7 @@ gu_log (gu_log_severity_t severity,
  *  gu_debug() macro and avoid calling gu_log() when debug is off.
  *  Don't use it directly! */
 extern gu_log_severity_t gu_log_max_level;
+
 #define gu_log_debug (GU_LOG_DEBUG == gu_log_max_level)
 
 #if defined(__cplusplus)
@@ -69,7 +71,7 @@ extern gu_log_severity_t gu_log_max_level;
 // NOTE: don't add "\n" here even if you really want to do it
 #define GU_LOG_C(level, ...)\
         gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-               ## __VA_ARGS__, NULL)
+               __VA_ARGS__, NULL)
 
 /**
  * @name Logging macros.
@@ -77,22 +79,14 @@ extern gu_log_severity_t gu_log_max_level;
  * they are called.
  */
 /*@{*/
-#define gu_fatal(...)\
-    GU_LOG_C(GU_LOG_FATAL, ## __VA_ARGS__, NULL)
-
-#define gu_error(...)\
-    GU_LOG_C(GU_LOG_ERROR, ## __VA_ARGS__, NULL)
-
-#define gu_warn(...)\
-    GU_LOG_C(GU_LOG_WARN, ## __VA_ARGS__, NULL)
-
-#define gu_info(...)\
-    GU_LOG_C(GU_LOG_INFO, ## __VA_ARGS__, NULL)
-
-#define gu_debug(...)\
-    (gu_log_max_level < GU_LOG_DEBUG ? 0 :                      \
-     GU_LOG_C(GU_LOG_DEBUG, ## __VA_ARGS__, NULL))
+#define gu_fatal(...) GU_LOG_C(GU_LOG_FATAL, __VA_ARGS__, NULL)
+#define gu_error(...) GU_LOG_C(GU_LOG_ERROR, __VA_ARGS__, NULL)
+#define gu_warn(...)  GU_LOG_C(GU_LOG_WARN,  __VA_ARGS__, NULL)
+#define gu_info(...)  GU_LOG_C(GU_LOG_INFO,  __VA_ARGS__, NULL)
+#define gu_debug(...) if (gu_unlikely(gu_log_debug))    \
+    { GU_LOG_C(GU_LOG_DEBUG, __VA_ARGS__, NULL); }
 /*@}*/
+
 #endif /* __cplusplus */
 #endif /* _gu_log_h_ */
 

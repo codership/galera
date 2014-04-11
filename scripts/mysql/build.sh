@@ -116,6 +116,7 @@ Options:
     -m32/-m64         build 32/64-bit binaries on x86
     -d|--debug        configure build with debug enabled (implies -c)
     -dl|--debug-level set debug level (1, implies -c)
+    --gd|--galera-debug only galera debug build (optimized mysqld)
     --with-spread     configure build with Spread (implies -c)
     --no-strip        prevent stripping of release binaries
     -j|--jobs         number of parallel compilation jobs (${JOBS})
@@ -270,7 +271,7 @@ then
 fi
 
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; MYSQLD_BINARY="mysqld-debug"; fi
+if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
@@ -438,7 +439,7 @@ then
             BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
         else # CMake build
             [ "$DEBUG" = "yes" ] \
-            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug" \
+            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
             || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
             [ "$MYSQL_MAJOR_VER$MYSQL_MINOR_VER" -ge "56" ] \
@@ -464,11 +465,11 @@ then
                   -DWITH_ZLIB=system \
                   $MEMCACHED_OPT \
                   $MYSQL_SRC \
-            && make -S && popd || exit 1
+            && make -j $JOBS -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
         [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
-        make -S > /dev/null
+        make -j $JOBS -S > /dev/null
         [ $MYSQL_MAJOR != "5.1" ] && popd
     fi
 fi # SKIP_BUILD

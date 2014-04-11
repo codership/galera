@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -45,7 +45,8 @@ START_TEST(test1)
     bh2->seqno_g = 1;
 
     /* freeing seqno'd buffer should only release it, but not discard */
-    ms.free (buf2);
+    BH_release(bh2);
+    ms.free (bh2);
     fail_if (!BH_is_released(bh2));
 
     buf3 = ms.malloc (1 + bh_size);
@@ -58,12 +59,20 @@ START_TEST(test1)
     fail_if (NULL == buf3);
 
     /* freeing unseqno'd buffer should free space immeditely */
-    ms.free (buf1);
+    bh1 = ptr2BH(buf1);
+    BH_release(bh1);
+    ms.free (bh1);
+
     void* buf4 = ms.malloc (2 + bh_size);
     fail_if (NULL == buf4);
 
-    ms.free (buf3);
-    ms.free (buf4);
+    BufferHeader* bh3(ptr2BH(buf3));
+    BH_release(bh3);
+    ms.free (bh3);
+
+    BufferHeader* bh4(ptr2BH(buf4));
+    BH_release(bh4);
+    ms.free (bh4);
 
     fail_if (ms._allocd());
 }

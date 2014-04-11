@@ -214,7 +214,7 @@ public:
     virtual ~Protolay() {}
 
     virtual void connect(bool) { }
-    virtual void close() { }
+    virtual void close(bool force = false) { }
     virtual void close(const UUID& uuid) { }
 
     /* apparently handles data from upper layer. what is return value? */

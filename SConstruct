@@ -116,7 +116,8 @@ ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
-GALERA_VER = ARGUMENTS.get('version', '3.2')
+
+GALERA_VER = ARGUMENTS.get('version', '3.6dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -398,9 +399,6 @@ if strict_build_flags == 1:
     conf.env.Append(CPPFLAGS = ' -Werror')
     conf.env.Append(CCFLAGS  = ' -pedantic')
     conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
-
-#    if 'clang' in cc:
-#        conf.env.Append(CPPFLAGS = ' -Qunused-arguments -Wno-tautological-compare -D_Bool=bool')
 
 env = conf.Finish()
 Export('arch', 'x86', 'env', 'sysname', 'libboost_program_options')

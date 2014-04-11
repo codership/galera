@@ -83,8 +83,9 @@ namespace galera
         Wsdb();
         ~Wsdb();
 
+        void print(std::ostream& os) const;
+
     private:
-        friend std::ostream& galera::operator<<(std::ostream& os, const Wsdb&);
         // Find existing trx handle in the map
         TrxHandle* find_trx(wsrep_trx_id_t trx_id);
 
@@ -104,6 +105,11 @@ namespace galera
         ConnMap      conn_map_;
         gu::Mutex    conn_mutex_;
     };
+
+    inline std::ostream& operator<<(std::ostream& os, const Wsdb& w)
+    {
+        w.print(os); return os;
+    }
 }
 
 
