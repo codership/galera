@@ -226,4 +226,16 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act, int* proto);
 extern gcs_state_msg_t*
 gcs_group_get_state (gcs_group_t* group);
 
+/*!
+ * find a donor and return its index, if available. pure function.
+ * @return donor index of negative error code.
+ * -EHOSTUNREACH if no available donor.
+ * -EHOSTDOWN if donor is joiner.
+ * -EAGAIN if no node in proper state.
+ */
+extern int
+gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
+                     const char* const donor_string, int const donor_len,
+                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
+
 #endif /* _gcs_group_h_ */

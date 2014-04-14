@@ -541,9 +541,7 @@ retry_str(int ret)
 }
 
 void
-ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
-                                   wsrep_seqno_t const       group_seqno,
-                                   const StateRequest* const req)
+ReplicatorSMM::send_state_request (const StateRequest* const req)
 {
     long ret;
     long tries = 0;
@@ -659,7 +657,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     st_.mark_unsafe();
 
-    send_state_request (group_uuid, group_seqno, req);
+    send_state_request (req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
@@ -797,5 +795,3 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 
 
 } /* namespace galera */
-
-

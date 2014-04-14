@@ -394,9 +394,7 @@ namespace galera
                                              const wsrep_uuid_t& group_uuid,
                                              wsrep_seqno_t       group_seqno);
 
-        void send_state_request (const wsrep_uuid_t& group_uuid,
-                                 wsrep_seqno_t       group_seqno,
-                                 const StateRequest* req);
+        void send_state_request (const StateRequest* req);
 
         void request_state_transfer (void* recv_ctx,
                                      const wsrep_uuid_t& group_uuid,
