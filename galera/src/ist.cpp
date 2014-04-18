@@ -10,7 +10,6 @@
 
 #include "GCache.hpp"
 #include "galera_common.hpp"
-#include "trx_handle.hpp"
 #include <boost/bind.hpp>
 #include <fstream>
 #include <algorithm>
@@ -121,21 +120,21 @@ namespace galera
                         AsyncSenderMap& asmap,
                         int version)
                 :
-                Sender(conf, asmap.gcache(), peer, version),
-                conf_(conf),
-                peer_(peer),
-                first_(first),
-                last_(last),
-                asmap_(asmap),
+                Sender (conf, asmap.gcache(), peer, version),
+                conf_  (conf),
+                peer_  (peer),
+                first_ (first),
+                last_  (last),
+                asmap_ (asmap),
                 thread_()
             { }
 
-            const gu::Config& conf()  { return conf_; }
-            const std::string& peer() { return peer_; }
-            wsrep_seqno_t first()     { return first_; }
-            wsrep_seqno_t last()      { return last_; }
-            AsyncSenderMap& asmap()   { return asmap_; }
-            pthread_t       thread()  { return thread_; }
+            const gu::Config&  conf()   { return conf_;   }
+            const std::string& peer()   { return peer_;   }
+            wsrep_seqno_t      first()  { return first_;  }
+            wsrep_seqno_t      last()   { return last_;   }
+            AsyncSenderMap&    asmap()  { return asmap_;  }
+            pthread_t          thread() { return thread_; }
 
         private:
 
@@ -165,23 +164,26 @@ galera::ist::register_params(gu::Config& conf)
     conf.add(CONF_SSL_PSWD_FILE);
 }
 
-galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
+galera::ist::Receiver::Receiver(gu::Config&           conf,
+                                TrxHandle::SlavePool& sp,
+                                const char*           addr)
     :
-    conf_      (conf),
-    io_service_(),
-    acceptor_  (io_service_),
-    ssl_ctx_   (io_service_, asio::ssl::context::sslv23),
-    thread_(),
-    mutex_(),
-    cond_(),
-    consumers_(),
-    running_(false),
-    ready_(false),
-    error_code_(0),
+    io_service_   (),
+    acceptor_     (io_service_),
+    ssl_ctx_      (io_service_, asio::ssl::context::sslv23),
+    mutex_        (),
+    cond_         (),
+    consumers_    (),
     current_seqno_(-1),
-    last_seqno_(-1),
-    use_ssl_(false),
-    version_(-1)
+    last_seqno_   (-1),
+    conf_         (conf),
+    trx_pool_     (sp),
+    thread_       (),
+    error_code_   (0),
+    version_      (-1),
+    use_ssl_      (false),
+    running_      (false),
+    ready_        (false)
 {
     std::string recv_addr;
 
@@ -211,7 +213,7 @@ galera::ist::Receiver::~Receiver()
 
 extern "C" void* run_receiver_thread(void* arg)
 {
-    galera::ist::Receiver* receiver(reinterpret_cast<galera::ist::Receiver*>(arg));
+    galera::ist::Receiver* receiver(static_cast<galera::ist::Receiver*>(arg));
     receiver->run();
     return 0;
 }
@@ -387,7 +389,9 @@ void galera::ist::Receiver::run()
     int ec(0);
     try
     {
-        Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        Proto p(trx_pool_, version_,
+                conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+
         if (use_ssl_ == true)
         {
             p.send_handshake(ssl_stream);
@@ -582,7 +586,7 @@ void galera::ist::Receiver::interrupt()
             ssl_stream.lowest_layer().connect(*i);
             set_fd_options(ssl_stream.lowest_layer());
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p(version_,
+            Proto p(trx_pool_, version_,
                     conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(ssl_stream);
             p.send_ctrl(ssl_stream, Ctrl::C_EOF);
@@ -593,7 +597,7 @@ void galera::ist::Receiver::interrupt()
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
             set_fd_options(socket);
-            Proto p(version_,
+            Proto p(trx_pool_, version_,
                     conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(socket);
             p.send_ctrl(socket, Ctrl::C_EOF);
@@ -612,14 +616,14 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
                             const std::string& peer,
                             int                version)
     :
-    conf_(conf),
     io_service_(),
-    socket_(io_service_),
-    ssl_ctx_(io_service_, asio::ssl::context::sslv23),
+    socket_    (io_service_),
+    ssl_ctx_   (io_service_, asio::ssl::context::sslv23),
     ssl_stream_(io_service_, ssl_ctx_),
-    use_ssl_(false),
-    gcache_(gcache),
-    version_(version)
+    conf_      (conf),
+    gcache_    (gcache),
+    version_   (version),
+    use_ssl_   (false)
 {
     gu::URI uri(peer);
     try
@@ -678,8 +682,11 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
     }
     try
     {
-        Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        TrxHandle::SlavePool unused(1, 0, "");
+        Proto p(unused, version_,
+                conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
+
         if (use_ssl_ == true)
         {
             p.recv_handshake(ssl_stream_);
@@ -704,7 +711,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
-            // log_info << "read " << first << " + " << n_read << " from gcache";
+            //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
                 // log_info << "sending " << buf_vec[i].seqno_g();
@@ -716,6 +723,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 {
                     p.send_trx(socket_, buf_vec[i]);
                 }
+
                 if (buf_vec[i].seqno_g() == last)
                 {
                     if (use_ssl_ == true)
@@ -754,6 +762,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             // resize buf_vec to avoid scanning gcache past last
             size_t next_size(std::min(static_cast<size_t>(last - first + 1),
                                       static_cast<size_t>(1024)));
+
             if (buf_vec.size() != next_size)
             {
                 buf_vec.resize(next_size);

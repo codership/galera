@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "replicator.hpp"
@@ -72,9 +72,10 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
 }
 
 
-galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
+galera::GcsActionTrx::GcsActionTrx(TrxHandle::SlavePool&    pool,
+                                   const struct gcs_action& act)
     :
-    trx_(new TrxHandle())
+    trx_(TrxHandle::New(pool))
     // TODO: this dynamic allocation should be unnecessary
 {
     assert(act.seqno_l != GCS_SEQNO_ILL);
@@ -113,7 +114,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     case GCS_ACT_TORDERED:
     {
         assert(act.seqno_g > 0);
-        GcsActionTrx trx(act);
+        GcsActionTrx trx(trx_pool_, act);
         trx.trx()->set_state(TrxHandle::S_REPLICATING);
         replicator_.process_trx(recv_ctx, trx.trx());
         exit_loop = trx.trx()->exit_loop(); // this is the end of trx lifespan

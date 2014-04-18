@@ -13,6 +13,8 @@
 #include "replicator_smm.hpp"
 #include <check.h>
 
+using namespace galera;
+
 // Message tests
 
 START_TEST(test_ist_message)
@@ -107,16 +109,19 @@ struct receiver_args
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
     size_t        n_receivers_;
+    TrxHandle::SlavePool& trx_pool_;
     int           version_;
+
     receiver_args(const std::string listen_addr,
-        wsrep_seqno_t first, wsrep_seqno_t last,
-                  size_t n_receivers, int version)
+                  wsrep_seqno_t first, wsrep_seqno_t last,
+                  size_t n_receivers, TrxHandle::SlavePool& sp, int version)
         :
         listen_addr_(listen_addr),
-        first_(first),
-        last_(last),
+        first_      (first),
+        last_       (last),
         n_receivers_(n_receivers),
-        version_(version)
+        trx_pool_   (sp),
+        version_    (version)
     { }
 };
 
@@ -181,7 +186,7 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    galera::ist::Receiver receiver(conf, 0);
+    galera::ist::Receiver receiver(conf, rargs->trx_pool_, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
 
@@ -233,11 +238,14 @@ static void test_ist_common(int const version)
 {
     using galera::KeyData;
     using galera::TrxHandle;
-    using galera::TrxHandleWithStore;
     using galera::KeyOS;
+
+    TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE, 4, "ist_common");
+    TrxHandle::SlavePool sp(sizeof(TrxHandle), 4, "ist_common");
+
     int const trx_version(select_trx_version(version));
-    galera::TrxHandle::Params const trx_params("", trx_version,
-                                               galera::KeySet::MAX_VERSION);
+    TrxHandle::Params const trx_params("", trx_version,
+                                       galera::KeySet::MAX_VERSION);
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL);
     std::string gcache_file("ist_check.cache");
@@ -254,8 +262,7 @@ static void test_ist_common(int const version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx((new TrxHandleWithStore(
-                            trx_params, uuid, 1234+i, 5678+i))->handle());
+        TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid, 1234+i, 5678+i));
 
         const wsrep_buf_t key[2] = {
             {"key1", 4},
@@ -310,7 +317,7 @@ static void test_ist_common(int const version)
 
     mark_point();
 
-    receiver_args rargs(receiver_addr, 1, 10, 1, version);
+    receiver_args rargs(receiver_addr, 1, 10, 1, sp, version);
     sender_args sargs(*gcache, rargs.listen_addr_, 1, 10, version);
 
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);

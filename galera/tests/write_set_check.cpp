@@ -321,6 +321,11 @@ START_TEST(test_mapped_buffer)
 }
 END_TEST
 
+static TrxHandle::LocalPool
+lp(TrxHandle::LOCAL_STORAGE_SIZE, 4, "ws_local_pool");
+
+static TrxHandle::SlavePool
+sp(sizeof(TrxHandle), 4, "ws_slave_pool");
 
 START_TEST(test_cert_hierarchical_v1)
 {
@@ -393,8 +398,8 @@ START_TEST(test_cert_hierarchical_v1)
 
     for (size_t i(0); i < nws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
-                                     wsi[i].conn_id, wsi[i].trx_id, NULL, 0));
+        TrxHandle* trx(TrxHandle::New(lp, trx_params, wsi[i].uuid,
+                                     wsi[i].conn_id, wsi[i].trx_id));
         trx->append_key(KeyData(1, wsi[i].key, wsi[i].iov_len,
                                 WSREP_KEY_EXCLUSIVE, true));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
@@ -406,7 +411,7 @@ START_TEST(test_cert_hierarchical_v1)
         gu::Buffer buf(wc.size());
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
-        trx = new TrxHandle();
+        trx = TrxHandle::New(sp);
         size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
@@ -515,8 +520,8 @@ START_TEST(test_cert_hierarchical_v2)
 
     for (size_t i(0); i < nws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(trx_params, wsi[i].uuid,
-                                     wsi[i].conn_id, wsi[i].trx_id, NULL, 0));
+        TrxHandle* trx(TrxHandle::New(lp, trx_params, wsi[i].uuid,
+                                      wsi[i].conn_id, wsi[i].trx_id));
         trx->append_key(KeyData(version, wsi[i].key, wsi[i].iov_len,
                                 (wsi[i].shared ?
                                  WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE),
@@ -530,7 +535,7 @@ START_TEST(test_cert_hierarchical_v2)
         gu::Buffer buf(wc.size());
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
-        trx = new TrxHandle();
+        trx = TrxHandle::New(sp);
         size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         log_info << "ws[" << i << "]: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
@@ -553,6 +558,7 @@ END_TEST
 START_TEST(test_trac_726)
 {
     log_info << "test_trac_726";
+
     const int version(2);
     TestEnv env;
     galera::Certification cert(env.conf(), env.thd());
@@ -567,7 +573,7 @@ START_TEST(test_trac_726)
     wsrep_buf_t key2 = {void_cast("2"), 1};
 
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid1, 0, 0, NULL, 0));
+        TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid1, 0, 0));
 
         trx->append_key(KeyData(version, &key1, 1, WSREP_KEY_EXCLUSIVE, true));
         trx->set_last_seen_seqno(0);
@@ -578,7 +584,7 @@ START_TEST(test_trac_726)
         gu::Buffer buf(wc.size());
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
-        trx = new TrxHandle();
+        trx = TrxHandle::New(sp);
         size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
@@ -590,7 +596,7 @@ START_TEST(test_trac_726)
     }
 
     {
-        TrxHandle* trx(new TrxHandle(trx_params, uuid2, 0, 0, NULL, 0));
+        TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid2, 0, 0));
 
         trx->append_key(KeyData(version, &key2, 1, WSREP_KEY_EXCLUSIVE, true));
         trx->append_key(KeyData(version, &key2, 1, WSREP_KEY_SHARED,    true));
@@ -604,7 +610,7 @@ START_TEST(test_trac_726)
         gu::Buffer buf(wc.size());
         std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
         trx->unref();
-        trx = new TrxHandle();
+        trx = TrxHandle::New(sp);
         size_t offset(trx->unserialize(&buf[0], buf.size(), 0));
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 

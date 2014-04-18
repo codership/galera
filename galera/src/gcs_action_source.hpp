@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_ACTION_SOURCE_HPP
@@ -8,6 +8,7 @@
 #include "action_source.hpp"
 #include "gcs.hpp"
 #include "replicator.hpp"
+#include "trx_handle.hpp"
 
 #include "GCache.hpp"
 
@@ -19,9 +20,12 @@ namespace galera
     {
     public:
 
-        GcsActionSource(GCS_IMPL& gcs, Replicator& replicator,
-                        gcache::GCache& gcache)
+        GcsActionSource(TrxHandle::SlavePool& sp,
+                        GCS_IMPL&             gcs,
+                        Replicator&           replicator,
+                        gcache::GCache&       gcache)
             :
+            trx_pool_      (sp        ),
             gcs_           (gcs       ),
             replicator_    (replicator),
             gcache_        (gcache    ),
@@ -29,7 +33,10 @@ namespace galera
             received_bytes_(0         )
         { }
 
-        ~GcsActionSource() { }
+        ~GcsActionSource()
+        {
+            log_info << trx_pool_;
+        }
 
         ssize_t   process(void*, bool& exit_loop);
         long long received()       const { return received_(); }
@@ -39,6 +46,7 @@ namespace galera
 
         void dispatch(void*, const gcs_action&, bool& exit_loop);
 
+        TrxHandle::SlavePool& trx_pool_;
         GCS_IMPL&             gcs_;
         Replicator&           replicator_;
         gcache::GCache&       gcache_;
@@ -49,7 +57,7 @@ namespace galera
     class GcsActionTrx
     {
     public:
-        GcsActionTrx(const struct gcs_action& act);
+        GcsActionTrx(TrxHandle::SlavePool& sp, const struct gcs_action& act);
         ~GcsActionTrx();
         TrxHandle* trx() const { return trx_; }
     private:

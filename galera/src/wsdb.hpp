@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 #ifndef GALERA_WSDB_HPP
 #define GALERA_WSDB_HPP
@@ -97,6 +97,9 @@ namespace galera
         Conn*      get_conn(wsrep_conn_id_t conn_id, bool create);
 
         static const size_t trx_mem_limit_ = 1 << 20;
+
+        TrxHandle::LocalPool trx_pool_;
+
         TrxMap       trx_map_;
         gu::Mutex    trx_mutex_;
         ConnMap      conn_map_;
