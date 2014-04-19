@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -119,7 +119,7 @@ gcs_state_msg_group_uuid (const gcs_state_msg_t* state);
 extern gcs_seqno_t
 gcs_state_msg_received (const gcs_state_msg_t* state);
 
-/* Get last cached action seqno */
+/* Get lowest cached action seqno */
 extern gcs_seqno_t
 gcs_state_msg_cached (const gcs_state_msg_t* state);
 

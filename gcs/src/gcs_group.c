@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
