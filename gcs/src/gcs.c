@@ -1589,22 +1589,50 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
                                  const void  *req,
                                  size_t       size,
                                  const char  *donor,
+                                 const gu_uuid_t* ist_uuid,
+                                 gcs_seqno_t ist_seqno,
                                  gcs_seqno_t *local)
 {
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
-    size_t rst_size  = size + donor_len;
+    size_t rst_size  = size + donor_len + sizeof(*ist_uuid) + sizeof(ist_seqno);
     char*  rst       = gu_malloc (rst_size);
 
     *local = GCS_SEQNO_ILL;
 
     if (rst) {
+        gu_debug("ist_uuid[" GU_UUID_FORMAT "], ist_seqno[%lld]",
+                 GU_UUID_ARGS(ist_uuid), (long long)ist_seqno);
+
+        int offset = 0;
+        // since quorum occurs before str, group protocol version here
+        // is the commmon highest supported protocol version.
+        int gcs_proto_ver = gcs_core_group_protocol_version(conn->core);
+
+        // version 0
         /* RST format: |donor name|\0|app request|
          * anything more complex will require a special (de)serializer.
          * NOTE: this is sender part. Check gcs_group_handle_state_request()
          *       for the receiver part. */
-        memcpy (rst, donor, donor_len);
-        memcpy (rst + donor_len, req, size);
+
+        if (gcs_proto_ver == 0) {
+            memcpy (rst + offset, donor, donor_len);
+            offset += donor_len;
+            memcpy (rst + offset, req, size);
+        }
+
+        // version 1(expose joiner's seqno and smart donor selection)
+        // RST format: |donor_name|\0|ist_uuid|ist_seqno|app_request|
+
+        else {
+            memcpy (rst + offset, donor, donor_len);
+            offset += donor_len;
+            memcpy (rst + offset, ist_uuid, sizeof(*ist_uuid));
+            offset += sizeof(*ist_uuid);
+            *(gcs_seqno_t*) (rst + offset) = gcs_seqno_htog(ist_seqno);
+            offset += sizeof(ist_seqno);
+            memcpy (rst + offset, req, size);
+        }
 
         struct gcs_action action = {
             .buf  = rst,
@@ -1644,7 +1672,11 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 
 long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* local)
 {
-    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, local);
+    gu_uuid_t ist_uuid = {{0, }};
+    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
+    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ,
+                                           &ist_uuid, ist_seqno,
+                                           local);
 
     if (ret >= 0) {
         return 0;

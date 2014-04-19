@@ -285,6 +285,16 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
             >> c >> istr.group_seqno_ >> c >> istr.peer_);
 }
 
+static void
+get_ist_request(const ReplicatorSMM::StateRequest* str, IST_request* istr)
+{
+  assert(str->ist_len());
+  std::string ist_str(reinterpret_cast<const char*>(str->ist_req()),
+                      str->ist_len());
+  std::istringstream is(ist_str);
+  is >> *istr;
+}
+
 static bool
 sst_is_trivial (const void* const req, size_t const len)
 {
@@ -340,10 +350,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         if (streq->ist_len())
         {
             IST_request istr;
-            std::string ist_str(reinterpret_cast<const char*>(streq->ist_req()),
-                                streq->ist_len());
-            std::istringstream is(ist_str);
-            is >> istr;
+            get_ist_request(streq, &istr);
 
             if (istr.uuid() == state_uuid_)
             {
@@ -364,6 +371,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
                     ist_sst_ = true; // gcs_.join() shall be called by IST
+                    gcs_.join(donor_seq);
 
                     wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
 
@@ -532,14 +540,22 @@ retry_str(int ret)
     return (ret == -EAGAIN || ret == -ENOTCONN);
 }
 
-
 void
-ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
-                                   wsrep_seqno_t const       group_seqno,
-                                   const StateRequest* const req)
+ReplicatorSMM::send_state_request (const StateRequest* const req)
 {
     long ret;
     long tries = 0;
+
+    gu_uuid_t ist_uuid = {{0, }};
+    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
+
+    if (req->ist_len())
+    {
+      IST_request istr;
+      get_ist_request(req, &istr);
+      ist_uuid = to_gu_uuid(istr.uuid());
+      ist_seqno = istr.last_applied();
+    }
 
     do
     {
@@ -548,6 +564,7 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
         gcs_seqno_t seqno_l;
 
         ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
+                                          ist_uuid, ist_seqno,
                                           &seqno_l);
 
         if (ret < 0)
@@ -640,7 +657,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     st_.mark_unsafe();
 
-    send_state_request (group_uuid, group_seqno, req);
+    send_state_request (req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
@@ -778,5 +795,3 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 
 
 } /* namespace galera */
-
-

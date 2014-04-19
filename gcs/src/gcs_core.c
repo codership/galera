@@ -96,7 +96,7 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static int const GCS_PROTO_MAX = 0;
+static int const GCS_PROTO_MAX = 1;
 
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
@@ -1191,6 +1191,13 @@ long gcs_core_destroy (gcs_core_t* core)
 
     return 0;
 }
+
+gcs_proto_t
+gcs_core_group_protocol_version (const gcs_core_t* conn)
+{
+    return conn->group.gcs_proto_ver;
+}
+
 
 long
 gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)

@@ -434,6 +434,8 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     long ret;
     static gcs_seqno_t conf_id = 0;
     gcs_act_conf_t* conf = (void*)thread->msg;
+    gu_uuid_t ist_uuid = {{0, }};
+    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
              "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
@@ -456,7 +458,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                      (long long)conf->seqno, // this is global seqno
                      strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
                                                             sizeof(conf->seqno),
-                                                            "",
+                                                            "", &ist_uuid, ist_seqno,
                                                             &seqno)));
 
             // pretend that state transfer is complete, cancel every action up

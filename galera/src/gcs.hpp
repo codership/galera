@@ -48,6 +48,8 @@ namespace galera
         virtual ssize_t set_last_applied(gcs_seqno_t) = 0;
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
+                                               const gu_uuid_t& ist_uuid,
+                                               gcs_seqno_t ist_seqno,
                                                gcs_seqno_t* seqno_l) = 0;
         virtual ssize_t desync(gcs_seqno_t* seqno_l) = 0;
         virtual void    join(gcs_seqno_t seqno) = 0;
@@ -157,10 +159,14 @@ namespace galera
 
         ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
+                                       const gu_uuid_t& ist_uuid,
+                                       gcs_seqno_t ist_seqno,
                                        gcs_seqno_t* seqno_l)
         {
             return gcs_request_state_transfer(conn_, req, req_len,
-                                              sst_donor.c_str(), seqno_l);
+                                              sst_donor.c_str(),
+                                              &ist_uuid, ist_seqno,
+                                              seqno_l);
         }
 
         ssize_t desync (gcs_seqno_t* seqno_l)
@@ -321,6 +327,8 @@ namespace galera
 
         ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
+                                       const gu_uuid_t& ist_uuid,
+                                       gcs_seqno_t ist_seqno,
                                        gcs_seqno_t* seqno_l)
         {
             *seqno_l = GCS_SEQNO_ILL;

@@ -186,7 +186,7 @@ group_redo_last_applied (gcs_group_t* group)
 //        gu_debug ("last_applied[%ld]: %lld", n, seqno);
 
         /* NOTE: It is crucial for consistency that last_applied algorithm
-         *       is absolutely identical on all nodes. Therefore for the 
+         *       is absolutely identical on all nodes. Therefore for the
          *       generality sake and future compatibility we have to assume
          *       non-blocking donor.
          *       GCS_BLOCKING_DONOR should never be defined unless in some
@@ -894,6 +894,12 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     const char* begin = str;
     const char* end;
     int err = -EHOSTDOWN; /* worst error */
+    bool dcomma = false; /* dangling comma */
+
+    if (str_len && str[str_len-1] == ',' &&
+        group->gcs_proto_ver > 0) {
+        dcomma = true;
+    }
 
     do {
         end = strchr(begin, ',');
@@ -913,8 +919,8 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
             group_find_node_by_name (group, joiner_idx, begin, len, status) :
             /* err == -EAGAIN here means that at least one of the nodes in the
              * list will be available later, so don't try others. */
-            (err == -EAGAIN ?
-             err : group_find_node_by_state(group, joiner_idx, status));
+             ((err == -EAGAIN && !dcomma) ?
+              err : group_find_node_by_state(group, joiner_idx, status));
 
         if (idx >= 0) return idx;
 
@@ -929,6 +935,239 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     return err;
 }
 
+static gcs_seqno_t
+group_lowest_cached_seqno(gcs_group_t* const group)
+{
+    gcs_seqno_t ret = GCS_SEQNO_ILL;
+    int idx = 0;
+    for (idx = 0; idx < group->num; idx++) {
+        gcs_seqno_t seq = gcs_node_cached(&group->nodes[idx]);
+        if (seq != GCS_SEQNO_ILL)
+        {
+            if (ret == GCS_SEQNO_ILL ||
+                seq < ret)
+            {
+                ret = seq;
+            }
+        }
+    }
+    return ret;
+}
+
+static int
+group_find_ist_donor_by_name (gcs_group_t* const group,
+                              int joiner_idx,
+                              const char* name, int  name_len,
+                              gcs_seqno_t ist_seqno,
+                              gcs_node_state_t status)
+{
+    int idx = 0;
+    for (idx = 0; idx < group->num; idx++)
+    {
+        gcs_node_t* node = &group->nodes[idx];
+        gcs_seqno_t cached = gcs_node_cached(node);
+        if (strncmp(node->name, name, name_len) == 0 &&
+            joiner_idx != idx &&
+            node->status >= status &&
+            cached != GCS_SEQNO_ILL &&
+            // ist potentially possible
+            (ist_seqno + 1) >= cached)
+        {
+            return idx;
+        }
+    }
+    return -1;
+}
+
+static int
+group_find_ist_donor_by_name_in_string (
+    gcs_group_t* const group,
+    int joiner_idx,
+    const char* str, int str_len,
+    gcs_seqno_t ist_seqno,
+    gcs_node_state_t status)
+{
+    assert (str != NULL);
+
+    const char* begin = str;
+    const char* end;
+
+    gu_debug("ist_seqno[%lld]", (long long)ist_seqno);
+    // return the highest cached seqno node.
+    int ret = -1;
+    do {
+        end = strchr(begin, ',');
+        int len = 0;
+        if (end == NULL) {
+            len = str_len - (begin - str);
+        } else {
+            len = end - begin;
+        }
+        assert (len >= 0);
+        if (len == 0) break;
+        int idx = group_find_ist_donor_by_name(
+            group, joiner_idx, begin, len,
+            ist_seqno, status);
+        if (idx >= 0)
+        {
+            if (ret == -1 ||
+                gcs_node_cached(&group->nodes[idx]) >=
+                gcs_node_cached(&group->nodes[ret]))
+            {
+                ret = idx;
+            }
+        }
+        begin = end + 1;
+    } while (end != NULL);
+
+    if (ret == -1) {
+        gu_debug("not found");
+    } else {
+        gu_debug("found. name[%s], seqno[%lld]",
+                 group->nodes[ret].name,
+                 (long long)gcs_node_cached(&group->nodes[ret]));
+    }
+    return ret;
+}
+
+static int
+group_find_ist_donor_by_state (gcs_group_t* const group,
+                               int joiner_idx,
+                               gcs_seqno_t ist_seqno,
+                               gcs_node_state_t status)
+{
+    gcs_node_t* joiner = &group->nodes[joiner_idx];
+    gcs_segment_t segment = joiner->segment;
+    // find node who is ist potentially possible.
+    // first highest cached seqno local node.
+    // then highest cached seqno remote node.
+    int idx = 0;
+    int local_idx = -1;
+    int remote_idx = -1;
+    for (idx = 0; idx < group->num; idx++)
+    {
+        if (joiner_idx == idx) continue;
+        gcs_node_t* node = &group->nodes[idx];
+        if (node->status >= status &&
+            group_node_is_stateful(group, node) &&
+            gcs_node_cached(node) != GCS_SEQNO_ILL)
+        {
+            if (segment == node->segment &&
+                (ist_seqno + 1) >= gcs_node_cached(node))
+            {
+                if (local_idx == -1 ||
+                    gcs_node_cached(node) >=
+                    gcs_node_cached(&group->nodes[local_idx]))
+                {
+                    local_idx = idx;
+                }
+            }
+            if (segment != node->segment &&
+                (ist_seqno + 1)>= gcs_node_cached(node))
+            {
+                if (remote_idx == -1 ||
+                    gcs_node_cached(node) >=
+                    gcs_node_cached(&group->nodes[remote_idx]))
+                {
+                    remote_idx = idx;
+                }
+            }
+        }
+    }
+    if (local_idx >= 0)
+    {
+        gu_debug("local found. name[%s], seqno[%lld]",
+                 group->nodes[local_idx].name,
+                 (long long)gcs_node_cached(&group->nodes[local_idx]));
+        return local_idx;
+    }
+    if (remote_idx >= 0)
+    {
+        gu_debug("remote found. name[%s], seqno[%lld]",
+                 group->nodes[remote_idx].name,
+                 (long long)gcs_node_cached(&group->nodes[remote_idx]));
+        return remote_idx;
+    }
+    gu_debug("not found.");
+    return -1;
+}
+
+static int
+group_find_ist_donor (gcs_group_t* const group, int joiner_idx,
+                      const char* str, int  str_len,
+                      gcs_seqno_t ist_seqno,
+                      gcs_node_state_t status)
+{
+    int idx = -1;
+
+    gcs_seqno_t conf_seqno = group->quorum.act_id;
+    gcs_seqno_t lowest_cached_seqno = group_lowest_cached_seqno(group);
+    if (lowest_cached_seqno == GCS_SEQNO_ILL)
+    {
+        gu_debug("fallback to sst. lowest_cached_seqno == GCS_SEQNO_ILL");
+        return -1;
+    }
+    gcs_seqno_t const max_cached_range = conf_seqno - lowest_cached_seqno;
+    gcs_seqno_t safety_gap = max_cached_range >> 7; /* 1.0 / 128 ~= 0.008 */
+    safety_gap = safety_gap < (1 << 20) ? safety_gap : (1 << 20); /* Be sensible and don't reserve more than 1M */
+    gcs_seqno_t safe_ist_seqno = lowest_cached_seqno + safety_gap;
+
+    gu_debug("ist_seqno[%lld], lowest_cached_seqno[%lld],"
+             "conf_seqno[%lld], safe_ist_seqno[%lld]",
+             (long long)ist_seqno, (long long)lowest_cached_seqno,
+             (long long)conf_seqno, (long long)safe_ist_seqno);
+
+    if (ist_seqno < safe_ist_seqno) {
+        // unsafe to perform ist.
+        gu_debug("fallback to sst. ist_seqno < safe_ist_seqno");
+        return -1;
+    }
+
+    if (str_len) {
+        // find ist donor by name.
+        idx = group_find_ist_donor_by_name_in_string(
+            group, joiner_idx, str, str_len, ist_seqno, status);
+        if (idx >= 0) return idx;
+    }
+    // find ist donor by status.
+    idx = group_find_ist_donor_by_state(
+        group, joiner_idx, ist_seqno, status);
+    if (idx >= 0) return idx;
+    return -1;
+}
+
+int
+gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
+                     const char* const donor_string, int const donor_len,
+                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno)
+{
+    static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
+
+    /* try to find ist donor first.
+       if it fails, fallbacks to find sst donor*/
+    int donor_idx = -1;
+    if (group->gcs_proto_ver > 0 &&
+        gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
+    {
+        assert (ist_seqno != GCS_SEQNO_ILL);
+        donor_idx = group_find_ist_donor(group, joiner_idx,
+                                         donor_string, donor_len,
+                                         ist_seqno,
+                                         min_donor_state);
+    }
+    if (donor_idx < 0)
+    {
+        /* if donor_string is empty,
+           it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string
+                (group, joiner_idx,
+                 donor_string, donor_len,
+                 min_donor_state);
+    }
+    return donor_idx;
+}
+
+
 /*!
  * Selects and returns the index of state transfer donor, if available.
  * Updates donor and joiner status if state transfer is possible
@@ -940,10 +1179,11 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
  */
 static int
 group_select_donor (gcs_group_t* group, int const joiner_idx,
-                    const char* const donor_string, bool const desync)
+                    const char* const donor_string,
+                    const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno,
+                    bool const desync)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
-
     int  donor_idx;
     int  const donor_len = strlen(donor_string);
     bool const required_donor = (donor_len > 0);
@@ -957,10 +1197,9 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
             donor_idx = -EAGAIN;
     }
     else {
-        /* if donor_string is empty, it will fallback to find_node_by_state() */
-        donor_idx = group_for_each_donor_in_string (group, joiner_idx,
-                                                    donor_string, donor_len,
-                                                    min_donor_state);
+        donor_idx = gcs_group_find_donor(group, joiner_idx,
+                                         donor_string, donor_len,
+                                         ist_uuid, ist_seqno);
     }
 
     if (donor_idx >= 0) {
@@ -1037,6 +1276,22 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     gcs_node_state_t joiner_status  = group->nodes[joiner_idx].status;
     bool const       desync         = group_desync_request (donor_name);
 
+    gu_uuid_t ist_uuid = {{0, }};
+    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
+    if (group->gcs_proto_ver > 0) {
+        const char* ist_buf = donor_name + donor_name_len + 1;
+        memcpy(&ist_uuid, ist_buf, sizeof(ist_uuid));
+        ist_seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(ist_buf + sizeof(ist_uuid)));
+
+        // change act.buf's content to original version.
+        // and it's safe to change act.buf_len
+        size_t head = donor_name_len + 1 + sizeof(ist_uuid) + sizeof(ist_seqno);
+        memmove((char*)act->act.buf + donor_name_len + 1,
+                (char*)act->act.buf + head,
+                act->act.buf_len - head);
+        act->act.buf_len -= sizeof(ist_uuid) + sizeof(ist_seqno);
+    }
+
     assert (GCS_ACT_STATE_REQ == act->act.type);
 
     if (joiner_status != GCS_NODE_STATE_PRIM && !desync) {
@@ -1059,7 +1314,8 @@ gcs_group_handle_state_request (gcs_group_t*         group,
         }
     }
 
-    donor_idx = group_select_donor(group, joiner_idx, donor_name, desync);
+    donor_idx = group_select_donor(group, joiner_idx, donor_name,
+                                   &ist_uuid, ist_seqno, desync);
 
     assert (donor_idx != joiner_idx || desync  || donor_idx < 0);
     assert (donor_idx == joiner_idx || !desync || donor_idx < 0);
@@ -1214,5 +1470,3 @@ gcs_group_get_state (gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
-
-

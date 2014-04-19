@@ -24,6 +24,7 @@ extern "C" {
 #include "gu_buf.h"
 #include "gcache.h"
 #include "gu_errno.h"
+#include "gu_uuid.h"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -305,6 +306,8 @@ extern long gcs_request_state_transfer (gcs_conn_t  *conn,
                                         const void  *req,
                                         size_t       size,
                                         const char  *donor,
+                                        const gu_uuid_t* ist_uuid,
+                                        gcs_seqno_t ist_seqno,
                                         gcs_seqno_t *seqno);
 
 /*! @brief Turns off flow control on the node.
