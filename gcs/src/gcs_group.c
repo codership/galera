@@ -894,12 +894,9 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     const char* begin = str;
     const char* end;
     int err = -EHOSTDOWN; /* worst error */
-    bool dcomma = false; /* dangling comma */
-
-    if (str_len && str[str_len-1] == ',' &&
-        group->gcs_proto_ver > 0) {
-        dcomma = true;
-    }
+    /* dangling comma */
+    bool const dcomma = (str_len && str[str_len-1] == ',' &&
+                         group->gcs_proto_ver >= 1);
 
     do {
         end = strchr(begin, ',');
@@ -915,12 +912,22 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
 
         assert (len >= 0);
 
-        int const idx = len > 0 ? /* consider empty name as "any" */
-            group_find_node_by_name (group, joiner_idx, begin, len, status) :
-            /* err == -EAGAIN here means that at least one of the nodes in the
-             * list will be available later, so don't try others. */
-             ((err == -EAGAIN && !dcomma) ?
-              err : group_find_node_by_state(group, joiner_idx, status));
+        int idx;
+        if (len > 0) {
+            idx = group_find_node_by_name (group, joiner_idx, begin, len,
+                                           status);
+        }
+        else {
+            if (err == -EAGAIN && !dcomma) {
+               /* -EAGAIN here means that at least one of the nodes in the
+                * list will be available later, so don't try others.
+                * (Proto 1 UPDATE: unless there is a dangling comma) */
+                idx = err;
+            }
+            else {
+                idx = group_find_node_by_state(group, joiner_idx, status);
+            }
+        }
 
         if (idx >= 0) return idx;
 
@@ -1037,7 +1044,7 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
                                gcs_node_state_t status)
 {
     gcs_node_t* joiner = &group->nodes[joiner_idx];
-    gcs_segment_t segment = joiner->segment;
+    gcs_segment_t joiner_segment = joiner->segment;
     // find node who is ist potentially possible.
     // first highest cached seqno local node.
     // then highest cached seqno remote node.
@@ -1047,30 +1054,22 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
     for (idx = 0; idx < group->num; idx++)
     {
         if (joiner_idx == idx) continue;
-        gcs_node_t* node = &group->nodes[idx];
+
+        gcs_node_t* const node = &group->nodes[idx];
+        gcs_seqno_t const node_cached = gcs_node_cached(node);
+
         if (node->status >= status &&
             group_node_is_stateful(group, node) &&
-            gcs_node_cached(node) != GCS_SEQNO_ILL)
+            node_cached != GCS_SEQNO_ILL &&
+            node_cached <= (ist_seqno + 1))
         {
-            if (segment == node->segment &&
-                (ist_seqno + 1) >= gcs_node_cached(node))
+            int* const idx_ptr =
+                (joiner_segment == node->segment) ? &local_idx : &remote_idx;
+
+            if (*idx_ptr == -1 ||
+                node_cached >= gcs_node_cached(&group->nodes[*idx_ptr]))
             {
-                if (local_idx == -1 ||
-                    gcs_node_cached(node) >=
-                    gcs_node_cached(&group->nodes[local_idx]))
-                {
-                    local_idx = idx;
-                }
-            }
-            if (segment != node->segment &&
-                (ist_seqno + 1)>= gcs_node_cached(node))
-            {
-                if (remote_idx == -1 ||
-                    gcs_node_cached(node) >=
-                    gcs_node_cached(&group->nodes[remote_idx]))
-                {
-                    remote_idx = idx;
-                }
+                *idx_ptr = idx;
             }
         }
     }
