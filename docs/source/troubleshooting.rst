@@ -8,7 +8,7 @@
 =================
 
 This chapter contains troubleshooting instructions
-for *Galera Cluster for MySQL*.
+for Galera Cluster.
 
 Contents:
 

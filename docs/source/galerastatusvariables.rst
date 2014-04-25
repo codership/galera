@@ -3,24 +3,18 @@
 =========================
 .. _`MySQL wsrep Options`:
 
-These variables are *Galera Cluster* 0.8.x
-status variables. There are two types of wsrep-related status
-variables:
+These variables are *Galera Cluster* 0.8.x status variables. There are two types of wsrep-related status variables:
 
-- *Galera Cluster*-specific variables
-  exported by *Galera Cluster*
-- Variables exported by MySQL. These variables
-  are for the general wsrep provider. 
+- Galera Cluster-specific variables exported by *Galera Cluster*
 
-This distinction is of importance for developers only.
-For convenience, all status variables are presented as
-a single list below.
+- Variables exported by MySQL. These variables are for the general wsrep provider. 
 
-The location (L) of the variable is presented in the second
-column from the left. The values are:
+This distinction is of importance for developers only.  For convenience, all status variables are presented as a single list below.
 
-- G |---| *Galera Cluster*
-- M |---| MySQL
+The location (L) of the variable is presented in the second column from the left. The values are:
+
+- *G* for Galera Cluster
+- *M* for MySQL
 
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | Status Variable                       | L | Example Value              | Introduced           | Deprecated                              |
@@ -161,7 +155,7 @@ Sequence number of the last committed transaction. See :ref:`wsrep API <wsrep AP
 .. index::
    pair: Parameters; wsrep_replicated
 
-Total number of writesets replicated (sent to other nodes).
+Total number of write-sets replicated (sent to other nodes).
 
 
 .. rubric:: wsrep_replicated_bytes
@@ -171,7 +165,7 @@ Total number of writesets replicated (sent to other nodes).
 .. index::
    pair: Parameters; wsrep_replicated_bytes
 
-Total size of writesets replicated.
+Total size of write-sets replicated.
 
 .. rubric:: wsrep_received
 
@@ -180,7 +174,7 @@ Total size of writesets replicated.
 .. index::
    pair: Parameters; wsrep_received
 
-Total number of writesets received from other nodes.
+Total number of write-sets received from other nodes.
 
 
 .. rubric:: wsrep_received_bytes
@@ -190,7 +184,7 @@ Total number of writesets received from other nodes.
 .. index::
    pair: Parameters; wsrep_received_bytes
 
-Total size of writesets received from other nodes.
+Total size of write-sets received from other nodes.
 
 
 .. rubric:: wsrep_local_commits
@@ -219,8 +213,7 @@ Total number of local transactions that failed certification test.
 .. index::
    pair: Parameters; wsrep_local_bf_aborts
 
-Total number of local transactions that were aborted by slave
-transactions while in execution.
+Total number of local transactions that were aborted by slave transactions while in execution.
 
 .. rubric:: wsrep_local_replays
 
@@ -248,9 +241,7 @@ Current (instantaneous) length of the send queue.
 .. index::
    pair: Parameters; wsrep_local_send_queue_avg
 
-Send queue length averaged over interval since the last status
-query. Values considerably larger than 0.0 indicate
-replication throttling or network throughput issue. 
+Send queue length averaged over interval since the last status query. Values considerably larger than 0.0 indicate replication throttling or network throughput issue. 
 
 
 .. rubric:: wsrep_local_recv_queue
@@ -270,10 +261,7 @@ Current (instantaneous) length of the recv queue.
 .. index::
    pair: Parameters; wsrep_local_recv_queue_avg
 
-Recv queue length averaged over interval since the last status 
-query. Values considerably larger than 0.0 mean that the node
-cannot apply writesets as fast as they are received and will
-generate a lot of replication throttling. 
+Recv queue length averaged over interval since the last status query. Values considerably larger than 0.0 mean that the node cannot apply writesets as fast as they are received and will generate a lot of replication throttling. 
 
 .. rubric:: wsrep_flow_control_paused
 
@@ -282,8 +270,7 @@ generate a lot of replication throttling.
 .. index::
    pair: Parameters; wsrep_flow_control_paused
 
-The fraction of time since the last status query that
-replication was paused due to flow control.
+The fraction of time since the last status query that replication was paused due to flow control.
 
 In other words, how much the slave lag is slowing down the cluster. 
 
@@ -305,8 +292,7 @@ Number of ``FC_PAUSE`` events sent since the last status query.
 .. index::
    pair: Parameters; wsrep_flow_control_recv
 
-Number of ``FC_PAUSE`` events received since the
-last status query (counts the events sent). 
+Number of ``FC_PAUSE`` events received since the last status query (counts the events sent). 
 
 
 .. rubric:: wsrep_cert_deps_distance
@@ -316,8 +302,7 @@ last status query (counts the events sent).
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
 
-Average distance between highest and lowest seqno that can be 
-possibly applied in parallel (potential degree of parallelization). 
+Average distance between highest and lowest ``seqno`` value that can be possibly applied in parallel (potential degree of parallelization). 
 
 
 .. rubric:: wsrep_apply_oooe
@@ -327,8 +312,7 @@ possibly applied in parallel (potential degree of parallelization).
 .. index::
    pair: Parameters; wsrep_apply_oooe
 
-How often applier started writeset applying out-of-order
-(parallelization efficiency).
+How often applier started writeset applying out-of-order (parallelization efficiency).
 
 
 .. rubric:: wsrep_apply_oool
@@ -338,9 +322,7 @@ How often applier started writeset applying out-of-order
 .. index::
    pair: Parameters; wsrep_apply_oool
 
-How often writeset was so slow to apply that writeset with
-higher seqno's were applied earlier. Values closer to 0 refer
-to a greater gap between slow and fast writesets.
+How often writeset was so slow to apply that write-set with higher seqno's were applied earlier. Values closer to 0 refer to a greater gap between slow and fast write-sets.
 
 .. rubric:: wsrep_apply_window
 
@@ -378,8 +360,7 @@ No meaning.
 .. index::
    pair: Parameters; wsrep_commit_window
 
-Average distance between highest and lowest concurrently
-committed seqno. 
+Average distance between highest and lowest concurrently committed seqno. 
 
 
 .. rubric:: wsrep_local_state
@@ -389,8 +370,7 @@ committed seqno.
 .. index::
    pair: Parameters; wsrep_local_state
 
-Internal *Galera Cluster* FSM state
-number. See :ref:`Node State Changes <Node State Changes>`. 
+Internal Galera Cluster FSM state number. See :ref:`Node State Changes <Node State Changes>`. 
 
 .. rubric:: wsrep_local_state_comment
 
@@ -408,8 +388,7 @@ Human-readable explanation of the state.
 .. index::
    pair: Parameters; wsrep_incoming_addresses
 
-Comma-separated list of incoming server addresses
-in the cluster component.
+Comma-separated list of incoming server addresses in the cluster component.
 
 
 .. rubric:: wsrep_cluster_conf_id
@@ -464,12 +443,11 @@ This node index in the cluster (base 0).
 .. index::
    pair: Parameters; wsrep_ready
 
-Whether the server is ready to accept queries. If this status
-is *OFF*, almost all of the queries fill fail with::
+Whether the server is ready to accept queries. If this status is ``OFF``, almost all of the queries fill fail with::
 
     ERROR 1047 (08S01) Unknown Command
 
-unless the ``wsrep_on`` session variable is set to *0*.
+unless the ``wsrep_on`` session variable is set to ``0``.
 
 .. rubric:: wsrep_cert_index_size
 
@@ -496,9 +474,7 @@ The version of the wsrep protocol used.
 .. index::
    pair: Parameters; wsrep_connected
 
-If the value is *OFF*, the node has not yet connected to any
-of the cluster components. This may be due to
-misconfiguration. Check the error log for proper diagnostics.
+If the value is ``OFF``, the node has not yet connected to any of the cluster components. This may be due to misconfiguration. Check the error log for proper diagnostics.
 
 
 .. |---|   unicode:: U+2014 .. EM DASH

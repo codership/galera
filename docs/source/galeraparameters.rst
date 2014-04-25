@@ -3,12 +3,7 @@
 ==================
 .. _`Galera Parameters`:
 
-As of version 0.8, *Galera Cluster*
-accepts parameters as semicolon-separated
-key value pair lists, such as ``key1 = value1; key2 = value2``.
-In this way, you can configure an arbitrary number of
-*Galera Cluster* parameters
-in one call. A key consists of parameter group and parameter name::
+As of version 0.8, Galera Cluster accepts parameters as semicolon-separated key value pair lists, such as ``key1 = value1; key2 = value2``.  In this way, you can configure an arbitrary number of Galera Cluster parameters in one call. A key consists of parameter group and parameter name::
 
   <group>.<name>
 
@@ -16,11 +11,11 @@ Where ``<group>`` roughly corresponds to some Galera module.
 
 Table legend:
 
-- *Numeric values* |---| *Galera Cluster*
-  understands the following numeric modifiers:
-  K, M, G, T standing for |210|, |220|, |230| and |240| respectively.
-- *Boolean values* |---| *Galera Cluster*
-  accepts the following boolean values: 0, 1, yes, no, true, false, on, off.
+- **Numeric values** Galera Cluster understands the following numeric modifiers:
+  ``K``, ``M``, ``G``, ``T`` standing for |210|, |220|, |230| and |240| respectively.
+
+- **Boolean values** Galera Cluster accepts the following boolean values: ``0``, ``1``, ``YES``, ``NO``, ``TRUE``, ``FALSE``, ``ON``, ``OFF``.
+
 - Time periods must be expressed in the ISO8601 format. See also the examples below.
 
 .. |210| replace:: 2\ :sup:`10`\
@@ -216,9 +211,7 @@ Which transport backend to use. Currently only ASIO is supported.
 .. index::
    pair: Parameters; protonet.version
 
-This status variable is used to check which transport
-backend protocol  version is used. This variable is
-mostly used for troubleshooting purposes.
+This status variable is used to check which transport backend protocol  version is used. This variable is mostly used for troubleshooting purposes.
 
 .. rubric:: socket.ssl_cert
 
@@ -227,8 +220,7 @@ mostly used for troubleshooting purposes.
 .. index::
    pair: Parameters; socket.ssl_cert
 
-A path (absolute or relative to the working
-directory )to an SSL certificate (in PEM format). 
+A path (absolute or relative to the working directory )to an SSL certificate (in PEM format). 
 
 .. rubric:: socket.ssl_key
 
@@ -237,9 +229,7 @@ directory )to an SSL certificate (in PEM format).
 .. index::
    pair: Parameters; socket.ssl_key
 
-A path (absolute or relative to the working
-directory to a private key for a certificate
-(in PEM format).
+A path (absolute or relative to the working directory to a private key for a certificate (in PEM format).
 
 .. rubric:: socket.ssl_compression
 
@@ -258,9 +248,7 @@ Whether to enable compression on SSL connections.
 .. index::
    pair: Parameters; socket.ssl_cipher
 
-Symmetric cipher to use. AES128 is used by default
-it is considerably faster and no less secure than
-AES256.
+Symmetric cipher to use. AES128 is used by default it is considerably faster and no less secure than AES256.
 
 .. rubric:: gmcast.listen_addr
 
@@ -269,10 +257,7 @@ AES256.
 .. index::
    pair: Parameters; gmcast.listen_addr
 
-Address at which *Galera Cluster* listens to connections
-from other nodes. By default the port to listen at
-is taken from the connection address. This setting
-can be used to overwrite that.
+Address at which *Galera Cluster* listens to connections from other nodes. By default the port to listen at is taken from the connection address. This setting can be used to overwrite that.
 
 .. rubric:: gmcast.mcast_addr
 
@@ -281,15 +266,13 @@ can be used to overwrite that.
 .. index::
    pair: Parameters; gmcast.mcast_addr
 
-If set, UDP multicast will be used for replication,
-for example::
+If set, UDP multicast will be used for replication, for example::
 
     gmcast.mcast_addr=239.192.0.11
 
 The value must be the same on all nodes.
 
-If you are planning to build a large cluster, we
-recommend using UDP.
+If you are planning to build a large cluster, we recommend using UDP.
 
 
 .. rubric:: gmcast.mcast_ttl
@@ -318,8 +301,7 @@ Connection timeout to initiate message relaying.
 .. index::
    pair: Parameters; gmcast.time_wait
 
-Time to wait until allowing peer declared outside
-of stable view to reconnect.
+Time to wait until allowing peer declared outside of stable view to reconnect.
 
 .. rubric:: gmcast.version
 
@@ -328,9 +310,7 @@ of stable view to reconnect.
 .. index::
    pair: Parameters; gmcast.version
 
-This status variable is used to check which gmcast
-protocol version is used. This variable is mostly used
-for troubleshooting purposes.
+This status variable is used to check which gmcast protocol version is used. This variable is mostly used for troubleshooting purposes.
 
 
 .. rubric:: evs.causal_keepalive_period
@@ -350,8 +330,7 @@ For developer use only. Defaults to ``evs.keepalive_period``.
 .. index::
    pair: Parameters; evs.consensus_timeout
 
-Timeout on reaching the consensus about cluster
-membership.
+Timeout on reaching the consensus about cluster membership.
 
 **Deprecated** See ``evs.install_timeout``.
 
@@ -363,8 +342,7 @@ membership.
 .. index::
    pair: Parameters; evs.debug_log_mask
 
-Control EVS debug logging, only effective when
-``wsrep_debug`` is in use.
+Control EVS debug logging, only effective when ``wsrep_debug`` is in use.
 
 
 
@@ -385,8 +363,7 @@ How often to check for peer inactivity.
 .. index::
    pair: Parameters; evs.inactive_timeout
 
-Hard limit on the inactivity period, after which
-the node is pronounced dead.
+Hard limit on the inactivity period, after which the node is pronounced dead.
 
 
 .. rubric:: evs.info_log_mask
@@ -398,10 +375,10 @@ the node is pronounced dead.
 
 Control extra EVS info logging. Bits:
  
-- *0x1* |---| extra view change info
-- *0x2* |---| extra state change info
-- *0x4* |---| statistics
-- *0x8* |---| profiling (only in builds with profiling enabled)
+- ``0x1`` Provides extra view change info.
+- ``0x2`` Provides extra state change info
+- ``0x4`` Provides statistics
+- ``0x8`` Provides profiling (only in builds with profiling enabled)
 
 
 .. rubric:: evs.install_timeout
@@ -411,9 +388,7 @@ Control extra EVS info logging. Bits:
 .. index::
    pair: Parameters; evs.install_timeout
 
-Timeout on waiting for install message
-acknowledgments. Successor to
-``evs.consensus_timeout``.
+Timeout on waiting for install message acknowledgments. Successor to ``evs.consensus_timeout``.
 
 .. rubric:: evs.join_retrans_period
 
@@ -441,8 +416,7 @@ How often to emit keepalive beacons (in the absence of any other traffic).
 .. index::
    pair: Parameters; evs.max_install_timeouts
 
-How many membership install rounds to try before
-giving up (total rounds will be ``evs.max_install_timeouts`` + 2).
+How many membership install rounds to try before giving up (total rounds will be ``evs.max_install_timeouts`` + 2).
 
 
 .. rubric:: evs.send_window
@@ -452,12 +426,7 @@ giving up (total rounds will be ``evs.max_install_timeouts`` + 2).
 .. index::
    pair: Parameters; evs.send_window
 
-Maximum packets in replication at a time. For WAN
-setups may be set considerably higher, e.g. 512.
-Must be no less than ``evs.user_send_window``.
-If you must use other that the default value, we
-recommend using double the
-``evs.user_send_window`` value.
+Maximum packets in replication at a time. For WAN setups may be set considerably higher, e.g. 512.  Must be no less than ``evs.user_send_window``.  If you must use other that the default value, we recommend using double the ``evs.user_send_window`` value.
 
 
 .. rubric:: evs.stats_report_period
@@ -467,8 +436,7 @@ recommend using double the
 .. index::
    pair: Parameters; evs.stats_report_period
 
-Control period of EVS statistics reporting.
-the node is pronounced dead.
+Control period of EVS statistics reporting.  The node is pronounced dead.
 
 .. rubric:: evs.suspect_timeout
 
@@ -477,10 +445,7 @@ the node is pronounced dead.
 .. index::
    pair: Parameters; evs.suspect_timeout
 
-Inactivity period after which the node is
-*suspected* to be dead. If all remaining nodes
-agree on that, the node is dropped out of cluster
-before ``evs.inactive_timeout`` is reached.
+Inactivity period after which the node is *suspected* to be dead. If all remaining nodes agree on that, the node is dropped out of cluster before ``evs.inactive_timeout`` is reached.
 
 
 .. rubric:: evs.use_aggregate
@@ -500,9 +465,7 @@ Aggregate small packets into one, when possible.
 .. index::
    pair: Parameters; evs.user_send_window
 
-Maximum data packets in replication at a time. 
-For WAN setups, this value can be set considerably
-higher, to, for example, 512.
+Maximum data packets in replication at a time. For WAN setups, this value can be set considerably higher, to, for example, 512.
 
 
 .. rubric:: evs.view_forget_timeout
@@ -521,9 +484,7 @@ Drop past views from the view history after this timeout.
 .. index::
    pair: Parameters; evs.version
 
-This status variable is used to check which evs
-protocol version is used. This variable is mostly used
-for troubleshooting purposes.
+This status variable is used to check which ``evs`` protocol version is used. This variable is mostly used for troubleshooting purposes.
 
 .. rubric:: pc.bootstrap
 
@@ -532,8 +493,7 @@ for troubleshooting purposes.
 .. index::
    pair: Parameters; pc.bootstrap
 
-If you set this value to *true* is a signal to
-turn a ``NON-PRIMARY`` component into ``PRIMARY``.
+If you set this value to *true* is a signal to turn a ``NON-PRIMARY`` component into ``PRIMARY``.
 
 
 .. rubric:: pc.checksum
@@ -552,11 +512,7 @@ Checksum replicated messages.
 .. index::
    pair: Parameters; pc.ignore_sb
 
-Should we allow nodes to process updates even in
-the case of split brain? This is a dangerous
-setting in multi-master setup, but should simplify
-things in master-slave cluster (especially if only
-2 nodes are used).
+Should we allow nodes to process updates even in the case of split brain? This is a dangerous setting in multi-master setup, but should simplify things in master-slave cluster (especially if only 2 nodes are used).
 
 .. rubric:: pc.ignore_quorum
 
@@ -565,11 +521,7 @@ things in master-slave cluster (especially if only
 .. index::
    pair: Parameters; pc.ignore_quorum
 
-Completely ignore quorum calculations. For
-example if the master splits from several slaves
-it still remains operational. Use with extreme
-caution even in master-slave setups, as slaves
-will not automatically reconnect to master in this case.
+Completely ignore quorum calculations. For example if the master splits from several slaves it still remains operational. Use with extreme caution even in master-slave setups, as slaves will not automatically reconnect to master in this case.
 
 .. rubric:: pc.linger
 
@@ -578,8 +530,7 @@ will not automatically reconnect to master in this case.
 .. index::
    pair: Parameters; pc.linger
 
-The period for which the PC protocol waits for the
-EVS termination.
+The period for which the PC protocol waits for the EVS termination.
 
 .. rubric:: pc.npvo
 
@@ -588,9 +539,7 @@ EVS termination.
 .. index::
    pair: Parameters; pc.npvo
 
-If set to ``true``, the more recent primary
-component overrides older ones in the case of
-conflicting primaries. 
+If set to ``TRUE``, the more recent primary component overrides older ones in the case of conflicting primaries. 
 
 
 .. rubric:: pc.wait_prim
@@ -600,10 +549,8 @@ conflicting primaries.
 .. index::
    pair: Parameters; pc.wait_prim
 
-If set to ``true``, the node waits for the primary
-component forever. Useful to bring up a
-non-primary component and make it primary with
-``pc.bootstrap``.
+If set to ``TRUE``, the node waits for the primary component forever. Useful to bring up a
+non-primary component and make it primary with ``pc.bootstrap``.
 
 .. rubric:: pc.weight
 
@@ -622,9 +569,7 @@ As of version 2.4. Node weight for quorum calculation.
 .. index::
    pair: Parameters; pc.version
 
-This status variable is used to check which pc
-protocol version is used. This variable is mostly used
-for troubleshooting purposes.
+This status variable is used to check which pc protocol version is used. This variable is mostly used for troubleshooting purposes.
 
 
 .. rubric:: gcs.fc_debug
@@ -654,9 +599,7 @@ Resume replication after recv queue drops below this fraction of ``gcs.fc_limit`
 .. index::
    pair: Parameters; gcs.fc_limit
 
-Pause replication if recv queue exceeds this
-number of  writesets. For master-slave setups this
-number can be increased considerably.
+Pause replication if recv queue exceeds this number of  writesets. For master-slave setups this number can be increased considerably.
 
 
 .. rubric:: gcs.fc_master_slave
@@ -686,10 +629,7 @@ All writesets exceeding that size will be fragmented.
 .. index::
    pair: Parameters; gcs.max_throttle
 
-How much to throttle replication rate during state
-transfer (to avoid running out of memory). Set the
-value to 0.0 if stopping replication is acceptable
-for completing state transfer. 
+How much to throttle replication rate during state transfer (to avoid running out of memory). Set the value to 0.0 if stopping replication is acceptable for completing state transfer. 
 
 
 .. rubric:: gcs.recv_q_hard_limit
@@ -699,9 +639,7 @@ for completing state transfer.
 .. index::
    pair: Parameters; gcs.recv_q_hard_limit
 
-Maximum allowed size of recv queue. This should
-normally be half of (RAM + swap). If this limit is
-exceeded, *Galera Cluster* will abort the server.
+Maximum allowed size of recv queue. This should normally be half of (RAM + swap). If this limit is exceeded, Galera Cluster will abort the server.
 
 
 .. rubric:: gcs.recv_q_soft_limit
@@ -711,16 +649,10 @@ exceeded, *Galera Cluster* will abort the server.
 .. index::
    pair: Parameters; gcs.recv_q_soft_limit
 
-The fraction of ``gcs.recv_q_hard_limit`` after
-which replication rate will be throttled.
+The fraction of ``gcs.recv_q_hard_limit`` after which replication rate will be throttled.
 
-The degree of throttling is a linear function of
-recv queue size and goes from 1.0 (*full rate*)
-at ``gcs.recv_q_soft_limit`` to
-``gcs.max_throttle`` at ``gcs.recv_q_hard_limit``
-Note that *full rate*, as estimated between 0 and
-``gcs.recv_q_soft_limit`` is a very imprecise
-estimate of a regular replication rate. 
+The degree of throttling is a linear function of recv queue size and goes from 1.0 (``full rate``)
+at ``gcs.recv_q_soft_limit`` to ``gcs.max_throttle`` at ``gcs.recv_q_hard_limit`` Note that ``full rate``, as estimated between 0 and ``gcs.recv_q_soft_limit`` is a very imprecise estimate of a regular replication rate. 
 
 .. rubric:: gcs.sync_donor
 
@@ -729,18 +661,9 @@ estimate of a regular replication rate.
 .. index::
    pair: Parameters; gcs.sync_donor
 
-Should the rest of the cluster keep in sync with
-the donor? *Yes* means that if the donor is
-blocked by state transfer, the whole cluster
-is blocked with it.
+Should the rest of the cluster keep in sync with the donor? ``YES`` means that if the donor is blocked by state transfer, the whole cluster is blocked with it.
 
-If you choose to use value *YES*, it is
-theoretically possible that the donor node cannot
-keep up with the rest of the cluster due to the
-extra load from the SST. If the node lags behind,
-it may send flow control messages stalling the
-whole cluster. However, you can monitor this using
-the ``wsrep_flow_control_paused`` status variable.
+If you choose to use value ``YES``, it is theoretically possible that the donor node cannot keep up with the rest of the cluster due to the extra load from the SST. If the node lags behind, it may send flow control messages stalling the whole cluster. However, you can monitor this using the ``wsrep_flow_control_paused`` status variable.
 
 .. rubric:: ist.recv_addr
 
@@ -749,9 +672,7 @@ the ``wsrep_flow_control_paused`` status variable.
 .. index::
    pair: Parameters; ist.recv_addr
 
-As of 2.0. Address to listen for Incremental State
-Transfer. By default this is the
-``<address>:<port+1>`` from ``wsrep_node_address``.
+As of 2.0. Address to listen for Incremental State Transfer. By default this is the ``<address>:<port+1>`` from ``wsrep_node_address``.
 
 
 .. rubric:: replicator.commit_order
@@ -761,18 +682,15 @@ Transfer. By default this is the
 .. index::
    pair: Parameters; replicator.commit_order
 
-Whether to allow Out-Of-Order committing (improves
-parallel applying performance). Possible settings:
+Whether to allow Out-Of-Order committing (improves parallel applying performance). Possible settings:
 
-- 0 |---| BYPASS: all commit order monitoring is
-  switched off (useful for measuring performance
-  penalty)
-- 1 |---| OOOC: allow out of order committing for
-  all transactions
-- 2 |---| LOCAL_OOOC: allow out of order
-  committing only for local transactions
-- 3 |---| NO_OOOC: no out of order committing is
-  allowed (strict total order committing)
+- ``0``or ``BYPASS`` All commit order monitoring is switched off (useful for measuring performance penalty).
+
+- ``1`` or ``OOOC`` Allows out of order committing for all transactions.
+
+- ``2`` or ``LOCAL_OOOC``  Allows out of order committing only for local transactions.
+
+- ``3`` or ``NO_OOOC`` No out of order committing is allowed (strict total order committing)
 
 .. rubric:: replicator.causal_read_timeout
 
@@ -790,8 +708,7 @@ Sometimes causal reads need to timeout.
 .. index::
    pair: Parameters; gcache.dir
 
-Directory where GCache should place its files.
-Defaults to the working directory. 
+Directory where GCache should place its files.  Defaults to the working directory. 
 
 
 .. rubric:: gcache.name
@@ -813,8 +730,7 @@ Name of the ring buffer storage file.
    pair: Parameters; gcache.size
 
 
-Size of the persistent on-disk ring buffer storage.
-This will be preallocated on startup. 
+Size of the persistent on-disk ring buffer storage. This will be preallocated on startup. 
 
 The buffer file name is ``galera.cache``.
 
@@ -828,9 +744,7 @@ The buffer file name is ``galera.cache``.
 .. index::
    pair: Parameters; gcache.page_size
 
-Size of the page files in page storage. The limit
-on overall page storage is the size of the disk.
-Pages are prefixed by ``gcache.page``.
+Size of the page files in page storage. The limit on overall page storage is the size of the disk.  Pages are prefixed by ``gcache.page``.
 
 .. rubric:: gcache.keep_pages_size
 
@@ -839,9 +753,7 @@ Pages are prefixed by ``gcache.page``.
 .. index::
    pair: Parameters; gcache.keep_pages_size
 
-Total size of the page storage pages to keep for
-caching purposes. If only page storage is enabled,
-one page is always present. 
+Total size of the page storage pages to keep for caching purposes. If only page storage is enabled, one page is always present. 
 
 
 .. rubric:: gcache.mem_size
@@ -863,24 +775,21 @@ Max size of the ``malloc()`` store (read: RAM). For setups with spare RAM.
 .. index::
    pair: Parameters; Checking
    
-You can set *Galera Cluster* parameters in the *my.cnf*
-configuration file as follows:
+You can set *Galera Cluster* parameters in the ``my.cnf`` configuration file as follows:
 
 ``wsrep_provider_options="gcs.fc_limit=256;gcs.fc_factor=0.9"``
 
 This is useful in master-slave setups.
 
-You can set *Galera Cluster*
-parameters through a MySQL client as follows:
+You can set Galera Cluster parameters through a MySQL client with the following query::
 
-``mysql> SET GLOBAL wsrep_provider_options="evs.send_window=16";``
+	SET GLOBAL wsrep_provider_options="evs.send_window=16";
 
-This command would only change the ``evs.send_window`` value.
+This query  only changes the ``evs.send_window`` value.
 
-To check which parameters are used in *Galera Cluster*,
-enter the command below:
+To check which parameters are used in Galera Cluster, enter the following query::
 
-``mysql> SHOW VARIABLES LIKE 'wsrep_provider_options';``
+	SHOW VARIABLES LIKE 'wsrep_provider_options';
 
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:

@@ -1,5 +1,5 @@
 ======================================
- Configuring Galera Cluster for MySQL
+Server Configuration for Galera Cluster
 ======================================
 .. _`Configuring Galera Cluster for MySQL`:
 

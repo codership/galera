@@ -7,7 +7,7 @@
  Reference
 ==========
 
-This chapter contains reference information on *Galera Cluster for MySQL*.
+This chapter contains reference information on Galera Cluster.
 
 Contents:
 

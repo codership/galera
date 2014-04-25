@@ -8,9 +8,7 @@
    pair: Logs; Debug log
 
 
-These are MySQL system variables introduced by *wsrep*
-patch v0.8. All variables are global except where marked
-by (L).
+These are MySQL system variables introduced by wsrep API patch v0.8. All variables are global except where marked by (L).
 
 
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
@@ -112,12 +110,9 @@ by (L).
 .. index::
    pair: Parameters; wsrep_auto_increment_control
 
-Automatically adjust ``auto_increment_increment`` and
-``auto_increment_offset`` system variables when the
-cluster membership changes.
+Automatically adjusts ``auto_increment_increment`` and ``auto_increment_offset`` system variables when the cluster membership changes.
 
-This parameters significantly reduces the certification
-conflict rate for``INSERT`` clauses.
+This parameters significantly reduces the certification conflict rate for``INSERT`` clauses.
 
 
 .. rubric:: wsrep_causal_reads
@@ -127,8 +122,7 @@ conflict rate for``INSERT`` clauses.
 .. index::
    pair: Parameters; wsrep_causal_reads
 
-Enforce strict cluster-wide ``READ COMMITTED`` semantics on
-non-transactional reads. Results in larger read latencies. 
+Enforce strict cluster-wide ``READ COMMITTED`` semantics on non-transactional reads. Results in larger read latencies. 
 
 
 .. rubric:: wsrep_certify_nonPK
@@ -138,9 +132,7 @@ non-transactional reads. Results in larger read latencies.
 .. index::
    pair: Parameters; wsrep_certify_nonPK
 
-Generate primary keys for rows without them for the
-purpose of certification. This is required for parallel
-applying. Do not use tables without primary keys. 
+Generate primary keys for rows without them for the purpose of certification. This is required for parallel applying. Do not use tables without primary keys. 
 
 .. rubric:: wsrep_cluster_address
 
@@ -151,7 +143,7 @@ applying. Do not use tables without primary keys.
 .. index::
    single: my.cnf
 
-*Galera Cluster* takes addresses in the URL format::
+Galera Cluster takes addresses in the URL format::
 
     <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
 
@@ -159,27 +151,17 @@ For example::
 
     gcomm://192.168.0.1:4567?gmcast.listen_addr=0.0.0.0:5678 
 
-Changing this variable in runtime will cause the node to
-close connection to the current cluster (if any), and
-reconnect to the new address. (However, doing this at
-runtime may not be possible for all SST methods.) As of
-*Galera Cluster* 23.2.2,
-it is possible to provide a comma separated
-list of other nodes in the cluster as follows::
+Changing this variable in runtime will cause the node to close connection to the current cluster (if any), and reconnect to the new address. (However, doing this at runtime may not be possible for all SST methods.) As of Galera Cluster 23.2.2, it is possible to provide a comma separated list of other nodes in the cluster as follows::
 
     gcomm://node1:port1,node2:port2,...[?option1=value1&...]
 
-Using the string *gcomm://* without any address will cause
-the node to startup alone, thus initializing a new cluster
-(that the other nodes can join to).
+Using the string *gcomm://* without any address will cause the node to startup alone, thus initializing a new cluster (that the other nodes can join to).
 
-.. note: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts,
-         that will cause the node to not join back to the cluster that it
-         was part of, rather it will initialize a new one node cluster
-         and cause a split brain. To bootstrap a cluster, you should
-         only pass the ``gcomm://`` string on the command line, such as:
-         
-         ``service mysql start --wsrep-cluster-address="gcomm://"``
+.. note:: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts, that will cause the node to not join back to the cluster that it was part of, rather it will initialize a new one node cluster and cause a split brain. To bootstrap a cluster, you should only pass the ``gcomm://`` string on the command line, such as:
+
+	.. code-block:: none
+	
+		$ service mysql start --wsrep-cluster-address="gcomm://"
 
 
 .. rubric:: wsrep_cluster_name
@@ -189,9 +171,7 @@ the node to startup alone, thus initializing a new cluster
 .. index::
    pair: Parameters; wsrep_cluster_name
 
-The logical cluster name. If a node tries to connect to a
-cluster with a different name, the connection fails. The
-cluster name must be same on all the cluster nodes. 
+The logical cluster name. If a node tries to connect to a cluster with a different name, the connection fails. The cluster name must be same on all the cluster nodes. 
 
  
 .. rubric:: wsrep_convert_LOCK_to_trx
@@ -201,18 +181,11 @@ cluster name must be same on all the cluster nodes.
 .. index::
    pair: Parameters; wsrep_convert_LOCK_to_trx
 
-Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT`` statements.
-In other words, this parameter implicitly converts locking sessions into
-transactions within *mysqld*. By itself, it does not mean support for
-locking sessions, but it prevents the database from ending up in a logically
-inconsistent state.
+Convert ``LOCK/UNLOCK TABLES`` statements to ``BEGIN/COMMIT`` statements. In other words, this parameter implicitly converts locking sessions into transactions within *mysqld*. By itself, it does not mean support for locking sessions, but it prevents the database from ending up in a logically inconsistent state.
 
-Sometimes this parameter may help to get old applications
-working in a multi-master setup.
+Sometimes this parameter may help to get old applications working in a multi-master setup.
 
-.. note:: Loading a large database dump with ``LOCK``
-          statements can result in abnormally large transactions and
-          cause an out-of-memory condition.
+.. note:: Loading a large database dump with ``LOCK`` statements can result in abnormally large transactions and cause an out-of-memory condition.
 
 .. rubric:: wsrep_data_home_dir
 
@@ -221,9 +194,7 @@ working in a multi-master setup.
 .. index::
    pair: Parameters; wsrep_data_home_dir
 
-A directory where the wsrep provider will store its files.
-*Galera Cluster* uses this parameter
-to store its internal state.
+A directory where the wsrep Provider will store its files.  Galera Cluster uses this parameter to store its internal state.
 
 .. rubric:: wsrep_dbug_option
 
@@ -252,14 +223,12 @@ Enable debug log output.
 .. index::
    pair: Parameters; wsrep_drupal_282555_workaround
 
-Enable a workaround for Drupal (actually MySQL/InnoDB) bug
-#282555 (Inserting a ``DEFAULT`` value into an
-``AUTO_INCREMENT`` column may return a duplicate key error).
+Enable a workaround for Drupal (actually MySQL/InnoDB) bug #282555 (Inserting a ``DEFAULT`` value into an ``AUTO_INCREMENT`` column may return a duplicate key error).
 
 Documented at:
 
-- http://bugs.mysql.com/bug.php?id=41984
-- http://drupal.org/node/282555
+- `Bug 41984 <http://bugs.mysql.com/bug.php?id=41984>`_
+- `Issue: Anonymous disappears from node_access table, gets access denied for all nodes <http://drupal.org/node/282555>`_
 
 .. rubric:: wsrep_forced_binlog_format
 
@@ -268,19 +237,11 @@ Documented at:
 .. index::
    pair: Parameters; wsrep_forced_binlog_format
 
-Force every transaction to use the given binlog format. When
-this variable is set to something else than *NONE*, all
-transactions will use the given forced format, regardless of
-the client session specified in ``binlog_format``.
+Force every transaction to use the given binlog format. When this variable is set to something else than ``NONE``, all transactions will use the given forced format, regardless of the client session specified in ``binlog_format``.
 
-Valid choices for ``wsrep_forced_binlog_format`` are: *ROW*,
-*STATEMENT*, *MIXED* and the special value *NONE*,
-meaning that there is no forced binlog format in effect.
+Valid choices for ``wsrep_forced_binlog_format`` are: ``ROW``, ``STATEMENT``, ``MIXED`` and the special value ``NONE``, meaning that there is no forced binlog format in effect.
 
-This variable was introduced to support ``STATEMENT`` format
-replication during  rolling schema upgrade processing.
-However, in most cases, ``ROW`` replication
-is valid for asymmetric schema replication.
+This variable was introduced to support ``STATEMENT`` format replication during  rolling schema upgrade processing. However, in most cases, ``ROW`` replication is valid for asymmetric schema replication.
 
 
 
@@ -291,9 +252,7 @@ is valid for asymmetric schema replication.
 .. index::
    pair: Parameters; wsrep_max_ws_rows
 
-The maximum number of rows allowed in the writeset. Currently,
-this parameter limits the supported size of transactions
-and ``LOAD DATA`` statements.
+The maximum number of rows allowed in the writeset. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
 
 
 .. rubric:: wsrep_max_ws_size
@@ -303,11 +262,9 @@ and ``LOAD DATA`` statements.
 .. index::
    pair: Parameters; wsrep_max_ws_size
 
-The maximum allowed writeset size. Currently, this parameter
-limits the supported size of transactions and ``LOAD DATA``
-statements.
+The maximum allowed writeset size. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
 
-The maximum allowed writeset size is 2G.
+The maximum allowed writeset size is ``2G``.
 
 
 .. rubric:: wsrep_node_address
@@ -318,16 +275,9 @@ The maximum allowed writeset size is 2G.
 .. index::
    pair: Parameters; wsrep_node_address
 
-An option to explicitly specify the network address of the
-node, if autoguessing for some reason does not produce
-desirable results (multiple network interfaces, NAT, etc.)
+An option to explicitly specify the network address of the node, if autoguessing for some reason does not produce desirable results (multiple network interfaces, NAT, etc.)
 
-By default, the address of the first network interface (*eth0*)
-and the default port 4567 are used. The *<address>* and
-*:port* will be passed to the Galera replication Plugin to be
-used as a base address in its communications. It will also be
-used to derive the default values for parameters
-``wsrep_sst_receive_address`` and ``ist.recv_address``.
+By default, the address of the first network interface (``eth0``) and the default port ``4567`` are used. The ``<address>`` and ``:port`` will be passed to the Galera replication Plugin to be used as a base address in its communications. It will also be used to derive the default values for parameters ``wsrep_sst_receive_address`` and ``ist.recv_address``.
 
 
 .. rubric:: wwsrep_node_incoming_address
@@ -338,8 +288,7 @@ used to derive the default values for parameters
 .. index::
    pair: Parameters; wsrep_node_incoming_address
 
-The address at which the server expects client connections.
-Intended for integration with load balancers. Not used for now.
+The address at which the server expects client connections.  Intended for integration with load balancers. Not used for now.
 
 .. rubric:: wsrep_node_name
 
@@ -358,46 +307,38 @@ The logical node name - for convenience.
 .. index::
    pair: Parameters; wsrep_notify_cmd
 
-This command is run whenever the cluster membership or state
-of this node changes. This option can be used to (re)configure
-load balancers, raise alarms, and so on. The command passes on
-one or more of the following options:
+This command is run whenever the cluster membership or state of this node changes. This option can be used to (re)configure load balancers, raise alarms, and so on. The command passes on one or more of the following options:
 
 --status <status str>        The status of this node. The possible statuses are:
 
-                             - *Undefined* |---| The node has just started up 
-                               and is not connected to any :term:`Primary Component`
-                             - *Joiner* |---| The node is connected to a primary
-                               component and now is receiving state snapshot.
-                             - *Donor* |---| The node is connected to primary
-                               component and now is sending state snapshot.
-                             - *Joined* |---| The node has a complete state and
-                               now is catching up with the cluster.  
-                             - *Synced* |---| The node has synchronized itself
-                               with the cluster.
-                             - *Error(<error code if available>)* |---| The node
-                               is in an error state.
+                             - ``Undefined`` The node has just started up and is not connected to any :term:`Primary Component`.
+                               
+                             - ``Joiner`` The node is connected to a primary component and now is receiving state snapshot.
+                             
+                             - ``Donor`` The node is connected to primary component and now is sending state snapshot.
+                             
+                             - ``Joined`` The node has a complete state and now is catching up with the cluster.  
+                             
+                             - ``Synced`` The node has synchronized itself with the cluster.
+                             
+                             - ``Error(<error code if available>)`` The node is in an error state.
                                 
 --uuid <state UUID>          The cluster state UUID.
+
 --primary <yes/no>           Whether the current cluster component is primary or not.
+
 --members <list>             A comma-separated list of the component member UUIDs.
                              The members are presented in the following syntax: 
                             
-                             - ``<node UUID>`` |---| A unique node ID. The wsrep
-                               provider automatically assigns this ID for each node.
-                             - ``<node name>`` |---| The node name as it is set in the
-                               ``wsrep_node_name`` option.
-                             - ``<incoming address>`` |---| The address for client
-                               connections as it is set in the ``wsrep_node_incoming_address``
-                               option.
+                             - ``<node UUID>`` A unique node ID. The wsrep Provider automatically assigns this ID for each node.
+                             
+                             - ``<node name>`` The node name as it is set in the ``wsrep_node_name`` option.
+                             
+                             - ``<incoming address>`` The address for client connections as it is set in the ``wsrep_node_incoming_address`` option.
 
 --index                      The index of this node in the node list.
 
-Click this link
-`link <http://bazaar.launchpad.net/~codership/codership-mysql/wsrep-5.5/view/head:/support-files/wsrep_notify.sh>`_ 
-to view an example script that updates two tables
-on the local node with changes taking place at the
-cluster.
+For an example script that updates two tables on a local node, with changes taking place at the cluster level, see the follow `script <http://bazaar.launchpad.net/~codership/codership-mysql/wsrep-5.5/view/head:/support-files/wsrep_notify.sh>`_.
 
 
 .. rubric:: wsrep_on
@@ -408,8 +349,7 @@ cluster.
 .. index::
    pair: Parameters; wsrep_on
 
-Use wsrep replication. When switched off, no changes made in
-this session will be replicated.
+Use wsrep replication. When switched ``OFF``, no changes made in this session will be replicated.
 
 
 .. rubric:: wsrep_OSU_method
@@ -419,26 +359,14 @@ this session will be replicated.
 .. index::
    pair: Parameters; wsrep_OSU_method
 
-Online schema upgrade method (MySQL >= 5.5.17). See also
-:ref:`Schema Upgrades <Schema Upgrades>`.
+Online schema upgrade method (MySQL >= 5.5.17). See also :ref:`Schema Upgrades <Schema Upgrades>`.
 
 Online Schema Upgrade (OSU) can be performed with two
 alternative methods:
 
-- *Total Order Isolation* (TOI) runs the DDL statement in all
-  cluster nodes in the same total order sequence, locking the
-  affected table for the duration of the operation. This may
-  result in the whole cluster being blocked for the duration
-  of the operation.
-- *Rolling Schema Upgrade* (RSU) executes the DDL statement
-  only locally, thus blocking one cluster
-  node only. During the DDL processing, the node is
-  not replicating and may be unable to process replication
-  events (due to a table lock). Once the DDL operation is
-  complete, the node will catch up and sync with the cluster
-  to become fully operational again. The DDL statement or its
-  effects are not replicated; the user is responsible for
-  manually performing this operation on each of the nodes.
+- **Total Order Isolation (TOI)** runs the DDL statement in all cluster nodes in the same total order sequence, locking the affected table for the duration of the operation. This may result in the whole cluster being blocked for the duration of the operation.
+
+- **Rolling Schema Upgrade (RSU)** executes the DDL statement only locally, thus blocking one cluster node only. During the DDL processing, the node is not replicating and may be unable to process replication events (due to a table lock). Once the DDL operation is complete, the node will catch up and sync with the cluster to become fully operational again. The DDL statement or its effects are not replicated; the user is responsible for manually performing this operation on each of the nodes.
 
 
 .. rubric:: wsrep_provider
@@ -449,9 +377,7 @@ alternative methods:
 .. index::
    pair: Parameters; wsrep_provider
 
-A path to wsrep provider to load. If not specified, all calls
-to wsrep provider will be bypassed and the server
-behaves like a regular *mysqld* server.
+A path to wsrep provider to load. If not specified, all calls to wsrep provider will be bypassed and the server behaves like a regular ``mysqld`` server.
    
 .. rubric:: wsrep_provider_options
 
@@ -464,14 +390,11 @@ A string of provider options passed directly to the provider.
 
 Usually, you just fine-tune:
 
-- ``gcache.size``, that is, the size of the GCache ring buffer,
-  which is used for Incremental State Transfer, among other
-  things. See chapter :ref:`Galera Parameters <Galera Parameters>`.
-- Group communication timeouts. See chapter
-  :ref:`WAN Replication <WAN Replication>`.
+- ``gcache.size``, that is, the size of the GCache ring buffer, which is used for Incremental State Transfer, among other things. See chapter :ref:`Galera Parameters <Galera Parameters>`.
 
-  See also a list of all *Galera Cluster* parameters
-  in chapter :ref:`Galera Parameters <Galera Parameters>`.
+- Group communication timeouts. See chapter :ref:`WAN Replication <WAN Replication>`.
+
+  See also a list of all Galera Cluster parameters in chapter :ref:`Galera Parameters <Galera Parameters>`.
 
 
 .. rubric:: wsrep_retry_autocommit
@@ -481,13 +404,9 @@ Usually, you just fine-tune:
 .. index::
    pair: Parameters; wsrep_retry_autocommit
 
-If an autocommit query fails the certification test due to a
-cluster-wide conflict, we can retry it without returning an
-error to the client. This option sets how many times to retry.
+If an autocommit query fails the certification test due to a cluster-wide conflict, we can retry it without returning an error to the client. This option sets how many times to retry.
 
-This option is analogous to rescheduling an autocommit query
-should it go into deadlock with other transactions
-in the database lock manager.
+This option is analogous to rescheduling an autocommit query should it go into deadlock with other transactions in the database lock manager.
 
 
 .. rubric:: wsrep_slave_threads
@@ -497,14 +416,11 @@ in the database lock manager.
 .. index::
    pair: Parameters; wsrep_slave_threads
 
-How many threads to use for applying slave writesets. There
-are two things to consider when choosing the number:
+How many threads to use for applying slave writesets. There are two things to consider when choosing the number:
 
-1. The number should be at least two times the number of CPU
-   cores.
-2. Consider how many writing client connections the other
-   nodes would have. Divide this by four and use that as the
-   ``wsrep_slave_threads`` value.
+1. The number should be at least two times the number of CPU cores.
+
+2. Consider how many writing client connections the other nodes would have. Divide this by four and use that as the ``wsrep_slave_threads`` value.
 
 
 .. rubric:: wsrep_sst_auth
@@ -514,15 +430,10 @@ are two things to consider when choosing the number:
 .. index::
    pair: Parameters; wsrep_sst_auth
 
-A string with authentication information for state snapshot
-transfer. The string depends on the state transfer method. For
-the *mysqldump* state transfer, it is *<username>:<password>*,
-where *username* has root privileges on this server. The
-*rsync* method ignores this option.
+A string with authentication information for state snapshot transfer. The string depends on the state transfer method. For the ``mysqldump`` state transfer, it is ``username>:<password>``.  The user must have root privileges on this server. The
+``rsync`` method ignores this option.
 
-Use the same value on all nodes. This parameter is used to
-authenticate with both the state snapshot receiver and the
-state snapshot donor.
+Use the same value on all nodes. This parameter is used to authenticate with both the state snapshot receiver and the state snapshot donor.
 
 
 
@@ -533,28 +444,18 @@ state snapshot donor.
 .. index::
    pair: Parameters; wsrep_sst_donor
 
-A name (given in the ``wsrep_node_name`` parameter) of the server
-that should be used as a source for state transfer. If not
-specified, *Galera Cluster* will choose
-the most appropriate one.
+A name (given in the ``wsrep_node_name`` parameter) of the server that should be used as a source for state transfer. If not specified, Galera Cluster will choose the most appropriate one.
 
-In this case, the group communication module monitors the node
-state for the purpose of flow control, state transfer and quorum
-calculations. The node can be a if it is in the ``SYNCED`` state.
-The first node in the ``SYNCED`` state in the index becomes the
-donor and is not available for requests. 
+In this case, the group communication module monitors the node state for the purpose of flow control, state transfer and quorum calculations. The node can be a if it is in the ``SYNCED`` state. The first node in the ``SYNCED`` state in the index becomes the donor and is not available for requests. 
 
-If there are no free ``SYNCED`` nodes at the moment, the
-joining node reports::
+If there are no free ``SYNCED`` nodes at the moment, the joining node reports::
 
     Requesting state transfer failed: -11(Resource temporarily unavailable).
     Will keep retrying every 1 second(s)
 
-and keeps on retrying the state transfer request until it
-succeeds. When the state transfer request succeeds, the
-entry below is written to log:
+and keeps on retrying the state transfer request until it succeeds. When the state transfer request succeeds, the entry below is written to log::
 
-``Node 0 (XXX) requested state transfer from '*any*'. Selected 1 (XXX) as donor.``
+	Node 0 (XXX) requested state transfer from '*any*'. Selected 1 (XXX) as donor.
 
 .. rubric:: wsrep_sst_donor_rejects_queries
 
@@ -566,27 +467,13 @@ entry below is written to log:
 .. index::
    pair: Errors; ER_UNKNOWN_COM_ERROR
 
-This parameter prevents blocking client sessions on a
-donor if the donor is performing a blocking SST, such
-as *mysqldump* or *rsync*.
+This parameter prevents blocking client sessions on a donor if the donor is performing a blocking SST, such as ``mysqldump`` or ``rsync``.
 
-In these situations, all queries return error
-``ER_UNKNOWN_COM_ERROR, "Unknown command"`` like a joining
-node does. In this case, the client (or the JDBC driver) can
-reconnect to another node.
+In these situations, all queries return error ``ER_UNKNOWN_COM_ERROR, "Unknown command"`` like a joining node does. In this case, the client (or the JDBC driver) can reconnect to another node.
 
-.. note:: As SST is scriptable, there is no way to tell whether
-          the requested SST method is blocking or not. You may
-          also want to avoid querying the donor even with
-          non-blocking SST. Consequently, this variable will
-          reject queries on the donor regardless of the SST
-          (that is, also for *xtrabackup*) even if the initial
-          request concerned a blocking-only SST.
+.. note:: As SST is scriptable, there is no way to tell whether the requested SST method is blocking or not. You may also want to avoid querying the donor even with non-blocking SST. Consequently, this variable will reject queries on the donor regardless of the SST (that is, also for *xtrabackup*) even if the initial request concerned a blocking-only SST.
 
-.. note:: The *mysqldump* SST does not work with this setting,
-          as *mysqldump* must run queries on the donor and there
-          is no way to distinguish a *mysqldump* session from a
-          regular client session. 
+.. note:: The ``mysqldump`` SST does not work with this setting, as ``mysqldump`` must run queries on the donor and there is no way to distinguish a *mysqldump* session from a regular client session. 
 
 
 .. rubric:: wsrep_sst_method
@@ -596,34 +483,26 @@ reconnect to another node.
 .. index::
    pair: Parameters; wsrep_sst_method
 
-The method to use for state snapshot transfers. The
-``wsrep_sst_<wsrep_sst_method>`` command will be called with
-the following arguments. For more information, see also
-:ref:`Scriptable State Snapshot Transfer
-<Scriptable State Snapshot Transfer>`.
+The method to use for state snapshot transfers. The ``wsrep_sst_<wsrep_sst_method>`` command will be called with the following arguments. For more information, see also :ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
 
 The supported methods are:
 
-- *mysqldump* |---| This is a slow (except for small datasets),
-  but the most tested option.
-- *rsync* |---| This option is much faster than *mysqldump* on
-  large datasets.
-- *rsync_wan* |---| This option is almost the same as *rsync*,
-  but uses the *delta-xfer* algorithm to minimize
-  network traffic.
+- ``mysqldump`` This is a slow (except for small datasets), but the most tested option.
 
-  .. note::  You can only use *rsync* when a node is starting.
-             In other words, you cannot use *rsync* under a running InnoDB
-             storage engine.
-- *xtrabackup* |---| This option is a fast and practically
-  non-blocking SST method based on Percona's xtrabackup tool.
+- ``rsync`` This option is much faster than ``mysqldump`` on large datasets.
 
-  If you want to use *xtrabackup*, the following settings must
-  be present in the *my.cnf* configuration file on all nodes::
+- ``rsync_wan`` This option is almost the same as ``rsync``, but uses the *delta-xfer* algorithm to minimize network traffic.
+
+  .. note::  You can only use *rsync* when a node is starting. In other words, you cannot use ``rsync`` under a running InnoDB storage engine.
+  
+- ``xtrabackup`` This option is a fast and practically non-blocking SST method based on Percona's ``xtrabackup`` tool.
+
+  If you want to use ``xtrabackup``, the following settings must be present in the ``my.cnf`` configuration file on all nodes::
 
       [mysqld]
       wsrep_sst_auth=root:<root password>
       datadir=<path to data dir>
+
       [client]
       socket=<path to socket>
 
@@ -635,14 +514,9 @@ The supported methods are:
 .. index::
    pair: Parameters; wsrep_sst_receive_address
 
-The address at which this node expects to receive state
-transfers. Depends on the state transfer method. For example,
-for the *mysqldump* state transfer, it is the address and the
-port on which this server listens. By default this is set to
-the *<address>* part of ``wsrep_node_address``.
+The address at which this node expects to receive state transfers. Depends on the state transfer method. For example, for the ``mysqldump`` state transfer, it is the address and the port on which this server listens. By default this is set to the ``<address>`` part of ``wsrep_node_address``.
 
-.. note:: Check that your firewall allows connections to this
-          address from other cluster nodes.
+.. note:: Check that your firewall allows connections to this address from other cluster nodes.
   
 
 
@@ -653,9 +527,7 @@ the *<address>* part of ``wsrep_node_address``.
 .. index::
    pair: Parameters; wsrep_start_position
 
-This variable exists for the sole purpose of notifying a joining
-node about state transfer completion. For more information, see
-:ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
+This variable exists for the sole purpose of notifying a joining node about state transfer completion. For more information, see :ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
 
 .. rubric:: wsrep_ws_persistency
 

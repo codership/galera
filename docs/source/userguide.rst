@@ -27,3 +27,4 @@ Contents:
    myisamtoinnodb
    compiling
    configurationtips
+   notification-cmd
