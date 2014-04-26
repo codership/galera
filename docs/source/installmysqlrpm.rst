@@ -10,6 +10,7 @@ If you run Red Hat or an RPM-based distribution, such as CentOS or Fedora, you c
 ---------------------------------------------
 Preparing Your Server
 ---------------------------------------------
+.. _`Preparing Your Server`:
 
 Before you begin installing Galera Cluster, you must first remove any existing installation of MySQL server and install the packages dependencies.
 
@@ -37,6 +38,7 @@ To install the package dependencies, complete the following steps:
 ---------------------------------------------
 Installing Galera Cluster for MySQL
 ---------------------------------------------
+.. _`Install Galera MySQL`:
 
 There are two packages involved in the installation of Galera Cluster for MySQL:
 
@@ -68,6 +70,7 @@ Galera Cluster is installed on your system, you can now start MySQL.
 ^^^^^^^^^^^^^^^^^^^^^^^
 Upgrading System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Upgrade System Tables`:
 
 If you installed Galera Cluster over an existing installation of MySQL, you must also upgrade the system tables to the new system.
 

@@ -1,6 +1,7 @@
 =================
  Getting Started with Galera Cluster
 =================
+.. _`Getting Started with Galera Cluster`:
 
 The :term:`Galera Replication Plugin` is a synchronous multi-master replication plugin for MySQL, MariaDB and Percona XtraDB.  It features:
 
@@ -17,6 +18,7 @@ The Galera Replication Plugin differs from the regular MySQL Replication by addr
 --------------------------------------
 How Galera Cluster Works
 --------------------------------------
+.. `How Galera Works`:
 
 In a typical instance of a Galera Cluster, applications can write to any node in the cluster and transaction commits, (RBR events), are then applied to all the servers, through certification-based replication.
 
@@ -29,6 +31,7 @@ Certification-based replication is an alternative approach to synchronous databa
 ----------------------------
 System Requirements
 ----------------------------
+.. _`System Requirements`:
 
 Galera Cluster requires:
 
@@ -45,12 +48,12 @@ Galera Cluster requires:
 ------------------------------
 Installation
 ------------------------------
+.. _`Installation`:
 
 Galera Cluster runs in Linux on MySQL, MariaDB and Percona XtraDB through the Galera Replicator Plugin.  You can install the plugin into any of these database servers through your package manager or by building it from source.
 
-^^^^^^^^^^^^^^^^^^
-MySQL
-^^^^^^^^^^^^^^^^^^
+**MySQL**
+
 .. toctree::
    :maxdepth: 1
 
@@ -58,9 +61,8 @@ MySQL
    installmysqlrpm
    installmysqlsrc
 
-^^^^^^^^^^^^^^^^^^
-MariaDB
-^^^^^^^^^^^^^^^^^^
+**MariaDB**
+
 .. toctree::
    :maxdepth: 1
 
@@ -68,9 +70,8 @@ MariaDB
    installmariadbrpm
    installmariadbsrc
 
-^^^^^^^^^^^^^^^^^^
-Percona XtraDB
-^^^^^^^^^^^^^^^^^^
+
+**Percona XtraDB**
 
 .. toctree::
    :maxdepth: 1
@@ -83,6 +84,7 @@ Percona XtraDB
 ------------------------------
 Configuration
 ------------------------------
+.. _`Galera Configuration`:
 
 Before you can bring Galera Cluster online, each node in the cluster requires some configuration, to grant other nodes access and to enable write-set replication on the database server.
 
@@ -96,6 +98,7 @@ Before you can bring Galera Cluster online, each node in the cluster requires so
 ------------------------------
 Cluster Management
 ------------------------------
+.. _`Cluster Management`:
 
 When you finish installation and configuration on your server, you're ready to launch the first node and bring the cluster online.  Once all the nodes are started, you can test that they're working and restart if necessary.
 

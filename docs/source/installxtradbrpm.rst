@@ -1,7 +1,7 @@
 =============================================
 Installing Galera Cluster for Percona XtraDB on RPM-based Distributions
 =============================================
-.. _`Percona RPM Installation
+.. _`XtraDB RPM Installation
 
 If you run Red Hat Enterprise Linux or another RPM-based distribution, such as Fedora or CentOS, you can install Galera Cluster for Percona XtraDB on your server through the package manager.
 
@@ -9,6 +9,7 @@ If you run Red Hat Enterprise Linux or another RPM-based distribution, such as F
 ---------------------------------------------
 Enabling the Percona Repository
 ---------------------------------------------
+.. _`Enable Percona Repo`:
 
 Percona provides a repository for the latest releases of Galera Cluster and Percona XtraDB itself.
 
@@ -46,6 +47,7 @@ Packages in the MariaDB repository are now available for installation on your se
 ------------------------------------------------
 Installing Galera Cluster for Percona XtraDB
 ------------------------------------------------
+.. _`Install Galera XtraDb`:
 
 The Galera Cluster and Percona XtraDB server configured for write-set replication are included together in one package.
 
@@ -60,12 +62,13 @@ Galera Cluster for Percona XtraDB is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you installed *Galera Cluster* over an existing installation of Percona XtraDB, you should update the system tables for the new database server.
 
 To update the system tables, run the following command::
 
-	$ percona_upgrade
+	$ mysql_upgrade
 	
 If this command generates any errors, check with Percona XtraDB Documentation for their meaning.  The errors it generates are typically uncritical and usually you can ignore them unless they involve specific functionality that your system requires.
 

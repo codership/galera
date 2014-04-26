@@ -8,6 +8,7 @@ After you install Galera Cluster, the next step is to configure your server to f
 ---------------------------------------
 Setting up the Configuration Files
 ---------------------------------------
+.. _`Configuration File`:
 
 After installing Galera Cluster, open the configuration file, (``my.cnf`` or ``my.ini``, depending on your system) and make the following changes:
 
@@ -32,6 +33,7 @@ After you save these changes, you can start your database server.
 ------------------------------
 Configuring Database Privileges
 ------------------------------
+.. _`Database Privileges`:
 
 Once your database server is running, you can log into the client and configure the user privileges for the node, to remove empty users and to create the write-set replication user for state snapshot transfers.
 
@@ -51,6 +53,7 @@ For the user and password, use the same values as you assigned to the ``wsrep_ss
 --------------------------
 Configuring the Firewall
 --------------------------
+.. _`Firewall Config`:
 
 When you bring your server into the cluster, other nodes must have access to the database server through its client listening socket and through the wsrep provider socket.
 
@@ -72,6 +75,7 @@ Additionally, if there is a NAT firewall between the nodes, you must configure i
 ----------------------------
 Disabling SELinux
 ----------------------------
+.. _`Disable SELinux`:
 
 If you have SELinux enabled, it may block ``mysqld`` from carrying out required operations.  You must disable SELinux or configure it to allow ``mysqld`` to run external programs and open listen sockets at unprivileged ports, (that is, things that an unprivileged user can do).
 
@@ -91,6 +95,7 @@ For more information, see the SELinux Documentation.
 ----------------------------
 Disabling AppArmor
 ----------------------------
+.. _`Disable AppArmor`:
 
 By default, Ubuntu servers include AppArmor, which may prevent ``mysqld`` from openning additional ports or running scripts.  You must disable AppArmor or configure it to allow ``mysqld`` to run external programs and open listen sockets at unprivileged ports.
 

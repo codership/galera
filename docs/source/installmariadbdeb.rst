@@ -9,6 +9,7 @@ If you run Debian or a Debian-based distribution, such as Ubuntu, you can instal
 ---------------------------------------------
 Enabling the MariaDB Repository
 ---------------------------------------------
+.. _`MariaDB Repo`:
 
 MariaDB provides a repository for the latest releases of Galera Cluster and MariaDB itself.  This requires that you have Software Properties installed on your server.
 
@@ -53,6 +54,7 @@ For more information on the repository or alternative mirrors, please see the `M
 ---------------------------------------------
 Installing Galera Cluster for MariaDB
 ---------------------------------------------
+.. _`Install Galera MariaDB`:
 
 There are three packages involved in the installation of Galera Cluster for MariaDB.
 
@@ -75,6 +77,7 @@ Galera Cluster for MariaDB is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you installed Galera Cluster over an existing installation of MariaDB, you should update the system tables for the new server installation.
 

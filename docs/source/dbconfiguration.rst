@@ -48,6 +48,7 @@ These are the primary variables you must set for clustering.
 ---------------------------------------
 Mandatory Database Settings
 ---------------------------------------
+.. _`Mandatory DB Settings`:
 
 Galera Cluster requires that you assign the following values for these configuration variables:
 
@@ -76,6 +77,7 @@ Galera Cluster requires that you assign the following values for these configura
 ------------------------------------
 Optional Database Settings
 ------------------------------------
+.. _`Optional DB Settings`:
 
 For better performance, consider using the following values for these configuration variables:
 
@@ -104,6 +106,7 @@ For better performance, consider using the following values for these configurat
 ------------------------------------
 Basic wsrep Provider Settings
 ------------------------------------
+.. _`Basic wsrep Provider Settings`:
 
 The following values configures the basic wsrep provider settings for your cluster:
 
@@ -145,6 +148,7 @@ The following values configures the basic wsrep provider settings for your clust
 ------------------------------------
 Optional wsrep Provider Settings
 ------------------------------------
+.. _`Optional wsrep Provider Settings`:
 
 For better performance, consider using the following wsrep provider settings:
 
@@ -164,6 +168,7 @@ For better performance, consider using the following wsrep provider settings:
 ----------------------------------
 Optional Memory Settings
 ----------------------------------
+.. _`Optional Memory Settings`:
 
 In normal operation, a Galera Cluster node does not consume much more memory than a regular database server.  Certification indexes and uncommitted write-sets do consume more memory, but usually this is not noticeable in typical applications.  Write-set caching during state transfers is the exception.
 

@@ -10,6 +10,7 @@ If you run a machine that does not support Debian- or RPM-based binary installat
 -----------------------------------------
 Build Dependencies
 -----------------------------------------
+.. _`Build Dependencies`:
 
 In order to install Galera Cluster for MariaDB from source, you must first install the build dependencies on your server.
 
@@ -27,8 +28,9 @@ Once you have these installed, you can begin compiling Galera Cluster.
 
 
 --------------------------------------------
-Building the Galera Cluster
+Building the Galera Cluster for Maria DB
 --------------------------------------------
+.. _`Build Galera MariaDB`:
 
 There are two components to Galera Cluster for MariaDB.  The Galera Replication plugin, the  MariaDB server with the write-set replication patch.
 
@@ -61,6 +63,7 @@ Galera Cluster for MariaDB is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you chose to overwrite an existing installation of MariaDB, you must also upgrade the system tables to the new system.
 

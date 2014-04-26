@@ -11,6 +11,7 @@ If you run a machine that does not support Debian- or RPM-based binary installat
 -----------------------------------------
 Build Dependencies
 -----------------------------------------
+.. _`Build Dependencies`:
 
 In order to install Galera Cluster for Percona XtraDB from source, you must first install the build dependencies on your server.
 
@@ -32,6 +33,7 @@ Once you have these installed, you can begin compiling Galera Cluster.
 ------------------------------------------
 Building Galera Cluster for Percona XtraDB
 ------------------------------------------
+.. _`Build Galera XtraDB`:
 
 To build Galera Cluster, complete the following steps:
 
@@ -51,6 +53,7 @@ Galera Cluster for Percona XtraDB is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you chose to overwrite an existing installation of the Percona XtraDB server, you must also upgrade the system tables to the new system.
 

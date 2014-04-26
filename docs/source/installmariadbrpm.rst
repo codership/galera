@@ -8,6 +8,7 @@ If you run Red Hat Enterprise Linux or another RPM-based distribution, such as F
 ---------------------------------------------
 Enabling the MariaDB Repository
 ---------------------------------------------
+.. _`Enable MariaDB Repo`:
 
 MariaDB provides a repository for the latest releases of Galera Cluster and MariaDB itself.
 
@@ -39,6 +40,7 @@ For more information on the repository, package names or available mirrors, plea
 ------------------------------------------------
 Installing Galera Cluster for MariaDB
 ------------------------------------------------
+.. _`Install Galera MariaDB`:
 
 There are three packages involved in the installation of Galera Cluster for MariaDB.
 
@@ -62,6 +64,7 @@ Galera Cluster for MariaDB is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you installed *Galera Cluster* over an existing installation of MariaDB, you should update the system tables for the new database server.
 

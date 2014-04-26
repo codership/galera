@@ -11,6 +11,7 @@ If you run a machine that does not support Debian- or RPM-based binary installat
 -----------------------------------------
 Build Dependencies
 -----------------------------------------
+.. _`Build Dependencies`:
 
 In order to install Galera Cluster for MySQL from source, you must first install the build dependencies on your server.
 
@@ -27,6 +28,7 @@ Once you have these installed, you can begin compiling Galera Cluster.
 --------------------------------------------
 Building Galera Cluster for MySQL
 --------------------------------------------
+.. `Build Galera MySQL`:
 
 There are three components to Galera Cluster for MySQL.  The Galera Replication plugin, the  MySQL server and the write-set replication patch for the MySQL server.
 
@@ -71,6 +73,7 @@ Galera Cluster for MySQL is now installed on your server.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Updating System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Update System Tables`:
 
 If you chose to overwrite an existing installation of MySQL, you must also upgrade the system tables to the new system.
 

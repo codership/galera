@@ -21,6 +21,7 @@ Before you begin, ensure that you have:
 -------------------------------------
 Creating Client Connections between the Nodes
 -------------------------------------
+.. _`Creating Client Connections between Nodes`:
 
 Connecting the database servers to each other as a cluster requires that you create client connections between the nodes.  This allows the nodes to carry out state snapshot transfers with each other.
 
@@ -36,6 +37,7 @@ This grants the root user of each node root privileges on the other nodes in the
 -------------------------------------
 Starting the First Cluster Node
 -------------------------------------
+.. _`Starting First Cluster Node`:
 
 In order to create and bootstrap the first cluster node, you must set up the group communication structure for the entire cluster.
 
@@ -70,6 +72,7 @@ The first node in your cluster is now live.
 -------------------------------------
 Adding Additional Nodes to the Cluster
 -------------------------------------
+.. _`Add Nodes to Cluster`:
 
 Once the first node is live, you can begin adding additional nodes to the cluster.  
 
@@ -95,6 +98,7 @@ When all nodes in the cluster agree on the membership state, the they will initi
 -------------------------------------
 Understanding Cluster Addresses
 -------------------------------------
+.. _`Understand Cluster Address`:
 
 For each node in the cluster, you must enter an address in the ``wsrep_cluster_address`` parameter of your configuration file.
 

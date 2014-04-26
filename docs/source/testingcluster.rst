@@ -3,10 +3,12 @@ Testing the Cluster
 =================================
 .. _`Testing Galera Cluster`:
 
+When you have your cluster up and running, you may want to test certain features to ensure that they are working properly or to prepare yourself for actual problems that may arise.
 
 -------------------------------------------
 Replication Testing
 -------------------------------------------
+.. _`Replication Testing`:
 
 To test that Galera Cluster is working as expected, complete the following steps:
 
@@ -59,6 +61,7 @@ The results given in the ``SELECT`` query indicates that data you entered in nod
 -------------------------------------------
 Split-brain Testing
 -------------------------------------------
+.. _`Split Brain Testing`:
 
 To test Galera Cluster for split-brain situations on a two node cluster, complete the following steps:
 
@@ -75,4 +78,22 @@ To test Galera Cluster for split-brain situations on a two node cluster, complet
 	SET GLOBAL wsrep_provider_options='pc.bootstrap=1';
 
 The quorum is reset and the cluster recovered.
+
+
+--------------------
+ Failure Simulation
+--------------------
+.. _`Failure Simulation`:
+
+You can also test *Galera Cluster* by simulating various failure situations on three nodes as follows:
+
+- To simulate a crash of a single ``mysqld`` process, run the command below on one of the nodes::
+
+      $ killall -9 mysqld
+
+- To simulate a network disconnection, use ``iptables`` or ``netem`` to block all TCP/IP traffic to a node.
+- To simulate an entire server crash, run each ``mysqld`` in a virtualized guest, and abrubtly terminate the entire virtual instance.
+
+If you have three or more Galera Cluster nodes, the cluster should be able to survive the simulations.
+
 

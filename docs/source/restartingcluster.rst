@@ -17,6 +17,7 @@ To restart an entire Galera Cluster, complete the following steps:
 ---------------------------------
 Identifying the Most Advanced Node
 ---------------------------------
+.. _`Identify Most Advanced Node`:
 
 Identifying the most advacned node state ID is managed by comparing the :term:`Global Transaction ID` values on different nodes in your cluster.  You can find this in the ``grastate.dat`` file, located in the datadir for your database.
 
@@ -37,6 +38,7 @@ This value is the node state ID.  You can use it to manually update the ``grasta
 --------------------------------------
 Identifying Crashed Nodes
 --------------------------------------
+.. _`Identify Crashed Node`:
 
 If the ``grastate.dat`` file looks like the example below, the node has either crashed during execution of a non-transactional operation, (such as ``ALTER TABLE``), or borted due to a database inconsistency::
 
@@ -50,15 +52,7 @@ It is possible for you to recover the Global Transaction ID of the last committe
 
 In the event that there are no other nodes in the cluster with a well-defined state, then there is no need to preserve the node state ID.  You must perform a thorough database recovery procedure, similar to that used on standalone database servers.  Once you recover one node, use it as the first node in a new cluster.
 
-
-
-If there are no other nodes with a well-defined state, you must perform a thorough database recovery procedure, (similar to that used on standalone database servers), on one node
-
-
-
-You can still recover the node state ID of the last committed transaction from InnoDB as described above, but the recovery is rather meaningless.  The crash likely corrupted the node state and it may not be functional.
-
-
+If there are no other nodes with a well-defined state, you must perform a thorough database recovery procedure, (similar to that used on standalone database servers), on one node, then use it as the first node in a new cluster.
 
 You can still recover the node state ID of the last committed transaction from InnoDB as described above; however, the recover is rather meaningless.  The node state is probably corrupted and may not even be functional.
 
