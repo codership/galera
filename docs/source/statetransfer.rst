@@ -93,7 +93,7 @@ Write-set Cache (GCache)
 .. index::
    pair: Writeset Cache; Descriptions
 
-*Galera Cluster* stores write sets in a special cache called Write-set Cache (GCache).  GCache is a memory allocator for write-sets and its primary purpose is to minimize the write-set footprint on the :abbr:`RAM (Random-access memory)`.  Galera Cluster also improves the offload write-set storage to disk.
+Galera Cluster stores write sets in a special cache called Write-set Cache (GCache).  GCache is a memory allocator for write-sets and its primary purpose is to minimize the write-set footprint on the :abbr:`RAM (Random-access memory)`.  Galera Cluster also improves the offload write-set storage to disk.
 
 GCache has three types of stores:
 
@@ -114,55 +114,3 @@ By default, GCache allocates files in the working directory of the process, but 
 
 .. note:: Since all cache files are memory-mapped, the process may
           appear to use more memory than it actually does.
-
-------------------------------------
- Scriptable State Snapshot Transfer
-------------------------------------
-.. _`Scriptable State Snapshot Transfer`:
-
-Galera Cluster has an interface to customize state snapshot transfer through an external script. The script assumes that the storage engine initialization on the receiving node takes place only after the state transfer is complete. In short, this transfer copies the contents of the source data directory to the destination data directory (with possible
-variations).
-
-As of wsrep API patch level 23.7, SST parameters are named. Individual scripts can use the ``wsrep_sst_common.sh`` file, which contains common functions for parsing argument lists, logging errors, and so on. There is no constraint on the order or number of parameters. New parameters can be added and any parameter can be ignored by the script. 
-
-Common Parameters
-====================
-
-These parameters are always passed to any state transfer script:
-
-- ``role``
-- ``address``
-- ``auth``
-- ``datadir``
-- ``defaults-file``
-- ``parent``
-
-Donor-specific Parameters
-==========================
-
-These parameters are passed to the state transfer script by the state transfer process:
-
-- ``socket`` The local server (donor) socket for communications, if is required.
-
-- ``gtid`` The :term:`Global Transaction ID` in format: ``<uuid>:<seqno>``.
-
-- ``bypass`` This parameter specifies whether the actual data transfer should be skipped and only the GTID should be passed to the receiving server (to go straight to Incremental State Transfer).
-
-``mysqldump``-specific Parameters
-==============================
-
-These parameters are only passed to the ``wsrep_sst_mysqldump``:
-
-- ``user`` The MySQL user to connect to both remote and local servers. The user must be the same on both servers.
-
-- ``password`` MySQL user password.
-
-- ``host`` The remote server (receiver) host address.
-
-- ``port`` The remote server (receiver) port.
-
-- ``local-port`` The local server (donor) port.
-
-.. |---|   unicode:: U+2014 .. EM DASH
-   :trim:
-   

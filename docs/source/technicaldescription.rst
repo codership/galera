@@ -16,6 +16,7 @@ Contents:
    certificationbasedreplication
    isolationlevels
    statetransfer
+   scriptablesst
    nodestates
    weightedquorum
    loadbalancing
