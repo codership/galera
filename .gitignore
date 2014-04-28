@@ -23,3 +23,9 @@ gcomm/test/ssl_test
 gcs/src/gcs_test
 gcs/src/unit_tests/gcs_tests
 gcs/src/unit_tests/gcs_tests.passed
+scripts/mysql/mysql-[5-9].[5-9].[0-9]*
+tests/bin
+tests/out
+tests/run
+tests/conf/cluster.conf
+tests/conf/nodes.conf
