@@ -3,8 +3,11 @@
 *.os
 *.so
 *.log
+*.diff
 .sconf_temp
 .sconsign.dblite
+core
+rb_test
 galera.cache
 galera/tests/galera_check
 galera/tests/galera_check.passed
