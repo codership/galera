@@ -319,7 +319,8 @@ namespace gcache
     {
         if (size_cache_ == size_free_) return;
 
-        /* find the last seqno'd RB buffer */
+        /* Find the last seqno'd RB buffer. It is likely to be close to the
+         * end of released buffers chain. */
         BufferHeader* bh(0);
 
         for (seqno2ptr_t::reverse_iterator r(seqno2ptr_.rbegin());
@@ -336,29 +337,33 @@ namespace gcache
 
         if (!bh) return;
 
-        /* This should be called in isolation, when all seqno'd buffers are
+        /* Seek the first unreleased buffer.
+         * This should be called in isolation, when all seqno'd buffers are
          * freed, and the only unreleased buffers should come only from new
-         * configuration. Find the first unreleased buffer. There should be
-         * no seqno'd buffers after it. */
+         * configuration. There should be no seqno'd buffers after it. */
 
         ssize_t const old(size_free_);
+
+        assert (0 == size_trail_ || first_ > next_);
+        if (first_ > next_ && reinterpret_cast<uint8_t*>(bh) <= next_) // rollover
+        {
+            size_trail_ = 0;
+        }
+        first_ = reinterpret_cast<uint8_t*>(bh);
 
         while (BH_is_released(bh)) // next_ is never released - no endless loop
         {
              first_ = reinterpret_cast<uint8_t*>(BH_next(bh));
-             bh = BH_cast(first_);
-
-             /* discard undiscarded */
-             // bh->seqno_g = SEQNO_ILL ???
-             if (bh->seqno_g > 0) discard(bh);
 
              if (gu_unlikely (0 == bh->size && first_ != next_))
              {
                  // rollover
+                 assert (first_ > next_);
                  size_trail_ = 0;
                  first_ = start_;
-                 bh = BH_cast(first_);
              }
+
+             bh = BH_cast(first_);
         }
 
         BH_assert_clear(BH_cast(next_));
@@ -375,8 +380,8 @@ namespace gcache
         assert (first_ != next_);
         assert ((BH_cast(first_))->seqno_g == SEQNO_NONE);
         assert (!BH_is_released(BH_cast(first_)));
-#if WRONG
-        /* Find how much space remains */
+
+        /* Estimate how much space remains */
         if (first_ < next_)
         {
             /* start_  first_      next_    end_
@@ -394,37 +399,44 @@ namespace gcache
             size_free_ = first_ - next_ + size_trail_;
             size_used_ = size_cache_ - size_free_;
         }
-#endif
+
         assert_size_free();
-        assert(size_free_ <  size_cache_);
+        assert(size_free_ < size_cache_);
 
         log_info << "GCache DEBUG: RingBuffer::seqno_reset(): discarded "
                  << (size_free_ - old) << " bytes";
 
-        /* There is a small but non-0 probability that some seqno'd buffers
+        /* There is a small but non-0 probability that some released buffers
          * are locked within yet unreleased aborted local actions.
-         * Seek all the way to next_ and invalidate seqnos */
-
-        long total(0);
-        long locked(0);
+         * Seek all the way to next_, invalidate seqnos and update size_free_ */
 
         assert(first_ != next_);
         assert(bh == BH_cast(first_));
 
-        bh = BH_next(BH_cast(first_));
+        long total(1);
+        long locked(0);
+
+        bh = BH_next(bh);
 
         while (bh != BH_cast(next_))
         {
             if (gu_likely (bh->size > 0))
             {
                 total++;
+
                 if (bh->seqno_g != SEQNO_NONE)
                 {
+                    // either released or already discarded buffer
                     assert (BH_is_released(bh));
                     bh->seqno_g = SEQNO_ILL;
                     discard (bh);
                     locked++;
                 }
+                else
+                {
+                    assert(!BH_is_released(bh));
+                }
+
                 bh = BH_next(bh);
             }
             else // rollover
