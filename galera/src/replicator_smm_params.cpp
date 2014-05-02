@@ -174,6 +174,7 @@ galera::ReplicatorSMM::param_set (const std::string& key,
     if (key == Certification::PARAM_LOG_CONFLICTS)
     {
         cert_.set_log_conflicts(value);
+        return;
     }
     // this key might be for another module
     else if (0 != key.find(common_prefix))
