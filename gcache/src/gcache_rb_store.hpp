@@ -65,7 +65,7 @@ namespace gcache
         void assert_size_free() const
         {
 #ifndef NDEBUG
-            if (next_ > first_)
+            if (next_ >= first_)
             {
                 /* start_  first_      next_    end_
                  *   |       |###########|       |      */
@@ -79,6 +79,22 @@ namespace gcache
             }
             assert (size_free_ <= size_cache_);
 #endif
+        }
+
+        void assert_size_trail() const
+        {
+#ifndef NDEBUG
+            if (next_ >= first_)
+                assert(0 == size_trail_);
+            else
+                assert(size_trail_ >= ssize_t(sizeof(BufferHeader)));
+#endif
+        }
+
+        void assert_sizes() const
+        {
+            assert_size_trail();
+            assert_size_free();
         }
 
     private:

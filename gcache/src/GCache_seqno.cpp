@@ -78,7 +78,75 @@ namespace gcache
      */
     int64_t GCache::seqno_get_min ()
     {
+<<<<<<< HEAD
         gu::Lock lock(mtx);
+=======
+        assert (seqno > 0);
+        /* The number of buffers scheduled for release is unpredictable, so
+         * we want to allow some concurrency in cache access by releasing
+         * buffers in small batches */
+        static int const min_batch_size(32);
+
+        /* Although extremely unlikely, theoretically concurrent access may
+         * lead to elements being added faster than released. The following is
+         * to control and possibly disable concurrency in that case. We start
+         * with min_batch_size and increase it if necessary. */
+        size_t old_gap(-1);
+        int    batch_size(min_batch_size);
+
+        bool   loop(false);
+
+        do
+        {
+            /* if we're doing this loop repeatedly, allow other threads to run*/
+            if (loop) sched_yield();
+
+            gu::Lock lock(mtx);
+
+            assert(seqno >= seqno_released);
+
+            seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
+
+            if (gu_unlikely(it == seqno2ptr.end()))
+            {
+                /* This means that there are no element with
+                 * seqno following seqno_released - and this should not
+                 * generally happen. But it looks like stopcont test does it. */
+                if (0 != seqno_released)
+                {
+                    log_debug << "Releasing seqno " << seqno << " before "
+                              << seqno_released + 1 << " was assigned.";
+                }
+                return;
+            }
+
+            assert(seqno_max >= seqno_released);
+
+            /* here we check if (seqno_max - seqno_released) is decreasing
+             * and if not - increase the batch_size (linearly) */
+            size_t const new_gap(seqno_max - seqno_released);
+            batch_size += (new_gap >= old_gap) * min_batch_size;
+            old_gap = new_gap;
+
+            int64_t const start(it->first - 1);
+            int64_t const end  (seqno - start >= 2*batch_size ?
+                                start + batch_size : seqno);
+#if 0
+            log_info << "############ releasing " << (seqno - start)
+                     << " buffers, batch_size: " << batch_size
+                     << ", end: " << end;
+#endif
+            for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
+            {
+                assert (seqno_released + 1 == it->first || seqno_released == 0);
+                BufferHeader* const bh(ptr2BH(it->second));
+                assert (bh->seqno_g == it->first);
+                seqno_released = it->first;
+                ++it; /* free_common() below may erase current element,
+                       * so advance iterator before calling free_common() */
+                if (gu_likely(!BH_is_released(bh))) free_common(bh);
+            }
+>>>>>>> e54f22a... Refs #8: size_trail_ could be reset wrongly in some cases
 
         // This is a protection against concurrent history locking.
         // I don't envision the need for concurrent history access, so I don't
