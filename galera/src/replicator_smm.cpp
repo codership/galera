@@ -407,7 +407,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
     assert(trx->is_certified() == true);
-    assert(trx->global_seqno() > apply_monitor_.last_left());
+    assert(trx->global_seqno() > STATE_SEQNO());
     assert(trx->is_local() == false);
 
     ApplyOrder ao(*trx);
@@ -732,7 +732,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
     }
 
     assert(trx->state() == TrxHandle::S_CERTIFYING);
-    assert(trx->global_seqno() > apply_monitor_.last_left());
+    assert(trx->global_seqno() > STATE_SEQNO());
     trx->set_state(TrxHandle::S_APPLYING);
 
     ApplyOrder ao(*trx);
@@ -806,7 +806,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
            trx->state() == TrxHandle::S_MUST_REPLAY_CM       ||
            trx->state() == TrxHandle::S_MUST_REPLAY);
     assert(trx->trx_id() != static_cast<wsrep_trx_id_t>(-1));
-    assert(trx->global_seqno() > apply_monitor_.last_left());
+    assert(trx->global_seqno() > STATE_SEQNO());
 
     wsrep_status_t retval(WSREP_OK);
 
@@ -994,7 +994,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle*        trx,
     assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->trx_id() == static_cast<wsrep_trx_id_t>(-1));
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
-    assert(trx->global_seqno() > apply_monitor_.last_left());
+    assert(trx->global_seqno() > STATE_SEQNO());
 
     wsrep_status_t retval;
     switch ((retval = cert_and_catch(trx)))
@@ -1359,8 +1359,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     {
         log_info << "State transfer required: "
                  << "\n\tGroup state: " << group_uuid << ":" << group_seqno
-                 << "\n\tLocal state: " << state_uuid_<< ":"
-                 << apply_monitor_.last_left();
+                 << "\n\tLocal state: " << state_uuid_<< ":" << STATE_SEQNO();
 
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
@@ -1399,8 +1398,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         service_thd_.flush();             // make sure service thd is idle
 
-        if (upto > 0) gcache_.seqno_release(upto); // make sure all gcache
-                                                   // buffers are released
+        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
+        // make sure all gcache buffers are released
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
@@ -1474,7 +1473,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // Non-primary configuration
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            st_.set (state_uuid_, apply_monitor_.last_left());
+            st_.set (state_uuid_, STATE_SEQNO());
         }
 
         if (next_state != S_CONNECTED && next_state != S_CLOSING)
@@ -1553,16 +1552,18 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
     pause_seqno_ = local_seqno;
 
     // Get drain seqno from cert index
-    wsrep_seqno_t const ret(cert_.position());
-    apply_monitor_.drain(ret);
-    assert (apply_monitor_.last_left() >= ret);
+    wsrep_seqno_t const upto(cert_.position());
+    apply_monitor_.drain(upto);
+    assert (apply_monitor_.last_left() >= upto);
 
     if (co_mode_ != CommitOrder::BYPASS)
     {
-        commit_monitor_.drain(ret);
-        assert (commit_monitor_.last_left() >= ret);
+        commit_monitor_.drain(upto);
+        assert (commit_monitor_.last_left() >= upto);
+        assert (commit_monitor_.last_left() == apply_monitor_.last_left());
     }
 
+    wsrep_seqno_t const ret(STATE_SEQNO());
     st_.set(state_uuid_, ret);
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret
@@ -1668,7 +1669,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     }
 
     wsrep_status_t retval(WSREP_OK);
-    bool const applicable(trx->global_seqno() > apply_monitor_.last_left());
+    bool const applicable(trx->global_seqno() > STATE_SEQNO());
 
     if (gu_likely (!interrupted))
     {

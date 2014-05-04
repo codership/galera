@@ -402,6 +402,9 @@ namespace galera
                                      const void*         sst_req,
                                      ssize_t             sst_req_len);
 
+        /* local state seqno for internal use (macro mock up) */
+        wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }
+
         class InitLib /* Library initialization routines */
         {
         public:

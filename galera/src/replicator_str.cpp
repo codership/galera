@@ -18,7 +18,7 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
         if (state_uuid_ == view_info.state_id.uuid) // common history
         {
             wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
-            wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
+            wsrep_seqno_t const local_seqno(STATE_SEQNO());
 
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
                                           a valid state here */
@@ -457,7 +457,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                << group_uuid << ')';
     }
 
-    wsrep_seqno_t const local_seqno(apply_monitor_.last_left());
+    wsrep_seqno_t const local_seqno(STATE_SEQNO());
 
     if (local_seqno < 0)
     {
@@ -471,8 +471,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     std::string recv_addr = ist_receiver_.prepare(
         local_seqno + 1, group_seqno, protocol_version_);
 
-    os << IST_request(recv_addr,
-                      state_uuid_, apply_monitor_.last_left(), group_seqno);
+    os << IST_request(recv_addr, state_uuid_, local_seqno, group_seqno);
 
     char* str = strdup (os.str().c_str());
 
@@ -564,8 +563,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         gcs_seqno_t seqno_l;
 
         ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
-                                          ist_uuid, ist_seqno,
-                                          &seqno_l);
+                                          ist_uuid, ist_seqno, &seqno_l);
 
         if (ret < 0)
         {
@@ -623,7 +621,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
     {
         sst_state_ = SST_REQ_FAILED;
 
-        st_.set(state_uuid_, apply_monitor_.last_left());
+        st_.set(state_uuid_, STATE_SEQNO());
         st_.mark_safe();
 
         if (state_() > S_CLOSING)
@@ -717,11 +715,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (req->ist_len() > 0)
     {
         // IST is prepared only with str proto ver 1 and above
-        if (apply_monitor_.last_left() < group_seqno)
+        if (STATE_SEQNO() < group_seqno)
         {
-            log_info << "Receiving IST: "
-                     << (group_seqno - apply_monitor_.last_left())
-                     << " writesets, seqnos " << apply_monitor_.last_left()
+            log_info << "Receiving IST: " << (group_seqno - STATE_SEQNO())
+                     << " writesets, seqnos " << STATE_SEQNO()
                      << "-" << group_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
