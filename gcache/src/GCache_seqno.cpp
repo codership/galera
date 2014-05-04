@@ -105,13 +105,13 @@ namespace gcache
 
             if (gu_unlikely(it == seqno2ptr.end()))
             {
-                /* this means that there are no element with
-                 * seqno following seqno_released - and this should never happen */
-// this kills some other unit tests: assert(0);
+                /* This means that there are no element with
+                 * seqno following seqno_released - and this should not
+                 * generally happen. But it looks like stopcont test does it. */
                 if (0 != seqno_released)
                 {
-                    log_warn << "Releasing seqno " << seqno << " before "
-                             << seqno_released + 1 << " was assigned.";
+                    log_debug << "Releasing seqno " << seqno << " before "
+                              << seqno_released + 1 << " was assigned.";
                 }
                 return;
             }

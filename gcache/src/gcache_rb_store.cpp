@@ -152,9 +152,10 @@ namespace gcache
             if (!BH_is_released(bh) /* true also when first_ == next_ */ ||
                 (bh->seqno_g > 0 && !discard_seqno (bh->seqno_g)))
             {
-                // can't free any more space, so no buffer, and check trailing
-                if (next_ > first_) size_trail_ = 0;
-                assert_size_free();
+                // can't free any more space, so no buffer, next_ is unchanged
+                // and revert size_trail_ if it was set above
+                if (next_ >= first_) size_trail_ = 0;
+                assert_sizes();
                 return 0;
             }
 
@@ -167,20 +168,23 @@ namespace gcache
 
             if (gu_unlikely(0 == (BH_cast(first_))->size))
             {
-                assert(first_ >= next_);
-
                 // empty header: check if we fit at the end and roll over if not
+                assert(first_ >= next_);
+                assert(first_ >= ret);
+
                 first_ = start_;
+// WRONG               if (first_ != ret) size_trail_ = 0; // we're now contiguous: first_ < next_
                 assert_size_free();
-                size_trail_ = 0; // we're now contiguous: first_ <= next_
 
                 if ((end_ - ret) >= size_next)
                 {
                     assert(size_free_ >= size);
+                    size_trail_ = 0;
                     goto found_space;
                 }
                 else
                 {
+                    size_trail_ = end_ - ret;
                     ret = start_;
                 }
             }
@@ -216,7 +220,7 @@ namespace gcache
         next_ = ret + size;
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));
-        assert_size_free();
+        assert_sizes();
 
         return bh;
     }
@@ -224,6 +228,8 @@ namespace gcache
     void*
     RingBuffer::malloc (ssize_t size)
     {
+        void* ret(0);
+
         // We can reliably allocate continuous buffer which is 1/2
         // of a total cache space. So compare to half the space
         if (size <= (size_cache_ / 2) && size <= (size_cache_ - size_used_))
@@ -233,10 +239,12 @@ namespace gcache
             BH_assert_clear(BH_cast(next_));
 //            mallocs_++;
 
-            if (gu_likely (0 != bh)) return (bh + 1);
+            if (gu_likely (0 != bh)) ret = bh + 1;
         }
 
-        return 0; // "out of memory"
+        assert_sizes();
+
+        return ret; // "out of memory"
     }
 
     void
@@ -246,10 +254,6 @@ namespace gcache
 
         size_used_ -= bh->size;
         assert(size_used_ >= 0);
-
-        // space is unused but not free
-        // space counted as free only when it is erased from the map
-//            BH_release (bh);
 
         if (SEQNO_NONE == bh->seqno_g)
         {
@@ -261,6 +265,7 @@ namespace gcache
     void*
     RingBuffer::realloc (void* ptr, ssize_t const size)
     {
+        assert_sizes();
         assert (NULL != ptr);
         assert (size > 0);
         // We can reliably allocate continuous buffer which is twice as small
@@ -274,18 +279,21 @@ namespace gcache
         // first check if we can grow this buffer by allocating
         // adjacent buffer
         {
-            uint8_t* adj_ptr  = reinterpret_cast<uint8_t*>(BH_next(bh));
-            ssize_t  adj_size = size - bh->size;
+            ssize_t  const adj_size(size - bh->size);
+            if (adj_size <= 0) return ptr;
 
+            uint8_t* const adj_ptr(reinterpret_cast<uint8_t*>(BH_next(bh)));
             if (adj_ptr == next_)
             {
+                ssize_t const size_trail_saved(size_trail_);
                 void* const adj_buf (get_new_buffer (adj_size));
 
                 BH_assert_clear(BH_cast(next_));
 
                 if (adj_ptr == adj_buf)
                 {
-                    bh->size = size;
+                    bh->size = next_ - static_cast<uint8_t*>(ptr) +
+                        sizeof(BufferHeader);
                     return ptr;
                 }
                 else // adjacent buffer allocation failed, return it back
@@ -294,12 +302,13 @@ namespace gcache
                     BH_clear (BH_cast(next_));
                     size_used_ -= adj_size;
                     size_free_ += adj_size;
+                    if (next_ < first_) size_trail_ = size_trail_saved;
                 }
             }
         }
 
         BH_assert_clear(BH_cast(next_));
-        assert_size_free();
+        assert_sizes();
 
         // find non-adjacent buffer
         void* ptr_new = malloc (size);
@@ -309,7 +318,7 @@ namespace gcache
         }
 
         BH_assert_clear(BH_cast(next_));
-        assert_size_free();
+        assert_sizes();
 
         return ptr_new;
     }
@@ -346,6 +355,9 @@ namespace gcache
 
         if (!bh) return;
 
+        assert(bh->size > 0);
+        assert(BH_is_released(bh));
+
         /* Seek the first unreleased buffer.
          * This should be called in isolation, when all seqno'd buffers are
          * freed, and the only unreleased buffers should come only from new
@@ -354,10 +366,6 @@ namespace gcache
         ssize_t const old(size_free_);
 
         assert (0 == size_trail_ || first_ > next_);
-        if (first_ > next_ && reinterpret_cast<uint8_t*>(bh) <= next_) // rollover
-        {
-            size_trail_ = 0;
-        }
         first_ = reinterpret_cast<uint8_t*>(bh);
 
         while (BH_is_released(bh)) // next_ is never released - no endless loop
@@ -368,7 +376,6 @@ namespace gcache
              {
                  // rollover
                  assert (first_ > next_);
-                 size_trail_ = 0;
                  first_ = start_;
              }
 
@@ -398,18 +405,19 @@ namespace gcache
              */
             size_used_ = next_ - first_;
             size_free_ = size_cache_ - size_used_;
-            assert(0 == size_trail_);
+            size_trail_ = 0;
         }
         else
         {
             /* start_  next_       first_   end_
              *   |#######|           |#####| |
              *                              ^size_trail_ */
-            size_free_ = first_ - next_ + size_trail_;
+            assert(size_trail_ > 0);
+            size_free_ = first_ - next_ + size_trail_ - sizeof(BufferHeader);
             size_used_ = size_cache_ - size_free_;
         }
 
-        assert_size_free();
+        assert_sizes();
         assert(size_free_ < size_cache_);
 
         log_info << "GCache DEBUG: RingBuffer::seqno_reset(): discarded "
@@ -457,6 +465,8 @@ namespace gcache
 
         log_info << "GCache DEBUG: RingBuffer::seqno_reset(): found "
                  << locked << '/' << total << " locked buffers";
+
+        assert_sizes();
     }
 
     void RingBuffer::print (std::ostream& os) const
