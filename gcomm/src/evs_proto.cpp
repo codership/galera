@@ -213,11 +213,11 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     input_map_->reset(1);
     current_view_.add_member(my_uuid_, segment_);
     // we don't need to store previous views, do we ?
-    // if (rst_view) {
-    //     previous_view_ = *rst_view;
-    //     previous_views_.push_back(
-    //         std::make_pair(rst_view -> id(), gu::datetime::Date::now()));
-    // }
+    if (rst_view) {
+        previous_view_ = *rst_view;
+        previous_views_.push_back(
+            std::make_pair(rst_view -> id(), gu::datetime::Date::now()));
+    }
     if (mtu_ != std::numeric_limits<size_t>::max())
     {
         send_buf_.reserve(mtu_);

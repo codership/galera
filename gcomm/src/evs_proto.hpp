@@ -94,7 +94,7 @@ public:
           SegmentId      segment,
           const gu::URI& uri = gu::URI("evs://"),
           const size_t   mtu = std::numeric_limits<size_t>::max(),
-          const View*    restore_view = NULL);
+          const View*    rst_view = NULL);
     ~Proto();
 
     const UUID& uuid() const { return my_uuid_; }

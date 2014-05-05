@@ -72,9 +72,6 @@ void gcomm::PC::connect(bool start_prim)
     {
         start_prim = true;
     }
-    if (pc_recovery_) {
-        start_prim = false;
-    }
 
     const bool wait_prim(
         gu::from_string<bool>(
@@ -84,6 +81,11 @@ void gcomm::PC::connect(bool start_prim)
         gu::from_string<gu::datetime::Period>(
             uri_.get_option(Conf::PcWaitPrimTimeout,
                             Defaults::PcWaitPrimTimeout)));
+
+    if (pc_recovery_) {
+        start_prim = false;
+        wait_prim = false;
+    }
 
     pstack_.push_proto(gmcast_);
     pstack_.push_proto(evs_);

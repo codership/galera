@@ -259,7 +259,14 @@ void gcomm::ViewState::write_file() const
         return ;
     }
     std::ostringstream os;
-    write_stream(os);
+    try {
+        write_stream(os);
+    } catch (const std::exception& e) {
+        log_warn << "write ostringstream failed("
+                 << e.what() << ")";
+        fclose(fout);
+        return ;
+    }
     std::string content(os.str());
     if (fwrite(content.c_str(), content.size(), 1, fout) == 0) {
         log_warn << "write file(" << tmp << ") failed("
@@ -267,8 +274,12 @@ void gcomm::ViewState::write_file() const
         fclose(fout);
         return ;
     }
-    fflush(fout);
-    fclose(fout);
+    // fflush is called inside.
+    if (fclose(fout) != 0){
+        log_warn << "close file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        return ;
+    }
 
     // rename atomically.
     if (rename(tmp.c_str(), COMMON_VIEW_STAT_FILE) != 0) {
