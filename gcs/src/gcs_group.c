@@ -1045,6 +1045,7 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
 {
     gcs_node_t* joiner = &group->nodes[joiner_idx];
     gcs_segment_t joiner_segment = joiner->segment;
+
     // find node who is ist potentially possible.
     // first highest cached seqno local node.
     // then highest cached seqno remote node.
