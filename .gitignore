@@ -4,6 +4,10 @@
 *.so
 *.log
 *.diff
+GPATH
+GRTAGS
+GTAGS
+GSYMS
 .sconf_temp
 .sconsign.dblite
 core
@@ -32,3 +36,5 @@ tests/out
 tests/run
 tests/conf/cluster.conf
 tests/conf/nodes.conf
+tests/conf/common_my.cnf
+tests/conf/my[0-9]*.cnf
