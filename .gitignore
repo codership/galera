@@ -13,6 +13,7 @@ GSYMS
 core
 rb_test
 galera.cache
+gvwstate.dat
 galera/tests/galera_check
 galera/tests/galera_check.passed
 galerautils/tests/gu_tests

@@ -420,6 +420,11 @@ namespace gcomm
          */
         static std::string const PcWeight;
 
+        /*!
+         * @brief PC recovery from cluster crash
+         */
+        static std::string const PcRecovery;
+
         static void register_params(gu::Config&);
     };
 

@@ -34,7 +34,7 @@ namespace gcomm
     {
     public:
 
-        GMCast (Protonet&, const gu::URI&);
+        GMCast (Protonet&, const gu::URI&, const UUID* my_uuid = NULL);
         ~GMCast();
 
         // Protolay interface

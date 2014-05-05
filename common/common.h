@@ -17,6 +17,7 @@
 #define COMMON_BASE_PORT_DEFAULT "4567"
 
 #define COMMON_STATE_FILE "grastate.dat"
+#define COMMON_VIEW_STAT_FILE "gvwstate.dat"
 
 #define COMMON_CONF_SSL_KEY       "socket.ssl_key"
 #define COMMON_CONF_SSL_CERT      "socket.ssl_cert"

@@ -40,7 +40,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                          const UUID&    my_uuid,
                          SegmentId      segment,
                          const gu::URI& uri,
-                         const size_t   mtu)
+                         const size_t   mtu,
+                         const View*    rst_view)
     :
     Protolay(conf),
     timers_(),
@@ -140,7 +141,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     causal_keepalive_period_(retrans_period_),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
-    current_view_(ViewId(V_TRANS, my_uuid, 0)),
+    current_view_(ViewId(V_TRANS, my_uuid,
+                         rst_view ? rst_view -> id().seq() + 1 : 0)),
     previous_view_(),
     previous_views_(),
     input_map_(new InputMap()),
@@ -210,6 +212,12 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     NodeMap::value(self_i_).set_index(0);
     input_map_->reset(1);
     current_view_.add_member(my_uuid_, segment_);
+    // we don't need to store previous views, do we ?
+    // if (rst_view) {
+    //     previous_view_ = *rst_view;
+    //     previous_views_.push_back(
+    //         std::make_pair(rst_view -> id(), gu::datetime::Date::now()));
+    // }
     if (mtu_ != std::numeric_limits<size_t>::max())
     {
         send_buf_.reserve(mtu_);

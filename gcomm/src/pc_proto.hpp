@@ -64,7 +64,8 @@ public:
     Proto(gu::Config&    conf,
           const UUID&    uuid,
           SegmentId      segment,
-          const gu::URI& uri = gu::URI("pc://"))
+          const gu::URI& uri = gu::URI("pc://"),
+          View*          rst_view = NULL)
         :
         Protolay(conf),
         version_(
@@ -94,7 +95,8 @@ public:
         weight_        (check_range(Conf::PcWeight,
                                     param<int>(conf, uri, Conf::PcWeight,
                                                Defaults::PcWeight),
-                                    0, 0xff))
+                                    0, 0xff)),
+        rst_view_      (rst_view)
     {
         log_info << "PC version " << version_;
         set_weight(weight_);
@@ -219,6 +221,7 @@ private:
     std::list<View>   views_;         // List of seen views
     size_t            mtu_;           // Maximum transmission unit
     int               weight_;        // Node weight in voting
+    View*             rst_view_;      // restored PC view
 };
 
 

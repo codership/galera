@@ -124,6 +124,30 @@ public:
         return os;
     }
 
+    std::ostream& write_stream(std::ostream& os) const
+    {
+        char uuid_buf[GU_UUID_STR_LEN + 1];
+        ssize_t ret(gu_uuid_print(&uuid_, uuid_buf, sizeof(uuid_buf)));
+        (void)ret;
+
+        assert(ret == GU_UUID_STR_LEN);
+        uuid_buf[GU_UUID_STR_LEN] = '\0';
+
+        return (os << uuid_buf);
+    }
+
+    std::istream& read_stream(std::istream& is)
+    {
+        char str[GU_UUID_STR_LEN + 1];
+        is.width(GU_UUID_STR_LEN + 1);
+        is >> str;
+        ssize_t ret(gu_uuid_scan(str, GU_UUID_STR_LEN, &uuid_));
+        if (ret == -1)
+            gu_throw_error(EINVAL) << "could not parse UUID from '" << str
+                                   << '\'' ;
+        return is;
+    }
+
     // Prefer the above function over this one
     std::string _str() const
     {

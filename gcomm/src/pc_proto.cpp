@@ -224,6 +224,24 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     log_info << v;
     send_up(Datagram(), um);
     set_stable_view(v);
+
+    if (v.id().type() == V_PRIM) {
+        ViewState vst(const_cast<UUID&>(my_uuid_), v);
+        log_info << "save pc into disk";
+        vst.write_file();
+    } else if (rst_view_) {
+        // pc recovery process.
+        log_debug << "compare members....";
+        log_debug << *rst_view_;
+        log_debug << v;
+        if (rst_view_ -> members() == v.members()) {
+            log_info << "promote to primary component";
+            // since all of them are non-primary component
+            // we need to bootstrap.
+            send_install(true);
+            rst_view_ = NULL;
+        }
+    }
 }
 
 
@@ -1511,7 +1529,8 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
              key == Conf::PcLinger ||
              key == Conf::PcNpvo ||
              key == Conf::PcWaitPrim ||
-             key == Conf::PcWaitPrimTimeout)
+             key == Conf::PcWaitPrimTimeout ||
+             key == Conf::PcRecovery)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";

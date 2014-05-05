@@ -49,6 +49,10 @@ namespace gcomm
         gu::datetime::Period linger_;
         gu::datetime::Period announce_timeout_;
 
+        bool        pc_recovery_;
+        UUID        rst_uuid_;
+        View        rst_view_;
+
         PC(const PC&);
         void operator=(const PC&);
 

@@ -17,6 +17,7 @@
 #include "gu_logger.hpp"
 
 #include <vector>
+#include <fstream>
 #include <limits>
 #include <cstdlib>
 #include <check.h>
@@ -196,6 +197,55 @@ START_TEST(test_protonet)
 }
 END_TEST
 
+START_TEST(test_view_state)
+{
+    // compare view.
+    UUID view_uuid(NULL, 0);
+    ViewId view_id(V_TRANS, view_uuid, 789);
+    UUID m1(NULL, 0);
+    UUID m2(NULL, 0);
+    View view(view_id, true);
+    view.add_member(m1, 0);
+    view.add_member(m2, 1);
+    View view2;
+
+    {
+        std::ostringstream os;
+        view.write_stream(os);
+
+        std::istringstream is(os.str());
+        view2.read_stream(is);
+
+        fail_unless(view == view2);
+    }
+
+    // compare view state.
+    UUID my_uuid(NULL, 0);
+    ViewState vst(my_uuid, view);
+    UUID my_uuid_2;
+    View view_2;
+    ViewState vst2(my_uuid_2, view_2);
+
+    {
+        std::ostringstream os;
+        vst.write_stream(os);
+
+        std::istringstream is(os.str());
+        vst2.read_stream(is);
+
+        fail_unless(vst == vst2);
+    }
+
+    // test write file and read file.
+    vst.write_file();
+    UUID my_uuid_3;
+    View view_3;
+    ViewState vst3(my_uuid_3, view_3);
+    vst3.read_file();
+    fail_unless(vst == vst3);
+}
+END_TEST
+
 
 Suite* util_suite()
 {
@@ -218,6 +268,10 @@ Suite* util_suite()
 
     tc = tcase_create("test_protonet");
     tcase_add_test(tc, test_protonet);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_view_state");
+    tcase_add_test(tc, test_view_state);
     suite_add_tcase(s, tc);
 
     return s;

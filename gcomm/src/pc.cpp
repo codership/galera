@@ -72,6 +72,9 @@ void gcomm::PC::connect(bool start_prim)
     {
         start_prim = true;
     }
+    if (pc_recovery_) {
+        start_prim = false;
+    }
 
     const bool wait_prim(
         gu::from_string<bool>(
@@ -206,17 +209,34 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
                     conf_, uri, Conf::PcLinger, "PT20S")),
     announce_timeout_(param<gu::datetime::Period>(
                           conf_, uri, Conf::PcAnnounceTimeout,
-                          Defaults::PcAnnounceTimeout))
+                          Defaults::PcAnnounceTimeout)),
+    pc_recovery_ (param<bool>(conf_, uri,
+                              Conf::PcRecovery, Defaults::PcRecovery)),
+    rst_uuid_(),
+    rst_view_()
+
 {
     if (uri_.get_scheme() != Conf::PcScheme)
     {
         log_fatal << "invalid uri: " << uri_.to_string();
     }
 
-    gmcast_ = new GMCast(pnet(), uri_);
+    conf_.set(Conf::PcRecovery, gu::to_string(pc_recovery_));
+    bool restored = false;
+    ViewState vst(rst_uuid_, rst_view_);
+    if (pc_recovery_) {
+        if (vst.read_file()) {
+            log_info << "restore pc from disk successfully";
+            restored = true;
+        } else {
+            log_info << "restore pc from disk failed";
+        }
+    } else {
+        log_info << "pass pc recovery";
+    }
 
+    gmcast_ = new GMCast(pnet(), uri_, restored ? &rst_uuid_ : NULL);
     const UUID& uuid(gmcast_->uuid());
-
     if (uuid == UUID::nil())
     {
         gu_throw_fatal << "invalid UUID: " << uuid;
@@ -224,9 +244,10 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     evs::UserMessage evsum;
     evs_ = new evs::Proto(pnet().conf(),
                           uuid, gmcast_->segment(),
-                          uri_, gmcast_->mtu() - 2*evsum.serial_size());
-    pc_  = new pc::Proto (pnet().conf(), uuid, gmcast_->segment(), uri_);
-
+                          uri_, gmcast_->mtu() - 2*evsum.serial_size(),
+                          restored ? &rst_view_ : NULL);
+    pc_  = new pc::Proto (pnet().conf(), uuid, gmcast_->segment(), uri_,
+                          restored ? &rst_view_ : NULL);
     conf_.set(Conf::PcLinger, gu::to_string(linger_));
 }
 
