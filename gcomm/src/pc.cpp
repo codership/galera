@@ -73,7 +73,7 @@ void gcomm::PC::connect(bool start_prim)
         start_prim = true;
     }
 
-    const bool wait_prim(
+    bool wait_prim(
         gu::from_string<bool>(
             uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
 
