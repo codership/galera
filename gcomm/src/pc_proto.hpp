@@ -101,6 +101,9 @@ public:
         log_info << "PC version " << version_;
         set_weight(weight_);
         NodeMap::value(self_i_).set_segment(segment);
+        if (rst_view_) {
+            NodeMap::value(self_i_).set_last_prim(rst_view_ -> id());
+        }
 
         conf.set(Conf::PcVersion,      gu::to_string(version_));
         conf.set(Conf::PcNpvo,         gu::to_string(npvo_));

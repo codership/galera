@@ -9,6 +9,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_macros.h"
+#include <algorithm>
 #include <set>
 
 using std::rel_ops::operator!=;
@@ -231,15 +232,33 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
         vst.write_file();
     } else if (rst_view_) {
         // pc recovery process.
-        log_debug << "compare members....";
+        uint32_t max_view_seqno = 0;
+        for(NodeMap::const_iterator i = instances_.begin();
+            i != instances_.end(); ++i) {
+            const Node& node(NodeMap::value(i));
+            const ViewId& last_prim(node.last_prim());
+            if (last_prim.type() == V_PRIM &&
+                last_prim.uuid() == rst_view_ -> id().uuid()){
+                max_view_seqno = std::max(max_view_seqno,
+                                          last_prim.seq());
+            }
+        }
+        assert(max_view_seqno != 0);
+
+        log_debug << "max_view_seqno = " << max_view_seqno
+                  << ", rst_view_seqno = " << rst_view_ -> id().seq();
+        log_debug << "rst_view = ";
         log_debug << *rst_view_;
+        log_debug << "deliver_view = ";
         log_debug << v;
-        if (rst_view_ -> members() == v.members()) {
+
+        if (rst_view_ -> id().seq() == max_view_seqno &&
+            rst_view_ -> members() == v.members()) {
             log_info << "promote to primary component";
             // since all of them are non-primary component
             // we need to bootstrap.
-            send_install(true);
             rst_view_ = NULL;
+            send_install(true);
         }
     }
 }
@@ -772,7 +791,9 @@ bool gcomm::pc::Proto::is_prim() const
 
     // No members coming from prim view, check if last known prim
     // view can be recovered (majority of members from last prim alive)
-    if (prim == false)
+    if (prim == false &&
+        // give up if via pc recovery
+        rst_view_ == NULL)
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
