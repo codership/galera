@@ -76,18 +76,22 @@ public:
                 const Datagram&     rb)
         :
         msg_(msg),
-        rb_ (rb)
+        rb_ (rb),
+        tstamp_(gu::datetime::Date::now())
     { }
-    InputMapMsg(const InputMapMsg& m) : msg_(m.msg_), rb_ (m.rb_) { }
+    InputMapMsg(const InputMapMsg& m) :
+            msg_(m.msg_), rb_ (m.rb_), tstamp_ (m.tstamp_) { }
     ~InputMapMsg() { }
 
     const UserMessage&  msg () const { return msg_;  }
     const Datagram& rb  () const { return rb_;   }
+    const gu::datetime::Date& tstamp() const { return tstamp_; }
 private:
     void operator=(const InputMapMsg&);
 
     UserMessage const msg_;
     Datagram          rb_;
+    gu::datetime::Date tstamp_;
 };
 
 
@@ -376,6 +380,9 @@ private:
 
     std::vector<size_t> n_msgs_;
     size_t max_droppable_;
+    long long repl_msg_number; // number of replicated messages.
+    long long repl_msg_latency; // sum of replication latency.
+
 };
 
 #endif // EVS_INPUT_MAP2_HPP
