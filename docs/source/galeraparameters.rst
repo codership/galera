@@ -44,6 +44,10 @@ Table legend:
 | :ref:`socket.ssl_cipher               | *AES128-SHA*          | 1.0                   | n/a                | No       |
 | <socket.ssl_cipher>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`socket.checksum                 | *1* (for version 2)   | 2.0                   | n/a                | No       |
+| <socket.checksum>`                    |                       |                       |                    |          |
+|                                       | *2* (for version 3+)  |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gmcast.listen_addr              | *tcp://0.0.0.0:4567*  | 1.0                   | n/a                | No       |
 | <gmcast.listen_addr>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -249,6 +253,19 @@ Whether to enable compression on SSL connections.
    pair: Parameters; socket.ssl_cipher
 
 Symmetric cipher to use. AES128 is used by default it is considerably faster and no less secure than AES256.
+
+.. rubric:: socket.checksum
+
+.. _`socket.checksum`:
+
+.. index::
+   pair: Parameters; socket.checksum
+
+Checksum to use on socket layer:
+
+- ``0`` - disable checksum
+- ``1`` - CRC32
+- ``2`` - CRC-32C (optimized and potentially HW-accelerated on Intel CPUs)
 
 .. rubric:: gmcast.listen_addr
 
