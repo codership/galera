@@ -121,9 +121,7 @@ gcomm::evs::InputMap::InputMap() :
     msg_index_      (new InputMapMsgIndex()),
     recovery_index_ (new InputMapMsgIndex()),
     n_msgs_         (O_SAFE + 1),
-    max_droppable_  (16),
-    repl_msg_number (0),
-    repl_msg_latency(0)
+    max_droppable_  (16)
 { }
 
 
@@ -342,12 +340,8 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 
 void gcomm::evs::InputMap::erase(iterator i)
 {
-    const InputMapMsg& im_msg(InputMapMsgIndex::value(i));
-    const UserMessage& msg(im_msg.msg());
+    const UserMessage& msg(InputMapMsgIndex::value(i).msg());
     --n_msgs_[msg.order()];
-    repl_msg_latency += (gu::datetime::Date::now() -
-                         im_msg.tstamp()).get_nsecs();
-    repl_msg_number++;
     gu_trace(recovery_index_->insert_unique(*i));
     gu_trace(msg_index_->erase(i));
 }

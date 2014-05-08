@@ -18,6 +18,7 @@ namespace gcomm
         void insert(const double);
         void clear();
         friend std::ostream& operator<<(std::ostream&, const Histogram&);
+        std::string to_string();
     private:
         std::map<double, long long> cnt_;
     };

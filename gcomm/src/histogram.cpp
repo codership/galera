@@ -74,6 +74,13 @@ void gcomm::Histogram::clear()
     }
 }
 
+std::string gcomm::Histogram::to_string()
+{
+    std::ostringstream os;
+    os << *this;
+    return os.str();
+}
+
 std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
 {
     std::map<double, long long>::const_iterator i, i_next;
@@ -97,5 +104,3 @@ std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
 
     return os;
 }
-
-

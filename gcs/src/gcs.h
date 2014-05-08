@@ -428,6 +428,8 @@ struct gcs_stats
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length
     int       send_q_len;     //! current send queue length
+    char**   backend_keys;    //! backend stat keys
+    char**   backend_values;  //! backend stat values
 };
 
 /*! Fills stats struct */

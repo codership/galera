@@ -28,7 +28,7 @@
 
 #include <list>
 #include <utility>
-
+#include <vector>
 
 // Declarations
 namespace gcomm
@@ -332,6 +332,11 @@ public:
     virtual bool set_param(const std::string& key, const std::string& val)
     {
         return false;
+    }
+
+    virtual void get_stats(std::vector<std::string>& keys,
+                           std::vector<std::string>& values)
+    {
     }
 
     const Protolay* id() const { return this; }

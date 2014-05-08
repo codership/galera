@@ -827,6 +827,60 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
     }
 }
 
+static
+GCS_BACKEND_STATS_GET_FN(gcomm_stats_get)
+{
+    GCommConn::Ref ref(backend);
+    *keys = NULL;
+    *values = NULL;
+    if (ref.get() == 0)
+    {
+        return ;
+    }
+    GCommConn& conn(*ref.get());
+    // not use map because prefer to preserve getting order.
+    std::vector<std::string> ks;
+    std::vector<std::string> vs;
+    char** tks = NULL;
+    char** tvs = NULL;
+    try {
+        gcomm::Critical<Protonet> cric(conn.get_pnet());
+        if (gu_unlikely(conn.get_error() !=0)) return ;
+        conn.get_pnet().get_stats(ks, vs);
+        gcomm_assert(ks.size() == vs.size());
+
+        // copy to tks and tvs.
+        size_t size = ks.size();
+        tks = static_cast<char**>(gu_malloc(sizeof(char*) * (size + 1)));
+        tvs = static_cast<char**>(gu_malloc(sizeof(char*) * (size + 1)));
+        for (size_t i=0; i < size; i++) {
+            tks[i] = strdup(ks[i].c_str());
+            tvs[i] = strdup(vs[i].c_str());
+        }
+        tks[size] = 0;
+        tvs[size] = 0;
+        *keys = tks;
+        *values = tvs;
+        return ;
+    } catch (const std::exception& e) {
+        log_warn << "gcomm stats get : caught exception("
+                 << e.what() << ")";
+    }
+    // clear garbage.
+    if (tks) {
+        for(int i=0; tks[i]; i++) {
+            free(tks[i]);
+        }
+        gu_free(tks);
+    }
+    if (tvs) {
+        for(int i=0; tvs[i]; i++) {
+            free(tvs[i]);
+        }
+        gu_free(tvs);
+    }
+}
+
 
 static
 GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
@@ -882,6 +936,7 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->msg_size  = gcomm_msg_size;
     backend->param_set = gcomm_param_set;
     backend->param_get = gcomm_param_get;
+    backend->stats_get = gcomm_stats_get;
     backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;

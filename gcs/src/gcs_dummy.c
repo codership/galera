@@ -268,6 +268,13 @@ GCS_BACKEND_PARAM_GET_FN(dummy_param_get)
 }
 
 static
+GCS_BACKEND_STATS_GET_FN(dummy_stats_get)
+{
+    *keys = NULL;
+    *values = NULL;
+}
+
+static
 const gcs_backend_t dummy_backend =
 {
     .conn      = NULL,
@@ -279,7 +286,8 @@ const gcs_backend_t dummy_backend =
     .name      = dummy_name,
     .msg_size  = dummy_msg_size,
     .param_set = dummy_param_set,
-    .param_get = dummy_param_get
+    .param_get = dummy_param_get,
+    .stats_get = dummy_stats_get
 };
 
 GCS_BACKEND_CREATE_FN(gcs_dummy_create)
