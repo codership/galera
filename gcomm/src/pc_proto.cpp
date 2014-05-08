@@ -230,7 +230,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
         ViewState vst(const_cast<UUID&>(my_uuid_), v);
         log_info << "save pc into disk";
         vst.write_file();
-    } else if (rst_view_) {
+    } else if (rst_view_ && !start_prim_) {
         // pc recovery process.
         uint32_t max_view_seqno = 0;
         for(NodeMap::const_iterator i = instances_.begin();

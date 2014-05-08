@@ -63,6 +63,12 @@ std::string gcomm::PC::listen_addr() const
 
 void gcomm::PC::connect(bool start_prim)
 {
+    // --wsrep-new-cluster specified in command line
+    // it should take precedence.
+    if (start_prim) {
+        pc_recovery_ = false;
+    }
+
     try
     {
         // for backward compatibility with old approach: gcomm://0.0.0.0
