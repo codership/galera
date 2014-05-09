@@ -59,7 +59,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 void gcomm::gmcast::Proto::send_handshake()
 {
     handshake_uuid_ = UUID(0, 0);
-    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_, gmcast_.uuid(), local_segment_, "");
+    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_,
+                gmcast_.uuid(), local_segment_);
 
     send_msg(hs);
 
@@ -114,7 +115,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 log_info << "handshake failed, my group: '" << group_name_
                          << "', peer group: '" << grp << "'";
                 Message failed(version_, Message::T_FAIL,
-                               gmcast_,uuid(), local_segment_, "invalid group");
+                               gmcast_.uuid(), local_segment_, "invalid group");
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
@@ -132,8 +133,8 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 log_info << "peer " << remote_uuid_
                          << " from " << remote_addr_
                          << " has been fenced out, rejecting connection";
-                Message failed(version_, Message::T_HANDSHAKE_FAIL,
-                               handshake_uuid_, gmcast_.uuid(), "fenced");
+                Message failed(version_, Message::T_FAIL,
+                               gmcast_.uuid(), local_segment_, "fenced");
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
@@ -210,7 +211,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 void gcomm::gmcast::Proto::handle_keepalive(const Message& msg)
 {
     log_debug << "keepalive: " << *this;
-    Message ok(version_, Message::T_OK, local_uuid_, local_segment_);
+    Message ok(version_, Message::T_OK, gmcast_.uuid(), local_segment_, "");
     send_msg(ok);
 }
 
@@ -239,7 +240,7 @@ void gcomm::gmcast::Proto::send_keepalive()
 {
     log_debug << "sending keepalive: " << *this;
     Message msg(version_, Message::T_KEEPALIVE,
-                local_uuid_, local_segment_);
+                gmcast_.uuid(), local_segment_, "");
     send_msg(msg);
 }
 

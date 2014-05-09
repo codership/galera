@@ -368,6 +368,7 @@ void gcomm::GMCast::gmcast_accept()
         listener_->listen_addr(),
         "",
         mcast_addr_,
+        segment_,
         group_name_);
     std::pair<ProtoMap::iterator, bool> ret =
         proto_map_->insert(std::make_pair(tp->id(), peer));
@@ -422,7 +423,6 @@ void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
         listener_->listen_addr(),
         remote_addr,
         mcast_addr_,
-        uuid(),
         segment_,
         group_name_);
 
