@@ -30,8 +30,11 @@ using namespace gcomm;
 START_TEST(test_uuid)
 {
     UUID uuid;
+#ifdef GCOMM_PRINT_FULL_UUID
     fail_unless(uuid._str() == "00000000-0000-0000-0000-000000000000");
-
+#else
+    fail_unless(uuid._str() == "00000000");
+#endif // GCOMM_PRINT_FULL_UUID
     for (size_t i = 0; i < 159; ++i)
     {
         UUID uuidrnd(0, 0);

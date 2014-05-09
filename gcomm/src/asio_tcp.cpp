@@ -370,16 +370,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
         return;
     }
 
-    if (state() == S_CLOSING)
-    {
-        // keep on reading data in case of deferred shutdown too
-        boost::array<asio::mutable_buffer, 1> mbs;
-        mbs[0] = asio::mutable_buffer(&recv_buf_[0],
-                                      recv_buf_.size());
-        read_one(mbs);
-        return;
-    }
-    else if (state() != S_CONNECTED)
+    if (state() != S_CONNECTED && state() != S_CLOSING)
     {
         log_debug << "read handler for " << id()
                   << " state " << state();
@@ -469,13 +460,7 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
         return 0;
     }
 
-    if (state() == S_CLOSING)
-    {
-        log_debug << "read completion condition for " << id()
-                  << " state " << state();
-        return 0;
-    }
-    else if (state_ != S_CONNECTED)
+    if (state() != S_CONNECTED && state() != S_CLOSING)
     {
         log_debug << "read completion condition for " << id()
                   << " state " << state();

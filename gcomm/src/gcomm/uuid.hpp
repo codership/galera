@@ -106,10 +106,13 @@ public:
         }
         else
         {
-            const uint16_t* s = reinterpret_cast<const uint16_t*>(uuid_.data);
+
 
             std::ios_base::fmtflags saved = os.flags();
-
+            os << std::hex
+               << std::setfill('0') << std::setw(8) << gu_be32(i[0]);
+#ifdef GCOMM_PRINT_FULL_UUID
+            const uint16_t* s = reinterpret_cast<const uint16_t*>(uuid_.data);
             os << std::hex
                << std::setfill('0') << std::setw(8) << gu_be32(i[0]) << '-'
                << std::setfill('0') << std::setw(4) << gu_be16(s[2]) << '-'
@@ -117,7 +120,7 @@ public:
                << std::setfill('0') << std::setw(4) << gu_be16(s[4]) << '-'
                << std::setfill('0') << std::setw(4) << gu_be16(s[5])
                << std::setfill('0') << std::setw(8) << gu_be32(i[3]);
-
+#endif // GCOMM_PRINT_FULL_UUID
             os.flags(saved);
         }
 

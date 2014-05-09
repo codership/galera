@@ -28,7 +28,7 @@
 
 #include <list>
 #include <utility>
-
+#include <set>
 
 // Declarations
 namespace gcomm
@@ -191,25 +191,8 @@ private:
 
 class gcomm::Protolay
 {
-    typedef std::list<Protolay*> CtxList;
-    CtxList     up_context_;
-    CtxList     down_context_;
-
-    Protolay (const Protolay&);
-    Protolay& operator=(const Protolay&);
-
-protected:
-
-    gu::Config& conf_;
-
-    Protolay(gu::Config& conf)
-        :
-        up_context_(0),
-        down_context_(0),
-        conf_(conf)
-    { }
-
 public:
+    typedef Map<UUID, gu::datetime::Date> FenceList;
 
     virtual ~Protolay() {}
 
@@ -324,6 +307,49 @@ public:
         }
     }
 
+
+    virtual void handle_fencing(const UUID& uuid) { }
+
+    void fence(const UUID& uuid)
+    {
+        fence_list_.insert(std::make_pair(uuid, gu::datetime::Date::now()));
+        handle_fencing(uuid);
+        for (CtxList::iterator i(down_context_.begin());
+             i != down_context_.end(); ++i)
+        {
+            (*i)->fence(uuid);
+        }
+    }
+
+    void unfence(const UUID& uuid)
+    {
+        fence_list_.erase(uuid);
+        for (CtxList::iterator i(down_context_.begin());
+             i != down_context_.end(); ++i)
+        {
+            (*i)->unfence(uuid);
+        }
+    }
+
+    bool is_fenced(const UUID& uuid) const
+    {
+        return (fence_list_.find(uuid) != fence_list_.end());
+    }
+
+    const FenceList& fence_list() const { return fence_list_; }
+
+    std::string get_address(const UUID& uuid) const
+    {
+        if (down_context_.empty()) return handle_get_address(uuid);
+        else return (*down_context_.begin())->get_address(uuid);
+    }
+
+    virtual std::string handle_get_address(const UUID& uuid) const
+    {
+        return "(unknown)";
+    }
+
+
     virtual gu::datetime::Date handle_timers()
     {
         return gu::datetime::Date::max();
@@ -335,6 +361,29 @@ public:
     }
 
     const Protolay* id() const { return this; }
+
+protected:
+    Protolay(gu::Config& conf)
+        :
+        conf_(conf),
+        up_context_(0),
+        down_context_(0),
+        fence_list_()
+    { }
+
+    gu::Config& conf_;
+
+private:
+    typedef std::list<Protolay*> CtxList;
+    CtxList     up_context_;
+    CtxList     down_context_;
+
+    FenceList   fence_list_;
+
+
+    Protolay (const Protolay&);
+    Protolay& operator=(const Protolay&);
+
 
 };
 
