@@ -61,6 +61,7 @@ SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
 NO_STRIP=${NO_STRIP:-"no"}
 WITH_SPREAD="no"
+RUN_TESTS=${RUN_TESTS:-1}
 if [ "$OS" == "FreeBSD" ]; then
   chown=/usr/sbin/chown
   true=/usr/bin/true
@@ -369,7 +370,7 @@ if [ "$SCONS" == "yes" ] # Build using Scons
 then
     # Scons variant dir, defaults to GALERA_SRC
     export SCONS_VD=$build_base
-    scons_args="-C $build_base revno=$GALERA_REV"
+    scons_args="-C $build_base revno=$GALERA_REV tests=$RUN_TESTS"
 
     [ -n "$TARGET"        ] && scons_args="$scons_args arch=$TARGET"
     [ -n "$RELEASE"       ] && scons_args="$scons_args version=$RELEASE"

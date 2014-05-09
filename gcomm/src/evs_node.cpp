@@ -11,18 +11,18 @@
 std::ostream&
 gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Node& n)
 {
-    os << "evs::node{";
-    os << "operational=" << n.operational() << ",";
-    os << "suspected=" << n.suspected() << ",";
-    os << "installed=" << n.installed() << ",";
-    os << "fifo_seq=" << n.fifo_seq() << ",";
+    os << "{";
+    os << "o=" << n.operational() << ",";
+    os << "s=" << n.suspected() << ",";
+    os << "i=" << n.installed() << ",";
+    os << "fs=" << n.fifo_seq() << ",";
     if (n.join_message() != 0)
     {
-        os << "join_message=\n" << *n.join_message() << ",\n";
+        os << "jm=\n" << *n.join_message() << ",\n";
     }
     if (n.leave_message() != 0)
     {
-        os << "leave_message=\n" << *n.leave_message() << ",\n";
+        os << "lm=\n" << *n.leave_message() << ",\n";
     }
     os << "}";
     return os;

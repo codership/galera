@@ -13,13 +13,14 @@
 std::ostream&
 gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::MessageNode& node)
 {
-    os << "node: {";
-    os << "operational=" << node.operational() << ",";
-    os << "suspected=" << node.suspected() << ",";
-    os << "leave_seq=" << node.leave_seq() << ",";
-    os << "view_id=" << node.view_id() << ",";
-    os << "safe_seq=" << node.safe_seq() << ",";
-    os << "im_range=" << node.im_range() << ",";
+    os << " {";
+    os << "o=" << node.operational() << ",";
+    os << "s=" << node.suspected() << ",";
+    os << "f=" << node.fenced() << ",";
+    os << "ls=" << node.leave_seq() << ",";
+    os << "vid=" << node.view_id() << ",";
+    os << "ss=" << node.safe_seq() << ",";
+    os << "ir=" << node.im_range() << ",";
     os << "}";
     return os;
 }
@@ -27,21 +28,21 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::MessageNode& node)
 std::ostream&
 gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Message& msg)
 {
-    os << "evs::msg{";
-    os << "version=" << static_cast<int>(msg.version()) << ",";
-    os << "type=" << msg.type() << ",";
-    os << "user_type=" << static_cast<int>(msg.user_type()) << ",";
-    os << "order=" << msg.order() << ",";
-    os << "seq=" << msg.seq() << ",";
-    os << "seq_range=" << msg.seq_range() << ",";
-    os << "aru_seq=" << msg.aru_seq() << ",";
-    os << "flags=" << static_cast<int>(msg.flags()) << ",";
-    os << "source=" << msg.source() << ",";
-    os << "source_view_id=" << msg.source_view_id() << ",";
-    os << "range_uuid=" << msg.range_uuid() << ",";
-    os << "range=" << msg.range() << ",";
-    os << "fifo_seq=" << msg.fifo_seq() << ",";
-    os << "node_list=(" << msg.node_list() << ")\n";
+    os << "{";
+    os << "v=" << static_cast<int>(msg.version()) << ",";
+    os << "t=" << msg.type() << ",";
+    os << "ut=" << static_cast<int>(msg.user_type()) << ",";
+    os << "o=" << msg.order() << ",";
+    os << "s=" << msg.seq() << ",";
+    os << "sr=" << msg.seq_range() << ",";
+    os << "as=" << msg.aru_seq() << ",";
+    os << "f=" << static_cast<int>(msg.flags()) << ",";
+    os << "src=" << msg.source() << ",";
+    os << "srcvid=" << msg.source_view_id() << ",";
+    os << "ru=" << msg.range_uuid() << ",";
+    os << "r=" << msg.range() << ",";
+    os << "fs=" << msg.fifo_seq() << ",";
+    os << "nl=(\n" << msg.node_list() << ")\n";
     os << "}";
     return os;
 }
@@ -52,7 +53,8 @@ size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
 {
     uint8_t b =
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) |
-                             (suspected_   == true ? F_SUSPECTED   : 0));
+                             (suspected_   == true ? F_SUSPECTED   : 0) |
+                             (fenced_      == true ? F_FENCED      : 0));
     gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
     uint8_t pad(0);
     gu_trace(offset = gu::serialize1(pad, buf, buflen, offset));
@@ -70,12 +72,13 @@ size_t gcomm::evs::MessageNode::unserialize(const gu::byte_t* const buf,
 {
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
-    if ((b & ~(F_OPERATIONAL | F_SUSPECTED)) != 0)
+    if ((b & ~(F_OPERATIONAL | F_SUSPECTED | F_FENCED)) != 0)
     {
         log_warn << "unknown flags: " << static_cast<int>(b);
     }
     operational_ = b & F_OPERATIONAL;
     suspected_   = b & F_SUSPECTED;
+    fenced_      = b & F_FENCED;
 
     uint8_t pad(0);
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, pad));

@@ -81,7 +81,7 @@ START_TEST(test_message)
 
     MessageNodeList node_list;
     node_list.insert(make_pair(uuid1, MessageNode()));
-    node_list.insert(make_pair(UUID(2), MessageNode(true, false, 1,
+    node_list.insert(make_pair(UUID(2), MessageNode(true, false, true, 1,
                                                     ViewId(V_REG), 5,
                                                     Range(7, 8))));
     JoinMessage jm(0, uuid1, view_id, 8, 5, 27, node_list);
@@ -613,7 +613,7 @@ static gu::Config gu_conf;
 static DummyNode* create_dummy_node(size_t idx,
                                     const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT20M")
+                                    const string& retrans_period = "PT10M")
 {
     // reset conf to avoid stale config in case of nofork
     gu_conf = gu::Config();
@@ -1391,7 +1391,7 @@ START_TEST(test_trac_538)
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string suspect_timeout("PT0.5S");
-    const string inactive_timeout("PT1S");
+    const string inactive_timeout("PT2S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)

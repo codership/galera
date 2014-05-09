@@ -8,6 +8,7 @@
 #include "socket.hpp"
 #include "gmcast_message.hpp"
 #include "gmcast_link.hpp"
+#include "gmcast.hpp"
 
 namespace gcomm
 {
@@ -62,17 +63,16 @@ public:
 
 
 
-    Proto (int v,
+    Proto (const GMCast&      gmcast,
+           int                version,
            SocketPtr          tp,
            const std::string& local_addr,
            const std::string& remote_addr,
            const std::string& mcast_addr,
-           const gcomm::UUID& local_uuid,
            const std::string& group_name)
         :
-        version_(v),
+        version_          (version),
         handshake_uuid_   (),
-        local_uuid_       (local_uuid),
         remote_uuid_      (),
         local_addr_       (local_addr),
         remote_addr_      (remote_addr),
@@ -83,7 +83,8 @@ public:
         propagate_remote_ (false),
         tp_               (tp),
         link_map_         (),
-        tstamp_           (gu::datetime::Date::now())
+        tstamp_           (gu::datetime::Date::now()),
+        gmcast_           (gmcast)
     { }
 
     ~Proto() { tp_->close(); }
@@ -100,7 +101,7 @@ public:
     void handle_message(const Message& msg);
 
     const gcomm::UUID& handshake_uuid() const { return handshake_uuid_; }
-    const gcomm::UUID& local_uuid() const { return local_uuid_; }
+    const gcomm::UUID& local_uuid() const { return gmcast_.uuid(); }
     const gcomm::UUID& remote_uuid() const { return remote_uuid_; }
 
     SocketPtr socket() const { return tp_; }
@@ -125,7 +126,6 @@ private:
 
     int version_;
     gcomm::UUID       handshake_uuid_;
-    gcomm::UUID       local_uuid_;  // @todo: do we need it here?
     gcomm::UUID       remote_uuid_;
     std::string       local_addr_;
     std::string       remote_addr_;
@@ -137,13 +137,14 @@ private:
     SocketPtr         tp_;
     LinkMap           link_map_;
     gu::datetime::Date tstamp_;
+    const GMCast&     gmcast_;
 };
 
 
 inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
 {
     os << "v="  << p.version_ << ","
-       << "lu=" << p.local_uuid_ << ","
+       << "lu=" << p.gmcast_.uuid() << ","
        << "ru=" << p.remote_uuid_ << ","
        << "la=" << p.local_addr_ << ","
        << "ra=" << p.remote_addr_ << ","

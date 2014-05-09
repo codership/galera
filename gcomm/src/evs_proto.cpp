@@ -117,8 +117,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
         check_range(Conf::EvsInstallTimeout,
                     param<gu::datetime::Period>(
                         conf, uri, Conf::EvsInstallTimeout,
-                        gu::to_string(inactive_timeout_)),
-                    retrans_period_*2, inactive_timeout_ + 1)),
+                        gu::to_string(inactive_timeout_/2)),
+                    retrans_period_, inactive_timeout_ + 1)),
     join_retrans_period_(
         check_range(Conf::EvsJoinRetransPeriod,
                     param<gu::datetime::Period>(
@@ -174,7 +174,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     self_loopback_(false),
     state_(S_CLOSED),
     shift_to_rfcnt_(0),
-    pending_leave_(false)
+    pending_leave_(false),
+    isolation_end_(gu::datetime::Date::zero())
 {
     log_info << "EVS version " << version_;
 
@@ -262,7 +263,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsStatsReportPeriodMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsStatsReportPeriod, gu::to_string(stats_report_period_));
-        reset_timers();
+        reset_timer(T_STATS);
         return true;
     }
     else if (key == Conf::EvsInfoLogMask)
@@ -289,7 +290,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         {
             NodeMap::value(i).set_suspect_timeout(suspect_timeout_);
         }
-        reset_timers();
+        reset_timer(T_INACTIVITY);
         return true;
     }
     else if (key == Conf::EvsInactiveTimeout)
@@ -304,7 +305,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         {
             NodeMap::value(i).set_inactive_timeout(inactive_timeout_);
         }
-        reset_timers();
+        reset_timer(T_INACTIVITY);
         return true;
     }
     else if (key == Conf::EvsKeepalivePeriod)
@@ -315,7 +316,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsRetransPeriodMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsKeepalivePeriod, gu::to_string(retrans_period_));
-        reset_timers();
+        reset_timer(T_RETRANS);
         return true;
     }
     else if (key == Conf::EvsCausalKeepalivePeriod)
@@ -338,7 +339,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsRetransPeriodMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period_));
-        reset_timers();
+        reset_timer(T_RETRANS);
         return true;
     }
     else if (key == Conf::EvsInstallTimeout)
@@ -348,7 +349,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(val),
             retrans_period_*2, inactive_timeout_ + 1);
         conf_.set(Conf::EvsInstallTimeout, gu::to_string(install_timeout_));
-        reset_timers();
+        reset_timer(T_INSTALL);
         return true;
     }
     else if (key == Conf::EvsUseAggregate)
@@ -376,7 +377,13 @@ std::ostream& gcomm::evs::operator<<(std::ostream& os, const Proto& p)
     os << "input_map=" << *p.input_map_ << ",\n";
     os << "fifo_seq=" << p.fifo_seq_ << ",\n";
     os << "last_sent=" << p.last_sent_ << ",\n";
-    os << "known={\n" << p.known_ << " } \n";
+    os << "known:\n";
+    for (NodeMap::const_iterator i(p.known_.begin()); i != p.known_.end(); ++i)
+    {
+        os << NodeMap::key(i) << " at "
+           << p.get_address(NodeMap::key(i)) << "\n";
+        os << NodeMap::value(i) << "\n";
+    }
     if (p.install_message_ != 0)
         os << "install msg=" << *p.install_message_ << "\n";
     os << " }";
@@ -475,6 +482,7 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 {
     gu_trace(check_inactive());
     gu_trace(cleanup_views());
+    gu_trace(cleanup_fenced());
 }
 
 
@@ -483,12 +491,29 @@ void gcomm::evs::Proto::handle_retrans_timer()
     evs_log_debug(D_TIMERS) << "retrans timer";
     if (state() == S_GATHER)
     {
-        gu_trace(send_join(true));
         if (install_message_ != 0)
         {
+            // Resend install message as delegate to ensure delivery to all
+            if (is_all_committed() == false)
+            {
+                evs_log_debug(D_INSTALL_MSGS) << "retrans install";
+                gu::Buffer buf;
+                install_message_->set_flags(
+                    install_message_->flags() | Message::F_RETRANS);
+                serialize(*install_message_, buf);
+                Datagram dg(buf);
+                gu_trace(send_delegate(dg));
+            }
+            evs_log_debug(D_GAP_MSGS) << "retrans commit gap";
+            // Resend commit gap
             gu_trace(send_gap(UUID::nil(),
                               install_message_->install_view_id(),
                               Range(), true));
+        }
+        else
+        {
+            evs_log_debug(D_JOIN_MSGS) << "retrans join";
+            gu_trace(send_join(true));
         }
     }
     else if (state() == S_INSTALL)
@@ -521,6 +546,11 @@ void gcomm::evs::Proto::handle_retrans_timer()
     }
 }
 
+void gcomm::evs::Proto::isolate(gu::datetime::Period period)
+{
+    isolation_end_ = gu::datetime::Date::now() + period;
+}
+
 
 void gcomm::evs::Proto::handle_install_timer()
 {
@@ -535,14 +565,15 @@ void gcomm::evs::Proto::handle_install_timer()
     evs_log_info(I_STATE) << "state dump for diagnosis:";
     std::cerr << *this << std::endl;
 
-    if (install_timeout_count_ == max_install_timeouts_ - 1)
+    if (install_timeout_count_ < max_install_timeouts_ )
     {
         // before reaching max_install_timeouts, declare only inconsistent
         // nodes as inactive
         for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
         {
+            const UUID& node_uuid(NodeMap::key(i));
             const Node& node(NodeMap::value(i));
-            if (NodeMap::key(i) != uuid() &&
+            if (node_uuid != uuid() &&
                 (node.join_message() == 0 ||
                  consensus_.is_consistent(*node.join_message()) == false))
             {
@@ -567,6 +598,9 @@ void gcomm::evs::Proto::handle_install_timer()
                 set_inactive(NodeMap::key(i));
             }
         }
+        log_info << "max install timeouts reached, will isolate node "
+                 << "for a while";
+        isolate(suspect_timeout_ + inactive_timeout_);
     }
     else if (install_timeout_count_ > max_install_timeouts_)
     {
@@ -672,6 +706,7 @@ gu::datetime::Date gcomm::evs::Proto::next_expiration(const Timer t) const
             gu_throw_fatal;
         }
     case T_INSTALL:
+
         switch (state())
         {
         case S_GATHER:
@@ -687,22 +722,30 @@ gu::datetime::Date gcomm::evs::Proto::next_expiration(const Timer t) const
 }
 
 
-void gcomm::evs::Proto::reset_timers()
+void timer_list_erase_by_type(gcomm::evs::Proto::TimerList& timer_list,
+                              gcomm::evs::Proto::Timer timer)
 {
-    timers_.clear();
-    gu_trace((void)timers_.insert(
-                 std::make_pair(
-                     next_expiration(T_INACTIVITY), T_INACTIVITY)));
-    gu_trace((void)timers_.insert(
-                 std::make_pair(
-                     next_expiration(T_RETRANS), T_RETRANS)));
-    gu_trace((void)timers_.insert(
-                 std::make_pair(
-                     next_expiration(T_INSTALL), T_INSTALL)));
-    gu_trace((void)timers_.insert(
-                 std::make_pair(next_expiration(T_STATS), T_STATS)));
+    gcomm::evs::Proto::TimerList::iterator i, i_next;
+    for (i = timer_list.begin(); i != timer_list.end(); i = i_next)
+    {
+        i_next = i, ++i_next;
+        if (gcomm::evs::Proto::TimerList::value(i) == timer)
+        {
+            timer_list.erase(i);
+        }
+    }
 }
 
+void gcomm::evs::Proto::reset_timer(Timer t)
+{
+    timer_list_erase_by_type(timers_, t);
+    timers_.insert(std::make_pair(next_expiration(t), t));
+}
+
+void gcomm::evs::Proto::cancel_timer(Timer t)
+{
+    timer_list_erase_by_type(timers_, t);
+}
 
 gu::datetime::Date gcomm::evs::Proto::handle_timers()
 {
@@ -732,15 +775,7 @@ gu::datetime::Date gcomm::evs::Proto::handle_timers()
         {
             return gu::datetime::Date::max();
         }
-        // Make sure that timer was not inserted twice
-        TimerList::iterator ii(find_if(timers_.begin(), timers_.end(),
-                                       TimerSelectOp(t)));
-        if (ii != timers_.end())
-        {
-            timers_.erase(ii);
-        }
-        gu_trace((void)timers_.insert(
-                     std::make_pair(next_expiration(t), t)));
+        reset_timer(t);
     }
 
     if (timers_.empty() == true)
@@ -770,6 +805,7 @@ void gcomm::evs::Proto::check_inactive()
 
     bool has_inactive(false);
     size_t n_suspected(0);
+
     for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
     {
         const UUID& node_uuid(NodeMap::key(i));
@@ -790,11 +826,34 @@ void gcomm::evs::Proto::check_inactive()
             {
                 set_inactive(node_uuid);
             }
-            if (node.is_suspected() == true)
+            if (node.is_suspected() == true && node.operational() == true)
             {
                 ++n_suspected;
+                if (node.join_message() == 0)
+                {
+                    log_info << self_string()
+                             << " suspected node without join message, declaring inactive";
+                    set_inactive(node_uuid);
+                }
             }
             has_inactive = true;
+        }
+
+        if (node.index() != std::numeric_limits<size_t>::max() &&
+            node.tstamp() + retrans_period_*3 <= now)
+        {
+            Range range(input_map_->range(node.index()));
+            evs_log_info(I_STATE) << "delayed "
+                                  << node_uuid << " requesting range "
+                                  << Range(range.lu(), last_sent_);
+            if (last_sent_ >= range.lu())
+            {
+                // Request recovering message from all nodes (indicated
+                // by last arg) to increase probablity of receiving the
+                // message.
+                gu_trace(send_gap(node_uuid, current_view_.id(),
+                                  Range(range.lu(), last_sent_), false, true));
+            }
         }
     }
 
@@ -832,6 +891,16 @@ void gcomm::evs::Proto::check_inactive()
     }
 
     last_inactive_check_ = now;
+
+
+    // Check if isolation period has ended
+    if (isolation_end_ != gu::datetime::Date::zero() &&
+        isolation_end_ <= now)
+    {
+        log_info << "ending isolation";
+        isolation_end_ = gu::datetime::Date::zero();
+    }
+
 }
 
 
@@ -848,6 +917,14 @@ void gcomm::evs::Proto::set_inactive(const UUID& node_uuid)
     node.set_operational(false);
 }
 
+
+bool gcomm::evs::Proto::is_inactive(const UUID& uuid) const
+{
+    NodeMap::const_iterator i;
+    gu_trace(i = known_.find_checked(uuid));
+    const Node& node(NodeMap::value(i));
+    return (node.operational() == false);
+}
 
 void gcomm::evs::Proto::cleanup_foreign(const InstallMessage& im)
 {
@@ -882,6 +959,21 @@ void gcomm::evs::Proto::cleanup_views()
             break;
         }
         i = previous_views_.begin();
+    }
+}
+
+void gcomm::evs::Proto::cleanup_fenced()
+{
+    gu::datetime::Date now(gu::datetime::Date::now());
+    Protolay::FenceList::const_iterator i, i_next;
+    for (i = fence_list().begin(); i != fence_list().end(); i = i_next)
+    {
+        i_next = i, ++i_next;
+        if (Protolay::FenceList::value(i) + view_forget_timeout_ <= now)
+        {
+            log_info << "unfencing " << Protolay::FenceList::key(i);
+            unfence(Protolay::FenceList::key(i));
+        }
     }
 }
 
@@ -929,6 +1021,10 @@ void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
         {
             // Partitioned set is constructed after this loop
         }
+
+        // If node has been fenced, it should have been added to
+        // fenced list via JOIN messages.
+        assert(mn.fenced() == false || is_fenced(uuid) == true);
     }
 
     // Loop over previous view and add each node not in new view
@@ -1045,12 +1141,19 @@ void gcomm::evs::Proto::setall_committed(bool val)
     }
 }
 
+// Check if commit gaps from all known nodes found from install message have
+// been seen.
 bool gcomm::evs::Proto::is_all_committed() const
 {
-    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    gcomm_assert(install_message_ != 0);
+    for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
     {
+        const UUID& uuid(NodeMap::key(i));
         const Node& inst(NodeMap::value(i));
-        if (inst.operational() == true && inst.committed() == false)
+        if (install_message_->node_list().find(uuid) !=
+            install_message_->node_list().end()               &&
+            inst.operational()                        == true &&
+            inst.committed()                          == false)
         {
             return false;
         }
@@ -1066,6 +1169,25 @@ void gcomm::evs::Proto::setall_installed(bool val)
     }
 }
 
+// Check if gaps from new view from all known nodes found from install
+// message have been seen.
+bool gcomm::evs::Proto::is_all_installed() const
+{
+    gcomm_assert(install_message_ != 0);
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    {
+        const UUID& uuid(NodeMap::key(i));
+        const Node& inst(NodeMap::value(i));
+        if (install_message_->node_list().find(uuid) !=
+            install_message_->node_list().end()              &&
+            inst.operational()                       == true &&
+            inst.installed()                         == false)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 void gcomm::evs::Proto::cleanup_joins()
 {
@@ -1074,23 +1196,6 @@ void gcomm::evs::Proto::cleanup_joins()
         NodeMap::value(i).set_join_message(0);
     }
 }
-
-
-bool gcomm::evs::Proto::is_all_installed() const
-{
-    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
-    {
-        const Node& inst(NodeMap::value(i));
-        if (inst.operational() == true && inst.installed() == false)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-
-
 
 bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
 {
@@ -1362,7 +1467,8 @@ int gcomm::evs::Proto::send_delegate(Datagram& wb)
 void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
                                  const ViewId& source_view_id,
                                  const Range   range,
-                                 const bool    commit)
+                                 const bool    commit,
+                                 const bool    req_all)
 {
     evs_log_debug(D_GAP_MSGS) << "sending gap  to "
                               << range_uuid
@@ -1374,6 +1480,10 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     // flooding network with gap messages won't probably make
     // conditions better
 
+    uint8_t flags(0);
+    if (commit == true) flags |= Message::F_COMMIT;
+    if (req_all) flags |= Message::F_RETRANS;
+
     GapMessage gm(version_,
                   uuid(),
                   source_view_id,
@@ -1384,7 +1494,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
                   ++fifo_seq_,
                   range_uuid,
                   range,
-                  (commit == true ? Message::F_COMMIT : static_cast<uint8_t>(0)));
+                  flags);
 
     gu::Buffer buf;
     serialize(gm, buf);
@@ -1405,7 +1515,8 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
     {
         const UUID& node_uuid(NodeMap::key(i));
         const Node& node(NodeMap::value(i));
-        MessageNode mnode(node.operational(), node.suspected());
+        MessageNode mnode(node.operational(), node.suspected(),
+                          is_fenced(node_uuid));
         if (node_uuid != uuid())
         {
             const JoinMessage* jm(node.join_message());
@@ -1418,6 +1529,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const MessageNode& mn(MessageNodeList::value(jm->node_list().find_checked(node_uuid)));
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    is_fenced(node_uuid),
                                     -1,
                                     jm->source_view_id(),
                                     (nsv == current_view_.id() ?
@@ -1432,6 +1544,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const ViewId& nsv(lm->source_view_id());
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    is_fenced(node_uuid),
                                     lm->seq(),
                                     nsv,
                                     (nsv == current_view_.id() ?
@@ -1445,6 +1558,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             {
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
+                                    is_fenced(node_uuid),
                                     -1,
                                     current_view_.id(),
                                     input_map_->safe_seq(node.index()),
@@ -1455,12 +1569,25 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         {
             mnode = MessageNode(true,
                                 false,
+                                is_fenced(node_uuid),
                                 -1,
                                 current_view_.id(),
                                 input_map_->safe_seq(node.index()),
                                 input_map_->range(node.index()));
         }
         gu_trace((void)node_list->insert_unique(std::make_pair(node_uuid, mnode)));
+    }
+
+    // Iterate over fenced_list and add fenced nodes not yet in node list.
+    for (Protolay::FenceList::const_iterator i(fence_list().begin());
+         i != fence_list().end(); ++i)
+    {
+        if (node_list->find(Protolay::FenceList::key(i)) == node_list->end())
+        {
+            MessageNode mnode(false, false, true);
+            gu_trace((void)node_list->insert_unique(
+                         std::make_pair(Protolay::FenceList::key(i), mnode)));
+        }
     }
 
     evs_log_debug(D_CONSENSUS) << "populate node list:\n" << *node_list;
@@ -1482,12 +1609,6 @@ const gcomm::evs::JoinMessage& gcomm::evs::Proto::create_join()
     NodeMap::value(self_i_).set_join_message(&jm);
 
     evs_log_debug(D_JOIN_MSGS) << " created join message " << jm;
-
-    // Note: This assertion does not hold anymore, join message is
-    //       not necessarily equal to local state.
-    // gcomm_assert(consensus_.is_consistent_same_view(jm) == true)
-    //    << "created inconsistent JOIN message " << jm
-    //    << " local state " << *this;
 
     return *NodeMap::value(self_i_).join_message();
 }
@@ -1638,6 +1759,7 @@ void gcomm::evs::Proto::send_install()
                         node_list);
     ++attempt_seq_;
     evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
+    evs_log_info(I_STATE) << "sending install message";
     gcomm_assert(consensus_.is_consistent(imsg));
 
     gu::Buffer buf;
@@ -1662,9 +1784,10 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
 
     if (range.lu() <= input_map_->safe_seq())
     {
-        log_warn << self_string() << "lu (" << range.lu() <<
-            ") <= safe_seq(" << input_map_->safe_seq()
-                 << "), can't recover message";
+        evs_log_debug(D_RETRANS) << self_string() << "lu (" << range.lu()
+                                 << ") <= safe_seq("
+                                 << input_map_->safe_seq()
+                                 << "), can't recover message";
         return;
     }
 
@@ -1731,9 +1854,9 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 
     if (range.lu() <= input_map_->safe_seq())
     {
-        log_warn << self_string() << "lu (" << range.lu() <<
-            ") <= safe_seq(" << input_map_->safe_seq()
-                 << "), can't recover message";
+        evs_log_debug(D_RETRANS) << "lu (" << range.lu()
+                                 << ") <= safe_seq(" << input_map_->safe_seq()
+                                 << "), can't recover message";
         return;
     }
 
@@ -1810,13 +1933,14 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         return;
     }
 
-    // don't handle foreing messages in install phase
-    if (state()              == S_INSTALL)
+    // Don't handle foreing messages in install phase.
+    // This includes not only INSTALL state, but also
+    // GATHER state after receiving install message.
+    if (install_message_ != 0)
     {
-        //evs_log_debug(D_FOREIGN_MSGS)
-        log_warn << self_string()
-                 << " dropping foreign message from "
-                 << msg.source() << " in install state";
+        evs_log_debug(D_FOREIGN_MSGS)
+            << " dropping foreign message from "
+            << msg.source() << " in install state";
         return;
     }
 
@@ -1825,7 +1949,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         return;
     }
 
-    const UUID& source = msg.source();
+    const UUID& source(msg.source());
 
     evs_log_debug(D_FOREIGN_MSGS) << " detected new message source "
                                   << source;
@@ -1843,6 +1967,9 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
             << " shift to GATHER due to foreign message from "
             << msg.source();
         gu_trace(shift_to(S_GATHER, false));
+        // Reset install timer each time foreign message is seen to
+        // synchronize install timers.
+        reset_timer(T_INSTALL);
     }
 
     // Set join message after shift to recovery, shift may clean up
@@ -1863,6 +1990,12 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         return;
     }
 
+    if (isolation_end_ != gu::datetime::Date::zero())
+    {
+        // Isolation period is on
+        return;
+    }
+
     if (msg.source() == uuid())
     {
         return;
@@ -1874,10 +2007,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         return;
     }
 
-
-
     gcomm_assert(msg.source() != UUID::nil());
-
 
     // Figure out if the message is from known source
     NodeMap::iterator ii = known_.find(msg.source());
@@ -1899,7 +2029,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         // from it before new view has been formed.
         // Exceptions:
         // - Node that is leaving
-        // - Retransmitted messages
+        // - Retransmitted messages (why?)
         return;
     }
 
@@ -1993,6 +2123,7 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
                                        0));
     if ((msg->flags() & Message::F_SOURCE) == 0)
     {
+        assert(source != UUID::nil());
         gcomm_assert(source != UUID::nil());
         msg->set_source(source);
     }
@@ -2163,6 +2294,20 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
     return ret;
 }
 
+int gcomm::evs::Proto::send_down(Datagram& dg, const ProtoDownMeta& dm)
+{
+    if (isolation_end_ != gu::datetime::Date::zero())
+    {
+        // Node has isolated itself, don't emit any messages
+        return 0;
+    }
+    else
+    {
+        return Protolay::send_down(dg, dm);
+    }
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 // State handler
 /////////////////////////////////////////////////////////////////////////////
@@ -2215,6 +2360,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             std::make_pair(uuid(),
                            MessageNode(true,
                                        false,
+                                       false,
                                        -1,
                                        current_view_.id(),
                                        input_map_->safe_seq(
@@ -2249,7 +2395,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         break;
     case S_LEAVING:
         state_ = S_LEAVING;
-        reset_timers();
+        reset_timer(T_INACTIVITY);
+        reset_timer(T_RETRANS);
+        reset_timer(T_INSTALL);
         break;
     case S_GATHER:
     {
@@ -2280,6 +2428,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             gcomm_assert(output_.empty() == true);
         }
 
+        State prev_state(state_);
         state_ = S_GATHER;
         if (send_j == true)
         {
@@ -2288,7 +2437,12 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             profile_leave(send_join_prof_);
         }
         gcomm_assert(state() == S_GATHER);
-        reset_timers();
+        reset_timer(T_INACTIVITY);
+        if (prev_state == S_OPERATIONAL || prev_state == S_JOINING)
+        {
+            reset_timer(T_RETRANS);
+            reset_timer(T_INSTALL);
+        }
         break;
     }
     case S_INSTALL:
@@ -2296,7 +2450,8 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         gcomm_assert(install_message_ != 0);
         gcomm_assert(is_all_committed() == true);
         state_ = S_INSTALL;
-        reset_timers();
+        reset_timer(T_INACTIVITY);
+        reset_timer(T_RETRANS);
         break;
     }
     case S_OPERATIONAL:
@@ -2351,7 +2506,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             // Add operational nodes to new view, assign input map index
             NodeMap::iterator nmi(known_.find(uuid));
             gcomm_assert(nmi != known_.end()) << "node " << uuid
-                                            << " not found from known map";
+                                              << " not found from known map";
             if (n.operational() == true)
             {
                 current_view_.add_member(uuid);
@@ -2368,8 +2523,15 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         if (previous_view_.id().type() == V_REG &&
             previous_view_.members() == current_view_.members())
         {
-            log_warn << "subsequent views have same members, prev view "
-                     << previous_view_ << " current view " << current_view_;
+            evs_log_info(I_VIEWS)
+                << "subsequent views have same members, prev view "
+                << previous_view_ << " current view " << current_view_;
+            if (current_view_.members().size() == 1)
+            {
+                log_info << "subsequent singleton views detected, isolating "
+                         << "node for a while to stabilize";
+                isolate(suspect_timeout_ + inactive_timeout_);
+            }
         }
 
         input_map_->reset(current_view_.members().size());
@@ -2389,7 +2551,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         gu_trace(send_gap(UUID::nil(), current_view_.id(), Range()));;
         profile_leave(send_gap_prof_);
         gcomm_assert(state() == S_OPERATIONAL);
-        reset_timers();
+        reset_timer(T_INACTIVITY);
+        reset_timer(T_RETRANS);
+        cancel_timer(T_INSTALL);
         break;
     }
     default:
@@ -2754,7 +2918,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                                        << msg;
 
                 // Other instances installed view before this one, so it is
-                // safe to shift to S_OPERATIONAL if consensus has been reached
+                // safe to shift to S_OPERATIONAL
+
+                // Mark all operational nodes in install message as installed
                 for (MessageNodeList::const_iterator
                          mi = install_message_->node_list().begin();
                      mi != install_message_->node_list().end(); ++mi)
@@ -2768,37 +2934,22 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                     }
                 }
                 inst.set_tstamp(gu::datetime::Date::now());
-                if (consensus_.is_consensus() == true)
+                if (state() == S_INSTALL)
                 {
-                    if (state() == S_INSTALL)
+                    profile_enter(shift_to_prof_);
+                    gu_trace(shift_to(S_OPERATIONAL));
+                    profile_leave(shift_to_prof_);
+                    if (pending_leave_ == true)
                     {
-                        profile_enter(shift_to_prof_);
-                        gu_trace(shift_to(S_OPERATIONAL));
-                        profile_leave(shift_to_prof_);
-                        if (pending_leave_ == true)
-                        {
-                            close();
-                        }
+                        close();
                     }
-                    else
-                    {
-                        log_warn << self_string()
-                                 << "received user message from new "
-                                 << "view while in GATHER, dropping";
-                        return;
-                    }
+                    // proceed to process actual user message
                 }
                 else
                 {
-                    profile_enter(shift_to_prof_);
-                    evs_log_info(I_STATE)
-                        << " no consensus after "
-                        << "handling user message from new view";
-                    // Don't change state here but continue waiting for
-                    // install gaps. Other nodes should time out eventually
-                    // if consensus can't be reached.
-                    // gu_trace(shift_to(S_GATHER));
-                    profile_leave(shift_to_prof_);
+                    log_warn << self_string()
+                             << "received user message from new "
+                             << "view while in GATHER, dropping";
                     return;
                 }
             }
@@ -2956,9 +3107,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     if ((msg.flags() & Message::F_COMMIT) != 0)
     {
         log_debug << self_string() << " commit gap from " << msg.source();
-        if (state()                           == S_GATHER &&
-            install_message_                       != 0 &&
-            install_message_->fifo_seq()       == msg.seq())
+        if (state()                             == S_GATHER             &&
+            install_message_                    != 0                    &&
+            install_message_->install_view_id() == msg.source_view_id() &&
+            install_message_->fifo_seq()        == msg.seq())
         {
             inst.set_committed(true);
             inst.set_tstamp(gu::datetime::Date::now());
@@ -2970,9 +3122,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
                                   Range()));;
             }
         }
-        else if (state() == S_GATHER &&
-                 install_message_ != 0 &&
-                 install_message_->fifo_seq() < msg.seq())
+        else if (state()                             == S_GATHER             &&
+                 install_message_                    != 0                    &&
+                 install_message_->install_view_id() == msg.source_view_id() &&
+                 install_message_->fifo_seq()        < msg.seq())
         {
             // new install message has been generated
             shift_to(S_GATHER, true);
@@ -3068,6 +3221,11 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             gu_trace(resend(msg.source(),
                             Range(msg.range().lu(), upper_bound)));
         }
+    }
+    else if ((msg.flags() & Message::F_RETRANS) != 0 &&
+             msg.source() != uuid())
+    {
+        gu_trace(recover(msg.source(), msg.range_uuid(), msg.range()));
     }
 
     //
@@ -3241,13 +3399,14 @@ void gcomm::evs::Proto::check_suspects(const UUID& source,
             if (node_uuid != uuid())
             {
                 size_t s_cnt(0);
-                // Iterate over join messages to see if majority agrees
-                // with the suspicion
+                // Iterate over join messages to see if majority of current
+                // view agrees with the suspicion
                 for (NodeMap::const_iterator j(known_.begin());
                      j != known_.end(); ++j)
                 {
                     const JoinMessage* jm(NodeMap::value(j).join_message());
-                    if (jm != 0 && jm->source() != node_uuid)
+                    if (jm != 0 && jm->source() != node_uuid &&
+                        current_view_.is_member(jm->source()) == true)
                     {
                         MessageNodeList::const_iterator mni(jm->node_list().find(node_uuid));
                         if (mni != jm->node_list().end())
@@ -3275,21 +3434,24 @@ void gcomm::evs::Proto::check_suspects(const UUID& source,
 }
 
 
-// If one node has set some other as unoperational but we see it still
-// operational, do some arbitration. We wait until 2/3 of inactive timeout
-// from setting of consensus timer has passed. If both nodes express liveness,
-// select the one with greater uuid as a victim of exclusion.
 void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                                               const MessageNodeList& nl)
 {
     assert(source != uuid());
 
     const gu::datetime::Date now(gu::datetime::Date::now());
-    const gu::datetime::Period wait_c_to((install_timeout_*2)/3); // Wait for consensus
+    const gu::datetime::Period wait_c_to(suspect_timeout_);
 
     TimerList::const_iterator ti(
         find_if(timers_.begin(), timers_.end(), TimerSelectOp(T_INSTALL)));
+
     assert(ti != timers_.end());
+    if (ti == timers_.end())
+    {
+        log_warn << "install timer not set in cross_check_inactives()";
+        return;
+    }
+
     if (now + wait_c_to < TimerList::key(ti))
     {
         // No check yet
@@ -3298,28 +3460,34 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
 
     NodeMap::const_iterator source_i(known_.find_checked(source));
     const Node& local_source_node(NodeMap::value(source_i));
-    const gu::datetime::Period ito((install_timeout_*1)/3);       // Tighter inactive timeout
 
-    MessageNodeList inactive;
-    for_each(nl.begin(), nl.end(), SelectNodesOp(inactive, ViewId(), false, false));
-    for (MessageNodeList::const_iterator i = inactive.begin();
-         i != inactive.end(); ++i)
+    for (MessageNodeList::const_iterator i(nl.begin()); i != nl.end(); ++i)
     {
         const UUID& node_uuid(MessageNodeList::key(i));
         const MessageNode& node(MessageNodeList::value(i));
-        gcomm_assert(node.operational() == false);
-        NodeMap::iterator local_i(known_.find(node_uuid));
-
-        if (local_i != known_.end() && node_uuid != uuid())
+        if (node.operational() == false)
         {
-            Node& local_node(NodeMap::value(local_i));
-            if (local_node.operational()         == true &&
-                local_source_node.tstamp() + ito >= now  &&
-                local_node.tstamp() + ito        >= now  &&
-                node_uuid > source)
+            NodeMap::iterator local_i(known_.find(node_uuid));
+            if (local_i != known_.end() && node_uuid != uuid())
             {
-                evs_log_info(I_STATE) << " arbitrating, select " << node_uuid;
-                set_inactive(node_uuid);
+                const Node& local_node(NodeMap::value(local_i));
+                if (local_node.suspected())
+                {
+                    // We are already suspecting, set inactive
+                    set_inactive(node_uuid);
+                }
+                else if (local_source_node.suspected())
+                {
+                    set_inactive(source);
+                }
+                else if (local_node.tstamp() < local_source_node.tstamp())
+                {
+                    set_inactive(node_uuid);
+                }
+                else
+                {
+                    set_inactive(source);
+                }
             }
         }
     }
@@ -3421,6 +3589,8 @@ void gcomm::evs::Proto::check_nil_view_id()
             const MessageNode& mn(MessageNodeList::value(j));
             if (mn.view_id() == ViewId(V_REG))
             {
+                // todo: investigate why removing mn.suspected() == true
+                // condition causes some unit tests to fail
                 if (mn.suspected() == true)
                 {
                     const UUID& uuid(MessageNodeList::key(j));
@@ -3432,7 +3602,7 @@ void gcomm::evs::Proto::check_nil_view_id()
     for (std::map<UUID, size_t>::const_iterator
              i(nil_counts.begin()); i != nil_counts.end(); ++i)
     {
-        if (i->second == join_counts)
+        if (i->second == join_counts && is_inactive(i->first) == false)
         {
             log_info << "node " << i->first
                      << " marked with nil view id and suspected in all present"
@@ -3501,6 +3671,46 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             evs_log_info(I_STATE)
                 << "shift to gather due to representative "
                 << msg.source() << " join";
+            if (msg.source_view_id() == install_message_->install_view_id())
+            {
+                // Representative reached operational state, we follow
+                // Other instances installed view before this one, so it is
+                // safe to shift to S_OPERATIONAL
+
+                // Mark all operational nodes in install message as installed
+                for (MessageNodeList::const_iterator
+                         mi = install_message_->node_list().begin();
+                     mi != install_message_->node_list().end(); ++mi)
+                {
+                    if (MessageNodeList::value(mi).operational() == true)
+                    {
+                        NodeMap::iterator jj;
+                        gu_trace(jj = known_.find_checked(
+                                     MessageNodeList::key(mi)));
+                        NodeMap::value(jj).set_installed(true);
+                    }
+                }
+                inst.set_tstamp(gu::datetime::Date::now());
+                if (state() == S_INSTALL)
+                {
+                    profile_enter(shift_to_prof_);
+                    gu_trace(shift_to(S_OPERATIONAL));
+                    profile_leave(shift_to_prof_);
+                    if (pending_leave_ == true)
+                    {
+                        close();
+                        return;
+                    }
+                    // proceed to process actual join message
+                }
+                else
+                {
+                    log_warn << self_string()
+                             << "received join message from new "
+                             << "view while in GATHER, dropping";
+                    return;
+                }
+            }
             gu_trace(shift_to(S_GATHER, false));
         }
         else if (consensus_.is_consistent(*install_message_) == true)
@@ -3543,24 +3753,50 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
 
     gcomm_assert(output_.empty() == true);
 
-    // @todo Figure out how to avoid setting tstamp from any join message
-    if (inst.join_message() != 0)
-        inst.set_tstamp(gu::datetime::Date::now());
-    inst.set_join_message(&msg);
-
-    // Add unseen nodes to known list. No need to adjust node state here,
-    // it is done later on in check_suspects()/cross_check_inactives().
+    // Add unseen nodes to known list and fenced nodes to fenced list.
+    // Fenced nodes must also be added to known list for GATHER time
+    // bookkeeping.
+    // No need to adjust node state here, it is done later on in
+    // check_suspects()/cross_check_inactives().
     for (MessageNodeList::const_iterator i(msg.node_list().begin());
          i != msg.node_list().end(); ++i)
     {
         NodeMap::iterator ni(known_.find(MessageNodeList::key(i)));
+        const UUID mn_uuid(MessageNodeList::key(i));
+        const MessageNode& mn(MessageNodeList::value(i));
         if (ni == known_.end())
         {
             known_.insert_unique(
-                std::make_pair(MessageNodeList::key(i),
+                std::make_pair(mn_uuid,
                                Node(inactive_timeout_, suspect_timeout_)));
         }
+
+        // Fence nodes according to join message
+        if (mn_uuid != uuid() && mn.fenced() == true)
+        {
+            set_inactive(mn_uuid);
+            fence(mn_uuid);
+        }
     }
+
+    // Timestamp source if it sees processing node as operational.
+    // Adjust local entry operational status.
+    MessageNodeList::const_iterator self(msg.node_list().find(uuid()));
+    if (msg.node_list().end()                      != self)
+    {
+        if(MessageNodeList::value(self).operational() == true)
+        {
+            inst.set_tstamp(gu::datetime::Date::now());
+        }
+        else
+        {
+            evs_log_info(I_STATE)
+                << " declaring source " << msg.source()
+                << " as inactive (mutual exclusion)";
+            set_inactive(msg.source());
+        }
+    }
+    inst.set_join_message(&msg);
 
     // Select nodes that are coming from the same view as seen by
     // message source
@@ -3592,20 +3828,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     gu_trace(retrans_user(msg.source(), same_view));
     // Retrans leave messages that others are missing
     gu_trace(retrans_leaves(same_view));
-
-    // Check if this node is set inactive by the other,
-    // if yes, the other must be marked as inactive too
-    if (msg.source() != uuid() && nlself_i != same_view.end())
-    {
-        if (MessageNodeList::value(nlself_i).operational() == false)
-        {
-
-            evs_log_info(I_STATE)
-                << " declaring source " << msg.source()
-                << " as inactive (mutual exclusion)";
-            set_inactive(msg.source());
-        }
-    }
 
     // Make cross check to resolve conflict if two nodes
     // declare each other inactive. There is no need to make
@@ -3719,7 +3941,9 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
 
     if (state() == S_LEAVING)
     {
-        MessageNodeList::const_iterator mn_i = msg.node_list().find(uuid());
+        // Check if others have receievd leave message or declared
+        // as unoperational before shifting to closed.
+        MessageNodeList::const_iterator mn_i(msg.node_list().find(uuid()));
         if (mn_i != msg.node_list().end())
         {
             const MessageNode& mn(MessageNodeList::value(mn_i));
@@ -3732,32 +3956,59 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         }
         return;
     }
-    else if (state()           == S_OPERATIONAL &&
-             current_view_.id() == msg.source_view_id())
+    else if (state() == S_OPERATIONAL)
     {
+        // Drop install messages in operational state.
         evs_log_debug(D_INSTALL_MSGS)
             << "dropping install message in already installed view";
         return;
     }
     else if (inst.operational() == false)
     {
+        // Message source is not seen as operational, must not accept
+        // anything from it.
         evs_log_debug(D_INSTALL_MSGS)
-            << "previously unoperatioal message source " << msg.source()
-            << " discarding message";
+            << "install message source " << msg.source()
+            << " is not operational, discarding message";
         return;
     }
     else if (is_msg_from_previous_view(msg) == true)
     {
+        // Delayed install message
         evs_log_debug(D_FOREIGN_MSGS)
             << " dropping install message from previous view";
         return;
     }
     else if (install_message_ != 0)
     {
-        log_warn << self_string()
-                 << " shift to GATHER due to duplicate install";
-        gu_trace(shift_to(S_GATHER));
-        return;
+        if (msg.source() == install_message_->source() &&
+            msg.install_view_id().seq() > install_message_->install_view_id().seq())
+        {
+            // Representative regenerated install message
+            evs_log_debug(D_INSTALL_MSGS)
+                << "regenerated install message";
+            setall_committed(false);
+            setall_installed(false);
+            delete install_message_;
+            install_message_ = 0;
+            // Fall through to process new install message
+        }
+        else if (msg.source() == install_message_->source())
+        {
+            // Duplicate or delayed install message
+            evs_log_debug(D_INSTALL_MSGS)
+                << "duplicate or delayed install message";
+            return;
+        }
+        else
+        {
+            // Two nodes decided to generate install message simultaneously,
+            // shift to gather to combine groups in install messages.
+            log_warn << self_string()
+                     << " shift to GATHER due to conflicting install messages";
+            gu_trace(shift_to(S_GATHER));
+            return;
+        }
     }
     else if (inst.installed() == true)
     {
@@ -3768,27 +4019,11 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         profile_leave(shift_to_prof_);
         return;
     }
-    else if (is_representative(msg.source()) == false)
-    {
-        log_warn << self_string()
-                 << " source " << msg.source()
-                 << " is not supposed to be representative";
-        // Isolate node from my group
-        // set_inactive(msg.source());
-        profile_enter(shift_to_prof_);
-        gu_trace(shift_to(S_GATHER));
-        profile_leave(shift_to_prof_);
-        return;
-    }
 
-    assert(install_message_ == 0);
-
-    bool ic;
-    if ((ic = consensus_.is_consistent(msg)) == false)
+    // Construct join from install message so that the most recent
+    // information from representative is updated to local state.
+    if (msg.source() != uuid())
     {
-        gcomm_assert(msg.source() != uuid());
-        // Construct join from install message so that the most recent
-        // information from representative is updated to local state.
         const MessageNode& mn(
             MessageNodeList::value(
                 msg.node_list().find_checked(msg.source())));
@@ -3800,14 +4035,65 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                        msg.fifo_seq(),
                        msg.node_list());
         handle_join(jm, ii);
-        ic = consensus_.is_consistent(msg);
     }
 
-    if (ic == true)
+    // Drop install message if processing node won't be part of the
+    // view to be installed.
+    // Don't set nodes that are forming another view inactive here,
+    // they should enter new view shortly after install message
+    // delivery and should be ready to restart GATHER round.
+    MessageNodeList::const_iterator self(msg.node_list().find(uuid()));
+    if (msg.node_list().end()                      == self ||
+        MessageNodeList::value(self).operational() == false)
+    {
+        evs_log_debug(D_INSTALL_MSGS)
+            << "dropping install message, processing node not in new view";
+        return;
+    }
+
+    // Proceed to install phase
+    assert(install_message_ == 0);
+
+    // Run through known nodes and remove each entry that is
+    // not member of current view or present in install message.
+    // This is to prevent inconsistent view of group when first message(s)
+    // from new node are received after install message on representative
+    // and before install message on other nodes.
+    bool changed(false);
+    NodeMap::iterator i, i_next;
+    for (NodeMap::iterator i(known_.begin()); i != known_.end(); i = i_next)
+    {
+        i_next = i, ++i_next;
+        const UUID& uuid(NodeMap::key(i));
+        if (msg.node_list().find(uuid)         == msg.node_list().end() &&
+            current_view_.members().find(uuid) == current_view_.members().end())
+        {
+            log_info << self_string() << " temporarily discarding known "
+                     << uuid << " due to received install message";
+            known_.erase(i);
+            changed = true;
+        }
+    }
+
+    // Recreate join message to match current state, otherwise is_consistent()
+    // below will fail.
+    if (changed == true)
+    {
+        (void)create_join();
+    }
+
+    // See if install message is consistent with local state.
+    // Is_consistent() checks only local state and local join
+    // message in case other nodes have already been seen and reported
+    // nodes that will not be in the next view.
+    if (consensus_.is_consistent(msg) == true)
     {
         inst.set_tstamp(gu::datetime::Date::now());
         install_message_ = new InstallMessage(msg);
+        assert(install_message_->source() != UUID::nil());
+        assert(install_message_->flags() != 0);
         profile_enter(send_gap_prof_);
+        // Send commit gap
         gu_trace(send_gap(UUID::nil(), install_message_->install_view_id(),
                           Range(), true));
         profile_leave(send_gap_prof_);

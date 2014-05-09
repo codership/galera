@@ -48,12 +48,14 @@ class gcomm::evs::MessageNode
 public:
     MessageNode(const bool    operational  = false,
                 const bool    suspected    = false,
+                const bool    fenced       = false,
                 const seqno_t leave_seq    = -1,
                 const ViewId& view_id      = ViewId(V_REG),
                 const seqno_t safe_seq     = -1,
                 const Range   im_range     = Range()) :
         operational_(operational),
         suspected_  (suspected  ),
+        fenced_     (fenced     ),
         leave_seq_  (leave_seq  ),
         view_id_    (view_id    ),
         safe_seq_   (safe_seq   ),
@@ -64,6 +66,7 @@ public:
         :
         operational_ (mn.operational_),
         suspected_   (mn.suspected_  ),
+        fenced_      (mn.fenced_     ),
         leave_seq_   (mn.leave_seq_  ),
         view_id_     (mn.view_id_    ),
         safe_seq_    (mn.safe_seq_   ),
@@ -72,6 +75,7 @@ public:
 
     bool          operational() const { return operational_       ; }
     bool          suspected()   const { return suspected_         ; }
+    bool          fenced()      const { return fenced_            ; }
     bool          leaving()     const { return (leave_seq_ != -1) ; }
     seqno_t       leave_seq()   const { return leave_seq_         ; }
     const ViewId& view_id()     const { return view_id_           ; }
@@ -95,10 +99,12 @@ private:
     enum
     {
         F_OPERATIONAL = 1 << 0,
-        F_SUSPECTED   = 1 << 1
+        F_SUSPECTED   = 1 << 1,
+        F_FENCED      = 1 << 2
     };
     bool     operational_;     // Is operational
     bool     suspected_;
+    bool     fenced_;          // Fenced out of the cluster
     seqno_t  leave_seq_;
     ViewId   view_id_;         // Current view as seen by source of this message
     seqno_t  safe_seq_;        // Safe seq as seen...
@@ -199,6 +205,8 @@ public:
      */
     seqno_t aru_seq() const { return aru_seq_; }
 
+
+    void set_flags(uint8_t flags) { flags_ = flags; }
     /*!
      * Get message flags.
      *
@@ -566,7 +574,7 @@ public:
                 seq,
                 -1,
                 aru_seq,
-                0,
+                F_SOURCE,
                 UUID(),
                 Range(),
                 node_list)

@@ -85,6 +85,9 @@ namespace gu
 
             long long get_nsecs() const { return nsecs; }
 
+            Period operator+(const Period& add) const
+            { return (nsecs + add.nsecs); }
+
         private:
 
             friend class Date;

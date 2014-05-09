@@ -126,7 +126,8 @@ public:
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
     int send_delegate(Datagram&);
-    void send_gap(const UUID&, const ViewId&, const Range, bool commit = false);
+    void send_gap(const UUID&, const ViewId&, const Range,
+                  bool commit = false, bool req_all = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
@@ -141,10 +142,12 @@ public:
     void retrans_leaves(const MessageNodeList&);
 
     void set_inactive(const UUID&);
+    bool is_inactive(const UUID&) const;
     void check_inactive();
     // Clean up foreign nodes according to install message.
     void cleanup_foreign(const InstallMessage&);
     void cleanup_views();
+    void cleanup_fenced();
     void cleanup_joins();
 
     size_t n_operational() const;
@@ -205,6 +208,7 @@ private:
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
+    void isolate(gu::datetime::Period period);
 public:
     static size_t unserialize_message(const UUID&,
                                       const Datagram&,
@@ -214,10 +218,16 @@ public:
     // Protolay
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
     int handle_down(Datagram& wb, const ProtoDownMeta& dm);
+
+    int send_down(Datagram& dg, const ProtoDownMeta& dm);
+
     void handle_stable_view(const View& view)
     {
         set_stable_view(view);
     }
+
+    void handle_fencing(const UUID& uuid) { }
+
     void connect(bool first)
     {
         gu_trace(shift_to(S_JOINING));
@@ -269,8 +279,7 @@ public:
     /*!
      * Internal timer list
      */
-    class TimerList :
-        public  MultiMap<gu::datetime::Date, Timer> { };
+    typedef MultiMap<gu::datetime::Date, Timer> TimerList;
 private:
     TimerList timers_;
 public:
@@ -280,7 +289,8 @@ public:
     void handle_install_timer();
     void handle_stats_timer();
     gu::datetime::Date next_expiration(const Timer) const;
-    void reset_timers();
+    void reset_timer(Timer);
+    void cancel_timer(Timer);
     gu::datetime::Date handle_timers();
 
     /*!
@@ -421,7 +431,7 @@ private:
     State state_;
     int shift_to_rfcnt_;
     bool pending_leave_;
-
+    gu::datetime::Date isolation_end_;
     // non-copyable
     Proto(const Proto&);
     void operator=(const Proto&);

@@ -172,8 +172,10 @@ check()
 # Arguments: list of nodes
 wait_sync()
 {
+    local nodes=${@:-$NODE_LIST}
+
     local node
-    for node in "$@"
+    for node in $nodes
     do
         mysql_query "$node" "set wsrep_causal_reads=1; select 0;" 1>/dev/null
     done

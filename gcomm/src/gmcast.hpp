@@ -41,6 +41,8 @@ namespace gcomm
         void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
         int  handle_down(Datagram&, const ProtoDownMeta&);
         void handle_stable_view(const View& view);
+        void handle_fencing(const UUID& uuid);
+        std::string handle_get_address(const UUID& uuid) const;
         bool set_param(const std::string& key, const std::string& val);
         // Transport interface
         const UUID& uuid() const { return my_uuid_; }
@@ -91,6 +93,7 @@ namespace gcomm
                 uuid_           (uuid),
                 last_seen_      (last_seen),
                 next_reconnect_ (next_reconnect),
+                last_connect_   (0),
                 retry_cnt_      (0),
                 max_retries_    (0)
             { }
@@ -108,6 +111,16 @@ namespace gcomm
             const gu::datetime::Date& next_reconnect() const
             { return next_reconnect_; }
 
+            void set_last_connect()
+            {
+                last_connect_ = gu::datetime::Date::now();
+            }
+
+            const gu::datetime::Date& last_connect() const
+            {
+                return last_connect_;
+            }
+
             void set_retry_cnt(const int r) { retry_cnt_ = r; }
 
             int retry_cnt() const { return retry_cnt_; }
@@ -121,6 +134,7 @@ namespace gcomm
             UUID uuid_;
             gu::datetime::Date last_seen_;
             gu::datetime::Date next_reconnect_;
+            gu::datetime::Date last_connect_;
             int  retry_cnt_;
             int  max_retries_;
         };
