@@ -650,7 +650,7 @@ namespace galera
         {
             if (gu_unlikely(left_ < 0))
                 gu_throw_error (EMSGSIZE)
-                    << "Maximum wirteset size exceeded by " << -left_;
+                    << "Maximum writeset size exceeded by " << -left_;
         }
 
         WriteSetOut (const WriteSetOut&);
