@@ -180,6 +180,9 @@ Table legend:
 | :ref:`repl.causal_read_timeout        | *PT30S*               | 1.0                   | n/a                | No       |
 | <repl.causal_read_timeout>`           |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`repl.key_format                 | *FLAT8*               | 3.0                   | n/a                | No       |
+| <repl.key_format>`                    |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -717,6 +720,23 @@ Whether to allow Out-Of-Order committing (improves parallel applying performance
    pair: Parameters; repl.causal_read_timeout
 
 Sometimes causal reads need to timeout.
+
+.. rubric:: repl.key_format
+
+.. _`repl.key_format`:
+
+.. index::
+   pair: Parameters; repl.key_format
+
+The hash size to use for key formats (in bytes). An ``A`` suffix annotates the version.
+
+Possible settings:
+
+- ``EMPTY``
+- ``FLAT8``
+- ``FLAT8A``
+- ``FLAT16``
+- ``FLAT16A``
 
 .. rubric:: gcache.dir
 
