@@ -13,6 +13,11 @@ Contents:
 
 .. toctree::
 
-   galeraparameters
-   mysqlwsrepoptions
-   galerastatusvariables
+	galeraparameters
+	mysqlwsrepoptions
+	galerastatusvariables
+	glossary
+	legalnotice
+	versioninginformation
+	thirdpartygaleraimplementations
+
