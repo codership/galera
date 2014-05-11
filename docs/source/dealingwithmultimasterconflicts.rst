@@ -20,6 +20,8 @@ Galera Cluster can cope with a situation such as this by using Certification Bas
 .. index::
    pair: Parameters; wsrep_local_cert_failures
 .. index::
+   pair: Parameters; cert.log_conflicts
+.. index::
    pair: Logs; Debug log
 
 You can log cluster wide conflicts by using the ``wsrep_debug=1`` variable value, which will log these conflicts and plenty of other information. You may see any of the following messages::
@@ -33,6 +35,10 @@ You can also monitor the parameters below::
 
 	wsrep_local_bf_aborts
 	wsrep_local_cert_failures
+
+Setting the ``wsrep_provider_options="cert.log_conficts=1"`` will log messages like::
+
+     7:51:13 [Note] WSREP: trx conflict for key (1,FLAT8)056eac38 0989cb96: source: cdeae866-d4a8-11e3-bd84-479ea1a1e941 version: 3 local: 1 state: MUST_ABORT flags: 1 conn_id: 160285 trx_id: 29755710 seqnos (l: 643424, g: 8749173, s: 8749171, d: 8749171, ts: 12637975935482109) <--X--> source: 5af493da-d4ab-11e3-bfe0-16ba14bdca37 version: 3 local: 0 state: APPLYING flags: 1 conn_id: 157852 trx_id: 26224969 seqnos (l: 643423, g: 8749172, s: 8749171, d: 8749170, ts: 12637839897662340)
 
 ------------------------------
  Autocommitting Transactions
