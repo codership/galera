@@ -183,6 +183,9 @@ Table legend:
 | :ref:`repl.key_format                 | *FLAT8*               | 3.0                   | n/a                | No       |
 | <repl.key_format>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`repl.max_ws_size                | *2147483647*          | 3.0                   | n/a                | No       |
+| <repl.max_ws_size>`                   |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`repl.proto_max                  | *5*                   | 2.0                   | n/a                | No       |
 | <repl.proto_max>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -740,6 +743,15 @@ Possible settings:
 - ``FLAT8A``
 - ``FLAT16``
 - ``FLAT16A``
+
+.. rubric:: repl.max_ws_size
+
+.. _`repl.max_ws_size`:
+
+.. index::
+   pair: Parameters; repl.max_ws_size
+
+The maximum size of a writeset in bytes. This is limited to 2G.
 
 .. rubric:: repl.proto_max
 
