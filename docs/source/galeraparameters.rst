@@ -32,6 +32,9 @@ Table legend:
 | :ref:`base_port                       | *4567*                | 1.0                   | n/a                | No       |
 | <base_port>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`cert.log_conflicts              | *no*                  | 3.0                   | n/a                | No       |
+| <cert.log_conflicts>`                 |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -240,6 +243,15 @@ The network address used for IST and unicast network traffic. Provider needs to 
    pair: Parameters; base_port
 
 The network port number to use for writeset and IST network traffic. Provider needs to be restarted for this to have an effect.
+
+.. rubric:: cert.log_conflicts
+
+.. _`cert.log_conflicts`:
+
+.. index::
+   pair: Parameters; cert.log_conflicts
+
+Log details of certification failures.
 
 .. rubric:: protonet.backend
 
