@@ -34,6 +34,18 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_replicated_bytes          | G | *6526788*                  |                      |                                         |
 | <wsrep_replicated_bytes>`             |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_repl_keys                 | G | *797399*                   |                      |                                         |
+| <wsrep_repl_keys>`                    |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_repl_keys_bytes           | G | *11203721*                 |                      |                                         |
+| <wsrep_repl_keys_bytes>`              |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_repl_data_bytes           | G | *265035226*                |                      |                                         |
+| <wsrep_repl_data_bytes>`              |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_repl_other_bytes          | G | *0*                        |                      |                                         |
+| <wsrep_repl_other_bytes>`             |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_received                  | G | *17831*                    |                      |                                         |
 | <wsrep_received>`                     |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
@@ -179,6 +191,43 @@ Total number of write-sets replicated (sent to other nodes).
    pair: Parameters; wsrep_replicated_bytes
 
 Total size of write-sets replicated.
+
+.. rubric:: wsrep_repl_keys
+
+.. _`wsrep_repl_keys`:
+
+.. index::
+   pair: Parameters; wsrep_repl_keys
+
+Total number of keys replicated.
+
+.. rubric:: wsrep_repl_keys_bytes
+
+.. _`wsrep_repl_keys_bytes`:
+
+.. index::
+   pair: Parameters; wsrep_repl_keys_bytes
+
+Total size of keys replicated.
+
+.. rubric:: wsrep_repl_data_bytes
+
+.. _`wsrep_repl_data_bytes`:
+
+.. index::
+   pair: Parameters; wsrep_repl_data_bytes
+
+Total size of data replicated.
+
+.. rubric:: wsrep_repl_other_bytes
+
+.. _`wsrep_repl_other_bytes`:
+
+.. index::
+   pair: Parameters; wsrep_repl_other_bytes
+
+Total size of other bits replicated.
+
 
 .. rubric:: wsrep_received
 
