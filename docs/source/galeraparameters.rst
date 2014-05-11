@@ -183,6 +183,9 @@ Table legend:
 | :ref:`repl.key_format                 | *FLAT8*               | 3.0                   | n/a                | No       |
 | <repl.key_format>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`repl.proto_max                  | *5*                   | 2.0                   | n/a                | No       |
+| <repl.proto_max>`                     |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -737,6 +740,15 @@ Possible settings:
 - ``FLAT8A``
 - ``FLAT16``
 - ``FLAT16A``
+
+.. rubric:: repl.proto_max
+
+.. _`repl.proto_max`:
+
+.. index::
+   pair: Parameters; repl.proto_max
+
+The maximum protocol version in replication. Changes to this parameter will only take effect after a provider restart.
 
 .. rubric:: gcache.dir
 
