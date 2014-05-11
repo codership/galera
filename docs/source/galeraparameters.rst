@@ -120,6 +120,9 @@ Table legend:
 | :ref:`pc.bootstrap                    |                       | 1.0                   | n/a                | No       |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`pc.announce_timeout             | *PT3S*                | 2.0                   | n/a                | No       |
+| <pc.announce_timeout>`                |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.checksum                     | *true*                | 1.0                   | n/a                | No       |
 | <pc.checksum>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -137,6 +140,9 @@ Table legend:
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.wait_prim                    | ``false``             | 1.0                   | n/a                | No       |
 | <pc.wait_prim>`                       |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`pc.wait_prim_timeout            | ``P30S``              | 2.0                   | n/a                | No       |
+| <pc.wait_prim_timeout>`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.weight                       | *1*                   | 2.4                   | n/a                | Yes      |
 | <pc.weight>`                          |                       |                       |                    |          |
@@ -521,6 +527,15 @@ This status variable is used to check which ``evs`` protocol version is used. Th
 
 If you set this value to *true* is a signal to turn a ``NON-PRIMARY`` component into ``PRIMARY``.
 
+.. rubric:: pc.announce_timeout
+
+.. _`pc.announce_timeout`:
+
+.. index::
+   pair: Parameters; pc.announce_timeout
+
+Cluster joining announcements are sent every 1/2 second for this period of time or less if the other nodes are discovered.
+
 
 .. rubric:: pc.checksum
 
@@ -575,8 +590,17 @@ If set to ``TRUE``, the more recent primary component overrides older ones in th
 .. index::
    pair: Parameters; pc.wait_prim
 
-If set to ``TRUE``, the node waits for the primary component forever. Useful to bring up a
+If set to ``TRUE``, the node waits for the ``pc.wait_prim_timeout`` time period. Useful to bring up a
 non-primary component and make it primary with ``pc.bootstrap``.
+
+.. rubric:: pc.wait_prim_timeout
+
+.. _`pc.wait_prim_timeout`:
+
+.. index::
+   pair: Parameters; pc.wait_prim_timeout
+
+The period of time to wait for a primary node.
 
 .. rubric:: pc.weight
 
