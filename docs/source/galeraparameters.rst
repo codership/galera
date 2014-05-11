@@ -26,6 +26,12 @@ Table legend:
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | Parameter                             | Default               |  Introduced           | Deprecated         | Dynamic  |
 +=======================================+=======================+=======================+====================+==========+
+| :ref:`base_host                       | detected network      | 1.0                   | n/a                | No       |
+| <base_host>`                          | address               |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`base_port                       | *4567*                | 1.0                   | n/a                | No       |
+| <base_port>`                          |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -216,6 +222,24 @@ Table legend:
 | :ref:`gcache.mem_size                 | *0*                   | 1.0                   | n/a                | No       |
 | <gcache.mem_size>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+
+.. rubric:: base_host
+
+.. _`base_host`:
+
+.. index::
+   pair: Parameters; base_host
+
+The network address used for IST and unicast network traffic. Provider needs to be restarted for this to have an effect.
+
+.. rubric:: base_port
+
+.. _`base_port`:
+
+.. index::
+   pair: Parameters; base_port
+
+The network port number to use for writeset and IST network traffic. Provider needs to be restarted for this to have an effect.
 
 .. rubric:: protonet.backend
 
