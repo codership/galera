@@ -22,6 +22,9 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_local_state_uuid          | G | *e2c9a15e-5485-11e0-0800-* |                      |                                         |
 | <wsrep_local_state_uuid>`             |   | *6bbb637e7211*             |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_protocol_version          | G | *5*                        | 2.0                  |                                         |
+| <wsrep_protocol_version>`             |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_last_committed            | G | *409745*                   |                      |                                         |
 | <wsrep_last_committed>`               |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
@@ -136,6 +139,16 @@ The location (L) of the variable is presented in the second column from the left
    pair: Parameters; wsrep_local_state_uuid
 
 The UUID of the state stored on this node. See :ref:`wsrep API <wsrep API>`. 
+
+
+.. rubric:: wsrep_protocol_version
+
+.. _`wsrep_protocol_version`:
+
+.. index::
+   pair: Parameters; wsrep_protocol_version
+
+The protocol version number in use. See :ref:`Galera Parameters - repl.proto_max <Galera Parameters>`.  
 
 
 .. rubric:: wsrep_last_committed
