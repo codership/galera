@@ -1126,7 +1126,6 @@ table.indextable td > dl > dd > dl
 		}
 		div.relbar-top,
 		div.relbar-bottom,
-		div#legal-notice,
 		p.logo {
 		  display: none;
 		}
@@ -1154,6 +1153,16 @@ table.indextable td > dl > dd > dl
 		div.document a:visited {
 		  color: #ed7703 !important;
 		  text-decoration: none !important;
+		}
+		ul.nav-link {
+			text-align:right;
+			display:inline:
+		}
+		div.section p, 
+		div.section ul,
+		div.section h2,
+		div.section h3 {
+			margin-bottom:0.75em;
 		}
 
 /*****************************************************
