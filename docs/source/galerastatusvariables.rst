@@ -22,9 +22,6 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_local_state_uuid          | G | *e2c9a15e-5485-11e0-0800-* |                      |                                         |
 | <wsrep_local_state_uuid>`             |   | *6bbb637e7211*             |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
-| :ref:`wsrep_protocol_version          | G | *5*                        | 2.0                  |                                         |
-| <wsrep_protocol_version>`             |   |                            |                      |                                         |
-+---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_last_committed            | G | *409745*                   |                      |                                         |
 | <wsrep_last_committed>`               |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
@@ -75,6 +72,12 @@ The location (L) of the variable is presented in the second column from the left
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_local_recv_queue_avg      | G | *3.348452*                 |                      |                                         |
 | <wsrep_local_recv_queue_avg>`         |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_local_cached_downto       | G | *18446744073709551615*     |                      |                                         |
+| <wsrep_local_cached_downto>`          |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_flow_control_paused_ns    | G | *20222491180*              |                      |                                         |
+| <wsrep_flow_control_paused_ns>`       |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_flow_control_paused       | G | *0.184353*                 |                      |                                         |
 | <wsrep_flow_control_paused>`          |   |                            |                      |                                         |
@@ -130,6 +133,15 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_local_index               | M | *1*                        |                      |                                         |
 | <wsrep_local_index>`                  |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_provider_name             | M | *Galera*                   |                      |                                         |
+| <wsrep_provider_name>`                |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_provider_vendor           | M | *Codership Oy*             |                      |                                         |
+| <wsrep_provider_vendor>`              |   | *<info@codership.com>*     |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_provider_version          | M | *25.3.5-wheezy(rXXXX)*     |                      |                                         |
+| <wsrep_provider_version>`             |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_ready                     | M | *ON*                       |                      |                                         |
 | <wsrep_ready>`                        |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
@@ -151,16 +163,6 @@ The location (L) of the variable is presented in the second column from the left
    pair: Parameters; wsrep_local_state_uuid
 
 The UUID of the state stored on this node. See :ref:`wsrep API <wsrep API>`. 
-
-
-.. rubric:: wsrep_protocol_version
-
-.. _`wsrep_protocol_version`:
-
-.. index::
-   pair: Parameters; wsrep_protocol_version
-
-The protocol version number in use. See :ref:`Galera Parameters - repl.proto_max <Galera Parameters>`.  
 
 
 .. rubric:: wsrep_last_committed
@@ -324,6 +326,24 @@ Current (instantaneous) length of the recv queue.
    pair: Parameters; wsrep_local_recv_queue_avg
 
 Recv queue length averaged over interval since the last status query. Values considerably larger than 0.0 mean that the node cannot apply writesets as fast as they are received and will generate a lot of replication throttling. 
+
+.. rubric:: wsrep_local_cached_downto
+
+.. _`wsrep_local_cached_downto`:
+
+.. index::
+   pair: Parameters; wsrep_local_cached_downto
+
+The lowest sequence number in ``gcache``.
+
+.. rubric:: wsrep_flow_control_paused_ns
+
+.. _`wsrep_flow_control_paused_ns`:
+
+.. index::
+   pair: Parameters; wsrep_flow_control_paused_ns
+
+The total time spent in a paused state measured in nanoseconds.
 
 .. rubric:: wsrep_flow_control_paused
 
@@ -497,6 +517,33 @@ Status of this cluster component: *PRIMARY* or *NON_PRIMARY*.
    pair: Parameters; wsrep_local_index
 
 This node index in the cluster (base 0).
+
+.. rubric:: wsrep_provider_name
+
+.. _`wsrep_provider_name`:
+
+.. index::
+   pair: Parameters; wsrep_provider_name
+
+The name of the wsrep provider.
+
+.. rubric:: wsrep_provider_vendor
+
+.. _`wsrep_provider_vendor`:
+
+.. index::
+   pair: Parameters; wsrep_provider_vendor
+
+The name of the wsrep provider vendor.
+
+.. rubric:: wsrep_provider_version
+
+.. _`wsrep_provider_version`:
+
+.. index::
+   pair: Parameters; wsrep_provider_version
+
+The name of the wsrep provider version string.
 
 .. rubric:: wsrep_ready
 
