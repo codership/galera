@@ -60,6 +60,9 @@ Table legend:
 | :ref:`gmcast.peer_timeout             | *PT3S*                | 1.0                   | n/a                | No       |
 | <gmcast.peer_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`gmcast.segment                  | *0*                   | 3.0                   | n/a                | No       |
+| <gmcast.segment>`                     |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gmcast.time_wait                | *PT5S*                | 1.0                   | n/a                | No       |
 | <gmcast.time_wait>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -325,6 +328,17 @@ Time to live value for multicast packets.
 
 Connection timeout to initiate message relaying.
 
+
+.. rubric:: gmcast.segment
+
+.. _`gmcast.segment`:
+
+.. index::
+   pair: Parameters; gmcast.segment
+
+Define which network segment this node is in. Optimisations on communication are performed to minimise the amount of traffic
+between network segments including writeset relaying and IST and SST donor selection. The ``gmcast.segment`` value is a simple
+label.
 
 .. rubric:: gmcast.time_wait
 
