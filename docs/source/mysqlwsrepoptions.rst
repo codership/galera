@@ -264,7 +264,7 @@ The maximum number of rows allowed in the writeset. Currently, this parameter li
 
 The maximum allowed writeset size. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
 
-The maximum allowed writeset size is ``2G``.
+The maximum allowed writeset size is ``4G``.
 
 
 .. rubric:: wsrep_node_address
