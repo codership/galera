@@ -4021,11 +4021,23 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         }
         else
         {
-            // Two nodes decided to generate install message simultaneously,
-            // shift to gather to combine groups in install messages.
-            log_warn << self_string()
-                     << " shift to GATHER due to conflicting install messages";
-            gu_trace(shift_to(S_GATHER));
+            MessageNodeList::const_iterator self(msg.node_list().find(uuid()));
+            if (msg.node_list().end()                      == self ||
+                MessageNodeList::value(self).operational() == false)
+            {
+                evs_log_debug(D_INSTALL_MSGS)
+                    << "dropping install message, processing node not in "
+                    << "new view";
+            }
+            else
+            {
+                // Two nodes decided to generate install message simultaneously,
+                // shift to gather to combine groups in install messages.
+                log_warn << self_string()
+                         << " shift to GATHER due to conflicting install "
+                         << "messages";
+                gu_trace(shift_to(S_GATHER));
+            }
             return;
         }
     }
