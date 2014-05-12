@@ -21,5 +21,10 @@ do
     wait
 done
 
+test $($MYSQL0 -ss -e "select count(*) from uniq") == 1 || \
+    (echo "duplicate uniq key" && exit 1)
+test $($MYSQL1 -ss -e "select count(*) from uniq") == 1 || \
+    (echo "duplicate uniq key" && exit 1)
+
 $SCRIPTS/command.sh check | wc -l
 
