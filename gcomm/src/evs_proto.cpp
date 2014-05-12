@@ -495,18 +495,22 @@ void gcomm::evs::Proto::handle_retrans_timer()
     {
         if (install_message_ != 0)
         {
-            // Resend install message as delegate to ensure delivery to all
-            if (is_all_committed() == false)
+            // Retransmit install message if representative and all commit
+            // gaps have not been received yet.
+            if (is_all_committed()         == false &&
+                install_message_->source() == uuid())
             {
                 evs_log_debug(D_INSTALL_MSGS) << "retrans install";
                 gu::Buffer buf;
                 install_message_->set_flags(
                     install_message_->flags() | Message::F_RETRANS);
-                serialize(*install_message_, buf);
+                (void)serialize(*install_message_, buf);
                 Datagram dg(buf);
-                gu_trace(send_delegate(dg));
+                // Must not be sent as delegate, newly joining node
+                // will filter them out in handle_msg().
+                gu_trace(send_down(dg, ProtoDownMeta()));
             }
-            evs_log_debug(D_GAP_MSGS) << "retrans commit gap";
+            evs_log_debug(D_GAP_MSGS) << "resend commit gap";
             // Resend commit gap
             gu_trace(send_gap(UUID::nil(),
                               install_message_->install_view_id(),
@@ -2001,12 +2005,14 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 
     if (isolation_end_ != gu::datetime::Date::zero())
     {
+        evs_log_debug(D_STATE) << " dropping message due to isolation";
         // Isolation period is on
         return;
     }
 
     if (msg.source() == uuid())
     {
+        evs_log_debug(D_FOREIGN_MSGS) << " dropping own message";
         return;
     }
 
@@ -2039,6 +2045,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         // Exceptions:
         // - Node that is leaving
         // - Retransmitted messages (why?)
+        evs_log_debug(D_FOREIGN_MSGS)
+            << " dropping message from unoperational source " << node;
         return;
     }
 
@@ -2086,6 +2094,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             // set_inactive(msg.source());
             // gu_trace(shift_to(S_GATHER, true));
         }
+        evs_log_debug(D_FOREIGN_MSGS)
+            << "dropping non-membership message from foreign view";
         return;
     }
 
@@ -3096,8 +3106,7 @@ void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
                                         const Datagram& rb)
 {
     gcomm_assert(ii != known_.end());
-    // evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
-    log_debug << "delegate";
+    evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
     Message umsg;
     size_t offset;
     gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
