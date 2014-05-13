@@ -467,6 +467,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                  * remap below */
                 strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
                          sizeof (new_nodes[0].id) - 1);
+                group->nodes[0].segment = new_nodes[0].segment;
             }
         }
     }
