@@ -555,7 +555,8 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     {
         const UUID& uuid(NodeList::key(i));
 
-        log_debug << "member: " << n << " uuid: " << uuid;
+        log_debug << "member: " << n << " uuid: " << uuid
+                  << " segment: " << static_cast<int>(i->second.segment());
 
 //        (void)snprintf(cm->memb[n].id, GCS_COMP_MEMB_ID_MAX_LEN, "%s",
 //                       uuid._str().c_str());
