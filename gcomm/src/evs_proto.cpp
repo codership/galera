@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
+#include <iterator>
 
 using namespace std::rel_ops;
 
@@ -141,9 +142,10 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     current_view_(ViewId(V_TRANS, my_uuid, 0)),
     previous_view_(),
     previous_views_(),
+    gather_views_(),
     input_map_(new InputMap()),
     causal_queue_(),
-    consensus_(my_uuid_, known_, *input_map_, current_view_),
+    consensus_(*this, known_, *input_map_, current_view_),
     install_message_(0),
     attempt_seq_(1),
     max_install_timeouts_(
@@ -448,16 +450,13 @@ void gcomm::evs::Proto::reset_stats()
 
 bool gcomm::evs::Proto::is_msg_from_previous_view(const Message& msg)
 {
-    for (std::list<std::pair<ViewId, gu::datetime::Date> >::const_iterator
-             i = previous_views_.begin();
-         i != previous_views_.end(); ++i)
+    ViewList::const_iterator i;
+    if ((i = previous_views_.find(msg.source_view_id()))
+        != previous_views_.end())
     {
-        if (msg.source_view_id() == i->first)
-        {
-            evs_log_debug(D_FOREIGN_MSGS) << " message " << msg
-                                          << " from previous view " << i->first;
-            return true;
-        }
+        evs_log_debug(D_FOREIGN_MSGS) << " message " << msg
+                                      << " from previous view " << i->first;
+        return true;
     }
 
     // If node is in current view, check message source view seq, if it is
@@ -603,7 +602,7 @@ void gcomm::evs::Proto::handle_install_timer()
             }
         }
         log_info << "max install timeouts reached, will isolate node "
-                 << "for a while";
+                 << "for " << suspect_timeout_ + inactive_timeout_;
         isolate(suspect_timeout_ + inactive_timeout_);
     }
     else if (install_timeout_count_ > max_install_timeouts_)
@@ -949,20 +948,16 @@ void gcomm::evs::Proto::cleanup_foreign(const InstallMessage& im)
 void gcomm::evs::Proto::cleanup_views()
 {
     gu::datetime::Date now(gu::datetime::Date::now());
-    std::list<std::pair<ViewId, gu::datetime::Date> >::iterator
-        i(previous_views_.begin());
-    while (i != previous_views_.end())
+
+    ViewList::iterator i, i_next;
+    for (i = previous_views_.begin(); i != previous_views_.end(); i = i_next)
     {
+        i_next = i, ++i_next;
         if (i->second + view_forget_timeout_ <= now)
         {
             evs_log_debug(D_STATE) << " erasing view: " << i->first;
             previous_views_.erase(i);
         }
-        else
-        {
-            break;
-        }
-        i = previous_views_.begin();
     }
 }
 
@@ -1955,8 +1950,8 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     const UUID& source(msg.source());
 
-    evs_log_debug(D_FOREIGN_MSGS) << " detected new message source "
-                                  << source;
+    evs_log_info(I_STATE) << " detected new message source "
+                          << source;
 
     NodeMap::iterator i;
     gu_trace(i = known_.insert_unique(
@@ -2060,9 +2055,9 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 
     // Accept non-membership messages only from current view
     // or from view to be installed
-    if (msg.is_membership()                     == false                    &&
-        msg.source_view_id()                != current_view_.id()    &&
-        (install_message_                        == 0                     ||
+    if (msg.is_membership()                  == false                    &&
+        msg.source_view_id()                 != current_view_.id()    &&
+        (install_message_                    == 0                     ||
          install_message_->install_view_id() != msg.source_view_id()))
     {
         // If source node seems to be operational but it has proceeded
@@ -2493,8 +2488,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         // handle messages.
 
         previous_view_ = current_view_;
-        previous_views_.push_back(
-            std::make_pair(current_view_.id(), gu::datetime::Date::now()));
+        std::copy(gather_views_.begin(), gather_views_.end(),
+                  std::inserter(previous_views_, previous_views_.end()));
+        gather_views_.clear();
 
         current_view_ = View(install_message_->install_view_id());
         size_t idx = 0;
@@ -2506,12 +2502,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         {
             const UUID& uuid(MessageNodeList::key(i));
             const MessageNode& n(MessageNodeList::value(i));
-
-            // Collect list of previous view identifiers to filter out
-            // delayed messages from previous views.
-            previous_views_.push_back(
-                std::make_pair(n.view_id(),
-                               gu::datetime::Date::now()));
 
             // Add operational nodes to new view, assign input map index
             NodeMap::iterator nmi(known_.find(uuid));
@@ -2539,7 +2529,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             if (current_view_.members().size() == 1)
             {
                 log_info << "subsequent singleton views detected, isolating "
-                         << "node for a while to stabilize";
+                         << "node for " << suspect_timeout_ + inactive_timeout_;
                 isolate(suspect_timeout_ + inactive_timeout_);
             }
         }
@@ -2923,9 +2913,36 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             if (install_message_ != 0 &&
                 msg.source_view_id() == install_message_->install_view_id())
             {
-                assert(state() == S_INSTALL);
+                assert(state() == S_GATHER || state() == S_INSTALL);
                 evs_log_debug(D_STATE) << " recovery user message "
                                        << msg;
+
+                // This is possible if install timer expires just before
+                // new view is established on this node and retransmitted
+                // install message is received just before user this message.
+                if (state() == S_GATHER)
+                {
+                    // Sanity check
+                    MessageNodeList::const_iterator self(
+                        install_message_->node_list().find(uuid()));
+                    gcomm_assert(self != install_message_->node_list().end()
+                                 && MessageNodeList::value(self).operational() == true);
+                    // Mark all operational nodes in install message as
+                    // committed
+                    for (MessageNodeList::const_iterator
+                             mi = install_message_->node_list().begin();
+                         mi != install_message_->node_list().end(); ++mi)
+                    {
+                        if (MessageNodeList::value(mi).operational() == true)
+                        {
+                            NodeMap::iterator jj;
+                            gu_trace(jj = known_.find_checked(
+                                         MessageNodeList::key(mi)));
+                            NodeMap::value(jj).set_committed(true);
+                        }
+                    }
+                    shift_to(S_INSTALL);
+                }
 
                 // Other instances installed view before this one, so it is
                 // safe to shift to S_OPERATIONAL
@@ -2944,24 +2961,15 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                     }
                 }
                 inst.set_tstamp(gu::datetime::Date::now());
-                if (state() == S_INSTALL)
+
+                profile_enter(shift_to_prof_);
+                gu_trace(shift_to(S_OPERATIONAL));
+                profile_leave(shift_to_prof_);
+                if (pending_leave_ == true)
                 {
-                    profile_enter(shift_to_prof_);
-                    gu_trace(shift_to(S_OPERATIONAL));
-                    profile_leave(shift_to_prof_);
-                    if (pending_leave_ == true)
-                    {
-                        close();
-                    }
-                    // proceed to process actual user message
+                    close();
                 }
-                else
-                {
-                    log_warn << self_string()
-                             << "received user message from new "
-                             << "view while in GATHER, dropping";
-                    return;
-                }
+                // proceed to process actual user message
             }
             else
             {
@@ -3448,27 +3456,8 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
 {
     assert(source != uuid());
 
-    const gu::datetime::Date now(gu::datetime::Date::now());
-    const gu::datetime::Period wait_c_to(suspect_timeout_);
-
-    TimerList::const_iterator ti(
-        find_if(timers_.begin(), timers_.end(), TimerSelectOp(T_INSTALL)));
-
-    assert(ti != timers_.end());
-    if (ti == timers_.end())
-    {
-        log_warn << "install timer not set in cross_check_inactives()";
-        return;
-    }
-
-    if (now + wait_c_to < TimerList::key(ti))
-    {
-        // No check yet
-        return;
-    }
-
+    // Do elimination by suspect status
     NodeMap::const_iterator source_i(known_.find_checked(source));
-    const Node& local_source_node(NodeMap::value(source_i));
 
     for (MessageNodeList::const_iterator i(nl.begin()); i != nl.end(); ++i)
     {
@@ -3482,26 +3471,145 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                 const Node& local_node(NodeMap::value(local_i));
                 if (local_node.suspected())
                 {
-                    // We are already suspecting, set inactive
+                    // This node is suspecting and the source node has
+                    // already set inactve, mark also locally inactive.
                     set_inactive(node_uuid);
-                }
-                else if (local_source_node.suspected())
-                {
-                    set_inactive(source);
-                }
-                else if (local_node.tstamp() < local_source_node.tstamp())
-                {
-                    set_inactive(node_uuid);
-                }
-                else
-                {
-                    set_inactive(source);
                 }
             }
         }
     }
 }
 
+
+// Asymmetry elimination:
+// 1a) Find all joins that has this node marked as operational and which
+//     this node considers operational
+// 1b) Mark all operational nodes without join message unoperational
+// 2) Iterate over join messages gathered in 1a, find all
+//    unoperational entries and mark them unoperational too
+void gcomm::evs::Proto::asymmetry_elimination()
+{
+    // Allow some time to pass from setting install timers to get
+    // join messages accumulated.
+    const gu::datetime::Date now(gu::datetime::Date::now());
+    TimerList::const_iterator ti(
+        find_if(timers_.begin(), timers_.end(), TimerSelectOp(T_INSTALL)));
+
+    assert(ti != timers_.end());
+    if (ti == timers_.end())
+    {
+        log_warn << "install timer not set in asymmetry_elimination()";
+        return;
+    }
+
+    if (install_timeout_ - suspect_timeout_ < TimerList::key(ti) - now)
+    {
+        // No check yet
+        return;
+    }
+
+    // Record initial operational state for logging
+    std::vector<int> oparr_before(known_.size());
+    size_t index(0);
+    for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
+    {
+        oparr_before[index] = (NodeMap::value(i).operational() == true);
+        index++;
+    }
+    std::list<const JoinMessage*> joins;
+
+    // Compose list of join messages
+    for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
+    {
+        const UUID& node_uuid(NodeMap::key(i));
+        const Node& node(NodeMap::value(i));
+        const JoinMessage* jm(node.join_message());
+        if (jm != 0)
+        {
+            MessageNodeList::const_iterator self_ref(
+                jm->node_list().find(uuid()));
+            if (node.operational() == true                           &&
+                self_ref           != jm->node_list().end()          &&
+                MessageNodeList::value(self_ref).operational() == true)
+            {
+                joins.push_back(NodeMap::value(i).join_message());
+            }
+        }
+        else if (node.operational() == true)
+        {
+            evs_log_info(I_STATE)
+                << "marking operational node "
+                << node_uuid << " without "
+                << "join message inactive in asymmetry elimination";
+            set_inactive(node_uuid);
+        }
+    }
+
+    // Setting node inactive may remove join message and so invalidate
+    // pointer in joins list, so collect set of UUIDs to set inactive
+    // and do inactivation in separate loop.
+    std::set<UUID> to_inactive;
+    // Iterate over join messages and collect nodes to be set inactive
+    for (std::list<const JoinMessage*>::const_iterator i(joins.begin());
+         i != joins.end(); ++i)
+    {
+        for (MessageNodeList::const_iterator j((*i)->node_list().begin());
+             j != (*i)->node_list().end(); ++j)
+        {
+            if (MessageNodeList::value(j).operational() == false)
+            {
+                to_inactive.insert(MessageNodeList::key(j));
+            }
+        }
+    }
+    joins.clear();
+    for (std::set<UUID>::const_iterator i(to_inactive.begin());
+         i != to_inactive.end(); ++i)
+    {
+        NodeMap::const_iterator ni(known_.find(*i));
+        if (ni != known_.end())
+        {
+            if (NodeMap::value(ni).operational() == true)
+            {
+                evs_log_info(I_STATE) << "setting " << *i
+                                      << " inactive in asymmetry elimination";
+                set_inactive(*i);
+            }
+        }
+        else
+        {
+            log_warn << "node " << *i << " not found from known list in ae";
+        }
+    }
+
+    // Compute final state and log if it has changed
+    std::vector<int> oparr_after(known_.size());
+    index = 0;
+    for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
+    {
+        oparr_after[index] = (NodeMap::value(i).operational() == true);
+        index++;
+    }
+
+    if (oparr_before != oparr_after)
+    {
+        evs_log_info(I_STATE) << "before asym elimination";
+        if (info_mask_ & I_STATE)
+        {
+            std::copy(oparr_before.begin(), oparr_before.end(),
+                      std::ostream_iterator<int>(std::cerr, " "));
+            std::cerr << "\n";
+        }
+
+        evs_log_info(I_STATE) << "after asym elimination";
+        if (info_mask_ & I_STATE)
+        {
+            std::copy(oparr_after.begin(), oparr_after.end(),
+                      std::ostream_iterator<int>(std::cerr, " "));
+            std::cerr << "\n";
+        }
+    }
+}
 
 // For each node thas has no join message associated, iterate over other
 // known nodes' join messages to find out if the node without join message
@@ -3519,8 +3627,8 @@ void gcomm::evs::Proto::check_unseen()
             node.join_message()                == 0      &&
             node.operational()                 == true)
         {
-            evs_log_info(I_STATE) << "checking operational unseen "
-                                  << node_uuid;
+            evs_log_debug(D_STATE) << "checking operational unseen "
+                                   << node_uuid;
             size_t cnt(0), inact_cnt(0);
             for (NodeMap::iterator j(known_.begin()); j != known_.end(); ++j)
             {
@@ -3539,7 +3647,7 @@ void gcomm::evs::Proto::check_unseen()
                         (MessageNodeList::value(mn_i).operational() == true &&
                          NodeMap::value(known_i).join_message() == 0))
                     {
-                        evs_log_info(I_STATE)
+                        evs_log_debug(D_STATE)
                             << "all joins not locally present for "
                             << NodeMap::key(j)
                             << " join message node list";
@@ -3551,7 +3659,7 @@ void gcomm::evs::Proto::check_unseen()
                     != jm->node_list().end())
                 {
                     const MessageNode& mn(MessageNodeList::value(mn_i));
-                    evs_log_info(I_STATE)
+                    evs_log_debug(D_STATE)
                         << "found " << node_uuid << " from " <<  NodeMap::key(j)
                         << " join message: "
                         << mn.view_id() << " "
@@ -3762,6 +3870,18 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
 
     gcomm_assert(output_.empty() == true);
 
+    // If source node is member of current view but has already
+    // formed new view, mark it unoperational
+    if (current_view_.is_member(msg.source()) == true &&
+        msg.source_view_id().seq() > current_view_.id().seq())
+    {
+        evs_log_info(I_STATE)
+            << " join source has already formed new view, marking inactive";
+        set_inactive(msg.source());
+        return;
+    }
+
+    // Collect view ids to gather_views_ list.
     // Add unseen nodes to known list and fenced nodes to fenced list.
     // Fenced nodes must also be added to known list for GATHER time
     // bookkeeping.
@@ -3773,6 +3893,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         NodeMap::iterator ni(known_.find(MessageNodeList::key(i)));
         const UUID mn_uuid(MessageNodeList::key(i));
         const MessageNode& mn(MessageNodeList::value(i));
+        gather_views_.insert(std::make_pair(mn.view_id(),
+                                            gu::datetime::Date::now()));
         if (ni == known_.end())
         {
             known_.insert_unique(
@@ -3848,6 +3970,10 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         gu_trace(check_unseen());
         gu_trace(check_nil_view_id());
     }
+
+    // Eliminate asymmetry according to operational status flags in
+    // join messages
+    gu_trace(asymmetry_elimination());
 
     // If current join message differs from current state, send new join
     const JoinMessage* curr_join(NodeMap::value(self_i_).join_message());

@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "evs_consensus.hpp"
 #include "evs_message2.hpp"
 #include "evs_input_map2.hpp"
 #include "evs_node.hpp"
+#include "evs_proto.hpp"
 #include "gcomm/view.hpp"
 
 #include "gu_logger.hpp"
@@ -13,7 +14,8 @@
 #include <list>
 
 // Disable debug logging until debug mask is available here
-#define evs_log_debug(i) if (true) {} else log_debug << uuid() << " "
+#define evs_log_debug(i) if ((proto_.debug_mask_ & gcomm::evs::Proto::D_CONSENSUS) == 0) \
+    {} else log_debug << proto_.uuid() << " "
 
 //
 // Helpers
@@ -436,7 +438,7 @@ bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
                  msg.type() == Message::T_INSTALL);
 
     const JoinMessage* my_jm =
-        NodeMap::value(known_.find_checked(uuid())).join_message();
+        NodeMap::value(known_.find_checked(proto_.uuid())).join_message();
     if (my_jm == 0)
     {
         return false;
@@ -455,7 +457,7 @@ bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
 bool gcomm::evs::Consensus::is_consensus() const
 {
     const JoinMessage* my_jm =
-        NodeMap::value(known_.find_checked(uuid())).join_message();
+        NodeMap::value(known_.find_checked(proto_.uuid())).join_message();
 
     if (my_jm == 0)
     {

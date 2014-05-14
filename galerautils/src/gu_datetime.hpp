@@ -88,6 +88,9 @@ namespace gu
             Period operator+(const Period& add) const
             { return (nsecs + add.nsecs); }
 
+            Period operator-(const Period& dec) const
+            { return (nsecs - dec.nsecs); }
+
         private:
 
             friend class Date;

@@ -85,6 +85,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream&, const Proto&);
+    friend class Consensus;
 
     /*!
      * Default constructor.
@@ -196,6 +197,7 @@ private:
     void cross_check_inactives(const UUID&, const MessageNodeList&);
     void check_unseen();
     void check_nil_view_id();
+    void asymmetry_elimination();
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,
@@ -375,7 +377,13 @@ private:
     // ViewId current_view;
     View current_view_;
     View previous_view_;
-    std::list<std::pair<ViewId, gu::datetime::Date> > previous_views_;
+    typedef std::map<ViewId, gu::datetime::Date> ViewList;
+    // List of previously seen views from which messages should not be
+    // accepted anymore
+    ViewList previous_views_;
+    // Seen views in gather state, will be copied to previous views
+    // when shifting to operational
+    ViewList gather_views_;
 
     // Map containing received messages and aru/safe seqnos
     InputMap* input_map_;

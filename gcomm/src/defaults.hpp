@@ -15,6 +15,8 @@ namespace gcomm
         static std::string const ProtonetVersion          ;
         static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
+        static std::string const GMCastTimeWait           ;
+        static std::string const GMCastPeerTimeout        ;
         static std::string const EvsViewForgetTimeout     ;
         static std::string const EvsViewForgetTimeoutMin  ;
         static std::string const EvsInactiveCheckPeriod   ;

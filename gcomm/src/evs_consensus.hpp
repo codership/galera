@@ -1,6 +1,9 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
+
+#ifndef GCOMM_EVS_CONSENSUS_HPP
+#define GCOMM_EVS_CONSENSUS_HPP
 
 #include "evs_seqno.hpp"
 
@@ -15,17 +18,18 @@ namespace gcomm
         class InputMap;
         class Message;
         class Consensus;
+        class Proto;
     }
 }
 
 class gcomm::evs::Consensus
 {
 public:
-    Consensus(const UUID&     uuid,
+    Consensus(const Proto&    proto,
               const NodeMap&  known,
               const InputMap& input_map,
               const View&     current_view) :
-        uuid_        (uuid),
+        proto_       (proto),
         known_       (known),
         input_map_   (input_map),
         current_view_(current_view)
@@ -61,10 +65,10 @@ public:
     bool is_consensus() const;
 private:
 
-    const UUID& uuid() const { return uuid_; }
-
-    const UUID&     uuid_;
+    const Proto&    proto_;
     const NodeMap&  known_;
     const InputMap& input_map_;
     const View&     current_view_;
 };
+
+#endif // GCOMM_EVS_CONSENSUS_HPP
