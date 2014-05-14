@@ -214,6 +214,15 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
         else
         {
 #endif /* HAVE_ASIO_SSL_HPP */
+            const std::string bind_ip_ = uri.get_option(gcomm::Socket::OptIfAddr, "");
+            if (!bind_ip_.empty()) {
+                socket_.open(i->endpoint().protocol());
+                asio::ip::tcp::endpoint ep(
+                    asio::ip::address::from_string(bind_ip_),
+                    // connect from any port.
+                    0);
+                socket_.bind(ep);
+            }
             socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
                                                   shared_from_this(),
                                                   asio::placeholders::error));
