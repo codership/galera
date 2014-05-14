@@ -50,7 +50,10 @@ namespace gcomm
         void connect();
         void connect(const gu::URI&);
         void close(bool force = false);
-        void close(const UUID& uuid) { gmcast_forget(uuid); }
+        void close(const UUID& uuid)
+        {
+            gmcast_forget(uuid, time_wait_);
+        }
 
         void listen()
         {
@@ -194,7 +197,7 @@ namespace gcomm
         // Initialize connecting to remote host
         void gmcast_connect(const std::string&);
         // Forget node
-        void gmcast_forget(const gcomm::UUID&);
+        void gmcast_forget(const gcomm::UUID&, const gu::datetime::Period&);
         // Handle proto entry that has established connection to remote host
         void handle_connected(gmcast::Proto*);
         // Handle proto entry that has succesfully finished handshake

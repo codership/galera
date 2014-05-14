@@ -19,6 +19,8 @@ namespace gcomm
     std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
     std::string const Defaults::GMCastSegment           = "0";
+    std::string const Defaults::GMCastTimeWait          = "PT5S";
+    std::string const Defaults::GMCastPeerTimeout       = "PT3S";
     std::string const Defaults::EvsViewForgetTimeout    = "PT24H";
     std::string const Defaults::EvsViewForgetTimeoutMin = "PT1S";
     std::string const Defaults::EvsInactiveCheckPeriod  = "PT0.5S";
@@ -43,6 +45,6 @@ namespace gcomm
     std::string const Defaults::PcNpvo                  = "false";
     std::string const Defaults::PcVersion               = "0";
     std::string const Defaults::PcWaitPrim              = "true";
-    std::string const Defaults::PcWaitPrimTimeout       = "P30S";
+    std::string const Defaults::PcWaitPrimTimeout       = "P120S";
     std::string const Defaults::PcWeight                = "1";
 }

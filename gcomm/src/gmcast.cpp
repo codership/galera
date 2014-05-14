@@ -81,9 +81,13 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     relay_set_    (),
     segment_map_  (),
     self_index_   (std::numeric_limits<size_t>::max()),
-    time_wait_    (param<gu::datetime::Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
+    time_wait_    (param<gu::datetime::Period>(
+                       conf_, uri,
+                       Conf::GMCastTimeWait, Defaults::GMCastTimeWait)),
     check_period_ ("PT0.5S"),
-    peer_timeout_ (param<gu::datetime::Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
+    peer_timeout_ (param<gu::datetime::Period>(
+                       conf_, uri,
+                       Conf::GMCastPeerTimeout, Defaults::GMCastPeerTimeout)),
     max_initial_reconnect_attempts_(
         param<int>(conf_, uri,
                    Conf::GMCastMaxInitialReconnectAttempts,
@@ -439,7 +443,8 @@ void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
 }
 
 
-void gcomm::GMCast::gmcast_forget(const UUID& uuid)
+void gcomm::GMCast::gmcast_forget(const UUID& uuid,
+                                  const gu::datetime::Period& wait_period)
 {
     /* Close all proto entries corresponding to uuid */
 
@@ -480,7 +485,17 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid)
             }
             ae.set_max_retries(0);
             ae.set_retry_cnt(1);
-            ae.set_next_reconnect(gu::datetime::Date::now() + time_wait_);
+            gu::datetime::Date now(gu::datetime::Date::now());
+            // Don't reduce next reconnect time if it is set greater than
+            // requested
+            if (now + wait_period > ae.next_reconnect())
+            {
+                ae.set_next_reconnect(gu::datetime::Date::now() + wait_period);
+            }
+            else
+            {
+                log_debug << "not decreasing next reconnect for " << uuid;
+            }
         }
     }
 
@@ -1497,12 +1512,16 @@ void gcomm::GMCast::handle_stable_view(const View& view)
                             view_lst.end(),
                             std::back_inserter(diff));
 
+        // Forget partitioned entries, allow them to reconnect
+        // in time_wait_/2. Left nodes are given time_wait_ ban for
+        // reconnecting when handling V_REG below.
         for (std::list<UUID>::const_iterator i(diff.begin());
              i != diff.end(); ++i)
         {
-            gmcast_forget(*i);
+            gmcast_forget(*i, time_wait_/2);
         }
 
+        // mark nodes in view as stable
         for (std::set<UUID>::const_iterator i(view_lst.begin());
              i != view_lst.end(); ++i)
         {
@@ -1563,6 +1582,13 @@ void gcomm::GMCast::handle_stable_view(const View& view)
                 ai->second.set_max_retries(max_retry_cnt_);
             }
         }
+
+        // Forget left nodes
+        for (NodeList::const_iterator i(view.left().begin());
+             i != view.left().end(); ++i)
+        {
+            gmcast_forget(NodeList::key(i), time_wait_);
+        }
     }
     check_liveness();
 
@@ -1577,7 +1603,7 @@ void gcomm::GMCast::handle_stable_view(const View& view)
 void gcomm::GMCast::handle_fencing(const UUID& uuid)
 {
     log_info << "fencing " << uuid;
-    gmcast_forget(uuid);
+    gmcast_forget(uuid, time_wait_);
 }
 
 
