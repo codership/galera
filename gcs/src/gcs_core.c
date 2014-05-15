@@ -1350,6 +1350,16 @@ gcs_core_param_get (gcs_core_t* core, const char* key)
     }
 }
 
+void
+gcs_core_get_stats (gcs_core_t* core, char*** keys, char*** values)
+{
+    *keys = NULL;
+    *values = NULL;
+    if (core->backend.conn) {
+        core->backend.stats_get (&core->backend, keys, values);
+    }
+}
+
 #ifdef GCS_CORE_TESTING
 
 gcs_backend_t*
