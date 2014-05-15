@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 /*
@@ -9,10 +9,13 @@
 #ifndef GCOMM_GMCAST_HPP
 #define GCOMM_GMCAST_HPP
 
+#include "gmcast_proto.hpp"
+
 #include "gcomm/uuid.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/types.hpp"
+
 
 #include <set>
 
@@ -25,7 +28,6 @@ namespace gcomm
     namespace gmcast
     {
         class Proto;
-        class ProtoMap;
         class Node;
         class Message;
     }
@@ -192,6 +194,9 @@ namespace gcomm
         gu::datetime::Date next_check_;
         gu::datetime::Date handle_timers();
 
+        // Erase ProtoMap entry in a safe way so that all lookup lists
+        // become properly updated.
+        void erase_proto(gmcast::ProtoMap::iterator);
         // Accept new connection
         void gmcast_accept();
         // Initialize connecting to remote host

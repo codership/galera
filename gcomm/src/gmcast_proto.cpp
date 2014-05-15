@@ -3,10 +3,36 @@
  */
 
 #include "gmcast_proto.hpp"
+#include "gmcast.hpp"
 
 #include "gu_uri.hpp"
 
 using std::rel_ops::operator!=;
+
+const gcomm::UUID& gcomm::gmcast::Proto::local_uuid() const
+{
+    return gmcast_.uuid();
+}
+
+std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
+{
+    os << "v="  << p.version_ << ","
+       << "lu=" << p.gmcast_.uuid() << ","
+       << "ru=" << p.remote_uuid_ << ","
+       << "ls=" << static_cast<int>(p.local_segment_) << ","
+       << "rs=" << static_cast<int>(p.remote_segment_) << ","
+       << "la=" << p.local_addr_ << ","
+       << "ra=" << p.remote_addr_ << ","
+       << "mc=" << p.mcast_addr_ << ","
+       << "gn=" << p.group_name_ << ","
+       << "ch=" << p.changed_ << ","
+       << "st=" << gcomm::gmcast::Proto::to_string(p.state_) << ","
+       << "pr=" << p.propagate_remote_ << ","
+       << "tp=" << p.tp_ << ","
+       << "ts=" << p.tstamp_;
+    return os;
+}
+
 
 void gcomm::gmcast::Proto:: set_state(State new_state)
 {
