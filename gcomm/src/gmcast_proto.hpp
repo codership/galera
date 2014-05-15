@@ -2,17 +2,19 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
+#ifndef GCOMM_GMCAST_PROTO_HPP
+#define GCOMM_GMCAST_PROTO_HPP
+
 #include "gu_datetime.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/util.hpp"
 #include "socket.hpp"
 #include "gmcast_message.hpp"
 #include "gmcast_link.hpp"
-#include "gmcast.hpp"
 
 namespace gcomm
 {
-
+    class GMCast;
     namespace gmcast
     {
         class Proto;
@@ -101,7 +103,7 @@ public:
     void handle_message(const Message& msg);
 
     const gcomm::UUID& handshake_uuid() const { return handshake_uuid_; }
-    const gcomm::UUID& local_uuid() const { return gmcast_.uuid(); }
+    const gcomm::UUID& local_uuid() const;
     const gcomm::UUID& remote_uuid() const { return remote_uuid_; }
 
     SocketPtr socket() const { return tp_; }
@@ -140,22 +142,6 @@ private:
     const GMCast&     gmcast_;
 };
 
-
-inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
-{
-    os << "v="  << p.version_ << ","
-       << "lu=" << p.gmcast_.uuid() << ","
-       << "ru=" << p.remote_uuid_ << ","
-       << "la=" << p.local_addr_ << ","
-       << "ra=" << p.remote_addr_ << ","
-       << "mc=" << p.mcast_addr_ << ","
-       << "gn=" << p.group_name_ << ","
-       << "ch=" << p.changed_ << ","
-       << "st=" << gcomm::gmcast::Proto::to_string(p.state_) << ","
-       << "pr=" << p.propagate_remote_ << ","
-       << "tp=" << p.tp_ << ","
-       << "ts=" << p.tstamp_;
-    return os;
-}
-
 class gcomm::gmcast::ProtoMap : public Map<const SocketId, Proto*> { };
+
+#endif // !GCOMM_GMCAST_PROTO_HPP

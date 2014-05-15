@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #include "gmcast.hpp"
@@ -339,6 +339,21 @@ void gcomm::GMCast::close(bool force)
     remote_addrs_.clear();
 }
 
+// Erase proto entry in safe manner
+// 1) Erase from relay_set_
+// 2) Erase from proto_map_
+// 3) Delete proto entry
+void gcomm::GMCast::erase_proto(gmcast::ProtoMap::iterator i)
+{
+    Proto* p(ProtoMap::value(i));
+    std::set<Socket*>::iterator si(relay_set_.find(p->socket().get()));
+    if (si != relay_set_.end())
+    {
+        relay_set_.erase(si);
+    }
+    proto_map_->erase(i);
+    delete p;
+}
 
 void gcomm::GMCast::gmcast_accept()
 {
@@ -449,8 +464,7 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid,
         Proto* rp = ProtoMap::value(pi);
         if (rp->remote_uuid() == uuid)
         {
-            delete rp;
-            proto_map_->erase(pi);
+            erase_proto(pi);
         }
     }
 
@@ -469,12 +483,10 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid,
             for (pi = proto_map_->begin(); pi != proto_map_->end(); pi = pi_next)
             {
                 pi_next = pi, ++pi_next;
-                Proto* rp = ProtoMap::value(pi);
-                if (rp->remote_addr() == AddrList::key(ai))
+                if (ProtoMap::value(pi)->remote_addr() == AddrList::key(ai))
                 {
                     log_info << "deleting entry " << AddrList::key(ai);
-                    delete rp;
-                    proto_map_->erase(pi);
+                    erase_proto(pi);
                 }
             }
             ae.set_max_retries(0);
@@ -520,9 +532,7 @@ void gcomm::GMCast::handle_established(Proto* est)
     if (is_fenced(est->remote_uuid()))
     {
         log_warn << "Closing connection to fenced node " << est->remote_uuid();
-        proto_map_->erase(
-            proto_map_->find_checked(est->socket()->id()));
-        delete est;
+        erase_proto(proto_map_->find_checked(est->socket()->id()));
         update_addresses();
         return;
     }
@@ -550,9 +560,7 @@ void gcomm::GMCast::handle_established(Proto* est)
                                                        gu::datetime::Date::now(),
                                                        est->remote_uuid())));
         }
-        proto_map_->erase(
-            proto_map_->find_checked(est->socket()->id()));
-        delete est;
+        erase_proto(proto_map_->find_checked(est->socket()->id()));
         update_addresses();
         return;
     }
@@ -594,8 +602,7 @@ void gcomm::GMCast::handle_established(Proto* est)
         log_warn << "discarding established (time wait) "
                  << est->remote_uuid()
                  << " (" << est->remote_addr() << ") ";
-        proto_map_->erase(proto_map_->find(est->socket()->id()));
-        delete est;
+        erase_proto(proto_map_->find(est->socket()->id()));
         update_addresses();
         return;
     }
@@ -626,8 +633,7 @@ void gcomm::GMCast::handle_established(Proto* est)
                           << p->socket()
                           << " after established "
                           << est->socket();
-                proto_map_->erase(j);
-                delete p;
+                erase_proto(j);
             }
             else if (p->handshake_uuid() > est->handshake_uuid())
             {
@@ -636,9 +642,7 @@ void gcomm::GMCast::handle_established(Proto* est)
                           << est->socket()
                           << " which is duplicate of "
                           << p->socket();
-                proto_map_->erase(
-                    proto_map_->find_checked(est->socket()->id()));
-                delete est;
+                erase_proto(proto_map_->find_checked(est->socket()->id()));
                 update_addresses();
                 return;
             }
@@ -703,13 +707,7 @@ void gcomm::GMCast::handle_failed(Proto* failed)
         }
     }
 
-    std::set<Socket*>::iterator si(relay_set_.find(failed->socket().get()));
-    if (si != relay_set_.end())
-    {
-        relay_set_.erase(si);
-    }
-    proto_map_->erase(failed->socket()->id());
-    delete failed;
+    erase_proto(proto_map_->find_checked(failed->socket()->id()));
     update_addresses();
 }
 
@@ -793,8 +791,7 @@ void gcomm::GMCast::update_addresses()
                 // Duplicate entry, drop this one
                 // @todo Deeper inspection about the connection states
                 log_debug << self_string() << " dropping duplicate entry";
-                proto_map_->erase(i);
-                delete rp;
+                erase_proto(i);
             }
             else
             {
@@ -1429,8 +1426,7 @@ void gcomm::GMCast::handle_stable_view(const View& view)
                     if (p->remote_addr() == addr)
                     {
                         log_info << "discarding pending addr proto entry " << p;
-                        delete p;
-                        proto_map_->erase(pi);
+                        erase_proto(pi);
                     }
                     pi = pi_next;
                 }
@@ -1519,8 +1515,7 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
                 if (rp->remote_addr() == AddrList::key(ai))
                 {
                     log_info << "deleting entry " << AddrList::key(ai);
-                    delete rp;
-                    proto_map_->erase(pi);
+                    erase_proto(pi);
                 }
             }
             AddrEntry& ae(AddrList::value(ai));
@@ -1577,9 +1572,7 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
             for (pi = proto_map_->begin(); pi != proto_map_->end(); pi = pi_next)
             {
                 pi_next = pi, ++pi_next;
-                Proto* rp = ProtoMap::value(pi);
-                delete rp;
-                proto_map_->erase(pi);
+                erase_proto(pi);
             }
             mcast_tree_.clear();
         }
