@@ -235,28 +235,66 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
     /* Create a buffer to be passed to the caller. */
-    gu::Lock lock_inc(incoming_mutex_);
 
-    size_t const inc_size(incoming_list_.size() + 1);
-    size_t const vec_size(sv.size()*sizeof(struct wsrep_stats_var));
+    // the structure of return buffer
+    // 1. fixed stats vars
+    // 2. incomming list
+    // 3. variable stats vars(gcs_backend needs)
+
+    // compute how many wsrep_stats_vars
+    size_t all_sv_size(sv.size());
+    if (stats.backend_keys) {
+        for(int i=0; stats.backend_keys[i]; i++) {
+            all_sv_size++;
+        }
+    }
+    char* incoming_list_dup = NULL;
+    {
+        gu::Lock lock_inc(incoming_mutex_);
+        incoming_list_dup = strndup(incoming_list_.c_str(),
+                                    incoming_list_.size());
+    }
     struct wsrep_stats_var* const buf(
-        static_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
+        static_cast<struct wsrep_stats_var*>(
+            gu_malloc(all_sv_size * sizeof(wsrep_stats_var))));
 
     if (buf)
     {
-        char* const inc_buf(reinterpret_cast<char*>(buf + sv.size()));
-
-        wsrep_stats_[STATS_INCOMING_LIST].value._string = inc_buf;
-
-        memcpy(buf, &sv[0], vec_size);
-        memcpy(inc_buf, incoming_list_.c_str(), inc_size);
-        assert(inc_buf[inc_size - 1] == '\0');
+        memcpy(buf, &sv[0], sv.size() * sizeof(wsrep_stats_var));
+        wsrep_stats_var* incoming_list_sv =
+                static_cast<wsrep_stats_var*>(buf) +  STATS_INCOMING_LIST;
+        incoming_list_sv->value._string = incoming_list_dup;
+        wsrep_stats_var* next_sv = incoming_list_sv + 1;
+        if (stats.backend_keys) {
+            for(int i=0; stats.backend_keys[i]; i++) {
+                next_sv->name = stats.backend_keys[i];
+                next_sv->type = WSREP_VAR_STRING;
+                next_sv->value._string = stats.backend_values[i];
+                next_sv++;
+            }
+            gu_free(stats.backend_keys);
+            gu_free(stats.backend_values);
+        }
+        next_sv->name = NULL;
+        next_sv->type = WSREP_VAR_STRING;
+        next_sv->value._string = NULL;
     }
     else
     {
         log_warn << "Failed to allocate stats vars buffer to "
-                 << (inc_size + vec_size)
+                 << (all_sv_size * sizeof(wsrep_stats_var))
                  << " bytes. System is running out of memory.";
+
+        // clear garbage.
+        free(incoming_list_dup);
+        if(stats.backend_keys) {
+            for(int i=0; stats.backend_keys[i]; i++) {
+                free(stats.backend_keys[i]);
+                free(stats.backend_values[i]);
+            }
+            gu_free(stats.backend_keys);
+            gu_free(stats.backend_values);
+        }
     }
 
     return buf;
@@ -281,5 +319,17 @@ galera::ReplicatorSMM::stats_free(struct wsrep_stats_var* arg)
 {
     if (!arg) return;
     log_debug << "########### Freeing stats object ##########";
+    wsrep_stats_var* incoming_list_sv = arg + STATS_INCOMING_LIST;
+    log_debug << "free incomming list";
+    free(const_cast<char*>(incoming_list_sv->value._string));
+    wsrep_stats_var* next_sv = incoming_list_sv + 1;
+    while(next_sv->name) {
+        log_debug << "free " << next_sv->name;
+        free(const_cast<char*>(next_sv->name));
+        if(next_sv->type == WSREP_VAR_STRING) {
+            free(const_cast<char*>(next_sv->value._string));
+        }
+        next_sv++;
+    }
     gu_free(arg);
 }

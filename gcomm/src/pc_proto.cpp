@@ -233,32 +233,46 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     } else if (rst_view_ && !start_prim_) {
         // pc recovery process.
         uint32_t max_view_seqno = 0;
+        bool check = true;
         for(NodeMap::const_iterator i = instances_.begin();
             i != instances_.end(); ++i) {
-            const Node& node(NodeMap::value(i));
-            const ViewId& last_prim(node.last_prim());
-            if (last_prim.type() == V_PRIM &&
-                last_prim.uuid() == rst_view_ -> id().uuid()){
+            const UUID& uuid(NodeMap::key(i));
+            // just consider property of nodes in restored view.
+            if (rst_view_ -> members().find(uuid) !=
+                rst_view_ -> members().end()) {
+                const Node& node(NodeMap::value(i));
+                const ViewId& last_prim(node.last_prim());
+                if (last_prim.type() != V_PRIM ||
+                    last_prim.uuid() != rst_view_ -> id().uuid()) {
+                    log_warn << "node uuid: " << uuid << " last_prim(type: "
+                             << last_prim.type() << ", uuid: "
+                             << last_prim.uuid() << ") is inconsistent to "
+                             << "restored view(type: V_PRIM, uuid: "
+                             << rst_view_ ->id().uuid();
+                    check = false;
+                    break;
+                }
                 max_view_seqno = std::max(max_view_seqno,
                                           last_prim.seq());
             }
         }
-        assert(max_view_seqno != 0);
+        if (check) {
+            assert(max_view_seqno != 0);
+            log_debug << "max_view_seqno = " << max_view_seqno
+                      << ", rst_view_seqno = " << rst_view_ -> id().seq();
+            log_debug << "rst_view = ";
+            log_debug << *rst_view_;
+            log_debug << "deliver_view = ";
+            log_debug << v;
 
-        log_debug << "max_view_seqno = " << max_view_seqno
-                  << ", rst_view_seqno = " << rst_view_ -> id().seq();
-        log_debug << "rst_view = ";
-        log_debug << *rst_view_;
-        log_debug << "deliver_view = ";
-        log_debug << v;
-
-        if (rst_view_ -> id().seq() == max_view_seqno &&
-            rst_view_ -> members() == v.members()) {
-            log_info << "promote to primary component";
-            // since all of them are non-primary component
-            // we need to bootstrap.
-            rst_view_ = NULL;
-            send_install(true);
+            if (rst_view_ -> id().seq() == max_view_seqno &&
+                rst_view_ -> members() == v.members()) {
+                log_info << "promote to primary component";
+                // since all of them are non-primary component
+                // we need to bootstrap.
+                rst_view_ = NULL;
+                send_install(true);
+            }
         }
     }
 }

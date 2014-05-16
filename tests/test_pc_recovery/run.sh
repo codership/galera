@@ -45,7 +45,7 @@ GCOMM_EXTRA_PARAMS="pc.recovery=1"
 cycle()
 {
     kill_all
-
+    pause 1 1
     SECONDS=0 # for wait_jobs
     for node in $NODE_LIST
     do

@@ -73,3 +73,13 @@ bool gcomm::Protostack::set_param(const std::string& key,
     }
     return ret;
 }
+
+void gcomm::Protostack::get_stats(std::vector<std::string>& keys,
+                                  std::vector<std::string>& values)
+{
+    for (std::deque<Protolay*>::iterator i(protos_.begin());
+         i != protos_.end(); ++i)
+    {
+        (*i)->get_stats(keys, values);
+    }
+}

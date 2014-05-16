@@ -12,7 +12,7 @@
 #include "gu_assert.hpp"
 #include "gu_byteswap.h"
 
-#include "gu_uuid.h"
+#include "gu_uuid.hpp"
 
 #include <ostream>
 #include <iomanip>
@@ -48,24 +48,12 @@ public:
 
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
     {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
-                                           << (buflen - offset);
-
-        memcpy(&uuid_, buf + offset, sizeof(gu_uuid_t));
-
-        return offset + sizeof(gu_uuid_t);
+        return gu_uuid_unserialize(buf, buflen, offset, uuid_);
     }
 
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
     {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
-                                           << (buflen - offset);
-
-        memcpy(buf + offset, &uuid_, sizeof(gu_uuid_t));
-
-        return offset + sizeof(gu_uuid_t);
+        return gu_uuid_serialize(uuid_, buf, buflen, offset);
     }
 
     static size_t serial_size()

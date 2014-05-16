@@ -1868,6 +1868,9 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;
     stats->fc_received = conn->stats_fc_received;
+    gcs_core_get_stats(conn->core,
+                       &stats->backend_keys,
+                       &stats->backend_values);
 }
 
 void

@@ -58,6 +58,15 @@ bool gcomm::Protonet::set_param(const std::string& key, const std::string& val)
     return ret;
 }
 
+void gcomm::Protonet::get_stats(std::vector<std::string>& keys,
+                                std::vector<std::string>& values)
+{
+    for (std::deque<Protostack*>::iterator i(protos_.begin());
+         i != protos_.end(); ++i)
+    {
+        (*i)->get_stats(keys, values);
+    }
+}
 
 gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 {
