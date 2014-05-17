@@ -26,10 +26,19 @@ Table legend:
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | Parameter                             | Default               |  Introduced           | Deprecated         | Dynamic  |
 +=======================================+=======================+=======================+====================+==========+
+| :ref:`base_host                       | detected network      |                       |                    |          |
+| <base_host>`                          | address               |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`base_port                       | *4567*                |                       |                    |          |
+| <base_port>`                          |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`cert.log_conflicts              | *no*                  | 2.0                   | n/a                | Yes      |
+| <cert.log_conflicts>`                 |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`protonet.version                | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`protonet.version                | n/a                   |                       |                    |          |
 | <protonet.version>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`socket.ssl_cert                 |                       | 1.0                   | n/a                | No       |
@@ -60,10 +69,13 @@ Table legend:
 | :ref:`gmcast.peer_timeout             | *PT3S*                | 1.0                   | n/a                | No       |
 | <gmcast.peer_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`gmcast.segment                  | *0*                   | 3.0                   | n/a                | No       |
+| <gmcast.segment>`                     |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gmcast.time_wait                | *PT5S*                | 1.0                   | n/a                | No       |
 | <gmcast.time_wait>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.version                  | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`gmcast.version                  | n/a                   |                       |                    |          |
 | <gmcast.version>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.causal_keepalive_period     |                       | 1.0                   | n/a                | No       |
@@ -114,11 +126,14 @@ Table legend:
 | :ref:`evs.view_forget_timeout         | *PT5M*                | 1.0                   | n/a                | No       |
 | <evs.view_forget_timeout>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.version                     | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`evs.version                     | n/a                   |                       |                    |          |
 | <evs.version>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.bootstrap                    |                       | 1.0                   | n/a                | No       |
+| :ref:`pc.bootstrap                    | n/a                   | 2.0                   | n/a                | Yes      |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`pc.announce_timeout             | *PT3S*                | 2.0                   | n/a                | No       |
+| <pc.announce_timeout>`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.checksum                     | *true*                | 1.0                   | n/a                | No       |
 | <pc.checksum>`                        |                       |                       |                    |          |
@@ -138,10 +153,13 @@ Table legend:
 | :ref:`pc.wait_prim                    | ``false``             | 1.0                   | n/a                | No       |
 | <pc.wait_prim>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`pc.wait_prim_timeout            | ``P30S``              | 2.0                   | n/a                | No       |
+| <pc.wait_prim_timeout>`               |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.weight                       | *1*                   | 2.4                   | n/a                | Yes      |
 | <pc.weight>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.version                      | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`pc.version                      | n/a                   |                       |                    |          |
 | <pc.version>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
@@ -180,7 +198,16 @@ Table legend:
 | :ref:`repl.causal_read_timeout        | *PT30S*               | 1.0                   | n/a                | No       |
 | <repl.causal_read_timeout>`           |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
+| :ref:`repl.key_format                 | *FLAT8*               | 3.0                   | n/a                | No       |
+| <repl.key_format>`                    |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`repl.max_ws_size                | *2147483647*          | 3.0                   | n/a                | No       |
+| <repl.max_ws_size>`                   |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`repl.proto_max                  | *5*                   | 2.0                   | n/a                | No       |
+| <repl.proto_max>`                     |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`gcache.dir                      | working directory     | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcache.name                     | *"galera.cache"*      | 1.0                   | n/a                | No       |
@@ -199,6 +226,33 @@ Table legend:
 | <gcache.mem_size>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 
+.. rubric:: base_host
+
+.. _`base_host`:
+
+.. index::
+   pair: Parameters; base_host
+
+Global variable for internal use. Should not be set manually.
+
+.. rubric:: base_port
+
+.. _`base_port`:
+
+.. index::
+   pair: Parameters; base_port
+
+Global variable for internal use. Should not be set manually.
+
+.. rubric:: cert.log_conflicts
+
+.. _`cert.log_conflicts`:
+
+.. index::
+   pair: Parameters; cert.log_conflicts
+
+Log details of certification failures.
+
 .. rubric:: protonet.backend
 
 .. _`protonet.backend`:
@@ -215,7 +269,7 @@ Which transport backend to use. Currently only ASIO is supported.
 .. index::
    pair: Parameters; protonet.version
 
-This status variable is used to check which transport backend protocol  version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which transport backend protocol version is used. This variable is mostly used for troubleshooting purposes.
 
 .. rubric:: socket.ssl_cert
 
@@ -310,6 +364,17 @@ Time to live value for multicast packets.
 
 Connection timeout to initiate message relaying.
 
+
+.. rubric:: gmcast.segment
+
+.. _`gmcast.segment`:
+
+.. index::
+   pair: Parameters; gmcast.segment
+
+Define which network segment this node is in. Optimisations on communication are performed to minimise the amount of traffic
+between network segments including writeset relaying and IST and SST donor selection.
+The ``gmcast.segment`` value is an integer from 0 to 255. By default all nodes are placed in the same segment (0).
 
 .. rubric:: gmcast.time_wait
 
@@ -512,6 +577,15 @@ This status variable is used to check which ``evs`` protocol version is used. Th
 
 If you set this value to *true* is a signal to turn a ``NON-PRIMARY`` component into ``PRIMARY``.
 
+.. rubric:: pc.announce_timeout
+
+.. _`pc.announce_timeout`:
+
+.. index::
+   pair: Parameters; pc.announce_timeout
+
+Cluster joining announcements are sent every 1/2 second for this period of time or less if the other nodes are discovered.
+
 
 .. rubric:: pc.checksum
 
@@ -566,8 +640,17 @@ If set to ``TRUE``, the more recent primary component overrides older ones in th
 .. index::
    pair: Parameters; pc.wait_prim
 
-If set to ``TRUE``, the node waits for the primary component forever. Useful to bring up a
+If set to ``TRUE``, the node waits for the ``pc.wait_prim_timeout`` time period. Useful to bring up a
 non-primary component and make it primary with ``pc.bootstrap``.
+
+.. rubric:: pc.wait_prim_timeout
+
+.. _`pc.wait_prim_timeout`:
+
+.. index::
+   pair: Parameters; pc.wait_prim_timeout
+
+The period of time to wait for a primary component.
 
 .. rubric:: pc.weight
 
@@ -717,6 +800,40 @@ Whether to allow Out-Of-Order committing (improves parallel applying performance
    pair: Parameters; repl.causal_read_timeout
 
 Sometimes causal reads need to timeout.
+
+.. rubric:: repl.key_format
+
+.. _`repl.key_format`:
+
+.. index::
+   pair: Parameters; repl.key_format
+
+The hash size to use for key formats (in bytes). An ``A`` suffix annotates the version.
+
+Possible settings:
+
+- ``FLAT8``
+- ``FLAT8A``
+- ``FLAT16``
+- ``FLAT16A``
+
+.. rubric:: repl.max_ws_size
+
+.. _`repl.max_ws_size`:
+
+.. index::
+   pair: Parameters; repl.max_ws_size
+
+The maximum size of a writeset in bytes. This is limited to 2G.
+
+.. rubric:: repl.proto_max
+
+.. _`repl.proto_max`:
+
+.. index::
+   pair: Parameters; repl.proto_max
+
+The maximum protocol version in replication. Changes to this parameter will only take effect after a provider restart.
 
 .. rubric:: gcache.dir
 
