@@ -26,19 +26,19 @@ Table legend:
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | Parameter                             | Default               |  Introduced           | Deprecated         | Dynamic  |
 +=======================================+=======================+=======================+====================+==========+
-| :ref:`base_host                       | detected network      | 1.0                   | n/a                | No       |
+| :ref:`base_host                       | detected network      |                       |                    |          |
 | <base_host>`                          | address               |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`base_port                       | *4567*                | 1.0                   | n/a                | No       |
+| :ref:`base_port                       | *4567*                |                       |                    |          |
 | <base_port>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`cert.log_conflicts              | *no*                  | 3.0                   | n/a                | No       |
+| :ref:`cert.log_conflicts              | *no*                  | 2.0                   | n/a                | Yes      |
 | <cert.log_conflicts>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`protonet.version                | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`protonet.version                | n/a                   |                       |                    |          |
 | <protonet.version>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`socket.ssl_cert                 |                       | 1.0                   | n/a                | No       |
@@ -75,7 +75,7 @@ Table legend:
 | :ref:`gmcast.time_wait                | *PT5S*                | 1.0                   | n/a                | No       |
 | <gmcast.time_wait>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gmcast.version                  | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`gmcast.version                  | n/a                   |                       |                    |          |
 | <gmcast.version>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.causal_keepalive_period     |                       | 1.0                   | n/a                | No       |
@@ -126,10 +126,10 @@ Table legend:
 | :ref:`evs.view_forget_timeout         | *PT5M*                | 1.0                   | n/a                | No       |
 | <evs.view_forget_timeout>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`evs.version                     | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`evs.version                     | n/a                   |                       |                    |          |
 | <evs.version>`                        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.bootstrap                    |                       | 1.0                   | n/a                | No       |
+| :ref:`pc.bootstrap                    | n/a                   | 2.0                   | n/a                | Yes      |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.announce_timeout             | *PT3S*                | 2.0                   | n/a                | No       |
@@ -159,7 +159,7 @@ Table legend:
 | :ref:`pc.weight                       | *1*                   | 2.4                   | n/a                | Yes      |
 | <pc.weight>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`pc.version                      | *0*                   | 1.0                   | n/a                | No       |
+| :ref:`pc.version                      | n/a                   |                       |                    |          |
 | <pc.version>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
@@ -207,7 +207,7 @@ Table legend:
 | :ref:`repl.proto_max                  | *5*                   | 2.0                   | n/a                | No       |
 | <repl.proto_max>`                     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
+| :ref:`gcache.dir                      | working directory     | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcache.name                     | *"galera.cache"*      | 1.0                   | n/a                | No       |
@@ -233,7 +233,7 @@ Table legend:
 .. index::
    pair: Parameters; base_host
 
-The network address used for IST and unicast network traffic. Provider needs to be restarted for this to have an effect.
+Global variable for internal use. Should not be set manually.
 
 .. rubric:: base_port
 
@@ -242,7 +242,7 @@ The network address used for IST and unicast network traffic. Provider needs to 
 .. index::
    pair: Parameters; base_port
 
-The network port number to use for writeset and IST network traffic. Provider needs to be restarted for this to have an effect.
+Global variable for internal use. Should not be set manually.
 
 .. rubric:: cert.log_conflicts
 
@@ -269,7 +269,7 @@ Which transport backend to use. Currently only ASIO is supported.
 .. index::
    pair: Parameters; protonet.version
 
-This status variable is used to check which transport backend protocol  version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which transport backend protocol version is used. This variable is mostly used for troubleshooting purposes.
 
 .. rubric:: socket.ssl_cert
 
@@ -373,8 +373,8 @@ Connection timeout to initiate message relaying.
    pair: Parameters; gmcast.segment
 
 Define which network segment this node is in. Optimisations on communication are performed to minimise the amount of traffic
-between network segments including writeset relaying and IST and SST donor selection. The ``gmcast.segment`` value is a simple
-label.
+between network segments including writeset relaying and IST and SST donor selection.
+The ``gmcast.segment`` value is an integer from 0 to 255. By default all nodes are placed in the same segment (0).
 
 .. rubric:: gmcast.time_wait
 
@@ -650,7 +650,7 @@ non-primary component and make it primary with ``pc.bootstrap``.
 .. index::
    pair: Parameters; pc.wait_prim_timeout
 
-The period of time to wait for a primary node.
+The period of time to wait for a primary component.
 
 .. rubric:: pc.weight
 
@@ -812,7 +812,6 @@ The hash size to use for key formats (in bytes). An ``A`` suffix annotates the v
 
 Possible settings:
 
-- ``EMPTY``
 - ``FLAT8``
 - ``FLAT8A``
 - ``FLAT16``
