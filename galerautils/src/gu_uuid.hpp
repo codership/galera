@@ -77,5 +77,87 @@ inline size_t gu_uuid_unserialize(const gu::byte_t* buf, size_t buflen,
     return offset;
 }
 
+namespace gu {
+    class BaseUUID;
+}
+
+class gu::BaseUUID
+{
+public:
+
+    BaseUUID() : uuid_(GU_UUID_NIL) {}
+
+    BaseUUID(const void* node, const size_t node_len) : uuid_()
+    {
+        gu_uuid_generate(&uuid_, node, node_len);
+    }
+
+    BaseUUID(gu_uuid_t uuid) : uuid_(uuid) {}
+
+    virtual ~BaseUUID() {}
+    size_t unserialize(const gu::byte_t* buf,
+                       const size_t buflen, const size_t offset)
+    {
+        return gu_uuid_unserialize(buf, buflen, offset, uuid_);
+    }
+
+    size_t serialize(gu::byte_t* buf,
+                     const size_t buflen, const size_t offset) const
+    {
+        return gu_uuid_serialize(uuid_, buf, buflen, offset);
+    }
+
+    static size_t serial_size()
+    {
+        return sizeof(gu_uuid_t);
+    }
+
+    const gu_uuid_t* uuid_ptr() const
+    {
+        return &uuid_;
+    }
+
+    bool operator<(const BaseUUID& cmp) const
+    {
+        return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
+    }
+
+    bool operator==(const BaseUUID& cmp) const
+    {
+        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
+    }
+
+    bool older(const BaseUUID& cmp) const
+    {
+        return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
+    }
+
+    std::ostream& write_stream(std::ostream& os) const
+    {
+        char uuid_buf[GU_UUID_STR_LEN + 1];
+        ssize_t ret(gu_uuid_print(&uuid_, uuid_buf, sizeof(uuid_buf)));
+        (void)ret;
+
+        assert(ret == GU_UUID_STR_LEN);
+        uuid_buf[GU_UUID_STR_LEN] = '\0';
+
+        return (os << uuid_buf);
+    }
+
+    std::istream& read_stream(std::istream& is)
+    {
+        char str[GU_UUID_STR_LEN + 1];
+        is.width(GU_UUID_STR_LEN + 1);
+        is >> str;
+        ssize_t ret(gu_uuid_scan(str, GU_UUID_STR_LEN, &uuid_));
+        if (ret == -1)
+            gu_throw_error(EINVAL) << "could not parse BaseUUID from '" << str
+                                   << '\'' ;
+        return is;
+    }
+
+protected:
+    gu_uuid_t         uuid_;
+}; // class BaseUUID
 
 #endif // _gu_uuid_hpp_

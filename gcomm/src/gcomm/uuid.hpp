@@ -23,62 +23,25 @@ namespace gcomm
     std::ostream& operator<<(std::ostream&, const UUID&);
 }
 
-class gcomm::UUID
+class gcomm::UUID :
+        public gu::BaseUUID
 {
 public:
 
-    UUID() : uuid_(GU_UUID_NIL) {}
+    UUID() : gu::BaseUUID() {}
 
-    UUID(const void* node, const size_t node_len) : uuid_()
-    {
-        gu_uuid_generate(&uuid_, node, node_len);
-    }
+    UUID(const void* node, const size_t node_len) :
+            gu::BaseUUID(node, node_len) {}
 
-    UUID(const int32_t idx) : uuid_()
+    UUID(const int32_t idx) : gu::BaseUUID()
     {
         assert(idx > 0);
-        uuid_ = GU_UUID_NIL;
         memcpy(&uuid_, &idx, sizeof(idx));
     }
 
     static const UUID& nil()
     {
         return uuid_nil_;
-    }
-
-    size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-    {
-        return gu_uuid_unserialize(buf, buflen, offset, uuid_);
-    }
-
-    size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
-    {
-        return gu_uuid_serialize(uuid_, buf, buflen, offset);
-    }
-
-    static size_t serial_size()
-    {
-        return sizeof(gu_uuid_t);
-    }
-
-    const gu_uuid_t* uuid_ptr() const
-    {
-        return &uuid_;
-    }
-
-    bool operator<(const UUID& cmp) const
-    {
-        return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
-    }
-
-    bool operator==(const UUID& cmp) const
-    {
-        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
-    }
-
-    bool older(const UUID& cmp) const
-    {
-        return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
 
     std::ostream& to_stream(std::ostream& os) const
@@ -112,30 +75,6 @@ public:
         return os;
     }
 
-    std::ostream& write_stream(std::ostream& os) const
-    {
-        char uuid_buf[GU_UUID_STR_LEN + 1];
-        ssize_t ret(gu_uuid_print(&uuid_, uuid_buf, sizeof(uuid_buf)));
-        (void)ret;
-
-        assert(ret == GU_UUID_STR_LEN);
-        uuid_buf[GU_UUID_STR_LEN] = '\0';
-
-        return (os << uuid_buf);
-    }
-
-    std::istream& read_stream(std::istream& is)
-    {
-        char str[GU_UUID_STR_LEN + 1];
-        is.width(GU_UUID_STR_LEN + 1);
-        is >> str;
-        ssize_t ret(gu_uuid_scan(str, GU_UUID_STR_LEN, &uuid_));
-        if (ret == -1)
-            gu_throw_error(EINVAL) << "could not parse UUID from '" << str
-                                   << '\'' ;
-        return is;
-    }
-
     // Prefer the above function over this one
     std::string _str() const
     {
@@ -145,13 +84,9 @@ public:
     }
 
 private:
-
-    gu_uuid_t         uuid_;
     static const UUID uuid_nil_;
-    UUID(gu_uuid_t uuid) : uuid_(uuid) {}
+    UUID(gu_uuid_t uuid) : gu::BaseUUID(uuid) {}
 };
-
-
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)
 {

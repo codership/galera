@@ -10,28 +10,28 @@
 
 #include <iostream>
 
-inline const gu_uuid_t& to_gu_uuid(const wsrep_uuid_t& uuid)
-{
-    return *reinterpret_cast<const gu_uuid_t*>(&uuid);
-}
-
-inline gu_uuid_t& to_gu_uuid(wsrep_uuid_t& uuid)
-{
-    return *reinterpret_cast<gu_uuid_t*>(&uuid);
-}
-
-inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-{
-    return to_gu_uuid(a) == to_gu_uuid(b);
-}
-
-inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-{
-    return !(a == b);
-}
-
 namespace galera
 {
+    inline const gu_uuid_t& to_gu_uuid(const wsrep_uuid_t& uuid)
+    {
+        return *reinterpret_cast<const gu_uuid_t*>(&uuid);
+    }
+
+    inline gu_uuid_t& to_gu_uuid(wsrep_uuid_t& uuid)
+    {
+        return *reinterpret_cast<gu_uuid_t*>(&uuid);
+    }
+
+    inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+    {
+        return to_gu_uuid(a) == to_gu_uuid(b);
+    }
+
+    inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+    {
+        return !(a == b);
+    }
+
     inline std::ostream& operator<<(std::ostream& os, const wsrep_uuid_t& uuid)
     {
         return os << to_gu_uuid(uuid);
