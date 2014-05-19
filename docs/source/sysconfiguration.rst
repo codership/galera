@@ -91,6 +91,8 @@ To disable SELinux, complete the following steps:
 
 For more information, see the SELinux Documentation.
 
+This blog article titled `SELinux and MySQL <https://blogs.oracle.com/jsmyth/entry/selinux_and_mysql>`_ will provide a good guide for writing a selinux policy. Don't forget to add a label for port 4567 as ``mysqld_port_t``.
+
 
 ----------------------------
 Disabling AppArmor
