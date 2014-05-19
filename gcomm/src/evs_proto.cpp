@@ -2526,12 +2526,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             evs_log_info(I_VIEWS)
                 << "subsequent views have same members, prev view "
                 << previous_view_ << " current view " << current_view_;
-            if (current_view_.members().size() == 1)
-            {
-                log_info << "subsequent singleton views detected, isolating "
-                         << "node for " << suspect_timeout_ + inactive_timeout_;
-                isolate(suspect_timeout_ + inactive_timeout_);
-            }
         }
 
         input_map_->reset(current_view_.members().size());
