@@ -4,6 +4,7 @@ Import('env')
 
 libgcomm_sources = [
     'conf.cpp',
+    'stats.cpp',
     'defaults.cpp',
     'datagram.cpp',
     'evs_consensus.cpp',
@@ -37,4 +38,3 @@ if '-DHAVE_ASIO_HPP' in libgcomm_env['CPPFLAGS']:
 libgcomm_env.StaticLibrary('gcomm', libgcomm_sources)
 
 env.Append(LIBGALERA_OBJS = libgcomm_env.SharedObject(libgcomm_sources))
-

@@ -1351,12 +1351,18 @@ gcs_core_param_get (gcs_core_t* core, const char* key)
 }
 
 void
-gcs_core_get_stats (gcs_core_t* core, char*** keys, char*** values)
+gcs_core_get_stats (gcs_core_t* core, gcs_backend_stats_t* stats)
 {
-    *keys = NULL;
-    *values = NULL;
     if (core->backend.conn) {
-        core->backend.stats_get (&core->backend, keys, values);
+        core->backend.stats_get (&core->backend, stats);
+    }
+}
+
+void
+gcs_core_free_stats (gcs_core_t* core, gcs_backend_stats_t* stats)
+{
+    if (core->backend.conn) {
+        core->backend.stats_free(&core->backend, stats);
     }
 }
 

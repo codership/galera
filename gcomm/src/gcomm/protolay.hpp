@@ -19,6 +19,7 @@
 #include "gcomm/exception.hpp"
 #include "gcomm/order.hpp"
 #include "gcomm/datagram.hpp"
+#include "gcomm/stats.hpp"
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
@@ -28,7 +29,6 @@
 
 #include <list>
 #include <utility>
-#include <vector>
 
 // Declarations
 namespace gcomm
@@ -334,8 +334,7 @@ public:
         return false;
     }
 
-    virtual void get_stats(std::vector<std::string>& keys,
-                           std::vector<std::string>& values)
+    virtual void get_stats(Stats& stats)
     {
     }
 

@@ -376,11 +376,9 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     return false;
 }
 
-void gcomm::evs::Proto::get_stats(std::vector<std::string>& keys,
-                                  std::vector<std::string>& values)
+void gcomm::evs::Proto::get_stats(Stats& stats)
 {
-    keys.push_back("repl_msg_lat_hist");
-    values.push_back(hs_safe_.to_string());
+    stats[S_REPL_LAGTENCY_HIST] = hs_safe_.to_string();
 }
 
 std::ostream& gcomm::evs::operator<<(std::ostream& os, const Proto& p)

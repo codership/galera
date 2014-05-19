@@ -165,7 +165,10 @@ extern const char*
 gcs_core_param_get (gcs_core_t* core, const char* key);
 
 extern void
-gcs_core_get_stats (gcs_core_t* core, char*** keys, char*** values);
+gcs_core_get_stats (gcs_core_t* core, gcs_backend_stats_t* stats);
+
+extern void
+gcs_core_free_stats (gcs_core_t* core, gcs_backend_stats_t* stats);
 
 #ifdef GCS_CORE_TESTING
 

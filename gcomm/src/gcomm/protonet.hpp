@@ -112,8 +112,7 @@ public:
     virtual void leave() = 0;
 
     bool set_param(const std::string& key, const std::string& val);
-    void get_stats(std::vector<std::string>& keys,
-                   std::vector<std::string>& values);
+    void get_stats(Stats& stats);
     gu::Config& conf() { return conf_; }
 
     //!

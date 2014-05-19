@@ -256,8 +256,7 @@ public:
     }
 
     bool set_param(const std::string& key, const std::string& val);
-    void get_stats(std::vector<std::string>& keys,
-                   std::vector<std::string>& values);
+    void get_stats(Stats& stats);
 
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time

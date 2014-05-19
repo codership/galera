@@ -1868,9 +1868,7 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;
     stats->fc_received = conn->stats_fc_received;
-    gcs_core_get_stats(conn->core,
-                       &stats->backend_keys,
-                       &stats->backend_values);
+    gcs_core_get_stats(conn->core, &stats->backend_stats);
 }
 
 void
@@ -1880,6 +1878,12 @@ gcs_flush_stats(gcs_conn_t* conn)
     gcs_sm_stats_flush (conn->sm);
     conn->stats_fc_sent     = 0;
     conn->stats_fc_received = 0;
+}
+
+void
+gcs_free_stats(gcs_conn_t* conn, struct gcs_stats* stats)
+{
+    gcs_core_free_stats(conn->core, &stats->backend_stats);
 }
 
 static long

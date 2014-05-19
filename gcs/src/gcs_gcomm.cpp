@@ -29,6 +29,7 @@ extern "C"
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/conf.hpp"
+#include "gcomm/stats.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
@@ -831,57 +832,64 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
 static
 GCS_BACKEND_STATS_GET_FN(gcomm_stats_get)
 {
+    stats->stats = NULL;
+    stats->ctx = NULL;
     GCommConn::Ref ref(backend);
-    *keys = NULL;
-    *values = NULL;
     if (ref.get() == 0)
     {
         return ;
     }
     GCommConn& conn(*ref.get());
-    // not use map because prefer to preserve getting order.
-    std::vector<std::string> ks;
-    std::vector<std::string> vs;
-    char** tks = NULL;
-    char** tvs = NULL;
+    gcomm::Stats backend_stats;
     try {
         gcomm::Critical<Protonet> cric(conn.get_pnet());
         if (gu_unlikely(conn.get_error() !=0)) return ;
-        conn.get_pnet().get_stats(ks, vs);
-        gcomm_assert(ks.size() == vs.size());
+        conn.get_pnet().get_stats(backend_stats);
 
-        // copy to tks and tvs.
-        size_t size = ks.size();
-        tks = static_cast<char**>(gu_malloc(sizeof(char*) * (size + 1)));
-        tvs = static_cast<char**>(gu_malloc(sizeof(char*) * (size + 1)));
-        for (size_t i=0; i < size; i++) {
-            tks[i] = strdup(ks[i].c_str());
-            tvs[i] = strdup(vs[i].c_str());
+        size_t stats_size = backend_stats.size();
+        size_t value_size = 0;
+        for (gcomm::Stats::const_iterator i = backend_stats.begin();
+             i != backend_stats.end(); ++i) {
+            value_size += i->second.size() + 1;
         }
-        tks[size] = 0;
-        tvs[size] = 0;
-        *keys = tks;
-        *values = tvs;
+        stats->ctx = gu_malloc(
+            sizeof(gcs_backend_stats_t::stats_t) * (stats_size + 1) +
+            sizeof(char) * value_size);
+        if (!stats->ctx) {
+            return ;
+        }
+
+        stats->stats = static_cast<gcs_backend_stats_t::stats_t*>(stats->ctx);
+        char* base = reinterpret_cast<char*>(stats->stats + stats_size + 1);
+        size_t offset = 0;
+        size_t idx = 0;
+        for (gcomm::Stats::const_iterator i = backend_stats.begin();
+             i != backend_stats.end(); ++i) {
+            stats->stats[idx].key =
+                    gcomm::stats_key_to_string(i->first);
+            stats->stats[idx].value = base + offset;
+            strcpy(base + offset, i->second.c_str());
+            offset += i->second.size() + 1;
+            idx++;
+        }
+        assert(idx == stats_size);
+        stats->stats[idx].key = NULL;
+        stats->stats[idx].value = NULL;
         return ;
     } catch (const std::exception& e) {
         log_warn << "gcomm stats get : caught exception("
                  << e.what() << ")";
     }
-    // clear garbage.
-    if (tks) {
-        for(int i=0; tks[i]; i++) {
-            free(tks[i]);
-        }
-        gu_free(tks);
-    }
-    if (tvs) {
-        for(int i=0; tvs[i]; i++) {
-            free(tvs[i]);
-        }
-        gu_free(tvs);
-    }
 }
 
+static
+GCS_BACKEND_STATS_FREE_FN(gcomm_stats_free)
+{
+    if (stats->ctx) {
+        gu_free(stats->ctx);
+        stats->ctx = NULL;
+    }
+}
 
 static
 GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
@@ -938,6 +946,7 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->param_set = gcomm_param_set;
     backend->param_get = gcomm_param_get;
     backend->stats_get = gcomm_stats_get;
+    backend->stats_free = gcomm_stats_free;
     backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;
