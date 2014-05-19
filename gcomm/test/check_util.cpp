@@ -27,10 +27,9 @@ using std::numeric_limits;
 using std::string;
 
 using namespace gcomm;
-
-using namespace gu;
-
-#define UUID gcomm::UUID
+using gu::Exception;
+using gu::byte_t;
+using gu::Buffer;
 
 START_TEST(test_histogram)
 {
@@ -165,7 +164,7 @@ START_TEST(test_asio)
 
     SocketPtr cl = pn.socket(uri_str);
     cl->connect(uri_str);
-    pn.event_loop(datetime::Sec);
+    pn.event_loop(gu::datetime::Sec);
 
     SocketPtr sr = acc->accept();
     fail_unless(sr->state() == Socket::S_CONNECTED);
@@ -181,7 +180,7 @@ START_TEST(test_asio)
         Datagram dg(Buffer(&buf[0], &buf[0] + buf.size()));
         cl->send(dg);
     }
-    pn.event_loop(datetime::Sec);
+    pn.event_loop(gu::datetime::Sec);
 
     delete acc;
 

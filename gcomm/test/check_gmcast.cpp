@@ -12,10 +12,9 @@
 using namespace std;
 using namespace gcomm;
 using namespace gcomm::gmcast;
-using namespace gu;
 using namespace gu::datetime;
-
-#define UUID gcomm::UUID
+using gu::byte_t;
+using gu::Buffer;
 
 #include <check.h>
 

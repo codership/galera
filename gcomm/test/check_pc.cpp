@@ -21,12 +21,14 @@
 
 using namespace std;
 using namespace std::rel_ops;
-using namespace gu;
 using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::pc;
-
-#define UUID gcomm::UUID
+using gu::byte_t;
+using gu::Buffer;
+using gu::Exception;
+using gu::URI;
+using gu::DeleteObject;
 
 START_TEST(test_pc_messages)
 {
