@@ -262,9 +262,11 @@ The maximum number of rows allowed in the writeset. Currently, this parameter li
 .. index::
    pair: Parameters; wsrep_max_ws_size
 
-The maximum allowed writeset size. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
+The maximum allowed writeset size. This was the limit for the supported size of transactions and ``LOAD DATA`` statements however
+the real limition is in the wsrep provider. See ``repl.max_ws_size`` in :ref:`Galera Parameters <Galera Parameters>` for details and
+change its value to limit the transaction size. This parameter will be deprecated in the future.
 
-The maximum allowed writeset size is ``2G``.
+The maximum allowed writeset size is ``4G``.
 
 
 .. rubric:: wsrep_node_address
