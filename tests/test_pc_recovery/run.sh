@@ -50,7 +50,10 @@ cycle()
     for node in $NODE_LIST
     do
         echo "Restarting ${NODE_ID[$node]}"
-        stop_node $node
+        # sometimes mysql pid exists for a while
+        # after being given SIGKILL.
+        # here we double check it for safety.
+        stop_node $node || stop_node $node
         # starts with pc.recovery=1
         start_node "-g $(gcs_address $node)" $node &
     done
