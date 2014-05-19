@@ -30,6 +30,7 @@ using namespace gcomm;
 
 using namespace gu;
 
+#define UUID gcomm::UUID
 
 START_TEST(test_histogram)
 {

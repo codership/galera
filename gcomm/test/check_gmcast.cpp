@@ -15,6 +15,8 @@ using namespace gcomm::gmcast;
 using namespace gu;
 using namespace gu::datetime;
 
+#define UUID gcomm::UUID
+
 #include <check.h>
 
 // Note: Not all tests are run by default as they require default port to be

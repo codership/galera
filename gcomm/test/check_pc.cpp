@@ -26,6 +26,7 @@ using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::pc;
 
+#define UUID gcomm::UUID
 
 START_TEST(test_pc_messages)
 {

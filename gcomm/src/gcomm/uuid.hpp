@@ -24,16 +24,16 @@ namespace gcomm
 }
 
 class gcomm::UUID :
-        public gu::BaseUUID
+        public gu::UUID
 {
 public:
 
-    UUID() : gu::BaseUUID() {}
+    UUID() : gu::UUID() {}
 
     UUID(const void* node, const size_t node_len) :
-            gu::BaseUUID(node, node_len) {}
+            gu::UUID(node, node_len) {}
 
-    UUID(const int32_t idx) : gu::BaseUUID()
+    UUID(const int32_t idx) : gu::UUID()
     {
         assert(idx > 0);
         memcpy(&uuid_, &idx, sizeof(idx));
@@ -85,7 +85,7 @@ public:
 
 private:
     static const UUID uuid_nil_;
-    UUID(gu_uuid_t uuid) : gu::BaseUUID(uuid) {}
+    UUID(gu_uuid_t uuid) : gu::UUID(uuid) {}
 };
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)

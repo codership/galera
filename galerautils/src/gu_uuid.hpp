@@ -78,23 +78,23 @@ inline size_t gu_uuid_unserialize(const gu::byte_t* buf, size_t buflen,
 }
 
 namespace gu {
-    class BaseUUID;
+    class UUID;
 }
 
-class gu::BaseUUID
+class gu::UUID
 {
 public:
 
-    BaseUUID() : uuid_(GU_UUID_NIL) {}
+    UUID() : uuid_(GU_UUID_NIL) {}
 
-    BaseUUID(const void* node, const size_t node_len) : uuid_()
+    UUID(const void* node, const size_t node_len) : uuid_()
     {
         gu_uuid_generate(&uuid_, node, node_len);
     }
 
-    BaseUUID(gu_uuid_t uuid) : uuid_(uuid) {}
+    UUID(gu_uuid_t uuid) : uuid_(uuid) {}
 
-    virtual ~BaseUUID() {}
+    virtual ~UUID() {}
     size_t unserialize(const gu::byte_t* buf,
                        const size_t buflen, const size_t offset)
     {
@@ -117,17 +117,17 @@ public:
         return &uuid_;
     }
 
-    bool operator<(const BaseUUID& cmp) const
+    bool operator<(const UUID& cmp) const
     {
         return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
     }
 
-    bool operator==(const BaseUUID& cmp) const
+    bool operator==(const UUID& cmp) const
     {
         return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
     }
 
-    bool older(const BaseUUID& cmp) const
+    bool older(const UUID& cmp) const
     {
         return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
@@ -151,13 +151,13 @@ public:
         is >> str;
         ssize_t ret(gu_uuid_scan(str, GU_UUID_STR_LEN, &uuid_));
         if (ret == -1)
-            gu_throw_error(EINVAL) << "could not parse BaseUUID from '" << str
+            gu_throw_error(EINVAL) << "could not parse UUID from '" << str
                                    << '\'' ;
         return is;
     }
 
 protected:
     gu_uuid_t         uuid_;
-}; // class BaseUUID
+}; // class UUID
 
 #endif // _gu_uuid_hpp_

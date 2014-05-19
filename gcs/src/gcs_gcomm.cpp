@@ -201,7 +201,7 @@ public:
         delete net_;
     }
 
-    const UUID& get_uuid() const { return uuid_; }
+    const gcomm::UUID& get_uuid() const { return uuid_; }
 
     static void* run_fn(void* arg)
     {
@@ -369,7 +369,7 @@ private:
     void unref() { }
 
     gu::Config& conf_;
-    UUID        uuid_;
+    gcomm::UUID        uuid_;
     pthread_t   thd_;
     URI         uri_;
     Protonet*   net_;
@@ -464,7 +464,7 @@ void GCommConn::run()
             // Backtrace().print(std::cerr);
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -486,7 +486,7 @@ void GCommConn::run()
 
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -546,7 +546,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 }
 
 
-static void fill_cmp_msg(const View& view, const UUID& my_uuid,
+static void fill_cmp_msg(const View& view, const gcomm::UUID& my_uuid,
                          gcs_comp_msg_t* cm)
 {
     size_t n(0);
@@ -554,7 +554,7 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     for (NodeList::const_iterator i = view.members().begin();
          i != view.members().end(); ++i)
     {
-        const UUID& uuid(NodeList::key(i));
+        const gcomm::UUID& uuid(NodeList::key(i));
 
         log_debug << "member: " << n << " uuid: " << uuid
                   << " segment: " << static_cast<int>(i->second.segment());
@@ -737,7 +737,7 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
                   << e.get_errno() << ": " << e.what();
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.handle_up(0, Datagram(),
-                       ProtoUpMeta(UUID::nil(),
+                       ProtoUpMeta(gcomm::UUID::nil(),
                                    ViewId(V_NON_PRIM),
                                    0,
                                    0xff,

@@ -26,6 +26,7 @@ using std::string;
 using namespace gu;
 using namespace gcomm;
 
+#define UUID gcomm::UUID
 
 START_TEST(test_uuid)
 {

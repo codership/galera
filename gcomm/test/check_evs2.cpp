@@ -35,6 +35,7 @@ using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::evs;
 
+#define UUID gcomm::UUID
 
 void init_rand()
 {
