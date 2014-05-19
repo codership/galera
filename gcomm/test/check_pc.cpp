@@ -1337,10 +1337,10 @@ public:
         delete tp_;
     }
 
-    void start()
+    void start(bool bootstrap = false)
     {
         gcomm::connect(tp_, this);
-        tp_->connect();
+        tp_->connect(bootstrap);
         gcomm::disconnect(tp_, this);
         tp_->pstack().push_proto(this);
     }
@@ -1423,7 +1423,7 @@ START_TEST(test_pc_transport)
 
     gu_conf_self_tstamp_on();
 
-    pu1.start();
+    pu1.start(true);
     net->event_loop(5*Sec);
 
     PCUser2 pu2(*net,
@@ -1776,7 +1776,7 @@ START_TEST(test_set_param)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "node.name=n1");
-    pu1.start();
+    pu1.start(true);
     // no such a parameter
     fail_unless(net->set_param("foo.bar", "1") == false);
 
@@ -1848,7 +1848,7 @@ START_TEST(test_trac_599)
     int err;
     err = tp->send_down(dg, gcomm::ProtoDownMeta());
     fail_unless(err == ENOTCONN, "%d", err);
-    tp->connect();
+    tp->connect(true);
     buf.resize(tp->mtu());
     Datagram dg2(buf);
     err = tp->send_down(dg2, gcomm::ProtoDownMeta());
@@ -1886,7 +1886,7 @@ START_TEST(test_trac_620)
     };
     D d(conf);
     gcomm::connect(tp, &d);
-    tp->connect();
+    tp->connect(true);
     tp->close(true);
     gcomm::disconnect(tp, &d);
     delete tp;
