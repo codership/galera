@@ -1337,10 +1337,10 @@ public:
         delete tp_;
     }
 
-    void start(bool bootstrap = false)
+    void start()
     {
         gcomm::connect(tp_, this);
-        tp_->connect(bootstrap);
+        tp_->connect();
         gcomm::disconnect(tp_, this);
         tp_->pstack().push_proto(this);
     }
@@ -1419,11 +1419,12 @@ START_TEST(test_pc_transport)
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
+                "pc.recovery=0&"
                 "node.name=n1");
 
     gu_conf_self_tstamp_on();
 
-    pu1.start(true);
+    pu1.start();
     net->event_loop(5*Sec);
 
     PCUser2 pu2(*net,
@@ -1433,6 +1434,7 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "pc.recovery=0&"
                 "node.name=n2");
     PCUser2 pu3(*net,
                 std::string("pc://")
@@ -1441,6 +1443,7 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "pc.recovery=0&"
                 "node.name=n3");
 
 
@@ -1775,8 +1778,9 @@ START_TEST(test_set_param)
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
+                "pc.recovery=0&"
                 "node.name=n1");
-    pu1.start(true);
+    pu1.start();
     // no such a parameter
     fail_unless(net->set_param("foo.bar", "1") == false);
 
