@@ -13,6 +13,6 @@ static const char* stats_key_string[] = {
 const char*
 gcomm::stats_key_to_string(gcomm::StatsKey key)
 {
-    assert(key < gcomm::StatsKey::S_MAX);
+    assert(key < gcomm::S_MAX);
     return stats_key_string[key];
 }
