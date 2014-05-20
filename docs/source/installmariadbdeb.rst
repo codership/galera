@@ -1,5 +1,5 @@
 =============================================
-Installing Galera Cluster for MariaDB on Debian-based Distributions
+Debian Installation
 =============================================
 .. _`MariaDB Debian Installation`
 

@@ -1,5 +1,5 @@
 =============================================
-Installing Galera Cluster for Percona XtraDB on RPM-based Distributions
+RPM Installation
 =============================================
 .. _`XtraDB RPM Installation
 

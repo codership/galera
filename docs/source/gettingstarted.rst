@@ -1,7 +1,8 @@
 =================
- Getting Started with Galera Cluster
+ Getting Started
 =================
 .. _`Getting Started with Galera Cluster`:
+
 
 The :term:`Galera Replication Plugin` is a synchronous multi-master replication plugin for MySQL, MariaDB and Percona XtraDB.  It features:
 
@@ -52,34 +53,24 @@ Installation
 
 Galera Cluster runs in Linux on MySQL, MariaDB and Percona XtraDB through the Galera Replicator Plugin.  You can install the plugin into any of these database servers through your package manager or by building it from source.
 
-**MySQL**
+**Galera Cluster for MySQL**
 
-.. toctree::
-   :maxdepth: 1
+- :doc:`installmysqldeb`
+- :doc:`installmysqlrpm`
+- :doc:`installmysqlsrc`
 
-   installmysqldeb
-   installmysqlrpm
-   installmysqlsrc
+**Galerea Cluster for MariaDB**
 
-**MariaDB**
-
-.. toctree::
-   :maxdepth: 1
-
-   installmariadbdeb
-   installmariadbrpm
-   installmariadbsrc
+- :doc:`installmariadbdeb`
+- :doc:`installmariadbrpm`
+- :doc:`installmariadbsrc`
 
 
-**Percona XtraDB**
+**Galera Cluster for Percona XtraDB**
 
-.. toctree::
-   :maxdepth: 1
-
-   installxtradbdeb
-   installxtradbrpm
-   installxtradbsrc
-
+- :doc:`installxtradbdeb`
+- :doc:`installxtradbrpm`
+- :doc:`installxtradbsrc`
 
 ------------------------------
 Configuration
@@ -88,11 +79,8 @@ Configuration
 
 Before you can bring Galera Cluster online, each node in the cluster requires some configuration, to grant other nodes access and to enable write-set replication on the database server.
 
-.. toctree::
-   :maxdepth: 1
-
-   sysconfiguration
-   dbconfiguration
+- :doc:`sysconfiguration`
+- :doc:`dbconfiguration`
 
 
 ------------------------------
@@ -102,10 +90,18 @@ Cluster Management
 
 When you finish installation and configuration on your server, you're ready to launch the first node and bring the cluster online.  Once all the nodes are started, you can test that they're working and restart if necessary.
 
+- :doc:`startingcluster`
+- :doc:`testingcluster`
+- :doc:`restartingcluster`
+
 
 .. toctree::
-   :maxdepth: 1
-
-   startingcluster
-   testingcluster
-   restartingcluster
+	:titlesonly:
+	:hidden: 
+	
+	galerainstallation
+	sysconfiguration
+	dbconfiguration
+	startingcluster
+	testingcluster
+	restartingcluster

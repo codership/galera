@@ -1,5 +1,5 @@
 =========================================
-Installing Galera Cluster for MySQL from Source
+Source Installation
 =========================================
 .. _'MySQL Source Installation'
 

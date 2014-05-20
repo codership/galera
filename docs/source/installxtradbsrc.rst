@@ -1,5 +1,5 @@
 =========================================
-Installing Galera Cluster for Percona XtraDB from Source
+Source Installation
 =========================================
 .. _'XtraDB Source Installation'
 

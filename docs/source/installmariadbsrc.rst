@@ -1,5 +1,5 @@
 =========================================
-Installing Galera Cluster for MariaDB from Source
+Source Installation
 =========================================
 .. _'MariaDB Source Installation'
 

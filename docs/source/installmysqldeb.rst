@@ -1,5 +1,5 @@
 =============================================
-Installing Galera Cluster for MySQL on Debian-based Distributions
+Debian Installation
 =============================================
 .. _`MySQL Debian Installation`
 

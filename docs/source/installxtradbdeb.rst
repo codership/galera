@@ -1,5 +1,5 @@
 =====================================
-Installing Galera Cluster for Percona XtraDB on Debian-based Distributions
+Debian Installation
 =====================================
 .. _`XtraDB Debian Installation`
 

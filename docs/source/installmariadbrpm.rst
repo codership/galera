@@ -1,5 +1,5 @@
 =============================================
-Installing Galera Cluster for MariaDB on RPM-based Distributions
+RPM Installation
 =============================================
 .. _`MariaDB RPM Installation`
 

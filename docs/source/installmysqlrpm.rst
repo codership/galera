@@ -1,5 +1,5 @@
 =============================================
-Installing Galera Cluster for MySQL on RPM-based Distributions
+RPM Installation
 =============================================
 .. _`MySQL RPM Installation`
 

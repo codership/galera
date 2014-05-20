@@ -89,9 +89,11 @@ To disable SELinux, complete the following steps:
 
 	SELINUX=permissive
 
-For more information, see the SELinux Documentation.
+SELinux now runs by default in permissive mode.
 
-This blog article titled `SELinux and MySQL <https://blogs.oracle.com/jsmyth/entry/selinux_and_mysql>`_ will provide a good guide for writing a selinux policy. Don't forget to add a label for port 4567 as ``mysqld_port_t``.
+For more information on writing SELinux policies, see `SELinux and MySQL <https://blogs.oracle.com/jsmyth/entry/selinux_and_mysql>`.  For additional information, see the SELinux Documentation.
+
+	.. note:: Add a label for port 4567 as ``mysqld_port_t``.
 
 
 ----------------------------

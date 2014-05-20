@@ -3,48 +3,40 @@ Galera Cluster Installation
 ==============================
 .. _'Galera Cluster Installation'
 
-Intro.  General Notes on Installation Process.
 
---------------------------
-Galera Cluster for MySQL
---------------------------
+Galera Cluster runs in Linux on MySQL, MariaDB and Percona XtraDB through the Galera Replicator Plugin.  You can install the plugin into any of these database servers through your package manager or by building it from source.
 
-Intro.  General Notes on MySQL
+
+**Galera Cluster for MySQL**
+
+- :doc:`installmysqldeb`
+- :doc:`installmysqlrpm`
+- :doc:`installmysqlsrc`
+
+**Galera Cluster for MariaDB**
+
+- :doc:`installmariadbdeb`
+- :doc:`installmariadbrpm`
+- :doc:`installmariadbsrc`
+	
+
+**Galera Cluster for Percona XtraDB**
+
+- :doc:`installxtradbdeb`
+- :doc:`installxtradbrpm`
+- :doc:`installxtradbsrc`
 
 .. toctree::
-	:maxdepth: 1
-	:numbered:
-	
+	:hidden:
+	:titlesonly:
+
 	installmysqldeb
 	installmysqlrpm
-	installmysqlsrc
-
-
---------------------------
-Galera Cluster for MariaDB
---------------------------
-
-Intro.  General Notes on MariaDB
-
-.. toctree::
-	:maxdepth: 1
-	:numbered:
-	
+	installmysqlsrc	
 	installmariadbdeb
 	installmariadbrpm
 	installmariadbsrc
-	
-
---------------------------
-Galera Cluster for Percona XtraDB
---------------------------
-
-Intro.  General Notes on Percona XtraDB
-
-.. toctree::
-	:maxdepth: 1
-	:numbered:
-	
 	installxtradbdeb
 	installxtradbrpm
 	installxtradbsrc
+
