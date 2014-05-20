@@ -12,8 +12,8 @@ Contents:
 .. toctree::
 
    introduction
-   architecture
    certificationbasedreplication
+   architecture
    isolationlevels
    statetransfer
    scriptablesst

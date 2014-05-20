@@ -70,7 +70,8 @@ Documentation
 
 .. toctree::
    :maxdepth: 2
-   :numbered:
+   :titlesonly:
+   :includehidden:
 
    technicaldescription
    gettingstarted

@@ -12,6 +12,7 @@ This chapter contains reference information on Galera Cluster.
 Contents:
 
 .. toctree::
+	:titlesonly:
 
 	galeraparameters
 	mysqlwsrepoptions

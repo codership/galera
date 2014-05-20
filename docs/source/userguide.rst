@@ -10,6 +10,7 @@
 Contents:
 
 .. toctree::
+	:titlesonly:
 
    deploymentvariants
    nodeprovisioning
