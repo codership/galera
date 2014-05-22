@@ -849,12 +849,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
             assert (conf->my_idx < 0);
             gu_info ("Received SELF-LEAVE. Closing connection.");
             gcs_shift_state (conn, GCS_CONN_CLOSED);
-            // normally we have to call gcs_close here to shutdown appliers.
-            // however we can not do it here, because gcs_core calls
-            // thread_join of the very thread we are in.
-            // so we can do a trick: close conn->recv_q,and let gcs_recv
-            // which is in applier thread calls gcs_close.
-            gu_fifo_close (conn->recv_q);
         }
         else {
             gu_info ("Received NON-PRIMARY.");
@@ -1334,8 +1328,13 @@ long gcs_close (gcs_conn_t *conn)
         return -EALREADY;
     }
 
-    if (!(ret = gcs_sm_close   (conn->sm)) &&
-        !(ret = gcs_core_close (conn->core))) {
+    if (!(ret = gcs_sm_close (conn->sm))) {
+        // we ignore return value on purpose. the reason is
+        // we can not tell why self-leave message is generated.
+        // there are two possible reasons.
+        // 1. gcs_core_close is called.
+        // 2. GCommConn::run() caught exception.
+        (void)gcs_core_close (conn->core);
 
         /* here we synchronize with SELF_LEAVE event caused by gcs_core_close */
         if ((ret = gu_thread_join (conn->recv_thread, NULL))) {
@@ -1749,7 +1748,6 @@ long gcs_recv (gcs_conn_t*        conn,
         switch (err) {
         case -ENODATA:
             assert (GCS_CONN_CLOSED == conn->state);
-            gcs_close (conn);
             return GCS_CLOSED_ERROR;
         default:
             return err;
