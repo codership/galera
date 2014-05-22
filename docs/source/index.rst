@@ -70,7 +70,7 @@ Documentation
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
+   :numbered:
    :includehidden:
 
    technicaldescription

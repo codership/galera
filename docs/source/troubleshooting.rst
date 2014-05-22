@@ -13,7 +13,7 @@ for Galera Cluster.
 Contents:
 
 .. toctree::
-	:titlesonly:
+	:numbered:
 
    symptomsolution
    detectingaslownode

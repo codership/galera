@@ -10,7 +10,8 @@
 Contents:
 
 .. toctree::
-
+	:numbered:
+	
    introduction
    certificationbasedreplication
    architecture
