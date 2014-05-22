@@ -1,6 +1,8 @@
 # Copyright (C) 2012 Coedership Oy
 # This config file is to be sourced by garb service script.
 
+# REMOVE THIS AFTER CONFIGURATION
+
 # A space-separated list of node addresses (address[:port]) in the cluster
 # GALERA_NODES=""
 
