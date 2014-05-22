@@ -157,6 +157,8 @@ struct gcs_conn
     /* gcs_core object */
     gcs_core_t*  core; // the context that is returned by
                        // the core group communication system
+
+    int close_count; // how many gcs_close has been called.
 };
 
 // Oh C++, where art thou?
@@ -843,6 +845,12 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
             assert (conf->my_idx < 0);
             gu_info ("Received SELF-LEAVE. Closing connection.");
             gcs_shift_state (conn, GCS_CONN_CLOSED);
+            // normally we have to call gcs_close here to shutdown appliers.
+            // however we can not do it here, because gcs_core calls
+            // thread_join of the very thread we are in.
+            // so we can do a trick: close conn->recv_q,and let gcs_recv
+            // which is in applier thread calls gcs_close.
+            gu_fifo_close (conn->recv_q);
         }
         else {
             gu_info ("Received NON-PRIMARY.");
@@ -1278,6 +1286,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
                 gu_fifo_open(conn->recv_q);
                 gcs_shift_state (conn, GCS_CONN_OPEN);
                 gu_info ("Opened channel '%s'", channel);
+                conn->close_count = 0;
                 goto out;
             }
             else {
@@ -1313,6 +1322,10 @@ long gcs_close (gcs_conn_t *conn)
      * the following call, it is thread-safe */
 
     long ret;
+
+    if (gu_sync_fetch_and_add(&conn->close_count, 1) != 0) {
+        return -EALREADY;
+    }
 
     if (!(ret = gcs_sm_close   (conn->sm)) &&
         !(ret = gcs_core_close (conn->core))) {
@@ -1763,6 +1776,7 @@ long gcs_recv (gcs_conn_t*        conn,
         switch (err) {
         case -ENODATA:
             assert (GCS_CONN_CLOSED == conn->state);
+            gcs_close (conn);
             return GCS_CLOSED_ERROR;
         default:
             return err;

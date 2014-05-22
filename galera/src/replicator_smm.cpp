@@ -389,7 +389,10 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         {
             log_warn << "Broken shutdown sequence, provider state: "
                      << state_() << ", retval: " << retval;
-            assert (0);
+            // if exception raised from gcs can not be handled.
+            // galera needs to be restarted. but state_() now
+            // is not S_CLOSING. so we comment out following line.
+            // assert (0);
             /* avoid abort in production */
             state_.shift_to(S_CLOSING);
         }
