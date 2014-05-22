@@ -1,0 +1,6 @@
+percona-xtradb-cluster-galera-3.x (0.1-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed,  06 Nov 2013 17:00:00 -0300
+
