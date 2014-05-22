@@ -95,6 +95,11 @@ start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
 
+	if grep -q -E '^# REMOVE' $config;then 
+	    log_daemon_msg "Garbd config $config is not configured yet"
+	    return 0
+	fi
+
 	if [ -r $PIDFILE ]; then
 		log_failure "$prog is already running with PID $(cat ${PIDFILE})"
 		return 0

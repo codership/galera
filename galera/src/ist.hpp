@@ -17,7 +17,9 @@
 #pragma GCC diagnostic ignored "-Weffc++"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "asio.hpp"
+#ifdef HAVE_ASIO_SSL_HPP
 #include "asio/ssl.hpp"
+#endif
 #include <stack>
 #include <set>
 
@@ -52,7 +54,9 @@ namespace galera
             std::string                                   recv_addr_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
+#ifdef HAVE_ASIO_SSL_HPP
             asio::ssl::context                            ssl_ctx_;
+#endif
             pthread_t                                     thread_;
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
@@ -78,7 +82,9 @@ namespace galera
             int error_code_;
             wsrep_seqno_t current_seqno_;
             wsrep_seqno_t last_seqno_;
+#ifdef HAVE_ASIO_SSL_HPP
             bool use_ssl_;
+#endif
             int version_;
         };
 
@@ -93,11 +99,13 @@ namespace galera
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
             void cancel()
             {
+#ifdef HAVE_ASIO_SSL_HPP
                 if (use_ssl_ == true)
                 {
                     ssl_stream_.lowest_layer().close();
                 }
                 else
+#endif
                 {
                     socket_.close();
                 }
@@ -108,9 +116,11 @@ namespace galera
             const gu::Config&                        conf_;
             asio::io_service                         io_service_;
             asio::ip::tcp::socket                    socket_;
+#ifdef HAVE_ASIO_SSL_HPP
             asio::ssl::context                       ssl_ctx_;
             asio::ssl::stream<asio::ip::tcp::socket> ssl_stream_;
             bool                                     use_ssl_;
+#endif
             gcache::GCache&                          gcache_;
             int                                      version_;
         };

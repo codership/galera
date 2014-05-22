@@ -1,0 +1,17 @@
+percona-xtradb-cluster-galera-2.x (0.3-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed,  07 Feb 2014 17:00:00 -0300
+
+percona-xtradb-cluster-galera-2.x (0.2-1) unstable; urgency=low
+
+  * Change package name to include 2.x in its name
+
+ -- Ignacio Nin <ignacio-nin@percona.com>  Tue, 13 Mar 2012 13:14:50 -0300
+
+percona-xtradb-cluster-galera (0.1-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Ignacio Nin <ignacio.nin@percona.com>  Tue, 06 Dec 2011 12:19:07 -0500
