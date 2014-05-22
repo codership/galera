@@ -31,6 +31,8 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
+    static_ssl=[0|1]    Build with static SSL
+    with_ssl=path       Prefix for SSL
     debug=n             debug build with optimization level n
     arch=str            target architecture [i686|x86_64]
     build_dir=dir       build directory, default: '.'
@@ -55,6 +57,8 @@ opt_flags    = ' -g -O3 -DNDEBUG'
 compile_arch = ''
 link_arch    = ''
 
+with_ssl     = ''
+
 # Build directory
 build_dir    = ''
 
@@ -64,6 +68,7 @@ build_dir    = ''
 #
 
 build_dir = ARGUMENTS.get('build_dir', '')
+with_ssl = ARGUMENTS.get('with_ssl', '/usr/lib64')
 
 # Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
@@ -104,12 +109,13 @@ else:
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
+static_ssl = int(ARGUMENTS.get('static_ssl', 0))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '2.10dev')
+GALERA_VER = ARGUMENTS.get('version', '2.10')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -376,12 +382,25 @@ if ssl == 1:
         print 'ssl support required but asio/ssl.hpp not found or not usable'
         print 'compile with ssl=0 or check that openssl devel headers are usable'
         Exit(1)
-    if conf.CheckLib('ssl'):
-        conf.CheckLib('crypto')
+    if static_ssl == 0:
+        if conf.CheckLib('ssl'):
+            conf.CheckLib('crypto')
+        else:
+            print 'ssl support required but openssl library not found'
+            print 'compile with ssl=0 or check that openssl library is usable'
+            Exit(1)
     else:
-        print 'ssl support required but openssl library not found'
-        print 'compile with ssl=0 or check that openssl library is usable'
-        Exit(1)
+        conf.env.Append(LIBPATH  = [with_ssl])
+        if conf.CheckLib('libssl.a', autoadd=0) or \
+            conf.CheckLib('libcrypto.a', autoadd=0) or \
+            conf.CheckLib('libz.a', autoadd=0):
+            pass
+        else:
+            print 'ssl support required but openssl library (static) not found'
+            print 'compile with ssl=0 or check that' 
+            print 'openssl static librares - libssl.a, libcrypto.a, libz.a are available'
+            Exit(1)
+
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
@@ -393,7 +412,7 @@ if strict_build_flags == 1:
 #        conf.env.Append(CPPFLAGS = ' -Qunused-arguments -Wno-tautological-compare -D_Bool=bool')
 
 env = conf.Finish()
-Export('env', 'sysname', 'libboost_program_options')
+Export('env', 'sysname', 'libboost_program_options', 'static_ssl', 'with_ssl')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

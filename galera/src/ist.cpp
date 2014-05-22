@@ -20,10 +20,12 @@ namespace
     static std::string const CONF_KEEP_KEYS     ("ist.keep_keys");
     static bool        const CONF_KEEP_KEYS_DEFAULT (true);
 
+#ifdef HAVE_ASIO_SSL_HPP
     static std::string const CONF_SSL_KEY       (COMMON_CONF_SSL_KEY);
     static std::string const CONF_SSL_CERT      (COMMON_CONF_SSL_CERT);
     static std::string const CONF_SSL_CA        (COMMON_CONF_SSL_CA);
     static std::string const CONF_SSL_PSWD_FILE (COMMON_CONF_SSL_PSWD_FILE);
+#endif
 
 
     static std::string escape_addr(const asio::ip::address& addr)
@@ -61,6 +63,8 @@ namespace
     }
 
 
+
+#ifdef HAVE_ASIO_SSL_HPP
     class SSLPasswordCallback
     {
     public:
@@ -104,6 +108,7 @@ namespace
         ctx.load_verify_file(conf.get(CONF_SSL_CA,
                                       conf.get(CONF_SSL_CERT)));
     }
+#endif
 }
 
 
@@ -159,10 +164,12 @@ galera::ist::register_params(gu::Config& conf)
 {
     conf.add(Receiver::RECV_ADDR);
     conf.add(CONF_KEEP_KEYS);
+#ifdef HAVE_ASIO_SSL_HPP
     conf.add(CONF_SSL_KEY);
     conf.add(CONF_SSL_CERT);
     conf.add(CONF_SSL_CA);
     conf.add(CONF_SSL_PSWD_FILE);
+#endif
 }
 
 galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
@@ -170,7 +177,9 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     conf_      (conf),
     io_service_(),
     acceptor_  (io_service_),
+#ifdef HAVE_ASIO_SSL_HPP
     ssl_ctx_   (io_service_, asio::ssl::context::sslv23),
+#endif
     thread_(),
     mutex_(),
     cond_(),
@@ -180,7 +189,9 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     error_code_(0),
     current_seqno_(-1),
     last_seqno_(-1),
+#ifdef HAVE_ASIO_SSL_HPP
     use_ssl_(false),
+#endif
     version_(-1)
 {
     std::string recv_addr;
@@ -242,6 +253,7 @@ IST_determine_recv_addr (gu::Config& conf)
     /* check if explicit scheme is present */
     if (recv_addr.find("://") == std::string::npos)
     {
+#ifdef HAVE_ASIO_SSL_HPP
         bool ssl(false);
 
         try
@@ -254,6 +266,7 @@ IST_determine_recv_addr (gu::Config& conf)
         if (ssl)
             recv_addr.insert(0, "ssl://");
         else
+#endif
             recv_addr.insert(0, "tcp://");
     }
 
@@ -303,12 +316,14 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     gu::URI     const uri(recv_addr_);
     try
     {
+#ifdef HAVE_ASIO_SSL_HPP
         if (uri.get_scheme() == "ssl")
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
             prepare_ssl_ctx(conf_, ssl_ctx_);
         }
+#endif
 
         asio::ip::tcp::resolver resolver(io_service_);
         asio::ip::tcp::resolver::query
@@ -362,10 +377,13 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 void galera::ist::Receiver::run()
 {
     asio::ip::tcp::socket socket(io_service_);
+#ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::context ssl_ctx(io_service_, asio::ssl::context::sslv23);
     asio::ssl::stream<asio::ip::tcp::socket> ssl_stream(io_service_, ssl_ctx_);
+#endif
     try
     {
+#ifdef HAVE_ASIO_SSL_HPP
         if (use_ssl_ == true)
         {
             acceptor_.accept(ssl_stream.lowest_layer());
@@ -373,6 +391,7 @@ void galera::ist::Receiver::run()
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::server);
         }
         else
+#endif
         {
             acceptor_.accept(socket);
             set_fd_options(socket);
@@ -389,6 +408,7 @@ void galera::ist::Receiver::run()
     try
     {
         Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+#ifdef HAVE_ASIO_SSL_HPP
         if (use_ssl_ == true)
         {
             p.send_handshake(ssl_stream);
@@ -396,6 +416,7 @@ void galera::ist::Receiver::run()
             p.send_ctrl(ssl_stream, Ctrl::C_OK);
         }
         else
+#endif
         {
             p.send_handshake(socket);
             p.recv_handshake_response(socket);
@@ -404,11 +425,13 @@ void galera::ist::Receiver::run()
         while (true)
         {
             TrxHandle* trx;
+#ifdef HAVE_ASIO_SSL_HPP
             if (use_ssl_ == true)
             {
                 trx = p.recv_trx(ssl_stream);
             }
             else
+#endif
             {
                 trx = p.recv_trx(socket);
             }
@@ -455,12 +478,14 @@ void galera::ist::Receiver::run()
 
 err:
     gu::Lock lock(mutex_);
+#ifdef HAVE_ASIO_SSL_HPP
     if (use_ssl_ == true)
     {
         ssl_stream.lowest_layer().close();
         // ssl_stream.shutdown();
     }
     else
+#endif
     {
         socket.close();
     }
@@ -576,6 +601,7 @@ void galera::ist::Receiver::interrupt()
                 << uri.to_string()
                 << "', asio error '" << e.what() << "'";
         }
+#ifdef HAVE_ASIO_SSL_HPP
         if (use_ssl_ == true)
         {
             asio::ssl::stream<asio::ip::tcp::socket>
@@ -590,6 +616,7 @@ void galera::ist::Receiver::interrupt()
             p.recv_ctrl(ssl_stream);
         }
         else
+#endif
         {
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
@@ -616,9 +643,11 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
     conf_(conf),
     io_service_(),
     socket_(io_service_),
+#ifdef HAVE_ASIO_SSL_HPP
     ssl_ctx_(io_service_, asio::ssl::context::sslv23),
     ssl_stream_(io_service_, ssl_ctx_),
     use_ssl_(false),
+#endif
     gcache_(gcache),
     version_(version)
 {
@@ -631,6 +660,7 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
                   uri.get_port(),
                   asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+#ifdef HAVE_ASIO_SSL_HPP
         if (uri.get_scheme() == "ssl")
         {
             use_ssl_ = true;
@@ -644,6 +674,7 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
             ssl_stream_.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
         }
         else
+#endif
         {
             socket_.connect(*i);
             set_fd_options(socket_);
@@ -659,11 +690,13 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
 
 galera::ist::Sender::~Sender()
 {
+#ifdef HAVE_ASIO_SSL_HPP
     if (use_ssl_ == true)
     {
         ssl_stream_.lowest_layer().close();
     }
     else
+#endif
     {
         socket_.close();
     }
@@ -681,6 +714,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
     {
         Proto p(version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
+#ifdef HAVE_ASIO_SSL_HPP
         if (use_ssl_ == true)
         {
             p.recv_handshake(ssl_stream_);
@@ -688,6 +722,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             ctrl = p.recv_ctrl(ssl_stream_);
         }
         else
+#endif
         {
             p.recv_handshake(socket_);
             p.send_handshake_response(socket_);
@@ -709,21 +744,25 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
                 // log_info << "sending " << buf_vec[i].seqno_g();
+#ifdef HAVE_ASIO_SSL_HPP
                 if (use_ssl_ == true)
                 {
                     p.send_trx(ssl_stream_, buf_vec[i]);
                 }
                 else
+#endif
                 {
                     p.send_trx(socket_, buf_vec[i]);
                 }
                 if (buf_vec[i].seqno_g() == last)
                 {
+#ifdef HAVE_ASIO_SSL_HPP
                     if (use_ssl_ == true)
                     {
                         p.send_ctrl(ssl_stream_, Ctrl::C_EOF);
                     }
                     else
+#endif
                     {
                         p.send_ctrl(socket_, Ctrl::C_EOF);
                     }
@@ -732,11 +771,13 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                     {
                         gu::byte_t b;
                         size_t n;
+#ifdef HAVE_ASIO_SSL_HPP
                         if (use_ssl_ == true)
                         {
                             n = asio::read(ssl_stream_, asio::buffer(&b, 1));
                         }
                         else
+#endif
                         {
                             n = asio::read(socket_, asio::buffer(&b, 1));
                         }
