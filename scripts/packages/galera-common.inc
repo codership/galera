@@ -15,7 +15,7 @@
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
-%requires    libssl0.9.8
+%requires    libssl${OPENSSL_SHLIB_VERSION_NUMBER}
 %format rpm
 %requires    glibc      2.4
 %requires    libstdc++  4.1.2
