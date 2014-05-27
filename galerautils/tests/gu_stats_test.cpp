@@ -22,12 +22,21 @@ START_TEST(test_stats)
     st.insert(30.0);
     fail_if(!double_equal(st.mean(), 20.0));
     fail_if(!double_equal(st.variance() * 3, 200.0));
+    fail_if(!double_equal(st.min(), 10.0));
+    fail_if(!double_equal(st.max(), 30.0));
     st.clear();
 
     st.insert(10.0);
     fail_if(!double_equal(st.mean(), 10.0));
     fail_if(!double_equal(st.variance(), 0.0));
+    fail_if(!double_equal(st.min(), 10.0));
+    fail_if(!double_equal(st.max(), 10.0));
     st.clear();
+
+    fail_if(!double_equal(st.mean(), 0.0));
+    fail_if(!double_equal(st.variance(), 0.0));
+    fail_if(!double_equal(st.min(), 0.0));
+    fail_if(!double_equal(st.max(), 0.0));
 }
 END_TEST
 
