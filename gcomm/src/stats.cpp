@@ -6,7 +6,7 @@
 #include "stats.hpp"
 
 static const char* stats_key_string[] = {
-    "repl_latency_hist",
+    "msg_repl_latency",
     0
 };
 

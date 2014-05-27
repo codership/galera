@@ -13,7 +13,8 @@
 
 gu::Histogram::Histogram(const std::string& vals)
     :
-    cnt_()
+    cnt_(),
+    stats_()
 {
     std::vector<std::string> varr = gu::strsplit(vals, ',');
 
@@ -60,6 +61,7 @@ void gu::Histogram::insert(const double val)
     }
 
     i->second++;
+    stats_.insert(val);
 }
 
 void gu::Histogram::clear()
@@ -69,9 +71,10 @@ void gu::Histogram::clear()
     {
         i->second = 0;
     }
+    stats_.clear();
 }
 
-std::string gu::Histogram::to_string()
+std::string gu::Histogram::to_string() const
 {
     std::ostringstream os;
     os << *this;

@@ -12,7 +12,7 @@ namespace gcomm
 {
     enum StatsKey
     {
-        S_REPL_LAGTENCY_HIST,
+        S_MSG_REPL_LATENCY,
         S_MAX
     };
     const char* stats_key_to_string(StatsKey key);

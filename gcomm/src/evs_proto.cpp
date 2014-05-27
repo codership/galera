@@ -378,7 +378,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 
 void gcomm::evs::Proto::get_stats(Stats& stats)
 {
-    stats[S_REPL_LAGTENCY_HIST] = hs_safe_.to_string();
+    stats[S_MSG_REPL_LATENCY] = hs_safe_.stats().to_string();
 }
 
 std::ostream& gcomm::evs::operator<<(std::ostream& os, const Proto& p)
