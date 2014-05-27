@@ -14,7 +14,6 @@ libgcomm_sources = [
     'evs_proto.cpp',
     'gmcast.cpp',
     'gmcast_proto.cpp',
-    'histogram.cpp',
     'pc.cpp',
     'pc_proto.cpp',
     'protonet.cpp',

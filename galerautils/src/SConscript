@@ -77,7 +77,8 @@ libgalerautilsxx_sources = [
     'gu_mmap.cpp',
     'gu_alloc.cpp',
     'gu_rset.cpp',
-    'gu_resolver.cpp'
+    'gu_resolver.cpp',
+    'gu_histogram.cpp'
 ]
 
 #libgalerautilsxx_objs  = libgalerautilsxx_env.Object(

@@ -1,15 +1,14 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2014 Codership Oy <info@codership.com>
  */
 
-#ifndef GCOMM_HISTOGRAM_HPP
-#define GCOMM_HISTOGRAM_HPP
+#ifndef _gu_histogram_hpp_
+#define _gu_histogram_hpp_
 
 #include <map>
 #include <ostream>
 
-
-namespace gcomm
+namespace gu
 {
     class Histogram
     {
@@ -26,5 +25,4 @@ namespace gcomm
     std::ostream& operator<<(std::ostream&, const Histogram&);
 }
 
-
-#endif // GCOMM_HISTOGRAM_HPP
+#endif // _gu_histogram_hpp_
