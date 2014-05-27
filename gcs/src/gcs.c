@@ -157,6 +157,8 @@ struct gcs_conn
     /* gcs_core object */
     gcs_core_t*  core; // the context that is returned by
                        // the core group communication system
+
+    int close_count; // how many gcs_close has been called.
 };
 
 // Oh C++, where art thou?
@@ -1278,6 +1280,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
                 gu_fifo_open(conn->recv_q);
                 gcs_shift_state (conn, GCS_CONN_OPEN);
                 gu_info ("Opened channel '%s'", channel);
+                conn->close_count = 0;
                 goto out;
             }
             else {
@@ -1314,8 +1317,17 @@ long gcs_close (gcs_conn_t *conn)
 
     long ret;
 
-    if (!(ret = gcs_sm_close   (conn->sm)) &&
-        !(ret = gcs_core_close (conn->core))) {
+    if (gu_sync_fetch_and_add(&conn->close_count, 1) != 0) {
+        return -EALREADY;
+    }
+
+    if (!(ret = gcs_sm_close (conn->sm))) {
+        // we ignore return value on purpose. the reason is
+        // we can not tell why self-leave message is generated.
+        // there are two possible reasons.
+        // 1. gcs_core_close is called.
+        // 2. GCommConn::run() caught exception.
+        (void)gcs_core_close (conn->core);
 
         /* here we synchronize with SELF_LEAVE event caused by gcs_core_close */
         if ((ret = gu_thread_join (conn->recv_thread, NULL))) {

@@ -556,8 +556,12 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
                 if (state_match_candidate (states[i], &candidates[j],
                                            quorum->version)) {
                     assert(states[i]->prim_joined == candidates[j].prim_joined);
-                    assert(candidates[j].found < candidates[j].prim_joined);
-                    assert(candidates[j].found > 0);
+                    // comment out following two lines for pc recovery
+                    // when nodes recoveried from state files, if their states
+                    // match, so candidates[j].found > 0.
+                    // However their prim_joined == 0.
+                    // assert(candidates[j].found < candidates[j].prim_joined);
+                    // assert(candidates[j].found > 0);
 
                     candidates[j].found++;
 
@@ -793,4 +797,3 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
 
     return 0;
 }
-
