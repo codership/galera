@@ -59,8 +59,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 void gcomm::gmcast::Proto::send_handshake()
 {
     handshake_uuid_ = UUID(0, 0);
-    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_, local_uuid_,
-                local_segment_);
+    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_,
+                gmcast_.uuid(), local_segment_);
 
     send_msg(hs);
 
@@ -92,7 +92,7 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
 
     Message hsr (version_, Message::T_HANDSHAKE_RESPONSE,
                  handshake_uuid_,
-                 local_uuid_,
+                 gmcast_.uuid(),
                  local_addr_,
                  group_name_,
                  local_segment_);
@@ -115,7 +115,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 log_info << "handshake failed, my group: '" << group_name_
                          << "', peer group: '" << grp << "'";
                 Message failed(version_, Message::T_FAIL,
-                               local_uuid_, local_segment_);
+                               gmcast_.uuid(), local_segment_, "invalid group");
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
@@ -127,9 +127,22 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                                       remote_uri.get_host(),
                                       gu::URI(hs.node_address()).get_port());
 
+
+            if (gmcast_.is_fenced(remote_uuid_) == true)
+            {
+                log_info << "peer " << remote_uuid_
+                         << " from " << remote_addr_
+                         << " has been fenced out, rejecting connection";
+                Message failed(version_, Message::T_FAIL,
+                               gmcast_.uuid(), local_segment_, "fenced");
+                send_msg(failed);
+                set_state(S_FAILED);
+                return;
+            }
+
             propagate_remote_ = true;
-            Message ok(version_, Message::T_OK, local_uuid_,
-                       local_segment_);
+            Message ok(version_, Message::T_OK, gmcast_.uuid(),
+                       local_segment_, "");
             send_msg(ok);
             set_state(S_OK);
         }
@@ -137,10 +150,9 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         {
             log_warn << "Parsing peer address '"
                      << hs.node_address() << "' failed: " << e.what();
-
             Message nok (version_, Message::T_FAIL,
-                         local_uuid_, local_segment_);
-
+                         gmcast_.uuid(), local_segment_,
+                         "invalid node address");
             send_msg (nok);
             set_state(S_FAILED);
         }
@@ -158,7 +170,16 @@ void gcomm::gmcast::Proto::handle_ok(const Message& hs)
 
 void gcomm::gmcast::Proto::handle_failed(const Message& hs)
 {
+    log_warn << "handshake with " << remote_uuid_ << " "
+             << remote_addr_ << " failed: '"
+             << hs.error() << "'";
     set_state(S_FAILED);
+    if (hs.error() == "fenced")
+    {
+        gu_throw_error(EPERM)
+            << "this node has been fenced out of the cluster, "
+            << "gcomm backend restart is required";
+    }
 }
 
 
@@ -190,7 +211,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 void gcomm::gmcast::Proto::handle_keepalive(const Message& msg)
 {
     log_debug << "keepalive: " << *this;
-    Message ok(version_, Message::T_OK, local_uuid_, local_segment_);
+    Message ok(version_, Message::T_OK, gmcast_.uuid(), local_segment_, "");
     send_msg(ok);
 }
 
@@ -208,7 +229,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
                            Node(LinkMap::value(i).addr())));
     }
 
-    Message msg(version_, Message::T_TOPOLOGY_CHANGE, local_uuid_,
+    Message msg(version_, Message::T_TOPOLOGY_CHANGE, gmcast_.uuid(),
                 group_name_, nl);
 
     send_msg(msg);
@@ -219,7 +240,7 @@ void gcomm::gmcast::Proto::send_keepalive()
 {
     log_debug << "sending keepalive: " << *this;
     Message msg(version_, Message::T_KEEPALIVE,
-                local_uuid_, local_segment_);
+                gmcast_.uuid(), local_segment_, "");
     send_msg(msg);
 }
 

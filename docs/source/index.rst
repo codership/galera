@@ -4,52 +4,84 @@
    contain the root `toctree` directive.
 
 ==========================
- Galera Cluster
+ Galera Cluster Documentation
 ==========================
 
-This is the official documentation for *Galera Cluster*.
+
+.. index::
+   pair: Certification based replication; Descriptions
+.. index::
+   pair: Virtual synchrony; Descriptions
+
+Galera Cluster is a synchronous multi-master database cluster, based on synchronous replication and Oracle's MySQL/InnoDB.  When Galera Cluster is in use, you can direct reads and writes to any node, and you can lose any individual node without interruption in operations and without the need to handle complex failover procedures.
+
+At a high level, Galera Cluster consists of a database server |---| that is, MySQL, MariaDB or Percona XtraDB |---| that then uses the :term:`Galera Replicator` to manage replication.  To be more specific, the MySQL replication plugin API has been extended to provide all the information and hooks required for true multi-master, synchronous replication.  This extended API is called the Write-Set Replication API, or wsrep API.
+
+Through the wsrep API, Galera Cluster provides certification-based replication.  A transaction for replication, the write-set, not only contains the database rows to replicate, but also includes information on all the locks that were held by the database during the transaction.  Each node then certifies the replicated write-set against other write-sets in the applier queue.  The write-set is then applied, if there are no conflicting locks.  At this point, the transaction is considered committed, after which each node continues to apply it to the tablespace. 
+
+This approach is also called virtually synchronous replication, given that while it is logically synchronous, the actual writing and committing to the tablespace happens independently, and thus asynchronously on each node.
+
+
+----------------------------------------
+Benefits of Galera Cluster
+----------------------------------------
+.. _`Galera Cluster Benefits`:
+
+Galera Cluster provides a significant improvement in high-availability for the MySQL ecosystem.  The various ways to achieve high-availability have typically provided only some of the features available through Galera Cluster, making the choice of a high-availability solution an exercise in tradeoffs.
+
+The following features are available through Galera Cluster:
+
+- **True Multi-master** Read and write to any node at any time.
+
+- **Synchronous Replication** No slave lag, no data is lost at node crash.
+
+- **Tightly Coupled** All nodes hold the same state. No diverged data between nodes allowed.
+
+- **Multi-threaded Slave** For better performance. For any workload.
+
+- **No Master-Slave Failover Operations or Use of VIP.**
+
+- **Hot Standby** No downtime during failover (since there is no failover).
+
+- **Automatic Node Provisioning** No need to manually back up the database and copy it to the new node.
+
+- **Supports InnoDB.**
+
+- **Transparent to Applications** Required no (or minimal) changes) to the application. 
+
+- **No Read and Write Splitting Needed.** 
 
 
 
-Contents
-========
+The result is a high-availability solution that is both robust in terms of data integrity and high-performance with instant failovers.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Cloud Implementations with Galera Cluster
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`Galera Cluster Cloud Implementations`:
+
+An additional benefit of Galera Cluster is good cloud support.  Automatic node provisioning makes elastic scale-out and scale-in operations painless.  Galera Cluster has been proven to perform extremely well in the cloud, such as when using multiple small node instances, across multiple data centers |---| AWS zones, for example |---| or even over Wider Area Networks.
+
+
+
+------------------
+Documentation
+------------------
 
 .. toctree::
    :maxdepth: 2
    :numbered:
 
-   overview
    technicaldescription
    gettingstarted
    userguide
    troubleshooting
    reference
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
+- :ref:`genindex`
+- :ref:`search`
+   
 
 
-Legal Notice
-============
-
-Copyright (C) 2013 Codership Oy <info@codership.com>
-
-This work is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License. To view a copy of this license, visit `Creative Commons Attribution-ShareAlike 3.0 Unported License <http://creativecommons.org/licenses/by-sa/3.0/>`_.
-
-Permission is granted to copy, distribute and/or modify this document under the terms of the GNU Free Documentation License, Version 1.3 or any later version published by the Free Software Foundation; with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  To view a copy of that license, visit `GNU Free Documentation License <http://www.gnu.org/licenses/fdl-1.3.txt>`_.
-
-Any trademarks, logos, and service marks in this document are the property of Codership or other third parties. You are not permitted to use these Marks without the prior written consent of Codership or such appropriate third party. Codership, Galera Cluster for MySQL,
-and the Codership logo are trademarks or registered trademarks of Codership.
-
-All Materials on this Document are (and shall continue to be) owned exclusively by Codership or other respective third party owners and are protected under applicable  copyrights, patents, trademarks, trade dress and/or other proprietary rights. Under no circumstances will you acquire any ownership rights or other interest in any Materials by or through your access or use of the Materials. All right, title and interest not expressly granted is reserved to Codership.
-
-- *"MySQL"* is a registered trademark of Oracle Corporation. 
-
-- *"Percona XtraDB Cluster"* and *"Percona Server"* are registered trademarks of Percona LLC.  
-
-- *"MariaDB"* and *"MariaDB Galera Cluster"* are registered trademarks of Monty Program Ab.
-
-
+.. |---|   unicode:: U+2014 .. EM DASH
+   :trim:

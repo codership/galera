@@ -1119,6 +1119,52 @@ table.indextable td > dl > dd > dl
     }
 }
 
+/* Documentation Team Additions */
+		body {
+		  font-family: 'Lucida Sans', 'Lucida Grande', Helvetica, Arial, sans-serif;
+		  background-color:  #f0f0f0 !important;
+		}
+		div.relbar-top,
+		div.relbar-bottom,
+		p.logo {
+		  display: none;
+		}
+		h1 {
+		  font-family: 'UniversLT-CondensedBold' !important;
+		  font-weight: normal !important;
+		  font-size: 1em;
+		  text-align: left !important;
+		  color: #004d95 !important;
+		}
+		div#contents h2,
+		div#indices-and-tables h2 {
+		  background: none;
+		  color: black;
+		  font-size: 1.2em;
+		  text-transform: none;
+		  border: none;
+		}
+		div.document a,
+		div.document a:link {
+		  color: #ed7703 !important;
+		  text-decoration: none !important;
+		  background: none !important;
+		}
+		div.document a:visited {
+		  color: #ed7703 !important;
+		  text-decoration: none !important;
+		}
+		ul.nav-link {
+			text-align:right;
+			display:inline:
+		}
+		div.section p, 
+		div.section ul,
+		div.section h2,
+		div.section h3 {
+			margin-bottom:0.75em;
+		}
+
 /*****************************************************
  * EOF
  *****************************************************/

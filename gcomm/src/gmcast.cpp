@@ -362,10 +362,12 @@ void gcomm::GMCast::gmcast_accept()
     }
 
     Proto* peer = new Proto (
-        version_, tp,
-        listener_->listen_addr() /* listen_addr */,
-        "", mcast_addr_,
-        uuid(),
+        *this,
+        version_,
+        tp,
+        listener_->listen_addr(),
+        "",
+        mcast_addr_,
         segment_,
         group_name_);
     std::pair<ProtoMap::iterator, bool> ret =
@@ -415,12 +417,12 @@ void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
     }
 
     Proto* peer = new Proto (
+        *this,
         version_,
         tp,
-        listener_->listen_addr()/* listen_addr*/ ,
+        listener_->listen_addr(),
         remote_addr,
         mcast_addr_,
-        uuid(),
         segment_,
         group_name_);
 
@@ -505,6 +507,16 @@ void gcomm::GMCast::handle_established(Proto* est)
     log_debug << self_string() << " connection established to "
               << est->remote_uuid() << " "
               << est->remote_addr();
+
+    if (is_fenced(est->remote_uuid()))
+    {
+        log_warn << "Closing connection to fenced node " << est->remote_uuid();
+        proto_map_->erase(
+            proto_map_->find_checked(est->socket()->id()));
+        delete est;
+        update_addresses();
+        return;
+    }
 
     if (est->remote_uuid() == uuid())
     {
@@ -600,7 +612,7 @@ void gcomm::GMCast::handle_established(Proto* est)
         {
             if (p->handshake_uuid() < est->handshake_uuid())
             {
-                log_info << self_string()
+                log_debug << self_string()
                           << " cleaning up duplicate "
                           << p->socket()
                           << " after established "
@@ -610,21 +622,35 @@ void gcomm::GMCast::handle_established(Proto* est)
             }
             else if (p->handshake_uuid() > est->handshake_uuid())
             {
-                log_info << self_string()
-                         << " cleaning up established "
-                         << est->socket()
-                         << " which is duplicate of "
-                         << p->socket();
+                log_debug << self_string()
+                          << " cleaning up established "
+                          << est->socket()
+                          << " which is duplicate of "
+                          << p->socket();
                 proto_map_->erase(
                     proto_map_->find_checked(est->socket()->id()));
                 delete est;
-                break;
+                update_addresses();
+                return;
             }
             else
             {
                 assert(p == est);
             }
         }
+    }
+
+    AddrList::iterator ali(find_if(remote_addrs_.begin(),
+                                   remote_addrs_.end(),
+                                   AddrListUUIDCmp(est->remote_uuid())));
+    if (ali != remote_addrs_.end())
+    {
+        AddrList::value(ali).set_last_connect();
+    }
+    else
+    {
+        log_warn << "peer " << est->remote_addr()
+                 << " not found from remote addresses";
     }
 
     update_addresses();
@@ -1074,6 +1100,12 @@ void gcomm::GMCast::check_liveness()
             nonlive_peers += AddrList::key(i) + " ";
             should_relay = true;
         }
+        else if (ae.last_connect() + peer_timeout_ > now)
+        {
+            log_debug << "continuing relaying for "
+                      << (ae.last_connect() + peer_timeout_ - now);
+            should_relay = true;
+        }
     }
 
     if (should_relay == true)
@@ -1302,6 +1334,12 @@ void gcomm::GMCast::handle_up(const void*        id,
 
             if (msg.type() >= Message::T_USER_BASE)
             {
+                if (fence_list().empty() == false &&
+                    fence_list().find(msg.source_uuid()) != fence_list().end())
+                {
+                    log_info << "dropping msg from fenced node";
+                    return;
+                }
                 if (msg.flags() &
                     (Message::F_RELAY | Message::F_SEGMENT_RELAY))
                 {
@@ -1518,7 +1556,9 @@ void gcomm::GMCast::handle_stable_view(const View& view)
                               AddrListUUIDCmp(NodeList::key(i))))
                 != remote_addrs_.end())
             {
-                log_info << "declaring " << NodeList::key(i) << " stable";
+                log_info << "declaring " << NodeList::key(i)
+                         << " at " << handle_get_address(NodeList::key(i))
+                         << " stable";
                 ai->second.set_retry_cnt(-1);
                 ai->second.set_max_retries(max_retry_cnt_);
             }
@@ -1531,6 +1571,23 @@ void gcomm::GMCast::handle_stable_view(const View& view)
     {
         log_debug << "proto: " << *ProtoMap::value(i);
     }
+}
+
+
+void gcomm::GMCast::handle_fencing(const UUID& uuid)
+{
+    log_info << "fencing " << uuid;
+    gmcast_forget(uuid);
+}
+
+
+std::string gcomm::GMCast::handle_get_address(const UUID& uuid) const
+{
+    AddrList::const_iterator ali(
+        find_if(remote_addrs_.begin(),
+                remote_addrs_.end(),
+                AddrListUUIDCmp(uuid)));
+    return (ali == remote_addrs_.end() ? "" : AddrList::key(ali));
 }
 
 void gcomm::GMCast::add_or_del_addr(const std::string& val)

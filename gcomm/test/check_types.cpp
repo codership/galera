@@ -28,8 +28,8 @@ using namespace gcomm;
 START_TEST(test_uuid)
 {
     UUID uuid;
-    fail_unless(uuid._str() == "00000000-0000-0000-0000-000000000000");
-
+    fail_unless(uuid.full_str() == "00000000-0000-0000-0000-000000000000",
+                "%s", uuid.full_str().c_str());
     for (size_t i = 0; i < 159; ++i)
     {
         UUID uuidrnd(0, 0);

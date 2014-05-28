@@ -44,6 +44,10 @@ Table legend:
 | :ref:`socket.ssl_cipher               | *AES128-SHA*          | 1.0                   | n/a                | No       |
 | <socket.ssl_cipher>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`socket.checksum                 | *1* (for version 2)   | 2.0                   | n/a                | No       |
+| <socket.checksum>`                    |                       |                       |                    |          |
+|                                       | *2* (for version 3+)  |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gmcast.listen_addr              | *tcp://0.0.0.0:4567*  | 1.0                   | n/a                | No       |
 | <gmcast.listen_addr>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -170,11 +174,11 @@ Table legend:
 | :ref:`ist.recv_addr                   |                       | 1.0                   | n/a                | No       |
 | <ist.recv_addr>`                      |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`replicator.commit_order         | *3*                   | 1.0                   | n/a                | No       |
-| <replicator.commit_order>`            |                       |                       |                    |          |
+| :ref:`repl.commit_order               | *3*                   | 1.0                   | n/a                | No       |
+| <repl.commit_order>`                  |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`replicator.causal_read_timeout  | *PT30S*               | 1.0                   | n/a                | No       |
-| <replicator.causal_read_timeout>`     |                       |                       |                    |          |
+| :ref:`repl.causal_read_timeout        | *PT30S*               | 1.0                   | n/a                | No       |
+| <repl.causal_read_timeout>`           |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcache.dir                      |                       | 1.0                   | n/a                | No       |
 | <gcache.dir>`                         |                       |                       |                    |          |
@@ -249,6 +253,19 @@ Whether to enable compression on SSL connections.
    pair: Parameters; socket.ssl_cipher
 
 Symmetric cipher to use. AES128 is used by default it is considerably faster and no less secure than AES256.
+
+.. rubric:: socket.checksum
+
+.. _`socket.checksum`:
+
+.. index::
+   pair: Parameters; socket.checksum
+
+Checksum to use on socket layer:
+
+- ``0`` - disable checksum
+- ``1`` - CRC32
+- ``2`` - CRC-32C (optimized and potentially HW-accelerated on Intel CPUs)
 
 .. rubric:: gmcast.listen_addr
 
@@ -675,12 +692,12 @@ If you choose to use value ``YES``, it is theoretically possible that the donor 
 As of 2.0. Address to listen for Incremental State Transfer. By default this is the ``<address>:<port+1>`` from ``wsrep_node_address``.
 
 
-.. rubric:: replicator.commit_order
+.. rubric:: repl.commit_order
 
-.. _`replicator.commit_order`:
+.. _`repl.commit_order`:
 
 .. index::
-   pair: Parameters; replicator.commit_order
+   pair: Parameters; repl.commit_order
 
 Whether to allow Out-Of-Order committing (improves parallel applying performance). Possible settings:
 
@@ -692,12 +709,12 @@ Whether to allow Out-Of-Order committing (improves parallel applying performance
 
 - ``3`` or ``NO_OOOC`` No out of order committing is allowed (strict total order committing)
 
-.. rubric:: replicator.causal_read_timeout
+.. rubric:: repl.causal_read_timeout
 
-.. _`replicator.causal_read_timeout`:
+.. _`repl.causal_read_timeout`:
 
 .. index::
-   pair: Parameters; replicator.causal_read_timeout
+   pair: Parameters; repl.causal_read_timeout
 
 Sometimes causal reads need to timeout.
 
