@@ -1219,9 +1219,15 @@ bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
     for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         if (NodeMap::value(i).operational() == true &&
-            NodeMap::value(i).is_inactive()     == false)
+            NodeMap::value(i).is_inactive() == false)
         {
-            gcomm_assert(NodeMap::value(i).leave_message() == 0);
+            assert(NodeMap::value(i).leave_message() == 0);
+            if (NodeMap::value(i).leave_message() != 0)
+            {
+                log_warn << "operational node " << NodeMap::key(i)
+                         << " with leave message: " << NodeMap::value(i);
+                continue;
+            }
             return (uuid == NodeMap::key(i));
         }
     }
@@ -4048,13 +4054,15 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     }
     else
     {
+        // Always set node nonoperational if leave message is seen
+        node.set_operational(false);
         if (msg.source_view_id()       != current_view_.id() ||
             is_msg_from_previous_view(msg) == true)
         {
             // Silent drop
             return;
         }
-        node.set_operational(false);
+
         const seqno_t prev_safe_seq(update_im_safe_seq(node.index(), msg.aru_seq()));
         if (prev_safe_seq != input_map_->safe_seq(node.index()))
         {
