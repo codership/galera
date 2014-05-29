@@ -23,9 +23,7 @@ using std::string;
 
 #include <check.h>
 
-using namespace gu;
 using namespace gcomm;
-
 
 START_TEST(test_uuid)
 {

@@ -30,11 +30,10 @@
 
 using namespace std;
 using namespace std::rel_ops;
-using namespace gu;
 using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::evs;
-
+using gu::DeleteObject;
 
 void init_rand()
 {

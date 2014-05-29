@@ -1,22 +1,20 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2014 Codership Oy <info@codership.com>
  */
 
-#include "histogram.hpp"
-
-#include "gcomm/exception.hpp"
-#include "gcomm/types.hpp"
-
+#include "gu_histogram.hpp"
 #include "gu_logger.hpp"
+#include "gu_throw.hpp"
 #include "gu_string_utils.hpp" // strsplit()
 
 #include <sstream>
 #include <limits>
 #include <vector>
 
-gcomm::Histogram::Histogram(const std::string& vals)
+gu::Histogram::Histogram(const std::string& vals)
     :
-    cnt_()
+    cnt_(),
+    stats_()
 {
     std::vector<std::string> varr = gu::strsplit(vals, ',');
 
@@ -47,7 +45,7 @@ gcomm::Histogram::Histogram(const std::string& vals)
     }
 }
 
-void gcomm::Histogram::insert(const double val)
+void gu::Histogram::insert(const double val)
 {
     if (val < 0.0)
     {
@@ -63,18 +61,27 @@ void gcomm::Histogram::insert(const double val)
     }
 
     i->second++;
+    stats_.insert(val);
 }
 
-void gcomm::Histogram::clear()
+void gu::Histogram::clear()
 {
     for (std::map<double, long long>::iterator i = cnt_.begin();
          i != cnt_.end(); ++i)
     {
         i->second = 0;
     }
+    stats_.clear();
 }
 
-std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
+std::string gu::Histogram::to_string() const
+{
+    std::ostringstream os;
+    os << *this;
+    return os.str();
+}
+
+std::ostream& gu::operator<<(std::ostream& os, const Histogram& hs)
 {
     std::map<double, long long>::const_iterator i, i_next;
 
@@ -97,5 +104,3 @@ std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
 
     return os;
 }
-
-

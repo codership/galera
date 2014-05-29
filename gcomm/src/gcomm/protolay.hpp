@@ -19,6 +19,7 @@
 #include "gcomm/exception.hpp"
 #include "gcomm/order.hpp"
 #include "gcomm/datagram.hpp"
+#include "gcomm/stats.hpp"
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
@@ -28,7 +29,6 @@
 
 #include <list>
 #include <utility>
-#include <set>
 
 // Declarations
 namespace gcomm
@@ -358,6 +358,10 @@ public:
     virtual bool set_param(const std::string& key, const std::string& val)
     {
         return false;
+    }
+
+    virtual void get_stats(Stats& stats)
+    {
     }
 
     const Protolay* id() const { return this; }

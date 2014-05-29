@@ -134,7 +134,7 @@ namespace galera
 
         const struct wsrep_stats_var* stats_get()  const;
         void                          stats_reset();
-        static void                   stats_free(struct wsrep_stats_var*);
+        void                   stats_free(struct wsrep_stats_var*);
 
         /*! @throws NotFound */
         void           set_param (const std::string& key,

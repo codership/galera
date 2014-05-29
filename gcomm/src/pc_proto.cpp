@@ -9,6 +9,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_macros.h"
+#include <algorithm>
 #include <set>
 
 using std::rel_ops::operator!=;
@@ -224,6 +225,56 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     log_debug << v;
     send_up(Datagram(), um);
     set_stable_view(v);
+
+    if (v.id().type() == V_PRIM) {
+        ViewState vst(const_cast<UUID&>(my_uuid_), v);
+        log_info << "save pc into disk";
+        vst.write_file();
+    } else if (rst_view_ && !start_prim_) {
+        // pc recovery process.
+        uint32_t max_view_seqno = 0;
+        bool check = true;
+        for(NodeMap::const_iterator i = instances_.begin();
+            i != instances_.end(); ++i) {
+            const UUID& uuid(NodeMap::key(i));
+            // just consider property of nodes in restored view.
+            if (rst_view_ -> members().find(uuid) !=
+                rst_view_ -> members().end()) {
+                const Node& node(NodeMap::value(i));
+                const ViewId& last_prim(node.last_prim());
+                if (last_prim.type() != V_PRIM ||
+                    last_prim.uuid() != rst_view_ -> id().uuid()) {
+                    log_warn << "node uuid: " << uuid << " last_prim(type: "
+                             << last_prim.type() << ", uuid: "
+                             << last_prim.uuid() << ") is inconsistent to "
+                             << "restored view(type: V_PRIM, uuid: "
+                             << rst_view_ ->id().uuid();
+                    check = false;
+                    break;
+                }
+                max_view_seqno = std::max(max_view_seqno,
+                                          last_prim.seq());
+            }
+        }
+        if (check) {
+            assert(max_view_seqno != 0);
+            log_debug << "max_view_seqno = " << max_view_seqno
+                      << ", rst_view_seqno = " << rst_view_ -> id().seq();
+            log_debug << "rst_view = ";
+            log_debug << *rst_view_;
+            log_debug << "deliver_view = ";
+            log_debug << v;
+
+            if (rst_view_ -> id().seq() == max_view_seqno &&
+                rst_view_ -> members() == v.members()) {
+                log_info << "promote to primary component";
+                // since all of them are non-primary component
+                // we need to bootstrap.
+                rst_view_ = NULL;
+                send_install(true);
+            }
+        }
+    }
 }
 
 
@@ -754,7 +805,9 @@ bool gcomm::pc::Proto::is_prim() const
 
     // No members coming from prim view, check if last known prim
     // view can be recovered (majority of members from last prim alive)
-    if (prim == false)
+    if (prim == false &&
+        // give up if via pc recovery
+        rst_view_ == NULL)
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
@@ -1511,7 +1564,8 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
              key == Conf::PcLinger ||
              key == Conf::PcNpvo ||
              key == Conf::PcWaitPrim ||
-             key == Conf::PcWaitPrimTimeout)
+             key == Conf::PcWaitPrimTimeout ||
+             key == Conf::PcRecovery)
     {
         gu_throw_error(EPERM) << "can't change value for '"
                               << key << "' during runtime";

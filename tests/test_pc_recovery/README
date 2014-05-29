@@ -1,0 +1,9 @@
+The test runs sqlgen load aganist the cluster, and kills all nodes with -9 to
+simulate cluster outage. Then restarts nodes and expects them to form PC,
+and then checks consistency.
+
+Usage:
+
+./run.sh [N]
+
+where N is the number of simulations. If N is omitted it goes forever.

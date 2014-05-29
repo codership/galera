@@ -12,7 +12,7 @@
 #include "gu_assert.hpp"
 #include "gu_byteswap.h"
 
-#include "gu_uuid.h"
+#include "gu_uuid.hpp"
 
 #include <ostream>
 #include <iomanip>
@@ -23,74 +23,25 @@ namespace gcomm
     std::ostream& operator<<(std::ostream&, const UUID&);
 }
 
-class gcomm::UUID
+class gcomm::UUID :
+        public gu::UUID
 {
 public:
 
-    UUID() : uuid_(GU_UUID_NIL) {}
+    UUID() : gu::UUID() {}
 
-    UUID(const void* node, const size_t node_len) : uuid_()
-    {
-        gu_uuid_generate(&uuid_, node, node_len);
-    }
+    UUID(const void* node, const size_t node_len) :
+            gu::UUID(node, node_len) {}
 
-    UUID(const int32_t idx) : uuid_()
+    UUID(const int32_t idx) : gu::UUID()
     {
         assert(idx > 0);
-        uuid_ = GU_UUID_NIL;
         memcpy(&uuid_, &idx, sizeof(idx));
     }
 
     static const UUID& nil()
     {
         return uuid_nil_;
-    }
-
-    size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
-    {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
-                                           << (buflen - offset);
-
-        memcpy(&uuid_, buf + offset, sizeof(gu_uuid_t));
-
-        return offset + sizeof(gu_uuid_t);
-    }
-
-    size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
-    {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
-                                           << (buflen - offset);
-
-        memcpy(buf + offset, &uuid_, sizeof(gu_uuid_t));
-
-        return offset + sizeof(gu_uuid_t);
-    }
-
-    static size_t serial_size()
-    {
-        return sizeof(gu_uuid_t);
-    }
-
-    const gu_uuid_t* uuid_ptr() const
-    {
-        return &uuid_;
-    }
-
-    bool operator<(const UUID& cmp) const
-    {
-        return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
-    }
-
-    bool operator==(const UUID& cmp) const
-    {
-        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
-    }
-
-    bool older(const UUID& cmp) const
-    {
-        return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
 
     std::ostream& to_stream(std::ostream& os, bool full) const
@@ -141,13 +92,9 @@ public:
     }
 
 private:
-
-    gu_uuid_t         uuid_;
     static const UUID uuid_nil_;
-    UUID(gu_uuid_t uuid) : uuid_(uuid) {}
+    UUID(gu_uuid_t uuid) : gu::UUID(uuid) {}
 };
-
-
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)
 {

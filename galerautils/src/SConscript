@@ -77,7 +77,9 @@ libgalerautilsxx_sources = [
     'gu_mmap.cpp',
     'gu_alloc.cpp',
     'gu_rset.cpp',
-    'gu_resolver.cpp'
+    'gu_resolver.cpp',
+    'gu_histogram.cpp',
+    'gu_stats.cpp'
 ]
 
 #libgalerautilsxx_objs  = libgalerautilsxx_env.Object(
@@ -93,7 +95,7 @@ hexdump_sobj = libgalerautilsxx_env.SharedObject('gu_hexdump++','gu_hexdump.cpp'
 libgalerautilsxx_sobjs += hexdump_sobj
 
 #if '-DGALERA_USE_GU_NETWORK' in libgalerautils_env['CPPFLAGS']:
-#    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
+#    libgalerautilsxx_sources = [libgalerautilsxx_sources,
 #                                'gu_resolver.cpp']
 
 libgalerautilsxx_env.StaticLibrary('galerautils++',

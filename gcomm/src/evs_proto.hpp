@@ -15,7 +15,7 @@
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/map.hpp"
-#include "histogram.hpp"
+#include "gu_histogram.hpp"
 #include "profile.hpp"
 
 #include "evs_seqno.hpp"
@@ -94,7 +94,8 @@ public:
           const UUID&    my_uuid,
           SegmentId      segment,
           const gu::URI& uri = gu::URI("evs://"),
-          const size_t   mtu = std::numeric_limits<size_t>::max());
+          const size_t   mtu = std::numeric_limits<size_t>::max(),
+          const View*    rst_view = NULL);
     ~Proto();
 
     const UUID& uuid() const { return my_uuid_; }
@@ -267,6 +268,7 @@ public:
     }
 
     bool set_param(const std::string& key, const std::string& val);
+    void get_stats(Stats& stats);
 
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time
@@ -334,9 +336,9 @@ private:
     int info_mask_;
     gu::datetime::Date last_stats_report_;
     bool collect_stats_;
-    Histogram hs_agreed_;
-    Histogram hs_safe_;
-    Histogram hs_local_causal_;
+    gu::Histogram hs_agreed_;
+    gu::Histogram hs_safe_;
+    gu::Histogram hs_local_causal_;
     long long int send_queue_s_;
     long long int n_send_queue_s_;
     std::vector<long long int> sent_msgs_;

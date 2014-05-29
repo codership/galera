@@ -4,7 +4,7 @@
  * $Id$
  */
 
-/*! @file This unit contains Flow Control parts deemed worthy to be 
+/*! @file This unit contains Flow Control parts deemed worthy to be
  *        taken out of gcs.c */
 
 #include "gcs_fc.h"
@@ -152,7 +152,7 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size)
 
             // Move reference point to soft limit
             fc->last_sleep = fc->soft_limit;
-            fc->start      = end - interval;
+            fc->start      = end - interval * 1000000000;
 
             gu_warn("Soft recv queue limit exceeded, starting replication "
                     "throttle. Measured avg. rate: %f bytes/sec; "

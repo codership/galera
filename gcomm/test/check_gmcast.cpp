@@ -12,8 +12,9 @@
 using namespace std;
 using namespace gcomm;
 using namespace gcomm::gmcast;
-using namespace gu;
 using namespace gu::datetime;
+using gu::byte_t;
+using gu::Buffer;
 
 #include <check.h>
 

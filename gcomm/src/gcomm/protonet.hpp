@@ -19,6 +19,7 @@
 
 #include "socket.hpp"
 
+#include <vector>
 #include <deque>
 
 #ifndef GCOMM_PROTONET_MAX_VERSION
@@ -111,6 +112,7 @@ public:
     virtual void leave() = 0;
 
     bool set_param(const std::string& key, const std::string& val);
+    void get_stats(Stats& stats);
     gu::Config& conf() { return conf_; }
 
     //!

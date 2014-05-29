@@ -417,6 +417,14 @@ typedef struct gcs_act_conf {
                                 *  incoming address, 8-byte cached seqno) */
 } gcs_act_conf_t;
 
+typedef struct gcs_backend_stats {
+    struct stats_t {
+        const char* key;
+        const char* value;
+    }* stats;
+    void* ctx;
+} gcs_backend_stats_t;
+
 struct gcs_stats
 {
     double    send_q_len_avg; //! average send queue length per send call
@@ -428,12 +436,15 @@ struct gcs_stats
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length
     int       send_q_len;     //! current send queue length
+    gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
 /*! Fills stats struct */
 extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
 /*! flushes stats counters */
 extern void gcs_flush_stats(gcs_conn_t *conn);
+/*! free stats struct */
+extern void gcs_free_stats(gcs_conn_t* conn, struct gcs_stats* stats);
 
 /*! A node with this name will be treated as a stateless arbitrator */
 #define GCS_ARBITRATOR_NAME "garb"
