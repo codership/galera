@@ -96,7 +96,7 @@ start() {
 	[ "$NETWORKING" = "no" ] && return 1
 
 	if grep -q -E '^# REMOVE' $config;then 
-	    log_daemon_msg "Garbd config $config is not configured yet"
+	    log_failure "Garbd config $config is not configured yet"
 	    return 0
 	fi
 
