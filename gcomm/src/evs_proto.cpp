@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <numeric>
 #include <iterator>
+#include <set>
 
 using namespace std::rel_ops;
 
@@ -218,7 +219,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     // we don't need to store previous views, do we ?
     if (rst_view) {
         previous_view_ = *rst_view;
-        previous_views_.push_back(
+        previous_views_.insert(
             std::make_pair(rst_view -> id(), gu::datetime::Date::now()));
     }
     if (mtu_ != std::numeric_limits<size_t>::max())
