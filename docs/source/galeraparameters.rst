@@ -18,6 +18,8 @@ Table legend:
 
 - Time periods must be expressed in the ISO8601 format. See also the examples below.
 
+- **T** indicates parameters that are strictly for use in troubleshooting problems.  You should not implement these in production environments.
+
 .. |210| replace:: 2\ :sup:`10`\
 .. |220| replace:: 2\ :sup:`20`\
 .. |230| replace:: 2\ :sup:`30`\
@@ -39,7 +41,7 @@ Table legend:
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.version                | n/a                   |                       |                    |          |
-| <protonet.version>`                   |                       |                       |                    |          |
+| <protonet.version>` :sup:`T`          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`socket.ssl_cert                 |                       | 1.0                   | n/a                | No       |
 | <socket.ssl_cert>`                    |                       |                       |                    |          |
@@ -76,13 +78,13 @@ Table legend:
 | <gmcast.time_wait>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gmcast.version                  | n/a                   |                       |                    |          |
-| <gmcast.version>`                     |                       |                       |                    |          |
+| <gmcast.version>` :sup:`T`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.causal_keepalive_period     |                       | 1.0                   | n/a                | No       |
 | <evs.causal_keepalive_period>`        |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.consensus_timeout           | *PT30S*               | 1.0                   | Yes, as of 2.0     | No       |
-| <evs.consensus_timeout>`              |                       |                       |                    |          |
+| <evs.consensus_timeout>` :sup:`T`     |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.debug_log_mask              | *0x1*                 | 1.0                   | n/a                | Yes      |
 | <evs.debug_log_mask>`                 |                       |                       |                    |          |
@@ -127,7 +129,7 @@ Table legend:
 | <evs.view_forget_timeout>`            |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`evs.version                     | n/a                   |                       |                    |          |
-| <evs.version>`                        |                       |                       |                    |          |
+| <evs.version>` :sup:`T`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.bootstrap                    | n/a                   | 2.0                   | n/a                | Yes      |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
@@ -160,7 +162,7 @@ Table legend:
 | <pc.weight>`                          |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.version                      | n/a                   |                       |                    |          |
-| <pc.version>`                         |                       |                       |                    |          |
+| <pc.version>` :sup:`T`                |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
 | <gcs.fc_debug>`                       |                       |                       |                    |          |
@@ -269,7 +271,9 @@ Which transport backend to use. Currently only ASIO is supported.
 .. index::
    pair: Parameters; protonet.version
 
-This status variable is used to check which transport backend protocol version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which transport backend protocol version is used. 
+
+This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 .. rubric:: socket.ssl_cert
 
@@ -392,7 +396,9 @@ Time to wait until allowing peer declared outside of stable view to reconnect.
 .. index::
    pair: Parameters; gmcast.version
 
-This status variable is used to check which gmcast protocol version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which gmcast protocol version is used.
+
+This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 
 .. rubric:: evs.causal_keepalive_period
@@ -413,6 +419,8 @@ For developer use only. Defaults to ``evs.keepalive_period``.
    pair: Parameters; evs.consensus_timeout
 
 Timeout on reaching the consensus about cluster membership.
+
+This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 **Deprecated** See ``evs.install_timeout``.
 
@@ -566,7 +574,9 @@ Drop past views from the view history after this timeout.
 .. index::
    pair: Parameters; evs.version
 
-This status variable is used to check which ``evs`` protocol version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which ``evs`` protocol version is used. 
+
+This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 .. rubric:: pc.bootstrap
 
@@ -669,7 +679,9 @@ As of version 2.4. Node weight for quorum calculation.
 .. index::
    pair: Parameters; pc.version
 
-This status variable is used to check which pc protocol version is used. This variable is mostly used for troubleshooting purposes.
+This status variable is used to check which pc protocol version is used. 
+
+This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 
 .. rubric:: gcs.fc_debug

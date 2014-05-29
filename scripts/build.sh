@@ -71,7 +71,9 @@ else
   true=/bin/true
   epm=/usr/bin/epm
 fi
+
 EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
+
 if [ "$OS" == "Darwin" ]; then
   if which -s port && test -x /opt/local/bin/port; then
     EXTRA_SYSROOT=/opt/local
@@ -94,6 +96,7 @@ else
     CC=${CC:-"gcc"}
     CXX=${CXX:-"g++"}
 fi
+
 if ccache -V > /dev/null 2>&1
 then
     echo "$CC"  | grep "ccache" > /dev/null || CC="ccache $CC"
@@ -286,6 +289,7 @@ build_packages()
 
     set +e
     if [ $DEBIAN -ne 0 ]; then # build DEB
+        export OPENSSL_SHLIB_VERSION_NUMBER=$(grep 'define SHLIB_VERSION_NUMBER' /usr/include/openssl/opensslv.h | cut -d '"' -f 2)
         $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
         $SUDO /bin/chown -R $WHOAMI.users $ARCH
