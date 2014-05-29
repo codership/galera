@@ -63,12 +63,6 @@ std::string gcomm::PC::listen_addr() const
 
 void gcomm::PC::connect(bool start_prim)
 {
-    // --wsrep-new-cluster specified in command line
-    // it should take precedence.
-    if (start_prim) {
-        pc_recovery_ = false;
-    }
-
     try
     {
         // for backward compatibility with old approach: gcomm://0.0.0.0
@@ -88,8 +82,14 @@ void gcomm::PC::connect(bool start_prim)
             uri_.get_option(Conf::PcWaitPrimTimeout,
                             Defaults::PcWaitPrimTimeout)));
 
+    // --wsrep-new-cluster specified in command line
+    // or cluster address as gcomm://0.0.0.0 or gcomm://
+    // should take precedence. otherwise it's not able to bootstrap.
+    if (start_prim) {
+        log_info << "start_prim is enabled, turn off pc_recovery";
+        pc_recovery_ = false;
+    }
     if (pc_recovery_) {
-        start_prim = false;
         wait_prim = false;
     }
 
