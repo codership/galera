@@ -12,9 +12,14 @@ libgcs_env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
 # Disable old style cast warns until code is fixed
 libgcs_env.Append(CPPFLAGS = ' -Wno-old-style-cast')
 # Allow zero sized arrays
-libgcs_env.Append(CPPFLAGS = ' -Wno-pedantic')
+libgcs_env.Replace(CCFLAGS = libgcs_env['CCFLAGS'].replace('-pedantic', ''))
 libgcs_env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
 libgcs_env.Append(CPPFLAGS = ' -Wno-effc++')
+
+print libgcs_env['CFLAGS']
+print libgcs_env['CCFLAGS']
+print libgcs_env['CPPFLAGS']
+print libgcs_env['CXXFLAGS']
 
 gcs4garb_env = libgcs_env.Clone()
 

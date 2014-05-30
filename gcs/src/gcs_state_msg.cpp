@@ -8,6 +8,8 @@
  *
  */
 
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
 #include <string.h>
 #include <galerautils.h>
 

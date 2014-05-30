@@ -93,7 +93,7 @@ START_TEST(gcs_fc_test_precise)
 {
     gcs_fc_t fc;
     long long       ret;
-    struct timespec p10ms = { .tv_sec = 0, .tv_nsec = 10000000 }; // 10 ms
+    struct timespec p10ms = {0, 10000000 }; // 10 ms
 
     ret = gcs_fc_init (&fc, 2000, 0.5, 0.5);
     fail_if (ret != 0);
