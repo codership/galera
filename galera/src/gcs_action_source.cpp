@@ -8,10 +8,7 @@
 
 #include "gu_serialize.hpp"
 
-extern "C"
-{
-#include "galera_info.h"
-}
+#include "galera_info.hpp"
 
 #include <cassert>
 

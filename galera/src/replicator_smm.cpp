@@ -7,10 +7,8 @@
 #include "galera_exception.hpp"
 #include "uuid.hpp"
 
-extern "C"
-{
-#include "galera_info.h"
-}
+#include "galera_info.hpp"
+
 
 #include <sstream>
 #include <iostream>

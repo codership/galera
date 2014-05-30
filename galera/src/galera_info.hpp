@@ -3,7 +3,7 @@
 #ifndef __GALERA_INFO_H__
 #define __GALERA_INFO_H__
 
-#include "gcs.h"
+#include "gcs.hpp"
 #include "wsrep_api.h"
 
 /* create view info out of configuration message */

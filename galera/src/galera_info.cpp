@@ -1,6 +1,6 @@
 // Copyright (C) 2009 Codership Oy <info@codership.com>
 
-#include "galera_info.h"
+#include "galera_info.hpp"
 #include <galerautils.h>
 #include <string.h>
 
