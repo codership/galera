@@ -7,7 +7,7 @@
 
 #include <galerautils.h>
 #include <galerautils.hpp>
-#include "gcs.hpp"
+#include "galera_gcs.hpp"
 
 namespace galera
 {

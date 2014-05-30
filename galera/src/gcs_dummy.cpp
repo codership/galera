@@ -2,7 +2,7 @@
 // Copyright (C) 2011-2012 Codership Oy <info@codership.com>
 //
 
-#include "gcs.hpp"
+#include "galera_gcs.hpp"
 
 namespace galera
 {

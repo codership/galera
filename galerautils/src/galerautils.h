@@ -9,6 +9,11 @@
 #ifndef _galerautils_h_
 #define _galerautils_h_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif /* __cplusplus */
+
 #include "gu_macros.h"
 #include "gu_limits.h"
 #include "gu_byteswap.h"
@@ -28,5 +33,9 @@
 #include "gu_abort.h"
 #include "gu_errno.h"
 #include "gu_atomic.h"
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _galerautils_h_ */

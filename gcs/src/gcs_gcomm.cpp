@@ -11,17 +11,11 @@
  */
 
 
-extern "C"
-{
-#include "gcs_gcomm.h"
-}
+#include "gcs_gcomm.hpp"
 
 // We access data comp msg struct directly
-extern "C"
-{
 #define GCS_COMP_MSG_ACCESS 1
-#include "gcs_comp_msg.h"
-}
+#include "gcs_comp_msg.hpp"
 
 
 #include <galerautils.hpp>
