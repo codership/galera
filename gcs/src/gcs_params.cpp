@@ -6,8 +6,9 @@
 
 #include "gcs_params.hpp"
 
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <errno.h>
+#include <cerrno>
 
 const char* const GCS_PARAMS_FC_FACTOR         = "gcs.fc_factor";
 const char* const GCS_PARAMS_FC_LIMIT          = "gcs.fc_limit";

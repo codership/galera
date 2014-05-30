@@ -278,23 +278,6 @@ GCS_BACKEND_STATS_FREE_FN(dummy_stats_free)
 {
 }
 
-static
-const gcs_backend_t dummy_backend =
-{
-    .conn      = NULL,
-    .open      = dummy_open,
-    .close     = dummy_close,
-    .destroy   = dummy_destroy,
-    .send      = dummy_send,
-    .recv      = dummy_recv,
-    .name      = dummy_name,
-    .msg_size  = dummy_msg_size,
-    .param_set = dummy_param_set,
-    .param_get = dummy_param_get,
-    .stats_get = dummy_stats_get,
-    .stats_free = dummy_stats_free
-};
-
 GCS_BACKEND_CREATE_FN(gcs_dummy_create)
 {
     long     ret   = -ENOMEM;
@@ -311,7 +294,19 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     if (!(dummy->gc_q = gu_fifo_create (1 << 16, sizeof(void*))))
         goto out1;
 
-    *backend      = dummy_backend; // set methods
+    backend->conn      = NULL;
+    backend->open      = dummy_open;
+    backend->close     = dummy_close;
+    backend->destroy   = dummy_destroy;
+    backend->send      = dummy_send;
+    backend->recv      = dummy_recv;
+    backend->name      = dummy_name;
+    backend->msg_size  = dummy_msg_size;
+    backend->param_set = dummy_param_set;
+    backend->param_get = dummy_param_get;
+    backend->stats_get = dummy_stats_get;
+    backend->stats_free = dummy_stats_free;
+
     backend->conn = dummy;         // set data
 
     return 0;

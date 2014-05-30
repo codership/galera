@@ -8,9 +8,10 @@ env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
 # Disable old style cast warns until code is fixed
 env.Append(CPPFLAGS = ' -Wno-old-style-cast')
 # Allow zero sized arrays
-env.Append(CPPFLAGS = ' -Wno-pedantic')
+env.Replace(CCFLAGS = env['CCFLAGS'].replace('-pedantic', ''))
 env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
 env.Append(CPPFLAGS = ' -Wno-effc++')
+
 
 gcs_tests_sources = Split('''
                              gcs_tests.cpp

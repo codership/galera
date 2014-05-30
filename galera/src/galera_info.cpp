@@ -21,7 +21,8 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
         const char* str = conf->data;
         int m;
 
-        wsrep_uuid_t  uuid  = *reinterpret_cast<const wsrep_uuid_t*>(&conf->uuid);
+        wsrep_uuid_t  uuid;
+	memcpy(uuid.data, conf->uuid, sizeof(uuid.data));
         wsrep_seqno_t seqno = conf->seqno != GCS_SEQNO_ILL ?
                               conf->seqno : WSREP_SEQNO_UNDEFINED;
         wsrep_gtid_t  gtid  = { uuid, seqno };

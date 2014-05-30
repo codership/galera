@@ -174,6 +174,11 @@ struct gcs_repl_act
     struct gcs_action*   action;
     gu_mutex_t           wait_mutex;
     gu_cond_t            wait_cond;
+    gcs_repl_act(const struct gu_buf* a_act_in, struct gcs_action* a_action)
+      :
+        act_in(a_act_in),
+        action(a_action)
+    { }
 };
 
 /*! Releases resources associated with parameters */
@@ -1495,7 +1500,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
     act->seqno_g = GCS_SEQNO_ILL;
 
     /* This is good - we don't have to do a copy because we wait */
-    struct gcs_repl_act repl_act = { .act_in = act_in, .action = act };
+    struct gcs_repl_act repl_act(act_in, act);
 
     gu_mutex_init (&repl_act.wait_mutex, NULL);
     gu_cond_init  (&repl_act.wait_cond,  NULL);
