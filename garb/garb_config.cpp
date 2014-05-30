@@ -3,7 +3,7 @@
 #include "gu_crc32c.h"
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
-#include "gcs.h"
+#include "gcs.hpp"
 
 #include <wsrep_api.h>
 
