@@ -19,7 +19,7 @@
 void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
-    if (pc_save_prim_ &&
+    if (pc_recovery_ &&
         um.err_no() == 0 &&
         um.has_view() &&
         um.view().id().type() == V_PRIM)
@@ -97,9 +97,7 @@ void gcomm::PC::connect(bool start_prim)
     // should take precedence. otherwise it's not able to bootstrap.
     if (start_prim) {
         log_info << "start_prim is enabled, turn off pc_recovery";
-        pc_recovery_ = false;
-    }
-    if (pc_recovery_) {
+    } else if (pc_recovery_) {
         wait_prim = false;
     }
 
@@ -230,8 +228,6 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
                           Defaults::PcAnnounceTimeout)),
     pc_recovery_ (param<bool>(conf_, uri,
                               Conf::PcRecovery, Defaults::PcRecovery)),
-    pc_save_prim_ (param<bool>(conf_, uri,
-                               Conf::PcSavePrim, Defaults::PcSavePrim)),
     rst_uuid_(),
     rst_view_()
 

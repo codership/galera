@@ -425,11 +425,6 @@ namespace gcomm
          */
         static std::string const PcRecovery;
 
-        /*!
-         * @brief PC save primay component
-         */
-        static std::string const PcSavePrim;
-
         static void register_params(gu::Config&);
     };
 

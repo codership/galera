@@ -50,7 +50,6 @@ namespace gcomm
         gu::datetime::Period announce_timeout_;
 
         bool        pc_recovery_;
-        bool        pc_save_prim_;
         UUID        rst_uuid_;
         View        rst_view_;
 

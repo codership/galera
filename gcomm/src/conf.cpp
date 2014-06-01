@@ -115,7 +115,6 @@ std::string const gcomm::Conf::PcWaitPrimTimeout =
     PcPrefix + "wait_prim_timeout";
 std::string const gcomm::Conf::PcWeight = PcPrefix + "weight";
 std::string const gcomm::Conf::PcRecovery = PcPrefix + "recovery";
-std::string const gcomm::Conf::PcSavePrim = PcPrefix + "save_prim";
 
 void
 gcomm::Conf::register_params(gu::Config& cnf)
@@ -182,7 +181,6 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(PcWaitPrimTimeout);
     GCOMM_CONF_ADD_DEFAULT(PcWeight);
     GCOMM_CONF_ADD_DEFAULT(PcRecovery);
-    GCOMM_CONF_ADD_DEFAULT(PcSavePrim);
 
 #undef GCOMM_CONF_ADD
 #undef GCOMM_CONF_ADD_DEFAULT
