@@ -247,10 +247,11 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
     return is;
 }
 
-void gcomm::ViewState::write_file() const
+void gcomm::ViewState::write_file(const char* fname) const
 {
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
     // write to temporary file first.
-    std::string tmp(COMMON_VIEW_STAT_FILE);
+    std::string tmp(fname);
     tmp += ".tmp";
     FILE* fout = fopen(tmp.c_str(), "w");
     if (fout == NULL) {
@@ -282,27 +283,28 @@ void gcomm::ViewState::write_file() const
     }
 
     // rename atomically.
-    if (rename(tmp.c_str(), COMMON_VIEW_STAT_FILE) != 0) {
+    if (rename(tmp.c_str(), fname) != 0) {
         log_warn << "rename file(" << tmp << ") to file("
-                 << COMMON_VIEW_STAT_FILE << ") failed("
+                 << fname << ") failed("
                  << strerror(errno) << ")";
     }
 }
 
-bool gcomm::ViewState::read_file()
+bool gcomm::ViewState::read_file(const char* fname)
 {
-    if (access(COMMON_VIEW_STAT_FILE, R_OK) != 0) {
-        log_warn << "access file(" << COMMON_VIEW_STAT_FILE << ") failed("
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    if (access(fname, R_OK) != 0) {
+        log_warn << "access file(" << fname << ") failed("
                  << strerror(errno) << ")";
         return false;
     }
     try {
-        std::ifstream ifs(COMMON_VIEW_STAT_FILE, std::ifstream::in);
+        std::ifstream ifs(fname, std::ifstream::in);
         read_stream(ifs);
         ifs.close();
         return true;
     } catch (const std::exception& e) {
-        log_warn << "read file(" << COMMON_VIEW_STAT_FILE << ") failed("
+        log_warn << "read file(" << fname << ") failed("
                  << e.what() << ")";
         return false;
     }

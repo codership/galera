@@ -1420,6 +1420,7 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "pc.recovery=0&"
+                "pc.save_prim=0&"
                 "node.name=n1");
 
     gu_conf_self_tstamp_on();
@@ -1435,6 +1436,7 @@ START_TEST(test_pc_transport)
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "pc.recovery=0&"
+                "pc.save_prim=0&"
                 "node.name=n2");
     PCUser2 pu3(*net,
                 std::string("pc://")
@@ -1444,6 +1446,7 @@ START_TEST(test_pc_transport)
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "pc.recovery=0&"
+                "pc.save_prim=0&"
                 "node.name=n3");
 
 
@@ -1779,6 +1782,7 @@ START_TEST(test_set_param)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "pc.recovery=0&"
+                "pc.save_prim=0&"
                 "node.name=n1");
     pu1.start();
     // no such a parameter
@@ -1845,7 +1849,8 @@ START_TEST(test_trac_599)
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
     std::auto_ptr<gcomm::Transport> tp(
         gcomm::Transport::create
-        (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"));
+        (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"
+         "&pc.recovery=0&pc.save_prim=0"));
     gcomm::connect(tp.get(), &d);
     gu::Buffer buf(10);
     Datagram dg(buf);
@@ -1877,6 +1882,8 @@ START_TEST(test_trac_620)
 				    "gmcast.listen_addr=tcp://127.0.0.1:0&"
 				    "gmcast.group=pc&"
 				    "gmcast.time_wait=PT0.5S&"
+                    "pc.recovery=0&"
+                    "pc.save_prim=0&"
 				    "node.name=n1"));
     class D : public gcomm::Toplay
     {

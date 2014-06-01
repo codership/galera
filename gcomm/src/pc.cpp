@@ -19,6 +19,16 @@
 void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
+    if (pc_save_prim_ &&
+        um.err_no() == 0 &&
+        um.has_view() &&
+        um.view().id().type() == V_PRIM)
+    {
+        ViewState vst(const_cast<UUID&>(uuid()),
+                      const_cast<View&>(um.view()));
+        log_info << "save pc into disk";
+        vst.write_file();
+    }
     send_up(rb, um);
 }
 
@@ -220,6 +230,8 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
                           Defaults::PcAnnounceTimeout)),
     pc_recovery_ (param<bool>(conf_, uri,
                               Conf::PcRecovery, Defaults::PcRecovery)),
+    pc_save_prim_ (param<bool>(conf_, uri,
+                               Conf::PcSavePrim, Defaults::PcSavePrim)),
     rst_uuid_(),
     rst_view_()
 

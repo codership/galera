@@ -226,11 +226,8 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     send_up(Datagram(), um);
     set_stable_view(v);
 
-    if (v.id().type() == V_PRIM) {
-        ViewState vst(const_cast<UUID&>(my_uuid_), v);
-        log_info << "save pc into disk";
-        vst.write_file();
-    } else if (rst_view_ && !start_prim_) {
+    if (v.id().type() == V_NON_PRIM &&
+        rst_view_ && !start_prim_) {
         // pc recovery process.
         uint32_t max_view_seqno = 0;
         bool check = true;
