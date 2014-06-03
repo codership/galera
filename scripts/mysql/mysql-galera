@@ -374,7 +374,8 @@ galera_start()
         then
             # process is alive, wait for pid file
             echo -n "."
-        elif test $second -lt $MYSQL_STARTUP_WAIT
+        elif test $MYSQL_STARTUP_WAIT -lt 0 -o \
+            $second -lt $MYSQL_STARTUP_WAIT
         then
             # process is not yet alive, wait for it to start
             echo -n "."
