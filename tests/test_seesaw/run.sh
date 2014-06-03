@@ -81,13 +81,13 @@ cycle()
         skip_recovery_opt="--skip-recovery --start-position '00000000-0000-0000-0000-000000000000:-2'"
     fi
 
-    if test $pause_var -gt 3
-    then
-        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
-    else
-        stop_node $node || : # just in case the process is still lingering
-        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
-    fi
+    # if test $pause_var -gt 3
+    # then
+    #     restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
+    # else
+    stop_node $node || : # just in case the process is still lingering
+    restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
+    # fi
 }
 
 node=0
