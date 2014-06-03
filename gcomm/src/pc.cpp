@@ -248,7 +248,7 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
             log_info << "restore pc from disk failed";
         }
     } else {
-        log_info << "pass pc recovery and remove state file";
+        log_info << "skip pc recovery and remove state file";
         ViewState::remove_file();
     }
 
