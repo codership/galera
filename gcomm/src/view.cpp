@@ -309,3 +309,9 @@ bool gcomm::ViewState::read_file(const char* fname)
         return false;
     }
 }
+
+void gcomm::ViewState::remove_file(const char* fname)
+{
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    (void) unlink(fname);
+}

@@ -248,7 +248,8 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
             log_info << "restore pc from disk failed";
         }
     } else {
-        log_info << "pass pc recovery";
+        log_info << "pass pc recovery and remove state file";
+        ViewState::remove_file();
     }
 
     gmcast_ = new GMCast(pnet(), uri_, restored ? &rst_uuid_ : NULL);
