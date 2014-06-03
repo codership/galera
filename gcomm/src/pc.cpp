@@ -210,6 +210,7 @@ void gcomm::PC::close(bool force)
     pstack_.pop_proto(pc_);
     pstack_.pop_proto(evs_);
     pstack_.pop_proto(gmcast_);
+    ViewState::remove_file();
 
     closed_ = true;
 }
