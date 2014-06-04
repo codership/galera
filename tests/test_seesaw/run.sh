@@ -57,7 +57,8 @@ cycle()
     then
         echo "Killing node $node_id..."
         kill_node $node
-        pause_var=$((($RANDOM % 8) + 1))
+        #pause_var=$((($RANDOM % 8) + 1))
+        pause_var=4
     else
         echo "Stopping node $node_id..."
         stop_node $node
@@ -81,13 +82,13 @@ cycle()
         skip_recovery_opt="--skip-recovery --start-position '00000000-0000-0000-0000-000000000000:-2'"
     fi
 
-    # if test $pause_var -gt 3
-    # then
-    #     restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
-    # else
-    stop_node $node || : # just in case the process is still lingering
-    restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
-    # fi
+    if test $pause_var -gt 3
+    then
+        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
+    else
+        stop_node $node || : # just in case the process is still lingering
+        restart_node "-g $(gcs_address $node) $skip_recovery_opt" $node
+    fi
 }
 
 node=0
