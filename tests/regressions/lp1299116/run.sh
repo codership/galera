@@ -7,7 +7,7 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 
 NODE0="--host ${NODE_INCOMING_HOST[0]} --port ${NODE_INCOMING_PORT[0]}"
 NODE1="--host ${NODE_INCOMING_HOST[1]} --port ${NODE_INCOMING_PORT[1]}"
-MYSQL="mysql -utest -ptestpass  -Dtest"
+MYSQL="mysql -utest -ptestpass -hgw -Dtest"
 MYSQL0="$MYSQL $NODE0"
 MYSQL1="$MYSQL $NODE1"
 
