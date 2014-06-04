@@ -57,8 +57,7 @@ cycle()
     then
         echo "Killing node $node_id..."
         kill_node $node
-        #pause_var=$((($RANDOM % 8) + 1))
-        pause_var=4
+        pause_var=$((($RANDOM % 8) + 1))
     else
         echo "Stopping node $node_id..."
         stop_node $node
