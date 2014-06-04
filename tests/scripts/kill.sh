@@ -20,14 +20,14 @@ kill_cmd()
 
 kill_node()
 {
-    node_job kill_cmd "$@"
     local node=${@:$#}
     local dir="${NODE_TEST_DIR[$node]}"
     local pid=$(cat $dir/mysql/var/mysqld.pid)
+    node_job kill_cmd "$@"
     # wait process to disappear.
     while find_mysqld_pid $pid
     do
-        sleep 1
+        sleep 0.1
     done
 }
 
