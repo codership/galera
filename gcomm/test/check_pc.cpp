@@ -21,11 +21,14 @@
 
 using namespace std;
 using namespace std::rel_ops;
-using namespace gu;
 using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::pc;
-
+using gu::byte_t;
+using gu::Buffer;
+using gu::Exception;
+using gu::URI;
+using gu::DeleteObject;
 
 START_TEST(test_pc_messages)
 {
@@ -1416,6 +1419,7 @@ START_TEST(test_pc_transport)
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
+                "pc.recovery=0&"
                 "node.name=n1");
 
     gu_conf_self_tstamp_on();
@@ -1430,6 +1434,7 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "pc.recovery=0&"
                 "node.name=n2");
     PCUser2 pu3(*net,
                 std::string("pc://")
@@ -1438,6 +1443,7 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                "pc.recovery=0&"
                 "node.name=n3");
 
 
@@ -1772,6 +1778,7 @@ START_TEST(test_set_param)
                 "gmcast.listen_addr=tcp://127.0.0.1:0&"
                 "gmcast.group=pc&"
                 "gmcast.time_wait=PT0.5S&"
+                "pc.recovery=0&"
                 "node.name=n1");
     pu1.start();
     // no such a parameter
@@ -1845,7 +1852,7 @@ START_TEST(test_trac_599)
     int err;
     err = tp->send_down(dg, gcomm::ProtoDownMeta());
     fail_unless(err == ENOTCONN, "%d", err);
-    tp->connect();
+    tp->connect(true);
     buf.resize(tp->mtu());
     Datagram dg2(buf);
     err = tp->send_down(dg2, gcomm::ProtoDownMeta());
@@ -1883,7 +1890,7 @@ START_TEST(test_trac_620)
     };
     D d(conf);
     gcomm::connect(tp, &d);
-    tp->connect();
+    tp->connect(true);
     tp->close(true);
     gcomm::disconnect(tp, &d);
     delete tp;

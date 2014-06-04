@@ -5,7 +5,7 @@
 #ifndef GALERA_SERVICE_THD_HPP
 #define GALERA_SERVICE_THD_HPP
 
-#include "gcs.hpp"
+#include "galera_gcs.hpp"
 #include <GCache.hpp>
 
 #include <galerautils.h>

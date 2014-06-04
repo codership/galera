@@ -9,7 +9,7 @@
 #include <pthread.h>
 
 #include "wsrep_api.h"
-#include "gcs.hpp"
+#include "galera_gcs.hpp"
 #include "trx_handle.hpp"
 #include "gu_config.hpp"
 #include "gu_lock.hpp"

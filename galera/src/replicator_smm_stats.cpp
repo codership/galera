@@ -188,7 +188,10 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
     sv[STATS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
 
-    struct gcs_stats stats;
+    struct gcs_stats* ptr_stats = static_cast<struct gcs_stats*>(
+        gu_malloc(sizeof(*ptr_stats)));
+    if (!ptr_stats) return 0;
+    struct gcs_stats& stats(*ptr_stats);
     gcs_.get_stats (&stats);
 
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
@@ -235,28 +238,61 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
     /* Create a buffer to be passed to the caller. */
-    gu::Lock lock_inc(incoming_mutex_);
 
-    size_t const inc_size(incoming_list_.size() + 1);
-    size_t const vec_size(sv.size()*sizeof(struct wsrep_stats_var));
+    // the structure of return buffer
+    // 1. fixed stats vars
+    // 2. incomming list
+    // 3. backend stats.
+    // 4. pointer to gcs_stats
+
+    // compute how many wsrep_stats_vars
+    size_t all_sv_size(sv.size());
+    struct gcs_backend_stats::stats_t* backend_stats = stats.backend_stats.stats;
+    if (backend_stats) {
+        for(int i=0; backend_stats[i].key; i++) {
+            all_sv_size++;
+        }
+    }
+    char* incoming_list_dup = NULL;
+    {
+        gu::Lock lock_inc(incoming_mutex_);
+        incoming_list_dup = strndup(incoming_list_.c_str(),
+                                    incoming_list_.size());
+    }
     struct wsrep_stats_var* const buf(
-        static_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
+        static_cast<struct wsrep_stats_var*>(
+            gu_malloc(all_sv_size * sizeof(wsrep_stats_var) +
+                      sizeof(ptr_stats))));
 
     if (buf)
     {
-        char* const inc_buf(reinterpret_cast<char*>(buf + sv.size()));
-
-        wsrep_stats_[STATS_INCOMING_LIST].value._string = inc_buf;
-
-        memcpy(buf, &sv[0], vec_size);
-        memcpy(inc_buf, incoming_list_.c_str(), inc_size);
-        assert(inc_buf[inc_size - 1] == '\0');
+        memcpy(buf, &sv[0], sv.size() * sizeof(wsrep_stats_var));
+        wsrep_stats_var* incoming_list_sv =
+                static_cast<wsrep_stats_var*>(buf) +  STATS_INCOMING_LIST;
+        incoming_list_sv->value._string = incoming_list_dup;
+        wsrep_stats_var* next_sv = incoming_list_sv + 1;
+        if (backend_stats) {
+            for(int i=0; backend_stats[i].key; i++) {
+                next_sv->name = backend_stats[i].key;
+                next_sv->type = WSREP_VAR_STRING;
+                next_sv->value._string = backend_stats[i].value;
+                next_sv++;
+            }
+        }
+        next_sv->name = NULL;
+        next_sv->type = WSREP_VAR_STRING;
+        next_sv->value._string = NULL;
+        *reinterpret_cast<struct gcs_stats**>(next_sv + 1) = ptr_stats;
     }
     else
     {
         log_warn << "Failed to allocate stats vars buffer to "
-                 << (inc_size + vec_size)
+                 << (all_sv_size * sizeof(wsrep_stats_var))
                  << " bytes. System is running out of memory.";
+
+        // clear garbage.
+        free(incoming_list_dup);
+        gcs_.free_stats(ptr_stats);
     }
 
     return buf;
@@ -281,5 +317,15 @@ galera::ReplicatorSMM::stats_free(struct wsrep_stats_var* arg)
 {
     if (!arg) return;
     log_debug << "########### Freeing stats object ##########";
+    wsrep_stats_var* incoming_list_sv = arg + STATS_INCOMING_LIST;
+    log_debug << "free incomming list";
+    free(const_cast<char*>(incoming_list_sv->value._string));
+    wsrep_stats_var* next_sv = incoming_list_sv + 1;
+    while(next_sv->name) next_sv++;
+    struct gcs_stats* ptr_stats =
+            *reinterpret_cast<struct gcs_stats**>(next_sv + 1);
+    log_debug << "gcs free stats";
+    gcs_.free_stats(ptr_stats);
+    gu_free(ptr_stats);
     gu_free(arg);
 }

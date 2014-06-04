@@ -45,8 +45,8 @@ static std::string get_scheme(bool use_ssl)
     return gcomm::TCP_SCHEME;
 }
 
-
-gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
+gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
+                      const UUID* my_uuid)
     :
     Transport     (net, uri),
     version_(check_range(Conf::GMCastVersion,
@@ -55,7 +55,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri)
     segment_ (check_range(Conf::GMCastSegment,
                           param<int>(conf_, uri, Conf::GMCastSegment, "0"),
                           0, 255)),
-    my_uuid_      (0, 0),
+    my_uuid_      (my_uuid ? *my_uuid : UUID(0, 0)),
     use_ssl_      (param<bool>(conf_, uri, Conf::SocketUseSsl, "false")),
     // @todo: technically group name should be in path component
     group_name_   (param<std::string>(conf_, uri, Conf::GMCastGroup, "")),

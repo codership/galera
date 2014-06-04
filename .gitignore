@@ -13,6 +13,7 @@ GSYMS
 core
 rb_test
 galera.cache
+gvwstate.dat
 galera/tests/galera_check
 galera/tests/galera_check.passed
 galerautils/tests/gu_tests
@@ -38,3 +39,4 @@ tests/conf/cluster.conf
 tests/conf/nodes.conf
 tests/conf/common_my.cnf
 tests/conf/my[0-9]*.cnf
+docs/build

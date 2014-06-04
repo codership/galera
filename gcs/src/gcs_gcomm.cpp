@@ -11,17 +11,11 @@
  */
 
 
-extern "C"
-{
-#include "gcs_gcomm.h"
-}
+#include "gcs_gcomm.hpp"
 
 // We access data comp msg struct directly
-extern "C"
-{
 #define GCS_COMP_MSG_ACCESS 1
-#include "gcs_comp_msg.h"
-}
+#include "gcs_comp_msg.hpp"
 
 
 #include <galerautils.hpp>
@@ -29,6 +23,7 @@ extern "C"
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/conf.hpp"
+#include "gcomm/stats.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
@@ -200,7 +195,7 @@ public:
         delete net_;
     }
 
-    const UUID& get_uuid() const { return uuid_; }
+    const gcomm::UUID& get_uuid() const { return uuid_; }
 
     static void* run_fn(void* arg)
     {
@@ -368,7 +363,7 @@ private:
     void unref() { }
 
     gu::Config& conf_;
-    UUID        uuid_;
+    gcomm::UUID        uuid_;
     pthread_t   thd_;
     URI         uri_;
     Protonet*   net_;
@@ -463,7 +458,7 @@ void GCommConn::run()
             // Backtrace().print(std::cerr);
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -485,7 +480,7 @@ void GCommConn::run()
 
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -545,7 +540,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 }
 
 
-static void fill_cmp_msg(const View& view, const UUID& my_uuid,
+static void fill_cmp_msg(const View& view, const gcomm::UUID& my_uuid,
                          gcs_comp_msg_t* cm)
 {
     size_t n(0);
@@ -553,7 +548,7 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     for (NodeList::const_iterator i = view.members().begin();
          i != view.members().end(); ++i)
     {
-        const UUID& uuid(NodeList::key(i));
+        const gcomm::UUID& uuid(NodeList::key(i));
 
         log_debug << "member: " << n << " uuid: " << uuid
                   << " segment: " << static_cast<int>(i->second.segment());
@@ -736,7 +731,7 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
                   << e.get_errno() << ": " << e.what();
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.handle_up(0, Datagram(),
-                       ProtoUpMeta(UUID::nil(),
+                       ProtoUpMeta(gcomm::UUID::nil(),
                                    ViewId(V_NON_PRIM),
                                    0,
                                    0xff,
@@ -828,6 +823,67 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
     }
 }
 
+static
+GCS_BACKEND_STATS_GET_FN(gcomm_stats_get)
+{
+    stats->stats = NULL;
+    stats->ctx = NULL;
+    GCommConn::Ref ref(backend);
+    if (ref.get() == 0)
+    {
+        return ;
+    }
+    GCommConn& conn(*ref.get());
+    gcomm::Stats backend_stats;
+    try {
+        gcomm::Critical<Protonet> cric(conn.get_pnet());
+        if (gu_unlikely(conn.get_error() !=0)) return ;
+        conn.get_pnet().get_stats(backend_stats);
+
+        size_t stats_size = backend_stats.size();
+        size_t value_size = 0;
+        for (gcomm::Stats::const_iterator i = backend_stats.begin();
+             i != backend_stats.end(); ++i) {
+            value_size += i->second.size() + 1;
+        }
+        stats->ctx = gu_malloc(
+            sizeof(gcs_backend_stats_t::stats_t) * (stats_size + 1) +
+            sizeof(char) * value_size);
+        if (!stats->ctx) {
+            return ;
+        }
+
+        stats->stats = static_cast<gcs_backend_stats_t::stats_t*>(stats->ctx);
+        char* base = reinterpret_cast<char*>(stats->stats + stats_size + 1);
+        size_t offset = 0;
+        size_t idx = 0;
+        for (gcomm::Stats::const_iterator i = backend_stats.begin();
+             i != backend_stats.end(); ++i) {
+            stats->stats[idx].key =
+                    gcomm::stats_key_to_string(i->first);
+            stats->stats[idx].value = base + offset;
+            strcpy(base + offset, i->second.c_str());
+            offset += i->second.size() + 1;
+            idx++;
+        }
+        assert(idx == stats_size);
+        stats->stats[idx].key = NULL;
+        stats->stats[idx].value = NULL;
+        return ;
+    } catch (const std::exception& e) {
+        log_warn << "gcomm stats get : caught exception("
+                 << e.what() << ")";
+    }
+}
+
+static
+GCS_BACKEND_STATS_FREE_FN(gcomm_stats_free)
+{
+    if (stats->ctx) {
+        gu_free(stats->ctx);
+        stats->ctx = NULL;
+    }
+}
 
 static
 GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
@@ -883,6 +939,8 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->msg_size  = gcomm_msg_size;
     backend->param_set = gcomm_param_set;
     backend->param_get = gcomm_param_get;
+    backend->stats_get = gcomm_stats_get;
+    backend->stats_free = gcomm_stats_free;
     backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;

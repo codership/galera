@@ -7,26 +7,39 @@ libgcs_env = env.Clone()
 
 # Backends (TODO: Get from global options)
 libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+# For C-style logging
+libgcs_env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
+# Disable old style cast warns until code is fixed
+libgcs_env.Append(CPPFLAGS = ' -Wno-old-style-cast')
+# Allow zero sized arrays
+libgcs_env.Replace(CCFLAGS = libgcs_env['CCFLAGS'].replace('-pedantic', ''))
+libgcs_env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
+libgcs_env.Append(CPPFLAGS = ' -Wno-effc++')
+
+print libgcs_env['CFLAGS']
+print libgcs_env['CCFLAGS']
+print libgcs_env['CPPFLAGS']
+print libgcs_env['CXXFLAGS']
 
 gcs4garb_env = libgcs_env.Clone()
 
 libgcs_sources = Split('''
-                          gcs_params.c
-                          gcs_conf.c
-                          gcs_fifo_lite.c
-                          gcs_msg_type.c
-                          gcs_comp_msg.c
-                          gcs_sm.c
-                          gcs_backend.c
-                          gcs_dummy.c
-                          gcs_act_proto.c
-                          gcs_defrag.c
-                          gcs_state_msg.c
-                          gcs_node.c
-                          gcs_group.c
-                          gcs_core.c
-                          gcs_fc.c
-                          gcs.c
+                          gcs_params.cpp
+                          gcs_conf.cpp
+                          gcs_fifo_lite.cpp
+                          gcs_msg_type.cpp
+                          gcs_comp_msg.cpp
+                          gcs_sm.cpp
+                          gcs_backend.cpp
+                          gcs_dummy.cpp
+                          gcs_act_proto.cpp
+                          gcs_defrag.cpp
+                          gcs_state_msg.cpp
+                          gcs_node.cpp
+                          gcs_group.cpp
+                          gcs_core.cpp
+                          gcs_fc.cpp
+                          gcs.cpp
                           gcs_gcomm.cpp
                        ''')
 #libgcs_env.VariantDir('.gcs', '.', duplicate=0)
@@ -43,7 +56,7 @@ gcs_test_env.Prepend(LIBS = File('#/gcache/src/libgcache.a'))
 gcs_test_env.Prepend(LIBS = File('#/gcs/src/libgcs.a'))
 
 gcs_test_env.Program(target = 'gcs_test',
-                     source = 'gcs_test.c',
+                     source = 'gcs_test.cpp',
                      LINK = libgcs_env['CXX'])
 
 SConscript('unit_tests/SConscript')

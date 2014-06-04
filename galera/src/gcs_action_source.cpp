@@ -8,10 +8,7 @@
 
 #include "gu_serialize.hpp"
 
-extern "C"
-{
-#include "galera_info.h"
-}
+#include "galera_info.hpp"
 
 #include <cassert>
 
@@ -140,6 +137,13 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
                                         conf->repl_proto_ver,
                                         state2repl(*conf), act.seqno_l);
         free(view_info);
+
+        if (conf->conf_id < 0 && conf->memb_num == 0) {
+            log_debug << "Received SELF-LEAVE. Closing connection.";
+            // called after being shifted to S_CLOSING state.
+            gcs_.close();
+        }
+
         break;
     }
     case GCS_ACT_STATE_REQ:

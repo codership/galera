@@ -3,35 +3,45 @@ Import('check_env')
 
 env = check_env.Clone()
 
+# For C-style logging
+env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
+# Disable old style cast warns until code is fixed
+env.Append(CPPFLAGS = ' -Wno-old-style-cast')
+# Allow zero sized arrays
+env.Replace(CCFLAGS = env['CCFLAGS'].replace('-pedantic', ''))
+env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
+env.Append(CPPFLAGS = ' -Wno-effc++')
+
+
 gcs_tests_sources = Split('''
-                             gcs_tests.c
-                             gcs_fifo_test.c
-                             ../gcs_fifo_lite.c
-                             gcs_sm_test.c
-                             ../gcs_sm.c
-                             gcs_comp_test.c
-                             ../gcs_comp_msg.c
-                             gcs_state_msg_test.c
-                             ../gcs_state_msg.c
-                             gcs_backend_test.c
-                             ../gcs_backend.c
-                             gcs_proto_test.c
-                             ../gcs_act_proto.c
-                             gcs_defrag_test.c
-                             ../gcs_defrag.c
-                             gcs_node_test.c
-                             ../gcs_node.c
-                             gcs_group_test.c
-                             gcs_memb_test.c
-                             ../gcs_group.c
-                             gcs_core_test.c
-                             ../gcs_core.c
-                             ../gcs_dummy.c
-                             ../gcs_msg_type.c
-                             ../gcs.c
-                             ../gcs_params.c
-                             gcs_fc_test.c
-                             ../gcs_fc.c
+                             gcs_tests.cpp
+                             gcs_fifo_test.cpp
+                             ../gcs_fifo_lite.cpp
+                             gcs_sm_test.cpp
+                             ../gcs_sm.cpp
+                             gcs_comp_test.cpp
+                             ../gcs_comp_msg.cpp
+                             gcs_state_msg_test.cpp
+                             ../gcs_state_msg.cpp
+                             gcs_backend_test.cpp
+                             ../gcs_backend.cpp
+                             gcs_proto_test.cpp
+                             ../gcs_act_proto.cpp
+                             gcs_defrag_test.cpp
+                             ../gcs_defrag.cpp
+                             gcs_node_test.cpp
+                             ../gcs_node.cpp
+                             gcs_group_test.cpp
+                             gcs_memb_test.cpp
+                             ../gcs_group.cpp
+                             gcs_core_test.cpp
+                             ../gcs_core.cpp
+                             ../gcs_dummy.cpp
+                             ../gcs_msg_type.cpp
+                             ../gcs.cpp
+                             ../gcs_params.cpp
+                             gcs_fc_test.cpp
+                             ../gcs_fc.cpp
                           ''')
 
 

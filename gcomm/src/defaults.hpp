@@ -45,6 +45,7 @@ namespace gcomm
         static std::string const PcWaitPrim               ;
         static std::string const PcWaitPrimTimeout        ;
         static std::string const PcWeight                 ;
+        static std::string const PcRecovery               ;
     };
 }
 
