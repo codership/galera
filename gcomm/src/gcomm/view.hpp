@@ -226,8 +226,9 @@ namespace gcomm
         { }
         std::ostream& write_stream(std::ostream& os) const;
         std::istream& read_stream(std::istream& is);
-        void write_file() const;
-        bool read_file();
+        void write_file(const char* fname = NULL) const;
+        bool read_file(const char* fname = NULL);
+        static void remove_file(const char* fname = NULL);
         bool operator== (const ViewState& vst) const
         {
             return my_uuid_ == vst.my_uuid_ &&

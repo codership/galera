@@ -214,13 +214,15 @@ START_TEST(test_view_state)
         fail_unless(vst == vst2);
     }
 
+    const char* fname = "/tmp/gvwstate.dat";
     // test write file and read file.
-    vst.write_file();
+    vst.write_file(fname);
     UUID my_uuid_3;
     View view_3;
     ViewState vst3(my_uuid_3, view_3);
-    vst3.read_file();
+    vst3.read_file(fname);
     fail_unless(vst == vst3);
+    unlink(fname);
 }
 END_TEST
 
