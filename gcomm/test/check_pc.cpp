@@ -1845,7 +1845,8 @@ START_TEST(test_trac_599)
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
     std::auto_ptr<gcomm::Transport> tp(
         gcomm::Transport::create
-        (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"));
+        (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"
+         "&pc.recovery=0"));
     gcomm::connect(tp.get(), &d);
     gu::Buffer buf(10);
     Datagram dg(buf);
@@ -1877,6 +1878,7 @@ START_TEST(test_trac_620)
 				    "gmcast.listen_addr=tcp://127.0.0.1:0&"
 				    "gmcast.group=pc&"
 				    "gmcast.time_wait=PT0.5S&"
+                    "pc.recovery=0&"
 				    "node.name=n1"));
     class D : public gcomm::Toplay
     {

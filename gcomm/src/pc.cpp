@@ -19,6 +19,16 @@
 void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
+    if (pc_recovery_ &&
+        um.err_no() == 0 &&
+        um.has_view() &&
+        um.view().id().type() == V_PRIM)
+    {
+        ViewState vst(const_cast<UUID&>(uuid()),
+                      const_cast<View&>(um.view()));
+        log_info << "save pc into disk";
+        vst.write_file();
+    }
     send_up(rb, um);
 }
 
@@ -87,9 +97,7 @@ void gcomm::PC::connect(bool start_prim)
     // should take precedence. otherwise it's not able to bootstrap.
     if (start_prim) {
         log_info << "start_prim is enabled, turn off pc_recovery";
-        pc_recovery_ = false;
-    }
-    if (pc_recovery_) {
+    } else if (pc_recovery_) {
         wait_prim = false;
     }
 
@@ -202,6 +210,7 @@ void gcomm::PC::close(bool force)
     pstack_.pop_proto(pc_);
     pstack_.pop_proto(evs_);
     pstack_.pop_proto(gmcast_);
+    ViewState::remove_file();
 
     closed_ = true;
 }
@@ -240,7 +249,8 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
             log_info << "restore pc from disk failed";
         }
     } else {
-        log_info << "pass pc recovery";
+        log_info << "skip pc recovery and remove state file";
+        ViewState::remove_file();
     }
 
     gmcast_ = new GMCast(pnet(), uri_, restored ? &rst_uuid_ : NULL);
