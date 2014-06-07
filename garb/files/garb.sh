@@ -97,7 +97,7 @@ start() {
 
 	if [ -r $PIDFILE ]; then
 		log_failure "$prog is already running with PID $(cat ${PIDFILE})"
-		return 0
+		return 3 # ESRCH
 	fi
 
 	[ -x $prog ] || return 5
@@ -136,7 +136,7 @@ start() {
 
 stop() {
 	[ "$EUID" != "0" ] && return 4
-	[ -r $PIDFILE ]    || return 0
+	[ -r $PIDFILE ]    || return 3 # ESRCH
 	program_stop
 }
 
@@ -171,4 +171,3 @@ case "$1" in
 esac
 
 exit $?
-
