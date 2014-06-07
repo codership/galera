@@ -10,6 +10,7 @@
 
 #define LOG_FILE "gu_tests++.log"
 
+#include "gu_atomic_test.hpp"
 #include "gu_vector_test.hpp"
 #include "gu_string_test.hpp"
 #include "gu_vlq_test.hpp"
@@ -29,6 +30,7 @@ typedef Suite *(*suite_creator_t)(void);
 
 static suite_creator_t suites[] =
 {
+    gu_atomic_suite,
     gu_vector_suite,
     gu_string_suite,
     gu_vlq_suite,
