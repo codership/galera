@@ -272,6 +272,16 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
             }
         }
     }
+
+    // if pc is formed by normal process(start_prim_=true) instead of
+    // pc recovery process, rst_view_ won't be clear.
+    // however this will prevent pc remerge(see is_prim function)
+    // so we have to clear rst_view_ once pc is formed..
+    if (v.id().type() == V_PRIM &&
+        rst_view_) {
+        log_info << "clear restored view";
+        rst_view_ = NULL;
+    }
 }
 
 
@@ -904,13 +914,11 @@ bool gcomm::pc::Proto::is_prim() const
     return prim;
 }
 
-
 void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 {
     gcomm_assert(msg.type() == Message::T_STATE);
     gcomm_assert(state() == S_STATES_EXCH);
     gcomm_assert(state_msgs_.size() < current_view_.members().size());
-
     log_debug << self_id() << " handle state from " << source << " " << msg;
 
     // Early check for possibly conflicting primary components. The one

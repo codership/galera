@@ -186,6 +186,8 @@ public:
     bool set_param(const std::string& key, const std::string& val);
     void set_mtu(size_t mtu) { mtu_ = mtu; }
     size_t mtu() const { return mtu_; }
+    void set_restored_view(View* rst_view) { rst_view_ = rst_view; }
+    const View* restored_view() const { return rst_view_; }
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);
     Proto (const Proto&);
