@@ -20,13 +20,16 @@ Build dependencies for the Galera Replication Plugin are:
 
 To build, proceed as follows:
 
-1. Download and extract the Galera Replication Plugin
-   source package from
-   https://launchpad.net/galera/+download::
+1. Download and extract the Galera Replication Plugin::
   
-    $ wget https://launchpad.net/galera/2.x/23.2.6/+download/galera-23.2.6-src.tar.gz
-    $ tar zxf galera-23.2.6-src.tar.gz
-    $ cd galera-23.2.6-src/
+    $ wget https://github.com/codership/galera/tarball/3.x -O galera.tar.gz
+    $ tar -zxf galera.tar.gz
+    $ cd galera
+
+   or::
+ 
+    $ git clone https://github.com/codership/galera.git
+    $ cd galera
 
 2. Run *scons* to build the Galera Replication Plugin::
 
