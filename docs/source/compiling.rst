@@ -41,23 +41,50 @@ To build, proceed as follows:
 
 Build the MySQL server as follows:
 
-1. Download MySQL source code from http://dev.mysql.com/downloads/mysql/.
-2. Extract the source package::
+1. Select a wsrep patch for mysql from https://launchpad.net/codership-mysql/+download
 
-    $ tar zxf mysql-5.5.31.tar.gz
+   It will have a filename like mysql-5.6.16_wsrep_25.5.patch
 
-3. Download and uncompress the *wsrep* patch that
-   corresponds to the MySQL version::
+2. Download MySQL source code from http://downloads.mysql.com/archives/community/
 
-    $ wget https://launchpad.net/codership-mysql/5.5/5.5.31-23.7.5/+download/mysql-5.5.31-23.7.5.patch.gz
-    $ gunzip mysql-5.5.31-23.7.5.patch.gz
+   In this page change `Select Platform` to `Source Code`.
 
-3. Apply the patch::
+   Download the version corresponding to the patch e.g. 5.6.16.
 
-    $ cd mysql-5.5.31
-    $ patch -p0 < ../mysql-5.5.31-23.7.5.patch
+3. Extract the source package::
 
-4. Build the MySQL server::
+    $ tar zxf mysql-5.6.16.tar.gz
+
+4. Apply the patch::
+
+    $ cd mysql-5.6.16
+    $ patch -p1 < ../mysql-5.6.16_wsrep_25.5.patch
+
+   Skip the .bzrignore file as it doesn't exist the tarball by pressing enter twice::
+
+    $ patch -p1 < ../mysql-5.6.16_wsrep_25.5.patch
+    can't find file to patch at input line 4
+    Perhaps you used the wrong -p or --strip option?
+    The text leading up to this was:
+    --------------------------
+    |=== modified file '.bzrignore'
+    |--- old/.bzrignore     2013-02-05 21:49:04 +0000
+    |+++ new/.bzrignore     2013-09-01 09:27:10 +0000
+    --------------------------
+    File to patch: 
+    Skip this patch? [y] 
+    Skipping patch.
+    3 out of 3 hunks ignored
+    patching file CMakeLists.txt
+    patching file Docs/README-wsrep
+    patching file cmake/configure.pl
+    ...
+
+
+5. Build the MySQL server::
+ 
 
     $ cmake -DWITH_WSREP=1 -DWITH_INNODB_DISALLOW_WRITES=1
     $ make 
+
+   See the following URL if you have missing dependancies http://dev.mysql.com/doc/refman/5.6/en/source-installation.html.
