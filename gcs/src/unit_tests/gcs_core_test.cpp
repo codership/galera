@@ -32,7 +32,7 @@
  * CORE_RECV_ACT(act_r, size, type)   // makes checks agains size and type
  *
  * In the first approach group messages will be received concurrently.
- * In the second apporach messages will wait in queue and be fetched afterwards
+ * In the second approach messages will wait in queue and be fetched afterwards
  *
  */
 

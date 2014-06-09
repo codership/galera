@@ -1,4 +1,4 @@
-#!/bin/bash -eux
+#!/bin/bash -eu
 
 declare -r DIST_BASE=$(cd $(dirname $0)/../..; pwd -P)
 TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
@@ -80,7 +80,7 @@ test_3_load()
 	[ "$val0" != "1" ] && echo "0 $val0 $val1" && exit
 	[ "$val1" != "1" ] && echo "1 $val0 $val1" && exit
 
-	echo "truncing"
+	# echo "truncing"
 	$MYSQL0 -e "truncate uniq;"
     done
 }
@@ -104,12 +104,6 @@ test_2
 test_3
 
 $SCRIPTS/command.sh wait_sync 0 1
-
-test $($MYSQL0 -ss -e "select count(*) from uniq") == 1 || \
-    (echo "duplicate uniq key" && exit 1)
-test $($MYSQL1 -ss -e "select count(*) from uniq") == 1 || \
-    (echo "duplicate uniq key" && exit 1)
-
 $SCRIPTS/command.sh check | wc -l
 
 $SCRIPTS/command.sh stop

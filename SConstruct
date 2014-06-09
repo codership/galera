@@ -254,6 +254,11 @@ if not conf.CheckLib('pthread'):
     print 'Error: pthread library not found'
     Exit(1)
 
+# libatomic may be needed on some 32bit platforms (and 32bit userland PPC64)
+# for 8 byte atomics but not generally required
+if 0 == x86:
+    conf.CheckLib('atomic')
+
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
         print 'Error: rt library not found'
