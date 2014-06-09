@@ -96,13 +96,13 @@ public:
                                     param<int>(conf, uri, Conf::PcWeight,
                                                Defaults::PcWeight),
                                     0, 0xff)),
-        rst_view_      (rst_view)
+        rst_view_      ()
     {
         log_info << "PC version " << version_;
         set_weight(weight_);
         NodeMap::value(self_i_).set_segment(segment);
-        if (rst_view_) {
-            NodeMap::value(self_i_).set_last_prim(rst_view_ -> id());
+        if (rst_view) {
+            set_restored_view(rst_view);
         }
 
         conf.set(Conf::PcVersion,      gu::to_string(version_));
@@ -186,7 +186,11 @@ public:
     bool set_param(const std::string& key, const std::string& val);
     void set_mtu(size_t mtu) { mtu_ = mtu; }
     size_t mtu() const { return mtu_; }
-    void set_restored_view(View* rst_view) { rst_view_ = rst_view; }
+    void set_restored_view(View* rst_view) {
+        gcomm_assert(state_ == S_CLOSED);
+        rst_view_ = rst_view;
+        NodeMap::value(self_i_).set_last_prim(rst_view_ -> id());
+    }
     const View* restored_view() const { return rst_view_; }
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);

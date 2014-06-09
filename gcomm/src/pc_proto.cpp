@@ -267,8 +267,11 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
                 log_info << "promote to primary component";
                 // since all of them are non-primary component
                 // we need to bootstrap.
-                rst_view_ = NULL;
                 send_install(true);
+                // clear rst_view after pc is formed, otherwise
+                // there would be network partition when sending
+                // install message. and if rst_view is cleared here,
+                // then pc recovery will never happen again.
             }
         }
     }
