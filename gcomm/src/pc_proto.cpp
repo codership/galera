@@ -239,12 +239,12 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
                 rst_view_ -> members().end()) {
                 const Node& node(NodeMap::value(i));
                 const ViewId& last_prim(node.last_prim());
-                if (last_prim.type() != V_PRIM ||
+                if (last_prim.type() != V_NON_PRIM ||
                     last_prim.uuid() != rst_view_ -> id().uuid()) {
                     log_warn << "node uuid: " << uuid << " last_prim(type: "
                              << last_prim.type() << ", uuid: "
                              << last_prim.uuid() << ") is inconsistent to "
-                             << "restored view(type: V_PRIM, uuid: "
+                             << "restored view(type: V_NON_PRIM, uuid: "
                              << rst_view_ ->id().uuid();
                     check = false;
                     break;
@@ -815,9 +815,7 @@ bool gcomm::pc::Proto::is_prim() const
 
     // No members coming from prim view, check if last known prim
     // view can be recovered (majority of members from last prim alive)
-    if (prim == false &&
-        // give up if via pc recovery
-        rst_view_ == NULL)
+    if (prim == false)
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
@@ -859,7 +857,7 @@ bool gcomm::pc::Proto::is_prim() const
                 const UUID& uuid(NodeMap::key(j));
                 const Node& inst(NodeMap::value(j));
 
-                if (inst.last_prim() != ViewId(V_NON_PRIM) &&
+                if (inst.last_prim().type() != V_NON_PRIM &&
                     std::find<MultiMap<ViewId, UUID>::iterator,
                               std::pair<const ViewId, UUID> >(
                                   last_prim_uuids.begin(),

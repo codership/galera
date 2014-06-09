@@ -2900,7 +2900,7 @@ static void _test_join_split_cluster(
 {
     // construct restored view.
     const UUID& prim_uuid = uuid1 < uuid2 ? uuid1 : uuid2;
-    View rst_view(ViewId(V_PRIM, prim_uuid, 3));
+    View rst_view(ViewId(V_PRIM, prim_uuid, 0));
     rst_view.add_member(uuid1, 0);
     rst_view.add_member(uuid2, 0);
 
@@ -2929,6 +2929,13 @@ static void _test_join_split_cluster(
     Proto pc3(conf3, uuid3, 0);
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
+    // assume previous cluster is node1 and node3.
+    const UUID& prim_uuid2 = uuid1 < uuid3 ? uuid1 : uuid3;
+    View rst_view2(ViewId(V_PRIM, prim_uuid2, 0));
+    rst_view2.add_member(uuid1, 0);
+    rst_view2.add_member(uuid3, 0);
+    pc3.set_restored_view(&rst_view2);
+
 
     {
         uint32_t seq = pc1.current_view().id().seq();
@@ -3085,6 +3092,7 @@ START_TEST(test_join_split_cluster)
     UUID uuid3(3);
     _test_join_split_cluster(uuid1, uuid2, uuid3);
     _test_join_split_cluster(uuid2, uuid1, uuid3);
+    _test_join_split_cluster(uuid2, uuid3, uuid1);
 }
 END_TEST
 
