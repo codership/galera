@@ -21,6 +21,8 @@ sm_init_stats (gcs_sm_stats_t* stats)
     stats->paused_sample  = 0;
     stats->send_q_samples = 0;
     stats->send_q_len     = 0;
+    stats->send_q_len_max = 0;
+    stats->send_q_len_min = 0;
 }
 
 gcs_sm_t*
@@ -53,6 +55,8 @@ gcs_sm_create (long len, long n)
         sm->wait_q_head = 1;
         sm->wait_q_tail = 0;
         sm->users       = 0;
+        sm->users_max   = 0;
+        sm->users_min   = 0;
         sm->entered     = 0;
         sm->ret         = 0;
 #ifdef GCS_SM_CONCURRENCY
@@ -133,6 +137,8 @@ gcs_sm_destroy (gcs_sm_t* sm)
 void
 gcs_sm_stats_get (gcs_sm_t*  sm,
                   int*       q_len,
+                  int*       q_len_max,
+                  int*       q_len_min,
                   double*    q_len_avg,
                   long long* paused_ns,
                   double*    paused_avg)
@@ -143,6 +149,8 @@ gcs_sm_stats_get (gcs_sm_t*  sm,
 
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
+    *q_len_max = sm->users_max;
+    *q_len_min = sm->users_min;
     *q_len = sm->users;
     tmp    = sm->stats;
     now    = gu_time_monotonic();
@@ -193,8 +201,12 @@ gcs_sm_stats_flush(gcs_sm_t* sm)
     }
 
     sm->stats.send_q_len     = 0;
+    sm->stats.send_q_len_max = 0;
+    sm->stats.send_q_len_min = 0;
     sm->stats.send_q_samples = 0;
 
+    sm->users_max = sm->users;
+    sm->users_min = sm->users;
     gu_mutex_unlock (&sm->lock);
 }
 

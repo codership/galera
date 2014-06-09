@@ -116,7 +116,22 @@ In a non-primary component, the node state comment should be ``Initialized``. An
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
 
-.. note:: Status variables and variables in the chapters below are differential and reset on every ``SHOW STATUS`` command.  To view the value for the current moment, execute two ``SHOW STATUS`` commandson the node with an interval of ~1 minute. The output of the last invocation will correspond to the current moment.
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_avg
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_min
+
+.. note:: Status variables and variables in the chapters below are differential and reset on every ``SHOW STATUS`` command.  To view the value for the current moment, execute two ``SHOW STATUS`` commands on the node with an interval of ~1 minute. The output of the last invocation will correspond to the current moment.
+
+Flow control settings will result in a pause being set when the wsrep_local_recv_queue exceeds a threshold. Monitoring the following variables will provide an understanding of the wsrep_local_recv_queue length over the period between status examinations::
+
+    wsrep_local_recv_queue_avg
+    wsrep_local_recv_queue_max
+    wsrep_local_recv_queue_min
 
 When checking the replication health, the first thing you want to know is how much slave lag is slowing down the cluster. You can check this by checking the value of the variable below::
 
@@ -138,8 +153,16 @@ This variable indicates how many transactions may be applied in parallel on aver
 .. index::
    pair: Parameters; wsrep_local_send_queue_avg
 
-If you have a slow network, check the value of the variable below::
+.. index::
+   pair: Parameters; wsrep_local_send_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_min
+
+If you have a slow network, check the value of the variables below::
 
     wsrep_local_send_queue_avg
+    wsrep_local_send_queue_max
+    wsrep_local_send_queue_min
 
 If the variable value is high, the network link can be the bottleneck.  If this is the case, the cause can be at any layer, from the physical layer to the operating system configuration.
