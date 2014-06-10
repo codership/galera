@@ -69,9 +69,8 @@ Documentation
 ------------------
 
 .. toctree::
-   :maxdepth: 2
-   :numbered:
    :includehidden:
+   :maxdepth: 2
 
    technicaldescription
    gettingstarted

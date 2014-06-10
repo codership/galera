@@ -7,25 +7,56 @@
  Administration Guide
 =====================
 
-Contents:
+- :doc:`deploymentvariants`
+- :doc:`limitations`
+- :doc:`myisamtoinnodb`
+
+----------------------
+Using Galera Cluster
+----------------------
+
+- :doc:`nodeprovisioning`
+- :doc:`quorumreset`
+- :doc:`monitoringthecluster`
+- :doc:`backingupthecluster`
+- :doc:`notification-cmd`
+- :doc:`upgrading`
+
+----------------------
+Using Advanced Settings 
+----------------------
+
+- :doc:`ssl`
+- :doc:`firewallsettings`
+- :doc:`arbitrator`
+- :doc:`schemaupgrades`
+- :doc:`performance`
+- :doc:`configurationtips`
+
+
 
 .. toctree::
-	:numbered:
+	:hidden:
 
-   deploymentvariants
-   nodeprovisioning
-   quorumreset
-   monitoringthecluster
-   ssl
-   firewallsettings
-   limitations
-   upgrading
-   schemaupgrades
-   performance
-   backingupthecluster
-   arbitrator
-   faq
-   myisamtoinnodb
-   compiling
-   configurationtips
-   notification-cmd
+	deploymentvariants
+	limitations
+	myisamtoinnodb
+	nodeprovisioning
+	quorumreset
+	monitoringthecluster
+	backingupthecluster
+	notification-cmd
+	upgrading
+	ssl
+	firewallsettings
+	arbitrator
+	schemaupgrades
+	performance
+	configurationtips
+
+
+	
+
+
+
+
