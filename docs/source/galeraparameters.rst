@@ -711,7 +711,7 @@ Resume replication after recv queue drops below this fraction of ``gcs.fc_limit`
 .. index::
    pair: Parameters; gcs.fc_limit
 
-Pause replication if recv queue exceeds this number of writesets. For ``gcs.fc_master_slave`` = ``NO`` this limit is scaled up by ``sqrt( number of cluster members )``.
+Pause replication if recv queue exceeds this number of writesets. For master-slave setups this number can be increased considerably. For ``gcs.fc_master_slave`` = ``NO`` this limit is scaled up by ``sqrt( number of cluster members )``.
 
 
 .. rubric:: gcs.fc_master_slave

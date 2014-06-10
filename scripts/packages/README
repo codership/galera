@@ -340,7 +340,7 @@ fc_factor
 
 fc_limit
     Pause replication if recv queue exceeds that many writesets.
-    Default: 16. For fc_master_slave = NO this is increased.
+    Default: 16. For master-slave setups this number can be increased considerably.
 
 fc_master_slave
     When this is NO then the effective gcs.fc_limit is multipled by
