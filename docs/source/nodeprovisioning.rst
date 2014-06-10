@@ -25,9 +25,9 @@
 
 If the state of a new or failed node differs from the state of the cluster :term:`Primary Component` it needs to be synchronized. As a result, new node provisioning and failed node recovery are essentially the same process of joining a node to the cluster :abbr:`PC (Primary Component)`.
 
-The initial node state ID is read from the *grastate.txt* file in ``wsrep_data_dir``, where it is saved every time the node is gracefully shut down. If the node crashes in the :term:`Total Order Isolation` mode, its database state is unknown and its initial Galera Cluster node state is undefined (``00000000-0000-0000-0000-000000000000:-1``). [1]_
+The initial node state ID is read from the *grastate.txt* file in ``wsrep_data_dir``, where it is saved every time the node is gracefully shut down. If the node crashes in the :term:`Total Order Isolation` mode, its database state is unknown and its initial Galera Cluster node state is undefined (``00000000-0000-0000-0000-000000000000:-1``).
 
-.. [1] In normal transaction processing, only the ``seqno`` part
+.. note:: In normal transaction processing, only the ``seqno`` part
        of the GTID remains undefined (``-1``), and the ``UUID``
        part remains valid. In this case, the node can be recovered
        through IST.
