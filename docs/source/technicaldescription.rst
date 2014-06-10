@@ -1,24 +1,52 @@
-.. galera documentation master file, created by
-   sphinx-quickstart on Sat Apr 20 12:00:55 2013.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 ======================
  Technical Description
 ======================
 
-Contents:
+To understand how Galera Cluster works you first need to understand database replication, both what it is and how it works.  That understanding in turn provides contexts for understanding what Galera does and why.
+
+----------------------
+Understanding Replication
+----------------------
+
+Replication refers to the frequent copying of data from one server to another, distributing the content so that all the servers in the cluster share the same level of information.
+
+- :doc:`introduction`
+- :doc:`certificationbasedreplication`
 
 .. toctree::
-	:numbered:
-	
-   introduction
-   certificationbasedreplication
-   architecture
-   isolationlevels
-   statetransfer
-   scriptablesst
-   nodestates
-   weightedquorum
-   loadbalancing
-   recovery
+	:hidden:
+
+	introduction
+	certificationbasedreplication
+
+
+----------------------
+Understanding Galera Cluster
+----------------------
+
+How does Galera Cluster actually work?  Galera uses eager replication, where the nodes keep all other nodes in sync by updating all replicas in a single transaction.  When a transaction commits, all nodes have the same value through write-set replication over group communication.
+
+
+- :doc:`architecture`
+- :doc:`isolationlevels`
+- :doc:`statetransfer`
+- :doc:`scriptablesst`
+- :doc:`nodestates`
+- :doc:`loadbalancing`
+- :doc:`recovery`
+- :doc:`weightedquorum`
+
+
+.. toctree::
+	:hidden:
+
+	architecture
+	isolationlevels
+	statetransfer
+	scriptablesst
+	nodestates
+	loadbalancing
+	recovery
+	weightedquorum
+
+

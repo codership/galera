@@ -164,9 +164,9 @@
 		<li id="menu-item-297" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-297"><a href="http://galeracluster.com/category/blog/">Blog</a></li>
 		<li id="menu-item-38" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-38"><a href="http://galeracluster.com/contact-us/">Contact us</a></li>
 	</ul>
-
-
 	</div>
+
+
 	</nav><!-- #site-navigation -->
 
 	</div><!-- #navbar -->
@@ -199,16 +199,16 @@
 		<ul class="nav-link">
 			{% if sourcename %} 
 
-				<li><a href="https://github.com/codership/galera/blob/3.x/docs/source/{{ sourcename [:-4] }}.rst">Edit on Github</a></li>
+				<li><a href="https://github.com/codership/galera/blob/3.x/docs/source/{{ sourcename [:-4] }}.rst" title="Edit '{{title}}' on Github">Edit on Github</a></li>
 
 			{% endif %} {{ super() }}
 
 			{% if prev %}
-				<li><a href="{{ next.link|e }}">&lt; Previous</a></li>
+				<li><a href="{{ prev.link|e }}" title="{{ prev.title|e }}">&lt; Previous</a></li>
 			{% endif %}
 
 			{% if next %}
-				<li><a href="{{ next.link|e }}">Next &gt;</a></li>
+				<li><a href="{{ next.link|e }}" title="{{ next.title|e }}">Next &gt;</a></li>
 			{% endif %}
 
 		</ul>
