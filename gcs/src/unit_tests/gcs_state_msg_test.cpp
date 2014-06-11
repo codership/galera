@@ -406,6 +406,93 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
 }
 END_TEST
 
+START_TEST(gcs_state_msg_test_gh24)
+{
+    gcs_state_msg_t* st[7] = { NULL, };
+    gu_uuid_t state_uuid, group_uuid;
+    gu_uuid_generate(&state_uuid, NULL, 0);
+    gu_uuid_generate(&group_uuid, NULL, 0);
+    gu_uuid_t prim_uuid1, prim_uuid2;
+    gu_uuid_generate(&prim_uuid1, NULL, 0);
+    gu_uuid_generate(&prim_uuid2, NULL, 0);
+
+    gcs_seqno_t prim_seqno1 = 37;
+    int prim_joined1 = 3;
+    gcs_seqno_t prim_seqno2 = 35;
+    int prim_joined2 = 6;
+    gcs_seqno_t received = 0;
+
+    gcs_state_quorum_t quorum;
+    // first three are 35.
+    st[0] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
+                                 prim_seqno2, received, prim_joined2,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home0", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[0] != 0);
+    st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
+                                 prim_seqno2, received, prim_joined2,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home1", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[1] != 0);
+    st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
+                                 prim_seqno2, received, prim_joined2,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home2", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[2] != 0);
+
+    // last four are 37.
+    st[3] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
+                                 prim_seqno1, received, prim_joined1,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home3", "",
+                                 0, 4, 2, 3);
+    fail_unless(st[3] != 0);
+    st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
+                                 prim_seqno1, received, prim_joined1,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home4", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[4] != 0);
+    st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
+                                 prim_seqno1, received, prim_joined1,
+                                 GCS_NODE_STATE_SYNCED,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home5", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[5] != 0);
+    st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
+                                 prim_seqno1, received, prim_joined1,
+                                 GCS_NODE_STATE_PRIM,
+                                 GCS_NODE_STATE_NON_PRIM,
+                                 "home6", "",
+                                 0, 4, 2, 2);
+    fail_unless(st[6] != 0);
+    int ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 7,
+                                       &quorum);
+    fail_unless(ret == 0);
+    fail_unless(quorum.primary == true);
+    fail_unless(quorum.conf_id == prim_seqno1);
+
+    // // but we just have first five nodes, we don't have prim.
+    // // because prim_joined=3 but there are only 2 joined nodes.
+    // ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 5,
+    //                                &quorum);
+    // fail_unless(ret == 0);
+    // fail_unless(quorum.primary == false);
+
+    for(int i=0;i<7;i++)
+        gcs_state_msg_destroy(st[i]);
+}
+END_TEST
+
 Suite *gcs_state_msg_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
@@ -421,7 +508,8 @@ Suite *gcs_state_msg_suite(void)
 
   suite_add_tcase (s, tc_remerge);
   tcase_add_test  (tc_remerge, gcs_state_msg_test_quorum_remerge);
+  tcase_add_test  (tc_remerge, gcs_state_msg_test_gh24);
+
 
   return s;
 }
-
