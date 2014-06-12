@@ -140,13 +140,17 @@ END_TEST
 
 Suite* gu_atomic_suite()
 {
-    TCase* t = tcase_create ("test_atomic");
-    tcase_add_test (t, test_sanity_c);
-    tcase_add_test (t, test_sanity_cxx);
-    tcase_add_test (t, test_concurrency);
+    TCase* t1 = tcase_create ("sanity");
+    tcase_add_test (t1, test_sanity_c);
+    tcase_add_test (t1, test_sanity_cxx);
+
+    TCase* t2 = tcase_create ("concurrency");
+    tcase_add_test (t2, test_concurrency);
+    tcase_set_timeout(t2, 60);
 
     Suite* s = suite_create ("gu::Atomic");
-    suite_add_tcase (s, t);
+    suite_add_tcase (s, t1);
+    suite_add_tcase (s, t2);
 
     return s;
 }

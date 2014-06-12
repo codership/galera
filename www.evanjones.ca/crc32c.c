@@ -17,9 +17,9 @@
  */
 
 /*
- * Copyright (c) 2013 Codership Oy <info@codership.com>
+ * Copyright (c) 2013-2014 Codership Oy <info@codership.com>
  * Concatenated crc32ctables.cc and crc32c.cc, stripped off C++ garbage,
- * fixed PIC.
+ * fixed PIC, added support for big-endian CPUs.
  */
 
 #if defined(__cplusplus)
@@ -509,8 +509,12 @@ const uint32_t crc_tableil8_o88[256] =
  * available at http://www.opensource.org/licenses/bsd-license.html
  *
  * Abstract: The main routine
- * 
+ *
  --*/
+
+/*
+ * Traditional software CRC32 implementation: one byte at a time
+ */
 uint32_t crc32cSarwate(uint32_t crc, const void* data, size_t length) {
     const char* p_buf = (const char*) data;
     const char* p_end = p_buf + length;
@@ -522,12 +526,52 @@ uint32_t crc32cSarwate(uint32_t crc, const void* data, size_t length) {
     return crc;
 }
 
+/*
+ * Optimized CRC32 implementations that follow process input in slices
+ * of 4 byte integers and require byteswapping on big-endian platforms,
+ * so here we define byteswapping macro/function.
+ * GCC normally defines __BYTE_ORDER__ so we use that if available.
+ */
+#if defined(WITH_GALERA)
+#  include "galerautils/src/gu_byteswap.h"
+#  define CRC32C_TO_LE32 gu_le32
+#elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#  define CRC32C_TO_LE32(val) val
+#else
+#  if defined(HAVE_BYTESWAP_H)
+#    include <byteswap.h>
+#  endif
+static inline uint32_t
+CRC32C_TO_LE32(uint32_t const val)
+{
+#if !defined(__BYTE_ORDER__)
+    /* determine endianness in runtime and return if LE */
+    static union { uint32_t n; uint8_t little_endian; } const u = { 1 };
+    if (u.little_endian) return val;
+#elif (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#  error "Broken macro logic!"
+#endif /* __BYTE_ORDER__ */
+
+#if   defined(bswap32)
+    return bswap32(val);
+#elif defined(bswap_32)
+    return bswap_32(val);
+#elif defined(BSWAP_32)
+    return BSWAP_32(val);
+#else
+    return ((val << 24) | ((val & 0x0000FF00) << 8) |
+            (val >> 24) | ((val & 0x00FF0000) >> 8));
+#endif /* bswap32 */
+}
+#endif /* WITH_GALERA */
+
 uint32_t crc32cSlicingBy4(uint32_t crc, const void* data, size_t length) {
     const char* p_buf = (const char*) data;
 
     // Handle leading misaligned bytes
     size_t initial_bytes = (sizeof(int32_t) - (intptr_t)p_buf) & (sizeof(int32_t) - 1);
     if (length < initial_bytes) initial_bytes = length;
+
     for (size_t li = 0; li < initial_bytes; li++) {
         crc = crc_tableil8_o32[(crc ^ *p_buf++) & 0x000000FF] ^ (crc >> 8);
     }
@@ -537,7 +581,7 @@ uint32_t crc32cSlicingBy4(uint32_t crc, const void* data, size_t length) {
     size_t end_bytes = length - running_length; 
 
     for (size_t li = 0; li < running_length/4; li++) {
-        crc ^= *(uint32_t*) p_buf;
+        crc ^= CRC32C_TO_LE32(*(const uint32_t*)p_buf);
         p_buf += 4;
         uint32_t term1 = crc_tableil8_o56[crc & 0x000000FF] ^
                 crc_tableil8_o48[(crc >> 8) & 0x000000FF];
@@ -560,6 +604,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
     // Handle leading misaligned bytes
     size_t initial_bytes = (sizeof(int32_t) - (intptr_t)p_buf) & (sizeof(int32_t) - 1);
     if (length < initial_bytes) initial_bytes = length;
+
     for (size_t li = 0; li < initial_bytes; li++) {
         crc = crc_tableil8_o32[(crc ^ *p_buf++) & 0x000000FF] ^ (crc >> 8);
     }
@@ -569,22 +614,27 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
     size_t end_bytes = length - running_length; 
 
     for (size_t li = 0; li < running_length/8; li++) {
-        crc ^= *(uint32_t*) p_buf;
-        p_buf += 4;
+        const uint32_t* const slices = (const uint32_t*)p_buf;
+
+        crc ^= CRC32C_TO_LE32(slices[0]);
         uint32_t term1 = crc_tableil8_o88[crc & 0x000000FF] ^
                 crc_tableil8_o80[(crc >> 8) & 0x000000FF];
+
         uint32_t term2 = crc >> 16;
         crc = term1 ^
-              crc_tableil8_o72[term2 & 0x000000FF] ^ 
+              crc_tableil8_o72[term2 & 0x000000FF] ^
               crc_tableil8_o64[(term2 >> 8) & 0x000000FF];
-        term1 = crc_tableil8_o56[(*(uint32_t *)p_buf) & 0x000000FF] ^
-                crc_tableil8_o48[((*(uint32_t *)p_buf) >> 8) & 0x000000FF];
 
-        term2 = (*(uint32_t *)p_buf) >> 16;
+        uint32_t const slice2 = CRC32C_TO_LE32(slices[1]);
+        term1 = crc_tableil8_o56[slice2 & 0x000000FF] ^
+                crc_tableil8_o48[(slice2 >> 8) & 0x000000FF];
+
+        term2 = slice2 >> 16;
         crc = crc ^ term1 ^
                 crc_tableil8_o40[term2  & 0x000000FF] ^
                 crc_tableil8_o32[(term2 >> 8) & 0x000000FF];
-        p_buf += 4;
+
+        p_buf += 8;
     }
 
     for (size_t li=0; li < end_bytes; li++) {
