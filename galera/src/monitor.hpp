@@ -275,7 +275,7 @@ namespace galera
         }
 
 
-        void get_stats(double* oooe, double* oool, double* win_size)
+        void get_stats(double* oooe, double* oool, double* win_size, size_t* entered)
         {
             gu::Lock lock(mutex_);
 
@@ -284,6 +284,8 @@ namespace galera
                 *oooe = (oooe_ > 0 ? double(oooe_)/entered_ : .0);
                 *oool = (oool_ > 0 ? double(oool_)/entered_ : .0);
                 *win_size = (win_size_ > 0 ? double(win_size_)/entered_ : .0);
+                *entered = size_t(entered_);
+                oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
             }
             else
             {
