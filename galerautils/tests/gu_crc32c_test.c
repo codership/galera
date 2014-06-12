@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2013-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,26 +18,30 @@
     "0123456789abcdef0123456789ABCDEF" \
     "0123456789abcdef0123456789ABCDEF"
 
+#define long_output 0x7e5806b3
+
 struct test_pair
 {
     const char* input;
     uint32_t    output;
 };
 
-#define test_vector_length 6
+//#define test_vector_length 6
 
 /*
  * boost::crc_optimal<32, 0x1EDC6F41, 0, 0, true, true> crc;
  */
 static struct test_pair
-test_vector[test_vector_length] =
+test_vector[] =
 {
     { "",                  0x00000000 },
+    { "0",                 0x629e1ae0 },
     { "123456789",         0xe3069283 }, // taken from SCTP mailing list
     { "My",                0xc7600404 }, // taken from
     { "test",              0x86a072c0 }, // http://www.zorc.breitbandkatze.de/crc.html
     { "vector",            0xa0b8f38a },
-    { long_input,          0x7e5806b3 }
+    { long_input,          long_output},
+    { NULL,                0x0 }
 };
 
 static void
@@ -45,7 +49,7 @@ test_function(void)
 {
     int i;
 
-    for (i = 0; i < test_vector_length; i++)
+    for (i = 0; test_vector[i].input != NULL; i++)
     {
         const char* const input  = test_vector[i].input;
         uint32_t    const output = test_vector[i].output;
@@ -56,8 +60,8 @@ test_function(void)
                 input, ret, output);
     }
 
-    const char* const input = test_vector[5].input;
-    uint32_t output = test_vector[5].output;
+    const char* const input = long_input;
+    uint32_t const   output = long_output;
     int const size = strlen(input);
     int offset = 0;
 
