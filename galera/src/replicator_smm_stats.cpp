@@ -261,6 +261,14 @@ galera::ReplicatorSMM::stats_get() const
             sv[sv_pos].value._string = tail_buf;
             tail_buf += i->second.size() + 1;
         }
+
+        assert(sv_pos == sv.size() - 1);
+
+        // NULL terminate
+        sv[sv_pos].name = 0;
+        sv[sv_pos].type = WSREP_VAR_STRING;
+        sv[sv_pos].value._string = 0;
+
         assert(static_cast<size_t>(tail_buf - reinterpret_cast<const char*>(buf)) == vec_size + tail_size);
         assert(reinterpret_cast<const char*>(buf)[vec_size + tail_size - 1] == '\0');
         // Finally copy sv vector to buf
