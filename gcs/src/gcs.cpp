@@ -1854,6 +1854,15 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
     stats->fc_received = conn->stats_fc_received; conn->stats_fc_received = 0;
 }
 
+
+void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
+{
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        gcs_core_get_status(conn->core, status);
+    }
+}
+
 static long
 _set_fc_limit (gcs_conn_t* conn, const char* value)
 {

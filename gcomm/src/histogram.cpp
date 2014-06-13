@@ -99,3 +99,9 @@ std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
 }
 
 
+std::string gcomm::Histogram::to_string() const
+{
+    std::ostringstream os;
+    os << *this;
+    return os.str();
+}

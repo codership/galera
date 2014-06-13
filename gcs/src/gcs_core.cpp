@@ -11,6 +11,8 @@
 #include <string.h> // for mempcpy
 #include <errno.h>
 
+#include "gu_throw.hpp"
+
 #define GCS_COMP_MSG_ACCESS
 
 #include "gcs_core.hpp"
@@ -1296,6 +1298,18 @@ gcs_core_param_get (gcs_core_t* core, const char* key)
     else {
         return NULL;
     }
+}
+
+
+void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
+{
+    if (gu_mutex_lock(&core->send_lock))
+        gu_throw_fatal << "could not lock mutex";
+    if (core->state < CORE_CLOSED)
+    {
+        core->backend.status_get(&core->backend, status);
+    }
+    gu_mutex_unlock(&core->send_lock);
 }
 
 #ifdef GCS_CORE_TESTING

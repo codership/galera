@@ -312,6 +312,12 @@ public:
     gu::Config& get_conf()                { return conf_; }
     int         get_error() const         { return error_; }
 
+    void        get_status(gu::Status& status) const
+    {
+        gcomm::Critical<gcomm::Protonet> crit(*net_);
+        tp_->get_status(status);
+    }
+
     class Ref
     {
     public:
@@ -825,6 +831,21 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
     return NULL;
 }
 
+static
+GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
+{
+    GCommConn::Ref ref(backend);
+    if (ref.get() == 0)
+    {
+        gu_throw_error(-EBADFD);
+    }
+
+    GCommConn& conn(*ref.get());
+
+    conn.get_status(status);
+
+}
+
 
 GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
 {
@@ -873,6 +894,8 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->msg_size  = gcomm_msg_size;
     backend->param_set = gcomm_param_set;
     backend->param_get = gcomm_param_get;
+    backend->status_get = gcomm_status_get;
+
     backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;

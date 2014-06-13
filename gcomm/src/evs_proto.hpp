@@ -267,6 +267,8 @@ public:
 
     bool set_param(const std::string& key, const std::string& val);
 
+    void handle_get_status(gu::Status& status) const;
+
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time
 private:

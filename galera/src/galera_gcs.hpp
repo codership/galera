@@ -8,6 +8,7 @@
 #include "gu_atomic.hpp"
 #include "gu_throw.hpp"
 #include "gu_config.hpp"
+#include "gu_status.hpp"
 #include "gcs.hpp"
 #include "wsrep_api.h"
 
@@ -44,7 +45,7 @@ namespace galera
         virtual void    join(gcs_seqno_t seqno) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
-
+        virtual void    get_status(gu::Status&) const = 0;
         /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
                                    const std::string& value) = 0;
@@ -164,6 +165,11 @@ namespace galera
         void get_stats(gcs_stats* stats) const
         {
             return gcs_get_stats(conn_, stats);
+        }
+
+        void get_status(gu::Status& status) const
+        {
+            gcs_get_status(conn_, status);
         }
 
         void param_set (const std::string& key, const std::string& value)
@@ -322,6 +328,9 @@ namespace galera
         {
             memset (stats, 0, sizeof(*stats));
         }
+
+        void get_status(gu::Status& status) const
+        {}
 
         void  param_set (const std::string& key, const std::string& value)
         {}

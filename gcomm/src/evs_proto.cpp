@@ -369,6 +369,35 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     return false;
 }
 
+void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
+{
+    log_info << "handle_get_status " << info_mask_ << " " << I_STATISTICS;
+    if (info_mask_ & I_STATISTICS)
+    {
+        status.insert("evs_safe_hs", hs_safe_.to_string());
+        status.insert("evs_causal_hs", hs_local_causal_.to_string());
+        status.insert("evs_outq_avg", gu::to_string(double(send_queue_s_)/
+                                                    double(n_send_queue_s_)));
+        std::ostringstream os;
+        const double norm(
+            double(gu::datetime::Date::now().get_utc()
+                   - last_stats_report_.get_utc())/gu::datetime::Sec);
+        std::vector<double> result(7, norm);
+        std::transform(sent_msgs_.begin(), sent_msgs_.end(),
+                       result.begin(), result.begin(), std::divides<double>());
+        std::copy(result.begin(), result.end(),
+                  std::ostream_iterator<double>(os, ","));
+        status.insert("evs_sent", os.str());
+        status.insert("evs_retransmitted", gu::to_string(retrans_msgs_));
+        status.insert("evs_recovered", gu::to_string(recovered_msgs_));
+        status.insert("evs_safe_deliv_per_sent",
+                      gu::to_string(double(delivered_msgs_[O_SAFE])
+                                    /double(accumulate(
+                                                sent_msgs_.begin(),
+                                                sent_msgs_.end(), 0))));
+    }
+}
+
 
 std::ostream& gcomm::evs::operator<<(std::ostream& os, const Proto& p)
 {
@@ -652,11 +681,6 @@ void gcomm::evs::Proto::handle_install_timer()
 
 void gcomm::evs::Proto::handle_stats_timer()
 {
-    if (info_mask_ & I_STATISTICS)
-    {
-        evs_log_info(I_STATISTICS) << "statistics (stderr):";
-        std::cerr << stats() << std::endl;
-    }
     reset_stats();
 #ifdef GCOMM_PROFILE
     evs_log_info(I_PROFILING) << "\nprofiles:\n";
@@ -2403,6 +2427,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     }
     case S_JOINING:
         state_ = S_JOINING;
+        reset_timer(T_STATS);
         break;
     case S_LEAVING:
         state_ = S_LEAVING;

@@ -38,9 +38,12 @@ namespace gu
         const std::string& find(const std::string& key) const
         {
             VarMap::const_iterator i(vars_.find(key));
-if (i == vars_.end()) throw gu::NotFound();
+            if (i == vars_.end()) throw gu::NotFound();
             return i->second;
         }
+
+        size_t size() const { return vars_.size(); }
+
 
     private:
         VarMap vars_;
