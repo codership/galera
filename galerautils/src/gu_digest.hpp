@@ -116,13 +116,13 @@ MMH3::digest (const void* const in, size_t size, uint64_t& out)
 template <> inline int
 MMH3::gather<8> (void* const out) const
 {
-    *(reinterpret_cast<uint64_t*>(out)) = htog64(gather8()); return 8;
+    *(static_cast<uint64_t*>(out)) = gather8(); return 8;
 }
 
 template <> inline int
 MMH3::gather<4> (void* const out) const
 {
-    *(reinterpret_cast<uint32_t*>(out)) = htog32(gather4()); return 4;
+    *(static_cast<uint32_t*>(out)) = gather4(); return 4;
 }
 
 typedef MMH3 Hash;

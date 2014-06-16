@@ -11,8 +11,11 @@
 
 using namespace gu;
 
-#define double_equal(a,b) \
-    (std::fabs((a) - (b)) < std::numeric_limits<double>::epsilon())
+static inline bool double_equal(double a, double b)
+{
+    return (std::fabs(a - b) <=
+            std::fabs(a + b) * std::numeric_limits<double>::epsilon());
+}
 
 START_TEST(test_stats)
 {
@@ -21,7 +24,8 @@ START_TEST(test_stats)
     st.insert(20.0);
     st.insert(30.0);
     fail_if(!double_equal(st.mean(), 20.0));
-    fail_if(!double_equal(st.variance() * 3, 200.0));
+    fail_if(!double_equal(st.variance() * 3, 200.0),
+            "%e != 0", st.variance()*3-200.0);
     fail_if(!double_equal(st.min(), 10.0));
     fail_if(!double_equal(st.max(), 30.0));
     st.clear();
