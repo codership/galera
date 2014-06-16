@@ -23,30 +23,42 @@
 .. index::
    single: Total Order Isolation
 
-If the state of a new or failed node differs from the state of the cluster :term:`Primary Component` it needs to be synchronized. As a result, new node provisioning and failed node recovery are essentially the same process of joining a node to the cluster :abbr:`PC (Primary Component)`.
+When the state of a new or failed node differs from that of the cluster's :term:`Primary Component`, the new or failed node must be synchronized with the cluster.  Because of this, the provisioning of new nodes and the recover of failed nodes are essentially the same process as that of joining a node to the cluster Primary Component.
 
-The initial node state ID is read from the *grastate.txt* file in ``wsrep_data_dir``, where it is saved every time the node is gracefully shut down. If the node crashes in the :term:`Total Order Isolation` mode, its database state is unknown and its initial Galera Cluster node state is undefined (``00000000-0000-0000-0000-000000000000:-1``).
+Galera reads the initial node state ID from the **grastate.txt** file, found in the directory assigned by the ``wsrep_data_dir`` parameter.  Each time the node gracefully shuts down, Galera saves to this file.  
 
-.. note:: In normal transaction processing, only the ``seqno`` part
-       of the GTID remains undefined (``-1``), and the ``UUID``
-       part remains valid. In this case, the node can be recovered
-       through IST.
+In the event that the node crashes while in :term:`Total Order Isolation` mode, its database state is unknown and its initial node state remains undefined::
 
-When a node joins the primary component, it compares its state ID to that of the :abbr:`PC (Primary Component)` and if they do not match, the node requests state transfer from the cluster.
+	00000000-0000-0000-0000-000000000000:-1
 
-There are two possibilities to select the state transfer donor:
+.. note:: In normal transaction processing, only the :term:`seqno` part of the GTID remains undefined, (that is, with a value of ``-1``.  The UUID, (that is, the remainder of the node state), remains valid.  In such cases, you can recover the node through an :term:`Incremental State Transfer`. 
 
-- **Automatic** The group communication layer determines the state donor from the available members of the primary component.
+---------------------------
+How Nodes Join the Cluster
+---------------------------
 
-- **Manual** The state donor name is specified with the ``wsrep_sst_donor`` parameter on startup.
+When a node joins the cluster, it compares its own state ID to that of the Primary Component.  If the state ID does not match, the joining node requests a state transfer from the cluster.
 
-In the latter case, if a node with that name is not a part of the primary component, state transfer fails and the joining node aborts. Use the same donor name as set in the ``wsrep_node_name`` parameter on the donor node.
+There are two options available to determining the state transfer donor:
 
-.. note:: State transfer is a heavy operation not only on the joining node, but also on the donor. The state donor may not be able to serve client requests. Thus, when possible, select the donor manually, based on network proximity.  Configure the load balancer to transfer client connections to the other nodes for the duration of state transfer.
+- **Automatic** When the node attempts to join the cluster, the group communication layer determines the state donor it should use from those members available in the Primary Component.
 
-During the state transfer the joining node caches writesets received from other nodes in a *slave queue* and applies them after the state transfer is over, to catch up with the current primary component state. Since the state snapshot always has a state ID, it is easy to determine which writesets are already contained in the snapshot and should be discarded.
+- **Manual** When the node attempts to join the cluster, it uses the ``wsrep_sst_donor`` parameter to determine which state donor it should use.  If it finds that the state donor it is looking for is not part of the Primary Component, the state transfer fails and the joining node aborts.  For ``wsrep_sst_donor``, use the same name as you use on the donor node for the ``wsrep_node_name`` parameter.
 
-During the catch-up phase, flow control ensures that the slave queue gets shorter (that is, the cluster replication rate will be limited to the writeset application rate on the catching node).  However, there is no guarantee on how soon the node will catch up.  When the node catches up, its status becomes ``SYNCED`` and it will accept client connections.
+.. note:: A state transfer is a heavy operation.  This is true not only for the joining node, but also for the donor.  In fact, a state donor may not be able to serve client requests.  
+
+	Thus, whenever possible: manually select the state donor, based on network proximity and configure the load balancer to transfer client connections to other nodes in the cluster for the duration of the state transfer.
+
+When a state transfer is in process, the joining node caches write-sets that it receives from other nodes in a slave queue.  Once the state transfer is complete, it applies the write-sets from the slave queue to catch up with the current Primary Component state.  Since the state snapshot carries a state ID, it is easy to determine which write-sets the snapshot contains and which it should discard.
+
+During the catch-up phase, flow control ensures that the slave queue shortens, (that is, it limits the cluster replication rates to the write-set application rate on the node that is catching up).  
+
+While there is no guarantee on how soon a node will catch up, when it does the node status updates to ``SYNCED`` and it begins to accept client connections.
+
+
+
+
+
 
 ------------------------------------------------
  Comparison of State Snapshot Transfer Methods
@@ -56,81 +68,111 @@ During the catch-up phase, flow control ensures that the slave queue gets shorte
 .. index::
    pair: State Snapshot Transfer methods; Comparison of
 
-There are two different node provisioning methods:
+There are two methods available for provisioning nodes:
 
-- State Snapshot Transfer (SST), which transfers the entire node state as it is (hence "snapshot").
+- **State Snapshot Transfer (SST)** Where Galera transfers the entire node state as it is, (hence, "snapshot").
 
-- Incremental State Transfer (IST), which only transfers the results of transactions missing from the joining node.
+- **Incremental State Transfer (IST)** Where Galera only transfers the results of transactions missing from the joining node.
 
-You can choose the SST method (``mysqldump``, ``rsync``, or ``xtrabackup``), whereas IST will be automatically chosen by the donor node, when it is available.  The SST methods are compared in this chapter.
+When performing state snapshot transfers, you can choose the method Galera uses in the transfer, (**mysqldump**, **rsync**, or **xtrabackup**).  When performing incremental snapshot transfers, the donor node determines the method Galera uses.
 
-There is no single best state snapshot transfer method; the method must be chosen depending on the situation. Fortunately, the choice only must be done on the receiving node; the donor will serve whatever is requested, as long as it has support for it.
+This chapter covers state snapshot transfers.
 
-See the table below for a summary on the the differences between the state snapshot transfer methods:
 
-+------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
-| Method     | Speed          | Blocks the donor? | Available on live node? | Logical/Physical | Requires root access to MySQL server? |
-+============+================+===================+=========================+==================+=======================================+
-| mysqldump  | :red:`slow`    | :red:`yes`        | yes                     | logical          | both donor and joiner                 |
-+------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
-| rsync      | fastest        | :red:`yes`        | :red:`no`               | physical         | none                                  |
-+------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
-| xtrabackup | fast           | For a short time  | :red:`no`               | physical         | donor only                            |
-+------------+----------------+-------------------+-------------------------+------------------+---------------------------------------+
++------------------------------+-----------------+---------------+------------------------+------------------+------------------------------------------+
+| Method                       | Speed           | Blocks Donor? | Available on Live Node | Type             | Requires root access to database server? |
++==============================+=================+===============+========================+==================+==========================================+
+| :ref:`mysqldump<mysqldump>`  | :red:`slow`     | :green:`yes`  | :green:`yes`           | logical           | donor and joiner                        |
++------------------------------+-----------------+---------------+------------------------+-------------------+-----------------------------------------+
+| :ref:`rsync<rsync>`          | :green:`fastest`| :green:`yes`  | :red:`no`              | physical          | none                                    |
++------------------------------+-----------------+---------------+------------------------+-------------------+-----------------------------------------+
+| :ref:`xtrabackup<xtrabackup>`| :green:`fast`   | briefly       | :red:`no`              | physical          | donor only                              |
++------------------------------+-----------------+---------------+------------------------+-------------------+-----------------------------------------+
 
-When comparing the different state snapshot transfer methods, the division between a logical state snapshot and a physical state snapshot is important, especially from the perspective of configuration:
+There is no one best State Snapshot Transfer method.  You must choose what method to use based on the situation.  Fortunately, you need only set the method on the receiving node.  So long as the donor has support, it serves the transfer in whatever method the joiner node requests.
 
-- **Physical state snapshot**
+There are two types of state snapshot transfers to consider from the perspective of configuration:
 
-  :green:`Pluses`: Physical state snapshot is the fastest to transfer, as by definition it does not involve a server on either end. It just physically copies data from the disk at one node to the disk on the other. It does not depend on the joining node database being in a working condition: it just writes all over it. This is a good way to restore a corrupted data directory.
 
-  :red:`Minuses`: Physical state snapshot requires the receptor node to have the same data directory layout and the same storage engine configuration as the donor. For example, InnoDB should have the same file-per-table, compression, log file size and similar settings.  Furthermore, a server with initialized storage engines cannor receive physical state snapshots. This means that:
-
-  - The node in need of a SST must restart the server.
+**Physical State Snapshot**
   
-  - The server is inaccessible to the mysql client until the SST is complete, since the server cannot perform authentication without storage engines.
+:green:`Pros`:  A physical state snapshot is the fastest to transfer, as it does not involve a server on either side.  The transfer physically copies data from the disk of one node to the disk of the other.  It does not need the joining database in a working condition.  The transfer overwrites whatever was previously there.
+  
+This is a good method to use in restoring a corrupted data directory.
 
-- **Logical state snapshot**
+:red:`Cons`:  A physical state snapshot requires the receptor node to have the same data directory layout and the same storage engine configuration as the donor.  For example, InnoDB must have the same file-per-table, compression, log file size and similar settings.
 
-  :green:`Pluses`: A running server can receive a logical state transfer (in fact, only a fully initialized server can receive a logical state transfer). Logical state transfer does not require a receptor node to have the same configuration as the donor node, allowing to upgrade storage engine options. You can, for example, migrate from the Antelope to the Barracuda file format, start using compression or resize, or
-  place iblog* files to another partition.
-    
-  :red:`Minuses`: A logical state transfer is as slow as *mysqldump*. The receiving server must be prepared to accept root connections from potential donor nodes and the receiving server must have a non-corrupted database.
+Furthermore, a server with initialized storage engines cannot receive a physical state snapshot.  This means that:
 
-``mysqldump``
-=============
+- The node in need of a state snapshot transfer must restart the database server.
 
-``mysqldump`` requires the receiving node to have a fully functional database (which can be empty) and the same root credentials as the donor has. It also requires root access from other nodes. ``mysqldump`` is several times slower than other methods on sizable databases, but may be faster if the database is very small (smaller than the log files, for example). It is also sensitive to the ``mysqldump`` tool version; it must be the most recent. It is not uncommon for several ``mysqldump`` binaries to be found in the system. ``mysqldump`` can fail if an older ``mysqldump`` tool version is incompatible with the newer
-server.
+- The database server remains inaccessible to the client until the state snapshot transfer is complete, since the server cannot perform authentication without the storage engines.
 
-The main advantage of ``mysqldump`` is that a state snapshot can be transferred to a working server. That is, the server can be started standalone and then be instructed to join a cluster from the MySQL client command line. It also can be used to migrate from older database formats to newer. 
+**Logical State Snapshot**
 
-Sometimes ``mysqldump`` is the only option. For example, when upgrading from a MySQL 5.1 cluster with a built-in InnoDB to MySQL 5.5 with an InnoDB plugin.
+:green:`Pros`: A logical state transfer can be used on a running server.  In fact, only a fully initialized server can receive a logical state snapshot transfer.  It does not require a receptor node to have the same configuration as the donor node.  This allows you to upgrade storage engine options.  
 
-The ``mysqldump`` script only runs on the sending side and pipes the ``mysqldump`` output to the MySQL client connected to the receiving server.
+For example, with a logical state snapshop transfer, you can migrate from the Antelope to the Barracuda file format, start using compression resize, or move iblog* files to another partition. 
 
-``rsync``
-=============
+:red:`Cons`: A logical state snapshot is as slow as **mysqldump**.  It requires that you configure the receiving server to accept root connections from potential donor nodes.  The receiving server must have a non-corrupted database.
 
-``rsync``-based state snapshot transfer is the fastest. It has all pluses and minuses of the physical snapshot transfer and, in addition, it blocks the donor for the whole duration of transfer. However, on terabyte-scale databases, it was found to be considerably (1.5-2 times) faster than ``xtrabackup``. This is several hours faster. ``rsync`` does not depend on MySQL configuration or root access. This makes it probably the easiest method to configure.
 
-``rsync`` also has the *rsync-wan* modification that engages the ``rsync`` delta transfer algorithm. However, this method is more IO intensive and should only be used when the network throughput is the bottleneck, that is usually the case in conjunction with wide area networks.
+^^^^^^^^^^^^^^^^^
+mysqldump
+^^^^^^^^^^^^^^^^^
+.. _mysqldump:
 
-The ``rsync`` script runs on both sending and receiving sides. On the receiving side, it starts the *rsync* in server mode and waits for a connection from the sender. On the sender side, it starts the ``rsync`` in client mode and sends the contents of the MySQL data directory to the joining node.
+The main advantage of **mysqldump** is that you can transfer a state snapshot to a working server.  That is, you start the server standalone and then instruct it to join a cluster from the database client command line.  
 
-The most frequently encountered issue with this method is having incompatible ``rsync`` versions on the donor and on the receiving server.
+You can also use it to migrate from an older database format to a newer one.
 
+**mysqldump** requires that the receiving node have a fully functional database, which can be empty, and the same root credentials as the donor.  It also requires root access from the other nodes.
+
+This method is several times slower than the others on sizable databases, but it may prove faster in the case of very small databases.  For instance, when the database is smaller than the log files.
+
+.. note:: State snapshot transfers that use **mysqldump** are sensitive to the version of the tool each node uses.  It is not uncommon for a given system to have installed several versions.  A state snapshot transfer can fail if the version one node uses is older and incompatible with the newer server.
+
+On occasion, **mysqldump** is the only option available.  For instance, if you upgrade from a MySQL 5.1 cluster with the built-in InnoDB to MySQL 5.5 with the InnoDB plugin.
+
+The **mysqldump** script only runs on the sending side.  The output from the script gets piped to the MySQL client that connects to the receiving server.
+
+For more information, see the `mysqldump Documentation <http://dev.mysql.com/doc/refman/5.6/en/mysqldump.html>`_.
+
+^^^^^^^^^^^^^^^^^
+rsync
+^^^^^^^^^^^^^^^^^
+.. _rsync:
+
+The fastest state snapshot transfer method is **rsync**.  It carries all the advantages and disadvantages of the physical snapshot transfer method with the added bonus of blocking the donor for the duration of the transfer.  **rsync** does not require database configuration or root access, which makes it easier to configure.
+
+On terabyte-scale databases, it was found to be considerably faster, (1.5 to 2 times faster), than **xtrabackup**.  This means transfer times on larger databases can process several hours faster.
+
+Additionally, **rsync** features the rsync-wan modification, which engages the **rsync** delta transfer algorithm.  However, given that this makes it more I/O intensive, you should only use it when the network throughput is the bottleneck, which is usually the case with wide area networks.
+
+.. note:: The most common issue encountered with this method is due to incompatibilities between the versions of **rsync** on the donor and joining nodes.
+
+The **rsync** script runs on both sending and receiving sides.  On the receiving side, it starts **rsync** in server-mode and waits for a connection from the sender.  On the sender side, it starts **rsync** in client-mode and sends the contents of the data directory to the receiving node.
+
+For more information, see the `Rsync Documentation <http://rsync.samba.org/>`_.
+
+
+^^^^^^^^^^^^^^^^^
 ``xtrabackup``
-==========
-
+^^^^^^^^^^^^^^^^^
+.. _xtrabackup:
 .. index::
    single: my.cnf
 
-``xtrabackup``-based state snapshot transfer is probably the most popular choice. As ``rsync``, it has the pluses and minuses of the physical snapshot. However, ``xtrabackup`` is a virtually non-blocking method on the donor. It only blocks the donor for a very short period of time to copy MyISAM tables, such as system tables. If these tables are small, the blocking time is very short. This naturally happens at the cost of speed: ``xtrabackup`` can be considerably slower than ``rsync``.
+The most popular method for state snapshot transfers is **xtrabackup**.  It carries all the advantages and disadvantages of physical state snapshot transfers, but is virtually non-blocking on the donor.  
 
-As ``xtrabackup`` must copy a large amount of data in the shortest possible time, it may noticeably degrade the donor performance.
+**xtrabackup** only blocks the donor for the short period of time it takes to copy MyISAM tables, (the system tables, for instance).  If these tables are small, the blocking time is very short.  However, this comes at the cost of speed: **xtrabackup** state snapshot transfers can be considerably slower than those that use **rsync**.
 
-The most frequently encountered problem with ``xtrabackup`` is its configuration. ``xtrabackup`` requires that certain options be set in the ``my.cnf`` file (for example ``datadir``) and a local root access to the donor server. Refer to the ``xtrabackup`` manual for more details.
+Given that **xtrabackup** must copy a large amount of data in the shortest time possible, it may noticeably degrade donor performance.
+
+
+.. note:: The most common issue encountered with this method is due to it configuration.  **xtrabackup** requires that you set certain options in the configuration file, (``my.cnf`` or ``my.ini``, depending on your build) and a local root access to the donor server.
+
+For more information, see the `Percona XtraBackup User Manual <https://www.percona.com/doc/percona-xtrabackup/2.1/manual.html?id=percona-xtrabackup:xtrabackup_manual>`_.
 
 
 .. |---|   unicode:: U+2014 .. EM DASH
