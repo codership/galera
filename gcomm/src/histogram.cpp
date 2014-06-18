@@ -10,9 +10,12 @@
 #include "gu_logger.hpp"
 #include "gu_string.hpp"
 
+#include <cmath>
+
 #include <sstream>
 #include <limits>
 #include <vector>
+
 
 gcomm::Histogram::Histogram(const std::string& vals)
     :
@@ -38,13 +41,6 @@ gcomm::Histogram::Histogram(const std::string& vals)
             gu_throw_fatal << "Failed to insert value: " << val;
         }
     }
-
-    if (cnt_.insert(
-            std::make_pair(
-                std::numeric_limits<double>::max(), 0)).second == false)
-    {
-        gu_throw_fatal << "Failed to insert numeric_limits<double>::max()";
-    }
 }
 
 void gcomm::Histogram::insert(const double val)
@@ -55,14 +51,23 @@ void gcomm::Histogram::insert(const double val)
         return;
     }
 
-    std::map<double, long long>::iterator i = cnt_.lower_bound(val);
+    // Returns element that has key greater to val,
+    // the correct bin is one below that
+    std::map<double, long long>::iterator i(cnt_.upper_bound(val));
 
     if (i == cnt_.end())
     {
-        gu_throw_fatal;
+        ++cnt_.rbegin()->second;
     }
-
-    i->second++;
+    else if (i == cnt_.begin())
+    {
+        log_warn << "value " << val << " below histogram range, discarding";
+    }
+    else
+    {
+        --i;
+        ++i->second;
+    }
 }
 
 void gcomm::Histogram::clear()
@@ -88,12 +93,9 @@ std::ostream& gcomm::operator<<(std::ostream& os, const Histogram& hs)
     {
         i_next = i;
         ++i_next;
-        if (i_next == hs.cnt_.end())
-            break;
-        os << i->first << " -> " << i_next->first << ": "
-           << 100.*double(i_next->second + (i == hs.cnt_.begin() ? i->second : 0))/double(norm) << " ";
+        os << i->first << ":" << std::fabs(double(i->second)/double(norm));
+        if (i_next != hs.cnt_.end()) os << ",";
     }
-    os << "total: " << norm;
 
     return os;
 }

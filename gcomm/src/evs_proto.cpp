@@ -18,6 +18,8 @@
 
 #include "defaults.hpp"
 
+#include <cmath>
+
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
@@ -51,9 +53,9 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report_(gu::datetime::Date::now()),
     collect_stats_(true),
-    hs_agreed_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
-    hs_safe_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
-    hs_local_causal_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+    hs_agreed_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
+    hs_safe_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
+    hs_local_causal_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
     send_queue_s_(0),
     n_send_queue_s_(0),
     sent_msgs_(7, 0),
@@ -371,30 +373,29 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 
 void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
 {
-    log_info << "handle_get_status " << info_mask_ << " " << I_STATISTICS;
     if (info_mask_ & I_STATISTICS)
     {
         status.insert("evs_safe_hs", hs_safe_.to_string());
         status.insert("evs_causal_hs", hs_local_causal_.to_string());
-        status.insert("evs_outq_avg", gu::to_string(double(send_queue_s_)/
-                                                    double(n_send_queue_s_)));
-        std::ostringstream os;
-        const double norm(
-            double(gu::datetime::Date::now().get_utc()
-                   - last_stats_report_.get_utc())/gu::datetime::Sec);
-        std::vector<double> result(7, norm);
-        std::transform(sent_msgs_.begin(), sent_msgs_.end(),
-                       result.begin(), result.begin(), std::divides<double>());
-        std::copy(result.begin(), result.end(),
-                  std::ostream_iterator<double>(os, ","));
-        status.insert("evs_sent", os.str());
+        status.insert("evs_outq_avg",
+                      gu::to_string(std::fabs(double(send_queue_s_)/
+                                              double(n_send_queue_s_))));
+        status.insert("evs_sent_user",
+                      gu::to_string(sent_msgs_[Message::T_USER]));
+        status.insert("evs_sent_delegate",
+                      gu::to_string(sent_msgs_[Message::T_DELEGATE]));
+        status.insert("evs_sent_gap",
+                      gu::to_string(sent_msgs_[Message::T_GAP]));
+        status.insert("evs_sent_join",
+                      gu::to_string(sent_msgs_[Message::T_JOIN]));
+        status.insert("evs_sent_install",
+                      gu::to_string(sent_msgs_[Message::T_INSTALL]));
+        status.insert("evs_sent_leave",
+                      gu::to_string(sent_msgs_[Message::T_LEAVE]));
         status.insert("evs_retransmitted", gu::to_string(retrans_msgs_));
         status.insert("evs_recovered", gu::to_string(recovered_msgs_));
-        status.insert("evs_safe_deliv_per_sent",
-                      gu::to_string(double(delivered_msgs_[O_SAFE])
-                                    /double(accumulate(
-                                                sent_msgs_.begin(),
-                                                sent_msgs_.end(), 0))));
+        status.insert("evs_deliv_safe",
+                      gu::to_string(delivered_msgs_[O_SAFE]));
     }
 }
 
@@ -468,11 +469,6 @@ void gcomm::evs::Proto::reset_stats()
     hs_local_causal_.clear();
     send_queue_s_ = 0;
     n_send_queue_s_ = 0;
-    fill(sent_msgs_.begin(), sent_msgs_.end(), 0LL);
-    fill(recvd_msgs_.begin(), recvd_msgs_.end(), 0LL);
-    retrans_msgs_ = 0LL;
-    recovered_msgs_ = 0LL;
-    fill(delivered_msgs_.begin(), delivered_msgs_.end(), 0LL);
     last_stats_report_ = gu::datetime::Date::now();
 }
 
