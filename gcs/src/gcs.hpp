@@ -11,10 +11,6 @@
 #ifndef _gcs_h_
 #define _gcs_h_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -23,6 +19,8 @@ extern "C" {
 #include "gu_config.h"
 #include "gcache.h"
 #include "gu_errno.h"
+
+#include "gu_status.hpp"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -405,11 +403,9 @@ struct gcs_stats
 /*! Fills stats struct and resets stats counters */
 extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
 
+void gcs_get_status(gcs_conn_t* conn, gu::Status& status);
+
 /*! A node with this name will be treated as a stateless arbitrator */
 #define GCS_ARBITRATOR_NAME "garb"
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // _gcs_h_

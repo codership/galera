@@ -158,7 +158,7 @@ galera::ReplicatorSMM::stats_get() const
 {
     if (S_DESTROYED == state_()) return 0;
 
-    std::vector<struct wsrep_stats_var>& sv(wsrep_stats_);
+    std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
@@ -207,28 +207,77 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_CERT_INDEX_SIZE].value._int64 = cert_.index_size();
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
-    /* Create a buffer to be passed to the caller. */
-    gu::Lock lock_inc(incoming_mutex_);
 
-    size_t const inc_size(incoming_list_.size() + 1);
-    size_t const vec_size(sv.size()*sizeof(struct wsrep_stats_var));
+    // Get gcs backend status
+    gu::Status status;
+    gcs_.get_status(status);
+
+    // Dynamical strings are copied into buffer allocated after stats var array.
+    // Compute space needed.
+    size_t tail_size(0);
+    for (gu::Status::const_iterator i(status.begin()); i != status.end(); ++i)
+    {
+        tail_size += i->first.size() + 1 + i->second.size() + 1;
+    }
+
+    gu::Lock lock_inc(incoming_mutex_);
+    tail_size += incoming_list_.size() + 1;
+
+    /* Create a buffer to be passed to the caller. */
+    // The buffer size needed:
+    // * Space for wsrep_stats_ array
+    // * Space for additional elements from status map
+    // * Trailing space for string store
+    size_t const vec_size(
+        (sv.size() + status.size())*sizeof(struct wsrep_stats_var));
     struct wsrep_stats_var* const buf(
-        reinterpret_cast<struct wsrep_stats_var*>(gu_malloc(inc_size + vec_size)));
+        reinterpret_cast<struct wsrep_stats_var*>(
+            gu_malloc(vec_size + tail_size)));
 
     if (buf)
     {
-        char* const inc_buf(reinterpret_cast<char*>(buf + sv.size()));
+        // Resize sv to have enough space for variables from status
+        sv.resize(sv.size() + status.size());
 
-        wsrep_stats_[STATS_INCOMING_LIST].value._string = inc_buf;
+        // Initial tail_buf position
+        char* tail_buf(reinterpret_cast<char*>(buf + sv.size()));
 
+        // Assign incoming list
+        strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);
+        wsrep_stats_[STATS_INCOMING_LIST].value._string = tail_buf;
+        tail_buf += incoming_list_.size() + 1;
+
+        // Iterate over dynamical status variables and assing strings
+        size_t sv_pos(STATS_INCOMING_LIST + 1);
+        for (gu::Status::const_iterator i(status.begin());
+             i != status.end(); ++i, ++sv_pos)
+        {
+            // Name
+            strncpy(tail_buf, i->first.c_str(), i->first.size() + 1);
+            sv[sv_pos].name = tail_buf;
+            tail_buf += i->first.size() + 1;
+            // Value
+            strncpy(tail_buf, i->second.c_str(), i->second.size() + 1);
+            sv[sv_pos].value._string = tail_buf;
+            tail_buf += i->second.size() + 1;
+        }
+
+        assert(sv_pos == sv.size() - 1);
+
+        // NULL terminate
+        sv[sv_pos].name = 0;
+        sv[sv_pos].type = WSREP_VAR_STRING;
+        sv[sv_pos].value._string = 0;
+
+        assert(static_cast<size_t>(tail_buf - reinterpret_cast<const char*>(buf)) == vec_size + tail_size);
+        assert(reinterpret_cast<const char*>(buf)[vec_size + tail_size - 1] == '\0');
+        // Finally copy sv vector to buf
         memcpy(buf, &sv[0], vec_size);
-        memcpy(inc_buf, incoming_list_.c_str(), inc_size);
-        assert(inc_buf[inc_size - 1] == '\0');
     }
     else
     {
         log_warn << "Failed to allocate stats vars buffer to "
-                 << (inc_size + vec_size)
+                 << (vec_size + tail_size)
                  << " bytes. System is running out of memory.";
     }
 
