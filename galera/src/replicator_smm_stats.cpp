@@ -232,7 +232,7 @@ galera::ReplicatorSMM::stats_get() const
         (sv.size() + status.size())*sizeof(struct wsrep_stats_var));
     struct wsrep_stats_var* const buf(
         reinterpret_cast<struct wsrep_stats_var*>(
-            gu_malloc(vec_size+ tail_size)));
+            gu_malloc(vec_size + tail_size)));
 
     if (buf)
     {

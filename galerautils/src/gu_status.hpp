@@ -2,9 +2,9 @@
 
 //!
 // @file
-// Common definitions for status variables
+// Common class for gathering Galera wide status. The class is simple
+// string based key-value store.
 //
-
 
 #ifndef GU_STATUS_HPP
 #define GU_STATUS_HPP
@@ -24,31 +24,21 @@ namespace gu
         typedef VarMap::const_iterator             const_iterator;
 
         Status() : vars_() { }
+
         void insert(const std::string& key, const std::string& val)
         {
             vars_.insert(std::make_pair(key, val));
         }
-        void erase(const std::string& key)
-        {
-            vars_.erase(key);
-        }
 
         const_iterator begin() { return vars_.begin(); }
+
         const_iterator end()   { return vars_.end(); }
-        const std::string& find(const std::string& key) const
-        {
-            VarMap::const_iterator i(vars_.find(key));
-            if (i == vars_.end()) throw gu::NotFound();
-            return i->second;
-        }
 
         size_t size() const { return vars_.size(); }
-
 
     private:
         VarMap vars_;
     };
-
 }
 
 
