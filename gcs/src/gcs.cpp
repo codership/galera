@@ -1889,7 +1889,6 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;
     stats->fc_received = conn->stats_fc_received;
-    gcs_core_get_stats(conn->core, &stats->backend_stats);
 }
 
 void
@@ -1901,10 +1900,12 @@ gcs_flush_stats(gcs_conn_t* conn)
     conn->stats_fc_received = 0;
 }
 
-void
-gcs_free_stats(gcs_conn_t* conn, struct gcs_stats* stats)
+void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
 {
-    gcs_core_free_stats(conn->core, &stats->backend_stats);
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        gcs_core_get_status(conn->core, status);
+    }
 }
 
 static long

@@ -4,7 +4,6 @@ Import('env')
 
 libgcomm_sources = [
     'conf.cpp',
-    'stats.cpp',
     'defaults.cpp',
     'datagram.cpp',
     'evs_consensus.cpp',

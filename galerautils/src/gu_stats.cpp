@@ -63,10 +63,10 @@ std::string gu::Stats::to_string() const
 
 std::ostream& gu::operator<<(std::ostream& os, const gu::Stats& stats)
 {
-    os << "avg=" << stats.mean()
-       << ", sd=" << stats.std_dev()
-       << ", min=" << stats.min()
-       << ", max=" << stats.max()
-       << ", n=" << stats.times();
-    return os;
+    return (os
+            << stats.min()     << "/"
+            << stats.mean()    << "/"
+            << stats.max()     << "/"
+            << stats.std_dev() << "/"
+            << stats.times());
 }

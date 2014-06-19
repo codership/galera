@@ -19,11 +19,11 @@
 #include "gcomm/exception.hpp"
 #include "gcomm/order.hpp"
 #include "gcomm/datagram.hpp"
-#include "gcomm/stats.hpp"
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
 #include "gu_config.hpp"
+#include "gu_status.hpp"
 
 #include <cerrno>
 
@@ -338,6 +338,20 @@ public:
 
     const FenceList& fence_list() const { return fence_list_; }
 
+    virtual void handle_get_status(gu::Status& status) const
+    { }
+
+    void get_status(gu::Status& status) const
+    {
+        for (CtxList::const_iterator i(down_context_.begin());
+             i != down_context_.end(); ++i)
+        {
+            (*i)->get_status(status);
+        }
+        handle_get_status(status);
+    }
+
+
     std::string get_address(const UUID& uuid) const
     {
         if (down_context_.empty()) return handle_get_address(uuid);
@@ -358,10 +372,6 @@ public:
     virtual bool set_param(const std::string& key, const std::string& val)
     {
         return false;
-    }
-
-    virtual void get_stats(Stats& stats)
-    {
     }
 
     const Protolay* id() const { return this; }

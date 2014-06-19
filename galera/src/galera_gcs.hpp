@@ -12,6 +12,7 @@
 #include "gu_throw.hpp"
 #include "gu_config.hpp"
 #include "gu_buf.hpp"
+#include "gu_status.hpp"
 
 #include <GCache.hpp>
 #include <cerrno>
@@ -55,10 +56,8 @@ namespace galera
         virtual void    join(gcs_seqno_t seqno) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
-        virtual void free_stats(gcs_stats* stats) const = 0;
-
         virtual void    flush_stats() = 0;
-
+        virtual void    get_status(gu::Status&) const = 0;
         /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
                                    const std::string& value) = 0;
@@ -196,14 +195,14 @@ namespace galera
             return gcs_get_stats(conn_, stats);
         }
 
-        void free_stats(gcs_stats* stats) const
-        {
-            return gcs_free_stats(conn_, stats);
-        }
-
         void flush_stats()
         {
             return gcs_flush_stats(conn_);
+        }
+
+        void get_status(gu::Status& status) const
+        {
+            gcs_get_status(conn_, status);
         }
 
         void param_set (const std::string& key, const std::string& value)
@@ -364,9 +363,10 @@ namespace galera
             memset (stats, 0, sizeof(*stats));
         }
 
-        void free_stats(gcs_stats* stats) const {}
-
         void flush_stats() {}
+
+        void get_status(gu::Status& status) const
+        {}
 
         void  param_set (const std::string& key, const std::string& value)
         {}
