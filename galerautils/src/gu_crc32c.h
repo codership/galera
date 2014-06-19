@@ -15,6 +15,7 @@ extern "C" {
 
 #include "www.evanjones.ca/crc32c.h"
 #include "gu_macros.h"
+#include "gu_byteswap.h"
 
 /*! Call this to configure CRC32C to use the best available implementation */
 extern void
@@ -41,13 +42,13 @@ gu_crc32c_append (gu_crc32c_t* crc, const void* data, size_t size)
 static GU_FORCE_INLINE uint32_t
 gu_crc32c_get (gu_crc32c_t crc)
 {
-    return ~(crc);
+    return (~(crc));
 }
 
 static GU_FORCE_INLINE uint32_t
 gu_crc32c (const void* data, size_t size)
 {
-    return ~(gu_crc32c_func (GU_CRC32C_INIT, data, size));
+    return (~(gu_crc32c_func (GU_CRC32C_INIT, data, size)));
 }
 
 #if defined(__cplusplus)

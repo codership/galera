@@ -29,6 +29,7 @@ libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_env = env.Clone()
+crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
 

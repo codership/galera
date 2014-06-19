@@ -8,6 +8,8 @@
  * See gcs_core.h
  */
 
+#include "gu_throw.hpp"
+
 #define GCS_COMP_MSG_ACCESS
 
 #include "gcs_core.hpp"
@@ -1352,20 +1354,15 @@ gcs_core_param_get (gcs_core_t* core, const char* key)
     }
 }
 
-void
-gcs_core_get_stats (gcs_core_t* core, gcs_backend_stats_t* stats)
+void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
 {
-    if (core->backend.conn) {
-        core->backend.stats_get (&core->backend, stats);
+    if (gu_mutex_lock(&core->send_lock))
+        gu_throw_fatal << "could not lock mutex";
+    if (core->state < CORE_CLOSED)
+    {
+        core->backend.status_get(&core->backend, status);
     }
-}
-
-void
-gcs_core_free_stats (gcs_core_t* core, gcs_backend_stats_t* stats)
-{
-    if (core->backend.conn) {
-        core->backend.stats_free(&core->backend, stats);
-    }
+    gu_mutex_unlock(&core->send_lock);
 }
 
 #ifdef GCS_CORE_TESTING
