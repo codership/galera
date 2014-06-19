@@ -270,7 +270,7 @@ galera::ReplicatorSMM::stats_get() const
 
         // Assign incoming list
         strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);
-        wsrep_stats_[STATS_INCOMING_LIST].value._string = tail_buf;
+        sv[STATS_INCOMING_LIST].value._string = tail_buf;
         tail_buf += incoming_list_.size() + 1;
 
         // Iterate over dynamical status variables and assing strings
@@ -282,6 +282,8 @@ galera::ReplicatorSMM::stats_get() const
             strncpy(tail_buf, i->first.c_str(), i->first.size() + 1);
             sv[sv_pos].name = tail_buf;
             tail_buf += i->first.size() + 1;
+            // Type
+            sv[sv_pos].type = WSREP_VAR_STRING;
             // Value
             strncpy(tail_buf, i->second.c_str(), i->second.size() + 1);
             sv[sv_pos].value._string = tail_buf;
