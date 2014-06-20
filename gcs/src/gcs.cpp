@@ -1166,7 +1166,7 @@ static void *gcs_recv_thread (void *arg)
         if (gu_likely (rcvd.act.type != GCS_ACT_TORDERED ||
                        (rcvd.id > 0 && (conn->global_seqno = rcvd.id)))) {
             /* successful delivery - increment local order */
-            this_act_id = gu_sync_fetch_and_add(&conn->local_act_id, 1);
+            this_act_id = gu_atomic_fetch_and_add(&conn->local_act_id, 1);
         }
 
         if (NULL != rcvd.local                                          &&
@@ -1326,7 +1326,7 @@ long gcs_close (gcs_conn_t *conn)
 
     long ret;
 
-    if (gu_sync_fetch_and_add(&conn->close_count, 1) != 0) {
+    if (gu_atomic_fetch_and_add(&conn->close_count, 1) != 0) {
         return -EALREADY;
     }
 
@@ -1869,7 +1869,7 @@ gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)
 {
-    return gu_sync_fetch_and_add(&conn->local_act_id, 1);
+    return gu_atomic_fetch_and_add(&conn->local_act_id, 1);
 }
 
 void
@@ -1893,7 +1893,6 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;
     stats->fc_received = conn->stats_fc_received;
-    gcs_core_get_stats(conn->core, &stats->backend_stats);
 }
 
 void
@@ -1905,10 +1904,12 @@ gcs_flush_stats(gcs_conn_t* conn)
     conn->stats_fc_received = 0;
 }
 
-void
-gcs_free_stats(gcs_conn_t* conn, struct gcs_stats* stats)
+void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
 {
-    gcs_core_free_stats(conn->core, &stats->backend_stats);
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        gcs_core_get_status(conn->core, status);
+    }
 }
 
 static long

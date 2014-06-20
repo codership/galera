@@ -58,7 +58,7 @@ static GU_FORCE_INLINE uint64_t GU_ROTL64 (uint64_t x, int8_t r)
 #  define gu_bswap16 __bswap16_var
 #  define gu_bswap32 __bswap32_var
 #  define gu_bswap64 __bswap64_var
-#elif defined(__sun__) /* BSWAP macros inherited from gu_arch.h */
+#elif defined(__sun__)
 #  define gu_bswap16 BSWAP_16
 #  define gu_bswap32 BSWAP_32
 #  define gu_bswap64 BSWAP_64

@@ -7,18 +7,33 @@
  Reference
 ==========
 
-This chapter contains reference information on Galera Cluster.
 
-Contents:
+-----------
+Database Parameters and Reference
+-----------
+
+- :doc:`galeraparameters`
+- :doc:`mysqlwsrepoptions`
+- :doc:`galerastatusvariables`
+- :doc:`glossary`
+
+-----------
+Version and Legal Information
+-----------
+
+- :doc:`versioninginformation`
+- :doc:`thirdpartygaleraimplementations`
+- :doc:`legalnotice`
+
 
 .. toctree::
-	:numbered:
+	:hidden:
 
 	galeraparameters
 	mysqlwsrepoptions
 	galerastatusvariables
 	glossary
-	legalnotice
 	versioninginformation
 	thirdpartygaleraimplementations
+	legalnotice
 

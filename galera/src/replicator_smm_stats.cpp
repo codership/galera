@@ -180,7 +180,7 @@ galera::ReplicatorSMM::stats_get() const
 {
     if (S_DESTROYED == state_()) return 0;
 
-    std::vector<struct wsrep_stats_var>& sv(wsrep_stats_);
+    std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
@@ -196,10 +196,7 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
     sv[STATS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
 
-    struct gcs_stats* ptr_stats = static_cast<struct gcs_stats*>(
-        gu_malloc(sizeof(*ptr_stats)));
-    if (!ptr_stats) return 0;
-    struct gcs_stats& stats(*ptr_stats);
+    struct gcs_stats stats;
     gcs_.get_stats (&stats);
 
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
@@ -249,62 +246,80 @@ galera::ReplicatorSMM::stats_get() const
                                                                    sst_state_);
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
-    /* Create a buffer to be passed to the caller. */
+    // Get gcs backend status
+    gu::Status status;
+    gcs_.get_status(status);
 
-    // the structure of return buffer
-    // 1. fixed stats vars
-    // 2. incomming list
-    // 3. backend stats.
-    // 4. pointer to gcs_stats
-
-    // compute how many wsrep_stats_vars
-    size_t all_sv_size(sv.size());
-    struct gcs_backend_stats::stats_t* backend_stats = stats.backend_stats.stats;
-    if (backend_stats) {
-        for(int i=0; backend_stats[i].key; i++) {
-            all_sv_size++;
-        }
-    }
-    char* incoming_list_dup = NULL;
+    // Dynamical strings are copied into buffer allocated after stats var array.
+    // Compute space needed.
+    size_t tail_size(0);
+    for (gu::Status::const_iterator i(status.begin()); i != status.end(); ++i)
     {
-        gu::Lock lock_inc(incoming_mutex_);
-        incoming_list_dup = strndup(incoming_list_.c_str(),
-                                    incoming_list_.size());
+        tail_size += i->first.size() + 1 + i->second.size() + 1;
     }
+
+    gu::Lock lock_inc(incoming_mutex_);
+    tail_size += incoming_list_.size() + 1;
+
+    /* Create a buffer to be passed to the caller. */
+    // The buffer size needed:
+    // * Space for wsrep_stats_ array
+    // * Space for additional elements from status map
+    // * Trailing space for string store
+    size_t const vec_size(
+        (sv.size() + status.size())*sizeof(struct wsrep_stats_var));
     struct wsrep_stats_var* const buf(
-        static_cast<struct wsrep_stats_var*>(
-            gu_malloc(all_sv_size * sizeof(wsrep_stats_var) +
-                      sizeof(ptr_stats))));
+        reinterpret_cast<struct wsrep_stats_var*>(
+            gu_malloc(vec_size + tail_size)));
 
     if (buf)
     {
-        memcpy(buf, &sv[0], sv.size() * sizeof(wsrep_stats_var));
-        wsrep_stats_var* incoming_list_sv =
-                static_cast<wsrep_stats_var*>(buf) +  STATS_INCOMING_LIST;
-        incoming_list_sv->value._string = incoming_list_dup;
-        wsrep_stats_var* next_sv = incoming_list_sv + 1;
-        if (backend_stats) {
-            for(int i=0; backend_stats[i].key; i++) {
-                next_sv->name = backend_stats[i].key;
-                next_sv->type = WSREP_VAR_STRING;
-                next_sv->value._string = backend_stats[i].value;
-                next_sv++;
-            }
+        // Resize sv to have enough space for variables from status
+        sv.resize(sv.size() + status.size());
+
+        // Initial tail_buf position
+        char* tail_buf(reinterpret_cast<char*>(buf + sv.size()));
+
+        // Assign incoming list
+        strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);
+        sv[STATS_INCOMING_LIST].value._string = tail_buf;
+        tail_buf += incoming_list_.size() + 1;
+
+        // Iterate over dynamical status variables and assing strings
+        size_t sv_pos(STATS_INCOMING_LIST + 1);
+        for (gu::Status::const_iterator i(status.begin());
+             i != status.end(); ++i, ++sv_pos)
+        {
+            // Name
+            strncpy(tail_buf, i->first.c_str(), i->first.size() + 1);
+            sv[sv_pos].name = tail_buf;
+            tail_buf += i->first.size() + 1;
+            // Type
+            sv[sv_pos].type = WSREP_VAR_STRING;
+            // Value
+            strncpy(tail_buf, i->second.c_str(), i->second.size() + 1);
+            sv[sv_pos].value._string = tail_buf;
+            tail_buf += i->second.size() + 1;
         }
-        next_sv->name = NULL;
-        next_sv->type = WSREP_VAR_STRING;
-        next_sv->value._string = NULL;
-        *reinterpret_cast<struct gcs_stats**>(next_sv + 1) = ptr_stats;
+
+        assert(sv_pos == sv.size() - 1);
+
+        // NULL terminate
+        sv[sv_pos].name = 0;
+        sv[sv_pos].type = WSREP_VAR_STRING;
+        sv[sv_pos].value._string = 0;
+
+        assert(static_cast<size_t>(tail_buf - reinterpret_cast<const char*>(buf)) == vec_size + tail_size);
+        assert(reinterpret_cast<const char*>(buf)[vec_size + tail_size - 1] == '\0');
+        // Finally copy sv vector to buf
+        memcpy(buf, &sv[0], vec_size);
     }
     else
     {
         log_warn << "Failed to allocate stats vars buffer to "
-                 << (all_sv_size * sizeof(wsrep_stats_var))
+                 << (vec_size + tail_size)
                  << " bytes. System is running out of memory.";
 
-        // clear garbage.
-        free(incoming_list_dup);
-        gcs_.free_stats(ptr_stats);
     }
 
     return buf;
@@ -327,17 +342,5 @@ galera::ReplicatorSMM::stats_reset()
 void
 galera::ReplicatorSMM::stats_free(struct wsrep_stats_var* arg)
 {
-    if (!arg) return;
-    log_debug << "########### Freeing stats object ##########";
-    wsrep_stats_var* incoming_list_sv = arg + STATS_INCOMING_LIST;
-    log_debug << "free incomming list";
-    free(const_cast<char*>(incoming_list_sv->value._string));
-    wsrep_stats_var* next_sv = incoming_list_sv + 1;
-    while(next_sv->name) next_sv++;
-    struct gcs_stats* ptr_stats =
-            *reinterpret_cast<struct gcs_stats**>(next_sv + 1);
-    log_debug << "gcs free stats";
-    gcs_.free_stats(ptr_stats);
-    gu_free(ptr_stats);
     gu_free(arg);
 }

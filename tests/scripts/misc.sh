@@ -25,3 +25,8 @@ consistency_check() #pids
     kill -CONT $pids # processes will receive SIGHUP in case of script exit
     return $ret
 }
+
+find_mysqld_pid()
+{
+    ps ax | grep mysqld | grep -w ^\ *$1 > /dev/null
+}

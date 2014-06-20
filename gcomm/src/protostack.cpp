@@ -5,7 +5,6 @@
 #include "gcomm/protostack.hpp"
 #include "socket.hpp"
 #include "gcomm/util.hpp"
-#include "stats.hpp"
 
 void gcomm::Protostack::push_proto(Protolay* p)
 {
@@ -73,13 +72,4 @@ bool gcomm::Protostack::set_param(const std::string& key,
         ret |= (*i)->set_param(key, val);
     }
     return ret;
-}
-
-void gcomm::Protostack::get_stats(Stats& stats)
-{
-    for (std::deque<Protolay*>::iterator i(protos_.begin());
-         i != protos_.end(); ++i)
-    {
-        (*i)->get_stats(stats);
-    }
 }

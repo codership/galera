@@ -32,7 +32,6 @@ public:
     void dispatch(const void* id, const Datagram& dg,
                   const ProtoUpMeta& um);
     bool set_param(const std::string&, const std::string&);
-    void get_stats(Stats& stats);
     void enter() { mutex_.lock(); }
     void leave() { mutex_.unlock(); }
 private:
