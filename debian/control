@@ -38,17 +38,17 @@ Description: Debugging package for Percona XtraDB Cluster Garbd 3.
 Package: percona-xtradb-cluster-galera-3
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-galera-3.x (>= ${source:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-galera-3.x (= ${source:Version}), ${misc:Depends}
 Description: Metapackage for latest version of galera3.
 
 Package: percona-xtradb-cluster-garbd-3
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-garbd-3.x (>= ${source:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-garbd-3.x (= ${source:Version}), ${misc:Depends}
 Description: Metapackage for latest version of garbd3.
 
 Package: percona-xtradb-cluster-galera3-dbg
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-galera-3.x-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-3.x-dbg (>= ${source:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-galera-3.x-dbg (= ${source:Version}), percona-xtradb-cluster-garbd-3.x-dbg (= ${source:Version}), ${misc:Depends}
 Description: Metapackage for latest version of debug packages.
