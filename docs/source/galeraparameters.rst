@@ -131,6 +131,9 @@ Table legend:
 | :ref:`evs.version                     | n/a                   |                       |                    |          |
 | <evs.version>` :sup:`T`               |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`pc.recovery                     | *true*                | 3.0                   | n/a                | No       |
+| <pc.recovery>`                        |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`pc.bootstrap                    | n/a                   | 2.0                   | n/a                | Yes      |
 | <pc.bootstrap>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -577,6 +580,24 @@ Drop past views from the view history after this timeout.
 This status variable is used to check which ``evs`` protocol version is used. 
 
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
+
+.. rubric:: pc.recovery
+.. _`pc.recovery`:
+.. index::
+	pair: Parameters, pc.recovery
+
+When set to ``true``, the node stores the Primary Component state to disk.  The Primary Component can then recover automatically when all nodes that were part of the last saved state reestablish communications with each other.  
+
+This allows for:
+
+- Automatic recovery from full cluster crashes, such as in the case of a data center power outage.
+
+- Graceful full cluster restarts without the need for explicitly bootstrapping a new Primary Component.
+
+
+.. note:: In the event that the wsrep position differs between nodes, recovery also requires a full State Snapshot Transfer.
+
+
 
 .. rubric:: pc.bootstrap
 
