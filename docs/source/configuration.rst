@@ -132,7 +132,6 @@ See below for an example *my.cnf* file::
 
     [mysqld]
     # 1. Mandatory settings: these settings are REQUIRED for proper cluster operation
-    query_cache_size=0
     binlog_format=ROW
     default_storage_engine=innodb
     innodb_autoinc_lock_mode=2
@@ -172,10 +171,6 @@ This is usually all that is needed for clustering.
 
 You must give values to the settings below:
 
-- ``query_cache_size=0`` |---| This value disables the query cache.
-  The query cache is disabled as, in the typical high concurrency
-  environments, InnoDB scalability outstrips the query cache.
-  It is not recommended to enable the query cache.
 - ``binlog_format=ROW`` |---| This variable sets the binary logging
   format to use row-level replication as opposed to statement-level
   replication. Do not change this value, as it affects performance

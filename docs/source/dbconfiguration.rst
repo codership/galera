@@ -9,7 +9,6 @@ In your configuration file, (my.cnf or my.ini, depending on your system), there 
 
   [mysqld]
   # Mandatory Settings
-  query_cache_size=0
   binlog_format=ROW
   default_storage_engine=InnoDB
   innodb_autoinc_lock_mode=2
@@ -51,12 +50,6 @@ Mandatory Database Settings
 .. _`Mandatory DB Settings`:
 
 Galera Cluster requires that you assign the following values for these configuration variables:
-
-- ``query_cache_size=0``
-
-  This disables the query cache as, in typical high concurrency environment, InnoDB scalability outstrips what the query cache provies.  
-
-  As such, it is not recommended that you enable the query cache.
 
 - ``binlog_format=ROW``
   
