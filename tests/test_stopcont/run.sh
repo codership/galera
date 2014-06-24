@@ -37,7 +37,7 @@ terminate()
 
 trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
 
-trap "kill $sqlgen_pid" EXIT
+trap "kill $sqlgen_pid || :" EXIT
 
 pause 10 10
 consistency_check $sqlgen_pid
@@ -80,5 +80,8 @@ do
 
     node=$(( ( node + 1 ) % node_num ))
 done
+
+kill $sqlgen_pid
+check
 
 exit

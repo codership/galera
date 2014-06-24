@@ -19,6 +19,9 @@ The location (L) of the variable is presented in the second column from the left
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | Status Variable                       | L | Example Value              | Introduced           | Deprecated                              |
 +=======================================+===+============================+======================+=========================================+
+| :ref:`wsrep_evs_repl_latency          | G |                            | 3.0                  |                                         |
+| <wsrep_evs_repl_latency>`             |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_local_state_uuid          | G | *e2c9a15e-5485-11e0-0800-* |                      |                                         |
 | <wsrep_local_state_uuid>`             |   | *6bbb637e7211*             |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
@@ -154,6 +157,28 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_connected                 | G | *ON*                       |                      |                                         |
 | <wsrep_connected>`                    |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+
+
+.. rubric:: wsrep_evs_repl_latency
+.. _`wsrep_evs_repl_latency`:
+
+.. index::
+   pair: Parameters; wsrep_evs_repl_latency
+
+The variable provides the group communication replication latency.  Galera measures latency from the time point when a message is sent out to the time point when a message is received.
+
+Example::
+
+  0.00243433/0.144022/0.591963/0.215824/13
+
+Galera formats the status variable into the following fields:
+
+- Minimum
+- Average
+- Maximum
+- Standard Deviation
+- Sample Size
+
 
 .. rubric:: wsrep_local_state_uuid
 
