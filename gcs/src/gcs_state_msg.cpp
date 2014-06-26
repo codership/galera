@@ -471,6 +471,7 @@ struct candidate /* remerge candidate */
     const gcs_state_msg_t* rep;
     int                    prim_joined;
     int                    found;
+    gcs_seqno_t            prim_seqno;
 };
 
 static bool
@@ -484,7 +485,11 @@ state_match_candidate (const gcs_state_msg_t* const s,
         return (0 == gu_uuid_compare(&s->prim_uuid, &c->prim_uuid));
     default:
         return ((0 == gu_uuid_compare(&s->group_uuid, &c->state_uuid)) &&
-                (s->received == c->state_seqno));
+                (s->received == c->state_seqno) &&
+                // what if they are different components.
+                // but have same group uuid and received(0)
+                // see gh24.
+                (s->prim_seqno == c->prim_seqno));
     }
 }
 
@@ -498,6 +503,7 @@ state_rep_candidate (const struct candidate* const c,
     const struct candidate* rep = &c[0];
     gu_uuid_t const state_uuid  = rep->state_uuid;
     gcs_seqno_t     state_seqno = rep->state_seqno;
+    gcs_seqno_t     prim_seqno  = rep->prim_seqno;
     int i;
 
     for (i = 1; i < c_num; i++) {
@@ -513,9 +519,14 @@ state_rep_candidate (const struct candidate* const c,
             return NULL;
         }
 
-        assert (state_seqno != c[i].state_seqno);
+        assert (prim_seqno != c[i].prim_seqno ||
+                state_seqno != c[i].state_seqno);
 
-        if (state_seqno < c[i].state_seqno) {
+        if (prim_seqno < c[i].prim_seqno) {
+            rep = &c[i];
+            prim_seqno = rep->prim_seqno;
+        } else if (prim_seqno == c[i].prim_seqno &&
+                   state_seqno < c[i].state_seqno) {
             rep = &c[i];
             state_seqno = rep->state_seqno;
         }
@@ -600,12 +611,14 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
                 candidates[j].prim_joined = states[i]->prim_joined;
                 candidates[j].rep         = states[i];
                 candidates[j].found       = 1;
+                candidates[j].prim_seqno  = states[i]->prim_seqno;
                 candidates_found++;
 
                 assert(candidates_found <= states_num);
             }
         }
     }
+
 
     const gcs_state_msg_t* rep = NULL;
 
