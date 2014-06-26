@@ -377,6 +377,8 @@ private:
     gu::datetime::Period stats_report_period_;
     gu::datetime::Period causal_keepalive_period_;
 
+    gu::datetime::Period delayed_period_;
+
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;
 
@@ -447,6 +449,28 @@ private:
     int shift_to_rfcnt_;
     bool pending_leave_;
     gu::datetime::Date isolation_end_;
+
+    class DelayedEntry
+    {
+    public:
+        DelayedEntry(const std::string& addr,
+                     gu::datetime::Date keep_until)
+            :
+            addr_      (addr),
+            keep_until_(keep_until)
+        { }
+        const std::string& addr() const { return addr_; }
+        void set_keep_until(gu::datetime::Date keep_until)
+        { keep_until_ = keep_until; }
+        gu::datetime::Date keep_until() const { return keep_until_; }
+    private:
+        const std::string addr_;
+        gu::datetime::Date keep_until_;
+    };
+
+    typedef std::map<UUID, DelayedEntry> DelayedList;
+    DelayedList delayed_list_;
+
     // non-copyable
     Proto(const Proto&);
     void operator=(const Proto&);

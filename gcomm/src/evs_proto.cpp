@@ -144,6 +144,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                         Defaults::EvsStatsReportPeriodMin),
                     gu::datetime::Period::max())),
     causal_keepalive_period_(retrans_period_),
+    delayed_period_(retrans_period_*2),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
     current_view_(ViewId(V_TRANS, my_uuid,
@@ -185,7 +186,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     state_(S_CLOSED),
     shift_to_rfcnt_(0),
     pending_leave_(false),
-    isolation_end_(gu::datetime::Date::zero())
+    isolation_end_(gu::datetime::Date::zero()),
+    delayed_list_()
 {
     log_info << "EVS version " << version_;
 
@@ -387,6 +389,18 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
 {
     status.insert("evs_repl_latency", safe_deliv_latency_.to_string());
+    std::string delayed_list_str;
+    DelayedList::const_iterator i, i_next;
+    for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
+    {
+        delayed_list_str += i->first.full_str()
+            + ":"
+            + i->second.addr();
+        i_next = i, ++i_next;
+        if (i_next != delayed_list_.end()) delayed_list_str += ",";
+    }
+    status.insert("evs_delayed", delayed_list_str);
+
     if (info_mask_ & I_STATISTICS)
     {
         status.insert("evs_safe_hs", hs_safe_.to_string());
@@ -878,7 +892,7 @@ void gcomm::evs::Proto::check_inactive()
         }
 
         if (node.index() != std::numeric_limits<size_t>::max() &&
-            node.tstamp() + retrans_period_*3 <= now)
+            node.tstamp() + delayed_period_ <= now)
         {
             Range range(input_map_->range(node.index()));
             evs_log_info(I_STATE) << "delayed "
@@ -891,6 +905,31 @@ void gcomm::evs::Proto::check_inactive()
                 // message.
                 gu_trace(send_gap(node_uuid, current_view_.id(),
                                   Range(range.lu(), last_sent_), false, true));
+            }
+            DelayedList::iterator dli(delayed_list_.find(node_uuid));
+            if (dli == delayed_list_.end())
+            {
+                delayed_list_.insert(
+                    std::make_pair(node_uuid,
+                                   DelayedEntry(get_address(node_uuid),
+                                                now + inactive_timeout_)));
+            }
+            else
+            {
+                dli->second.set_keep_until(now + inactive_timeout_);
+            }
+        }
+    }
+
+    // Clean up delayed list
+    {
+        DelayedList::iterator i, i_next;
+        for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
+        {
+            i_next = i, ++i_next;
+            if (i->second.keep_until() <= now)
+            {
+                delayed_list_.erase(i);
             }
         }
     }
@@ -938,7 +977,6 @@ void gcomm::evs::Proto::check_inactive()
         log_info << "ending isolation";
         isolation_end_ = gu::datetime::Date::zero();
     }
-
 }
 
 
