@@ -426,25 +426,26 @@ START_TEST(gcs_state_msg_test_gh24)
     gcs_seqno_t prim_seqno2 = 35;
     int prim_joined2 = 6;
     gcs_seqno_t received = 0;
+    gcs_seqno_t cached = 0;
 
     gcs_state_quorum_t quorum;
     // first three are 35.
     st[0] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
-                                 prim_seqno2, received, prim_joined2,
+                                 prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home0", "",
                                  0, 4, 2, 2);
     fail_unless(st[0] != 0);
     st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
-                                 prim_seqno2, received, prim_joined2,
+                                 prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home1", "",
                                  0, 4, 2, 2);
     fail_unless(st[1] != 0);
     st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
-                                 prim_seqno2, received, prim_joined2,
+                                 prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home2", "",
@@ -453,28 +454,28 @@ START_TEST(gcs_state_msg_test_gh24)
 
     // last four are 37.
     st[3] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
-                                 prim_seqno1, received, prim_joined1,
+                                 prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home3", "",
                                  0, 4, 2, 3);
     fail_unless(st[3] != 0);
     st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
-                                 prim_seqno1, received, prim_joined1,
+                                 prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home4", "",
                                  0, 4, 2, 2);
     fail_unless(st[4] != 0);
     st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
-                                 prim_seqno1, received, prim_joined1,
+                                 prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home5", "",
                                  0, 4, 2, 2);
     fail_unless(st[5] != 0);
     st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
-                                 prim_seqno1, received, prim_joined1,
+                                 prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_PRIM,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home6", "",
