@@ -453,19 +453,34 @@ private:
     class DelayedEntry
     {
     public:
+        typedef enum
+        {
+            S_OK,
+            S_DELAYED
+        } State;
         DelayedEntry(const std::string& addr,
                      gu::datetime::Date keep_until)
             :
             addr_      (addr),
-            keep_until_(keep_until)
+            keep_until_(keep_until),
+            state_(S_DELAYED),
+            state_change_cnt_(0)
         { }
         const std::string& addr() const { return addr_; }
         void set_keep_until(gu::datetime::Date keep_until)
         { keep_until_ = keep_until; }
         gu::datetime::Date keep_until() const { return keep_until_; }
+        void set_state(State state)
+        {
+            if (state_ != state) ++state_change_cnt_;
+            state_ = state;
+        }
+        size_t state_change_cnt() const { return state_change_cnt_; }
     private:
         const std::string addr_;
         gu::datetime::Date keep_until_;
+        State  state_;
+        size_t state_change_cnt_;
     };
 
     typedef std::map<UUID, DelayedEntry> DelayedList;

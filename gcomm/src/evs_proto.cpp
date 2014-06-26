@@ -395,7 +395,9 @@ void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
     {
         delayed_list_str += i->first.full_str()
             + ":"
-            + i->second.addr();
+            + i->second.addr()
+            + ":"
+            + gu::to_string(i->second.state_change_cnt());
         i_next = i, ++i_next;
         if (i_next != delayed_list_.end()) delayed_list_str += ",";
     }
@@ -891,6 +893,7 @@ void gcomm::evs::Proto::check_inactive()
             has_inactive = true;
         }
 
+        DelayedList::iterator dli(delayed_list_.find(node_uuid));
         if (node.index() != std::numeric_limits<size_t>::max() &&
             node.tstamp() + delayed_period_ <= now)
         {
@@ -906,7 +909,7 @@ void gcomm::evs::Proto::check_inactive()
                 gu_trace(send_gap(node_uuid, current_view_.id(),
                                   Range(range.lu(), last_sent_), false, true));
             }
-            DelayedList::iterator dli(delayed_list_.find(node_uuid));
+
             if (dli == delayed_list_.end())
             {
                 delayed_list_.insert(
@@ -917,7 +920,12 @@ void gcomm::evs::Proto::check_inactive()
             else
             {
                 dli->second.set_keep_until(now + inactive_timeout_);
+                dli->second.set_state(DelayedEntry::S_DELAYED);
             }
+        }
+        else if (dli != delayed_list_.end())
+        {
+            dli->second.set_state(DelayedEntry::S_OK);
         }
     }
 
