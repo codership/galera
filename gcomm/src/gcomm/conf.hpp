@@ -342,6 +342,9 @@ namespace gcomm
          */
         static std::string const EvsCausalKeepalivePeriod;
 
+        static std::string const EvsDelayedPeriod;
+        static std::string const EvsDelayedKeepPeriod;
+
         /*!
          * @brief EVS maximum install timeouts ("evs.max_install_timeouts")
          *
