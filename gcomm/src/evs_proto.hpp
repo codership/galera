@@ -378,6 +378,7 @@ private:
     gu::datetime::Period causal_keepalive_period_;
 
     gu::datetime::Period delayed_period_;
+    gu::datetime::Period delayed_keep_period_;
 
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;
@@ -458,18 +459,18 @@ private:
             S_OK,
             S_DELAYED
         } State;
-        DelayedEntry(const std::string& addr,
-                     gu::datetime::Date keep_until)
+        DelayedEntry(const std::string& addr)
             :
             addr_      (addr),
-            keep_until_(keep_until),
+            tstamp_(gu::datetime::Date::now()),
             state_(S_DELAYED),
             state_change_cnt_(0)
         { }
         const std::string& addr() const { return addr_; }
-        void set_keep_until(gu::datetime::Date keep_until)
-        { keep_until_ = keep_until; }
-        gu::datetime::Date keep_until() const { return keep_until_; }
+
+        void set_tstamp(gu::datetime::Date tstamp) { tstamp_ = tstamp; }
+        gu::datetime::Date tstamp() const { return tstamp_; }
+
         void set_state(State state)
         {
             if (state_ != state) ++state_change_cnt_;
@@ -478,7 +479,7 @@ private:
         size_t state_change_cnt() const { return state_change_cnt_; }
     private:
         const std::string addr_;
-        gu::datetime::Date keep_until_;
+        gu::datetime::Date tstamp_;
         State  state_;
         size_t state_change_cnt_;
     };

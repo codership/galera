@@ -144,7 +144,12 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                         Defaults::EvsStatsReportPeriodMin),
                     gu::datetime::Period::max())),
     causal_keepalive_period_(retrans_period_),
-    delayed_period_(retrans_period_*2),
+    delayed_period_(param<gu::datetime::Period>(
+                        conf, uri, Conf::EvsDelayedPeriod,
+                        Defaults::EvsDelayedPeriod)),
+    delayed_keep_period_(param<gu::datetime::Period>(
+                             conf, uri, Conf::EvsDelayedKeepPeriod,
+                             Defaults::EvsDelayedKeepPeriod)),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
     current_view_(ViewId(V_TRANS, my_uuid,
@@ -209,6 +214,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     conf.set(Conf::EvsDebugLogMask, gu::to_string(debug_mask_, std::hex));
     conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask_, std::hex));
     conf.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts_));
+    conf.set(Conf::EvsDelayedPeriod, gu::to_string(delayed_period_));
+    conf.set(Conf::EvsDelayedKeepPeriod, gu::to_string(delayed_keep_period_));
 
     //
 
@@ -374,6 +381,19 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     {
         use_aggregate_ = gu::from_string<bool>(val);
         conf_.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate_));
+        return true;
+    }
+    else if (key == Conf::EvsDelayedPeriod)
+    {
+        delayed_period_ = gu::from_string<gu::datetime::Period>(val);
+        conf_.set(Conf::EvsDelayedPeriod, gu::to_string(delayed_period_));
+        return true;
+    }
+    else if (key == Conf::EvsDelayedKeepPeriod)
+    {
+        delayed_keep_period_ = gu::from_string<gu::datetime::Period>(val);
+        conf_.set(Conf::EvsDelayedKeepPeriod,
+                  gu::to_string(delayed_keep_period_));
         return true;
     }
     else if (key == Conf::EvsViewForgetTimeout ||
@@ -914,12 +934,11 @@ void gcomm::evs::Proto::check_inactive()
             {
                 delayed_list_.insert(
                     std::make_pair(node_uuid,
-                                   DelayedEntry(get_address(node_uuid),
-                                                now + inactive_timeout_)));
+                                   DelayedEntry(get_address(node_uuid))));
             }
             else
             {
-                dli->second.set_keep_until(now + inactive_timeout_);
+                dli->second.set_tstamp(now);
                 dli->second.set_state(DelayedEntry::S_DELAYED);
             }
         }
@@ -935,7 +954,7 @@ void gcomm::evs::Proto::check_inactive()
         for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
         {
             i_next = i, ++i_next;
-            if (i->second.keep_until() <= now)
+            if (i->second.tstamp() + delayed_keep_period_ <= now)
             {
                 delayed_list_.erase(i);
             }
