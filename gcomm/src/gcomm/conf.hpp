@@ -342,9 +342,6 @@ namespace gcomm
          */
         static std::string const EvsCausalKeepalivePeriod;
 
-        static std::string const EvsDelayedPeriod;
-        static std::string const EvsDelayedKeepPeriod;
-
         /*!
          * @brief EVS maximum install timeouts ("evs.max_install_timeouts")
          *
@@ -353,6 +350,26 @@ namespace gcomm
          * group via singleton views.
          */
         static std::string const EvsMaxInstallTimeouts;
+
+        /*!
+         * @brief Period after which non-responsive node is added to delayed
+         * list.
+         */
+        static std::string const EvsDelayedPeriod;
+
+        /*!
+         * @brief Period of which delayed node is kept on delayed list after
+         * it becomes responsive again.
+         */
+        static std::string const EvsDelayedKeepPeriod;
+
+        /*!
+         * @brief List of nodes (UUIDs) that should be evicted permanently from
+         * cluster.
+         *
+         * Setting value to nil UUID will clear the evict list.
+         */
+        static std::string const EvsEvict;
 
         /*!
          * @brief PC scheme for transport URI ("pc")

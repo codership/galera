@@ -396,6 +396,34 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
                   gu::to_string(delayed_keep_period_));
         return true;
     }
+    else if (key == Conf::EvsEvict)
+    {
+        UUID uuid;
+        std::istringstream is(val);
+        uuid.read_stream(is);
+        conf_.set(Conf::EvsEvict, val);
+
+        if (uuid == UUID::nil())
+        {
+            Protolay::FenceList::const_iterator i, i_next;
+            for (i = fence_list().begin(); i != fence_list().end(); i = i_next)
+            {
+                i_next = i, ++i_next;
+                log_info << "unfencing " << Protolay::FenceList::key(i);
+                unfence(Protolay::FenceList::key(i));
+            }
+        }
+        else
+        {
+            log_info << "Evicting node " << uuid << " permanently from cluster";
+            fence(uuid);
+            if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)
+            {
+                shift_to(S_GATHER, true);
+            }
+        }
+        return true;
+    }
     else if (key == Conf::EvsViewForgetTimeout ||
              key == Conf::EvsInactiveCheckPeriod)
     {
@@ -410,16 +438,24 @@ void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
 {
     status.insert("evs_repl_latency", safe_deliv_latency_.to_string());
     std::string delayed_list_str;
-    DelayedList::const_iterator i, i_next;
-    for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
+    for (DelayedList::const_iterator i(delayed_list_.begin());
+         i != delayed_list_.end(); ++i)
     {
-        delayed_list_str += i->first.full_str()
-            + ":"
-            + i->second.addr()
-            + ":"
-            + gu::to_string(i->second.state_change_cnt());
-        i_next = i, ++i_next;
-        if (i_next != delayed_list_.end()) delayed_list_str += ",";
+        if (is_fenced(i->first)               == false ||
+            current_view_.is_member(i->first) == true)
+        {
+            delayed_list_str += i->first.full_str()
+                + ":"
+                + i->second.addr()
+                + ":"
+                + gu::to_string(i->second.state_change_cnt());
+            delayed_list_str += ",";
+        }
+    }
+    // Strip trailing comma
+    if (delayed_list_str.empty() == false)
+    {
+        delayed_list_str.resize(delayed_list_str.size() - 1);
     }
     status.insert("evs_delayed", delayed_list_str);
 
