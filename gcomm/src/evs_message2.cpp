@@ -152,7 +152,7 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     }
 
     type_    = static_cast<Type>((b >> 2) & 0x7);
-    if (type_ <= T_NONE || type_ > T_LEAVE)
+    if (type_ <= T_NONE || type_ > T_EVICT_LIST)
     {
         gu_throw_error(EINVAL) << "invalid type " << type_;
     }
@@ -441,4 +441,54 @@ size_t gcomm::evs::LeaveMessage::unserialize(const gu::byte_t* const buf,
 size_t gcomm::evs::LeaveMessage::serial_size() const
 {
     return (Message::serial_size() + 2 * sizeof(seqno_t));
+}
+
+size_t gcomm::evs::EvictListMessage::serialize(gu::byte_t* const buf,
+                                               size_t      const buflen,
+                                               size_t            offset) const
+{
+    gu_trace(offset = Message::serialize(buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(static_cast<uint8_t>(evict_list_.size()),
+                                     buf, buflen, offset));
+    for (EvictList::const_iterator i(evict_list_.begin());
+         i != evict_list_.end(); ++i)
+    {
+        gu_trace(offset = i->first.serialize(buf, buflen, offset));
+        gu_trace(offset = gu::serialize1(i->second, buf, buflen, offset));
+    }
+    return offset;
+}
+
+size_t gcomm::evs::EvictListMessage::unserialize(const gu::byte_t* const buf,
+                                                 size_t            const buflen,
+                                                 size_t                  offset,
+                                                 bool skip_header)
+{
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
+    evict_list_.clear();
+    uint8_t list_sz(0);
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, list_sz));
+    for (uint8_t i(0); i < list_sz; ++i)
+    {
+        UUID uuid;
+        uint8_t cnt;
+        gu_trace(offset = uuid.unserialize(buf, buflen, offset));
+        gu_trace(offset = gu::unserialize1(buf, buflen, offset, cnt));
+        evict_list_.insert(std::make_pair(uuid, cnt));
+    }
+
+    return offset;
+}
+
+size_t gcomm::evs::EvictListMessage::serial_size() const
+{
+    return (Message::serial_size()
+            + gu::serial_size(uint8_t(0))
+            + std::min(
+                evict_list_.size(),
+                static_cast<size_t>(std::numeric_limits<uint8_t>::max()))
+            * (UUID::serial_size() + gu::serial_size(uint8_t(0))));
 }

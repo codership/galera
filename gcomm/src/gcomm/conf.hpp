@@ -372,6 +372,11 @@ namespace gcomm
         static std::string const EvsEvict;
 
         /*!
+         * @brief Autoevict threshold.
+         */
+        static std::string const EvsAutoEvict;
+
+        /*!
          * @brief PC scheme for transport URI ("pc")
          */
         static std::string const PcScheme;

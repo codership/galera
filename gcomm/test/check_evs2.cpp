@@ -95,6 +95,13 @@ START_TEST(test_message)
     LeaveMessage lm(0, uuid1, view_id, 45, 88, 3456);
     lm.set_source(uuid1);
     check_serialization(lm, lm.serial_size(), LeaveMessage());
+
+
+    EvictListMessage elm(0, uuid1, view_id, 4576);
+    elm.add(UUID(2), 23);
+    elm.add(UUID(3), 45);
+    elm.add(UUID(5), 255);
+    check_serialization(elm, elm.serial_size(), EvictListMessage());
 }
 END_TEST
 

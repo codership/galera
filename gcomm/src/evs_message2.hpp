@@ -34,6 +34,7 @@ namespace gcomm
         class JoinMessage;
         class LeaveMessage;
         class InstallMessage;
+        class EvictListMessage;
         class SelectNodesOp;
         class RangeLuCmp;
         class RangeHsCmp;
@@ -135,9 +136,11 @@ public:
         T_GAP      = 3, /*!< Gap message            */
         T_JOIN     = 4, /*!< Join message           */
         T_INSTALL  = 5, /*!< Install message        */
-        T_LEAVE    = 6  /*!< Leave message          */
+        T_LEAVE    = 6, /*!< Leave message          */
+        T_EVICT_LIST = 7 /*!< Evict list message */
     };
 
+    typedef std::map<UUID, uint8_t> EvictList;
 
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
     static const uint8_t F_RETRANS  = 0x2; /*!< Message is resent upon request    */
@@ -305,7 +308,8 @@ public:
         range_uuid_      (msg.range_uuid_),
         range_           (msg.range_),
         tstamp_          (msg.tstamp_),
-        node_list_       (msg.node_list_)
+        node_list_       (msg.node_list_),
+        evict_list_      (msg.evict_list_)
     { }
 
     Message& operator=(const Message& msg)
@@ -326,6 +330,7 @@ public:
         range_           = msg.range_;
         tstamp_          = msg.tstamp_;
         node_list_       = msg.node_list_;
+        evict_list_      = msg.evict_list_;
         return *this;
     }
 
@@ -363,7 +368,8 @@ public:
         range_uuid_      (range_uuid),
         range_           (range),
         tstamp_          (gu::datetime::Date::now()),
-        node_list_       (node_list)
+        node_list_       (node_list),
+        evict_list_      ()
     { }
 
 protected:
@@ -388,8 +394,7 @@ protected:
     Range              range_;
     gu::datetime::Date tstamp_;
     MessageNodeList    node_list_;
-
-
+    EvictList          evict_list_;
 };
 
 /*!
@@ -619,6 +624,42 @@ public:
     size_t serial_size() const;
 };
 
+class gcomm::evs::EvictListMessage : public Message
+{
+public:
+    EvictListMessage(const int     version = -1,
+                     const UUID&   source  = UUID::nil(),
+                     const ViewId& source_view_id = ViewId(),
+                     const seqno_t fifo_seq = -1)
+        :
+        Message(version,
+                T_EVICT_LIST,
+                source,
+                source_view_id,
+                ViewId(),
+                0xff,
+                O_DROP,
+                fifo_seq)
+    { }
+
+    void add(const UUID& uuid, uint16_t cnt)
+    {
+        evict_list_.insert(std::make_pair(uuid, cnt));
+    }
+
+    const EvictList& evict_list() const { return evict_list_; }
+
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false);
+    size_t serial_size() const;
+    bool operator==(const EvictListMessage& cmp) const
+    {
+        return (evict_list_ == cmp.evict_list_);
+    }
+private:
+
+};
 
 class gcomm::evs::SelectNodesOp
 {

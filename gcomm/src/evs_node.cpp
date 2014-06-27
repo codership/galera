@@ -41,6 +41,8 @@ gcomm::evs::Node::Node(const Node& n)
                       new JoinMessage(*n.join_message_) : 0),
     leave_message_   (n.leave_message_ != 0 ?
                       new LeaveMessage(*n.leave_message_) : 0),
+    evict_list_message_ (n.evict_list_message_ != 0 ?
+                         new EvictListMessage(*n.evict_list_message_) : 0),
     suspect_timeout_ (n.suspect_timeout_),
     inactive_timeout_(n.inactive_timeout_),
     tstamp_          (n.tstamp_),
@@ -89,6 +91,14 @@ void gcomm::evs::Node::set_leave_message(const LeaveMessage* lm)
     }
 }
 
+void gcomm::evs::Node::set_evict_list_message(const EvictListMessage* elm)
+{
+    if (evict_list_message_ != 0)
+    {
+        delete evict_list_message_;
+    }
+    evict_list_message_ = (elm == 0 ? 0 : new EvictListMessage(*elm));
+}
 
 bool gcomm::evs::Node::is_suspected() const
 {
