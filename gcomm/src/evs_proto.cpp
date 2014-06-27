@@ -405,18 +405,18 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 
         if (uuid == UUID::nil())
         {
-            Protolay::FenceList::const_iterator i, i_next;
-            for (i = fence_list().begin(); i != fence_list().end(); i = i_next)
+            Protolay::EvictList::const_iterator i, i_next;
+            for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
             {
                 i_next = i, ++i_next;
-                log_info << "unfencing " << Protolay::FenceList::key(i);
-                unfence(Protolay::FenceList::key(i));
+                log_info << "unevicting " << Protolay::EvictList::key(i);
+                unevict(Protolay::EvictList::key(i));
             }
         }
         else
         {
             log_info << "Evicting node " << uuid << " permanently from cluster";
-            fence(uuid);
+            evict(uuid);
             if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)
             {
                 shift_to(S_GATHER, true);
@@ -441,7 +441,7 @@ void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
     for (DelayedList::const_iterator i(delayed_list_.begin());
          i != delayed_list_.end(); ++i)
     {
-        if (is_fenced(i->first)               == false ||
+        if (is_evicted(i->first)              == false ||
             current_view_.is_member(i->first) == true)
         {
             delayed_list_str += i->first.full_str()
@@ -593,7 +593,7 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 {
     gu_trace(check_inactive());
     gu_trace(cleanup_views());
-    gu_trace(cleanup_fenced());
+    gu_trace(cleanup_evicted());
 }
 
 
@@ -1097,17 +1097,17 @@ void gcomm::evs::Proto::cleanup_views()
     }
 }
 
-void gcomm::evs::Proto::cleanup_fenced()
+void gcomm::evs::Proto::cleanup_evicted()
 {
     gu::datetime::Date now(gu::datetime::Date::now());
-    Protolay::FenceList::const_iterator i, i_next;
-    for (i = fence_list().begin(); i != fence_list().end(); i = i_next)
+    Protolay::EvictList::const_iterator i, i_next;
+    for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
     {
         i_next = i, ++i_next;
-        if (Protolay::FenceList::value(i) + view_forget_timeout_ <= now)
+        if (Protolay::EvictList::value(i) + view_forget_timeout_ <= now)
         {
-            log_info << "unfencing " << Protolay::FenceList::key(i);
-            unfence(Protolay::FenceList::key(i));
+            log_info << "unevicting " << Protolay::EvictList::key(i);
+            unevict(Protolay::EvictList::key(i));
         }
     }
 }
@@ -1157,9 +1157,9 @@ void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
             // Partitioned set is constructed after this loop
         }
 
-        // If node has been fenced, it should have been added to
-        // fenced list via JOIN messages.
-        assert(mn.fenced() == false || is_fenced(uuid) == true);
+        // If node has been evicted, it should have been added to
+        // evicted list via JOIN messages.
+        assert(mn.evicted() == false || is_evicted(uuid) == true);
     }
 
     // Loop over previous view and add each node not in new view
@@ -1660,7 +1660,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         const UUID& node_uuid(NodeMap::key(i));
         const Node& node(NodeMap::value(i));
         MessageNode mnode(node.operational(), node.suspected(),
-                          is_fenced(node_uuid));
+                          is_evicted(node_uuid));
         if (node_uuid != uuid())
         {
             const JoinMessage* jm(node.join_message());
@@ -1674,7 +1674,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     -1,
                                     jm->source_view_id(),
                                     (nsv == current_view_.id() ?
@@ -1690,7 +1690,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     lm->seq(),
                                     nsv,
                                     (nsv == current_view_.id() ?
@@ -1705,7 +1705,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     -1,
                                     current_view_.id(),
                                     input_map_->safe_seq(node.index()),
@@ -1717,7 +1717,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             mnode = MessageNode(true,
                                 false,
                                 node.segment(),
-                                is_fenced(node_uuid),
+                                is_evicted(node_uuid),
                                 -1,
                                 current_view_.id(),
                                 input_map_->safe_seq(node.index()),
@@ -1726,15 +1726,15 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         gu_trace((void)node_list->insert_unique(std::make_pair(node_uuid, mnode)));
     }
 
-    // Iterate over fenced_list and add fenced nodes not yet in node list.
-    for (Protolay::FenceList::const_iterator i(fence_list().begin());
-         i != fence_list().end(); ++i)
+    // Iterate over evicted_list and add evicted nodes not yet in node list.
+    for (Protolay::EvictList::const_iterator i(evict_list().begin());
+         i != evict_list().end(); ++i)
     {
-        if (node_list->find(Protolay::FenceList::key(i)) == node_list->end())
+        if (node_list->find(Protolay::EvictList::key(i)) == node_list->end())
         {
             MessageNode mnode(false, false, true);
             gu_trace((void)node_list->insert_unique(
-                         std::make_pair(Protolay::FenceList::key(i), mnode)));
+                         std::make_pair(Protolay::EvictList::key(i), mnode)));
         }
     }
 
@@ -4035,8 +4035,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     }
 
     // Collect view ids to gather_views_ list.
-    // Add unseen nodes to known list and fenced nodes to fenced list.
-    // Fenced nodes must also be added to known list for GATHER time
+    // Add unseen nodes to known list and evicted nodes to evicted list.
+    // Evicted nodes must also be added to known list for GATHER time
     // bookkeeping.
     // No need to adjust node state here, it is done later on in
     // check_suspects()/cross_check_inactives().
@@ -4055,11 +4055,11 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                                Node(inactive_timeout_, suspect_timeout_)));
         }
 
-        // Fence nodes according to join message
-        if (mn_uuid != uuid() && mn.fenced() == true)
+        // Evict nodes according to join message
+        if (mn_uuid != uuid() && mn.evicted() == true)
         {
             set_inactive(mn_uuid);
-            fence(mn_uuid);
+            evict(mn_uuid);
         }
     }
 

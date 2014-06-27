@@ -151,7 +151,7 @@ public:
     // Clean up foreign nodes according to install message.
     void cleanup_foreign(const InstallMessage&);
     void cleanup_views();
-    void cleanup_fenced();
+    void cleanup_evicted();
     void cleanup_joins();
 
     size_t n_operational() const;

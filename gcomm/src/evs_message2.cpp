@@ -16,7 +16,7 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::MessageNode& node)
     os << " {";
     os << "o=" << node.operational() << ",";
     os << "s=" << node.suspected() << ",";
-    os << "f=" << node.fenced() << ",";
+    os << "e=" << node.evicted() << ",";
     os << "ls=" << node.leave_seq() << ",";
     os << "vid=" << node.view_id() << ",";
     os << "ss=" << node.safe_seq() << ",";
@@ -54,7 +54,7 @@ size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
     uint8_t b =
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) |
                              (suspected_   == true ? F_SUSPECTED   : 0) |
-                             (fenced_      == true ? F_FENCED      : 0));
+                             (evicted_     == true ? F_EVICTED      : 0));
     gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
     gu_trace(offset = gu::serialize1(segment_, buf, buflen, offset));
     gu_trace(offset = gu::serialize8(leave_seq_, buf, buflen, offset));
@@ -71,13 +71,13 @@ size_t gcomm::evs::MessageNode::unserialize(const gu::byte_t* const buf,
 {
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
-    if ((b & ~(F_OPERATIONAL | F_SUSPECTED | F_FENCED)) != 0)
+    if ((b & ~(F_OPERATIONAL | F_SUSPECTED | F_EVICTED)) != 0)
     {
         log_warn << "unknown flags: " << static_cast<int>(b);
     }
     operational_ = b & F_OPERATIONAL;
     suspected_   = b & F_SUSPECTED;
-    fenced_      = b & F_FENCED;
+    evicted_      = b & F_EVICTED;
 
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, segment_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, leave_seq_));

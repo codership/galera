@@ -535,9 +535,9 @@ void gcomm::GMCast::handle_established(Proto* est)
               << est->remote_uuid() << " "
               << est->remote_addr();
 
-    if (is_fenced(est->remote_uuid()))
+    if (is_evicted(est->remote_uuid()))
     {
-        log_warn << "Closing connection to fenced node " << est->remote_uuid();
+        log_warn << "Closing connection to evicted node " << est->remote_uuid();
         erase_proto(proto_map_->find_checked(est->socket()->id()));
         update_addresses();
         return;
@@ -1346,10 +1346,10 @@ void gcomm::GMCast::handle_up(const void*        id,
 
             if (msg.type() >= Message::T_USER_BASE)
             {
-                if (fence_list().empty() == false &&
-                    fence_list().find(msg.source_uuid()) != fence_list().end())
+                if (evict_list().empty() == false &&
+                    evict_list().find(msg.source_uuid()) != evict_list().end())
                 {
-                    log_info << "dropping msg from fenced node";
+                    log_info << "dropping msg from evicted node";
                     return;
                 }
                 if (msg.flags() &
