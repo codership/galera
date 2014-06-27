@@ -49,7 +49,7 @@ public:
     MessageNode(const bool    operational  = false,
                 const bool    suspected    = false,
                 const SegmentId segment    = 0,
-                const bool    fenced       = false,
+                const bool    evicted      = false,
                 const seqno_t leave_seq    = -1,
                 const ViewId& view_id      = ViewId(V_REG),
                 const seqno_t safe_seq     = -1,
@@ -57,7 +57,7 @@ public:
         operational_(operational),
         suspected_  (suspected  ),
         segment_    (segment    ),
-        fenced_     (fenced     ),
+        evicted_    (evicted    ),
         leave_seq_  (leave_seq  ),
         view_id_    (view_id    ),
         safe_seq_   (safe_seq   ),
@@ -69,7 +69,7 @@ public:
         operational_ (mn.operational_),
         suspected_   (mn.suspected_  ),
         segment_     (mn.segment_    ),
-        fenced_      (mn.fenced_     ),
+        evicted_     (mn.evicted_    ),
         leave_seq_   (mn.leave_seq_  ),
         view_id_     (mn.view_id_    ),
         safe_seq_    (mn.safe_seq_   ),
@@ -78,7 +78,7 @@ public:
 
     bool          operational() const { return operational_       ; }
     bool          suspected()   const { return suspected_         ; }
-    bool          fenced()      const { return fenced_            ; }
+    bool          evicted()     const { return evicted_           ; }
     bool          leaving()     const { return (leave_seq_ != -1) ; }
     seqno_t       leave_seq()   const { return leave_seq_         ; }
     const ViewId& view_id()     const { return view_id_           ; }
@@ -104,12 +104,12 @@ private:
     {
         F_OPERATIONAL = 1 << 0,
         F_SUSPECTED   = 1 << 1,
-        F_FENCED      = 1 << 2
+        F_EVICTED     = 1 << 2
     };
     bool      operational_;  // Is operational
     bool      suspected_;
     SegmentId segment_;
-    bool      fenced_;        // Fenced out of the cluster
+    bool      evicted_;       // Evicted out of the cluster
     seqno_t   leave_seq_;
     ViewId    view_id_;       // Current view as seen by source of this message
     seqno_t   safe_seq_;      // Safe seq as seen...
