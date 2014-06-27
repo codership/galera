@@ -37,19 +37,20 @@ public:
     Node(const gu::datetime::Period& inactive_timeout,
          const gu::datetime::Period& suspect_timeout)
         :
-        index_           (std::numeric_limits<size_t>::max()),
-        operational_     (true),
-        suspected_       (false),
-        inactive_        (false),
-        committed_       (false),
-        installed_       (false),
-        join_message_    (0),
-        leave_message_   (0),
-        suspect_timeout_ (suspect_timeout),
-        inactive_timeout_(inactive_timeout),
-        tstamp_          (gu::datetime::Date::now()),
-        fifo_seq_        (-1),
-        segment_         (0)
+        index_             (std::numeric_limits<size_t>::max()),
+        operational_       (true),
+        suspected_         (false),
+        inactive_          (false),
+        committed_         (false),
+        installed_         (false),
+        join_message_      (0),
+        leave_message_     (0),
+        evict_list_message_(0),
+        suspect_timeout_   (suspect_timeout),
+        inactive_timeout_  (inactive_timeout),
+        tstamp_            (gu::datetime::Date::now()),
+        fifo_seq_          (-1),
+        segment_           (0)
     {}
 
     Node(const Node& n);
@@ -84,6 +85,12 @@ public:
     void set_leave_message(const LeaveMessage* msg);
 
     const LeaveMessage* leave_message() const { return leave_message_; }
+
+    void set_evict_list_message(const EvictListMessage* msg);
+
+    const EvictListMessage *evict_list_message() const
+    { return evict_list_message_; }
+
 
     void set_tstamp(const gu::datetime::Date& t) { tstamp_ = t; }
     const gu::datetime::Date& tstamp() const { return tstamp_; }
@@ -122,8 +129,10 @@ private:
     bool installed_;
     // Last received JOIN message
     JoinMessage* join_message_;
-    // Last activity timestamp
+    // Leave message
     LeaveMessage* leave_message_;
+    // Evict list message
+    EvictListMessage* evict_list_message_;
     gu::datetime::Period suspect_timeout_;
     //
     gu::datetime::Period inactive_timeout_;

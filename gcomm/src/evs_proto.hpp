@@ -138,6 +138,7 @@ public:
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
     void send_install();
+    void send_evict_list();
 
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
@@ -212,6 +213,7 @@ private:
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
+    void handle_evict_list(const EvictListMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
     void isolate(gu::datetime::Period period);
 public:
@@ -486,6 +488,7 @@ private:
 
     typedef std::map<UUID, DelayedEntry> DelayedList;
     DelayedList delayed_list_;
+    size_t      auto_evict_;
 
     // non-copyable
     Proto(const Proto&);

@@ -102,6 +102,8 @@ std::string const gcomm::Conf::EvsDelayedKeepPeriod =
     EvsPrefix + "delayed_keep_period";
 std::string const gcomm::Conf::EvsEvict =
     EvsPrefix + "evict";
+std::string const gcomm::Conf::EvsAutoEvict =
+    EvsPrefix + "auto_evict";
 
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
@@ -177,6 +179,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(EvsDelayedPeriod);
     GCOMM_CONF_ADD_DEFAULT(EvsDelayedKeepPeriod);
     GCOMM_CONF_ADD        (EvsEvict);
+    GCOMM_CONF_ADD_DEFAULT(EvsAutoEvict);
 
     GCOMM_CONF_ADD_DEFAULT(PcVersion);
     GCOMM_CONF_ADD_DEFAULT(PcIgnoreSb);
