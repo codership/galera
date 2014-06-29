@@ -243,7 +243,7 @@ The notification command with the ``--status`` option uses the following strings
 
 - ``Error([error code if available])``
 
-.. note:: Only those nodes that in the ``Synced`` state accept connections from the cluster.  For more information on node states, see galera_node_fsm.
+.. note:: Only those nodes that in the ``Synced`` state accept connections from the cluster.  For more information on node states, see :ref:`Node State Changes <node-state-changes>`.
 
 
 
