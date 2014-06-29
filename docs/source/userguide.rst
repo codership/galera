@@ -19,7 +19,6 @@ Using Galera Cluster
 - :doc:`quorumreset`
 - :doc:`monitoringthecluster`
 - :doc:`backingupthecluster`
-- :doc:`notification-cmd`
 - :doc:`upgrading`
 
 ----------------------
@@ -45,7 +44,6 @@ Using Advanced Settings
 	quorumreset
 	monitoringthecluster
 	backingupthecluster
-	notification-cmd
 	upgrading
 	ssl
 	firewallsettings
