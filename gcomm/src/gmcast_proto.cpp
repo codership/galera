@@ -202,7 +202,7 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     set_state(S_FAILED);
     if (hs.error() == "evicted")
     {
-        gu_throw_error(EPERM)
+        gu_throw_fatal
             << "this node has been evicted out of the cluster, "
             << "gcomm backend restart is required";
     }

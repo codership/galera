@@ -4153,7 +4153,10 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (mn_uuid != uuid() && mn.evicted() == true)
         {
             set_inactive(mn_uuid);
-            evict(mn_uuid);
+            if (is_evicted(mn_uuid) == false)
+            {
+                evict(mn_uuid);
+            }
         }
     }
 
@@ -4528,7 +4531,10 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
     // Construct a list of evict candidates that appear in evict list messages
     // with cnt greater than local auto_evict_. If evict candidate is reported
     // by majority of the current group, evict process is triggered.
-    std::map<UUID, size_t> evicts;
+
+    // UUID -> over auto_evict_, total count
+    typedef std::map<UUID, std::pair<size_t, size_t> > Evicts;
+    Evicts evicts;
     for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
     {
         const EvictListMessage* const elm(
@@ -4539,13 +4545,14 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
         }
         else if (elm->evict_list().find(uuid()) != elm->evict_list().end())
         {
-            log_info << "found self " << uuid() << " from evict list from "
-                     << msg.source() << " at " << get_address(msg.source());
+            evs_log_debug(D_STATE)
+                << "found self " << uuid() << " from evict list from "
+                << msg.source() << " at " << get_address(msg.source());
             continue;
         }
         else if (elm->tstamp() + delayed_keep_period_ < now)
         {
-            log_info << "ignoring expired evict message";
+            evs_log_debug(D_STATE) << "ignoring expired evict message";
             continue;
         }
 
@@ -4554,22 +4561,50 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
              elm_i != elm->evict_list().end();
              ++elm_i)
         {
+            if (elm_i->second <= 1)
+            {
+                // Don't consider entries with single delayed event as
+                // evict candidates.
+                continue;
+            }
+
+            std::pair<Evicts::iterator, bool> eir(
+                evicts.insert(
+                    std::make_pair(
+                        elm_i->first, std::make_pair(0, 0))));
+            ++eir.first->second.second; // total count
             if (elm_i->second >= auto_evict_)
             {
-                std::pair<std::map<UUID, size_t>::iterator, bool> eir(
-                    evicts.insert(std::make_pair(elm_i->first, size_t(1))));
-                if (eir.second == false)
-                {
-                    ++eir.first->second;
-                }
+                ++eir.first->second.first; // over threshold count
             }
         }
     }
 
-    for (std::map<UUID, size_t>::const_iterator i(evicts.begin());
-         i != evicts.end(); ++i)
+    // First pass: Check if at least evict candidate is found
+    bool found(false);
+    for (Evicts::const_iterator i(evicts.begin()); i != evicts.end(); ++i)
     {
-        if (i->second > current_view_.members().size()/2)
+        if (i->second.first > 0)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    // Second pass: If evict candidate was found in the first pass,
+    // evict all candedates that have been reported by majority of
+    // current group as they are all probably behind bad link.
+    for (Evicts::const_iterator i(evicts.begin());
+         found == true && i != evicts.end(); ++i)
+    {
+        if (is_evicted(i->first) == true)
+        {
+            // Already evicted, avoid spamming
+            continue;
+        }
+        log_info << "evict candidate " << i->first << " " << i->second.first
+                 << " " << i->second.second;
+        if (i->second.second > current_view_.members().size()/2)
         {
             log_warn << "evicting member " << i->first
                      << " at " << get_address(i->first)

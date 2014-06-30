@@ -1349,7 +1349,6 @@ void gcomm::GMCast::handle_up(const void*        id,
                 if (evict_list().empty() == false &&
                     evict_list().find(msg.source_uuid()) != evict_list().end())
                 {
-                    log_info << "dropping msg from evicted node";
                     return;
                 }
                 if (msg.flags() &
@@ -1376,6 +1375,10 @@ void gcomm::GMCast::handle_up(const void*        id,
                     log_warn << "handling gmcast protocol message failed: "
                              << e.what();
                     handle_failed(p);
+                    if (e.get_errno() == ENOTRECOVERABLE)
+                    {
+                        throw;
+                    }
                     return;
                 }
 
@@ -1596,9 +1599,12 @@ void gcomm::GMCast::handle_stable_view(const View& view)
 }
 
 
-void gcomm::GMCast::handle_fencing(const UUID& uuid)
+void gcomm::GMCast::handle_evict(const UUID& uuid)
 {
-    log_info << "fencing " << uuid;
+    if (is_evicted(uuid) == true)
+    {
+        return;
+    }
     gmcast_forget(uuid, time_wait_);
 }
 
