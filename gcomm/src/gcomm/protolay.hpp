@@ -308,12 +308,12 @@ public:
     }
 
 
-    virtual void handle_fencing(const UUID& uuid) { }
+    virtual void handle_evict(const UUID& uuid) { }
 
     void evict(const UUID& uuid)
     {
         evict_list_.insert(std::make_pair(uuid, gu::datetime::Date::now()));
-        handle_fencing(uuid);
+        handle_evict(uuid);
         for (CtxList::iterator i(down_context_.begin());
              i != down_context_.end(); ++i)
         {
