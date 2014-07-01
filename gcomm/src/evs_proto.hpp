@@ -176,7 +176,7 @@ public:
     bool is_representative(const UUID& pid) const;
 
     void shift_to(const State, const bool send_j = true);
-
+    bool is_all_suspected(const UUID& uuid) const;
 
     // Message handlers
 private:

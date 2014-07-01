@@ -1255,6 +1255,23 @@ bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
     return false;
 }
 
+bool gcomm::evs::Proto::is_all_suspected(const UUID& uuid) const
+{
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    {
+        const Node& node(NodeMap::value(i));
+        if (node.operational() == true) {
+            const JoinMessage* jm(node.join_message());
+            if (!jm) return false;
+            const MessageNodeList::const_iterator j(jm->node_list().find(uuid));
+            if (!(j != jm->node_list().end() &&
+                  MessageNodeList::value(j).suspected()))
+                return false;
+        }
+    }
+    return true;
+}
+
 
 
 /////////////////////////////////////////////////////////////////////////////
