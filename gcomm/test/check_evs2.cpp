@@ -1733,6 +1733,59 @@ START_TEST(test_gh_41)
 }
 END_TEST
 
+START_TEST(test_gh_37)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (gh_37)";
+
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+    // node 0 is gonna to leave
+    for(size_t i = 2; i <= n_nodes; i++)
+    {
+        // leaving node(LN) is able to send messages to remaining nodes.
+        // prop.set_loss(1, i, 0.);
+        // but remaining nodes(RNS) won't be able to ack these messages.
+        prop.set_loss(i, 1, 0.);
+        // so RNS aru_seq are the same and higher than LN aru_seq.
+    }
+    // LN  ss=-1, ir=[2,1]
+    // RNS ss=1,  ir=[2,1]
+    dn[0]->send();
+    dn[0]->send();
+    dn[0]->close();
+
+    dn[0]->set_cvi(V_REG);
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+    dn[2]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+
+    prop.propagate_until_cvi(true);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -1882,14 +1935,17 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_trac_760);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_41");
+        tcase_add_test(tc, test_gh_41);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_37");
+        tcase_add_test(tc, test_gh_37);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
     }
-
-
-    tc = tcase_create("test_gh_41");
-    tcase_add_test(tc, test_gh_41);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
-
 
     return s;
 }
