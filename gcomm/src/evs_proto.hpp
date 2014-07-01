@@ -168,7 +168,7 @@ public:
     bool is_all_committed() const;
     void setall_installed(bool val);
     bool is_all_installed() const;
-
+    bool is_install_message() const { return install_message_ != 0; }
 
     bool is_representative(const UUID& pid) const;
 

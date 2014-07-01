@@ -213,7 +213,6 @@ void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj,
     ChannelMap::value(i)->set_loss(loss);
 }
 
-
 void gcomm::PropagationMatrix::split(const size_t ii, const size_t jj)
 {
     set_loss(ii, jj, 0.);
