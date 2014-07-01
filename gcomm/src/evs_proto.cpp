@@ -1255,6 +1255,23 @@ bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
     return false;
 }
 
+bool gcomm::evs::Proto::is_all_suspected(const UUID& uuid) const
+{
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    {
+        const Node& node(NodeMap::value(i));
+        if (node.operational() == true) {
+            const JoinMessage* jm(node.join_message());
+            if (!jm) return false;
+            const MessageNodeList::const_iterator j(jm->node_list().find(uuid));
+            if (!(j != jm->node_list().end() &&
+                  MessageNodeList::value(j).suspected()))
+                return false;
+        }
+    }
+    return true;
+}
+
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2070,15 +2087,13 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     Node& node(NodeMap::value(ii));
 
     if (node.operational()                 == false &&
-        node.leave_message()               == 0     &&
-        (msg.flags() & Message::F_RETRANS) == 0)
+        node.leave_message()               == 0)
     {
         // We have set this node unoperational and there was
         // probably good reason to do so. Don't accept messages
         // from it before new view has been formed.
         // Exceptions:
         // - Node that is leaving
-        // - Retransmitted messages (why?)
         evs_log_debug(D_FOREIGN_MSGS)
             << " dropping message from unoperational source " << node;
         return;
@@ -3037,6 +3052,20 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
+
+    // note: #gh40
+    bool shift_to_gather = false;
+    if (install_message_) {
+        const MessageNode& mn(
+            MessageNodeList::value(
+                install_message_->node_list().find_checked(
+                    msg.source())));
+        if (mn.operational() &&
+            msg.seq() > mn.im_range().hs()) {
+            shift_to_gather = true;
+        }
+    }
+
     Range range;
     Range prev_range;
     seqno_t prev_aru;
@@ -3147,6 +3176,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             gu_trace(send_join());
             profile_leave(send_join_prof_);
         }
+    }
+    if (shift_to_gather) {
+        shift_to(S_GATHER, true);
     }
 }
 
