@@ -1032,34 +1032,6 @@ void gcomm::evs::Proto::check_inactive()
         send_evict_list();
     }
 
-    // Clean up delayed list and evict list messages
-    {
-        DelayedList::iterator i, i_next;
-        for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
-        {
-            i_next = i, ++i_next;
-            if (i->second.tstamp() + delayed_keep_period_ <= now)
-            {
-                delayed_list_.erase(i);
-            }
-        }
-        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
-        {
-            Node& node(NodeMap::value(i));
-            const EvictListMessage* const elm(node.evict_list_message());
-            if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
-            {
-                log_info << "discarding expired elm from " << elm->source();
-                node.set_evict_list_message(0);
-            }
-        }
-    }
-
-    if (do_send_evict_list == true && auto_evict_ > 0)
-    {
-        send_evict_list();
-    }
-
     // All other nodes are under suspicion, set all others as inactive.
     // This will speed up recovery when this node has been isolated from
     // other group. Note that this should be done only if known size is
