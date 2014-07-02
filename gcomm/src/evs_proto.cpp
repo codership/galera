@@ -2065,13 +2065,22 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     Node& node(NodeMap::value(ii));
 
     if (node.operational()                 == false &&
-        node.leave_message()               == 0)
+        node.leave_message()               == 0     &&
+        (msg.flags() & Message::F_RETRANS) == 0)
     {
         // We have set this node unoperational and there was
         // probably good reason to do so. Don't accept messages
         // from it before new view has been formed.
         // Exceptions:
         // - Node that is leaving
+        // - Retransmitted messages.
+
+        // why we accept retransimted messages?
+        // a node sends a message, some nodes(A) get it, but some(B) don't
+        // then this node is non-operational(or unreachable)
+        // so A need to send B the missing message(in envelope as delegate message)
+        // otherwise the input map will not be consistent forever.
+        // and user message in delegate message always comes with F_RETRANS flag.
         evs_log_debug(D_FOREIGN_MSGS)
             << " dropping message from unoperational source " << node;
         return;
@@ -3029,6 +3038,8 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             MessageNodeList::value(
                 install_message_->node_list().find_checked(
                     msg.source())));
+        if (!mn.operational())
+            return ;
         if (mn.operational() &&
             msg.seq() > mn.im_range().hs()) {
             shift_to_gather = true;
