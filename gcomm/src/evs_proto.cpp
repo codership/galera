@@ -1988,6 +1988,7 @@ void gcomm::evs::Proto::send_evict_list()
     serialize(elm, buf);
     Datagram dg(buf);
     (void)send_down(dg, ProtoDownMeta());
+    handle_evict_list(elm, self_i_);
 }
 
 void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
