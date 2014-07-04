@@ -361,7 +361,7 @@ namespace gcomm
          * @brief Period of which delayed node is kept on delayed list after
          * it becomes responsive again.
          */
-        static std::string const EvsDelayedKeepPeriod;
+        static std::string const EvsDelayedDecayPeriod;
 
         /*!
          * @brief List of nodes (UUIDs) that should be evicted permanently from

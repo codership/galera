@@ -147,9 +147,9 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     delayed_period_(param<gu::datetime::Period>(
                         conf, uri, Conf::EvsDelayedPeriod,
                         Defaults::EvsDelayedPeriod)),
-    delayed_keep_period_(param<gu::datetime::Period>(
-                             conf, uri, Conf::EvsDelayedKeepPeriod,
-                             Defaults::EvsDelayedKeepPeriod)),
+    delayed_decay_period_(param<gu::datetime::Period>(
+                             conf, uri, Conf::EvsDelayedDecayPeriod,
+                             Defaults::EvsDelayedDecayPeriod)),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
     current_view_(ViewId(V_TRANS, my_uuid,
@@ -217,7 +217,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask_, std::hex));
     conf.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts_));
     conf.set(Conf::EvsDelayedPeriod, gu::to_string(delayed_period_));
-    conf.set(Conf::EvsDelayedKeepPeriod, gu::to_string(delayed_keep_period_));
+    conf.set(Conf::EvsDelayedDecayPeriod, gu::to_string(delayed_decay_period_));
     conf.set(Conf::EvsAutoEvict, gu::to_string(auto_evict_));
     //
 
@@ -391,11 +391,11 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         conf_.set(Conf::EvsDelayedPeriod, gu::to_string(delayed_period_));
         return true;
     }
-    else if (key == Conf::EvsDelayedKeepPeriod)
+    else if (key == Conf::EvsDelayedDecayPeriod)
     {
-        delayed_keep_period_ = gu::from_string<gu::datetime::Period>(val);
-        conf_.set(Conf::EvsDelayedKeepPeriod,
-                  gu::to_string(delayed_keep_period_));
+        delayed_decay_period_ = gu::from_string<gu::datetime::Period>(val);
+        conf_.set(Conf::EvsDelayedDecayPeriod,
+                  gu::to_string(delayed_decay_period_));
         return true;
     }
     else if (key == Conf::EvsEvict)
@@ -984,7 +984,8 @@ void gcomm::evs::Proto::check_inactive()
             else
             {
                 dli->second.set_tstamp(now);
-                dli->second.set_state(DelayedEntry::S_DELAYED);
+                dli->second.set_state(DelayedEntry::S_DELAYED,
+                                      delayed_decay_period_, now);
                 if (dli->second.state_change_cnt() > 1)
                 {
                     do_send_evict_list = true;
@@ -994,11 +995,14 @@ void gcomm::evs::Proto::check_inactive()
         else if (dli != delayed_list_.end())
         {
             const size_t prev_cnt(dli->second.state_change_cnt());
-            dli->second.set_state(DelayedEntry::S_OK);
-            if (dli->second.state_change_cnt() > 1 &&
-                prev_cnt != dli->second.state_change_cnt())
+            dli->second.set_state(DelayedEntry::S_OK,
+                                  delayed_decay_period_, now);
+            if (prev_cnt != dli->second.state_change_cnt())
             {
                 dli->second.set_tstamp(now);
+            }
+            if (dli->second.state_change_cnt() > 1)
+            {
                 do_send_evict_list = true;
             }
         }
@@ -1010,7 +1014,13 @@ void gcomm::evs::Proto::check_inactive()
         for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
         {
             i_next = i, ++i_next;
-            if (i->second.tstamp() + delayed_keep_period_ <= now)
+            // State change count has decayed back to zero
+            // or node is already evicted and not in the current view
+            // anymore.
+            if ((i->second.state_change_cnt() == 0 &&
+                 i->second.state() == DelayedEntry::S_OK) ||
+                (is_evicted(i->first) == true &&
+                 current_view_.is_member(i->first) == false))
             {
                 delayed_list_.erase(i);
             }
@@ -1019,7 +1029,7 @@ void gcomm::evs::Proto::check_inactive()
         {
             Node& node(NodeMap::value(i));
             const EvictListMessage* const elm(node.evict_list_message());
-            if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
+            if (elm != 0 && elm->tstamp() + delayed_decay_period_ < now)
             {
                 log_info << "discarding expired elm from " << elm->source();
                 node.set_evict_list_message(0);
@@ -2409,7 +2419,7 @@ void gcomm::evs::Proto::handle_up(const void* cid,
 
     Message msg;
 
-    if (state() == S_CLOSED || um.source() == uuid())
+    if (state() == S_CLOSED || um.source() == uuid() || is_evicted(um.source()))
     {
         // Silent drop
         return;
@@ -4562,7 +4572,7 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
                 << msg.source() << " at " << get_address(msg.source());
             continue;
         }
-        else if (elm->tstamp() + delayed_keep_period_ < now)
+        else if (elm->tstamp() + delayed_decay_period_ < now)
         {
             evs_log_debug(D_STATE) << "ignoring expired evict message";
             continue;
@@ -4592,7 +4602,9 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
         }
     }
 
-    // First pass: Check if at least evict candidate is found
+    // First pass: Check if at least single evict candidate is found
+    // And this is unnecessary, just set the found flag when over threshold
+    // count has been detected.
     bool found(false);
     for (Evicts::const_iterator i(evicts.begin()); i != evicts.end(); ++i)
     {

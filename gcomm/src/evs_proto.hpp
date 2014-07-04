@@ -380,7 +380,7 @@ private:
     gu::datetime::Period causal_keepalive_period_;
 
     gu::datetime::Period delayed_period_;
-    gu::datetime::Period delayed_keep_period_;
+    gu::datetime::Period delayed_decay_period_;
 
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;
@@ -473,11 +473,26 @@ private:
         void set_tstamp(gu::datetime::Date tstamp) { tstamp_ = tstamp; }
         gu::datetime::Date tstamp() const { return tstamp_; }
 
-        void set_state(State state)
+        void set_state(State state,
+                       const gu::datetime::Period decay_period,
+                       const gu::datetime::Date now)
         {
-            if (state_ != state) ++state_change_cnt_;
+            if (state_ != state)
+            {
+                // Limit to 0xff, see EvictList format in EvictListMessage
+                // restricts this value to uint8_t max.
+                if (state_change_cnt_ < 0xff)
+                    ++state_change_cnt_;
+            }
+            else if (state == S_OK &&
+                     tstamp_ + decay_period < now)
+            {
+                if (state_change_cnt_ > 0)
+                    --state_change_cnt_;
+            }
             state_ = state;
         }
+        State state() const {return state_; }
         size_t state_change_cnt() const { return state_change_cnt_; }
     private:
         const std::string addr_;

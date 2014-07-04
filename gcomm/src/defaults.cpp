@@ -39,7 +39,7 @@ namespace gcomm
     std::string const Defaults::EvsUserSendWindowMin    = "1";
     std::string const Defaults::EvsMaxInstallTimeouts   = "3";
     std::string const Defaults::EvsDelayedPeriod        = "PT2S";
-    std::string const Defaults::EvsDelayedKeepPeriod    = "PT60S";
+    std::string const Defaults::EvsDelayedDecayPeriod   = "PT30S";
     std::string const Defaults::EvsAutoEvict            = "0";
     std::string const Defaults::PcAnnounceTimeout       = "PT3S";
     std::string const Defaults::PcChecksum              = "false";
