@@ -316,6 +316,13 @@ group_post_state_exchange (gcs_group_t* group)
             group->group_uuid = quorum->group_uuid;
             group->prim_uuid  = group->state_uuid;
             group->state_uuid = GU_UUID_NIL;
+            // update max supported protocols version.
+            *const_cast<gcs_proto_t*>(&group->gcs_proto_ver) =
+                    quorum->gcs_proto_ver;
+            *const_cast<int*>(&group->repl_proto_ver) =
+                    quorum->repl_proto_ver;
+            *const_cast<int*>(&group->appl_proto_ver) =
+                    quorum->appl_proto_ver;
         }
         else {
             // no state exchange happend, processing old state messages

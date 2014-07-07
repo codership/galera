@@ -1618,6 +1618,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
     size_t rst_size  = size + donor_len + sizeof(*ist_uuid) + sizeof(ist_seqno);
+    // for simplicity, allocate maximum space what we need here.
     char*  rst       = (char*)gu_malloc (rst_size);
 
     *local = GCS_SEQNO_ILL;
@@ -1641,6 +1642,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
             memcpy (rst + offset, req, size);
+            rst_size = size + donor_len;
         }
 
         // version 1(expose joiner's seqno and smart donor selection)
