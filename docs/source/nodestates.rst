@@ -1,7 +1,7 @@
 =============
  Flow Control
 =============
-.. _`Flow Control`:
+.. _`flow-control`:
 
 Flow Control allows a cluster node to instruct the other nodes in the cluster when it needs to pause replication and when it is ready to continue replication. This prevents any node in the cluster from lagging too far behind the others in applying replication.
 
@@ -12,7 +12,7 @@ This chapter describes the flow control of node states and the possible node sta
 ---------------
  Node States
 ---------------
-.. _`Node States`:
+.. _`node-states`:
 
 .. index::
    pair: Node states; OPEN
@@ -75,7 +75,7 @@ In the ``SYNCED`` state, the node flow control attempts to keep the slave queue 
 --------------------
  Node State Changes
 --------------------
-.. _`Node State Changes`:
+.. _`node-state-changes`:
 .. index::
    pair: Node states; Node state changes
 

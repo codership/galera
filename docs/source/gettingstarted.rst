@@ -96,10 +96,17 @@ When you finish installation and configuration on your server, you're ready to l
 
 
 .. toctree::
-	:numbered:
 	:hidden: 
 	
-	galerainstallation
+	installmysqldeb
+	installmysqlrpm
+	installmysqlsrc	
+	installmariadbdeb
+	installmariadbrpm
+	installmariadbsrc
+	installxtradbdeb
+	installxtradbrpm
+	installxtradbsrc	
 	sysconfiguration
 	dbconfiguration
 	startingcluster

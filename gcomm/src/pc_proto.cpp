@@ -226,11 +226,8 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     send_up(Datagram(), um);
     set_stable_view(v);
 
-    if (v.id().type() == V_PRIM) {
-        ViewState vst(const_cast<UUID&>(my_uuid_), v);
-        log_info << "save pc into disk";
-        vst.write_file();
-    } else if (rst_view_ && !start_prim_) {
+    if (v.id().type() == V_NON_PRIM &&
+        rst_view_ && !start_prim_) {
         // pc recovery process.
         uint32_t max_view_seqno = 0;
         bool check = true;
@@ -242,12 +239,12 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
                 rst_view_ -> members().end()) {
                 const Node& node(NodeMap::value(i));
                 const ViewId& last_prim(node.last_prim());
-                if (last_prim.type() != V_PRIM ||
+                if (last_prim.type() != V_NON_PRIM ||
                     last_prim.uuid() != rst_view_ -> id().uuid()) {
                     log_warn << "node uuid: " << uuid << " last_prim(type: "
                              << last_prim.type() << ", uuid: "
                              << last_prim.uuid() << ") is inconsistent to "
-                             << "restored view(type: V_PRIM, uuid: "
+                             << "restored view(type: V_NON_PRIM, uuid: "
                              << rst_view_ ->id().uuid();
                     check = false;
                     break;
@@ -270,10 +267,23 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
                 log_info << "promote to primary component";
                 // since all of them are non-primary component
                 // we need to bootstrap.
-                rst_view_ = NULL;
                 send_install(true);
+                // clear rst_view after pc is formed, otherwise
+                // there would be network partition when sending
+                // install message. and if rst_view is cleared here,
+                // then pc recovery will never happen again.
             }
         }
+    }
+
+    // if pc is formed by normal process(start_prim_=true) instead of
+    // pc recovery process, rst_view_ won't be clear.
+    // however this will prevent pc remerge(see is_prim function)
+    // so we have to clear rst_view_ once pc is formed..
+    if (v.id().type() == V_PRIM &&
+        rst_view_) {
+        log_info << "clear restored view";
+        rst_view_ = NULL;
     }
 }
 
@@ -805,9 +815,7 @@ bool gcomm::pc::Proto::is_prim() const
 
     // No members coming from prim view, check if last known prim
     // view can be recovered (majority of members from last prim alive)
-    if (prim == false &&
-        // give up if via pc recovery
-        rst_view_ == NULL)
+    if (prim == false)
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
@@ -849,7 +857,7 @@ bool gcomm::pc::Proto::is_prim() const
                 const UUID& uuid(NodeMap::key(j));
                 const Node& inst(NodeMap::value(j));
 
-                if (inst.last_prim() != ViewId(V_NON_PRIM) &&
+                if (inst.last_prim().type() != V_NON_PRIM &&
                     std::find<MultiMap<ViewId, UUID>::iterator,
                               std::pair<const ViewId, UUID> >(
                                   last_prim_uuids.begin(),
@@ -907,13 +915,11 @@ bool gcomm::pc::Proto::is_prim() const
     return prim;
 }
 
-
 void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 {
     gcomm_assert(msg.type() == Message::T_STATE);
     gcomm_assert(state() == S_STATES_EXCH);
     gcomm_assert(state_msgs_.size() < current_view_.members().size());
-
     log_debug << self_id() << " handle state from " << source << " " << msg;
 
     // Early check for possibly conflicting primary components. The one

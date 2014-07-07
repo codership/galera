@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2013-2014 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,26 +18,37 @@
     "0123456789abcdef0123456789ABCDEF" \
     "0123456789abcdef0123456789ABCDEF"
 
+#define long_output 0x7e5806b3
+
 struct test_pair
 {
     const char* input;
     uint32_t    output;
 };
 
-#define test_vector_length 6
+//#define test_vector_length 6
 
 /*
  * boost::crc_optimal<32, 0x1EDC6F41, 0, 0, true, true> crc;
  */
 static struct test_pair
-test_vector[test_vector_length] =
+test_vector[] =
 {
     { "",                  0x00000000 },
+    { "1",                 0x90f599e3 },
+    { "22",                0x47b26cf9 },
+    { "333",               0x4cb6e5c8 },
+    { "4444",              0xfb8150f7 },
+    { "55555",             0x23874b2f },
+    { "666666",            0xfad65244 },
+    { "7777777",           0xe4cbaa36 },
+    { "88888888",          0xda8901c2 },
     { "123456789",         0xe3069283 }, // taken from SCTP mailing list
     { "My",                0xc7600404 }, // taken from
     { "test",              0x86a072c0 }, // http://www.zorc.breitbandkatze.de/crc.html
     { "vector",            0xa0b8f38a },
-    { long_input,          0x7e5806b3 }
+    { long_input,          long_output},
+    { NULL,                0x0 }
 };
 
 static void
@@ -45,7 +56,7 @@ test_function(void)
 {
     int i;
 
-    for (i = 0; i < test_vector_length; i++)
+    for (i = 0; test_vector[i].input != NULL; i++)
     {
         const char* const input  = test_vector[i].input;
         uint32_t    const output = test_vector[i].output;
@@ -56,8 +67,8 @@ test_function(void)
                 input, ret, output);
     }
 
-    const char* const input = test_vector[5].input;
-    uint32_t output = test_vector[5].output;
+    const char* const input = long_input;
+    uint32_t const   output = long_output;
     int const size = strlen(input);
     int offset = 0;
 
@@ -89,8 +100,23 @@ test_function(void)
     fail_if (ret != output, "Generated %#08x, expected %#08x\n", ret, output);
 }
 
-START_TEST(test_software)
+START_TEST(test_Sarwate)
 {
+    gu_crc32c_func = crc32cSarwate;
+    test_function();
+}
+END_TEST
+
+START_TEST(test_SlicingBy4)
+{
+    gu_crc32c_func = crc32cSlicingBy4;
+    test_function();
+}
+END_TEST
+
+START_TEST(test_SlicingBy8)
+{
+    gu_crc32c_func = crc32cSlicingBy8;
     test_function();
 }
 END_TEST
@@ -106,10 +132,17 @@ END_TEST
 Suite *gu_crc32c_suite(void)
 {
     Suite *suite = suite_create("CRC32C implementation");
-    TCase *tcase = tcase_create("test");
 
-    suite_add_tcase (suite, tcase);
-    tcase_add_test  (tcase, test_software);
-    tcase_add_test  (tcase, test_hardware);
+    TCase *sw = tcase_create("test_sw");
+
+    suite_add_tcase (suite, sw);
+    tcase_add_test  (sw, test_Sarwate);
+    tcase_add_test  (sw, test_SlicingBy4);
+    tcase_add_test  (sw, test_SlicingBy8);
+
+    TCase *hw = tcase_create("test_hw");
+    suite_add_tcase (suite, hw);
+    tcase_add_test  (hw, test_hardware);
+
     return suite;
 }

@@ -17,7 +17,9 @@ By default, Galera Cluster may require all or some of the following ports to be 
 - ``4568`` For Incremental State Transfers.
 - ``4444`` For all State Snapshot Transfers besides ``mysqldump``.
 
-For example, in a :abbr:`LAN (Local Area Network)` environment the ``iptables`` configuration on each node may look as follows::
+For example, in a :abbr:`LAN (Local Area Network)` environment the ``iptables`` configuration on each node may look as follows:
+
+.. code-block:: console
 
     $ iptables -A INPUT -i eth0 -p tcp -m tcp \
     	--source 192.168.0.1/24 --dport 3306 -j ACCEPT
@@ -28,7 +30,9 @@ For example, in a :abbr:`LAN (Local Area Network)` environment the ``iptables`` 
     $ iptables -A INPUT -i eth0 -p tcp -m tcp \
     	--source 192.168.0.1/24 --dport 4444 -j ACCEPT 
 
-In a :abbr:`WAN (Wide Area Network)` environment, this setup may be tedious to manage. Alternatively, with not much loss of security, you can simply open a full range of ports between trusted hosts::
+In a :abbr:`WAN (Wide Area Network)` environment, this setup may be tedious to manage. Alternatively, with not much loss of security, you can simply open a full range of ports between trusted hosts:
+
+.. code-block:: console
 
     $ iptables -A INPUT -p tcp \
     	-s 64.57.102.34 -j ACCEPT

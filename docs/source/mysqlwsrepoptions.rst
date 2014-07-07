@@ -103,10 +103,9 @@ These are MySQL system variables introduced by wsrep API patch v0.8. All variabl
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
 
 
-.. rubric:: wsrep_auto_increment_control
 
+.. rubric:: ``wsrep_auto_increment_control``
 .. _`wsrep_auto_increment_control`:
-
 .. index::
    pair: Parameters; wsrep_auto_increment_control
 
@@ -115,29 +114,24 @@ Automatically adjusts ``auto_increment_increment`` and ``auto_increment_offset``
 This parameters significantly reduces the certification conflict rate for``INSERT`` clauses.
 
 
-.. rubric:: wsrep_causal_reads
-
+.. rubric:: ``wsrep_causal_reads``
 .. _`wsrep_causal_reads`:
-
 .. index::
    pair: Parameters; wsrep_causal_reads
 
 Enforce strict cluster-wide ``READ COMMITTED`` semantics on non-transactional reads. Results in larger read latencies. 
 
 
-.. rubric:: wsrep_certify_nonPK
-
+.. rubric:: ``wsrep_certify_nonPK``
 .. _`wsrep_certify_nonPK`:
-
 .. index::
    pair: Parameters; wsrep_certify_nonPK
 
 Generate primary keys for rows without them for the purpose of certification. This is required for parallel applying. Do not use tables without primary keys. 
 
-.. rubric:: wsrep_cluster_address
 
+.. rubric:: ``wsrep_cluster_address``
 .. _`wsrep_cluster_address`:
-
 .. index::
    pair: Parameters; wsrep_cluster_address
 .. index::
@@ -159,25 +153,21 @@ Using the string *gcomm://* without any address will cause the node to startup a
 
 .. note:: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts, that will cause the node to not join back to the cluster that it was part of, rather it will initialize a new one node cluster and cause a split brain. To bootstrap a cluster, you should only pass the ``gcomm://`` string on the command line, such as:
 
-	.. code-block:: none
+	.. code-block:: console
 	
 		$ service mysql start --wsrep-cluster-address="gcomm://"
 
 
-.. rubric:: wsrep_cluster_name
-
+.. rubric:: ``wsrep_cluster_name``
 .. _`wsrep_cluster_name`:
-
 .. index::
    pair: Parameters; wsrep_cluster_name
 
 The logical cluster name. If a node tries to connect to a cluster with a different name, the connection fails. The cluster name must be same on all the cluster nodes. 
 
  
-.. rubric:: wsrep_convert_LOCK_to_trx
-
+.. rubric:: ``wsrep_convert_LOCK_to_trx``
 .. _`wsrep_convert_LOCK_to_trx`:
-
 .. index::
    pair: Parameters; wsrep_convert_LOCK_to_trx
 
@@ -187,39 +177,34 @@ Sometimes this parameter may help to get old applications working in a multi-mas
 
 .. note:: Loading a large database dump with ``LOCK`` statements can result in abnormally large transactions and cause an out-of-memory condition.
 
-.. rubric:: wsrep_data_home_dir
 
+
+.. rubric:: ``wsrep_data_home_dir``
 .. _`wsrep_data_home_dir`:
-
 .. index::
    pair: Parameters; wsrep_data_home_dir
 
 A directory where the wsrep Provider will store its files.  Galera Cluster uses this parameter to store its internal state.
 
-.. rubric:: wsrep_dbug_option
 
+.. rubric:: ``wsrep_dbug_option``
 .. _`wsrep_dbug_option`:
-
 .. index::
    pair: Parameters; wsrep_dbug_option
 
 A debug option to be passed to the provider.
 
 
-.. rubric:: wsrep_debug
-
+.. rubric:: ``wsrep_debug``
 .. _`wsrep_debug`:
-
 .. index::
    pair: Parameters; wsrep_debug
 
 Enable debug log output.
 
 
-.. rubric:: wsrep_drupal_282555_workaround
-
+.. rubric:: ``wsrep_drupal_282555_workaround``
 .. _`wsrep_drupal_282555_workaround`:
-
 .. index::
    pair: Parameters; wsrep_drupal_282555_workaround
 
@@ -230,10 +215,9 @@ Documented at:
 - `Bug 41984 <http://bugs.mysql.com/bug.php?id=41984>`_
 - `Issue: Anonymous disappears from node_access table, gets access denied for all nodes <http://drupal.org/node/282555>`_
 
-.. rubric:: wsrep_forced_binlog_format
 
+.. rubric:: ``wsrep_forced_binlog_format``
 .. _`wsrep_forced_binlog_format`:
-
 .. index::
    pair: Parameters; wsrep_forced_binlog_format
 
@@ -245,35 +229,26 @@ This variable was introduced to support ``STATEMENT`` format replication during 
 
 
 
-.. rubric:: wsrep_max_ws_rows
-
+.. rubric:: ``wsrep_max_ws_rows``
 .. _`wsrep_max_ws_rows`:
-
 .. index::
    pair: Parameters; wsrep_max_ws_rows
 
 The maximum number of rows allowed in the writeset. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
 
 
-.. rubric:: wsrep_max_ws_size
-
+.. rubric:: ``wsrep_max_ws_size``
 .. _`wsrep_max_ws_size`:
-
 .. index::
    pair: Parameters; wsrep_max_ws_size
 
-The maximum allowed writeset size. This was the limit for the supported size of transactions and ``LOAD DATA`` statements however
-the real limition is in the wsrep provider. See ``repl.max_ws_size`` in :ref:`Galera Parameters <Galera Parameters>` for details and
-change its value to limit the transaction size. This parameter will be deprecated in the future.
+The maximum allowed writeset size. Currently, this parameter limits the supported size of transactions and ``LOAD DATA`` statements.
 
-The maximum allowed writeset size is ``4G``.
+The maximum allowed writeset size is ``2G``.
 
 
-.. rubric:: wsrep_node_address
-
+.. rubric:: ``wsrep_node_address``
 .. _`wsrep_node_address`:
-
-
 .. index::
    pair: Parameters; wsrep_node_address
 
@@ -282,30 +257,25 @@ An option to explicitly specify the network address of the node, if autoguessing
 By default, the address of the first network interface (``eth0``) and the default port ``4567`` are used. The ``<address>`` and ``:port`` will be passed to the Galera replication Plugin to be used as a base address in its communications. It will also be used to derive the default values for parameters ``wsrep_sst_receive_address`` and ``ist.recv_address``.
 
 
-.. rubric:: wwsrep_node_incoming_address
-
+.. rubric:: ``wsrep_node_incoming_address``
 .. _`wsrep_node_incoming_address`:
-
-
 .. index::
    pair: Parameters; wsrep_node_incoming_address
 
 The address at which the server expects client connections.  Intended for integration with load balancers. Not used for now.
 
-.. rubric:: wsrep_node_name
 
+
+.. rubric:: ``wsrep_node_name``
 .. _`wsrep_node_name`:
-
-
 .. index::
    pair: Parameters; wsrep_node_name
 
 The logical node name - for convenience.
 
-.. rubric:: wsrep_notify_cmd
 
+.. rubric:: ``wsrep_notify_cmd``
 .. _`wsrep_notify_cmd`:
-
 .. index::
    pair: Parameters; wsrep_notify_cmd
 
@@ -343,21 +313,17 @@ This command is run whenever the cluster membership or state of this node change
 For an example script that updates two tables on a local node, with changes taking place at the cluster level, see the follow `script <http://bazaar.launchpad.net/~codership/codership-mysql/wsrep-5.5/view/head:/support-files/wsrep_notify.sh>`_.
 
 
-.. rubric:: wsrep_on
 
+.. rubric:: ``wsrep_on``
 .. _`wsrep_on`:
-
-
 .. index::
    pair: Parameters; wsrep_on
 
 Use wsrep replication. When switched ``OFF``, no changes made in this session will be replicated.
 
 
-.. rubric:: wsrep_OSU_method
-
+.. rubric:: ``wsrep_OSU_method``
 .. _`wsrep_OSU_method`:
-
 .. index::
    pair: Parameters; wsrep_OSU_method
 
@@ -371,20 +337,17 @@ alternative methods:
 - **Rolling Schema Upgrade (RSU)** executes the DDL statement only locally, thus blocking one cluster node only. During the DDL processing, the node is not replicating and may be unable to process replication events (due to a table lock). Once the DDL operation is complete, the node will catch up and sync with the cluster to become fully operational again. The DDL statement or its effects are not replicated; the user is responsible for manually performing this operation on each of the nodes.
 
 
-.. rubric:: wsrep_provider
 
+.. rubric:: ``wsrep_provider``
 .. _`wsrep_provider`:
-
-
 .. index::
    pair: Parameters; wsrep_provider
 
 A path to wsrep provider to load. If not specified, all calls to wsrep provider will be bypassed and the server behaves like a regular ``mysqld`` server.
    
-.. rubric:: wsrep_provider_options
 
+.. rubric:: ``wsrep_provider_options``
 .. _`wsrep_provider_options`:
-
 .. index::
    pair: Parameters; wsrep_provider_options
 
@@ -399,10 +362,8 @@ Usually, you just fine-tune:
   See also a list of all Galera Cluster parameters in chapter :ref:`Galera Parameters <Galera Parameters>`.
 
 
-.. rubric:: wsrep_retry_autocommit
-
+.. rubric:: ``wsrep_retry_autocommit``
 .. _`wsrep_retry_autocommit`:
-
 .. index::
    pair: Parameters; wsrep_retry_autocommit
 
@@ -411,10 +372,8 @@ If an autocommit query fails the certification test due to a cluster-wide confli
 This option is analogous to rescheduling an autocommit query should it go into deadlock with other transactions in the database lock manager.
 
 
-.. rubric:: wsrep_slave_threads
-
+.. rubric:: ``wsrep_slave_threads``
 .. _`wsrep_slave_threads`:
-
 .. index::
    pair: Parameters; wsrep_slave_threads
 
@@ -425,10 +384,8 @@ How many threads to use for applying slave writesets. There are two things to co
 2. Consider how many writing client connections the other nodes would have. Divide this by four and use that as the ``wsrep_slave_threads`` value.
 
 
-.. rubric:: wsrep_sst_auth
-
+.. rubric:: ``wsrep_sst_auth``
 .. _`wsrep_sst_auth`:
-
 .. index::
    pair: Parameters; wsrep_sst_auth
 
@@ -440,9 +397,7 @@ Use the same value on all nodes. This parameter is used to authenticate with bot
 
 
 .. rubric:: wsrep_sst_donor
-
 .. _`wsrep_sst_donor`:
-
 .. index::
    pair: Parameters; wsrep_sst_donor
 
@@ -459,13 +414,11 @@ and keeps on retrying the state transfer request until it succeeds. When the sta
 
 	Node 0 (XXX) requested state transfer from '*any*'. Selected 1 (XXX) as donor.
 
-.. rubric:: wsrep_sst_donor_rejects_queries
 
+.. rubric:: ``wsrep_sst_donor_rejects_queries``
 .. _`wsrep_sst_donor_rejects_queries`:
-
 .. index::
    pair: Parameters; wsrep_sst_donor_rejects_queries
-
 .. index::
    pair: Errors; ER_UNKNOWN_COM_ERROR
 
@@ -478,14 +431,12 @@ In these situations, all queries return error ``ER_UNKNOWN_COM_ERROR, "Unknown c
 .. note:: The ``mysqldump`` SST does not work with this setting, as ``mysqldump`` must run queries on the donor and there is no way to distinguish a *mysqldump* session from a regular client session. 
 
 
-.. rubric:: wsrep_sst_method
-
+.. rubric:: ``wsrep_sst_method``
 .. _`wsrep_sst_method`:
-
 .. index::
    pair: Parameters; wsrep_sst_method
 
-The method to use for state snapshot transfers. The ``wsrep_sst_<wsrep_sst_method>`` command will be called with the following arguments. For more information, see also :ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
+The method to use for state snapshot transfers. The ``wsrep_sst_<wsrep_sst_method>`` command will be called with the following arguments. For more information, see also :doc:`scriptablesst`.
 
 The supported methods are:
 
@@ -499,7 +450,9 @@ The supported methods are:
   
 - ``xtrabackup`` This option is a fast and practically non-blocking SST method based on Percona's ``xtrabackup`` tool.
 
-  If you want to use ``xtrabackup``, the following settings must be present in the ``my.cnf`` configuration file on all nodes::
+  If you want to use ``xtrabackup``, the following settings must be present in the ``my.cnf`` configuration file on all nodes:
+  
+  .. code-block:: ini
 
       [mysqld]
       wsrep_sst_auth=root:<root password>
@@ -509,10 +462,8 @@ The supported methods are:
       socket=<path to socket>
 
 
-.. rubric:: wsrep_sst_receive_address
-
+.. rubric:: ``wsrep_sst_receive_address``
 .. _`wsrep_sst_receive_address`:
-
 .. index::
    pair: Parameters; wsrep_sst_receive_address
 
@@ -522,19 +473,16 @@ The address at which this node expects to receive state transfers. Depends on th
   
 
 
-.. rubric:: wsrep_start_position
-
+.. rubric:: ``wsrep_start_position``
 .. _`wsrep_start_position`:
-
 .. index::
    pair: Parameters; wsrep_start_position
 
-This variable exists for the sole purpose of notifying a joining node about state transfer completion. For more information, see :ref:`Scriptable State Snapshot Transfer <Scriptable State Snapshot Transfer>`.
+This variable exists for the sole purpose of notifying a joining node about state transfer completion. For more information, see :doc:`scriptablesst`.
 
-.. rubric:: wsrep_ws_persistency
 
+.. rubric:: ``wsrep_ws_persistency``
 .. _`wsrep_ws_persistency`:
-
 .. index::
    pair: Parameters; wsrep_ws_persistency
 
