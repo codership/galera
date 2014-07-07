@@ -171,12 +171,12 @@ public:
     bool is_all_committed() const;
     void setall_installed(bool val);
     bool is_all_installed() const;
-
+    bool is_install_message() const { return install_message_ != 0; }
 
     bool is_representative(const UUID& pid) const;
 
     void shift_to(const State, const bool send_j = true);
-
+    bool is_all_suspected(const UUID& uuid) const;
 
     // Message handlers
 private:
