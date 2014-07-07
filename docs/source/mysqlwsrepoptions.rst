@@ -153,7 +153,7 @@ Using the string *gcomm://* without any address will cause the node to startup a
 
 .. note:: Never use an empty ``gcomm://`` string in *my.cnf*. If a node restarts, that will cause the node to not join back to the cluster that it was part of, rather it will initialize a new one node cluster and cause a split brain. To bootstrap a cluster, you should only pass the ``gcomm://`` string on the command line, such as:
 
-	.. code-block:: none
+	.. code-block:: console
 	
 		$ service mysql start --wsrep-cluster-address="gcomm://"
 
@@ -450,7 +450,9 @@ The supported methods are:
   
 - ``xtrabackup`` This option is a fast and practically non-blocking SST method based on Percona's ``xtrabackup`` tool.
 
-  If you want to use ``xtrabackup``, the following settings must be present in the ``my.cnf`` configuration file on all nodes::
+  If you want to use ``xtrabackup``, the following settings must be present in the ``my.cnf`` configuration file on all nodes:
+  
+  .. code-block:: ini
 
       [mysqld]
       wsrep_sst_auth=root:<root password>

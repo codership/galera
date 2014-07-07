@@ -857,13 +857,17 @@ You can set *Galera Cluster* parameters in the ``my.cnf`` configuration file as 
 
 This is useful in master-slave setups.
 
-You can set Galera Cluster parameters through a MySQL client with the following query::
+You can set Galera Cluster parameters through a MySQL client with the following query:
+
+.. code-block:: mysql
 
 	SET GLOBAL wsrep_provider_options="evs.send_window=16";
 
 This query  only changes the ``evs.send_window`` value.
 
-To check which parameters are used in Galera Cluster, enter the following query::
+To check which parameters are used in Galera Cluster, enter the following query:
+
+.. code-block:: mysql
 
 	SHOW VARIABLES LIKE 'wsrep_provider_options';
 
