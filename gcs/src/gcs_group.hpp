@@ -154,6 +154,8 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
     assert (frg->act_id > 0);
     assert (frg->act_size > 0);
 
+    rcvd->proto_ver = frg->proto_ver;
+
     // clear reset flag if set by own first fragment after reset flag was set
     group->frag_reset = (group->frag_reset && (!local || (0 != frg->frag_no)));
 

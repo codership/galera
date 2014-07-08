@@ -316,13 +316,6 @@ group_post_state_exchange (gcs_group_t* group)
             group->group_uuid = quorum->group_uuid;
             group->prim_uuid  = group->state_uuid;
             group->state_uuid = GU_UUID_NIL;
-            // update max supported protocols version.
-            *const_cast<gcs_proto_t*>(&group->gcs_proto_ver) =
-                    quorum->gcs_proto_ver;
-            *const_cast<int*>(&group->repl_proto_ver) =
-                    quorum->repl_proto_ver;
-            *const_cast<int*>(&group->appl_proto_ver) =
-                    quorum->appl_proto_ver;
         }
         else {
             // no state exchange happend, processing old state messages
@@ -1284,7 +1277,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
 
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
-    if (group->gcs_proto_ver > 0) {
+    if (act->proto_ver > 0) {
         const char* ist_buf = donor_name + donor_name_len + 1;
         memcpy(&ist_uuid, ist_buf, sizeof(ist_uuid));
         ist_seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(ist_buf + sizeof(ist_uuid)));

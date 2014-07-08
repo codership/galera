@@ -717,16 +717,12 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        int gcs_proto_ver;
-        ret = gcs_group_act_conf (group, act, &gcs_proto_ver);
+        ret = gcs_group_act_conf (group, act, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
             assert (0);
             ret = -ENOTRECOVERABLE;
-        }
-        else {
-            if (0 == gcs_proto_ver) { core->proto_ver = 0; }
         }
         assert (ret == act->buf_len);
         break;
@@ -1033,6 +1029,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                 GCS_ACT_ERROR),
         NULL,
         -1,   // GCS_SEQNO_ILL
+        -1,
         -1);
 
     *recv_act = zero_act;
@@ -1202,6 +1199,11 @@ gcs_core_group_protocol_version (const gcs_core_t* conn)
     return conn->group.gcs_proto_ver;
 }
 
+int
+gcs_core_action_protcol_version (const gcs_core_t* conn)
+{
+    return conn->proto_ver;
+}
 
 long
 gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)

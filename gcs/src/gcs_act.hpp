@@ -35,14 +35,16 @@ struct gcs_act_rcvd
     const struct gu_buf* local; // local buffer vector if any
     gcs_seqno_t    id;          // global total order seqno
     int            sender_idx;
+    int            proto_ver;
     gcs_act_rcvd() { }
     gcs_act_rcvd(const gcs_act& a, const struct gu_buf* loc,
-                 gcs_seqno_t i, int si)
+                 gcs_seqno_t i, int si, int pv)
         :
         act(a),
         local(loc),
         id(i),
-        sender_idx(si)
+        sender_idx(si),
+        proto_ver(pv)
     { }
 };
 

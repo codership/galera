@@ -1630,7 +1630,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         int offset = 0;
         // since quorum occurs before str, group protocol version here
         // is the commmon highest supported protocol version.
-        int gcs_proto_ver = gcs_core_group_protocol_version(conn->core);
+        int act_proto_ver = gcs_core_action_protcol_version(conn->core);
 
         // version 0
         /* RST format: |donor name|\0|app request|
@@ -1638,7 +1638,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
          * NOTE: this is sender part. Check gcs_group_handle_state_request()
          *       for the receiver part. */
 
-        if (gcs_proto_ver == 0) {
+        if (act_proto_ver == 0) {
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
             memcpy (rst + offset, req, size);
