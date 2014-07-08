@@ -333,6 +333,15 @@ namespace gcomm
             }
         }
 
+        Datagram create_datagram()
+        {
+            const int64_t seq(curr_seq_);
+            gu::byte_t buf[sizeof(seq)];
+            size_t sz;
+            gu_trace(sz = gu::serialize8(seq, buf, sizeof(buf), 0));
+            return Datagram (gu::Buffer(buf, buf + sz));
+        }
+
         const Trace& trace() const { return tr_; }
 
         void set_cvi(const ViewId& vi)

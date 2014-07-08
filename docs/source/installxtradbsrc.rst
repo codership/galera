@@ -37,12 +37,16 @@ Building Galera Cluster for Percona XtraDB
 
 To build Galera Cluster, complete the following steps:
 
-1. Download and extract Galera Cluster for Percona XtraDB from `Percona <http://www.percona.com/downloads/Percona-XtraDB-Cluster>`_::
+1. Download and extract Galera Cluster for Percona XtraDB from `Percona <http://www.percona.com/downloads/Percona-XtraDB-Cluster>`_:
+
+   .. code-block:: console
 
 	$ wget http://www.percona.com/downloads/Percona-XtraDB-Cluster/version_nbr/source/percona-xtradb-cluster-galera.tar.gz
 	$ tar zxf percona-xtradb-cluster-galera.tar.gz
 
-2. Build the Percona server::
+2. Build the Percona XtraDB server:
+
+   .. code-block:: console
 
 	$ cmake -DWITH_WSREP-1 \
 		-DWITH_INNODB_DISALLOW_WRITES=1
@@ -57,7 +61,9 @@ Updating System Tables
 
 If you chose to overwrite an existing installation of the Percona XtraDB server, you must also upgrade the system tables to the new system.
 
-To upgrade the system tables, after you start the XtraDB server run the following from the command-line::
+To upgrade the system tables, after you start the XtraDB server run the following from the command-line:
+
+.. code-block:: console
 
 	$ xtradb_upgrade
 

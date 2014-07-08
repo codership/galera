@@ -17,7 +17,9 @@
    
 Galera Cluster supports :abbr:`SSL (Secure Sockets Layer)` for the encryption of replication traffic. Authentication is not supported. SSL is a cluster-wide option and must be enabled either on all of the nodes or none at all. 
 
-To use SSL, you must generate a private certificate/key pair for the cluster, for example, by the following command::
+To use SSL, you must generate a private certificate/key pair for the cluster, for example, by the following command:
+
+.. code-block:: console
 
     $ openssl req -new -x509 -days 365000 \
     	-nodes -keyout key.pem -out cert.pem
@@ -26,7 +28,9 @@ To use SSL, you must generate a private certificate/key pair for the cluster, fo
 
 Copy this certificate/key pair to the ``/etc/mysql`` directory on all of the nodes. Copy the files over a secure channel between the nodes.
 
-Take the certificate/key pair to use by specifying the following Galera Cluster options::
+Take the certificate/key pair to use by specifying the following Galera Cluster options:
+
+.. code-block:: ini
 
     socket.ssl_cert = /path/to/cert-file
     socket.ssl_key = /path/to/key-file
