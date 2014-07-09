@@ -13,8 +13,8 @@
 # Should-Start:
 # Required-Stop:     $network
 # Should-Stop:
-# Default-Start:     3 4 5
-# Default-Stop:      0 1 2 6
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
 # Description:       Galera Arbitrator Daemon
 ### END INIT INFO
