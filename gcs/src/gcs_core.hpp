@@ -133,10 +133,6 @@ gcs_core_recv (gcs_core_t*          conn,
 extern gcs_proto_t
 gcs_core_group_protocol_version (const gcs_core_t* conn);
 
-/* action protocol version */
-extern int
-gcs_core_action_protcol_version (const gcs_core_t* conn);
-
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size.
  * In case of failure returns negative error code, in case of success -

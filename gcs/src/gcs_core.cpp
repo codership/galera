@@ -1196,12 +1196,6 @@ long gcs_core_destroy (gcs_core_t* core)
 gcs_proto_t
 gcs_core_group_protocol_version (const gcs_core_t* conn)
 {
-    return conn->group.gcs_proto_ver;
-}
-
-int
-gcs_core_action_protcol_version (const gcs_core_t* conn)
-{
     return conn->proto_ver;
 }
 

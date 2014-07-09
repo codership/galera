@@ -895,7 +895,7 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     int err = -EHOSTDOWN; /* worst error */
     /* dangling comma */
     bool const dcomma = (str_len && str[str_len-1] == ',' &&
-                         group->gcs_proto_ver >= 1);
+                         group->quorum.gcs_proto_ver > 0);
 
     do {
         end = strchr(begin, ',');
@@ -1145,7 +1145,7 @@ gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
     /* try to find ist donor first.
        if it fails, fallbacks to find sst donor*/
     int donor_idx = -1;
-    if (group->gcs_proto_ver > 0 &&
+    if (group->quorum.gcs_proto_ver > 0 &&
         gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
     {
         assert (ist_seqno != GCS_SEQNO_ILL);

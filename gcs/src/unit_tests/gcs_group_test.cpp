@@ -538,6 +538,7 @@ START_TEST(test_gcs_group_find_donor)
             GCS_NODE_STATE_SYNCED,
             "", "", 1, 0, 0, 0);
     }
+    group.quorum.gcs_proto_ver = 1;
 
     int donor = -1;
 
