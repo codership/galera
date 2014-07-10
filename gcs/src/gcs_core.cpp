@@ -508,17 +508,25 @@ core_handle_act_msg (gcs_core_t*          core,
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
+    bool  inconsistent_version = false;
 
     assert (GCS_MSG_ACTION == msg->type);
 
     if ((CORE_PRIMARY == core->state) || my_msg){//should always handle own msgs
 
-        if (gu_unlikely(GCS_ACT_PROTO_MAX < gcs_act_proto_ver(msg->buf))) {
-            // this is most likely due to #482
-            gu_info ("Message with protocol version %d > max supported: %d. "
-                     "Need to abort.",
-                     gcs_act_proto_ver(msg->buf), GCS_ACT_PROTO_MAX);
-            return -ENOTRECOVERABLE;
+        if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
+                        gcs_core_group_protocol_version(core))) {
+            gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
+                     gcs_act_proto_ver(msg->buf),
+                     gcs_core_group_protocol_version(core));
+            inconsistent_version = true;
+            if (!my_msg) {
+                gu_info ("Discard message from member %d because of "
+                         "inconsistent protocol version.", msg->sender_idx);
+                return 0;
+            } else {
+                gu_info ("Resend message because of inconsistent protocol version.");
+            }
         }
 
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
@@ -530,7 +538,8 @@ core_handle_act_msg (gcs_core_t*          core,
             return -ENOTRECOVERABLE;
         }
 
-        ret = gcs_group_handle_act_msg (group, &frg, msg, act);
+        ret = gcs_group_handle_act_msg (group, &frg, msg, act,
+                                        inconsistent_version);
 
         if (ret > 0) { /* complete action received */
             assert (ret  == act->act.buf_len);

@@ -1371,13 +1371,18 @@ gcs_group_act_conf (gcs_group_t*    group,
                     struct gcs_act* act,
                     int*            gcs_proto_ver)
 {
-    if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
-        *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
-    else if (group->quorum.gcs_proto_ver >= 0 &&
-             group->quorum.gcs_proto_ver < *gcs_proto_ver) {
-        gu_warn ("Refusing GCS protocol version downgrade from %d to %d",
-                 *gcs_proto_ver, group->quorum.gcs_proto_ver);
-    }
+    // if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
+    //     *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
+    // else if (group->quorum.gcs_proto_ver >= 0 &&
+    //          group->quorum.gcs_proto_ver < *gcs_proto_ver) {
+    //     gu_warn ("Refusing GCS protocol version downgrade from %d to %d",
+    //              *gcs_proto_ver, group->quorum.gcs_proto_ver);
+    // }
+
+    // actually we allow gcs protocol version downgrade.
+    // because if message version is inconsistent with gcs protocol version
+    // gcs requires resending message with correct gcs protocol version.
+    *gcs_proto_ver = group->quorum.gcs_proto_ver;
 
     ssize_t conf_size = sizeof(gcs_act_conf_t) + group_memb_record_size(group);
     gcs_act_conf_t* conf = static_cast<gcs_act_conf_t*>(malloc (conf_size));
