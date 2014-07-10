@@ -317,8 +317,7 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
             gcs_act(req_buf, req_len, GCS_ACT_STATE_REQ),
             NULL,
             GCS_SEQNO_ILL,
-            src_idx,
-            0);
+            src_idx);
 
         long ret;
 

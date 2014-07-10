@@ -1277,18 +1277,25 @@ gcs_group_handle_state_request (gcs_group_t*         group,
 
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
-    if (act->proto_ver > 0) {
-        const char* ist_buf = donor_name + donor_name_len + 1;
+    int str_version = 1; // actually it's 0 or 1.
+
+    if (act->act.buf_len != (donor_name_len + 1) &&
+        donor_name[donor_name_len + 1] == 'V') {
+        str_version = (int)donor_name[donor_name_len + 2];
+    }
+
+    if (str_version >= 2) {
+        const char* ist_buf = donor_name + donor_name_len + 3;
         memcpy(&ist_uuid, ist_buf, sizeof(ist_uuid));
         ist_seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(ist_buf + sizeof(ist_uuid)));
 
         // change act.buf's content to original version.
         // and it's safe to change act.buf_len
-        size_t head = donor_name_len + 1 + sizeof(ist_uuid) + sizeof(ist_seqno);
+        size_t head = donor_name_len + 3 + sizeof(ist_uuid) + sizeof(ist_seqno);
         memmove((char*)act->act.buf + donor_name_len + 1,
                 (char*)act->act.buf + head,
                 act->act.buf_len - head);
-        act->act.buf_len -= sizeof(ist_uuid) + sizeof(ist_seqno);
+        act->act.buf_len -= sizeof(ist_uuid) + sizeof(ist_seqno) + 2;
     }
 
     assert (GCS_ACT_STATE_REQ == act->act.type);

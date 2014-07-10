@@ -1029,7 +1029,6 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                 GCS_ACT_ERROR),
         NULL,
         -1,   // GCS_SEQNO_ILL
-        -1,
         -1);
 
     *recv_act = zero_act;

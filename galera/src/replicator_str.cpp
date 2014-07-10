@@ -562,7 +562,8 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
         gcs_seqno_t seqno_l;
 
-        ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
+        ret = gcs_.request_state_transfer(str_proto_ver_,
+                                          req->req(), req->len(), sst_donor_,
                                           ist_uuid, ist_seqno, &seqno_l);
         if (ret < 0)
         {
