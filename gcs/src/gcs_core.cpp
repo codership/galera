@@ -98,7 +98,7 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static int const GCS_PROTO_MAX = 1;
+static int const GCS_PROTO_MAX = 0;
 
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
