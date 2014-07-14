@@ -547,7 +547,8 @@ core_handle_act_msg (gcs_core_t*          core,
                 }
             }
 
-            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
+            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0 &&
+                            core->state == CORE_PRIMARY)) {
 #ifdef GCS_FOR_GARB
             /* ignoring state requests from other nodes (not allocated) */
             if (my_msg) {
