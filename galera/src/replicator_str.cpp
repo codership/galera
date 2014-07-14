@@ -497,6 +497,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
         case 0:
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
+        case 2:
         {
             void*   ist_req(0);
             ssize_t ist_req_len(0);
