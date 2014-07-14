@@ -79,6 +79,7 @@ struct gcs_core
 
 #ifdef GCS_CORE_TESTING
     gu_lock_step_t  ls;        // to lock-step in unit tests
+    gu_uuid_t state_uuid;
 #endif
 };
 
@@ -140,6 +141,7 @@ gcs_core_create (gu_config_t* const conf,
                     core->send_act_no = 1; // 0 == no actions sent
 #ifdef GCS_CORE_TESTING
                     gu_lock_step_init (&core->ls);
+                    core->state_uuid = GU_UUID_NIL;
 #endif
                     return core; // success
                 }
@@ -589,7 +591,11 @@ core_handle_act_msg (gcs_core_t*          core,
                 }
             }
 
-            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
+            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0 &&
+                            // note: #gh74.
+                            // if lingering STR sneaks in when core->state != CORE_PRIMARY
+                            // act->id != GCS_SEQNO_ILL (most likely act->id == -EAGAIN)
+                            core->state == CORE_PRIMARY)) {
 #ifdef GCS_FOR_GARB
             /* ignoring state requests from other nodes (not allocated) */
             if (my_msg) {
@@ -628,7 +634,7 @@ core_handle_act_msg (gcs_core_t*          core,
     }
     else {
         /* Non-primary conf, foreign message - ignore */
-        gu_debug ("Action message in non-primary configuration from "
+        gu_warn ("Action message in non-primary configuration from "
                  "member %d", msg->sender_idx);
         ret = 0;
     }
@@ -739,6 +745,11 @@ core_handle_comp_msg (gcs_core_t*          core,
                 if (0 == gcs_group_my_idx(group)) { // I'm representative
                     gu_uuid_t uuid;
                     gu_uuid_generate (&uuid, NULL, 0);
+#ifdef GCS_CORE_TESTING
+                    if (gu_uuid_compare(&core->state_uuid, &GU_UUID_NIL)) {
+                        uuid = core->state_uuid;
+                    }
+#endif
                     ret = core->backend.send (&core->backend,
                                               &uuid,
                                               sizeof(uuid),
@@ -1202,7 +1213,6 @@ gcs_core_group_protocol_version (const gcs_core_t* conn)
     return conn->group.gcs_proto_ver;
 }
 
-
 long
 gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
 {
@@ -1385,4 +1395,15 @@ gcs_core_send_step (gcs_core_t* core, long timeout_ms)
     return gu_lock_step_cont (&core->ls, timeout_ms);
 }
 
+void
+gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid)
+{
+    core->state_uuid = *uuid;
+}
+
+const gcs_group_t*
+gcs_core_get_group (gcs_core_t* core)
+{
+    return &core->group;
+}
 #endif /* GCS_CORE_TESTING */

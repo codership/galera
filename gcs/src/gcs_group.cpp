@@ -1227,12 +1227,11 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
     }
     else {
-#if 0
         gu_warn ("Member %d.%d (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
-                 joiner_idx, joiner->seqment, group->nodes[joiner_idx].name,
-                 required_donor ? donor_name : "*any*", strerror (-donor_idx));
-#endif
+                 joiner_idx, group->nodes[joiner_idx].segment,
+                 group->nodes[joiner_idx].name,
+                 required_donor ? donor_string : "*any*", strerror (-donor_idx));
     }
 
     return donor_idx;
