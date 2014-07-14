@@ -768,6 +768,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
+        st_.mark_corrupt();
         gcs_.close();
         gu_abort();
     }
