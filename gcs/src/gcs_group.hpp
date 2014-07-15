@@ -144,7 +144,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
                           const gcs_act_frag_t* const frg,
                           const gcs_recv_msg_t* const msg,
                           struct gcs_act_rcvd*  const rcvd,
-                          bool inconsistent_version = false)
+                          bool not_commonly_supported_version = false)
 {
     long const sender_idx = msg->sender_idx;
     bool const local      = (sender_idx == group->my_idx);
@@ -171,7 +171,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
                       GCS_GROUP_PRIMARY == group->state   &&
                       group->nodes[sender_idx].status >= GCS_NODE_STATE_DONOR &&
                       !(group->frag_reset && local) &&
-                      !inconsistent_version)) {
+                      !not_commonly_supported_version)) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */

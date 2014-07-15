@@ -508,7 +508,7 @@ core_handle_act_msg (gcs_core_t*          core,
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
-    bool  inconsistent_version = false;
+    bool  not_commonly_supported_version = false;
 
     assert (GCS_MSG_ACTION == msg->type);
 
@@ -519,13 +519,14 @@ core_handle_act_msg (gcs_core_t*          core,
             gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
                      gcs_act_proto_ver(msg->buf),
                      gcs_core_group_protocol_version(core));
-            inconsistent_version = true;
+            not_commonly_supported_version = true;
             if (!my_msg) {
                 gu_info ("Discard message from member %d because of "
-                         "inconsistent protocol version.", msg->sender_idx);
+                         "not commonly supported version.", msg->sender_idx);
                 return 0;
             } else {
-                gu_info ("Resend message because of inconsistent protocol version.");
+                gu_info ("Resend message because of "
+                         "not commonly supported version.");
             }
         }
 
@@ -539,7 +540,7 @@ core_handle_act_msg (gcs_core_t*          core,
         }
 
         ret = gcs_group_handle_act_msg (group, &frg, msg, act,
-                                        inconsistent_version);
+                                        not_commonly_supported_version);
 
         if (ret > 0) { /* complete action received */
             assert (ret  == act->act.buf_len);
