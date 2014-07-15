@@ -143,7 +143,8 @@ static inline ssize_t
 gcs_group_handle_act_msg (gcs_group_t*          const group,
                           const gcs_act_frag_t* const frg,
                           const gcs_recv_msg_t* const msg,
-                          struct gcs_act_rcvd*  const rcvd)
+                          struct gcs_act_rcvd*  const rcvd,
+                          bool not_commonly_supported_version = false)
 {
     long const sender_idx = msg->sender_idx;
     bool const local      = (sender_idx == group->my_idx);
@@ -169,7 +170,8 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
         if (gu_likely(GCS_ACT_TORDERED  == rcvd->act.type &&
                       GCS_GROUP_PRIMARY == group->state   &&
                       group->nodes[sender_idx].status >= GCS_NODE_STATE_DONOR &&
-                      !(group->frag_reset && local))) {
+                      !(group->frag_reset && local) &&
+                      !not_commonly_supported_version)) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
@@ -237,7 +239,9 @@ gcs_group_get_state (gcs_group_t* group);
  * -EAGAIN if no node in proper state.
  */
 extern int
-gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
+gcs_group_find_donor(gcs_group_t* group,
+                     int const str_version,
+                     int const joiner_idx,
                      const char* const donor_string, int const donor_len,
                      const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
 
