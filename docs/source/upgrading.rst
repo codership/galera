@@ -78,26 +78,34 @@ Provider-only Upgrade
 
 If only a Galera provider upgrade is required, the bulk upgrade can be further optimized to only take a few seconds. The following is an example for a 64-bit CentOS (or RHEL):
 
-1. Issue the commands below on every node::
+1. Issue the commands below on every node:
+
+   .. code-block:: console
 
     $ rpm -e galera
     $ rpm -i <new galera rpm>
 
 2. Stop all load on the cluster.
 
-3. Issue the query below on every node::
+3. Issue the query below on every node:
+
+   .. code-block:: mysql
 
     SET GLOBAL wsrep_provider='none';
     SET GLOBAL wsrep_provider='/usr/lib64/galera/libgalera_smm.so';
 
-4. Issue the query below on node 1 (or any node)::
+4. Issue the query below on node 1 (or any node):
 
-    SET GLOBAL wsrep_cluster_address='gcomm://'
+   .. code-block:: mysql
 
-5. Issue the query below on the other nodes::
+    SET GLOBAL wsrep_cluster_address='gcomm://';
 
-    SET GLOBAL wsrep_cluster_address='gcomm://node1'
+5. Issue the query below on the other nodes:
 
+   .. code-block:: mysql
+
+    SET GLOBAL wsrep_cluster_address='gcomm://node1';
+    
 6. Resume the load on the cluster.
 
 Reloading the provider and connecting to the cluster takes typically less than 10 seconds; there is virtually no service outage. 

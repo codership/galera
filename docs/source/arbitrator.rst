@@ -50,13 +50,17 @@ parameters except those prefixed by ``replicator.``.
 ----------------------------
 .. _`Starting Galera Arbitrator`:
 
-Galera Arbitrator it is a separate daemon called ``garbd``. You can start is manually as follows::
+Galera Arbitrator it is a separate daemon called ``garbd``. You can start is manually as follows:
+
+.. code-block:: console
 
     $ /etc/init.d/garb start 
 
 You can also add configuration options to the command.
 
-You can also automate running Galera Arbitrator by using an ``/etc/default/garb`` init script, such as the one below::
+You can also automate running Galera Arbitrator by using an ``/etc/default/garb`` init script, such as the one below:
+
+.. code-block:: ini
 
     # Copyright (C) 2013 Codership Oy
     # This config file is to be sourced by garb service script.

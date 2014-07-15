@@ -209,6 +209,11 @@ GCS_BACKEND_OPEN_FN(dummy_open)
         return -EBADFD;
     }
 
+    if (!bootstrap) {
+        dummy->state = DUMMY_TRANS;
+        return 0;
+    }
+
     comp = gcs_comp_msg_new (true, false, 0, 1);
 
     if (comp) {

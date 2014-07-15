@@ -157,7 +157,7 @@ For more information, see the `Rsync Documentation <http://rsync.samba.org/>`_.
 
 
 ^^^^^^^^^^^^^^^^^
-``xtrabackup``
+xtrabackup
 ^^^^^^^^^^^^^^^^^
 .. _xtrabackup:
 .. index::

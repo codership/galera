@@ -1055,7 +1055,7 @@ table.indextable td > dl > dd > dl
 
     /* remove spacing on headers and reduce body padding */
     body div.body h2,
-    body div.body p.rubric,
+    body div.body p.rubric, /* deprecated in favor of style below */
     body div.section.emphasized > h3, /* deprecated in favor of below: */
     body div.section.emphasize-children > div.section > h3
     {
@@ -1164,6 +1164,31 @@ table.indextable td > dl > dd > dl
 		div.section h3 {
 			margin-bottom:0.75em;
 		}
+
+		/* Neutralize link <em> tags added by Sphinx */
+		a em {
+			font-style:normal;
+		}
+		
+		/* Formatting for Parameter Entries */
+		body div.body p.rubric {
+			padding-top:10px;
+			margin-top:25px;
+			margin-bottom:12px;
+			font-weight: bold;
+			font-size:110%;
+		}
+		body div.body p.rubric tt.literal {
+			font-family: monospace;
+			background-color: transparent  !important;
+			border: 0px;
+			letter-spacing:0.05em;
+			font-size:100%;
+			padding:0px;
+			margin:0px;
+		}
+
+		
 
 /*****************************************************
  * EOF

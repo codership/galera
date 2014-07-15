@@ -497,6 +497,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
         case 0:
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
+        case 2:
         {
             void*   ist_req(0);
             ssize_t ist_req_len(0);
@@ -562,7 +563,8 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
         gcs_seqno_t seqno_l;
 
-        ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
+        ret = gcs_.request_state_transfer(str_proto_ver_,
+                                          req->req(), req->len(), sst_donor_,
                                           ist_uuid, ist_seqno, &seqno_l);
         if (ret < 0)
         {
@@ -792,6 +794,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
+        st_.mark_corrupt();
         gcs_.close();
         gu_abort();
     }

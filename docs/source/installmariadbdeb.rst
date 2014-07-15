@@ -13,22 +13,30 @@ Enabling the MariaDB Repository
 
 MariaDB provides a repository for the latest releases of Galera Cluster and MariaDB itself.  This requires that you have Software Properties installed on your server.
 
-On Debian, run the following command as root::
+On Debian, run the following command as root:
+
+.. code-block:: console
 
 	$ apt-get install python-software-properties
 
-On Ubuntu, instead run this command::
+On Ubuntu, instead run this command:
+
+.. code-block:: console
 
 	$ sudo apt-get install software-properties-common
 
 After ``apt-get`` finishes running, you can begin installing the MariaDB repository.
 
-1. Add the GnuPG key for the MariaDB repository to your key server::
+1. Add the GnuPG key for the MariaDB repository to your key server:
+
+   .. code-block:: console
 
 	$ apt-key adv --recv-keys --keyserver \
 		keyserver.ubuntu.com 0xcbcb082a1bb943db
 
-2. Add the repository to ``/etc/apt/sources.list``::
+2. Add the repository to ``/etc/apt/sources.list``:
+
+   .. code-block:: console
 
 	$ add-apt-repository \
 		'deb http://mirror.jmu.edu/pub/mariadb/repo/version_nbr/distro_nm release_nm man'
@@ -38,11 +46,15 @@ After ``apt-get`` finishes running, you can begin installing the MariaDB reposit
 
   - For ``distro_nm`` use the name of your Linux distribution, such as ``ubuntu``.
 
-  - For ``release_nm`` use the distribution release name, such as ``wheezy``.  If you don't know the release name for your server, use the following command::
+  - For ``release_nm`` use the distribution release name, such as ``wheezy``.  If you don't know the release name for your server, use the following command:
+  
+    .. code-block:: console
 
   	$ lsb_release -a
 
-3. Update the local cache::
+3. Update the local cache:
+
+   .. code-block:: console
 
 	$ apt-get update
 
@@ -66,7 +78,9 @@ There are three packages involved in the installation of Galera Cluster for Mari
 
 .. note:: If you have an existing installation of the MariaDB server, ``apt-get`` will remove it to install the new patched server.  Additionally, after the installation is complete, you should update your system tables.
 
-To install Galera Cluster run the following command as root::
+To install Galera Cluster run the following command as root:
+
+.. code-block:: console
 
 	$ apt-get install mariadb-client \
 		mariadb-galera-server \
@@ -81,7 +95,9 @@ Updating System Tables
 
 If you installed Galera Cluster over an existing installation of MariaDB, you should update the system tables for the new server installation.
 
-To update the system tables, run the following command::
+To update the system tables, run the following command:
+
+.. code-block:: console
 
 	$ mariadb_upgrade
 

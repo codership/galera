@@ -456,7 +456,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
                      (long long)conf->seqno, // this is global seqno
-                     strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
+                     strerror (-gcs_request_state_transfer (gcs, 0, &conf->seqno,
                                                             sizeof(conf->seqno),
                                                             "", &ist_uuid, ist_seqno,
                                                             &seqno)));
