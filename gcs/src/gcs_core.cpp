@@ -99,7 +99,7 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static int const GCS_PROTO_MAX = 1;
+static int const GCS_PROTO_MAX = 0;
 
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
@@ -510,17 +510,26 @@ core_handle_act_msg (gcs_core_t*          core,
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
+    bool  not_commonly_supported_version = false;
 
     assert (GCS_MSG_ACTION == msg->type);
 
     if ((CORE_PRIMARY == core->state) || my_msg){//should always handle own msgs
 
-        if (gu_unlikely(GCS_ACT_PROTO_MAX < gcs_act_proto_ver(msg->buf))) {
-            // this is most likely due to #482
-            gu_info ("Message with protocol version %d > max supported: %d. "
-                     "Need to abort.",
-                     gcs_act_proto_ver(msg->buf), GCS_ACT_PROTO_MAX);
-            return -ENOTRECOVERABLE;
+        if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
+                        gcs_core_group_protocol_version(core))) {
+            gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
+                     gcs_act_proto_ver(msg->buf),
+                     gcs_core_group_protocol_version(core));
+            not_commonly_supported_version = true;
+            if (!my_msg) {
+                gu_info ("Discard message from member %d because of "
+                         "not commonly supported version.", msg->sender_idx);
+                return 0;
+            } else {
+                gu_info ("Resend message because of "
+                         "not commonly supported version.");
+            }
         }
 
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
@@ -532,7 +541,8 @@ core_handle_act_msg (gcs_core_t*          core,
             return -ENOTRECOVERABLE;
         }
 
-        ret = gcs_group_handle_act_msg (group, &frg, msg, act);
+        ret = gcs_group_handle_act_msg (group, &frg, msg, act,
+                                        not_commonly_supported_version);
 
         if (ret > 0) { /* complete action received */
             assert (ret  == act->act.buf_len);
@@ -723,16 +733,12 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        int gcs_proto_ver;
-        ret = gcs_group_act_conf (group, act, &gcs_proto_ver);
+        ret = gcs_group_act_conf (group, act, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
             assert (0);
             ret = -ENOTRECOVERABLE;
-        }
-        else {
-            if (0 == gcs_proto_ver) { core->proto_ver = 0; }
         }
         assert (ret == act->buf_len);
         break;
@@ -1210,7 +1216,7 @@ long gcs_core_destroy (gcs_core_t* core)
 gcs_proto_t
 gcs_core_group_protocol_version (const gcs_core_t* conn)
 {
-    return conn->group.gcs_proto_ver;
+    return conn->proto_ver;
 }
 
 long
