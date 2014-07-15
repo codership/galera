@@ -1276,6 +1276,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
     case 6:
         trx_params_.version_  = 3;
         str_proto_ver_ = 2; // gcs intelligent donor selection.
+        // include handling dangling comma in donor string.
         break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "

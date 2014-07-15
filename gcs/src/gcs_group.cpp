@@ -884,7 +884,9 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
 /* Calls group_find_node_by_name() for each name in comma-separated list,
  * falls back to group_find_node_by_state() if name (or list) is empty. */
 static int
-group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
+group_for_each_donor_in_string (gcs_group_t* const group,
+                                int const str_version,
+                                int const joiner_idx,
                                 const char* const str, int const str_len,
                                 gcs_node_state_t const status)
 {
@@ -895,7 +897,7 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     int err = -EHOSTDOWN; /* worst error */
     /* dangling comma */
     bool const dcomma = (str_len && str[str_len-1] == ',' &&
-                         group->quorum.gcs_proto_ver > 0);
+                         str_version >= 2);
 
     do {
         end = strchr(begin, ',');
@@ -1092,8 +1094,10 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
 }
 
 static int
-group_find_ist_donor (gcs_group_t* const group, int joiner_idx,
-                      const char* str, int  str_len,
+group_find_ist_donor (gcs_group_t* const group,
+                      int str_version,
+                      int joiner_idx,
+                      const char* str, int str_len,
                       gcs_seqno_t ist_seqno,
                       gcs_node_state_t status)
 {
@@ -1136,7 +1140,9 @@ group_find_ist_donor (gcs_group_t* const group, int joiner_idx,
 }
 
 int
-gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
+gcs_group_find_donor(gcs_group_t* group,
+                     int const str_version,
+                     int const joiner_idx,
                      const char* const donor_string, int const donor_len,
                      const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno)
 {
@@ -1145,11 +1151,13 @@ gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
     /* try to find ist donor first.
        if it fails, fallbacks to find sst donor*/
     int donor_idx = -1;
-    if (group->quorum.gcs_proto_ver > 0 &&
+    if (str_version >= 2 &&
         gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
     {
         assert (ist_seqno != GCS_SEQNO_ILL);
-        donor_idx = group_find_ist_donor(group, joiner_idx,
+        donor_idx = group_find_ist_donor(group,
+                                         str_version,
+                                         joiner_idx,
                                          donor_string, donor_len,
                                          ist_seqno,
                                          min_donor_state);
@@ -1159,7 +1167,7 @@ gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
         /* if donor_string is empty,
            it will fallback to find_node_by_state() */
         donor_idx = group_for_each_donor_in_string
-                (group, joiner_idx,
+                (group, str_version, joiner_idx,
                  donor_string, donor_len,
                  min_donor_state);
     }
@@ -1177,7 +1185,9 @@ gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
  *         -EAGAIN       if there were no nodes in the proper state.
  */
 static int
-group_select_donor (gcs_group_t* group, int const joiner_idx,
+group_select_donor (gcs_group_t* group,
+                    int const str_version,
+                    int const joiner_idx,
                     const char* const donor_string,
                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno,
                     bool const desync)
@@ -1196,7 +1206,9 @@ group_select_donor (gcs_group_t* group, int const joiner_idx,
             donor_idx = -EAGAIN;
     }
     else {
-        donor_idx = gcs_group_find_donor(group, joiner_idx,
+        donor_idx = gcs_group_find_donor(group,
+                                         str_version,
+                                         joiner_idx,
                                          donor_string, donor_len,
                                          ist_uuid, ist_seqno);
     }
@@ -1320,7 +1332,9 @@ gcs_group_handle_state_request (gcs_group_t*         group,
         }
     }
 
-    donor_idx = group_select_donor(group, joiner_idx, donor_name,
+    donor_idx = group_select_donor(group,
+                                   str_version,
+                                   joiner_idx, donor_name,
                                    &ist_uuid, ist_seqno, desync);
 
     assert (donor_idx != joiner_idx || desync  || donor_idx < 0);

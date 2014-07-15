@@ -500,7 +500,7 @@ END_TEST
 START_TEST(test_gcs_group_find_donor)
 {
     gcs_group_t group;
-    gcs_group_init(&group, NULL, "", "", 1, 0, 0);
+    gcs_group_init(&group, NULL, "", "", 0, 0, 0);
     const char* s_group_uuid = "0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d";
     gu_uuid_scan(s_group_uuid, strlen(s_group_uuid), &group.group_uuid);
     gu_uuid_t* group_uuid = &group.group_uuid;
@@ -536,45 +536,49 @@ START_TEST(test_gcs_group_find_donor)
             0, 0, seqnos[i], 0,
             GCS_NODE_STATE_SYNCED,
             GCS_NODE_STATE_SYNCED,
-            "", "", 1, 0, 0, 0);
+            "", "", 0, 0, 0, 0);
     }
-    group.quorum.gcs_proto_ver = 1;
+    group.quorum.act_id = 0; // in safe range.
+    fail_if (group.quorum.gcs_proto_ver != -1);
+    fail_if (group.gcs_proto_ver != 0);
 
     int donor = -1;
 
+    const int sv = 2; // str version.
 #define SARGS(s) s, strlen(s)
     //========== sst ==========
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home3"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3"),
                                  &empty_uuid, GCS_SEQNO_ILL);
     fail_if(donor != -EHOSTDOWN);
 
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home1,home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
                                  &empty_uuid, GCS_SEQNO_ILL);
     fail_if(donor != 1);
 
     nodes[1].status = GCS_NODE_STATE_JOINER;
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home1,home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
                                  &empty_uuid, GCS_SEQNO_ILL);
     fail_if(donor != 2);
     nodes[1].status = GCS_NODE_STATE_SYNCED;
 
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home3,"),
+    // handle dangling comma.
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3,"),
                                  &empty_uuid, GCS_SEQNO_ILL);
     fail_if(donor != 0);
 
     // ========== ist ==========
     // by name.
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home0,home1,home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home0,home1,home2"),
                                  group_uuid, ist_seqno);
     fail_if(donor != 1);
 
     group.quorum.act_id = 1498; // not in safe range.
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
                                  group_uuid, ist_seqno);
     fail_if(donor != 2);
 
     group.quorum.act_id = 1497; // in safe range. in segment.
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
                                  group_uuid, ist_seqno);
     fail_if(donor != 1);
 
@@ -582,7 +586,7 @@ START_TEST(test_gcs_group_find_donor)
     nodes[0].status = GCS_NODE_STATE_JOINER;
     nodes[1].status = GCS_NODE_STATE_JOINER;
     nodes[2].status = GCS_NODE_STATE_JOINER;
-    donor = gcs_group_find_donor(&group, joiner, SARGS("home2"),
+    donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
                                  group_uuid, ist_seqno);
     fail_if(donor != 5);
     nodes[0].status = GCS_NODE_STATE_SYNCED;

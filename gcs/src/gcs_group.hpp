@@ -239,7 +239,9 @@ gcs_group_get_state (gcs_group_t* group);
  * -EAGAIN if no node in proper state.
  */
 extern int
-gcs_group_find_donor(gcs_group_t* group, int const joiner_idx,
+gcs_group_find_donor(gcs_group_t* group,
+                     int const str_version,
+                     int const joiner_idx,
                      const char* const donor_string, int const donor_len,
                      const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
 
