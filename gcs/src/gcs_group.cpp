@@ -1290,7 +1290,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
     int str_version = 1; // actually it's 0 or 1.
 
-    if (act->act.buf_len != (donor_name_len + 1) &&
+    if (act->act.buf_len != (ssize_t)(donor_name_len + 1) &&
         donor_name[donor_name_len + 1] == 'V') {
         str_version = (int)donor_name[donor_name_len + 2];
     }
