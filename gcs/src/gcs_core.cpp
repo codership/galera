@@ -79,6 +79,7 @@ struct gcs_core
 
 #ifdef GCS_CORE_TESTING
     gu_lock_step_t  ls;        // to lock-step in unit tests
+    gu_uuid_t state_uuid;
 #endif
 };
 
@@ -98,7 +99,7 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static int const GCS_PROTO_MAX = 1;
+static int const GCS_PROTO_MAX = 0;
 
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
@@ -140,6 +141,7 @@ gcs_core_create (gu_config_t* const conf,
                     core->send_act_no = 1; // 0 == no actions sent
 #ifdef GCS_CORE_TESTING
                     gu_lock_step_init (&core->ls);
+                    core->state_uuid = GU_UUID_NIL;
 #endif
                     return core; // success
                 }
@@ -508,17 +510,26 @@ core_handle_act_msg (gcs_core_t*          core,
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
+    bool  not_commonly_supported_version = false;
 
     assert (GCS_MSG_ACTION == msg->type);
 
     if ((CORE_PRIMARY == core->state) || my_msg){//should always handle own msgs
 
-        if (gu_unlikely(GCS_ACT_PROTO_MAX < gcs_act_proto_ver(msg->buf))) {
-            // this is most likely due to #482
-            gu_info ("Message with protocol version %d > max supported: %d. "
-                     "Need to abort.",
-                     gcs_act_proto_ver(msg->buf), GCS_ACT_PROTO_MAX);
-            return -ENOTRECOVERABLE;
+        if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
+                        gcs_core_group_protocol_version(core))) {
+            gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
+                     gcs_act_proto_ver(msg->buf),
+                     gcs_core_group_protocol_version(core));
+            not_commonly_supported_version = true;
+            if (!my_msg) {
+                gu_info ("Discard message from member %d because of "
+                         "not commonly supported version.", msg->sender_idx);
+                return 0;
+            } else {
+                gu_info ("Resend message because of "
+                         "not commonly supported version.");
+            }
         }
 
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
@@ -530,7 +541,8 @@ core_handle_act_msg (gcs_core_t*          core,
             return -ENOTRECOVERABLE;
         }
 
-        ret = gcs_group_handle_act_msg (group, &frg, msg, act);
+        ret = gcs_group_handle_act_msg (group, &frg, msg, act,
+                                        not_commonly_supported_version);
 
         if (ret > 0) { /* complete action received */
             assert (ret  == act->act.buf_len);
@@ -589,7 +601,11 @@ core_handle_act_msg (gcs_core_t*          core,
                 }
             }
 
-            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
+            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0 &&
+                            // note: #gh74.
+                            // if lingering STR sneaks in when core->state != CORE_PRIMARY
+                            // act->id != GCS_SEQNO_ILL (most likely act->id == -EAGAIN)
+                            core->state == CORE_PRIMARY)) {
 #ifdef GCS_FOR_GARB
             /* ignoring state requests from other nodes (not allocated) */
             if (my_msg) {
@@ -628,7 +644,7 @@ core_handle_act_msg (gcs_core_t*          core,
     }
     else {
         /* Non-primary conf, foreign message - ignore */
-        gu_debug ("Action message in non-primary configuration from "
+        gu_warn ("Action message in non-primary configuration from "
                  "member %d", msg->sender_idx);
         ret = 0;
     }
@@ -717,16 +733,12 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        int gcs_proto_ver;
-        ret = gcs_group_act_conf (group, act, &gcs_proto_ver);
+        ret = gcs_group_act_conf (group, act, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
             assert (0);
             ret = -ENOTRECOVERABLE;
-        }
-        else {
-            if (0 == gcs_proto_ver) { core->proto_ver = 0; }
         }
         assert (ret == act->buf_len);
         break;
@@ -739,6 +751,11 @@ core_handle_comp_msg (gcs_core_t*          core,
                 if (0 == gcs_group_my_idx(group)) { // I'm representative
                     gu_uuid_t uuid;
                     gu_uuid_generate (&uuid, NULL, 0);
+#ifdef GCS_CORE_TESTING
+                    if (gu_uuid_compare(&core->state_uuid, &GU_UUID_NIL)) {
+                        uuid = core->state_uuid;
+                    }
+#endif
                     ret = core->backend.send (&core->backend,
                                               &uuid,
                                               sizeof(uuid),
@@ -1199,9 +1216,8 @@ long gcs_core_destroy (gcs_core_t* core)
 gcs_proto_t
 gcs_core_group_protocol_version (const gcs_core_t* conn)
 {
-    return conn->group.gcs_proto_ver;
+    return conn->proto_ver;
 }
-
 
 long
 gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
@@ -1385,4 +1401,15 @@ gcs_core_send_step (gcs_core_t* core, long timeout_ms)
     return gu_lock_step_cont (&core->ls, timeout_ms);
 }
 
+void
+gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid)
+{
+    core->state_uuid = *uuid;
+}
+
+const gcs_group_t*
+gcs_core_get_group (gcs_core_t* core)
+{
+    return &core->group;
+}
 #endif /* GCS_CORE_TESTING */

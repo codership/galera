@@ -180,7 +180,7 @@ group_add_node (struct group* group, struct node* node, bool new_id)
         int j;
         for (j = i+1; j < group->nodes_num; j++) {
             fail_if (!strcmp (group->nodes[i]->id, group->nodes[j]->id),
-                     "%d (%p) and %d (%p) have the same id: %s/%s", 
+                     "%d (%p) and %d (%p) have the same id: %s/%s",
                      i, group->nodes[i], j,group->nodes[j],
                      group->nodes[i]->id, group->nodes[j]->id);
         }
@@ -422,7 +422,7 @@ START_TEST(gcs_memb_test_465)
 
     group_sst_start (&group, 2, nodes[0].group.nodes[0].name);
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
-    deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced 
+    deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
     deliver_join_sync_msg (&group, 2, GCS_MSG_SYNC); // joiner can't sync
     fail_if (verify_node_state_across_group (&group, 2, GCS_NODE_STATE_JOINER));
     deliver_join_sync_msg (&group, 2, GCS_MSG_JOIN); // end of joiner SST
@@ -469,4 +469,3 @@ Suite *gcs_memb_suite(void)
     tcase_add_test  (tcase, gcs_memb_test_465);
     return suite;
 }
-
