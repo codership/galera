@@ -772,7 +772,7 @@ p.deprecated {
      * misc adjustments to admonitions
      *------------------------------------*/
 
-div.admonition p,
+div.admonition p
 div.admonition pre,
 div.admonition ul,
 div.admonition ol { margin-bottom: 5px; }
@@ -1161,7 +1161,8 @@ table.indextable td > dl > dd > dl
 		div.section p, 
 		div.section ul,
 		div.section h2,
-		div.section h3 {
+		div.section h3,
+		div.admonition p {
 			margin-bottom:0.75em;
 		}
 
@@ -1187,6 +1188,11 @@ table.indextable td > dl > dd > dl
 			padding:0px;
 			margin:0px;
 		}
+		
+		div.admonition {
+			text-align: justify;
+		}
+
 
 		
 
