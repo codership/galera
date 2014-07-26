@@ -165,7 +165,11 @@ mv $MYSQL_DIST/$MYSQL_DIST-linux-*.tar.gz ./
 #cleaning intermedieate sources:
 rm -rf $MYSQL_DIST
 
-if [ -n $TAR_ONLY ] || [ ! which rpmbuild ]; then exit 0; fi
+if [ -n "$TAR_ONLY" ] || ! which rpmbuild >/dev/null 2>&1
+then
+    echo "Not building RPMs"
+    exit 0
+fi
 
 ######################################
 ##                                  ##
@@ -223,6 +227,7 @@ mv $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./
 
 # remove the patch file if is was automatically generated
 if test ! -r "$2"; then rm -rf $WSREP_PATCH; fi
+rm -rf $RPM_BUILD_ROOT
 
 exit 0
 
