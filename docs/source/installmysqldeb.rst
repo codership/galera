@@ -1,7 +1,7 @@
 =============================================
 Debian Installation
 =============================================
-.. _`MySQL Debian Installation`
+.. _`mysql-debian-install`:
 
 If you run Debian or a Debian-based distribution, such as Ubuntu, you can install Galera Cluster for MySQL on your server through package downloads.
 
@@ -10,7 +10,7 @@ If you run Debian or a Debian-based distribution, such as Ubuntu, you can instal
 ---------------------------------------------
 Preparing Your Server
 ---------------------------------------------
-.. _`Preparing Your Server`:
+.. _`prep-server`:
 
 Before you begin installing Galera Cluster, you must first remove any existing installation of MySQL server and install the packages dependencies.
 
@@ -42,7 +42,7 @@ To install the package dependencies, run the following command as root::
 ---------------------------------------------
 Installing Galera Cluster for MySQL
 ---------------------------------------------
-.. _`Install Galera MySQL`:
+.. _`mysql-deb-galera-install`:
 
 There are two packages involved in the installation of Galera Cluster for MySQL:
 
@@ -60,7 +60,7 @@ To install Galera Cluster for MySQL, complete the following steps:
 
 	$ dpkg -i mysql-server-wsrep.deb 
 
-3. Go to `Galera Replicator <https://launchpad.net/g alera>`_ and download the Galera plugin.
+3. Go to `Galera Replicator <https://launchpad.net/galera>`_ and download the Galera plugin.
 
 4. Install the Galera Replicator package:
 
@@ -80,7 +80,7 @@ Galera Cluster is installed on your system, you can now start MySQL.
 ^^^^^^^^^^^^^^^^^^^^^^^
 Upgrading System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^
-.. _`Upgrade System Tables`:
+.. _`upgrade-sys-tables`:
 
 If you installed Galera Cluster over an existing installation of MySQL, you must also upgrade the system tables to the new system.
 

@@ -500,7 +500,8 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid,
             gu::datetime::Date now(gu::datetime::Date::now());
             // Don't reduce next reconnect time if it is set greater than
             // requested
-            if (now + wait_period > ae.next_reconnect())
+            if ((now + wait_period > ae.next_reconnect()) ||
+                (ae.next_reconnect() == gu::datetime::Date::max()))
             {
                 ae.set_next_reconnect(gu::datetime::Date::now() + wait_period);
             }

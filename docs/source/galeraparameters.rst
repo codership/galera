@@ -540,7 +540,7 @@ This variable is mostly used for troubleshooting purposes and should not be impl
 .. rubric:: ``pc.recovery``
 .. _`pc.recovery`:
 .. index::
-	pair: Parameters, pc.recovery
+   pair: Parameters; pc.recovery
 
 When set to ``TRUE``, the node stores the Primary Component state to disk.  The Primary Component can then recover automatically when all nodes that were part of the last saved state reestablish communications with each other.  
 
