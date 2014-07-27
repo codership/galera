@@ -12,7 +12,9 @@ Replication Testing
 
 To test that Galera Cluster is working as expected, complete the following steps:
 
-1. On the database client, verify that all nodes have connected to each other::
+1. On the database client, verify that all nodes have connected to each other:
+
+   .. code-block:: mysql
 
 	SHOW STATUS LIKE 'wsrep_%';
 
@@ -31,7 +33,9 @@ To test that Galera Cluster is working as expected, complete the following steps
 
   - ``wsrep_ready``: The value ``ON`` indicates that this node is connected to the cluster and able to handle transactions.
 
-2. On the database client of node1, create a table and insert data::
+2. On the database client of node1, create a table and insert data:
+
+   .. code-block:: mysql
 
 	CREATE DATABASE galeratest;
 	USE galeratest;
@@ -43,7 +47,9 @@ To test that Galera Cluster is working as expected, complete the following steps
 	INSERT INTO test (msg)
 		VALUES ("Hello, again, cluster dear.");
 
-3. On the database client of node2, check that the data was replicated correctly::
+3. On the database client of node2, check that the data was replicated correctly:
+
+   .. code-block:: mysql
 
 	USE galeratest;
 	SELECT * FROM test;
@@ -73,7 +79,9 @@ To test Galera Cluster for split-brain situations on a two node cluster, complet
 
    The quorum remains lost, and the nodes do not serve requests.
 
-3. On one of the database clients, reset the quorum::
+3. On one of the database clients, reset the quorum:
+
+   .. code-block:: mysql
 
 	SET GLOBAL wsrep_provider_options='pc.bootstrap=1';
 
@@ -87,7 +95,9 @@ The quorum is reset and the cluster recovered.
 
 You can also test *Galera Cluster* by simulating various failure situations on three nodes as follows:
 
-- To simulate a crash of a single ``mysqld`` process, run the command below on one of the nodes::
+- To simulate a crash of a single ``mysqld`` process, run the command below on one of the nodes:
+
+   .. code-block:: console
 
       $ killall -9 mysqld
 

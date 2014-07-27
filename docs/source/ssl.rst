@@ -1,38 +1,44 @@
 =============
  Enabling SSL
 =============
-.. _`Enabling SSL`:
-
+.. _`enabling-ssl`:
 .. index::
    pair: Parameters; socket.ssl_compression
-
 .. index::
    pair: Parameters; socket.ssl_cipher
-
 .. index::
    pair: Parameters; socket.ssl_cert
-
 .. index::
    pair: Parameters; socket.ssl_key
    
-Galera Cluster supports :abbr:`SSL (Secure Sockets Layer)` for the encryption of replication traffic. Authentication is not supported. SSL is a cluster-wide option and must be enabled either on all of the nodes or none at all. 
+   
+For the encryption of replication traffic, Galera Cluster supports :abbr:`SSL (Secure Sockets Layer)`.  It does not support authentication.  SSL is a cluster-wide option.  You must enable it for all nodes in the cluster or none at all.
 
-To use SSL, you must generate a private certificate/key pair for the cluster, for example, by the following command::
+.. warning:: Galera Cluster SLL support only covers Galera Cluster communications.  State Snapshot Transfers happen outside of Galera Cluster, so you must protect them separately.  For example, consider using the internal SSL support of the MySQL client or the **stunnel** program to protect **rsync** traffic.
 
-    $ openssl req -new -x509 -days 365000 \
-    	-nodes -keyout key.pem -out cert.pem
+To implement SSL on your cluster, complete the following steps:
 
-.. note:: It is crucial to generate a certificate/key pair, which is valid for a long time. When the certificate expires, there will be no way to update the cluster without complete shutdown. Thus, use a large value for the the ``-days`` parameter.
+1. Generate a private certificate/key pair for the cluster.  For instance, using **openssl** run the following command:
 
-Copy this certificate/key pair to the ``/etc/mysql`` directory on all of the nodes. Copy the files over a secure channel between the nodes.
+   .. code-block:: console
+   
+      $ openssl req -new -x509 -days 365000 -nodes \
+         -keyout key.pem -out cert.pem
 
-Take the certificate/key pair to use by specifying the following Galera Cluster options::
+   .. note:: When the certificate expires, there is no way to update the cluster without a complete shutdown.  Use a large value for the ``-days`` parameter.
 
-    socket.ssl_cert = /path/to/cert-file
-    socket.ssl_key = /path/to/key-file
+2. Use a secure channel to copy the certificate/key pair files into the ``/etc/mysql/`` directory on each node in the cluster.
 
-Other SSL configuration parameters include ``socket.ssl_compression`` and ``socket.ssl_cipher``. See :ref:`Galera Parameters <Galera Parameters>` for details.
+3. On each node, update the configuration file, (``my.cnf`` or ``my.ini``, depending on your build), to include the certificate/key pair.
 
-.. note:: You cannot use a mixed cluster where some nodes have SSL and some do not. We recommend configuring SSL when you are setting up a new cluster. If you must add SSL support on a production system, you must rebootstrap the cluster and accept a brief outage.
+   .. code-block:: ini
+   
+      socket.ssl_cert = /path/to/cert.pem
+      socket.ssl_key = /path/to/key.pem
 
-.. warning:: The Galera Cluster SSL support only covers Galera Cluster communication. Since state snapshot transfer happens outside of Galera Cluster, protect it separately.  You can use, for example, the internal SSL support in the MySQL client or the ``stunnel`` program to protect ``rsync`` traffic.
+Once all of the nodes have the update, Galera Cluster will use SSL to encrypt communication between the nodes.
+
+.. seealso:: For information on other parameters for SSL, see :ref:`socket.ssl_compression <socket.ssl_compression>` and :ref:`socket.ssl_cipher <socket.ssl_cipher>`.
+
+
+

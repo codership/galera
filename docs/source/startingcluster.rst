@@ -25,7 +25,9 @@ Creating Client Connections between the Nodes
 
 Connecting the database servers to each other as a cluster requires that you create client connections between the nodes.  This allows the nodes to carry out state snapshot transfers with each other.
 
-To connect the clients, on each node run the following queries::
+To connect the clients, on each node run the following queries:
+
+.. code-block:: mysql
 
 	GRANT ALL ON *.* TO 'root'@'node1-address';
 	GRANT ALL ON *.* TO 'root'@'node2-address';
@@ -43,13 +45,17 @@ In order to create and bootstrap the first cluster node, you must set up the gro
 
 To create and bootstrap the first cluster node, complete the following steps:
 
-1. Start the database server with an empty wsrep cluster address value::
+1. Start the database server with an empty wsrep cluster address value:
+
+   .. code-block:: console
 
 	$ mysqld --wsrep-new-cluster
 
   .. warning:: Only use ``--wsrep-new-cluster`` when you want to create a new cluster.  Never use it when you want to reconnect to an existing one.
 
-2. To check that the startup was successful, run the following query in the client::
+2. To check that the startup was successful, run the following query in the client:
+
+   .. code-block:: mysql
 
 	SHOW VARIABLES LIKE 'wsrep_cluster_address';
 
@@ -59,11 +65,14 @@ To create and bootstrap the first cluster node, complete the following steps:
 	 | wsrep_cluster_address | gcomm:// |
 	 +-----------------------+----------+
 
-3. If the output is correct, use a text editor to open your configuration file, (either ``my.cnf`` or ``my.ini`` depending on your build), and add the addresses for the other nodes in the cluster::
+3. If the output is correct, use a text editor to open your configuration file, (either ``my.cnf`` or ``my.ini`` depending on your build), and add the addresses for the other nodes in the cluster:
+
+   .. code-block:: ini
 
 	wsrep_cluster_address="node2-address, node3-address"
 
-  .. note:: You can use either :abbr:`IP (Internet Protocol)` or :abbr:`DNS (Domain Name System)` addresses.
+   .. note:: You can use either :abbr:`IP (Internet Protocol)` or :abbr:`DNS (Domain Name System)` addresses.
+
 The first node in your cluster is now live.
 
 	.. note:: Do not restart ``mysqld`` at this point.
@@ -78,13 +87,17 @@ Once the first node is live, you can begin adding additional nodes to the cluste
 
 To add a new node to an existing cluster, complete the following steps:
 
-1. Before you start ``mysqld``, use a text editor to modify the configuration file (either ``my.cnf`` or ``my.ini``, depending on your build), to enter the addresses for the other nodes in the cluster::
+1. Before you start ``mysqld``, use a text editor to modify the configuration file (either ``my.cnf`` or ``my.ini``, depending on your build), to enter the addresses for the other nodes in the cluster:
+
+   .. code-block:: ini
 
 	wsrep_cluster_address="node1-address, node3-address"
 
   .. note:: You can use either :abbr:`IP (Internet Protocol)` or :abbr:`DNS (Domain Name System)` addresses.
 
-2. Start ``mysqld``::
+2. Start ``mysqld``:
+
+   .. code-block:: console
 
 	$ mysql start
 
@@ -102,7 +115,9 @@ Understanding Cluster Addresses
 
 For each node in the cluster, you must enter an address in the ``wsrep_cluster_address`` parameter of your configuration file.
 
-The syntax for cluster addresses is explained below::
+The syntax for cluster addresses is explained below:
+
+.. code-block:: ini
 
 	<backend schema>://<cluster address>[?option1=value1[&option2=value2]]
 

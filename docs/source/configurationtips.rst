@@ -23,7 +23,9 @@ Start with four slave threads per CPU core, the logic being that, in a balanced 
 
 The top limit on the total number of slave threads can be obtained from the ``wsrep_cert_deps_distance`` status variable. This value essentially determines how many write-sets on average can be applied in parallel. Do not use a value higher than that.
 
-To set four parallel slave threads, use the parameter value below::
+To set four parallel slave threads, use the parameter value below:
+
+.. code-block:: ini
 
     wsrep_slave_threads=4
 
@@ -42,9 +44,15 @@ To set four parallel slave threads, use the parameter value below::
 .. index::
    single: my.cnf
 
-Transient network connectivity failures are not rare in :abbr:`WAN (Wide Area Network)` configurations. Thus, you may want to increase the keepalive timeouts to avoid partitioning. The following group of ``my.cnf`` settings tolerates 30 second connectivity outages::
+Transient network connectivity failures are not rare in :abbr:`WAN (Wide Area Network)` configurations. Thus, you may want to increase the keepalive timeouts to avoid partitioning. The following group of ``my.cnf`` settings tolerates 30 second connectivity outages:
 
-  wsrep_provider_options = "evs.keepalive_period = PT3S; evs.inactive_check_period = PT10S; evs.suspect_timeout = PT30S; evs.inactive_timeout = PT1M; evs.install_timeout = PT1M"
+.. code-block:: ini
+
+  wsrep_provider_options = "evs.keepalive_period = PT3S; 
+  	evs.inactive_check_period = PT10S; 
+  	evs.suspect_timeout = PT30S; 
+  	evs.inactive_timeout = PT1M; 
+  	evs.install_timeout = PT1M"
 
 Set the ``evs.suspect_timeout`` parameter value as high as possible to avoid partitions (as partitions will cause state transfers, which are very heavy). The ``evs.inactive_timeout`` parameter value must be no less than the ``evs.suspect_timeout`` parameter value and the ``evs.install_timeout`` parameter value must be no less than the ``evs.inactive_timeout`` parameter value.
 
@@ -65,9 +73,13 @@ The more masters (nodes which simultaneously process writes from clients) are in
 .. index::
    pair: Configuration Tips; wsrep_provider_options
 
-If only one node at a time is used as a master, certain requirements, such as the slave queue size, may be relaxed. Flow control can be relaxed by using the settings below::
+If only one node at a time is used as a master, certain requirements, such as the slave queue size, may be relaxed. Flow control can be relaxed by using the settings below:
 
-    wsrep_provider_options = "gcs.fc_limit = 256; gcs.fc_factor = 0.99; gcs.fc_master_slave = yes"
+.. code-block:: ini
+
+    wsrep_provider_options = "gcs.fc_limit = 256; 
+    	gcs.fc_factor = 0.99; 
+    	gcs.fc_master_slave = YES"
 
 These settings may improve replication performance by reducing the rate of flow control events. This setting can also be used as suboptimal in a multi-master setup.
 

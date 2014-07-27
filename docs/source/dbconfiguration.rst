@@ -5,40 +5,43 @@ Configuring the Database
 
 Once you finish installing Galera Cluster and setting up your system, you are ready to configure the database itself to serve as a node on a cluster.  
 
-In your configuration file, (my.cnf or my.ini, depending on your system), there are a series of write-set replication variables that you must set before adding the node to the cluster.  For example::
+In your configuration file, (my.cnf or my.ini, depending on your system), there are a series of write-set replication variables that you must set before adding the node to the cluster.  For example:
 
-  [mysqld]
-  # Mandatory Settings
-  binlog_format=ROW
-  default_storage_engine=InnoDB
-  innodb_autoinc_lock_mode=2
+.. code-block:: ini
 
-  # Optional mysqld Settings
-  datadir=/path/to/datadir
-  innodb_buffer_pool_size=28G
-  innodb_log_file_size=100M
-  innodb_file_per_table
-  innodb_flush_log_at_trx_commit=2
-
-  # Basic wsrep Provider Settings
-  wsrep_provider=/usr/lib/galera/libgalera_smm.so
-  wsrep_provider_options="gcache.szie=32G;gcache.page_size=1G;"
-  wsrep_cluster_address=gcomm://192.168.9.1,192.168.0.2,192.168.0.3
-  wsrep_cluster_name='example_cluster'
-  wsrep_node_address='192.168.0.2'
-  wsrep_node_name='example_node2'
-  wsrep_sst_method=xtrabackup
-  wsrep_sst_auth=root:rootpa$$
-
-  # Optional wsrep Provider Settings
-  wsrep_node_incoming_address='192.168.10.2'
-  wsrep_sst_donor='example_node3'
-  wsrep_slave_threads=16
-
-  # Optional Memory Settings
-  gcs.recv_q_hard_limit=4G
-  gcs.recv_q_soft_limit=2G
-  gcs.max_throttle=0.25
+	[mysqld]
+	
+	# Mandatory Settings
+	binlog_format=ROW
+	default_storage_engine=InnoDB
+	innodb_autoinc_lock_mode=2
+	
+	# Optional mysqld Settings
+	datadir=/path/to/datadir
+	innodb_buffer_pool_size=28G
+	innodb_log_file_size=100M
+	innodb_file_per_table=1
+	innodb_flush_log_at_trx_commit=2
+	
+	# Basic wsrep Provider Settings
+	wsrep_provider=/usr/lib/galera/libgalera_smm.so
+	wsrep_provider_options="gcache.szie=32G;gcache.page_size=1G;"
+	wsrep_cluster_address=gcomm://192.168.9.1,192.168.0.2,192.168.0.3
+	wsrep_cluster_name='example_cluster'
+	wsrep_node_address='192.168.0.2'
+	wsrep_node_name='example_node2'
+	wsrep_sst_method=xtrabackup
+	wsrep_sst_auth=root:rootpa$$
+	
+	# Optional wsrep Provider Settings
+	wsrep_node_incoming_address='192.168.10.2'
+	wsrep_sst_donor='example_node3'
+	wsrep_slave_threads=16
+	
+	# Optional Memory Settings
+	gcs.recv_q_hard_limit=4G
+	gcs.recv_q_soft_limit=2G
+	gcs.max_throttle=0.25T
 
 These are the primary variables you must set for clustering.
 

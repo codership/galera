@@ -126,6 +126,7 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
     for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
          ++i)
     {
+        const UUID& uuid(NodeMap::key(i));
         const Node& node(NodeMap::value(i));
         const JoinMessage* jm(node.join_message());
         const LeaveMessage* lm(node.leave_message());
@@ -136,14 +137,10 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
         {
             if (lm != 0)
             {
-                // #760 - commented out: It does not matter whether
-                //        the node that has sent leave message is suspected
-                //        or not, leave message seqno is the highest that it
-                //        will declare as safe
-                // if (node.is_suspected() == false)
-                // {
-                seq_list.push_back(lm->seq());
-                // }
+                if (proto_.is_all_suspected(uuid) == false)
+                {
+                    seq_list.push_back(lm->seq());
+                }
             }
             else if (node.operational() == false)
             {
@@ -162,6 +159,55 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
     return *std::min_element(seq_list.begin(), seq_list.end());
 }
 
+gcomm::evs::seqno_t
+gcomm::evs::Consensus::safe_seq_wo_all_susupected_leaving_nodes() const
+{
+    seqno_t safe_seq(-2);
+    for(NodeMap::const_iterator i = proto_.known_.begin();
+        i != proto_.known_.end(); ++i)
+    {
+        const UUID& uuid(NodeMap::key(i));
+        const Node& node(NodeMap::value(i));
+        if (node.index() != std::numeric_limits<size_t>::max()) {
+            if (node.operational() == false &&
+                node.leave_message() &&
+                proto_.is_all_suspected(uuid)) {
+                continue;
+            }
+            seqno_t ss = input_map_.safe_seq(node.index());
+            if (safe_seq == -2 ||
+                ss < safe_seq) {
+                safe_seq = ss;
+            }
+        }
+    }
+    return safe_seq;
+}
+
+namespace gcomm {
+namespace evs {
+
+class FilterAllSuspectedOp
+{
+public:
+    FilterAllSuspectedOp(MessageNodeList& nl,
+                         const Proto& proto)
+            :
+            nl_(nl), proto_(proto) {}
+    void operator()(const MessageNodeList::value_type& vt) const
+    {
+        const UUID& uuid(MessageNodeList::key(vt));
+        if (!proto_.is_all_suspected(uuid)) {
+            nl_.insert_unique(vt);
+        }
+    }
+private:
+    MessageNodeList& nl_;
+    const Proto& proto_;
+};
+
+} // evs
+} // gcomm
 
 bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     const Message& msg) const
@@ -187,10 +233,13 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
 
     seqno_t max_reachable_safe_seq(max_hs);
 
-    // Leaving nodes
-    MessageNodeList leaving;
+    // Leaving Nodes
+    MessageNodeList t_leaving;
     for_each(node_list.begin(), node_list.end(),
-             SelectNodesOp(leaving, current_view_.id(), false, true));
+             SelectNodesOp(t_leaving, current_view_.id(), false, true));
+    MessageNodeList leaving;
+    for_each(t_leaving.begin(), t_leaving.end(),
+             FilterAllSuspectedOp(leaving, proto_));
 
     if (leaving.empty() == false)
     {
@@ -233,11 +282,13 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
         << " highest reachable safe seq " << highest_reachable_safe_seq()
         << " max_hs " << max_hs
         << " input map max hs " << input_map_.max_hs()
-        << " input map safe_seq " << input_map_.safe_seq();
+        << " input map safe_seq " << input_map_.safe_seq()
+        << " safe seq wo suspected leaving nodes " << safe_seq_wo_all_susupected_leaving_nodes();
 
     return (input_map_.max_hs()       == max_hs                 &&
             highest_reachable_safe_seq() == max_reachable_safe_seq &&
-            input_map_.safe_seq()     == max_reachable_safe_seq);
+            // input_map_.safe_seq()     == max_reachable_safe_seq);
+            safe_seq_wo_all_susupected_leaving_nodes() == max_reachable_safe_seq);
 }
 
 

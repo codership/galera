@@ -14,7 +14,9 @@ Preparing Your Server
 
 Before you begin installing Galera Cluster, you must first remove any existing installation of MySQL server and install the packages dependencies.
 
-To remove an existing server, run the following command as root::
+To remove an existing server, run the following command as root:
+
+.. code-block:: console
 
 	$ rpm --nodeps --allmatches -e \
 		mysql-server \
@@ -23,14 +25,18 @@ To remove an existing server, run the following command as root::
 
 To install the package dependencies, complete the following steps:
 
-1. Install ``psmisc`` and the MySQL client::
+1. Install ``psmisc`` and the MySQL client:
+
+   .. code-block:: console
 
 	$ yum install psmisc \
 		mysql-client
 
 2. Go to `MySQL <http://dev.mysql.com/downloads/mysql>`_ and download the MySQL Shared Compatibility Libraries.
 
-3. Install the compatibility libraries::
+3. Install the compatibility libraries:
+
+   .. code-block:: console
 
 	$ rpm -e mysql-shared-compat.rpm
 
@@ -50,19 +56,25 @@ To install Galera Cluster for MySQL, complete the following steps:
 
 1. Go to `MySQL Server <https://launchpad.net/codership-mysql/+download>`_ and download the server package.
 
-2. Install the MySQL server package::
+2. Install the MySQL server package:
+
+   .. code-block:: console
 
 	$ rpm -e mysql-server-wsrep.rpm 
 
 3. Go to `Galera Replicator <https://launchpad.net/g alera>`_ and download the Galera plugin.
 
-4. Install the Galera Replicator package::
+4. Install the Galera Replicator package:
+
+   .. code-block:: console
 
 	$ rpm -e galera.rpm
 
-5. Configure the MySQL server to use the Galera Replicator plugin in ``my.cnf``.
+5. Configure the MySQL server to use the Galera Replicator plugin in ``my.cnf``:
 
-	``wsrep_provider=/usr/lib/galera/libgalera_smm.so``
+   .. code-block:: ini
+   
+	wsrep_provider = /usr/lib/galera/libgalera_smm.so
 
 Galera Cluster is installed on your system, you can now start MySQL.
 
@@ -74,7 +86,9 @@ Upgrading System Tables
 
 If you installed Galera Cluster over an existing installation of MySQL, you must also upgrade the system tables to the new system.
 
-To upgrade the system tables, after you start the MySQL server run the following from the command-line::
+To upgrade the system tables, after you start the MySQL server run the following from the command-line:
+
+.. code-block:: console
 
 	$ mysql_upgrade
 

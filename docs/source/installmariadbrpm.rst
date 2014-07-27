@@ -14,24 +14,29 @@ MariaDB provides a repository for the latest releases of Galera Cluster and Mari
 
 To set up the MariaDB repository, complete the following steps:
 
-1. Using your preferred text editor, create a ``.repo`` file in the ``/etc/yum.repos.d/`` directory.  For example::
+1. Using your preferred text editor, create a ``.repo`` file in the ``/etc/yum.repos.d/`` directory.  For example:
+
+   .. code-block:: console
 
 	$ vim /etc/yum.repos.d/MariaDB.repos
 
-2. Copy the following information into the file::
+2. Copy the following information into the file:
+
+   .. code-block:: ini
 
 	# MariaDB Repository List
 	[mariadb]
 	name = MariaDB
 	baseurl = htt://yum.mariadb.org/version_nbr/package_nm
 	gpgkey = https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
-	gpgcheck=1
+	gpgcheck = 1
 
   - For ``version_nbr`` use the version of MariaDB that you want to use.
 
   - For  ``package_nm`` use the package name for your server.  For example, ``rhel6-amd64`` for a Red Hat Enterprise Linux 6 server on amd64 architecture.
 
 3. Save the file.
+
 
 Packages in the MariaDB repository are now available for installation on your server through ``yum``.
 
@@ -52,7 +57,9 @@ There are three packages involved in the installation of Galera Cluster for Mari
 
 .. note:: If you have an existing installation of the MariaDB server, ``yum`` will remove it to install the new patched server.  Additionally, after the installation is complete, you should update your system tables.
 
-To install Galera Cluster run the following command as root::
+To install Galera Cluster run the following command as root:
+
+.. code-block:: console
 
 	$ yum install MariaDB-client \
 		MariaDB-Galera-server \
@@ -68,9 +75,10 @@ Updating Tables
 
 If you installed *Galera Cluster* over an existing installation of MariaDB, you should update the system tables for the new database server.
 
-To update the system tables, run the following command::
+To update the system tables, run the following command:
+
+.. code-block:: console
 
 	$ mariadb_upgrade
 	
 If this command generates any errors, check with MariaDB Documentation for their meaning.  The errors it generates are typically uncritical and usually you can ignore them unless they involve specific functionality that your system requires.
-

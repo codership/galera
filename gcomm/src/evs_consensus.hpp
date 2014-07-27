@@ -47,6 +47,10 @@ public:
      */
     seqno_t highest_reachable_safe_seq() const;
 
+    // input map safe seq but without considering
+    // all suspected leaving nodes.
+    seqno_t safe_seq_wo_all_susupected_leaving_nodes() const;
+
     /*!
      * Check if highest reachable safe seq according to message
      * consistent with local state.

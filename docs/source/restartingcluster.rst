@@ -21,7 +21,9 @@ Identifying the Most Advanced Node
 
 Identifying the most advacned node state ID is managed by comparing the :term:`Global Transaction ID` values on different nodes in your cluster.  You can find this in the ``grastate.dat`` file, located in the datadir for your database.
 
-If the ``grastate.dat`` file looks like the example below, you have found the most advanced node state ID::
+If the ``grastate.dat`` file looks like the example below, you have found the most advanced node state ID:
+
+.. code-block:: text
 
 	# GALERA saved state
 	version: 2.1
@@ -29,7 +31,9 @@ If the ``grastate.dat`` file looks like the example below, you have found the mo
 	seqno:   8204503945773
 	cert_index:
 
-To find the sequence number of the last committed transaction, run ``mysqld`` with the ``--wsrep-recover`` option.  This recovers the InnoDB table space to a consistent state, prints the corresponding Global Transaction ID value into the error log, and then exits.  For example::
+To find the sequence number of the last committed transaction, run ``mysqld`` with the ``--wsrep-recover`` option.  This recovers the InnoDB table space to a consistent state, prints the corresponding Global Transaction ID value into the error log, and then exits.  For example:
+
+.. code-block:: console
 
 	130514 18:39:13 [Note] WSREP: Recovered position: 5ee99582-bb8d-11e2-b8e3-23de375c1d30:8204503945771
 
@@ -40,7 +44,9 @@ Identifying Crashed Nodes
 --------------------------------------
 .. _`Identify Crashed Node`:
 
-If the ``grastate.dat`` file looks like the example below, the node has either crashed during execution of a non-transactional operation, (such as ``ALTER TABLE``), or borted due to a database inconsistency::
+If the ``grastate.dat`` file looks like the example below, the node has either crashed during execution of a non-transactional operation, (such as ``ALTER TABLE``), or borted due to a database inconsistency:
+
+.. code-block:: text
 
 	# GALERA saved state
 	version: 2.1
