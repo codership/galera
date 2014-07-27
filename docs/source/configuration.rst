@@ -130,6 +130,8 @@ To disable AppArmor, proceed as follows::
 
 See below for an example *my.cnf* file::
 
+.. code-block:: ini
+
     [mysqld]
     # 1. Mandatory settings: these settings are REQUIRED for proper cluster operation
     binlog_format=ROW
