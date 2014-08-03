@@ -170,7 +170,7 @@ Table legend:
 | :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
 | <gcs.fc_debug>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_factor                   | *0.5*                 | 1.0                   | n/a                | Yes      |
+| :ref:`gcs.fc_factor                   | *1.0*                 | 1.0                   | n/a                | Yes      |
 | <gcs.fc_factor>`                      |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcs.fc_limit                    | *16*                  | 1.0                   | n/a                | Yes      |
@@ -659,7 +659,7 @@ Post debug statistics about SST flow every this number of writesets.
 .. index::
    pair: Parameters; gcs.fc_factor
 
-Resume replication after recv queue drops below this fraction of ``gcs.fc_limit``. This limit is scaled further if ``gcs.gc_master_slave`` is ``NO``.
+Resume replication after recv queue drops below this fraction of ``gcs.fc_limit`` (```gcs.fc_factor * gcs.fc_limit```). This limit is scaled further if ``gcs.gc_master_slave`` is ``NO``.
 
 
 
@@ -668,7 +668,7 @@ Resume replication after recv queue drops below this fraction of ``gcs.fc_limit`
 .. index::
    pair: Parameters; gcs.fc_limit
 
-Pause replication if recv queue exceeds this number of writesets. For master-slave setups this number can be increased considerably. For ``gcs.fc_master_slave`` = ``NO`` this limit is scaled up by ``sqrt( number of cluster members )``.
+Pause replication if recv queue exceeds this number of writesets. For master-slave setups this number can be increased considerably. If ``gcs.fc_master_slave`` = ``NO`` this limit is scaled up by ``sqrt( number of cluster members )``.
 
 
 .. rubric:: ``gcs.fc_master_slave``
@@ -676,7 +676,7 @@ Pause replication if recv queue exceeds this number of writesets. For master-sla
 .. index::
    pair: Parameters; gcs.fc_master_slave
 
-When this is ``NO`` then the effective ``gcs.fc_limit`` is multipled by the ``sqrt( number of cluster members )``.
+When this is ``NO`` then the effective ``gcs.fc_limit`` is scaled by the ``sqrt( number of cluster members )``.
 
 
 .. rubric:: ``gcs.max_packet_size``

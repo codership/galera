@@ -336,7 +336,7 @@ fc_debug
 fc_factor
     Resume replication after recv queue drops below that fraction of
     gcs.fc_limit. For fc_master_slave = NO this is limit is also scaled.
-    Default: 0.5.
+    Default: 1.0.
 
 fc_limit
     Pause replication if recv queue exceeds that many writesets.
