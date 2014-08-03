@@ -335,14 +335,16 @@ fc_debug
 
 fc_factor
     Resume replication after recv queue drops below that fraction of
-    gcs.fc_limit. Default: 0.5.
+    gcs.fc_limit. For fc_master_slave = NO this is limit is also scaled.
+    Default: 0.5.
 
 fc_limit
     Pause replication if recv queue exceeds that many writesets.
-    Default: 16. For master-slave setups this can be increased considerably.
+    Default: 16. For master-slave setups this number can be increased considerably.
 
 fc_master_slave
-    Should we assume that there is only one master in the group? Default: NO.
+    When this is NO then the effective gcs.fc_limit is multipled by
+    sqrt( number of cluster members ). Default: NO.
 
 sync_donor
     Should we enable flow control in DONOR state the same way as in SYNCED
