@@ -1886,12 +1886,16 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 {
     gu_fifo_stats_get (conn->recv_q,
                        &stats->recv_q_len,
+                       &stats->recv_q_len_max,
+                       &stats->recv_q_len_min,
                        &stats->recv_q_len_avg);
 
     stats->recv_q_size = conn->recv_q_size;
 
     gcs_sm_stats_get (conn->sm,
                       &stats->send_q_len,
+                      &stats->send_q_len_max,
+                      &stats->send_q_len_min,
                       &stats->send_q_len_avg,
                       &stats->fc_paused_ns,
                       &stats->fc_paused_avg);

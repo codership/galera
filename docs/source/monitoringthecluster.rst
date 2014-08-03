@@ -158,10 +158,25 @@ Should each of these status variables check out, then the node is in working ord
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
 
-By monitoring for cluster integrity and node status, you can watch for any issues that may prevent or otherwise block replication.  Status variables for monitoring replication health allow you to check for performance issues, identifying problem areas so that you can get the most from your cluster.
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_avg
 
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_min
 
 .. note:: These status variables are differential and reset on every ``SHOW STATUS`` command.  To get the current value, execute the query a second time after about a minute.
+
+Flow control settings will result in a pause being set when the wsrep_local_recv_queue exceeds a threshold. Monitoring the following variables will provide an understanding of the wsrep_local_recv_queue length over the period between status examinations::
+
+    wsrep_local_recv_queue_avg
+    wsrep_local_recv_queue_max
+    wsrep_local_recv_queue_min
+
+By monitoring for cluster integrity and node status, you can watch for any issues that may prevent or otherwise block replication.  Status variables for monitoring replication health allow you to check for performance issues, identifying problem areas so that you can get the most from your cluster.
+
 
 To check replication health, complete the following steps:
 
@@ -192,6 +207,18 @@ To check replication health, complete the following steps:
 
 .. index::
    pair: Parameters; wsrep_local_send_queue_avg
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_min
+
+If you have a slow network, check the value of the variables below::
+
+    wsrep_local_send_queue_avg
+    wsrep_local_send_queue_max
+    wsrep_local_send_queue_min
 
 In the even that after all the checks and fine-tuning above, you find that you still have one or more nodes running slow, it is possible that the nodes have encountered an issue themselves in the network.
 

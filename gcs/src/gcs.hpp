@@ -435,7 +435,12 @@ struct gcs_stats
     long long fc_received;    //! flow control stops received
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length
+    int       recv_q_len_max; //! maximum recv queue length
+    int       recv_q_len_min; //! minimum recv queue length
     int       send_q_len;     //! current send queue length
+    int       send_q_len_max; //! maximum send queue length
+    int       send_q_len_min; //! minimum send queue length
+    gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
 /*! Fills stats struct */
