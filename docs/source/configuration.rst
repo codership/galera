@@ -142,7 +142,7 @@ See below for an example *my.cnf* file::
     innodb_buffer_pool_size=28G
     innodb_log_file_size=100M
     innodb_file_per_table
-    innodb_flush_log_at_trx_commit=2
+    innodb_flush_log_at_trx_commit=0
 
     # 3. wsrep provider configuration: basic wsrep options
     wsrep_provider=/usr/lib64/galera/libgalera_smm.so
