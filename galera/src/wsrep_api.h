@@ -824,8 +824,8 @@ struct wsrep {
    *
    * Whenever a new connection ID is passed to wsrep provider through
    * any of the API calls, a connection context is allocated for this
-   * connection. This call is to explicitly notify provider fo connection
-   * closing.
+   * connection. This call is to explicitly notify provider to close the
+   * connection.
    *
    * @param wsrep       provider handle
    * @param conn_id     connection ID

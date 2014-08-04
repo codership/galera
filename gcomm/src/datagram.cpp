@@ -23,7 +23,7 @@ gcomm::NetHeader::checksum_type (int i)
         log_info << "Using CRC-32 (backward-compatible) for message checksums.";
         return CS_CRC32;
     case CS_CRC32C:
-        log_info << "Using CRC-32C (optimized) for message checksums.";
+        log_info << "Using CRC-32C for message checksums.";
         return CS_CRC32C;
     }
 

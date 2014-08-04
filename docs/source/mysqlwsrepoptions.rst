@@ -396,7 +396,7 @@ Use the same value on all nodes. This parameter is used to authenticate with bot
 
 
 
-.. rubric:: wsrep_sst_donor
+.. rubric:: ``wsrep_sst_donor``
 .. _`wsrep_sst_donor`:
 .. index::
    pair: Parameters; wsrep_sst_donor

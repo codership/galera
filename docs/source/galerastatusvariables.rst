@@ -67,11 +67,23 @@ The location (L) of the variable is presented in the second column from the left
 | :ref:`wsrep_local_send_queue          | G | *1*                        |                      |                                         |
 | <wsrep_local_send_queue>`             |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_local_send_queue_max      | G | *10*                       |                      |                                         |
+| <wsrep_local_send_queue_max>`         |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_local_send_queue_min      | G | *0*                        |                      |                                         |
+| <wsrep_local_send_queue_min>`         |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_local_send_queue_avg      | G | *0.145000*                 |                      |                                         |
 | <wsrep_local_send_queue_avg>`         |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_local_recv_queue          | G | *0*                        |                      |                                         |
 | <wsrep_local_recv_queue>`             |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_local_recv_queue_max      | G | *10*                       |                      |                                         |
+| <wsrep_local_recv_queue_max>`         |   |                            |                      |                                         |
++---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
+| :ref:`wsrep_local_recv_queue_min      | G | *0*                        |                      |                                         |
+| <wsrep_local_recv_queue_min>`         |   |                            |                      |                                         |
 +---------------------------------------+---+----------------------------+----------------------+-----------------------------------------+
 | :ref:`wsrep_local_recv_queue_avg      | G | *3.348452*                 |                      |                                         |
 | <wsrep_local_recv_queue_avg>`         |   |                            |                      |                                         |
@@ -296,6 +308,25 @@ Total number of transaction replays due to *asymmetric lock granularity*.
 
 Current (instantaneous) length of the send queue.
 
+.. rubric:: ``wsrep_local_send_queue_max``
+
+.. _`wsrep_local_send_queue_max`:
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_max
+
+The maximum length of the send queue since the last status query. 
+
+
+.. rubric:: ``wsrep_local_send_queue_min``
+
+.. _`wsrep_local_send_queue_min`:
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_min
+
+The minimum length of the send queue since the last status query. 
+
 
 .. rubric:: ``wsrep_local_send_queue_avg``
 .. _`wsrep_local_send_queue_avg`:
@@ -311,6 +342,26 @@ Send queue length averaged over interval since the last status query. Values con
    pair: Parameters; wsrep_local_recv_queue
 
 Current (instantaneous) length of the recv queue. 
+
+
+.. rubric:: ``wsrep_local_recv_queue_max``
+
+.. _`wsrep_local_recv_queue_max`:
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_max
+
+The maximum length of the recv queue since the last status query. 
+
+
+.. rubric:: ``wsrep_local_recv_queue_min``
+
+.. _`wsrep_local_recv_queue_min`:
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_min
+
+The minimum length of the recv queue since the last status query. 
 
 
 .. rubric:: ``wsrep_local_recv_queue_avg``

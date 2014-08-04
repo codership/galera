@@ -880,7 +880,7 @@ START_TEST (gcs_core_test_gh74)
 
     // STR sneaks.
     // we have to make same message exists in sender queue too.
-    const struct gu_buf act = {act_ptr, act_size};
+    const struct gu_buf act = {act_ptr, (ssize_t)act_size};
     action_t act_s(&act, NULL, NULL, act_size, GCS_ACT_STATE_REQ, -1, (gu_thread_t)-1);
     CORE_SEND_START(&act_s);
     usleep(10000);
