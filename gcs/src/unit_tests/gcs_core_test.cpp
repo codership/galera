@@ -38,9 +38,11 @@
 
 #include "gcs_core_test.hpp"
 
+#define GCS_STATE_MSG_ACCESS
 #include "../gcs_core.hpp"
 #include "../gcs_dummy.hpp"
 #include "../gcs_seqno.hpp"
+#include "../gcs_state_msg.hpp"
 
 #include <galerautils.h>
 
@@ -162,6 +164,8 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
              "type does not match: expected %d, got %d", type, act->type);
     FAIL_IF (act->size > 0 && act->out == NULL,
              "null buffer received with positive size: %zu", act->size);
+
+    if (act->type == GCS_ACT_STATE_REQ) return false;
 
     // action is ordered only if it is of type GCS_ACT_TORDERED and not an error
     if (act->seqno >= GCS_SEQNO_NIL) {
@@ -319,7 +323,8 @@ core_test_set_payload_size (ssize_t s)
 
 // Initialises core and backend objects + some common tests
 static inline void
-core_test_init ()
+core_test_init (bool bootstrap = true,
+                const char* name = "core_test")
 {
     long     ret;
     action_t act;
@@ -329,7 +334,7 @@ core_test_init ()
     gu_config_t* config = gu_config_create ();
     fail_if (config == NULL);
 
-    Core = gcs_core_create (config, NULL, "core_test",
+    Core = gcs_core_create (config, NULL, name,
                             "aaa.bbb.ccc.ddd:xxxx", 0, 0);
 
     fail_if (NULL == Core);
@@ -347,13 +352,19 @@ core_test_init ()
     fail_if (-EINVAL != ret, "Expected -EINVAL, got %ld (%s)",
              ret, strerror(-ret));
 
-    ret = gcs_core_open (Core, "yadda-yadda", "dummy://", 1);
+    ret = gcs_core_open (Core, "yadda-yadda", "dummy://", bootstrap);
     fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
              ret, strerror(-ret));
 
+    if (!bootstrap) {
+        gcs_core_send_lock_step (Core, true);
+        mark_point();
+        return;
+    }
+
     // receive first configuration message
     fail_if (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act.out, true, 0, 1));
+    fail_if (core_test_check_conf((const gcs_act_conf_t*)act.out, bootstrap, 0, 1));
     free (act.out);
 
     // this will configure backend to have desired fragment size
@@ -690,6 +701,210 @@ START_TEST (gcs_core_test_own)
 }
 END_TEST
 
+START_TEST (gcs_core_test_gh74)
+{
+    core_test_init(true, "node1");
+
+    // set frag size large enough to avoid fragmentation.
+    gu_info ("set payload size = 1024");
+    core_test_set_payload_size(1024);
+
+    // new primary comp message.
+    gcs_comp_msg_t* prim = gcs_comp_msg_new (true, false, 0, 2);
+    fail_if (NULL == prim);
+    gcs_comp_msg_add(prim, "node1", 0);
+    gcs_comp_msg_add(prim, "node2", 1);
+
+    // construct state transform request.
+    static const char* req_ptr = "12345";
+    static const size_t req_size = 6;
+    static const char* donor = ""; // from *any*
+    static const size_t donor_len = strlen(donor) + 1;
+    size_t act_size = req_size + donor_len;
+    char* act_ptr = 0;
+
+    act_ptr = (char*)gu_malloc(act_size);
+    memcpy(act_ptr, donor, donor_len);
+    memcpy(act_ptr + donor_len, req_ptr, req_size);
+
+    // serialize request into message.
+    gcs_act_frag_t frg;
+    frg.proto_ver = gcs_core_group_protocol_version(Core);
+    frg.frag_no = 0;
+    frg.act_id = 1;
+    frg.act_size = act_size;
+    frg.act_type = GCS_ACT_STATE_REQ;
+    char msg_buf[1024];
+    fail_if(gcs_act_proto_write(&frg, msg_buf, sizeof(msg_buf)));
+    memcpy(const_cast<void*>(frg.frag), act_ptr, act_size);
+    size_t msg_size = act_size + gcs_act_proto_hdr_size(frg.proto_ver);
+    // gu_free(act_ptr);
+
+    // state exchange message.
+    gu_uuid_t state_uuid;
+    gu_uuid_generate(&state_uuid, NULL, 0);
+    gcs_core_set_state_uuid(Core, &state_uuid);
+
+    // construct uuid message from node1.
+    size_t uuid_len = sizeof(state_uuid);
+    char uuid_buf[uuid_len];
+    memcpy(uuid_buf, &state_uuid, uuid_len);
+
+    gcs_state_msg_t* state_msg = NULL;
+    const gcs_group_t* group = gcs_core_get_group(Core);
+
+    // state exchange message from node1
+    state_msg = gcs_group_get_state(const_cast<gcs_group_t*>(group));
+    state_msg->state_uuid = state_uuid;
+    size_t state_len = gcs_state_msg_len (state_msg);
+    char state_buf[state_len];
+    gcs_state_msg_write (state_buf, state_msg);
+    gcs_state_msg_destroy (state_msg);
+
+    // state exchange message from node2
+    state_msg = gcs_state_msg_create(&state_uuid,
+                                     &GU_UUID_NIL,
+                                     &GU_UUID_NIL,
+                                     GCS_SEQNO_ILL,
+                                     GCS_SEQNO_ILL,
+                                     GCS_SEQNO_ILL,
+                                     0,
+                                     GCS_NODE_STATE_NON_PRIM,
+                                     GCS_NODE_STATE_PRIM,
+                                     "node2", "127.0.0.1",
+                                     group->gcs_proto_ver,
+                                     group->repl_proto_ver,
+                                     group->appl_proto_ver,
+                                     0);
+    size_t state_len2 = gcs_state_msg_len (state_msg);
+    char state_buf2[state_len2];
+    gcs_state_msg_write (state_buf2, state_msg);
+    gcs_state_msg_destroy (state_msg);
+
+    action_t act_r(NULL,  NULL, NULL, -1, (gcs_act_type_t)-1, -1, (gu_thread_t)-1);
+
+    // ========== from node1's view ==========
+    fail_if (gcs_dummy_set_component(Backend, prim));
+    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    gu_free(prim);
+    CORE_RECV_START(&act_r); // we have to start another thread here.
+    // otherwise messages to node1 can not be in right order.
+    usleep(10000); // make sure node1 already changed its status to WAIT_STATE_MSG
+    // then STR sneaks before new configuration is delivered.
+    fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
+             (int)msg_size);
+    // then state exchange message from node2.
+    fail_if (gcs_dummy_inject_msg(Backend, state_buf2, state_len2, GCS_MSG_STATE_MSG, 1) !=
+             (int)state_len2);
+    // expect STR is lost here.
+    fail_if (CORE_RECV_END(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, true, 0, 2));
+    free(act_r.out);
+    core_test_cleanup();
+
+    // ========== from node2's view ==========
+    core_test_init(false, "node2");
+
+    // set frag size large enough to avoid fragmentation.
+    gu_info ("set payload size = 1024");
+    core_test_set_payload_size(1024);
+
+    prim = gcs_comp_msg_new (true, false, 1, 2);
+    fail_if (NULL == prim);
+    gcs_comp_msg_add(prim, "node1", 0);
+    gcs_comp_msg_add(prim, "node2", 1);
+
+    // node1 and node2 joins.
+    // now node2's status == GCS_NODE_STATE_PRIM
+    fail_if (gcs_dummy_set_component(Backend, prim));
+    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    gu_free(prim);
+    fail_if (gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len, GCS_MSG_STATE_UUID, 0) !=
+             (int)uuid_len);
+    fail_if (gcs_dummy_inject_msg(Backend, state_buf, state_len, GCS_MSG_STATE_MSG, 0) !=
+             (int)state_len);
+    fail_if (CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, true, 1, 2));
+    free(act_r.out);
+
+    // then node3 joins.
+    prim = gcs_comp_msg_new (true, false, 1, 3);
+    fail_if (NULL == prim);
+    gcs_comp_msg_add(prim, "node1", 0);
+    gcs_comp_msg_add(prim, "node2", 1);
+    gcs_comp_msg_add(prim, "node3", 2);
+    fail_if (gcs_dummy_set_component(Backend, prim));
+    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    gu_free(prim);
+
+    // generate a new state uuid.
+    gu_uuid_generate(&state_uuid, NULL, 0);
+    memcpy(uuid_buf, &state_uuid, uuid_len);
+
+    // state exchange message from node3
+    group = gcs_core_get_group(Core);
+    state_msg = gcs_state_msg_create(&state_uuid,
+                                     &GU_UUID_NIL,
+                                     &GU_UUID_NIL,
+                                     GCS_SEQNO_ILL,
+                                     GCS_SEQNO_ILL,
+                                     GCS_SEQNO_ILL,
+                                     0,
+                                     GCS_NODE_STATE_NON_PRIM,
+                                     GCS_NODE_STATE_PRIM,
+                                     "node3", "127.0.0.1",
+                                     group->gcs_proto_ver,
+                                     group->repl_proto_ver,
+                                     group->appl_proto_ver,
+                                     0);
+    size_t state_len3 = gcs_state_msg_len (state_msg);
+    char state_buf3[state_len3];
+    gcs_state_msg_write (state_buf3, state_msg);
+    gcs_state_msg_destroy (state_msg);
+
+    // updating state message from node1.
+    group = gcs_core_get_group(Core);
+    state_msg = gcs_group_get_state(const_cast<gcs_group_t*>(group));
+    state_msg->flags = GCS_STATE_FREP | GCS_STATE_FCLA;
+    state_msg->prim_state = GCS_NODE_STATE_JOINED;
+    state_msg->current_state = GCS_NODE_STATE_SYNCED;
+    state_msg->state_uuid = state_uuid;
+    state_msg->name = "node1";
+    gcs_state_msg_write(state_buf, state_msg);
+    gcs_state_msg_destroy(state_msg);
+
+    fail_if (gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len, GCS_MSG_STATE_UUID, 0) !=
+             (int)uuid_len);
+    fail_if (gcs_dummy_inject_msg(Backend, state_buf, state_len, GCS_MSG_STATE_MSG, 0) !=
+             (int)state_len);
+
+    // STR sneaks.
+    // we have to make same message exists in sender queue too.
+    const struct gu_buf act = {act_ptr, (ssize_t)act_size};
+    action_t act_s(&act, NULL, NULL, act_size, GCS_ACT_STATE_REQ, -1, (gu_thread_t)-1);
+    CORE_SEND_START(&act_s);
+    usleep(10000);
+    fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
+             (int)msg_size);
+
+    fail_if (gcs_dummy_inject_msg(Backend, state_buf3, state_len3, GCS_MSG_STATE_MSG, 2) !=
+             (int)state_len3);
+
+    // expect STR and id == -EAGAIN.
+    fail_if (CORE_RECV_ACT(&act_r, act_ptr, act_size, GCS_ACT_STATE_REQ));
+    fail_if (act_r.seqno != -EAGAIN);
+    free(act_r.out);
+
+    fail_if (CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, true, 1, 3));
+    free(act_r.out);
+
+    // core_test_cleanup();
+    // ==========
+    gu_free(act_ptr);
+}
+END_TEST
+
 #if 0 // requires multinode support from gcs_dummy
 START_TEST (gcs_core_test_foreign)
 {
@@ -706,9 +921,14 @@ Suite *gcs_core_suite(void)
   TCase *tcase = tcase_create("gcs_core");
 
   suite_add_tcase (suite, tcase);
-  tcase_add_test  (tcase, gcs_core_test_api);
-  tcase_add_test  (tcase, gcs_core_test_own);
-//  tcase_add_test  (tcase, gcs_core_test_foreign);
   tcase_set_timeout(tcase, 60);
+
+  bool skip = false;
+  if (skip == false) {
+      tcase_add_test  (tcase, gcs_core_test_api);
+      tcase_add_test  (tcase, gcs_core_test_own);
+      //  tcase_add_test  (tcase, gcs_core_test_foreign);
+      tcase_add_test (tcase, gcs_core_test_gh74);
+  }
   return suite;
 }

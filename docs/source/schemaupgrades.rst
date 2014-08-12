@@ -3,56 +3,80 @@
 ==========================
 .. _`Schema Upgrades`:
 
-A schema upgrade refers to any :abbr:`DDL (Data Definition Language)` statement run for the database. :abbr:`DDL (Data Definition Language)` statements change the database structure and are non-transactional.
+Any :abbr:`DDL (Data Definition Language)` statement that runs for the database, such as ``CREATE TABLE`` or ``GRANT``, upgrades the schema.  These :abbr:`DDL (Data Definition Language)` statements change the database itself and are non-transactional.
 
-:abbr:`DDL (Data Definition Language)` statements are processed in two different methods in Galera Cluster.  These methods are described in the chapters below.
+Galera Cluster processes schema upgrades in two different methods:
 
-.. note:: See also the ``pt-online-schema-change`` command in `Percona Toolkit for MySQL <http://www.percona.com/software/percona-toolkit>`_.
+- :ref:`Total Order Isolation (TOI) <toi>` Where the schema upgrades run on all cluster nodes in the same total order sequence, locking affected tables for the duration of the operation.
+
+- :ref:`Rolling Schema Upgrade (RSU) <rsu>` Where the schema upgrades run locally, blocking only the node on which they are run.  The changes do *not* replicate to the rest of the cluster.
+
+You can set the method for online schema upgrades by using the ``wsrep_OSU_method`` parameter in the configuration file, (**my.ini** or **my.cnf**, depending on your build) or through the MySQL client.  Galera Cluster defaults to the Total Order Isolation method.
+
+.. seealso:: If you are using Galera Cluster for Percona XtraDB Cluster, see the the `pt-online-schema-change <http://www.percona.com/doc/percona-toolkit/2.2/pt-online-schema-change.html>`_ in the Percona Toolkit.
+
+
+
 
 ---------------------------------
  Total Order Isolation
 ---------------------------------
-.. _`Total Order Isolation`:
+.. _`toi`:
 .. index::
    pair: Descriptions; Total Order Isolation
 
-By default, :abbr:`DDL (Data Definition Language)` statements are processed by using the Total Order Isolation (TOI) method. In TOI, the query is replicated to the nodes in a statement form before executing on master. The query waits for all preceding transactions to commit and then gets executed in isolation on all nodes simultaneously.  When using the TOI method, the cluster has a part of the database locked for the duration of the :abbr:`DDL (Data Definition Language)` processing (in other words, the cluster behaves like a single server).
+When you want your online schema upgrades to replicate through the cluster and don't mind the loss of high availability while the cluster processes the :abbr:`DDL (Data Definition Language)` statements, use the Total Order Isolation method.
 
-The isolation can take place at the following levels:
+.. code-block:: mysql
 
-1. At the server level, where no other transactions can be applied concurrently (for ``CREATE SCHEMA``, ``GRANT`` and similar queries).
+   SET GLOBAL wsrep_OSU_method='TOI';
 
-2. At the schema level, where no transaction accessing the schema can be applied concurrently (for ``CREATE TABLE`` and similar queries).
+In Total Order Isolation, queries that update the schema replicate as statements to all nodes in the cluster before they execute on the master.  The nodes wait for all preceding transactions to commit then, simultaneously, they execute the schema upgrade in isolation.  For the duration of the :abbr:`DDL (Data Definition Language)` processing, part of the database remains locked, causing the cluster to function as single server.
 
-3. At the table level, where no transaction accessing the table can be applied concurrently (for ``ALTER TABLE`` and similar queries).
+The cluster can maintain isolation at the following levels:
 
-TOI queries have several particularities  that must been taken into consideration:
+- **Server Level** For ``CREATE SCHEMA``, ``GRANT`` and similar queries, where the cluster cannot apply concurrently any other transactions.
 
-- From the perspective of certification:
+- **Schema Level** For ``CREATE TABLE`` and similar queries, where the cluster cannot apply concurrently any transactions that access the schema.
 
-  - TOI transactions never conflict with preceding transactions, since they are only executed after all preceding transactions were committed. Hence, their certification interval is of zero length. This means that TOI transactions will never fail certification and are guaranteed to be executed.
-  
-  - Certification takes place on a resource level. For example, for server-level isolation this means any transaction that has a TOI query in its certification interval will fail certification.
+- **Table Level** For ``ALTER TABLE`` and similar queries, where the cluster cannot apply concurrently any other transactions that access the table.
 
-- The system replicates the TOI query before execution and there is no way to know whether it succeeds or fails. Thus, error checking on TOI queries is switched off.
+The main advantage of Total Order Isolation is its simplicity and predictability, which guarantees data consistency.
 
-- The method is simple, predictable and guarantees data consistency.
+In addition, when using Total Order Isolation you should take the following particularities into consideration:
 
-- The disadvantage is that the cluster behaves like a single server, potentially preventing high-availability for the duration of :abbr:`DDL (Data Definition Language)` execution.
+- From the perspective of certification, schema upgrades in Total Order Isolation never conflict with preceding transactions, given that they only execute after the cluster commits all preceding transactions.  What this means is that the certification interval for schema upgrades in this method is of zero length.  The schema upgrades never fail certification and their execution is a guarantee.
+
+- The certification process takes place at a resource level.  Under server-level isolation transactions that come in during the certification interval that include schema upgrades in Total Order Isolation, will fail certification.
+
+- The cluster replicates the schema upgrade query as a statement before its execution.  There is no way to know whether or not the nodes succeed in processing the query.  This prevents error checking on schema upgrades in Total Order Isolation.
+
+The main disadvantage of Total Order Isolation is that while the nodes process the :abbr:`DDL (Data Definition Language)` statements, the cluster functions as a single server, which can potentially prevent high-availability for the duration of the process.
+
 
 ---------------------------------
  Rolling Schema Upgrade
 ---------------------------------
-.. _`Rolling Schema Upgrade`:
+.. _`rsu`:
 .. index::
    pair: Descriptions; Rolling Schema Upgrade
 .. index::
    pair: Parameters; wsrep_OSU_method
 
-As of wsrep API patch 5.5.17-22.3, you can choose whether to use the traditional total order isolation method or the rolling schema upgrade method. You can choose the rolling schema upgrade method by using the global parameter ``wsrep_OSU_method``.
+When you want to maintain high-availability during schema upgrades and can avoid conflicts between new and old schema definitions, use the Rolling Schema Upgrade method.
 
-The rolling schema upgrade is a :abbr:`DDL (Data Definition Language)` processing method, where the :abbr:`DDL (Data Definition Language)` will only be processed locally at the node. The node is desynchronized from the cluster for the duration of the :abbr:`DDL (Data Definition Language)` processing in a way that it does not block the rest of the nodes. When the :abbr:`DDL (Data Definition Language)` processing is complete, the node applies the delayed replication events and synchronizes back with the cluster.
+.. code-block:: mysql
 
-To upgrade a schema cluster-wide, the :abbr:`DDL (Data Definition Language)` must be manually executed at each node in turn. When the rolling schema upgrade proceeds, a part of the cluster will have the old schema structure and a part of the cluster will have the new schema structure.
+   SET GLOBAL wsrep_OSU_method='RSU';
 
-.. warning:: While the rolling schema upgrade has the advantage of blocking only one node at a time, it is potentially unsafe, and may fail if the new and old schema definitions are incompatible at the replication event level. Execute operations such as ``CREATE TABLE`` and ``DROP TABLE`` in TOI.
+In Rolling Schema Upgrade, queries that update the schema are only processed on the local node.  While the node processes the schema upgrade, it desynchronizes with the cluster.  When it finishes processing the schema upgrade it applies delayed replication events and synchronizes itself with the cluster.
+
+To upgrade the schema cluster-wide, you must manually execute the query on each node in turn.  Bear in mind that during a rolling schema upgrade the cluster continues to operate, with some nodes using the old schema structure while others use the new schema structure. 
+
+The main advantage of the Rolling Schema Upgrade is that it only blocks one node at a time.
+
+The main disadvantage of the Rolling Schema Upgrade is that it is potentially unsafe, and may fail if the new and old schema definitions are incompatible at the replication event level.
+
+.. warning:: To avoid conflicts between new and old schema definitions, execute operations such as ``CREATE TABLE`` and ``DROP TABLE`` using the :ref:`Total Order Isolation <toi>` method.
+
+

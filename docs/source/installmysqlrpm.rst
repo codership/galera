@@ -1,7 +1,7 @@
 =============================================
 RPM Installation
 =============================================
-.. _`MySQL RPM Installation`
+.. _`mysql-rpm-install`:
 
 If you run Red Hat or an RPM-based distribution, such as CentOS or Fedora, you can install Galera Cluster for MySQL on your server through package downloads.
 
@@ -10,11 +10,17 @@ If you run Red Hat or an RPM-based distribution, such as CentOS or Fedora, you c
 ---------------------------------------------
 Preparing Your Server
 ---------------------------------------------
-.. _`Preparing Your Server`:
+.. _`prep-server`:
 
 Before you begin installing Galera Cluster, you must first remove any existing installation of MySQL server and install the packages dependencies.
 
-To remove an existing server, run the following command as root::
+- ``psmisc`` The PSmisc utilities.
+- ``mysql`` The MySQL client package.
+- ``MySQL-shared-compat`` The MySQL shared compatibility libraries.
+
+To remove an existing server, run the following command as root:
+
+.. code-block:: console
 
 	$ rpm --nodeps --allmatches -e \
 		mysql-server \
@@ -23,46 +29,56 @@ To remove an existing server, run the following command as root::
 
 To install the package dependencies, complete the following steps:
 
-1. Install ``psmisc`` and the MySQL client::
+1. Install ``psmisc`` and the MySQL client:
+
+   .. code-block:: console
 
 	$ yum install psmisc \
-		mysql-client
+		mysql
 
 2. Go to `MySQL <http://dev.mysql.com/downloads/mysql>`_ and download the MySQL Shared Compatibility Libraries.
 
-3. Install the compatibility libraries::
+3. Install the compatibility libraries:
 
-	$ rpm -e mysql-shared-compat.rpm
+   .. code-block:: console
+
+	$ rpm -i MySQL-shared-compat-*.rpm
 
 
 ---------------------------------------------
 Installing Galera Cluster for MySQL
 ---------------------------------------------
-.. _`Install Galera MySQL`:
+.. _`install-galera`:
 
 There are two packages involved in the installation of Galera Cluster for MySQL:
 
-- ``mysql-server-wsrep``: A new installation of the MySQL server, which includes a patch for write-set replication.
+- ``mysql-server-wsrep`` A new installation of the MySQL server, which includes a patch for write-set replication.
 
-- ``galera``: The Galera Replicator plugin.
+- ``galera`` The Galera Replicator plugin.
 
 To install Galera Cluster for MySQL, complete the following steps:
 
 1. Go to `MySQL Server <https://launchpad.net/codership-mysql/+download>`_ and download the server package.
 
-2. Install the MySQL server package::
+2. Install the MySQL server package:
 
-	$ rpm -e mysql-server-wsrep.rpm 
+   .. code-block:: console
+
+	$ rpm -i mysql-server-wsrep-*.rpm 
 
 3. Go to `Galera Replicator <https://launchpad.net/g alera>`_ and download the Galera plugin.
 
-4. Install the Galera Replicator package::
+4. Install the Galera Replicator package:
 
-	$ rpm -e galera.rpm
+   .. code-block:: console
 
-5. Configure the MySQL server to use the Galera Replicator plugin in ``my.cnf``.
+	$ rpm -i galera-*.rpm
 
-	``wsrep_provider=/usr/lib/galera/libgalera_smm.so``
+5. Using a text editor, add to your configuration file, (``my.cnf`` or ``my.ini``, depending on your build), the path to the Galera Replicator plugin.
+
+   .. code-block:: ini
+   
+	wsrep_provider = /usr/lib/galera/libgalera_smm.so
 
 Galera Cluster is installed on your system, you can now start MySQL.
 
@@ -70,11 +86,13 @@ Galera Cluster is installed on your system, you can now start MySQL.
 ^^^^^^^^^^^^^^^^^^^^^^^
 Upgrading System Tables
 ^^^^^^^^^^^^^^^^^^^^^^^
-.. _`Upgrade System Tables`:
+.. _`upgrade-sys-tables`:
 
 If you installed Galera Cluster over an existing installation of MySQL, you must also upgrade the system tables to the new system.
 
-To upgrade the system tables, after you start the MySQL server run the following from the command-line::
+To upgrade the system tables, after you start the MySQL server run the following from the command-line:
+
+.. code-block:: console
 
 	$ mysql_upgrade
 

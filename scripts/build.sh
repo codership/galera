@@ -56,7 +56,7 @@ DEBUG=${DEBUG:-"no"}
 DEBUG_LEVEL=${DEBUG_LEVEL:-"0"}
 SCONS=${SCONS:-"yes"}
 SCONS_OPTS=${SCONS_OPTS:-""}
-JOBS=${JOBS:-"$(get_cores)"}
+export JOBS=${JOBS:-"$(get_cores)"}
 SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
 NO_STRIP=${NO_STRIP:-"no"}
@@ -289,10 +289,7 @@ build_packages()
 
     set +e
     if [ $DEBIAN -ne 0 ]; then # build DEB
-        export OPENSSL_SHLIB_VERSION_NUMBER=$(grep 'define SHLIB_VERSION_NUMBER' /usr/include/openssl/opensslv.h | cut -d '"' -f 2)
-        $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH $STRIP_OPT galera # && \
-        $SUDO /bin/chown -R $WHOAMI.users $ARCH
+        ./deb.sh $GALERA_VER
     elif [ "$OS" == "FreeBSD" ]; then
         if test "$NO_STRIP" != "yes"; then
             strip $build_base/{garb/garbd,libgalera_smm.so}

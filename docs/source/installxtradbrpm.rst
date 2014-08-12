@@ -15,7 +15,9 @@ Percona provides a repository for the latest releases of Galera Cluster and Perc
 
 To set up the Percona repository, complete the following steps:
 
-1. Using your preferred text editor, create a GPG file for the Percona repository.  For example::
+1. Using your preferred text editor, create a GPG file for the Percona repository.  For example:
+
+   .. code-block:: console
 
 	$ vim /etc/pki/rpm-gpg/RPB-GPG-KEY-percona
 
@@ -23,11 +25,15 @@ To set up the Percona repository, complete the following steps:
 
 3. Save and exit.
 
-4. Using your preferred text editor, create a ``.repo`` file in the ``/etc/yum.repos.d/`` directory.  For example::
+4. Using your preferred text editor, create a ``.repo`` file in the ``/etc/yum.repos.d/`` directory.  For example:
+
+   .. code-block:: console
 
 	$ vim /etc/yum.repos.d/Percona.repos
 
-5. Copy the following information into the file::
+5. Copy the following information into the file:
+
+   .. code-block:: ini
 
 	# Percona Repository List
 	[percona]
@@ -53,7 +59,9 @@ The Galera Cluster and Percona XtraDB server configured for write-set replicatio
 
 .. note:: If you have an existing installation of the Percona XtraDB server, ``yum`` will remove it to install the new patched server.  Additionally, after the installation is complete, you should update your system tables.
 
-To install Galera Cluster run the following command as root::
+To install Galera Cluster run the following command as root:
+
+.. code-block:: console
 
 	$ yum install Percona-XtraDB-Cluster
 
@@ -66,7 +74,9 @@ Updating Tables
 
 If you installed *Galera Cluster* over an existing installation of Percona XtraDB, you should update the system tables for the new database server.
 
-To update the system tables, run the following command::
+To update the system tables, run the following command:
+
+.. code-block:: console
 
 	$ mysql_upgrade
 	

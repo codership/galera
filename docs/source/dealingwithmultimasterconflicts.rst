@@ -24,7 +24,9 @@ Galera Cluster can cope with a situation such as this by using Certification Bas
 .. index::
    pair: Logs; Debug log
 
-You can log cluster wide conflicts by using the ``wsrep_debug=1`` variable value, which will log these conflicts and plenty of other information. You may see any of the following messages::
+You can log cluster wide conflicts by using the ``wsrep_debug=1`` variable value, which will log these conflicts and plenty of other information. You may see any of the following messages:
+
+.. code-block:: text
 
      110906 17:45:01 [Note] WSREP: BF kill (1, seqno: 16962377), victim:  (140588996478720 4) trx: 35525064
      110906 17:45:01 [Note] WSREP: Aborting query: commit

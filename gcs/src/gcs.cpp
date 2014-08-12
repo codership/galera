@@ -1608,6 +1608,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
 }
 
 long gcs_request_state_transfer (gcs_conn_t  *conn,
+                                 int          version,
                                  const void  *req,
                                  size_t       size,
                                  const char  *donor,
@@ -1617,7 +1618,8 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 {
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
-    size_t rst_size  = size + donor_len + sizeof(*ist_uuid) + sizeof(ist_seqno);
+    size_t rst_size  = size + donor_len + sizeof(*ist_uuid) + sizeof(ist_seqno) + 2;
+    // for simplicity, allocate maximum space what we need here.
     char*  rst       = (char*)gu_malloc (rst_size);
 
     *local = GCS_SEQNO_ILL;
@@ -1627,28 +1629,33 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
                  GU_UUID_ARGS(ist_uuid), (long long)ist_seqno);
 
         int offset = 0;
-        // since quorum occurs before str, group protocol version here
-        // is the commmon highest supported protocol version.
-        int gcs_proto_ver = gcs_core_group_protocol_version(conn->core);
 
-        // version 0
+        // version 0,1
         /* RST format: |donor name|\0|app request|
          * anything more complex will require a special (de)serializer.
          * NOTE: this is sender part. Check gcs_group_handle_state_request()
          *       for the receiver part. */
 
-        if (gcs_proto_ver == 0) {
+        if (version < 2) {
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
             memcpy (rst + offset, req, size);
+            rst_size = size + donor_len;
         }
 
-        // version 1(expose joiner's seqno and smart donor selection)
-        // RST format: |donor_name|\0|ist_uuid|ist_seqno|app_request|
+        // version 2(expose joiner's seqno and smart donor selection)
+        // RST format: |donor_name|\0|'V'|version|ist_uuid|ist_seqno|app_request|
 
+        // we expect 'version' could be hold by 'char'
+        // since app_request v0 starts with sst method name
+        // and app_request v1 starts with 'STRv1'
+        // and ist_uuid starts with hex character in lower case.
+        // it's safe to use 'V' as separator.
         else {
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
+            rst[offset++] = 'V';
+            rst[offset++] = (char)version;
             memcpy (rst + offset, ist_uuid, sizeof(*ist_uuid));
             offset += sizeof(*ist_uuid);
             *(gcs_seqno_t*) (rst + offset) = gcs_seqno_htog(ist_seqno);
@@ -1695,7 +1702,9 @@ long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* local)
 {
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
-    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ,
+    // for desync operation we use the lowest str_version.
+    long ret = gcs_request_state_transfer (conn, 0,
+                                           "", 1, GCS_DESYNC_REQ,
                                            &ist_uuid, ist_seqno,
                                            local);
 
@@ -1877,12 +1886,16 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 {
     gu_fifo_stats_get (conn->recv_q,
                        &stats->recv_q_len,
+                       &stats->recv_q_len_max,
+                       &stats->recv_q_len_min,
                        &stats->recv_q_len_avg);
 
     stats->recv_q_size = conn->recv_q_size;
 
     gcs_sm_stats_get (conn->sm,
                       &stats->send_q_len,
+                      &stats->send_q_len_max,
+                      &stats->send_q_len_min,
                       &stats->send_q_len_avg,
                       &stats->fc_paused_ns,
                       &stats->fc_paused_avg);

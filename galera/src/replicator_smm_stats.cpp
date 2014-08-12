@@ -87,8 +87,12 @@ typedef enum status_vars
     STATS_LOCAL_CERT_FAILURES,
     STATS_LOCAL_REPLAYS,
     STATS_LOCAL_SEND_QUEUE,
+    STATS_LOCAL_SEND_QUEUE_MAX,
+    STATS_LOCAL_SEND_QUEUE_MIN,
     STATS_LOCAL_SEND_QUEUE_AVG,
     STATS_LOCAL_RECV_QUEUE,
+    STATS_LOCAL_RECV_QUEUE_MAX,
+    STATS_LOCAL_RECV_QUEUE_MIN,
     STATS_LOCAL_RECV_QUEUE_AVG,
     STATS_LOCAL_CACHED_DOWNTO,
     STATS_FC_PAUSED_NS,
@@ -128,8 +132,12 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_cert_failures",      WSREP_VAR_INT64,  { 0 }  },
     { "local_replays",            WSREP_VAR_INT64,  { 0 }  },
     { "local_send_queue",         WSREP_VAR_INT64,  { 0 }  },
+    { "local_send_queue_max",     WSREP_VAR_INT64,  { 0 }  },
+    { "local_send_queue_min",     WSREP_VAR_INT64,  { 0 }  },
     { "local_send_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
     { "local_recv_queue",         WSREP_VAR_INT64,  { 0 }  },
+    { "local_recv_queue_max",     WSREP_VAR_INT64,  { 0 }  },
+    { "local_recv_queue_min",     WSREP_VAR_INT64,  { 0 }  },
     { "local_recv_queue_avg",     WSREP_VAR_DOUBLE, { 0 }  },
     { "local_cached_downto",      WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_paused_ns",   WSREP_VAR_INT64,  { 0 }  },
@@ -192,8 +200,12 @@ galera::ReplicatorSMM::stats_get() const
     gcs_.get_stats (&stats);
 
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
+    sv[STATS_LOCAL_SEND_QUEUE_MAX].value._int64  = stats.send_q_len_max;
+    sv[STATS_LOCAL_SEND_QUEUE_MIN].value._int64  = stats.send_q_len_min;
     sv[STATS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
     sv[STATS_LOCAL_RECV_QUEUE    ].value._int64  = stats.recv_q_len;
+    sv[STATS_LOCAL_RECV_QUEUE_MAX].value._int64  = stats.recv_q_len_max;
+    sv[STATS_LOCAL_RECV_QUEUE_MIN].value._int64  = stats.recv_q_len_min;
     sv[STATS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
     sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  = gcache_.seqno_min();
     sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;

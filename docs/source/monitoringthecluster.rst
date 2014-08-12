@@ -6,10 +6,11 @@
 .. index::
    pair: Parameters; wsrep_notify_cmd
    
-In Galera Cluster, you can monitor the status of write-set replication throughout the cluster by using standard wsrep queries in the **mysql** client.  As all status variables that relate to write-set replication are prefixed by ``wsrep``, you can query to display them all::
+In Galera Cluster, you can monitor the status of write-set replication throughout the cluster by using standard wsrep queries in the **mysql** client.  As all status variables that relate to write-set replication are prefixed by ``wsrep``, you can query to display them all:
 
-	SHOW VARIABLES LIKE
-	   'wsrep_%';
+.. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_%';
 
 To monitor for changes in cluster membership and node status, you can use the :ref:`notification-cmd`, which communicates such events to the monitoring agent.
 
@@ -35,33 +36,37 @@ When all the nodes in your cluster receive and replicate write-sets from the oth
 
 To check cluster integrity, for each node complete the following steps:
 
-1. Check that the node is part of the cluster::
+1. Check that the node is part of the cluster:
 
-	SHOW VARIABLES LIKE 
-	  'wsrep_cluster_state_uuid';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_cluster_state_uuid';
 
    Each node in the cluster should provide the same value.  If you find a node that carries a different cluster state UUID, that node is not connected to the cluster.
 
-2. Check that the node belongs to the same component::
+2. Check that the node belongs to the same component:
 
-	SHOW VARIABLES LIKE 
-	  'wsrep_cluster_conf_id';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_cluster_conf_id';
 
    Each node in the cluster should provide the same value.  If you find a node that carries a different value, this indicates the cluster is partitioned.  Once network connectivity is restored, the value will align itself with the others.
 
-3. On the first node, check the number of nodes in the cluster::
+3. On the first node, check the number of nodes in the cluster:
 
-	SHOW VARIABLES LIKE
-	  'wsrep_cluster_size';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_cluster_size';
 	  
    If the value equals the expected number of nodes in the cluster, all nodes are connected to the cluster.
    
    .. note:: You only need to check the cluster size on one node.
 
-4. Check the primary status of the cluster component::
+4. Check the primary status of the cluster component:
 
-	SHOW VARIABLES LIKE
-	  'wsrep_cluster_status';
+   .. code-block::
+
+	SHOW VARIABLES LIKE 'wsrep_cluster_status';
 
    The node should return a value of ``Primary``.  Other values indicate that the node is part of a nonoperational component.  This can occur in cases of multiple membership changes and a loss of quorum or in the case of a split-brain condition.
 
@@ -110,26 +115,29 @@ In addition to monitoring cluster integrity, you can also monitor that status of
 
 To check node status, complete the following steps:
 
-1. Check the node status::
+1. Check the node status:
 
-	SHOW VARIABLES LIKE
-	  'wsrep_ready';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_ready';
 
    If the value is ``TRUE``, the node can accept SQL load.
 
-2. If the ``wsrep_ready`` value is ``FALSE``, check that the node is connected::
+2. If the ``wsrep_ready`` value is ``FALSE``, check that the node is connected:
 
-	SHOW VARIABLES LIKE
-	  'wsrep_connected';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_connected';
 
    If the value is ``OFF``, the node has not connected to any of the cluster components.  This may relate to misconfiguration.  For instance, if the node uses invalid values for ``wsrep_cluster_address`` or ``wsrep_cluster_name``.
    
    Check the error log for proper diagnostics.
 
-3. If the node is connected, but still cannot accept SQL load, check that the node is part of the Primary Component::
+3. If the node is connected, but still cannot accept SQL load, check that the node is part of the Primary Component:
 
-	SHOW VARIABLES LIKE
-	  'wsrep_local_state_comment';
+   .. code-block:: mysql
+
+	SHOW VARIABLES LIKE 'wsrep_local_state_comment';
    
    If the the state comment is ``Joining``, ``Waiting for SST``, or ``Joined``, the node is syncing with the cluster.  
    
@@ -150,26 +158,43 @@ Should each of these status variables check out, then the node is in working ord
 .. index::
    pair: Parameters; wsrep_cert_deps_distance
 
-By monitoring for cluster integrity and node status, you can watch for any issues that may prevent or otherwise block replication.  Status variables for monitoring replication health allow you to check for performance issues, identifying problem areas so that you can get the most from your cluster.
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_avg
 
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_recv_queue_min
 
 .. note:: These status variables are differential and reset on every ``SHOW STATUS`` command.  To get the current value, execute the query a second time after about a minute.
 
+Flow control settings will result in a pause being set when the wsrep_local_recv_queue exceeds a threshold. Monitoring the following variables will provide an understanding of the wsrep_local_recv_queue length over the period between status examinations::
+
+    wsrep_local_recv_queue_avg
+    wsrep_local_recv_queue_max
+    wsrep_local_recv_queue_min
+
+By monitoring for cluster integrity and node status, you can watch for any issues that may prevent or otherwise block replication.  Status variables for monitoring replication health allow you to check for performance issues, identifying problem areas so that you can get the most from your cluster.
+
+
 To check replication health, complete the following steps:
 
-1. Determine the slave lag::
+1. Determine the slave lag:
 
-	SHOW STATUS LIKE
-	   'wsrep_flow_control_paused';
+   .. code-block:: mysql
+
+	SHOW STATUS LIKE 'wsrep_flow_control_paused';
 
    If the variable range is between ``0.0`` and ``1.0`` it indicates the fraction of time the replication was paused since the last ``SHOW STATUS`` command.  A value of ``1.0`` indicates a complete stop.  You want a value as close to ``0.0`` as possible.
     
    The main ways to improve this value are to increase the ``wsrep_slave_threads`` parameter and to exclude the slow nodes from the cluster.
 
-2. Determine the average distance between the lowest and highest seqno values::
+2. Determine the average distance between the lowest and highest seqno values:
 
-	SHOW STATUS LIKE
-	   'wsrep_cert_deps_distance';
+   .. code-block:: mysql
+
+	SHOW STATUS LIKE 'wsrep_cert_deps_distance';
 
    This provides an average of how many transactions you can apply in parallel.  This provides you with the optimal value for the ``wsrep_slave_threads`` parameter, as there is no reason to assign more slave threads than transactions you can apply in parallel.
 
@@ -183,15 +208,28 @@ To check replication health, complete the following steps:
 .. index::
    pair: Parameters; wsrep_local_send_queue_avg
 
+.. index::
+   pair: Parameters; wsrep_local_send_queue_max
+
+.. index::
+   pair: Parameters; wsrep_local_send_queue_min
+
+If you have a slow network, check the value of the variables below::
+
+    wsrep_local_send_queue_avg
+    wsrep_local_send_queue_max
+    wsrep_local_send_queue_min
+
 In the even that after all the checks and fine-tuning above, you find that you still have one or more nodes running slow, it is possible that the nodes have encountered an issue themselves in the network.
 
 .. note:: This status variables is differential and reset on every ``SHOW STATUS`` command.  To get the current value, execute the query a second time after about a minute.
 
 
-To determine if you have a slow network, run the following query::
+To determine if you have a slow network, run the following query:
 
-	SHOW STATUS LIKE
-	   'wsrep_local_send_queue_avg';
+.. code-block:: mysql
+
+	SHOW STATUS LIKE 'wsrep_local_send_queue_avg';
 
 A high value can indicate a bottleneck on the network link.  If this is the case, the cause can be at any layer, from the physical components to the operating system configuration.
 

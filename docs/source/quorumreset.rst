@@ -26,14 +26,18 @@ If you find yourself in this situation and you know that no other nodes in the c
 
 To rebootstrap the Primary Component, complete the following steps:
 
-1. Choose the most up to date node.  Run the following query on the database::
+1. Choose the most up to date node.  Run the following query on the database:
 
-	SHOW STATUS LIKE 'wsrep_last_committed'
+   .. code-block:: mysql
+
+	SHOW STATUS LIKE 'wsrep_last_committed';
 
    And choose the database that returns the highest value to serve as the new Primary Component.
 
-2. To bootstrap this node, run the following query::
+2. To bootstrap this node, run the following query:
 
-	SET GLOBAL wsrep_provider_options='pc.bootstrap=yes'
+   .. code-block:: mysql
+
+	SET GLOBAL wsrep_provider_options='pc.bootstrap=yes';
 
 This resets the quorum.  The component that has this node as a member becomes the new Primary Component.  All nodes in this component synchronize to the most up to date node.  The cluster begins to again accept SQL requests.

@@ -52,7 +52,8 @@ extern void  gu_fifo_push_tail (gu_fifo_t* q);
 /*! Return how many items are in the queue (unprotected) */
 extern long  gu_fifo_length    (gu_fifo_t* q);
 /*! Return how many items were in the queue on average per push_tail() */
-extern void  gu_fifo_stats_get (gu_fifo_t* q, int* q_len, double* q_len_avg);
+extern void  gu_fifo_stats_get (gu_fifo_t* q, int* q_len, int* q_len_max,
+                                int* q_len_min, double* q_len_avg);
 /*! Flush stats counters */
 extern void  gu_fifo_stats_flush(gu_fifo_t* q);
 

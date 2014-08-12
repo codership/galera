@@ -1,7 +1,7 @@
 =================
  Getting Started
 =================
-.. _`Getting Started with Galera Cluster`:
+.. _`getting-started`:
 
 
 The :term:`Galera Replication Plugin` is a synchronous multi-master replication plugin for MySQL, MariaDB and Percona XtraDB.  It features:
@@ -19,7 +19,7 @@ The Galera Replication Plugin differs from the regular MySQL Replication by addr
 --------------------------------------
 How Galera Cluster Works
 --------------------------------------
-.. `How Galera Works`:
+.. `how-galera-works`:
 
 In a typical instance of a Galera Cluster, applications can write to any node in the cluster and transaction commits, (RBR events), are then applied to all the servers, through certification-based replication.
 
@@ -32,7 +32,7 @@ Certification-based replication is an alternative approach to synchronous databa
 ----------------------------
 System Requirements
 ----------------------------
-.. _`System Requirements`:
+.. _`system-requirements`:
 
 Galera Cluster requires:
 
@@ -49,66 +49,70 @@ Galera Cluster requires:
 ------------------------------
 Installation
 ------------------------------
-.. _`Installation`:
+.. _`installation`:
 
 Galera Cluster runs in Linux on MySQL, MariaDB and Percona XtraDB through the Galera Replicator Plugin.  You can install the plugin into any of these database servers through your package manager or by building it from source.
 
-**Galera Cluster for MySQL**
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Galera Cluster for MySQL
+^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`install-mysql`:
 
-- :doc:`installmysqldeb`
-- :doc:`installmysqlrpm`
-- :doc:`installmysqlsrc`
+.. toctree::
+   :maxdepth: 1
 
-**Galerea Cluster for MariaDB**
+   installmysqldeb
+   installmysqlrpm
+   installmysqlsrc
 
-- :doc:`installmariadbdeb`
-- :doc:`installmariadbrpm`
-- :doc:`installmariadbsrc`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Galera Cluster for MariaDB
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`install-mariadb`:
 
+.. toctree::
+   :maxdepth: 1
 
-**Galera Cluster for Percona XtraDB**
+   installmariadbdeb
+   installmariadbrpm
+   installmariadbsrc
 
-- :doc:`installxtradbdeb`
-- :doc:`installxtradbrpm`
-- :doc:`installxtradbsrc`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Galera Cluster for Percona XtraDB
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`install-xtradb`:
+
+.. toctree::
+   :maxdepth: 1
+
+   installxtradbdeb
+   installxtradbrpm
+   installxtradbsrc
 
 ------------------------------
 Configuration
 ------------------------------
-.. _`Galera Configuration`:
+.. _`galera-configuration`:
 
 Before you can bring Galera Cluster online, each node in the cluster requires some configuration, to grant other nodes access and to enable write-set replication on the database server.
 
-- :doc:`sysconfiguration`
-- :doc:`dbconfiguration`
+.. toctree::
+   :maxdepth: 2
+
+   sysconfiguration
+   dbconfiguration
 
 
 ------------------------------
 Cluster Management
 ------------------------------
-.. _`Cluster Management`:
+.. _`cluster-management`:
 
 When you finish installation and configuration on your server, you're ready to launch the first node and bring the cluster online.  Once all the nodes are started, you can test that they're working and restart if necessary.
 
-- :doc:`startingcluster`
-- :doc:`testingcluster`
-- :doc:`restartingcluster`
-
-
 .. toctree::
-	:hidden: 
-	
-	installmysqldeb
-	installmysqlrpm
-	installmysqlsrc	
-	installmariadbdeb
-	installmariadbrpm
-	installmariadbsrc
-	installxtradbdeb
-	installxtradbrpm
-	installxtradbsrc	
-	sysconfiguration
-	dbconfiguration
-	startingcluster
-	testingcluster
-	restartingcluster
+   :maxdepth: 2
+
+   startingcluster
+   testingcluster
+   restartingcluster

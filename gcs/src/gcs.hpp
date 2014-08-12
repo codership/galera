@@ -289,6 +289,7 @@ extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
  * suitable group members.
  *
  * @param conn  connection to group
+ * @param ver   STR version.
  * @param req   opaque byte array that contains data required for
  *              the state transfer (application dependent)
  * @param size  request size
@@ -301,6 +302,7 @@ extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
  *         is unavailable)
  */
 extern long gcs_request_state_transfer (gcs_conn_t  *conn,
+                                        int          ver,
                                         const void  *req,
                                         size_t       size,
                                         const char  *donor,
@@ -433,7 +435,12 @@ struct gcs_stats
     long long fc_received;    //! flow control stops received
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length
+    int       recv_q_len_max; //! maximum recv queue length
+    int       recv_q_len_min; //! minimum recv queue length
     int       send_q_len;     //! current send queue length
+    int       send_q_len_max; //! maximum send queue length
+    int       send_q_len_min; //! minimum send queue length
+    gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
 /*! Fills stats struct */

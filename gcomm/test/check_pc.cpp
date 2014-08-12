@@ -3326,141 +3326,424 @@ START_TEST(test_trac_762)
 }
 END_TEST
 
+START_TEST(test_gh_92)
+{
+    UUID uuid1(1), uuid2(2), uuid3(3);
+    gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
+    ProtoUpMeta pum1(uuid1);
+    Proto pc1(conf1, uuid1, 0);
+    DummyTransport tp1;
+    PCUser pu1(conf1, uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+
+    gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
+    ProtoUpMeta pum2(uuid2);
+    Proto pc2(conf2, uuid2, 0);
+    DummyTransport tp2;
+    PCUser pu2(conf2, uuid2, &tp2, &pc2);
+    double_boot(&pu1, &pu2);
+
+    gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
+    ProtoUpMeta pum3(uuid3);
+    Proto pc3(conf3, uuid3, 0);
+    DummyTransport tp3;
+    PCUser pu3(conf3, uuid3, &tp3, &pc3);
+    triple_boot(&pu1, &pu2, &pu3);
+
+    uint32_t seq = pc1.current_view().id().seq();
+    Datagram* im = 0;
+    Datagram* dg = 0;
+
+    // they split into three parts.
+    {
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pu1.uuid(), 0);
+        tr1.add_partitioned(pu2.uuid(), 0);
+        tr1.add_partitioned(pu3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        fail_unless(pc1.state() == Proto::S_TRANS);
+
+        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        reg1.add_member(pu1.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        fail_unless(pc1.state() == Proto::S_STATES_EXCH);
+        dg = pu1.tp()->out();
+        pc1.handle_up(0, *dg, ProtoUpMeta(pu1.uuid()));
+        fail_unless(pc1.state() == Proto::S_NON_PRIM);
+
+        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        tr2.add_member(pu2.uuid(), 0);
+        tr2.add_partitioned(pu1.uuid(), 0);
+        tr2.add_partitioned(pu3.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
+        fail_unless(pc2.state() == Proto::S_TRANS);
+
+        View reg2(ViewId(V_REG, uuid2, seq + 1));
+        reg2.add_member(pu2.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
+        fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+        dg = pu2.tp()->out();
+        pc2.handle_up(0, *dg, ProtoUpMeta(pu2.uuid()));
+        fail_unless(pc2.state() == Proto::S_NON_PRIM);
+
+        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        tr3.add_member(pu3.uuid(), 0);
+        tr3.add_partitioned(pu1.uuid(), 0);
+        tr3.add_partitioned(pu2.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
+        fail_unless(pc3.state() == Proto::S_TRANS);
+
+        View reg3(ViewId(V_REG, uuid3, seq + 1));
+        reg3.add_member(pu3.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
+        fail_unless(pc3.state() == Proto::S_STATES_EXCH);
+        dg = pu3.tp()->out();
+        pc3.handle_up(0, *dg, ProtoUpMeta(pu3.uuid()));
+        fail_unless(pc3.state() == Proto::S_NON_PRIM);
+    }
+    seq += 1;
+
+    // they try to merge into a primary component, but fails when sending install message.
+    {
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pu1.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        fail_unless(pc1.state() == Proto::S_TRANS);
+
+        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        reg1.add_member(pu1.uuid(), 0);
+        reg1.add_member(pu2.uuid(), 0);
+        reg1.add_member(pu3.uuid(), 0);
+        reg1.add_joined(pu2.uuid(), 0);
+        reg1.add_joined(pu3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        fail_unless(pc1.state() == Proto::S_STATES_EXCH);
+
+        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        tr2.add_member(pu2.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
+        fail_unless(pc2.state() == Proto::S_TRANS);
+
+        View reg2(ViewId(V_REG, uuid1, seq + 1));
+        reg2.add_member(pu1.uuid(), 0);
+        reg2.add_member(pu2.uuid(), 0);
+        reg2.add_member(pu3.uuid(), 0);
+        reg2.add_joined(pu1.uuid(), 0);
+        reg2.add_joined(pu3.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
+        fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+
+        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        tr3.add_member(pu3.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
+        fail_unless(pc3.state() == Proto::S_TRANS);
+
+        View reg3(ViewId(V_REG, uuid1, seq + 1));
+        reg3.add_member(pu1.uuid(), 0);
+        reg3.add_member(pu2.uuid(), 0);
+        reg3.add_member(pu3.uuid(), 0);
+        reg3.add_joined(pu1.uuid(), 0);
+        reg3.add_joined(pu2.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
+        fail_unless(pc3.state() == Proto::S_STATES_EXCH);
+
+        Datagram* dg1(pu1.tp()->out());
+        Datagram* dg2(pu2.tp()->out());
+        Datagram* dg3(pu3.tp()->out());
+        fail_unless(dg1 != 0);
+        fail_unless(dg2 != 0);
+        fail_unless(dg3 != 0);
+        pc1.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc1.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc1.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        pc2.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc2.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc2.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        pc3.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc3.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc3.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        delete dg1; delete dg2; delete dg3;
+        fail_unless(pc1.state() == Proto::S_INSTALL);
+        fail_unless(pc2.state() == Proto::S_INSTALL);
+        fail_unless(pc3.state() == Proto::S_INSTALL);
+
+        im = pu1.tp()->out();
+        fail_unless(im != 0);
+        fail_unless(pu2.tp()->out() == 0);
+        fail_unless(pu3.tp()->out() == 0);
+    }
+    seq += 1;
+
+    // node3 is separate from node1 and node2.
+    // they get the stale install message when they get transient view.
+    {
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pu1.uuid(), 0);
+        tr1.add_member(pu2.uuid(), 0);
+        tr1.add_partitioned(pu3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        fail_unless(pc1.state() == Proto::S_TRANS);
+        fail_unless(pc2.state() == Proto::S_TRANS);
+        pc1.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        pc2.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        fail_unless(pc1.state() == Proto::S_TRANS);
+        fail_unless(pc2.state() == Proto::S_TRANS);
+
+        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        reg1.add_member(pu1.uuid(), 0);
+        reg1.add_member(pu2.uuid(), 0);
+        reg1.add_partitioned(pu3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        fail_unless(pc1.state() == Proto::S_STATES_EXCH);
+        fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+        Datagram* dg1(pu1.tp()->out());
+        Datagram* dg2(pu2.tp()->out());
+        fail_unless(dg1 != 0);
+        fail_unless(dg2 != 0);
+        pc1.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc1.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc2.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc2.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        fail_unless(pc1.state() == Proto::S_NON_PRIM);
+        fail_unless(pc2.state() == Proto::S_NON_PRIM);
+
+        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        tr3.add_member(pu3.uuid(), 0);
+        tr3.add_partitioned(pu1.uuid(), 0);
+        tr3.add_partitioned(pu2.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
+        fail_unless(pc3.state() == Proto::S_TRANS);
+        pc3.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        fail_unless(pc3.state() == Proto::S_TRANS);
+
+        View reg3(ViewId(V_REG, uuid3, seq + 1));
+        reg3.add_member(pu3.uuid(), 0);
+        reg3.add_partitioned(pu1.uuid(), 0);
+        reg3.add_partitioned(pu2.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
+        fail_unless(pc3.state() == Proto::S_STATES_EXCH);
+        Datagram* dg3(pu3.tp()->out());
+        fail_unless(dg3 != 0);
+        pc3.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        fail_unless(pc3.state() == Proto::S_NON_PRIM);
+    }
+    seq += 1;
+
+    // then they try to merge into a primary component again.
+    {
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pu1.uuid(), 0);
+        tr1.add_member(pu2.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        fail_unless(pc1.state() == Proto::S_TRANS);
+        fail_unless(pc2.state() == Proto::S_TRANS);
+
+        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        reg1.add_member(pu1.uuid(), 0);
+        reg1.add_member(pu2.uuid(), 0);
+        reg1.add_member(pu3.uuid(), 0);
+        reg1.add_joined(pu3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        fail_unless(pc1.state() == Proto::S_STATES_EXCH);
+        fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+
+        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        tr3.add_member(pu3.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
+        fail_unless(pc3.state() == Proto::S_TRANS);
+
+        View reg3(ViewId(V_REG, uuid1, seq + 1));
+        reg3.add_member(pu1.uuid(), 0);
+        reg3.add_member(pu2.uuid(), 0);
+        reg3.add_member(pu3.uuid(), 0);
+        reg3.add_joined(pu1.uuid(), 0);
+        reg3.add_joined(pu2.uuid(), 0);
+        pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
+        fail_unless(pc3.state() == Proto::S_STATES_EXCH);
+
+        Datagram* dg1(pu1.tp()->out());
+        Datagram* dg2(pu2.tp()->out());
+        Datagram* dg3(pu3.tp()->out());
+        fail_unless(dg1 != 0);
+        fail_unless(dg2 != 0);
+        fail_unless(dg3 != 0);
+        pc1.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc1.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc1.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        pc2.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc2.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc2.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        pc3.handle_up(0, *dg1, ProtoUpMeta(pu1.uuid()));
+        pc3.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
+        pc3.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
+        delete dg1; delete dg2; delete dg3;
+        fail_unless(pc1.state() == Proto::S_INSTALL);
+        fail_unless(pc2.state() == Proto::S_INSTALL);
+        fail_unless(pc3.state() == Proto::S_INSTALL);
+
+        im = pu1.tp()->out();
+        fail_unless(im != 0);
+        fail_unless(pu2.tp()->out() == 0);
+        fail_unless(pu3.tp()->out() == 0);
+        pc1.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        pc2.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        pc3.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
+        fail_unless(pc1.state() == Proto::S_PRIM);
+        fail_unless(pc2.state() == Proto::S_PRIM);
+        fail_unless(pc3.state() == Proto::S_PRIM);
+    }
+}
+END_TEST
 
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
     TCase* tc;
 
-    tc = tcase_create("test_pc_messages");
-    tcase_add_test(tc, test_pc_messages);
-    suite_add_tcase(s, tc);
+    bool skip = false;
+    
+    if (!skip) {
+        tc = tcase_create("test_pc_messages");
+        tcase_add_test(tc, test_pc_messages);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_view_changes_single");
-    tcase_add_test(tc, test_pc_view_changes_single);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_view_changes_single");
+        tcase_add_test(tc, test_pc_view_changes_single);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_view_changes_double");
-    tcase_add_test(tc, test_pc_view_changes_double);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_view_changes_double");
+        tcase_add_test(tc, test_pc_view_changes_double);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_view_changes_reverse");
-    tcase_add_test(tc, test_pc_view_changes_reverse);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_view_changes_reverse");
+        tcase_add_test(tc, test_pc_view_changes_reverse);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_state1");
-    tcase_add_test(tc, test_pc_state1);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_state1");
+        tcase_add_test(tc, test_pc_state1);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_state2");
-    tcase_add_test(tc, test_pc_state2);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_state2");
+        tcase_add_test(tc, test_pc_state2);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_state3");
-    tcase_add_test(tc, test_pc_state3);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_state3");
+        tcase_add_test(tc, test_pc_state3);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_conflicting_prims");
-    tcase_add_test(tc, test_pc_conflicting_prims);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_conflicting_prims");
+        tcase_add_test(tc, test_pc_conflicting_prims);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_conflicting_prims_npvo");
-    tcase_add_test(tc, test_pc_conflicting_prims_npvo);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_conflicting_prims_npvo");
+        tcase_add_test(tc, test_pc_conflicting_prims_npvo);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_split_merge");
-    tcase_add_test(tc, test_pc_split_merge);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_split_merge");
+        tcase_add_test(tc, test_pc_split_merge);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_split_merge_w_user_msg");
-    tcase_add_test(tc, test_pc_split_merge_w_user_msg);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_split_merge_w_user_msg");
+        tcase_add_test(tc, test_pc_split_merge_w_user_msg);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_complete_split_merge");
-    tcase_add_test(tc, test_pc_complete_split_merge);
-    tcase_set_timeout(tc, 25);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_complete_split_merge");
+        tcase_add_test(tc, test_pc_complete_split_merge);
+        tcase_set_timeout(tc, 25);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_transport");
-    tcase_add_test(tc, test_pc_transport);
-    tcase_set_timeout(tc, 35);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_pc_transport");
+        tcase_add_test(tc, test_pc_transport);
+        tcase_set_timeout(tc, 35);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_191");
-    tcase_add_test(tc, test_trac_191);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_191");
+        tcase_add_test(tc, test_trac_191);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_413");
-    tcase_add_test(tc, test_trac_413);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_413");
+        tcase_add_test(tc, test_trac_413);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_fifo_violation");
-    tcase_add_test(tc, test_fifo_violation);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_fifo_violation");
+        tcase_add_test(tc, test_fifo_violation);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_checksum");
-    tcase_add_test(tc, test_checksum);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_checksum");
+        tcase_add_test(tc, test_checksum);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_set_param");
-    tcase_add_test(tc, test_set_param);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_set_param");
+        tcase_add_test(tc, test_set_param);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_599");
-    tcase_add_test(tc, test_trac_599);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_599");
+        tcase_add_test(tc, test_trac_599);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_620");
-    tcase_add_test(tc, test_trac_620);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_620");
+        tcase_add_test(tc, test_trac_620);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_277");
-    tcase_add_test(tc, test_trac_277);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_277");
+        tcase_add_test(tc, test_trac_277);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_622_638");
-    tcase_add_test(tc, test_trac_622_638);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_622_638");
+        tcase_add_test(tc, test_trac_622_638);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weighted_quorum");
-    tcase_add_test(tc, test_weighted_quorum);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weighted_quorum");
+        tcase_add_test(tc, test_weighted_quorum);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weighted_partitioning_1");
-    tcase_add_test(tc, test_weighted_partitioning_1);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weighted_partitioning_1");
+        tcase_add_test(tc, test_weighted_partitioning_1);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weighted_partitioning_2");
-    tcase_add_test(tc, test_weighted_partitioning_2);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weighted_partitioning_2");
+        tcase_add_test(tc, test_weighted_partitioning_2);
+        suite_add_tcase(s, tc);
 
 
-    tc = tcase_create("test_weight_change_partitioning_1");
-    tcase_add_test(tc, test_weight_change_partitioning_1);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weight_change_partitioning_1");
+        tcase_add_test(tc, test_weight_change_partitioning_1);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weight_change_partitioning_2");
-    tcase_add_test(tc, test_weight_change_partitioning_2);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weight_change_partitioning_2");
+        tcase_add_test(tc, test_weight_change_partitioning_2);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weight_change_joining");
-    tcase_add_test(tc, test_weight_change_joining);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weight_change_joining");
+        tcase_add_test(tc, test_weight_change_joining);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_weight_change_leaving");
-    tcase_add_test(tc, test_weight_change_leaving);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_weight_change_leaving");
+        tcase_add_test(tc, test_weight_change_leaving);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_762");
-    tcase_add_test(tc, test_trac_762);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_trac_762");
+        tcase_add_test(tc, test_trac_762);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_join_split_cluster");
-    tcase_add_test(tc, test_join_split_cluster);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_join_split_cluster");
+        tcase_add_test(tc, test_join_split_cluster);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_92");
+        tcase_add_test(tc, test_gh_92);
+        suite_add_tcase(s, tc);
+    }
 
     return s;
 }

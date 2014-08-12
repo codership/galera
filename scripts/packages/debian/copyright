@@ -1,0 +1,40 @@
+Galera replication - implementation of write set replication (wsrep) interface.
+Copyright (C) 2007-2014 Codership Oy <info@codership.com>
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of version 2 of the GNU General Public
+License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You will find the GNU General Public License version 2 in the file
+LICENSE or at http://www.gnu.org/licenses/gpl-2.0.html
+
+In addition, as a special exception, the copyright holders give
+permission to link the code of portions of this program with the
+OpenSSL project's "OpenSSL" library (or with modified versions of it
+that use the same license as the "OpenSSL" library), and distribute
+the linked executables.  You must obey the GNU General Public License
+in all respects for all of the code used other than "OpenSSL".  If you
+modify this file, you may extend this exception to your version of the
+file, but you are not obligated to do so.  If you do not wish to do
+so, delete this exception statement from your version.
+
+
+docs/
+Documentation is dual licensed with the Creative Commons Attribution ShareAlike
+and GNU Free Documentation Licenses. See docs/COPYING for details.
+
+Following modules have their own authors and licenses:
+
+asio/
+see asio/COPYING for details
+
+chromium/
+see chromium/AUTHORS and chromium/LICENSE for details
+
+www.evanjones.ca/
+see www.evanjones.ca/AUTHORS and www.evanjones.ca/LICENSE for details

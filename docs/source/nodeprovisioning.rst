@@ -55,24 +55,36 @@ During the catch-up phase, flow control ensures that the slave queue shortens, (
 
 While there is no guarantee on how soon a node will catch up, when it does the node status updates to ``SYNCED`` and it begins to accept client connections.
 
+-------------------
+State Transfers
+-------------------
+.. _`state-transfer`:
+
+There are two types of state transfers available to bring the node up to date with the cluster:
+
+- **State Snapshot Transfer (SST)** Where donor transfers to the joining node a snapshot of the entire node state as it stands.
+
+- **Incremental State Transfer (IST)** Where the donor only transfers the results of transactions missing from the joining node.
+
+When using automatic donor selection, starting in Galera Cluster version 3.6, the cluster decides which state transfer method to use based on availability.
+
+- If there are no nodes available that can safely perform an incremental state transfer, the cluster defaults to a state snapshot transfer.
+
+- If there are nodes available that can safely perform an incremental state transfer, the cluster prefers a local node over remote nodes to serve as the donor.
+
+- If there are no local nodes available that can safely perform an incremental state transfer, the cluster chooses a remote node to serve as the donor.
+
+- Where there are several local or remote nodes available that can safely perform an incremental state transfer, the cluster chooses the node with the highest seqno to serve as the donor.
 
 
-
-
-
-------------------------------------------------
- Comparison of State Snapshot Transfer Methods
-------------------------------------------------
-.. _`Comparison of State Snapshot Transfer Methods`:
+--------------------------------------
+Comparison of State Transfer Methods
+--------------------------------------
+.. _`state-transfer-methods`:
 
 .. index::
    pair: State Snapshot Transfer methods; Comparison of
 
-There are two methods available for provisioning nodes:
-
-- **State Snapshot Transfer (SST)** Where Galera transfers the entire node state as it is, (hence, "snapshot").
-
-- **Incremental State Transfer (IST)** Where Galera only transfers the results of transactions missing from the joining node.
 
 When performing state snapshot transfers, you can choose the method Galera uses in the transfer, (**mysqldump**, **rsync**, or **xtrabackup**).  When performing incremental snapshot transfers, the donor node determines the method Galera uses.
 
@@ -157,7 +169,7 @@ For more information, see the `Rsync Documentation <http://rsync.samba.org/>`_.
 
 
 ^^^^^^^^^^^^^^^^^
-``xtrabackup``
+xtrabackup
 ^^^^^^^^^^^^^^^^^
 .. _xtrabackup:
 .. index::

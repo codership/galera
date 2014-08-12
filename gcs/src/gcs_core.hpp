@@ -188,6 +188,13 @@ gcs_core_send_lock_step (gcs_core_t* core, bool enable);
 extern long
 gcs_core_send_step (gcs_core_t* core, long timeout_ms);
 
+extern void
+gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid);
+
+#include "gcs_group.hpp"
+extern const gcs_group_t*
+gcs_core_get_group (gcs_core_t* core);
+
 #endif /* GCS_CORE_TESTING */
 
 #endif /* _gcs_core_h_ */

@@ -170,7 +170,7 @@ Table legend:
 | :ref:`gcs.fc_debug                    | *0*                   | 1.0                   | n/a                | No       |
 | <gcs.fc_debug>`                       |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
-| :ref:`gcs.fc_factor                   | *0.5*                 | 1.0                   | n/a                | Yes      |
+| :ref:`gcs.fc_factor                   | *1.0*                 | 1.0                   | n/a                | Yes      |
 | <gcs.fc_factor>`                      |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`gcs.fc_limit                    | *16*                  | 1.0                   | n/a                | Yes      |
@@ -231,46 +231,41 @@ Table legend:
 | <gcache.mem_size>`                    |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 
-.. rubric:: base_host
 
+.. rubric:: ``base_host``
 .. _`base_host`:
-
 .. index::
    pair: Parameters; base_host
 
 Global variable for internal use. Should not be set manually.
 
-.. rubric:: base_port
 
+.. rubric:: ``base_port``
 .. _`base_port`:
-
 .. index::
    pair: Parameters; base_port
 
 Global variable for internal use. Should not be set manually.
 
-.. rubric:: cert.log_conflicts
 
+.. rubric:: ``cert.log_conflicts``
 .. _`cert.log_conflicts`:
-
 .. index::
    pair: Parameters; cert.log_conflicts
 
 Log details of certification failures.
 
-.. rubric:: protonet.backend
 
+.. rubric:: ``protonet.backend``
 .. _`protonet.backend`:
-
 .. index::
    pair: Parameters; protonet.backend
 
 Which transport backend to use. Currently only ASIO is supported.
 
-.. rubric:: protonet.version
 
+.. rubric:: ``protonet.version``
 .. _`protonet.version`:
-
 .. index::
    pair: Parameters; protonet.version
 
@@ -278,47 +273,41 @@ This status variable is used to check which transport backend protocol version i
 
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
-.. rubric:: socket.ssl_cert
 
+.. rubric:: ``socket.ssl_cert``
 .. _`socket.ssl_cert`:
-
 .. index::
    pair: Parameters; socket.ssl_cert
 
 A path (absolute or relative to the working directory )to an SSL certificate (in PEM format). 
 
-.. rubric:: socket.ssl_key
 
+.. rubric:: ``socket.ssl_key``
 .. _`socket.ssl_key`:
-
 .. index::
    pair: Parameters; socket.ssl_key
 
 A path (absolute or relative to the working directory to a private key for a certificate (in PEM format).
 
-.. rubric:: socket.ssl_compression
 
+.. rubric:: ``socket.ssl_compression``
 .. _`socket.ssl_compression`:
-
 .. index::
    pair: Parameters; socket.ssl_compression
 
 Whether to enable compression on SSL connections.
 
 
-.. rubric:: socket.ssl_cipher
-
+.. rubric:: ``socket.ssl_cipher``
 .. _`socket.ssl_cipher`:
-
 .. index::
    pair: Parameters; socket.ssl_cipher
 
 Symmetric cipher to use. AES128 is used by default it is considerably faster and no less secure than AES256.
 
-.. rubric:: socket.checksum
 
+.. rubric:: ``socket.checksum``
 .. _`socket.checksum`:
-
 .. index::
    pair: Parameters; socket.checksum
 
@@ -328,19 +317,17 @@ Checksum to use on socket layer:
 - ``1`` - CRC32
 - ``2`` - CRC-32C (optimized and potentially HW-accelerated on Intel CPUs)
 
-.. rubric:: gmcast.listen_addr
 
+.. rubric:: ``gmcast.listen_addr``
 .. _`gmcast.listen_addr`:
-
 .. index::
    pair: Parameters; gmcast.listen_addr
 
 Address at which *Galera Cluster* listens to connections from other nodes. By default the port to listen at is taken from the connection address. This setting can be used to overwrite that.
 
-.. rubric:: gmcast.mcast_addr
 
+.. rubric:: ``gmcast.mcast_addr``
 .. _`gmcast.mcast_addr`:
-
 .. index::
    pair: Parameters; gmcast.mcast_addr
 
@@ -353,29 +340,24 @@ The value must be the same on all nodes.
 If you are planning to build a large cluster, we recommend using UDP.
 
 
-.. rubric:: gmcast.mcast_ttl
-
+.. rubric:: ``gmcast.mcast_ttl``
 .. _`gmcast.mcast_ttl`:
-
 .. index::
    pair: Parameters; gmcast.mcast_ttl
 
 Time to live value for multicast packets.
 
-.. rubric:: gmcast.peer_timeout
 
+.. rubric:: ``gmcast.peer_timeout``
 .. _`gmcast.peer_timeout`:
-
 .. index::
    pair: Parameters; gmcast.peer_timeout
 
 Connection timeout to initiate message relaying.
 
 
-.. rubric:: gmcast.segment
-
+.. rubric:: ``gmcast.segment``
 .. _`gmcast.segment`:
-
 .. index::
    pair: Parameters; gmcast.segment
 
@@ -383,19 +365,16 @@ Define which network segment this node is in. Optimisations on communication are
 between network segments including writeset relaying and IST and SST donor selection.
 The ``gmcast.segment`` value is an integer from 0 to 255. By default all nodes are placed in the same segment (0).
 
-.. rubric:: gmcast.time_wait
 
+.. rubric:: ``gmcast.time_wait``
 .. _`gmcast.time_wait`:
-
 .. index::
    pair: Parameters; gmcast.time_wait
 
 Time to wait until allowing peer declared outside of stable view to reconnect.
 
-.. rubric:: gmcast.version
-
+.. rubric:: ``gmcast.version``
 .. _`gmcast.version`:
-
 .. index::
    pair: Parameters; gmcast.version
 
@@ -404,20 +383,16 @@ This status variable is used to check which gmcast protocol version is used.
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 
-.. rubric:: evs.causal_keepalive_period
-
+.. rubric:: ``evs.causal_keepalive_period``
 .. _`evs.causal_keepalive_period`:
-
 .. index::
    pair: Parameters; evs.causal_keepalive_period
 
 For developer use only. Defaults to ``evs.keepalive_period``.
 
 
-.. rubric:: evs.consensus_timeout
-
+.. rubric:: ``evs.consensus_timeout``
 .. _`evs.consensus_timeout`:
-
 .. index::
    pair: Parameters; evs.consensus_timeout
 
@@ -425,13 +400,11 @@ Timeout on reaching the consensus about cluster membership.
 
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
-**Deprecated** See ``evs.install_timeout``.
+.. seealso:: This feature has been **deprecated**. Succeeded by :ref:`evs.install_timeout <evs.install_timeout>`.
 
 
-.. rubric:: evs.debug_log_mask
-
+.. rubric:: ``evs.debug_log_mask``
 .. _`evs.debug_log_mask`:
-
 .. index::
    pair: Parameters; evs.debug_log_mask
 
@@ -439,30 +412,24 @@ Control EVS debug logging, only effective when ``wsrep_debug`` is in use.
 
 
 
-.. rubric:: evs.inactive_check_period
-
+.. rubric:: ``evs.inactive_check_period``
 .. _`evs.inactive_check_period`:
-
 .. index::
    pair: Parameters; evs.inactive_check_period
 
 How often to check for peer inactivity.
 
 
-.. rubric:: evs.inactive_timeout
-
+.. rubric:: ``evs.inactive_timeout``
 .. _`evs.inactive_timeout`:
-
 .. index::
    pair: Parameters; evs.inactive_timeout
 
 Hard limit on the inactivity period, after which the node is pronounced dead.
 
 
-.. rubric:: evs.info_log_mask
-
+.. rubric:: ``evs.info_log_mask``
 .. _`evs.info_log_mask`:
-
 .. index::
    pair: Parameters; evs.info_log_mask
 
@@ -474,106 +441,94 @@ Control extra EVS info logging. Bits:
 - ``0x8`` Provides profiling (only in builds with profiling enabled)
 
 
-.. rubric:: evs.install_timeout
-
+.. rubric:: ``evs.install_timeout``
 .. _`evs.install_timeout`:
-
 .. index::
    pair: Parameters; evs.install_timeout
 
-Timeout on waiting for install message acknowledgments. Successor to ``evs.consensus_timeout``.
+Timeout on waiting for install message acknowledgments. 
 
-.. rubric:: evs.join_retrans_period
+.. seealso:: This parameter is the successor to :ref:`evs.consensus_timeout <evs.consensus_timeout>`.
 
+
+.. rubric:: ``evs.join_retrans_period``
 .. _`evs.join_retrans_period`:
-
 .. index::
    pair: Parameters; evs.join_retrans_period
 
 How often to retransmit EVS join messages when forming the cluster membership.
 
 
-.. rubric:: evs.keepalive_period
-
+.. rubric:: ``evs.keepalive_period``
 .. _`evs.keepalive_period`:
-
 .. index::
    pair: Parameters; evs.keepalive_period
 
 How often to emit keepalive beacons (in the absence of any other traffic).
 
-.. rubric:: evs.max_install_timeouts
 
+.. rubric:: ``evs.max_install_timeouts``
 .. _`evs.max_install_timeouts`:
-
 .. index::
    pair: Parameters; evs.max_install_timeouts
 
 How many membership install rounds to try before giving up (total rounds will be ``evs.max_install_timeouts`` + 2).
 
 
-.. rubric:: evs.send_window
-
+.. rubric:: ``evs.send_window``
 .. _`evs.send_window`:
-
 .. index::
    pair: Parameters; evs.send_window
 
 Maximum packets in replication at a time. For WAN setups may be set considerably higher, e.g. 512.  Must be no less than ``evs.user_send_window``.  If you must use other that the default value, we recommend using double the ``evs.user_send_window`` value.
 
+.. seealso:: :ref:`evs.user_send_window <evs.user_send_window>`.
 
-.. rubric:: evs.stats_report_period
 
+.. rubric:: ``evs.stats_report_period``
 .. _`evs.stats_report_period`:
-
 .. index::
    pair: Parameters; evs.stats_report_period
 
 Control period of EVS statistics reporting.  The node is pronounced dead.
 
-.. rubric:: evs.suspect_timeout
 
+.. rubric:: ``evs.suspect_timeout``
 .. _`evs.suspect_timeout`:
-
 .. index::
    pair: Parameters; evs.suspect_timeout
 
 Inactivity period after which the node is *suspected* to be dead. If all remaining nodes agree on that, the node is dropped out of cluster before ``evs.inactive_timeout`` is reached.
 
 
-.. rubric:: evs.use_aggregate
-
+.. rubric:: ``evs.use_aggregate``
 .. _`evs.use_aggregate`:
-
 .. index::
    pair: Parameters; evs.use_aggregate
 
 Aggregate small packets into one, when possible.
 
 
-.. rubric:: evs.user_send_window
-
+.. rubric:: ``evs.user_send_window``
 .. _`evs.user_send_window`:
-
 .. index::
    pair: Parameters; evs.user_send_window
 
 Maximum data packets in replication at a time. For WAN setups, this value can be set considerably higher, to, for example, 512.
 
+.. seealso:: :ref:`evs.send_window <evs.send_window>`.
 
-.. rubric:: evs.view_forget_timeout
 
+.. rubric:: ``evs.view_forget_timeout``
 .. _`evs.view_forget_timeout`:
-
 .. index::
    pair: Parameters; evs.view_forget_timeout
 
 Drop past views from the view history after this timeout.
 
-.. rubric:: evs.version
 
+.. rubric:: ``evs.version``
 .. _`evs.version`:
-
 .. index::
    pair: Parameters; evs.version
 
@@ -581,12 +536,13 @@ This status variable is used to check which ``evs`` protocol version is used.
 
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
-.. rubric:: pc.recovery
+
+.. rubric:: ``pc.recovery``
 .. _`pc.recovery`:
 .. index::
-	pair: Parameters, pc.recovery
+   pair: Parameters; pc.recovery
 
-When set to ``true``, the node stores the Primary Component state to disk.  The Primary Component can then recover automatically when all nodes that were part of the last saved state reestablish communications with each other.  
+When set to ``TRUE``, the node stores the Primary Component state to disk.  The Primary Component can then recover automatically when all nodes that were part of the last saved state reestablish communications with each other.  
 
 This allows for:
 
@@ -599,104 +555,89 @@ This allows for:
 
 
 
-.. rubric:: pc.bootstrap
-
+.. rubric:: ``pc.bootstrap``
 .. _`pc.bootstrap`:
-
 .. index::
    pair: Parameters; pc.bootstrap
 
 If you set this value to *true* is a signal to turn a ``NON-PRIMARY`` component into ``PRIMARY``.
 
-.. rubric:: pc.announce_timeout
 
+.. rubric:: ``pc.announce_timeout``
 .. _`pc.announce_timeout`:
-
 .. index::
    pair: Parameters; pc.announce_timeout
 
 Cluster joining announcements are sent every 1/2 second for this period of time or less if the other nodes are discovered.
 
 
-.. rubric:: pc.checksum
-
+.. rubric:: ``pc.checksum``
 .. _`pc.checksum`:
-
 .. index::
    pair: Parameters; pc.checksum
 
 Checksum replicated messages.
 
-.. rubric:: pc.ignore_sb
 
+.. rubric:: ``pc.ignore_sb``
 .. _`pc.ignore_sb`:
-
 .. index::
    pair: Parameters; pc.ignore_sb
 
 Should we allow nodes to process updates even in the case of split brain? This is a dangerous setting in multi-master setup, but should simplify things in master-slave cluster (especially if only 2 nodes are used).
 
-.. rubric:: pc.ignore_quorum
 
+.. rubric:: ``pc.ignore_quorum``
 .. _`pc.ignore_quorum`:
-
 .. index::
    pair: Parameters; pc.ignore_quorum
 
 Completely ignore quorum calculations. For example if the master splits from several slaves it still remains operational. Use with extreme caution even in master-slave setups, as slaves will not automatically reconnect to master in this case.
 
-.. rubric:: pc.linger
 
+.. rubric:: ``pc.linger``
 .. _`pc.linger`:
-
 .. index::
    pair: Parameters; pc.linger
 
 The period for which the PC protocol waits for the EVS termination.
 
-.. rubric:: pc.npvo
 
+.. rubric:: ``pc.npvo``
 .. _`pc.npvo`:
-
 .. index::
    pair: Parameters; pc.npvo
 
 If set to ``TRUE``, the more recent primary component overrides older ones in the case of conflicting primaries. 
 
 
-.. rubric:: pc.wait_prim
-
+.. rubric:: ``pc.wait_prim``
 .. _`pc.wait_prim`:
-
 .. index::
    pair: Parameters; pc.wait_prim
 
 If set to ``TRUE``, the node waits for the ``pc.wait_prim_timeout`` time period. Useful to bring up a
 non-primary component and make it primary with ``pc.bootstrap``.
 
-.. rubric:: pc.wait_prim_timeout
 
+.. rubric:: ``pc.wait_prim_timeout``
 .. _`pc.wait_prim_timeout`:
-
 .. index::
    pair: Parameters; pc.wait_prim_timeout
 
 The period of time to wait for a primary component.
 
-.. rubric:: pc.weight
 
+.. rubric:: ``pc.weight``
 .. _`pc.weight`:
-
 .. index::
    pair: Parameters; pc.weight
 
 As of version 2.4. Node weight for quorum calculation.
 
 
-.. rubric:: pc.version
-
+.. rubric:: ``pc.version``
 .. _`pc.version`:
-
 .. index::
    pair: Parameters; pc.version
 
@@ -705,58 +646,48 @@ This status variable is used to check which pc protocol version is used.
 This variable is mostly used for troubleshooting purposes and should not be implemented in a production environment.
 
 
-.. rubric:: gcs.fc_debug
-
+.. rubric:: ``gcs.fc_debug``
 .. _`gcs.fc_debug`:
-
 .. index::
    pair: Parameters; gcs.fc_debug
 
 Post debug statistics about SST flow every this number of writesets. 
 
-.. rubric:: gcs.fc_factor
 
+.. rubric:: ``gcs.fc_factor``
 .. _`gcs.fc_factor`:
-
 .. index::
    pair: Parameters; gcs.fc_factor
 
-Resume replication after recv queue drops below this fraction of ``gcs.fc_limit``.
+Resume replication after recv queue drops below this fraction of ``gcs.fc_limit`` (```gcs.fc_factor * gcs.fc_limit```). This limit is scaled further if ``gcs.gc_master_slave`` is ``NO``.
 
 
 
-.. rubric:: gcs.fc_limit
-
+.. rubric:: ``gcs.fc_limit``
 .. _`gcs.fc_limit`:
-
 .. index::
    pair: Parameters; gcs.fc_limit
 
-Pause replication if recv queue exceeds this number of  writesets. For master-slave setups this number can be increased considerably.
+Pause replication if recv queue exceeds this number of writesets. For master-slave setups this number can be increased considerably. If ``gcs.fc_master_slave`` = ``NO`` this limit is scaled up by ``sqrt( number of cluster members )``.
 
 
-.. rubric:: gcs.fc_master_slave
-
+.. rubric:: ``gcs.fc_master_slave``
 .. _`gcs.fc_master_slave`:
-
 .. index::
    pair: Parameters; gcs.fc_master_slave
 
-Should we assume that there is only one master in the group?
+When this is ``NO`` then the effective ``gcs.fc_limit`` is scaled by the ``sqrt( number of cluster members )``.
 
 
-.. rubric:: gcs.max_packet_size
-
+.. rubric:: ``gcs.max_packet_size``
 .. _`gcs.max_packet_size`:
-
 .. index::
    pair: Parameters; gcs.max_packet_size
 
 All writesets exceeding that size will be fragmented.
 
 
-.. rubric:: gcs.max_throttle
-
+.. rubric:: ``gcs.max_throttle``
 .. _`gcs.max_throttle`:
 
 .. index::
@@ -765,20 +696,16 @@ All writesets exceeding that size will be fragmented.
 How much to throttle replication rate during state transfer (to avoid running out of memory). Set the value to 0.0 if stopping replication is acceptable for completing state transfer. 
 
 
-.. rubric:: gcs.recv_q_hard_limit
-
+.. rubric:: ``gcs.recv_q_hard_limit``
 .. _`gcs.recv_q_hard_limit`:
-
 .. index::
    pair: Parameters; gcs.recv_q_hard_limit
 
 Maximum allowed size of recv queue. This should normally be half of (RAM + swap). If this limit is exceeded, Galera Cluster will abort the server.
 
 
-.. rubric:: gcs.recv_q_soft_limit
-
+.. rubric:: ``gcs.recv_q_soft_limit``
 .. _`gcs.recv_q_soft_limit`:
-
 .. index::
    pair: Parameters; gcs.recv_q_soft_limit
 
@@ -787,10 +714,9 @@ The fraction of ``gcs.recv_q_hard_limit`` after which replication rate will be t
 The degree of throttling is a linear function of recv queue size and goes from 1.0 (``full rate``)
 at ``gcs.recv_q_soft_limit`` to ``gcs.max_throttle`` at ``gcs.recv_q_hard_limit`` Note that ``full rate``, as estimated between 0 and ``gcs.recv_q_soft_limit`` is a very imprecise estimate of a regular replication rate. 
 
-.. rubric:: gcs.sync_donor
 
+.. rubric:: ``gcs.sync_donor``
 .. _`gcs.sync_donor`:
-
 .. index::
    pair: Parameters; gcs.sync_donor
 
@@ -798,20 +724,17 @@ Should the rest of the cluster keep in sync with the donor? ``YES`` means that i
 
 If you choose to use value ``YES``, it is theoretically possible that the donor node cannot keep up with the rest of the cluster due to the extra load from the SST. If the node lags behind, it may send flow control messages stalling the whole cluster. However, you can monitor this using the ``wsrep_flow_control_paused`` status variable.
 
-.. rubric:: ist.recv_addr
 
+.. rubric:: ``ist.recv_addr``
 .. _`ist.recv_addr`:
-
 .. index::
    pair: Parameters; ist.recv_addr
 
 As of 2.0. Address to listen for Incremental State Transfer. By default this is the ``<address>:<port+1>`` from ``wsrep_node_address``.
 
 
-.. rubric:: repl.commit_order
-
+.. rubric:: ``repl.commit_order``
 .. _`repl.commit_order`:
-
 .. index::
    pair: Parameters; repl.commit_order
 
@@ -825,19 +748,18 @@ Whether to allow Out-Of-Order committing (improves parallel applying performance
 
 - ``3`` or ``NO_OOOC`` No out of order committing is allowed (strict total order committing)
 
-.. rubric:: repl.causal_read_timeout
 
+
+.. rubric:: ``repl.causal_read_timeout``
 .. _`repl.causal_read_timeout`:
-
 .. index::
    pair: Parameters; repl.causal_read_timeout
 
 Sometimes causal reads need to timeout.
 
-.. rubric:: repl.key_format
 
+.. rubric:: ``repl.key_format``
 .. _`repl.key_format`:
-
 .. index::
    pair: Parameters; repl.key_format
 
@@ -850,52 +772,44 @@ Possible settings:
 - ``FLAT16``
 - ``FLAT16A``
 
-.. rubric:: repl.max_ws_size
 
+.. rubric:: ``repl.max_ws_size``
 .. _`repl.max_ws_size`:
-
 .. index::
    pair: Parameters; repl.max_ws_size
 
 The maximum size of a writeset in bytes. This is limited to 2G.
 
-.. rubric:: repl.proto_max
 
+
+.. rubric:: ``repl.proto_max``
 .. _`repl.proto_max`:
-
 .. index::
    pair: Parameters; repl.proto_max
 
 The maximum protocol version in replication. Changes to this parameter will only take effect after a provider restart.
 
-.. rubric:: gcache.dir
 
+.. rubric:: ``gcache.dir``
 .. _`gcache.dir`:
-
 .. index::
    pair: Parameters; gcache.dir
 
 Directory where GCache should place its files.  Defaults to the working directory. 
 
 
-.. rubric:: gcache.name
-
+.. rubric:: ``gcache.name``
 .. _`gcache.name`:
-
 .. index::
    pair: Parameters; gcache.name
-
 
 Name of the ring buffer storage file. 
 
 
-.. rubric:: gcache.size
-
+.. rubric:: ``gcache.size``
 .. _`gcache.size`:
-
 .. index::
    pair: Parameters; gcache.size
-
 
 Size of the persistent on-disk ring buffer storage. This will be preallocated on startup. 
 
@@ -904,29 +818,24 @@ The buffer file name is ``galera.cache``.
 .. seealso:: Chapter :ref:`Customizing GCache Size <Customizing GCache Size>`.  
 
 
-.. rubric:: gcache.page_size
-
+.. rubric:: ``gcache.page_size``
 .. _`gcache.page_size`:
-
 .. index::
    pair: Parameters; gcache.page_size
 
 Size of the page files in page storage. The limit on overall page storage is the size of the disk.  Pages are prefixed by ``gcache.page``.
 
-.. rubric:: gcache.keep_pages_size
 
+.. rubric:: ``gcache.keep_pages_size``
 .. _`gcache.keep_pages_size`:
-
 .. index::
    pair: Parameters; gcache.keep_pages_size
 
 Total size of the page storage pages to keep for caching purposes. If only page storage is enabled, one page is always present. 
 
 
-.. rubric:: gcache.mem_size
-
+.. rubric:: ``gcache.mem_size``
 .. _`gcache.mem_size`:
-
 .. index::
    pair: Parameters; gcache.mem_size
 
@@ -948,13 +857,17 @@ You can set *Galera Cluster* parameters in the ``my.cnf`` configuration file as 
 
 This is useful in master-slave setups.
 
-You can set Galera Cluster parameters through a MySQL client with the following query::
+You can set Galera Cluster parameters through a MySQL client with the following query:
+
+.. code-block:: mysql
 
 	SET GLOBAL wsrep_provider_options="evs.send_window=16";
 
 This query  only changes the ``evs.send_window`` value.
 
-To check which parameters are used in Galera Cluster, enter the following query::
+To check which parameters are used in Galera Cluster, enter the following query:
+
+.. code-block:: mysql
 
 	SHOW VARIABLES LIKE 'wsrep_provider_options';
 
