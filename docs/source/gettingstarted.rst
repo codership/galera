@@ -66,7 +66,7 @@ Galera Cluster for MySQL
    installmysqlsrc
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Galerea Cluster for MariaDB
+Galera Cluster for MariaDB
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. _`install-mariadb`:
 

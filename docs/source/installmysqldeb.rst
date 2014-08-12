@@ -14,6 +14,11 @@ Preparing Your Server
 
 Before you begin installing Galera Cluster, you must first remove any existing installation of MySQL server and install the packages dependencies.
 
+- ``psmisc`` The PSmisc utilities.
+- ``mysql`` The MySQL client package.
+- ``MySQL-shared-compat`` The MySQL shared compatibility libraries.
+
+
 To remove an existing server, run the following command as root:
 
 .. code-block:: console
@@ -36,7 +41,7 @@ To install the package dependencies, run the following command as root::
 
    .. code-block:: console
 
-	$ dpkg -i mysql-shared-compat.deb
+	$ dpkg -i mysql-shared-compat-*.deb
 
 
 ---------------------------------------------
@@ -58,7 +63,7 @@ To install Galera Cluster for MySQL, complete the following steps:
 
    .. code-block:: console
 
-	$ dpkg -i mysql-server-wsrep.deb 
+	$ dpkg -i mysql-server-wsrep-*.deb 
 
 3. Go to `Galera Replicator <https://launchpad.net/galera>`_ and download the Galera plugin.
 
@@ -66,9 +71,9 @@ To install Galera Cluster for MySQL, complete the following steps:
 
    .. code-block:: console
 
-	$ dpkg -i galera.deb
+	$ dpkg -i galera-*.deb
 
-5. Configure the MySQL server to use the Galera Replicator plugin in ``my.cnf``:
+5.  Using a text editor, add to your configuration file, (``my.cnf`` or ``my.ini``, depending on your build), the path to the Galera Replicator plugin.
 
    .. code-block:: ini
 
