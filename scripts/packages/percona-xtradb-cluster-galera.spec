@@ -76,7 +76,11 @@ This package contains the Galera library required by Percona XtraDB Cluster.
 Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
 Provides:       garbd3
-Requires:       nc chkconfig
+%if "%rhel" == "7"
+    Requires:       nmap chkconfig
+%else
+    Requires:       nc chkconfig
+%endif
 
 %description -n Percona-XtraDB-Cluster-garbd-3
 This package contains the garb binary and init scripts.
