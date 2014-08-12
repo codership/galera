@@ -4628,6 +4628,8 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
         }
         log_info << "evict candidate " << i->first << " " << i->second.first
                  << " " << i->second.second;
+        // TODO: Record stable views from PC and use weights from there
+        // accordingly (need to be added to view)
         if (i->second.second > current_view_.members().size()/2)
         {
             log_warn << "evicting member " << i->first
