@@ -444,6 +444,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 
 void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
 {
+    status.insert("evs_state", to_string(state_));
     status.insert("evs_repl_latency", safe_deliv_latency_.to_string());
     std::string delayed_list_str;
     for (DelayedList::const_iterator i(delayed_list_.begin());
@@ -905,7 +906,6 @@ gu::datetime::Date gcomm::evs::Proto::handle_timers()
 }
 
 
-
 void gcomm::evs::Proto::check_inactive()
 {
     const gu::datetime::Date now(gu::datetime::Date::now());
@@ -959,20 +959,27 @@ void gcomm::evs::Proto::check_inactive()
         }
 
         DelayedList::iterator dli(delayed_list_.find(node_uuid));
-        if (node.index() != std::numeric_limits<size_t>::max() &&
-            node.tstamp() + delayed_period_ <= now)
+        if (node.tstamp() + delayed_period_ <= now)
         {
-            Range range(input_map_->range(node.index()));
-            evs_log_info(I_STATE) << "delayed "
-                                  << node_uuid << " requesting range "
-                                  << Range(range.lu(), last_sent_);
-            if (last_sent_ >= range.lu())
+            if (node.index() != std::numeric_limits<size_t>::max())
             {
-                // Request recovering message from all nodes (indicated
-                // by last arg) to increase probablity of receiving the
-                // message.
-                gu_trace(send_gap(node_uuid, current_view_.id(),
-                                  Range(range.lu(), last_sent_), false, true));
+                // Delayed node in group, check input map state and request
+                // message recovery if necessary
+                log_info << "Node tstamp " << node.tstamp() << " own tstamp "
+                         << NodeMap::value(self_i_).tstamp();
+                Range range(input_map_->range(node.index()));
+                evs_log_info(I_STATE) << "delayed "
+                                      << node_uuid << " requesting range "
+                                      << Range(range.lu(), last_sent_);
+                if (last_sent_ >= range.lu())
+                {
+                    // Request recovering message from all nodes (indicated
+                    // by last arg) to increase probablity of receiving the
+                    // message.
+                    gu_trace(send_gap(node_uuid, current_view_.id(),
+                                      Range(range.lu(), last_sent_),
+                                      false, true));
+                }
             }
 
             if (dli == delayed_list_.end())
@@ -4534,12 +4541,6 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
 void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
                                           NodeMap::iterator ii)
 {
-    assert(msg.source_view_id() == current_view_.id());
-    if (msg.source_view_id() != current_view_.id())
-    {
-        return;
-    }
-
     if (auto_evict_ == 0)
     {
         // Ignore evict list messages if auto_evict_ is disabled.
@@ -4628,9 +4629,18 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
         }
         log_info << "evict candidate " << i->first << " " << i->second.first
                  << " " << i->second.second;
+        // If the candidate is in the current view, require majority
+        // of the view to agree. If the candidate is not in the current
+        // view, require majority of known nodes to agree. Ability to
+        // evict nodes outside of the group (even while in non-PC) is
+        // needed to stabilize cluster also in the case that nodes
+        // have already partitioned.
+
         // TODO: Record stable views from PC and use weights from there
-        // accordingly (need to be added to view)
-        if (i->second.second > current_view_.members().size()/2)
+        // accordingly (need to be added to view).
+        if ((current_view_.is_member(i->first) &&
+             i->second.second > current_view_.members().size()/2) ||
+            i->second.second > known_.size()/2)
         {
             log_warn << "evicting member " << i->first
                      << " at " << get_address(i->first)

@@ -174,7 +174,8 @@ public:
      */
     bool is_membership() const
     {
-        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE);
+        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE ||
+                type_ == T_EVICT_LIST);
     }
 
     /*!
