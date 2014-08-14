@@ -18,6 +18,8 @@
 
 #include "defaults.hpp"
 
+#include <cmath>
+
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
@@ -51,9 +53,9 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report_(gu::datetime::Date::now()),
     collect_stats_(true),
-    hs_agreed_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
-    hs_safe_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
-    hs_local_causal_("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+    hs_agreed_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
+    hs_safe_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
+    hs_local_causal_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
     send_queue_s_(0),
     n_send_queue_s_(0),
     sent_msgs_(7, 0),
@@ -369,6 +371,34 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     return false;
 }
 
+void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
+{
+    if (info_mask_ & I_STATISTICS)
+    {
+        status.insert("evs_safe_hs", hs_safe_.to_string());
+        status.insert("evs_causal_hs", hs_local_causal_.to_string());
+        status.insert("evs_outq_avg",
+                      gu::to_string(std::fabs(double(send_queue_s_)/
+                                              double(n_send_queue_s_))));
+        status.insert("evs_sent_user",
+                      gu::to_string(sent_msgs_[Message::T_USER]));
+        status.insert("evs_sent_delegate",
+                      gu::to_string(sent_msgs_[Message::T_DELEGATE]));
+        status.insert("evs_sent_gap",
+                      gu::to_string(sent_msgs_[Message::T_GAP]));
+        status.insert("evs_sent_join",
+                      gu::to_string(sent_msgs_[Message::T_JOIN]));
+        status.insert("evs_sent_install",
+                      gu::to_string(sent_msgs_[Message::T_INSTALL]));
+        status.insert("evs_sent_leave",
+                      gu::to_string(sent_msgs_[Message::T_LEAVE]));
+        status.insert("evs_retransmitted", gu::to_string(retrans_msgs_));
+        status.insert("evs_recovered", gu::to_string(recovered_msgs_));
+        status.insert("evs_deliv_safe",
+                      gu::to_string(delivered_msgs_[O_SAFE]));
+    }
+}
+
 
 std::ostream& gcomm::evs::operator<<(std::ostream& os, const Proto& p)
 {
@@ -439,11 +469,6 @@ void gcomm::evs::Proto::reset_stats()
     hs_local_causal_.clear();
     send_queue_s_ = 0;
     n_send_queue_s_ = 0;
-    fill(sent_msgs_.begin(), sent_msgs_.end(), 0LL);
-    fill(recvd_msgs_.begin(), recvd_msgs_.end(), 0LL);
-    retrans_msgs_ = 0LL;
-    recovered_msgs_ = 0LL;
-    fill(delivered_msgs_.begin(), delivered_msgs_.end(), 0LL);
     last_stats_report_ = gu::datetime::Date::now();
 }
 
@@ -652,11 +677,6 @@ void gcomm::evs::Proto::handle_install_timer()
 
 void gcomm::evs::Proto::handle_stats_timer()
 {
-    if (info_mask_ & I_STATISTICS)
-    {
-        evs_log_info(I_STATISTICS) << "statistics (stderr):";
-        std::cerr << stats() << std::endl;
-    }
     reset_stats();
 #ifdef GCOMM_PROFILE
     evs_log_info(I_PROFILING) << "\nprofiles:\n";
@@ -1201,14 +1221,37 @@ bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
     for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         if (NodeMap::value(i).operational() == true &&
-            NodeMap::value(i).is_inactive()     == false)
+            NodeMap::value(i).is_inactive() == false)
         {
-            gcomm_assert(NodeMap::value(i).leave_message() == 0);
+            assert(NodeMap::value(i).leave_message() == 0);
+            if (NodeMap::value(i).leave_message() != 0)
+            {
+                log_warn << "operational node " << NodeMap::key(i)
+                         << " with leave message: " << NodeMap::value(i);
+                continue;
+            }
             return (uuid == NodeMap::key(i));
         }
     }
 
     return false;
+}
+
+bool gcomm::evs::Proto::is_all_suspected(const UUID& uuid) const
+{
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
+    {
+        const Node& node(NodeMap::value(i));
+        if (node.operational() == true) {
+            const JoinMessage* jm(node.join_message());
+            if (!jm) return false;
+            const MessageNodeList::const_iterator j(jm->node_list().find(uuid));
+            if (!(j != jm->node_list().end() &&
+                  MessageNodeList::value(j).suspected()))
+                return false;
+        }
+    }
+    return true;
 }
 
 
@@ -2030,7 +2073,14 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         // from it before new view has been formed.
         // Exceptions:
         // - Node that is leaving
-        // - Retransmitted messages (why?)
+        // - Retransmitted messages.
+
+        // why we accept retransimted messages?
+        // a node sends a message, some nodes(A) get it, but some(B) don't
+        // then this node is non-operational(or unreachable)
+        // so A need to send B the missing message(in envelope as delegate message)
+        // otherwise the input map will not be consistent forever.
+        // and user message in delegate message always comes with F_RETRANS flag.
         evs_log_debug(D_FOREIGN_MSGS)
             << " dropping message from unoperational source " << node;
         return;
@@ -2397,6 +2447,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     }
     case S_JOINING:
         state_ = S_JOINING;
+        reset_timer(T_STATS);
         break;
     case S_LEAVING:
         state_ = S_LEAVING;
@@ -2979,6 +3030,22 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
+
+    // note: #gh40
+    bool shift_to_gather = false;
+    if (install_message_) {
+        const MessageNode& mn(
+            MessageNodeList::value(
+                install_message_->node_list().find_checked(
+                    msg.source())));
+        if (!mn.operational())
+            return ;
+        if (mn.operational() &&
+            msg.seq() > mn.im_range().hs()) {
+            shift_to_gather = true;
+        }
+    }
+
     Range range;
     Range prev_range;
     seqno_t prev_aru;
@@ -3089,6 +3156,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             gu_trace(send_join());
             profile_leave(send_join_prof_);
         }
+    }
+    if (shift_to_gather) {
+        shift_to(S_GATHER, true);
     }
 }
 
@@ -4025,13 +4095,15 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     }
     else
     {
+        // Always set node nonoperational if leave message is seen
+        node.set_operational(false);
         if (msg.source_view_id()       != current_view_.id() ||
             is_msg_from_previous_view(msg) == true)
         {
             // Silent drop
             return;
         }
-        node.set_operational(false);
+
         const seqno_t prev_safe_seq(update_im_safe_seq(node.index(), msg.aru_seq()));
         if (prev_safe_seq != input_map_->safe_seq(node.index()))
         {

@@ -14,7 +14,7 @@ libgaleraxx_srcs = [
     'wsrep_params.cpp',
     'replicator_smm_params.cpp',
     'gcs_action_source.cpp',
-    'galera_info.c',
+    'galera_info.cpp',
     'replicator.cpp',
     'ist.cpp',
     'gcs_dummy.cpp',

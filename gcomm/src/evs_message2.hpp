@@ -650,7 +650,6 @@ private:
     bool             const leaving_;
 };
 
-
 class gcomm::evs::RangeLuCmp
 {
 public:

@@ -168,12 +168,12 @@ public:
     bool is_all_committed() const;
     void setall_installed(bool val);
     bool is_all_installed() const;
-
+    bool is_install_message() const { return install_message_ != 0; }
 
     bool is_representative(const UUID& pid) const;
 
     void shift_to(const State, const bool send_j = true);
-
+    bool is_all_suspected(const UUID& uuid) const;
 
     // Message handlers
 private:
@@ -266,6 +266,8 @@ public:
     }
 
     bool set_param(const std::string& key, const std::string& val);
+
+    void handle_get_status(gu::Status& status) const;
 
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time
