@@ -379,8 +379,8 @@ private:
     gu::datetime::Period stats_report_period_;
     gu::datetime::Period causal_keepalive_period_;
 
-    gu::datetime::Period delayed_period_;
-    gu::datetime::Period delayed_decay_period_;
+    gu::datetime::Period delay_margin_;
+    gu::datetime::Period delayed_keep_period_;
 
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;

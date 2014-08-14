@@ -96,10 +96,10 @@ std::string const gcomm::Conf::EvsCausalKeepalivePeriod =
     EvsPrefix + "causal_keepalive_period";
 std::string const gcomm::Conf::EvsMaxInstallTimeouts =
     EvsPrefix + "max_install_timeouts";
-std::string const gcomm::Conf::EvsDelayedPeriod =
-    EvsPrefix + "delayed_period";
-std::string const gcomm::Conf::EvsDelayedDecayPeriod =
-    EvsPrefix + "delayed_decay_period";
+std::string const gcomm::Conf::EvsDelayMargin =
+    EvsPrefix + "delay_margin";
+std::string const gcomm::Conf::EvsDelayedKeepPeriod =
+    EvsPrefix + "delayed_keep_period";
 std::string const gcomm::Conf::EvsEvict =
     EvsPrefix + "evict";
 std::string const gcomm::Conf::EvsAutoEvict =
@@ -176,8 +176,8 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD        (EvsUseAggregate);
     GCOMM_CONF_ADD        (EvsCausalKeepalivePeriod);
     GCOMM_CONF_ADD_DEFAULT(EvsMaxInstallTimeouts);
-    GCOMM_CONF_ADD_DEFAULT(EvsDelayedPeriod);
-    GCOMM_CONF_ADD_DEFAULT(EvsDelayedDecayPeriod);
+    GCOMM_CONF_ADD_DEFAULT(EvsDelayMargin);
+    GCOMM_CONF_ADD_DEFAULT(EvsDelayedKeepPeriod);
     GCOMM_CONF_ADD        (EvsEvict);
     GCOMM_CONF_ADD_DEFAULT(EvsAutoEvict);
 
