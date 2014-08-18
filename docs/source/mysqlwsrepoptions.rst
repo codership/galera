@@ -8,7 +8,7 @@
    pair: Logs; Debug log
 
 
-These are MySQL system variables introduced by wsrep API patch v0.8. All variables are global except where marked by (L).
+These are MySQL system variables introduced by wsrep API patch v0.8. All variables are global except where marked by **L**.
 
 
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
@@ -17,8 +17,8 @@ These are MySQL system variables introduced by wsrep API patch v0.8. All variabl
 | :ref:`wsrep_auto_increment_control    | *ON*                               | 1                    | n/a                |          |
 | <wsrep_auto_increment_control>`       |                                    |                      |                    |          |
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
-| :ref:`wsrep_causal_reads              | *OFF*                              | 1                    | n/a                |          |
-| <wsrep_causal_reads>` **(L)**         |                                    |                      |                    |          |
+| :ref:`wsrep_causal_reads              | *OFF*                              | 1                    | 3.6                |          |
+| <wsrep_causal_reads>` :sup:`L`        |                                    |                      |                    |          |
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
 | :ref:`wsrep_certify_nonPK             | *ON*                               | 1                    | n/a                |          |
 | <wsrep_certify_nonPK>`                |                                    |                      |                    |          |
@@ -66,7 +66,7 @@ These are MySQL system variables introduced by wsrep API patch v0.8. All variabl
 | <wsrep_notify_cmd>`                   |                                    |                      |                    |          |
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
 | :ref:`wsrep_on                        | *ON*                               | 1                    | n/a                |          |
-| <wsrep_on>` **(L)**                   |                                    |                      |                    |          |
+| <wsrep_on>` :sup:`L`                  |                                    |                      |                    |          |
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
 | :ref:`wsrep_OSU_method                | *TOI*                              | Patch version 3      | n/a                |          |
 | <wsrep_OSU_method>`                   |                                    | (5.5.17-22.3)        |                    |          |
@@ -101,7 +101,9 @@ These are MySQL system variables introduced by wsrep API patch v0.8. All variabl
 | :ref:`wsrep_start_position            | *00000000-0000-0000-*              | 1                    | n/a                |          |
 | <wsrep_start_position>`               | *0000-000000000000:-1*             |                      |                    |          |
 +---------------------------------------+------------------------------------+----------------------+--------------------+----------+
-
+| :ref:`wsrep_sync_wait                 |                                    | 3.6                  | n/a                |          |
+| <wsrep_sync_wait>`                    |                                    |                      |                    |          |
++---------------------------------------+------------------------------------+----------------------+--------------------+----------+
 
 
 .. rubric:: ``wsrep_auto_increment_control``
@@ -120,6 +122,8 @@ This parameters significantly reduces the certification conflict rate for``INSER
    pair: Parameters; wsrep_causal_reads
 
 Enforce strict cluster-wide ``READ COMMITTED`` semantics on non-transactional reads. Results in larger read latencies. 
+
+.. seealso:: This feature has been **deprecated**.  It has been replaced by :ref:`wsrep_sync_wait <wsrep_sync_wait>`.
 
 
 .. rubric:: ``wsrep_certify_nonPK``
@@ -436,7 +440,7 @@ In these situations, all queries return error ``ER_UNKNOWN_COM_ERROR, "Unknown c
 .. index::
    pair: Parameters; wsrep_sst_method
 
-The method to use for state snapshot transfers. The ``wsrep_sst_<wsrep_sst_method>`` command will be called with the following arguments. For more information, see also :doc:`scriptablesst`.
+The method to use for state snapshot transfers. The ``wsrep_sst_method`` command will be called with the following arguments. For more information, see also :doc:`scriptablesst`.
 
 The supported methods are:
 
@@ -489,5 +493,25 @@ This variable exists for the sole purpose of notifying a joining node about stat
 Whether to store writesets locally for debugging. Not used in 0.8.
 
 
+.. rubric:: ``wsrep_sync_wait``
+.. _`wsrep_sync_wait`:
+.. index::
+  pair: Parameters; wsrep_sync_wait
+
+Controls causality checks on some SQL statements, such as ``SELECT``, ``BEGIN``/``END``, ``SHOW STATUS``, but not on some autocommit SQL statements ``UPDATE`` and ``INSERT``.
+
+Galera Cluster determines the type of causality check using a bitmask:
+
+- ``1`` Indicates check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
+
+- ``2`` Indicates check on ``UPDATE`` and ``DELETE`` statements.
+
+- ``4`` Indicates check on ``INSERT`` and ``REPLACE`` statements.
+
+This parameter deprecates :ref:`wsrep_causal_reads <wsrep_causal_reads>`.  Setting ``wsrep_sync_wait`` to ``1`` is the equivalent of setting ``wsrep_causal_reads`` to ``ON``.
+
+
+
 .. |---|   unicode:: U+2014 .. EM DASH
    :trim:
+
