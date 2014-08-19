@@ -497,16 +497,20 @@ Whether to store writesets locally for debugging. Not used in 0.8.
 .. _`wsrep_sync_wait`:
 .. index::
   pair: Parameters; wsrep_sync_wait
+.. index::
+  pair: Parameters; wsrep_causal_reads
 
-Controls causality checks on some SQL statements, such as ``SELECT``, ``BEGIN``/``END``, ``SHOW STATUS``, but not on some autocommit SQL statements ``UPDATE`` and ``INSERT``.
+Enforces stric cluster-wide causality checks.  Results in larger read latencies.
 
-Galera Cluster determines the type of causality check using a bitmask:
+The parameter value determines the type of causality checks to run, using a bitmask:
 
-- ``1`` Indicates check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
+- ``1`` Indicates a check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
 
-- ``2`` Indicates check on ``UPDATE`` and ``DELETE`` statements.
+- ``2`` Indicates a check on ``UPDATE`` and ``DELETE`` statements.
 
-- ``4`` Indicates check on ``INSERT`` and ``REPLACE`` statements.
+- ``3`` Indicates ``1`` or ``2``, a check on ``READ`` statements, as well as ``UPDATE`` and ``DELETE`` statements.
+
+- ``4`` Indicates a check on ``INSERT`` and ``REPLACE`` statements.
 
 This parameter deprecates :ref:`wsrep_causal_reads <wsrep_causal_reads>`.  Setting ``wsrep_sync_wait`` to ``1`` is the equivalent of setting ``wsrep_causal_reads`` to ``ON``.
 
