@@ -55,6 +55,13 @@ Prefix: %{_prefix}
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define distribution  rhel%{redhatversion}
 
+%if "%rhel" == "7"
+    %define distro_requires           chkconfig nmap
+%else
+    %define distro_requires           chkconfig nc
+%endif
+
+
 Name:		Percona-XtraDB-Cluster-galera-3
 Version:	%{galera_version}
 Release:	1.%{pxcg_revision}.%{?distribution}
@@ -76,11 +83,7 @@ This package contains the Galera library required by Percona XtraDB Cluster.
 Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
 Provides:       garbd3
-%if "%rhel" == "7"
-    Requires:       nmap chkconfig
-%else
-    Requires:       nc chkconfig
-%endif
+Requires:       %{distro_requires}
 
 %description -n Percona-XtraDB-Cluster-garbd-3
 This package contains the garb binary and init scripts.
