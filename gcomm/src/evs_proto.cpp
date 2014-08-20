@@ -468,6 +468,15 @@ void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
     }
     status.insert("evs_delayed", delayed_list_str);
 
+    std::string evict_list_str;
+    for (Protolay::EvictList::const_iterator i(evict_list().begin());
+         i != evict_list().end(); )
+    {
+        evict_list_str += EvictList::key(i).full_str();
+        if (++i != evict_list().end()) evict_list_str += ",";
+    }
+    status.insert("evs_evict_list", evict_list_str);
+
     if (info_mask_ & I_STATISTICS)
     {
         status.insert("evs_safe_hs", hs_safe_.to_string());
@@ -4597,6 +4606,9 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
                 evicts.insert(
                     std::make_pair(
                         elm_i->first, std::make_pair(0, 0))));
+            evs_log_info(I_STATE) << "eir " << eir.first->first
+                                  << " " << eir.first->second.first
+                                  << " " << eir.first->second.second;
             ++eir.first->second.second; // total count
             if (elm_i->second >= auto_evict_)
             {
@@ -4606,9 +4618,7 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
         }
     }
 
-    // If evict candidate was found, evict all candedates that have been
-    // reported by majority of current group as they are all probably
-    // behind bad link.
+    // Evict candidates that have reached threshold count
     for (Evicts::const_iterator i(evicts.begin());
          found == true && i != evicts.end(); ++i)
     {
@@ -4629,9 +4639,10 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
 
         // TODO: Record stable views from PC and use weights from there
         // accordingly (need to be added to view).
-        if ((current_view_.is_member(i->first) &&
-             i->second.second > current_view_.members().size()/2) ||
-            i->second.second > known_.size()/2)
+        if (i->second.first != 0 &&
+            ((current_view_.is_member(i->first) &&
+              i->second.second > current_view_.members().size()/2) ||
+             i->second.second > known_.size()/2))
         {
             log_warn << "evicting member " << i->first
                      << " at " << get_address(i->first)
