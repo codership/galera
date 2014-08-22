@@ -13,8 +13,8 @@
 # Should-Start:
 # Required-Stop:     $network
 # Should-Stop:
-# Default-Start:     3 4 5
-# Default-Stop:      0 1 2 6
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
 # Description:       Galera Arbitrator Daemon
 ### END INIT INFO
@@ -96,7 +96,7 @@ start() {
 	[ "$NETWORKING" = "no" ] && return 1
 
 	if grep -q -E '^# REMOVE' $config;then 
-	    log_daemon_msg "Garbd config $config is not configured yet"
+	    log_failure "Garbd config $config is not configured yet"
 	    return 0
 	fi
 
@@ -124,7 +124,14 @@ start() {
 		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
 		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
-		nc -z $HOST $PORT >/dev/null && break
+		if nc -h 2>&1 | grep -q  -- '-z';then
+                    nc -z $HOST $PORT >/dev/null && break
+                elif [[ -x `which nmap` ]];then
+                    nmap -Pn -p$PORT $HOST | awk "\$1 ~ /$PORT/ {print \$2}" | grep -q open && break
+                else
+                    log_failure "Neither netcat nor nmap are present for zero I/O scanning"
+                    return 1
+                fi
 	done
 	if [ ${ADDRESS} == "0" ]; then
 		log_failure "None of the nodes in $GALERA_NODES is accessible"
