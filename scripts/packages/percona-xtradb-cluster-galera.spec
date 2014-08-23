@@ -35,7 +35,7 @@ Prefix: %{_prefix}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 2.10
+ %define galera_version 2.11
 %endif
 
 %if %{undefined galera_revision}
@@ -54,6 +54,13 @@ Prefix: %{_prefix}
 
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define distribution  rhel%{redhatversion}
+
+%if "%rhel" == "7"
+    %define distro_requires           chkconfig nmap
+%else
+    %define distro_requires           chkconfig nc
+%endif
+
 
 Name:		Percona-XtraDB-Cluster-galera-2
 Version:	%{galera_version}
@@ -75,7 +82,7 @@ This package contains the Galera library required by Percona XtraDB Cluster.
 Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
 Provides:       garbd2
-Requires:       nc chkconfig
+Requires:       %{distro_requires}
 
 %description -n Percona-XtraDB-Cluster-garbd-2
 This package contains the garb binary and init scripts.
