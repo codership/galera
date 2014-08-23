@@ -18,5 +18,8 @@ override_dh_strip:
 	dh_strip -ppercona-xtradb-cluster-galera-2.x --dbg-package=percona-xtradb-cluster-galera-2.x-dbg
 	dh_strip -ppercona-xtradb-cluster-garbd-2.x --dbg-package=percona-xtradb-cluster-garbd-2.x-dbg
 
+override_dh_installinit:
+        dh_installinit -ppercona-xtradb-cluster-garbd-2.x  --name=garbd
+
 %:
 	dh $@ 
