@@ -14,6 +14,7 @@ function build_deb
 {
     # Create upstream tar.gz package
     local version="$1"
+    local debian_version="$(lsb_release -sc)"
 
     galera_dir="galera-$version"
     source_tar="galera-$version.tar.gz"
@@ -36,6 +37,7 @@ function build_deb
     cp -r debian "$galera_dir"
     cd "$galera_dir"
 
+    dch -m -D "$debian_version" --force-distribution -v "$version-$debian_version" "Version upgrade"
     DEB_BUILD_OPTIONS="parallel=$JOBS" dpkg-buildpackage -us -uc
 
     test -d "$galera_dir" && rm -rf "$galera_dir"
