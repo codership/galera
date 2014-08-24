@@ -1888,6 +1888,113 @@ START_TEST(test_gh_40)
 }
 END_TEST
 
+
+START_TEST(test_gh_100)
+{
+    log_info << "START (test_gh_100)";
+    gu::Config conf;
+    mark_point();
+    gcomm::Conf::register_params(conf);
+    conf.set("evs.info_log_mask", "0x3");
+    conf.set("evs.debug_log_mask", "0xa0");
+    UUID uuid1(1), uuid2(2);
+    DummyTransport t1(uuid1), t2(uuid2);
+    mark_point();
+    DummyUser u1(conf), u2(conf);
+    mark_point();
+    Proto p1(conf, uuid1, 0, gu::URI("evs://"), 10000, 0);
+    // Start p2 view seqno from higher value than p1
+    View p2_rst_view(ViewId(V_REG, uuid2, 3));
+    Proto p2(conf, uuid2, 0, gu::URI("evs://"), 10000, &p2_rst_view);
+
+    gcomm::connect(&t1, &p1);
+    gcomm::connect(&p1, &u1);
+
+    gcomm::connect(&t2, &p2);
+    gcomm::connect(&p2, &u2);
+
+    single_join(&t1, &p1);
+
+
+    // The following is from double_join(). Process messages until
+    // install message is generated. After that handle install timer
+    // on p1 and verify that the newly generated install message has
+    // greater install view id seqno than the first one.
+    Message jm;
+    Message im;
+    Message im2;
+    Message gm;
+    Message gm2;
+    Message msg;
+
+    Datagram* rb;
+
+    // Initial states check
+    p2.shift_to(Proto::S_JOINING);
+    fail_unless(p1.state() == Proto::S_OPERATIONAL);
+    fail_unless(p2.state() == Proto::S_JOINING);
+
+    // Send join message, don't self handle immediately
+    // Expected output: one join message
+    p2.send_join(false);
+    fail_unless(p2.state() == Proto::S_JOINING);
+    rb = get_msg(&t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t2, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 2's join on node 1
+    // Expected output: shift to S_GATHER and one join message
+    p1.handle_msg(jm);
+    fail_unless(p1.state() == Proto::S_GATHER);
+    rb = get_msg(&t1, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t1, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 1's join on node 2
+    // Expected output: shift to S_GATHER and one join message
+    p2.handle_msg(jm);
+    fail_unless(p2.state() == Proto::S_GATHER);
+    rb = get_msg(&t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t2, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 2's join on node 1
+    // Expected output: Install and commit gap messages, state stays in S_GATHER
+    p1.handle_msg(jm);
+    fail_unless(p1.state() == Proto::S_GATHER);
+    rb = get_msg(&t1, &im);
+    fail_unless(rb != 0);
+    fail_unless(im.type() == Message::T_INSTALL);
+    rb = get_msg(&t1, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) != 0);
+    rb = get_msg(&t1, &msg);
+    fail_unless(rb == 0);
+
+    // usleep(1100000);
+
+    // Handle timers to  to generate shift to GATHER
+    p1.handle_inactivity_timer();
+    p1.handle_install_timer();
+    rb = get_msg(&t1, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t1, &im2);
+    fail_unless(rb != 0);
+    fail_unless(im2.type() == Message::T_INSTALL);
+    fail_unless(im2.install_view_id().seq() > im.install_view_id().seq());
+
+}
+END_TEST
+
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -2036,7 +2143,7 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_trac_760);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
-        
+
         tc = tcase_create("test_gh_41");
         tcase_add_test(tc, test_gh_41);
         tcase_set_timeout(tc, 15);
@@ -2046,12 +2153,16 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_gh_37);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
-        
+
         tc = tcase_create("test_gh_40");
         tcase_add_test(tc, test_gh_40);
         tcase_set_timeout(tc, 5);
         suite_add_tcase(s, tc);
     }
+
+    tc = tcase_create("test_gh_100");
+    tcase_add_test(tc, test_gh_100);
+    suite_add_tcase(s, tc);
 
     return s;
 }
