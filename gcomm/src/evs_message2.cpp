@@ -39,6 +39,7 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Message& msg)
     os << "f=" << static_cast<int>(msg.flags()) << ",";
     os << "src=" << msg.source() << ",";
     os << "srcvid=" << msg.source_view_id() << ",";
+    os << "insvid=" << msg.install_view_id() << ",";
     os << "ru=" << msg.range_uuid() << ",";
     os << "r=" << msg.range() << ",";
     os << "fs=" << msg.fifo_seq() << ",";
