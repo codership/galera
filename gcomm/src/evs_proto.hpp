@@ -128,7 +128,8 @@ public:
     Proto(gu::Config&    conf,
           const UUID&    my_uuid,
           const gu::URI& uri = gu::URI("evs://"),
-          const size_t   mtu = std::numeric_limits<size_t>::max());
+          const size_t   mtu = std::numeric_limits<size_t>::max(),
+          const View*    rst_view = 0);
     ~Proto();
 
     const UUID& uuid() const { return my_uuid_; }

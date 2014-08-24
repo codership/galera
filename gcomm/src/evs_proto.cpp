@@ -42,7 +42,8 @@ using namespace std::rel_ops;
 gcomm::evs::Proto::Proto(gu::Config&    conf,
                          const UUID&    my_uuid,
                          const gu::URI& uri,
-                         const size_t   mtu)
+                         const size_t   mtu,
+                         const View* rst_view)
     :
     Protolay(conf),
     timers_(),
@@ -141,7 +142,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     causal_keepalive_period_(retrans_period_),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
-    current_view_(ViewId(V_TRANS, my_uuid, 0)),
+    current_view_(ViewId(V_TRANS, my_uuid,
+                         rst_view ? rst_view -> id().seq() + 1 : 0)),
     previous_view_(),
     previous_views_(),
     gather_views_(),

@@ -1903,10 +1903,10 @@ START_TEST(test_gh_100)
     mark_point();
     DummyUser u1(conf), u2(conf);
     mark_point();
-    Proto p1(conf, uuid1, 0, gu::URI("evs://"), 10000, 0);
+    Proto p1(conf, uuid1, gu::URI("evs://"), 10000, 0);
     // Start p2 view seqno from higher value than p1
     View p2_rst_view(ViewId(V_REG, uuid2, 3));
-    Proto p2(conf, uuid2, 0, gu::URI("evs://"), 10000, &p2_rst_view);
+    Proto p2(conf, uuid2, gu::URI("evs://"), 10000, &p2_rst_view);
 
     gcomm::connect(&t1, &p1);
     gcomm::connect(&p1, &u1);
