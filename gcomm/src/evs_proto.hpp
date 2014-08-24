@@ -51,6 +51,40 @@ namespace gcomm
         class InputMapMsg;
         class Proto;
         std::ostream& operator<<(std::ostream&, const Proto&);
+
+        //
+        // Helper class for getting the location where
+        // certain methods are called from.
+        //
+        // Example usage:
+        // Method prototype:
+        // void fun(EVS_CALLER_ARG, int a)
+        //
+        // Calling:
+        // fun(EVS_CALLER, a)
+        //
+        // Logging inside function:
+        // log_debug << EVS_LOG_METHOD << "log message"
+        //
+        class Caller
+        {
+        public:
+            Caller(const char* const file, const int line) :
+                file_(file),
+                line_(line)
+            { }
+            friend std::ostream& operator<<(std::ostream&, const Caller&);
+        private:
+            const char* const file_;
+            const int         line_;
+        };
+        inline std::ostream& operator<<(std::ostream& os, const Caller& caller)
+        {
+            return (os << caller.file_ << ": " << caller.line_ << ": ");
+        }
+#define EVS_CALLER_ARG const Caller& caller
+#define EVS_CALLER Caller(__FILE__, __LINE__)
+#define EVS_LOG_METHOD __FUNCTION__ << " called from " << caller
     }
 }
 
@@ -60,6 +94,7 @@ namespace gcomm
  */
 class gcomm::evs::Proto : public Protolay
 {
+
 public:
     enum State {
         S_CLOSED,
@@ -130,14 +165,15 @@ public:
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
     int send_delegate(Datagram&);
-    void send_gap(const UUID&, const ViewId&, const Range,
+    void send_gap(EVS_CALLER_ARG,
+                  const UUID&, const ViewId&, const Range,
                   bool commit = false, bool req_all = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
-    void send_install();
+    void send_install(EVS_CALLER_ARG);
     void send_evict_list();
 
     void resend(const UUID&, const Range);
@@ -428,6 +464,8 @@ private:
     Consensus consensus_;
     // Last received install message
     InstallMessage* install_message_;
+    // Highest seen view id seqno
+    uint32_t max_view_id_seq_;
     // Install attempt counter
     uint32_t attempt_seq_;
     // Install timeout counting

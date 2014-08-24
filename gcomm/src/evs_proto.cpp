@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
 #ifdef PROFILE_EVS_PROTO
@@ -161,6 +161,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     causal_queue_(),
     consensus_(*this, known_, *input_map_, current_view_),
     install_message_(0),
+    max_view_id_seq_(0),
     attempt_seq_(1),
     max_install_timeouts_(
         check_range(Conf::EvsMaxInstallTimeouts,
@@ -639,7 +640,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
             }
             evs_log_debug(D_GAP_MSGS) << "resend commit gap";
             // Resend commit gap
-            gu_trace(send_gap(UUID::nil(),
+            gu_trace(send_gap(EVS_CALLER, UUID::nil(),
                               install_message_->install_view_id(),
                               Range(), true));
         }
@@ -652,10 +653,10 @@ void gcomm::evs::Proto::handle_retrans_timer()
     else if (state() == S_INSTALL)
     {
         gcomm_assert(install_message_ != 0);
-        gu_trace(send_gap(UUID::nil(),
+        gu_trace(send_gap(EVS_CALLER, UUID::nil(),
                           install_message_->install_view_id(),
                           Range(), true));
-        gu_trace(send_gap(UUID::nil(),
+        gu_trace(send_gap(EVS_CALLER, UUID::nil(),
                           install_message_->install_view_id(),
                           Range()));
     }
@@ -775,7 +776,7 @@ void gcomm::evs::Proto::handle_install_timer()
     evs_log_info(I_STATE) << "repr     : " << is_repr;
     if (is_cons == true && is_repr == true)
     {
-        send_install();
+        send_install(EVS_CALLER);
     }
     install_timeout_count_++;
 }
@@ -985,7 +986,7 @@ void gcomm::evs::Proto::check_inactive()
                     // Request recovering message from all nodes (indicated
                     // by last arg) to increase probablity of receiving the
                     // message.
-                    gu_trace(send_gap(node_uuid, current_view_.id(),
+                    gu_trace(send_gap(EVS_CALLER, node_uuid, current_view_.id(),
                                       Range(range.lu(), last_sent_),
                                       false, true));
                 }
@@ -1686,15 +1687,13 @@ int gcomm::evs::Proto::send_delegate(Datagram& wb)
 }
 
 
-void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
+void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
+                                 const UUID&   range_uuid,
                                  const ViewId& source_view_id,
                                  const Range   range,
                                  const bool    commit,
                                  const bool    req_all)
 {
-    evs_log_debug(D_GAP_MSGS) << "sending gap  to "
-                              << range_uuid
-                              << " requesting range " << range;
     gcomm_assert((commit == false && source_view_id == current_view_.id())
                  || install_message_ != 0);
     // TODO: Investigate if gap sending can be somehow limited,
@@ -1718,6 +1717,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
                   range,
                   flags);
 
+    evs_log_debug(D_GAP_MSGS) << EVS_LOG_METHOD << gm;
     gu::Buffer buf;
     serialize(gm, buf);
     Datagram dg(buf);
@@ -1959,7 +1959,7 @@ struct ViewIdCmp
 };
 
 
-void gcomm::evs::Proto::send_install()
+void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
 {
     gcomm_assert(consensus_.is_consensus() == true &&
                  is_representative(uuid()) == true) << *this;
@@ -1969,8 +1969,9 @@ void gcomm::evs::Proto::send_install()
     NodeMap::const_iterator max_node =
         max_element(oper_list.begin(), oper_list.end(), ViewIdCmp());
 
-    const uint32_t max_view_id_seq =
-        NodeMap::value(max_node).join_message()->source_view_id().seq();
+    max_view_id_seq_ =
+        std::max(max_view_id_seq_,
+                 NodeMap::value(max_node).join_message()->source_view_id().seq());
 
     MessageNodeList node_list;
     populate_node_list(&node_list);
@@ -1978,14 +1979,14 @@ void gcomm::evs::Proto::send_install()
     InstallMessage imsg(version_,
                         uuid(),
                         current_view_.id(),
-                        ViewId(V_REG, uuid(), max_view_id_seq + attempt_seq_),
+                        ViewId(V_REG, uuid(), max_view_id_seq_ + attempt_seq_),
                         input_map_->safe_seq(),
                         input_map_->aru_seq(),
                         ++fifo_seq_,
                         node_list);
     ++attempt_seq_;
-    evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
-    evs_log_info(I_STATE) << "sending install message";
+    evs_log_debug(D_INSTALL_MSGS) << EVS_LOG_METHOD << imsg;
+    evs_log_info(I_STATE) << "sending install message" << imsg;
     gcomm_assert(consensus_.is_consistent(imsg));
 
     gu::Buffer buf;
@@ -2336,6 +2337,13 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         }
         evs_log_debug(D_FOREIGN_MSGS)
             << "dropping non-membership message from foreign view";
+        return;
+    }
+    else if (NodeMap::value(ii).index() == std::numeric_limits<size_t>::max() &&
+             msg.source_view_id()       == current_view_.id())
+    {
+        log_warn << "Message from node that claims to come from same view but is not in current view " << msg;
+        assert(0);
         return;
     }
 
@@ -2806,7 +2814,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         attempt_seq_ = 1;
         install_timeout_count_ = 0;
         profile_enter(send_gap_prof_);
-        gu_trace(send_gap(UUID::nil(), current_view_.id(), Range()));;
+        gu_trace(send_gap(EVS_CALLER, UUID::nil(), current_view_.id(), Range()));;
         profile_leave(send_gap_prof_);
         gcomm_assert(state() == S_OPERATIONAL);
         reset_timer(T_INACTIVITY);
@@ -3312,7 +3320,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                                  << " due to input map gap, aru "
                                  << input_map_->aru_seq();
         profile_enter(send_gap_prof_);
-        gu_trace(send_gap(msg.source(), current_view_.id(), range));
+        gu_trace(send_gap(EVS_CALLER, msg.source(), current_view_.id(), range));
         profile_leave(send_gap_prof_);
     }
 
@@ -3333,7 +3341,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         // Output queue empty and aru changed, send gap to inform others
         evs_log_debug(D_GAP_MSGS) << "sending empty gap";
         profile_enter(send_gap_prof_);
-        gu_trace(send_gap(UUID::nil(), current_view_.id(), Range()));
+        gu_trace(send_gap(EVS_CALLER, UUID::nil(), current_view_.id(), Range()));
         profile_leave(send_gap_prof_);
     }
 
@@ -3419,7 +3427,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             if (is_all_committed() == true)
             {
                 shift_to(S_INSTALL);
-                gu_trace(send_gap(UUID::nil(),
+                gu_trace(send_gap(EVS_CALLER, UUID::nil(),
                                   install_message_->install_view_id(),
                                   Range()));;
             }
@@ -4050,7 +4058,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                     const Range r(input_map_->range(node.index()));
                     if (r.lu() <= last_sent_)
                     {
-                        send_gap(uuid, current_view_.id(),
+                        send_gap(EVS_CALLER, uuid, current_view_.id(),
                                  Range(r.lu(), last_sent_));
                     }
                 }
@@ -4284,7 +4292,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if (is_representative(uuid()) == true)
         {
-            gu_trace(send_install());
+            gu_trace(send_install(EVS_CALLER));
         }
     }
 }
@@ -4531,7 +4539,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         assert(install_message_->flags() != 0);
         profile_enter(send_gap_prof_);
         // Send commit gap
-        gu_trace(send_gap(UUID::nil(), install_message_->install_view_id(),
+        gu_trace(send_gap(EVS_CALLER, UUID::nil(), install_message_->install_view_id(),
                           Range(), true));
         profile_leave(send_gap_prof_);
     }

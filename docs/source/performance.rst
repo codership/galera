@@ -12,12 +12,15 @@
 Write-set Caching during State Transfers
 -----------------------------------------
 .. _`gcache-during-state-transfers`:
+.. index::
+   pair: Performance; gcache
+
 
 A node under normal operations does not consume much more memory than a regular MySQL server.  The certification index and uncommitted write-sets cause some additional usage, but this is not usually noticeable in typical applications.  Write-set caching during state transfers is the exception.
 
 When a node receives a state transfer, it cannot process or apply incoming write-sets, because it does not at this point have a state to apply them to.  Depending on the state transfer method, (**mysqldump**, for instance), the sending node may also be unable to process or apply write-sets.
 
-The Write-set Cache, (or GCache), caches write-sets on memory-mapped files to disk.  Galera Cluster allocates these files as needed.  Meaning that the limit for the cache is the available disk space.
+The Write-set Cache, (or GCache), caches write-sets on Memory-mapped files to disk.  Galera Cluster allocates these files as needed.  Meaning that the limit for the cache is the available disk space.
 
 Writing to disk reduces memory consumption.
 
@@ -28,9 +31,9 @@ Customizing the Write-set Cache Size
 -------------------------------------
 .. _`customizing-gcache-size`:
 .. index::
-   pair: Configuration Tips; gcache.size
+   pair: Performance; gcache.size
 .. index::
-   pair: Configuration Tips; wsrep_received_bytes
+   pair: Performance; wsrep_received_bytes
 
 You can define the size of the write-set cache using the ``gcache.size`` parameter.  The write-set cache should be smaller than the size of the database.
 
@@ -71,11 +74,11 @@ Setting Parallel Slave Threads
 -----------------------------------
 .. _`parallel-slave-threads`:
 .. index::
-   pair: Configuration Tips; innodb_autoinc_lock_mode
+   pair: Performance; innodb_autoinc_lock_mode
 .. index::
-   pair: Configuration Tips; innodb_locks_unsafe_for_binlog
+   pair: Performance; innodb_locks_unsafe_for_binlog
 .. index::
-   pair: Configuration Tips, wsrep_slave_threads
+   pair: Performance; wsrep_slave_threads
 
 There is no rule about how many slave threads you need for replication.  Parallel threads do not guarantee better performance.  But, parallel applying does not impair regular operation performance and may speed up the synchronization of new nodes with the cluster.
 
