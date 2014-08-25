@@ -7,6 +7,7 @@
 
 #include "evs_message2.hpp"
 
+
 #include "gcomm/map.hpp"
 #include "gcomm/uuid.hpp"
 #include "gu_datetime.hpp"
@@ -27,6 +28,7 @@ namespace gcomm
         std::ostream& operator<<(std::ostream&, const Node&);
         class InspectNode;
         class OperationalSelect;
+        class Proto;
     }
 }
 
@@ -34,9 +36,9 @@ namespace gcomm
 class gcomm::evs::Node
 {
 public:
-    Node(const gu::datetime::Period& inactive_timeout,
-         const gu::datetime::Period& suspect_timeout)
+    Node(const Proto& proto)
         :
+        proto_             (proto),
         index_             (std::numeric_limits<size_t>::max()),
         operational_       (true),
         suspected_         (false),
@@ -46,9 +48,8 @@ public:
         join_message_      (0),
         leave_message_     (0),
         evict_list_message_(0),
-        suspect_timeout_   (suspect_timeout),
-        inactive_timeout_  (inactive_timeout),
         tstamp_            (gu::datetime::Date::now()),
+        seen_tstamp_       (tstamp_),
         fifo_seq_          (-1),
         segment_           (0)
     {}
@@ -95,6 +96,9 @@ public:
     void set_tstamp(const gu::datetime::Date& t) { tstamp_ = t; }
     const gu::datetime::Date& tstamp() const { return tstamp_; }
 
+    void set_seen_tstamp(const gu::datetime::Date& t) { seen_tstamp_ = t; }
+    const gu::datetime::Date& seen_tstamp() const { return seen_tstamp_; }
+
     void set_fifo_seq(const int64_t seq) { fifo_seq_ = seq; }
     int64_t fifo_seq() const { return fifo_seq_; }
     SegmentId segment() const { return segment_; }
@@ -102,21 +106,13 @@ public:
     bool is_inactive() const;
     bool is_suspected() const;
 
-    void set_suspect_timeout(const gu::datetime::Period& p)
-    {
-        suspect_timeout_ = p;
-    }
-    void set_inactive_timeout(const gu::datetime::Period& p)
-    {
-        inactive_timeout_ = p;
-    }
-
 private:
 
     void operator=(const Node&);
 
     friend class InspectNode;
 
+    const Proto& proto_;
     // Index for input map
     size_t index_;
     // True if instance is considered to be operational (has produced messages)
@@ -133,12 +129,13 @@ private:
     LeaveMessage* leave_message_;
     // Evict list message
     EvictListMessage* evict_list_message_;
-    gu::datetime::Period suspect_timeout_;
-    //
-    gu::datetime::Period inactive_timeout_;
-    //
+    // Timestamp denoting the last time a message from node
+    // advanced input map state or membership protocol. This is used
+    // for determining if the node should become suspected/inactive.
     gu::datetime::Date tstamp_;
-    //
+    // Timestamp denoting the time when the node was seen last time.
+    // This is used to decide if the node should be considered delayed.
+    gu::datetime::Date seen_tstamp_;
     int64_t fifo_seq_;
     SegmentId segment_;
 };
@@ -166,38 +163,7 @@ private:
 class gcomm::evs::InspectNode
 {
 public:
-    void operator()(std::pair<const gcomm::UUID, Node>& p) const
-    {
-        Node& node(p.second);
-        gu::datetime::Date now(gu::datetime::Date::now());
-        if (node.tstamp() + node.suspect_timeout_ < now)
-        {
-            if (node.suspected_ == false)
-            {
-                log_debug << "declaring node with index "
-                          << node.index_
-                          << " suspected, timeout " << node.suspect_timeout_;
-            }
-            node.suspected_ = true;
-        }
-        else
-        {
-            node.suspected_ = false;
-        }
-        if (node.tstamp() + node.inactive_timeout_ < now)
-        {
-            if (node.inactive_ == false)
-            {
-                log_debug << "declaring node with index "
-                          << node.index_ << " inactive ";
-            }
-            node.inactive_ = true;
-        }
-        else
-        {
-            node.inactive_ = false;
-        }
-    }
+    void operator()(std::pair<const gcomm::UUID, Node>& p) const;
 };
 
 

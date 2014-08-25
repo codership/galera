@@ -402,6 +402,8 @@ private:
     SegmentId segment_;
     //
     // Known instances
+    friend class Node;
+    friend class InspectNode;
     NodeMap known_;
     NodeMap::iterator self_i_;
     //

@@ -223,8 +223,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     //
 
     known_.insert_unique(
-        std::make_pair(my_uuid_,
-                       Node(inactive_timeout_, suspect_timeout_)));
+        std::make_pair(my_uuid_, Node(*this)));
     self_i_ = known_.begin();
     assert(NodeMap::value(self_i_).operational() == true);
 
@@ -314,10 +313,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsSuspectTimeoutMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsSuspectTimeout, gu::to_string(suspect_timeout_));
-        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
-        {
-            NodeMap::value(i).set_suspect_timeout(suspect_timeout_);
-        }
         reset_timer(T_INACTIVITY);
         return true;
     }
@@ -329,10 +324,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsInactiveTimeoutMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsInactiveTimeout, gu::to_string(inactive_timeout_));
-        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
-        {
-            NodeMap::value(i).set_inactive_timeout(inactive_timeout_);
-        }
         reset_timer(T_INACTIVITY);
         return true;
     }
@@ -933,10 +924,13 @@ void gcomm::evs::Proto::check_inactive()
 
     bool has_inactive(false);
     size_t n_suspected(0);
-
     bool do_send_evict_list(false);
-    for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
+
+    // Iterate over known nodes and check inactive/suspected/delayed status
+    for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
     {
+        if (i == self_i_) continue; // No need to check self
+
         const UUID& node_uuid(NodeMap::key(i));
         Node& node(NodeMap::value(i));
         if (node_uuid                  != uuid()    &&
@@ -969,14 +963,12 @@ void gcomm::evs::Proto::check_inactive()
         }
 
         DelayedList::iterator dli(delayed_list_.find(node_uuid));
-        if (node.tstamp() + retrans_period_ + delay_margin_ <= now)
+        if (node.seen_tstamp() + retrans_period_ + delay_margin_ <= now)
         {
             if (node.index() != std::numeric_limits<size_t>::max())
             {
                 // Delayed node in group, check input map state and request
                 // message recovery if necessary
-                log_info << "Node tstamp " << node.tstamp() << " own tstamp "
-                         << NodeMap::value(self_i_).tstamp();
                 Range range(input_map_->range(node.index()));
                 evs_log_info(I_STATE) << "delayed "
                                       << node_uuid << " requesting range "
@@ -2198,8 +2190,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     NodeMap::iterator i;
     gu_trace(i = known_.insert_unique(
-                 std::make_pair(
-                     source, Node(inactive_timeout_, suspect_timeout_))));
+                 std::make_pair(source, Node(*this))));
     assert(NodeMap::value(i).operational() == true);
 
     if (state() == S_JOINING || state() == S_GATHER ||
@@ -2268,6 +2259,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     }
 
     Node& node(NodeMap::value(ii));
+    node.set_seen_tstamp(gu::datetime::Date::now());
 
     if (node.operational()                 == false &&
         node.leave_message()               == 0     &&
@@ -4191,8 +4183,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (ni == known_.end())
         {
             known_.insert_unique(
-                std::make_pair(mn_uuid,
-                               Node(inactive_timeout_, suspect_timeout_)));
+                std::make_pair(mn_uuid, Node(*this)));
         }
 
         // Evict nodes according to join message

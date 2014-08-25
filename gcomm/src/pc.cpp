@@ -215,6 +215,10 @@ void gcomm::PC::close(bool force)
     closed_ = true;
 }
 
+void gcomm::PC::handle_get_status(gu::Status& status) const
+{
+    status.insert("gcomm_uuid", uuid().full_str());
+}
 
 gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     Transport (net, uri),

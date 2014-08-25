@@ -3,6 +3,7 @@
  */
 
 #include "evs_node.hpp"
+#include "evs_proto.hpp"
 #include "evs_message2.hpp"
 
 #include <ostream>
@@ -31,6 +32,7 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Node& n)
 
 gcomm::evs::Node::Node(const Node& n)
     :
+    proto_           (n.proto_),
     index_           (n.index_),
     operational_     (n.operational_),
     suspected_       (n.suspected_),
@@ -43,9 +45,8 @@ gcomm::evs::Node::Node(const Node& n)
                       new LeaveMessage(*n.leave_message_) : 0),
     evict_list_message_ (n.evict_list_message_ != 0 ?
                          new EvictListMessage(*n.evict_list_message_) : 0),
-    suspect_timeout_ (n.suspect_timeout_),
-    inactive_timeout_(n.inactive_timeout_),
     tstamp_          (n.tstamp_),
+    seen_tstamp_     (n.seen_tstamp_),
     fifo_seq_        (n.fifo_seq_),
     segment_         (n.segment_)
 { }
@@ -108,4 +109,39 @@ bool gcomm::evs::Node::is_suspected() const
 bool gcomm::evs::Node::is_inactive() const
 {
     return inactive_;
+}
+
+
+void gcomm::evs::InspectNode::operator()(std::pair<const gcomm::UUID, Node>& p) const
+{
+    Node& node(p.second);
+    gu::datetime::Date now(gu::datetime::Date::now());
+    if (node.tstamp() + node.proto_.suspect_timeout_ < now)
+    {
+        if (node.suspected_ == false)
+        {
+            log_debug << "declaring node with index "
+                      << node.index_
+                      << " suspected, timeout "
+                      << node.proto_.suspect_timeout_;
+        }
+        node.suspected_ = true;
+    }
+    else
+    {
+        node.suspected_ = false;
+    }
+    if (node.tstamp() + node.proto_.inactive_timeout_ < now)
+    {
+        if (node.inactive_ == false)
+        {
+            log_debug << "declaring node with index "
+                      << node.index_ << " inactive ";
+        }
+        node.inactive_ = true;
+    }
+    else
+    {
+        node.inactive_ = false;
+    }
 }
