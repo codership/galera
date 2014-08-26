@@ -1,3 +1,9 @@
+percona-xtradb-cluster-galera-2.x (@@GALERA_VERSION@@-1) unstable; urgency=low
+
+  * Added GALERA_VERSION variable.
+
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Mon, 25 Aug 2014 16:12:23 -0500
+
 percona-xtradb-cluster-galera-2.x (0.3-1) unstable; urgency=low
 
   * Initial release
