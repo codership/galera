@@ -9,7 +9,8 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-.PHONY: override_dh_strip
+%:
+	dh $@
 
 build:
 	scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd libgalera_smm.so $(SCONS_ARGS)
@@ -21,5 +22,4 @@ override_dh_strip:
 override_dh_installinit:
         dh_installinit -ppercona-xtradb-cluster-garbd-3.x  --name=garbd
 
-%:
-	dh $@ 
+.PHONY: override_dh_strip override_dh_installinit
