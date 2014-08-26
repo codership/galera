@@ -7,7 +7,7 @@
 # This special exception was added by Craig Small in version 0.37 of dh-make.
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 
 %:
 	dh $@
@@ -22,4 +22,3 @@ override_dh_strip:
 override_dh_installinit:
         dh_installinit -ppercona-xtradb-cluster-garbd-3.x  --name=garbd
 
-.PHONY: override_dh_strip override_dh_installinit
