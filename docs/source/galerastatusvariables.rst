@@ -176,19 +176,29 @@ The location (L) of the variable is presented in the second column from the left
 .. index::
    pair: Parameters; wsrep_evs_repl_latency
 
-The variable provides the group communication replication latency.  Galera measures latency from the time point when a message is sent out to the time point when a message is received.
+This status variable provides figures for the replication latency on group communication.  It measures latency from the time point when a message is sent out to the time point when a message is received.  As replication is a group operation, this essentially gives you the slowest ACK and longest RTT in the cluster.
 
-Example::
+For example,
 
-  0.00243433/0.144022/0.591963/0.215824/13
+.. code-block:: mysql
 
-Galera formats the status variable into the following fields:
+	SHOW STATUS LIKE 'wsrep_evs_repl_latency';
 
-- Minimum
-- Average
-- Maximum
-- Standard Deviation
-- Sample Size
+	+------------------------+------------------------------------------+
+	| Variable_name          | Value                                    |
+	+------------------------+------------------------------------------+
+	| wsrep_evs_repl_latency | 0.00243433/0.144022/0.591963/0.215824/13 |
+	+------------------------+------------------------------------------+
+
+The units are in seconds.  The format of the return value is:
+
+.. code-block:: plain
+
+	Minimum / Average / Maximum / Standard Deviation / Sample Size
+
+This variable periodically resets.  You can control the reset interval using the :ref:`evs.stats_report_period <evs.stats_report_period>` parameter.  The default value is 1 minute.
+
+
 
 
 .. rubric:: ``wsrep_local_state_uuid``
