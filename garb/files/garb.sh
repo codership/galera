@@ -124,7 +124,7 @@ start() {
 		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
 		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
-		if nc -h 2>&1 | grep -q  -- '-z';then
+		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
                     nc -z $HOST $PORT >/dev/null && break
                 elif [[ -x `which nmap` ]];then
                     nmap -Pn -p$PORT $HOST | awk "\$1 ~ /$PORT/ {print \$2}" | grep -q open && break
