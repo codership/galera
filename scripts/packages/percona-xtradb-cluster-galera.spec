@@ -52,6 +52,19 @@ Prefix: %{_prefix}
  %define scons_arch %{nil}
 %endif
 
+
+%bcond_with systemd
+#
+%if %{with systemd}
+  %define systemd 1
+%else
+  %if 0%{?rhel} > 6
+    %define systemd 1
+  %else
+    %define systemd 0
+  %endif
+%endif
+
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define distribution  rhel%{redhatversion}
 
@@ -84,6 +97,18 @@ Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
 Provides:       garbd3
 Requires:       %{distro_requires}
+%if 0%{?systemd}
+BuildRequires:  systemd
+%endif
+%if 0%{?systemd}
+Requires(post):   systemd
+Requires(preun):  systemd
+Requires(postun): systemd
+%else
+Requires(post):   /sbin/chkconfig
+Requires(preun):  /sbin/chkconfig
+Requires(preun):  /sbin/service
+%endif
 
 %description -n Percona-XtraDB-Cluster-garbd-3
 This package contains the garb binary and init scripts.
@@ -105,11 +130,19 @@ mkdir -p "$RPM_BUILD_ROOT"
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/{init.d,sysconfig}
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.cnf \
     $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/garb
-install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.sh \
-    $RPM_BUILD_ROOT%{_sysconfdir}/init.d/garb
-
 install -d "$RPM_BUILD_ROOT/%{_bindir}"
 install -d "$RPM_BUILD_ROOT/%{_libdir}"
+
+%if 0%{?systemd}
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.service \
+    $RPM_BUILD_ROOT/%{_unitdir}/garb.service
+install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.sh \
+    $RPM_BUILD_ROOT/%{_bindir}/garb-systemd
+%else
+install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.sh \
+    $RPM_BUILD_ROOT%{_sysconfdir}/init.d/garb
+%endif
+
 install -m 755 "$RPM_BUILD_DIR/%{src_dir}/garb/garbd" \
 	"$RPM_BUILD_ROOT/%{_bindir}/"
 install -d "$RPM_BUILD_ROOT/%{_libdir}/galera3"
@@ -147,7 +180,12 @@ rm -rf $RPM_BUILD_ROOT
 %files -n Percona-XtraDB-Cluster-garbd-3
 %defattr(-,root,root,-)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
-%attr(0755,root,root) %{_sysconfdir}/init.d/garb
+%if 0%{?systemd}
+    %attr(0644, root, root) %{_unitdir}/garb.service
+    %attr(0755,root,root) %{_bindir}/garb-systemd
+%else 
+    %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+%endif
 %attr(0755,root,root) %{_bindir}/garbd
 %doc %attr(0644,root,root) %{docs2}/COPYING
 %doc %attr(0644,root,root) %{docs2}/README
