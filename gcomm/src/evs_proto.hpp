@@ -517,7 +517,7 @@ private:
                        const gu::datetime::Period decay_period,
                        const gu::datetime::Date now)
         {
-            if (state_ != state)
+            if (state == S_DELAYED && state_ != state)
             {
                 // Limit to 0xff, see EvictList format in EvictListMessage
                 // restricts this value to uint8_t max.
