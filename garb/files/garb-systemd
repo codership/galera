@@ -53,7 +53,7 @@ start() {
 		return 1
 	fi
 
-	OPTIONS="-d -a gcomm://$ADDRESS"
+	OPTIONS=" -a gcomm://$ADDRESS "
 	[ -n "$GALERA_GROUP" ]   && OPTIONS="$OPTIONS -g $GALERA_GROUP"
 	[ -n "$GALERA_OPTIONS" ] && OPTIONS="$OPTIONS -o $GALERA_OPTIONS"
 	[ -n "$LOG_FILE" ]       && OPTIONS="$OPTIONS -l $LOG_FILE"
