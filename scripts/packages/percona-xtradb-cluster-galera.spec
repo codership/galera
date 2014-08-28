@@ -189,6 +189,21 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0644,root,root) %{docs2}/COPYING
 %doc %attr(0644,root,root) %{docs2}/README
 
+%post -n Percona-XtraDB-Cluster-garbd-3
+%if 0%{?systemd}
+  %systemd_post garb
+%endif
+
+%preun -n Percona-XtraDB-Cluster-garbd-3
+%if 0%{?systemd}
+    %systemd_preun garb
+%endif
+
+%postun -n Percona-XtraDB-Cluster-garbd-3
+%if 0%{?systemd}
+    %systemd_postun_with_restart garb
+%endif
+
 %changelog
 * Sun Mar 9 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 - Split the packaging for garbd.
