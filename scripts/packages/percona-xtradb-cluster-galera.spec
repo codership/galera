@@ -189,17 +189,17 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0644,root,root) %{docs2}/COPYING
 %doc %attr(0644,root,root) %{docs2}/README
 
-%post -n Percona-XtraDB-Cluster-garbd-3
+%post -n Percona-XtraDB-Cluster-garbd-2
 %if 0%{?systemd}
   %systemd_post garb
 %endif
 
-%preun -n Percona-XtraDB-Cluster-garbd-3
+%preun -n Percona-XtraDB-Cluster-garbd-2
 %if 0%{?systemd}
     %systemd_preun garb
 %endif
 
-%postun -n Percona-XtraDB-Cluster-garbd-3
+%postun -n Percona-XtraDB-Cluster-garbd-2
 %if 0%{?systemd}
     %systemd_postun_with_restart garb
 %endif
