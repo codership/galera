@@ -22,6 +22,7 @@
 //
 
 #include "gu_utils.hpp"
+#include "gu_string_utils.hpp"
 
 #include <mysql++.h>
 
