@@ -2,6 +2,7 @@
 #
 
 
+config=/etc/sysconfig/garb
 
 log_failure() {
     echo " ERROR! $@"
