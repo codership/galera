@@ -506,7 +506,7 @@ private:
             addr_      (addr),
             tstamp_(gu::datetime::Date::now()),
             state_(S_DELAYED),
-            state_change_cnt_(0)
+            state_change_cnt_(1)
         { }
         const std::string& addr() const { return addr_; }
 

@@ -995,7 +995,11 @@ void gcomm::evs::Proto::check_inactive()
                 dli->second.set_tstamp(now);
                 dli->second.set_state(DelayedEntry::S_DELAYED,
                                       delayed_keep_period_, now);
-                if (dli->second.state_change_cnt() > 1)
+                evs_log_debug(D_STATE) << "set '" << dli->first <<
+                        "' delayed state to S_DELAYED , cnt = " <<
+                        dli->second.state_change_cnt();
+                // todo(dirlt): make threshold as a configurable variable ?
+                if (dli->second.state_change_cnt() > 2)
                 {
                     do_send_evict_list = true;
                 }
@@ -1010,7 +1014,10 @@ void gcomm::evs::Proto::check_inactive()
             {
                 dli->second.set_tstamp(now);
             }
-            if (dli->second.state_change_cnt() > 1)
+            evs_log_debug(D_STATE) << "set '" << dli->first <<
+                    "' delayed state to S_OK. prev_cnt = " << prev_cnt <<
+                    ", cur_cnt = " << dli->second.state_change_cnt();
+            if (dli->second.state_change_cnt() > 2)
             {
                 do_send_evict_list = true;
             }
@@ -1031,6 +1038,7 @@ void gcomm::evs::Proto::check_inactive()
                 (is_evicted(i->first) == true &&
                  current_view_.is_member(i->first) == false))
             {
+                log_debug << "remove '" << i->first << "' from delayed_list";
                 delayed_list_.erase(i);
             }
         }
@@ -1802,7 +1810,8 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
     {
         if (node_list->find(Protolay::EvictList::key(i)) == node_list->end())
         {
-            MessageNode mnode(false, false, true);
+            // default arguments are evil.
+            MessageNode mnode(false, false, 0, true);
             gu_trace((void)node_list->insert_unique(
                          std::make_pair(Protolay::EvictList::key(i), mnode)));
         }
