@@ -135,7 +135,7 @@ install -d "$RPM_BUILD_ROOT/%{_libdir}"
 %if 0%{?systemd}
 install -D -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.service \
     $RPM_BUILD_ROOT/%{_unitdir}/garb.service
-install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.sh \
+install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb-systemd \
     $RPM_BUILD_ROOT/%{_bindir}/garb-systemd
 %else
 install -m 755 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.sh \
