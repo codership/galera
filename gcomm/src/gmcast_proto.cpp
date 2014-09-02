@@ -202,6 +202,9 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     set_state(S_FAILED);
     if (hs.error() == "evicted")
     {
+        // otherwise node use the uuid in view state file.
+        // which is probably still in other nodes evict list.
+        ViewState::remove_file();
         gu_throw_fatal
             << "this node has been evicted out of the cluster, "
             << "gcomm backend restart is required";
@@ -297,4 +300,3 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
         gu_throw_fatal << "invalid message type: " << msg.type();
     }
 }
-
