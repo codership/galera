@@ -999,7 +999,7 @@ void gcomm::evs::Proto::check_inactive()
                         "' delayed state to S_DELAYED , cnt = " <<
                         dli->second.state_change_cnt();
                 // todo(dirlt): make threshold as a configurable variable ?
-                if (dli->second.state_change_cnt() > 2)
+                if (dli->second.state_change_cnt() > 0)
                 {
                     do_send_evict_list = true;
                 }
@@ -1017,7 +1017,7 @@ void gcomm::evs::Proto::check_inactive()
             evs_log_debug(D_STATE) << "set '" << dli->first <<
                     "' delayed state to S_OK. prev_cnt = " << prev_cnt <<
                     ", cur_cnt = " << dli->second.state_change_cnt();
-            if (dli->second.state_change_cnt() > 2)
+            if (dli->second.state_change_cnt() > 0)
             {
                 do_send_evict_list = true;
             }
