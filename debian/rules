@@ -22,3 +22,4 @@ override_dh_strip:
 override_dh_installinit:
         dh_installinit -ppercona-xtradb-cluster-garbd-3.x  --name=garbd
 
+.PHONY: override_dh_strip override_dh_installinit
