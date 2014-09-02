@@ -931,7 +931,9 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
                                  << NodeMap::key(local_node_i);
                         local_node.set_weight(sm_node.weight());
                     }
-                    if (prim() == false && sm_node.un() == true)
+                    if (prim() == false && sm_node.un() == true &&
+                        // note #92
+                        local_node_i != self_i_)
                     {
                         // If coming from non-prim, set local instance status
                         // to unknown if any of the state messages has it
