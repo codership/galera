@@ -38,17 +38,17 @@ Description: Debugging package for Percona XtraDB Cluster Garbd 2.
 Package: percona-xtradb-cluster-galera-2
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-galera-2.x (>= ${binary:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-galera-2.x (= ${binary:Version}), ${misc:Depends}
 Description: Metapackage for latest version of galera2.
 
 Package: percona-xtradb-cluster-garbd-2
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-garbd-2.x (>= ${binary:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-garbd-2.x (= ${binary:Version}), ${misc:Depends}
 Description: Metapackage for latest version of garbd2.
 
 Package: percona-xtradb-cluster-galera2-dbg
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-galera-2.x-dbg (>= ${binary:Version}), percona-xtradb-cluster-garbd-2.x-dbg (>= ${binary:Version}), ${misc:Depends}
+Depends: percona-xtradb-cluster-galera-2.x-dbg (= ${binary:Version}), percona-xtradb-cluster-garbd-2.x-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Metapackage for latest version of debug packages.
