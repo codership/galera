@@ -1,7 +1,8 @@
 Source: percona-xtradb-cluster-galera-2.x
 Section: database
 Priority: extra
-Maintainer: Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+Maintainer: Percona Server Development Team <mysql-dev@percona.com>
+Uploaders: Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 Build-Depends: debhelper (>= 7.0.50~), scons, libboost-dev (>= 1.41),
     libssl-dev, check, libboost-program-options-dev (>= 1.41)
 Standards-Version: 7.0.0
