@@ -44,10 +44,15 @@ namespace galera
             int             version_;
             KeySet::Version key_format_;
             int             max_write_set_size_;
+
             Params (const std::string& wdir, int ver, KeySet::Version kformat,
                     int max_write_set_size = WriteSetNG::MAX_SIZE) :
                 working_dir_(wdir), version_(ver), key_format_(kformat),
                 max_write_set_size_(max_write_set_size) {}
+
+            Params () :
+                working_dir_(), version_(), key_format_(), max_write_set_size_()
+            {}
         };
 
         static const Params Defaults;
@@ -227,9 +232,7 @@ namespace galera
             void* const buf(pool.acquire());
 
             return new(buf)
-                TrxHandle(pool, params, source_id, conn_id, trx_id,
-                          static_cast<gu::byte_t*>(buf) + sizeof(TrxHandle),
-                          buf_size - sizeof(TrxHandle));
+                TrxHandle(pool, params, source_id, conn_id, trx_id, buf_size);
         }
 
         void lock()   const { mutex_.lock();   }
@@ -498,10 +501,15 @@ namespace galera
 
         void clear()
         {
-            if (new_version()) { return; }
-
-            write_set_.clear();
-            write_set_collection_.clear();
+            if (new_version())
+            {
+                release_write_set_out();
+            }
+            else
+            {
+                write_set_.clear();
+                write_set_collection_.clear();
+            }
         }
 
         void   ref()   { ++refcnt_; }
@@ -527,8 +535,12 @@ namespace galera
              * TrxHandle in the buffer allocated by TrxHandleWithStore.
              * I'll be damned if this+1 is not sufficiently well aligned. */
             assert(new_version());
+            if (gu_unlikely(!wso_))
+                init_write_set_out(params_,
+                                   static_cast<gu_byte_t*>(wso_buf()),
+                                   wso_buf_size_);
             assert(wso_);
-            return *reinterpret_cast<WriteSetOut*>(this + 1);
+            return *static_cast<WriteSetOut*>(wso_buf());
         }
         const WriteSetOut& write_set_out() const { return write_set_out(); }
 
@@ -572,11 +584,32 @@ namespace galera
         size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
 
+        void
+        init_write_set_out(const Params& params,
+                           gu_byte_t*    store,
+                           size_t        store_size)
+        {
+            assert(!wso_);
+            assert(store);
+            assert(store_size > sizeof(WriteSetOut));
+
+            new (store) WriteSetOut (params.working_dir_,
+                                     trx_id_, params.key_format_,
+                                     store      + sizeof(WriteSetOut),
+                                     store_size - sizeof(WriteSetOut),
+                                     0,
+                                     WriteSetNG::MAX_VERSION,
+                                     DataSet::MAX_VERSION,
+                                     DataSet::MAX_VERSION,
+                                     params.max_write_set_size_);
+
+            wso_ = true;
+        }
+
         void release_write_set_out()
         {
-            if (gu_likely(new_version()))
+            if (gu_likely(wso_))
             {
-                assert(wso_);
                 write_set_out().~WriteSetOut();
                 wso_ = false;
             }
@@ -588,6 +621,7 @@ namespace galera
         explicit
         TrxHandle(gu::MemPool<true>& mp)
             :
+            params_            (),
             source_id_         (WSREP_UUID_UNDEFINED),
             conn_id_           (-1),
             trx_id_            (-1),
@@ -606,6 +640,7 @@ namespace galera
             write_set_buffer_  (0, 0),
             mem_pool_          (mp),
             action_            (0),
+            wso_buf_size_      (),
             gcs_handle_        (-1),
             version_           (Defaults.version_),
             refcnt_            (1),
@@ -624,71 +659,51 @@ namespace galera
                   const wsrep_uuid_t& source_id,
                   wsrep_conn_id_t     conn_id,
                   wsrep_trx_id_t      trx_id,
-                  gu::byte_t*         reserved,
                   size_t              reserved_size)
             :
+            params_            (params),
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
             mutex_             (),
-            write_set_collection_(params.working_dir_),
+            write_set_collection_(params_.working_dir_),
             state_             (&trans_map_, S_EXECUTING),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             timestamp_         (gu_time_calendar()),
-            write_set_         (params.version_),
+            write_set_         (params_.version_),
             write_set_in_      (),
             annotation_        (),
             cert_keys_         (),
             write_set_buffer_  (0, 0),
             mem_pool_          (mp),
             action_            (0),
+            wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
-            version_           (params.version_),
+            version_           (params_.version_),
             refcnt_            (1),
             write_set_flags_   (0),
             local_             (true),
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
-            wso_               (new_version()),
+            wso_               (false),
             mac_               ()
+        {}
+
+        void* wso_buf()
         {
-            init_write_set_out(params, reserved, reserved_size);
+            return static_cast<void*>(this + 1);
         }
 
-        ~TrxHandle() { if (wso_) release_write_set_out(); }
-
-        void
-        init_write_set_out(const Params& params,
-                           gu::byte_t*   store,
-                           size_t        store_size)
-        {
-            if (wso_)
-            {
-                assert(store);
-                assert(store_size > sizeof(WriteSetOut));
-
-                WriteSetOut* wso = &write_set_out();
-                assert(static_cast<void*>(wso) == static_cast<void*>(store));
-
-                new (wso) WriteSetOut (params.working_dir_,
-                                       trx_id_, params.key_format_,
-                                       store      + sizeof(WriteSetOut),
-                                       store_size - sizeof(WriteSetOut),
-                                       0,
-                                       WriteSetNG::MAX_VERSION,
-                                       DataSet::MAX_VERSION,
-                                       DataSet::MAX_VERSION,
-                                       params.max_write_set_size_);
-            }
-        }
+        ~TrxHandle() { release_write_set_out(); }
 
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
 
+        Params const           params_;
         wsrep_uuid_t           source_id_;
         wsrep_conn_id_t        conn_id_;
         wsrep_trx_id_t         trx_id_;
@@ -710,6 +725,7 @@ namespace galera
 
         gu::MemPool<true>&     mem_pool_;
         const void*            action_;
+        size_t const           wso_buf_size_;
         long                   gcs_handle_;
         int                    version_;
         gu::Atomic<int>        refcnt_;

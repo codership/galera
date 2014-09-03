@@ -528,6 +528,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         retval = WSREP_FATAL;
     }
 
+    trx->release_write_set_out();
     repl->unref_local_trx(trx);
 
     return retval;
