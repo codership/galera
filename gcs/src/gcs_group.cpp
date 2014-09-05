@@ -727,7 +727,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             if (group->quorum.version < 2 && !from_donor && // #591
                 sender_idx == group->my_idx) {
                 // remove after quorum v1 is phased out
-                gu_fatal ("Faield to receive state. Need to abort.");
+                gu_fatal ("Failed to receive state. Need to abort.");
                 return -ENOTRECOVERABLE;
             }
         }
