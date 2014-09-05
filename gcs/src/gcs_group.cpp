@@ -870,10 +870,10 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
                 return -EAGAIN;
             }
             else {
-                /* technically we could return -EDEADLK here, but as long as
-                 * it is not -EAGAIN, it does not matter. If the node is in a
-                 * PRIMARY state, it is as good as not found. */
-                break;
+                /* we haven't met the minimium status and since this is below
+                 * GCS_NODE_STATE_JOINER we aren't optimistic of it happening.
+                 */
+                return -EDEADLK;
             }
         }
     }
@@ -1196,14 +1196,17 @@ group_select_donor (gcs_group_t* group,
     int  donor_idx;
     int  const donor_len = strlen(donor_string);
     bool const required_donor = (donor_len > 0);
+    const char*err = 0;
 
     if (desync) { /* sender wants to become "donor" itself */
         assert(donor_len > 0);
         gcs_node_state_t const st = group->nodes[joiner_idx].status;
         if (st >= min_donor_state)
             donor_idx = joiner_idx;
-        else
+        else {
+            err = "Donor isn't in a SYNC state yet. Waiting...";
             donor_idx = -EAGAIN;
+        }
     }
     else {
         donor_idx = gcs_group_find_donor(group,
@@ -1239,11 +1242,27 @@ group_select_donor (gcs_group_t* group,
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
     }
     else {
+        if (err == 0) {
+            switch (-donor_idx)
+            {
+            case EHOSTDOWN: err = "We can't sync against ourself";
+                break;
+            case EAGAIN: err = "There are no suitable donor nodes currently in the same segment";
+                break;
+            case EHOSTUNREACH: err = "The donor doesn't exist";
+                break;
+            case EDEADLK: err = "Donor not in JOINER state yet";
+                break;
+            default:
+                err = "unknown error - please report bug";
+            }
+        }
+
         gu_warn ("Member %d.%d (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
                  joiner_idx, group->nodes[joiner_idx].segment,
                  group->nodes[joiner_idx].name,
-                 required_donor ? donor_string : "*any*", strerror (-donor_idx));
+                 required_donor ? donor_string : "*any*", err);
     }
 
     return donor_idx;
