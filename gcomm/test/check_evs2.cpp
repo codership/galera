@@ -1732,6 +1732,269 @@ START_TEST(test_gh_41)
 }
 END_TEST
 
+START_TEST(test_gh_37)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (gh_37)";
+
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+    // node 0 is gonna to leave
+    for(size_t i = 2; i <= n_nodes; i++)
+    {
+        // leaving node(LN) is able to send messages to remaining nodes.
+        // prop.set_loss(1, i, 0.);
+        // but remaining nodes(RNS) won't be able to ack these messages.
+        prop.set_loss(i, 1, 0.);
+        // so RNS aru_seq are the same and higher than LN aru_seq.
+    }
+    // LN  ss=-1, ir=[2,1]
+    // RNS ss=1,  ir=[2,1]
+    dn[0]->send();
+    dn[0]->send();
+    dn[0]->close();
+
+    dn[0]->set_cvi(V_REG);
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+    dn[2]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+
+    prop.propagate_until_cvi(true);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+START_TEST(test_gh_40)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (gh_40)";
+
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+
+    // ss=0, ir=[1,0];
+    dn[0]->send();
+    gu_trace(prop.propagate_until_empty());
+    log_info << "gh_40 all got operational state";
+
+    // cut dn[0] from dn[1] and dn[2].
+    for (size_t i = 2; i <= n_nodes; ++i)
+    {
+        prop.set_loss(1, i, 0.);
+        prop.set_loss(i, 1, 0.);
+    }
+
+    // ss=0, ir=[2,1];
+    // dn[1] send msg(seq=1)
+    dn[1]->send();
+
+
+    Proto* evs1 = evs_from_dummy(dn[1]);
+    Proto* evs2 = evs_from_dummy(dn[2]);
+    fail_if(evs1->state() != Proto::S_OPERATIONAL);
+    fail_if(evs2->state() != Proto::S_OPERATIONAL);
+    evs1->set_inactive(dn[0]->uuid());
+    evs2->set_inactive(dn[0]->uuid());
+    evs1->check_inactive();
+    evs2->check_inactive();
+    fail_if(evs1->state() != Proto::S_GATHER);
+    fail_if(evs2->state() != Proto::S_GATHER);
+
+    while(!(evs1->state() == Proto::S_GATHER &&
+            evs1->is_install_message()))
+    {
+        gu_trace(prop.propagate_n(1));
+    }
+
+    // dn[0] comes back.
+    // here we have to set message F_RETRANS
+    // otherwise handle_msg ignores this msg.
+    // @todo:why?
+
+    // dn[0] ack dn[1] msg(seq=1) with flags F_RETRANS.
+    Datagram dg1 = dn[0]->create_datagram();
+    UserMessage msg1(GCOMM_EVS_MAX_VERSION,
+                     dn[0]->uuid(),
+                     ViewId(V_REG, dn[0]->uuid(), max_view_seq),
+                     1, 0, 0, O_DROP, 1, 0xff,
+                     Message::F_RETRANS);
+    // dn[0] msg(seq=2) leak into dn[1] input_map.
+    Datagram dg2 = dn[0]->create_datagram();
+    UserMessage msg2(GCOMM_EVS_MAX_VERSION,
+                     dn[0]->uuid(),
+                     ViewId(V_REG, dn[0]->uuid(), max_view_seq),
+                     2, 0, 0, O_SAFE, 2, 0xff,
+                     Message::F_RETRANS);
+    // so for dn[1]
+    // input_map:       ss=0, ir=[3,2]
+    // install message: ss=0, ir=[2,1]
+    // seq 1 = O_SAFE message.(initiated by self)
+    // seq 2 = O_DROP message.(complete_user)
+    push_header(msg1, dg1);
+    evs1->handle_up(0, dg1, ProtoUpMeta(dn[0]->uuid()));
+    push_header(msg2, dg2);
+    log_info << "evs1 handle msg " << msg2;
+    log_info << "before handle msg: " << *evs1;
+    evs1->handle_up(0, dg2, ProtoUpMeta(dn[0]->uuid()));
+    log_info << "after handle msg: " << *evs1;
+
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->uuid(), max_view_seq + 1));
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+    dn[2]->set_cvi(ViewId(V_REG, dn[1]->uuid(), max_view_seq + 1));
+    prop.propagate_until_cvi(true);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
+START_TEST(test_gh_100)
+{
+    log_info << "START (test_gh_100)";
+    gu::Config conf;
+    mark_point();
+    gcomm::Conf::register_params(conf);
+    conf.set("evs.info_log_mask", "0x3");
+    conf.set("evs.debug_log_mask", "0xa0");
+    UUID uuid1(1), uuid2(2);
+    DummyTransport t1(uuid1), t2(uuid2);
+    mark_point();
+    DummyUser u1(conf), u2(conf);
+    mark_point();
+    Proto p1(conf, uuid1, 0, gu::URI("evs://"), 10000, 0);
+    // Start p2 view seqno from higher value than p1
+    View p2_rst_view(ViewId(V_REG, uuid2, 3));
+    Proto p2(conf, uuid2, 0, gu::URI("evs://"), 10000, &p2_rst_view);
+
+    gcomm::connect(&t1, &p1);
+    gcomm::connect(&p1, &u1);
+
+    gcomm::connect(&t2, &p2);
+    gcomm::connect(&p2, &u2);
+
+    single_join(&t1, &p1);
+
+
+    // The following is from double_join(). Process messages until
+    // install message is generated. After that handle install timer
+    // on p1 and verify that the newly generated install message has
+    // greater install view id seqno than the first one.
+    Message jm;
+    Message im;
+    Message im2;
+    Message gm;
+    Message gm2;
+    Message msg;
+
+    Datagram* rb;
+
+    // Initial states check
+    p2.shift_to(Proto::S_JOINING);
+    fail_unless(p1.state() == Proto::S_OPERATIONAL);
+    fail_unless(p2.state() == Proto::S_JOINING);
+
+    // Send join message, don't self handle immediately
+    // Expected output: one join message
+    p2.send_join(false);
+    fail_unless(p2.state() == Proto::S_JOINING);
+    rb = get_msg(&t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t2, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 2's join on node 1
+    // Expected output: shift to S_GATHER and one join message
+    p1.handle_msg(jm);
+    fail_unless(p1.state() == Proto::S_GATHER);
+    rb = get_msg(&t1, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t1, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 1's join on node 2
+    // Expected output: shift to S_GATHER and one join message
+    p2.handle_msg(jm);
+    fail_unless(p2.state() == Proto::S_GATHER);
+    rb = get_msg(&t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t2, &msg);
+    fail_unless(rb == 0);
+
+    // Handle node 2's join on node 1
+    // Expected output: Install and commit gap messages, state stays in S_GATHER
+    p1.handle_msg(jm);
+    fail_unless(p1.state() == Proto::S_GATHER);
+    rb = get_msg(&t1, &im);
+    fail_unless(rb != 0);
+    fail_unless(im.type() == Message::T_INSTALL);
+    rb = get_msg(&t1, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless((gm.flags() & Message::F_COMMIT) != 0);
+    rb = get_msg(&t1, &msg);
+    fail_unless(rb == 0);
+
+    // usleep(1100000);
+
+    // Handle timers to  to generate shift to GATHER
+    p1.handle_inactivity_timer();
+    p1.handle_install_timer();
+    rb = get_msg(&t1, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.type() == Message::T_JOIN);
+    rb = get_msg(&t1, &im2);
+    fail_unless(rb != 0);
+    fail_unless(im2.type() == Message::T_INSTALL);
+    fail_unless(im2.install_view_id().seq() > im.install_view_id().seq());
+
+}
+END_TEST
+
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -1876,19 +2139,30 @@ Suite* evs2_suite()
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
 
-
         tc = tcase_create("test_trac_760");
         tcase_add_test(tc, test_trac_760);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_41");
+        tcase_add_test(tc, test_gh_41);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_37");
+        tcase_add_test(tc, test_gh_37);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_gh_40");
+        tcase_add_test(tc, test_gh_40);
+        tcase_set_timeout(tc, 5);
+        suite_add_tcase(s, tc);
     }
 
-
-    tc = tcase_create("test_gh_41");
-    tcase_add_test(tc, test_gh_41);
-    tcase_set_timeout(tc, 15);
+    tc = tcase_create("test_gh_100");
+    tcase_add_test(tc, test_gh_100);
     suite_add_tcase(s, tc);
-
 
     return s;
 }

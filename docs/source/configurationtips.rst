@@ -5,98 +5,99 @@
 
 This chapter contains some advanced configuration tips.
 
---------------------------------------
- Setting Parallel Slave Threads
---------------------------------------
-.. _`Setting Parallel Slave Threads`:
-
-.. index::
-   pair: Configuration Tips; innodb_autoinc_lock_mode
-.. index::
-   pair: Configuration Tips; innodb_locks_unsafe_for_binlog
-.. index::
-   pair: Configuration Tips; wsrep_slave_threads
-
-There is no rule about how many slave threads one should configure for replication. At the same time, parallel threads do not guarantee better performance. However, parallel applying will not impair regular operation performance and will most likely speed up the synchronization of new nodes with the cluster.
-
-Start with four slave threads per CPU core, the logic being that, in a balanced system, four slave threads can usually saturate the core. However, depending on IO performance, this figure can be increased several times (for example, you can use 32 slave threads on a single-core ThinkPad R51 with a 4200 RPM drive). 
-
-The top limit on the total number of slave threads can be obtained from the ``wsrep_cert_deps_distance`` status variable. This value essentially determines how many write-sets on average can be applied in parallel. Do not use a value higher than that.
-
-To set four parallel slave threads, use the parameter value below::
-
-    wsrep_slave_threads=4
-
-.. note:: Parallel applying requires the following settings:
-
-          - ``innodb_autoinc_lock_mode=2``
-          - ``innodb_locks_unsafe_for_binlog=1``
- 
 -------------------
  WAN Replication
 -------------------
-.. _`WAN Replication`:
+.. _`wan-replication`:
 
 .. index::
    pair: Configuration Tips; wsrep_provider_options
 .. index::
    single: my.cnf
 
-Transient network connectivity failures are not rare in :abbr:`WAN (Wide Area Network)` configurations. Thus, you may want to increase the keepalive timeouts to avoid partitioning. The following group of ``my.cnf`` settings tolerates 30 second connectivity outages::
+When running the cluster over :abbr:`WAN (Wide Area Network)`, you may frequently experience transient network connectivity failures.  To prevent this from partitioning the cluster, you may want to increase the keepalive timeouts.
 
-  wsrep_provider_options = "evs.keepalive_period = PT3S; evs.inactive_check_period = PT10S; evs.suspect_timeout = PT30S; evs.inactive_timeout = PT1M; evs.install_timeout = PT1M"
+The following parameters can tolerate 30 second connectivity outages.
 
-Set the ``evs.suspect_timeout`` parameter value as high as possible to avoid partitions (as partitions will cause state transfers, which are very heavy). The ``evs.inactive_timeout`` parameter value must be no less than the ``evs.suspect_timeout`` parameter value and the ``evs.install_timeout`` parameter value must be no less than the ``evs.inactive_timeout`` parameter value.
+.. code-block:: ini
 
-.. note:: WAN links can have exceptionally high latencies. Take Round-Trip Time (RTT) measurements (ping RTT is a fair estimate) from between your cluster nodes and make sure that all temporal Galera Cluster settings (periods and timeouts, such as ``evs.join_retrans_period``) exceed the highest RTT in your cluster.
+  wsrep_provider_options = "evs.keepalive_period = PT3S; 
+  	evs.inactive_check_period = PT10S; 
+  	evs.suspect_timeout = PT30S; 
+  	evs.inactive_timeout = PT1M; 
+  	evs.install_timeout = PT1M"
+
+In configuring these parameters, consider the following:
+
+- You want ``evs.suspect_timeout`` parameter set as high as possible to help avoid partitions.  Given that partitions cause state transfers, which can effect performance.
+
+- You must set the ``evs.inactive_timeout`` parameter to a value higher than ``evs.suspect_timeout``.
+
+- You must set the ``evs.install_timeout`` parameter to a value higher than the ``evs.inactive_timeout``.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Dealing with WAN Latency
+^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`latency`:
+
+When using Galera Cluster over a :abbr:`WAN (Wide Area Network)`, bear in mind that WAN links can have exceptionally high latency.  You can correct for this by taking Round-Trip Time (RTT) measurements between cluster nodes and adjust all temporal parameters.
+
+To take RTT measurements, use **ping** on each cluster node to ping the others.  For example, if you were to log in to the node at ``192.168.1.1``:
+
+.. code-block:: console
+
+   $ ping -c 3 192.168.1.2
+     PING 192.168.1.2 (192.168.1.2) 58(84) bytes of data.
+     64 bytes from 192.168.1.2: icmp_seq=1 ttl=64 time=0.736 ms
+     64 bytes from 192.168.1.2: icmp_seq=2 ttl=64 time=0.878 ms
+     64 bytes from 192.168.1.2: icmp_seq=3 ttl=64 time=12.7 ms
+
+     --- 192.168.1.2 ---
+     3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+     rtt min/avg/max/mdev = 0.736/4.788/12.752/5.631 ms
+
+Take RTT measurements on each node in your cluster and note the highest value among them.  
+
+Parameters that relate to periods and timeouts, such as ``evs.join_retrans_period``.  They must all use values that exceed the highest RTT measurement in your cluster.
+
+.. code-block:: ini
+
+   wsrep_provider_options="evs.join_retrans_period=14"
+
+This allows the cluster to compensate for the latency issues of the :abbr:`WAN (Wide Area Network)` links between your cluster nodes.
   
 ---------------------
  Multi-Master Setup
 ---------------------
-.. _`Multi-Master Setup`:
+.. _`multi-master-setup`:
 
-The more masters (nodes which simultaneously process writes from clients) are in the cluster, the higher the probability of certification conflict. This may cause undesirable rollbacks and performance degradation.  In such a case, reduce the number of nodes used as masters.
+A master is a node that can simultaneously process writes from clients.  
+
+The more masters you have in the cluster the higher the probability of certification conflicts.  This can lead to undesirable rollbacks and performance degradation.
+
+If you find you experience frequent certification conflicts, consider reducing the number of nodes your cluster uses as masters.
 
 ----------------------
  Single Master Setup
 ----------------------
-.. _`Single Master Setup`:
-
+.. _`single-master-setup`:
 .. index::
    pair: Configuration Tips; wsrep_provider_options
 
-If only one node at a time is used as a master, certain requirements, such as the slave queue size, may be relaxed. Flow control can be relaxed by using the settings below::
+In the event that your cluster uses only one node as a master, there are certain requirements, such as the slave queue size, that can be relaxed.
 
-    wsrep_provider_options = "gcs.fc_limit = 256; gcs.fc_factor = 0.99; gcs.fc_master_slave = yes"
+To relax flow control, use the settings below:
 
-These settings may improve replication performance by reducing the rate of flow control events. This setting can also be used as suboptimal in a multi-master setup.
+.. code-block:: ini
 
---------------------------
- Customizing GCache Size
---------------------------
-.. _`Customizing GCache Size`:
+    wsrep_provider_options = "gcs.fc_limit = 256; 
+    	gcs.fc_factor = 0.99; 
+    	gcs.fc_master_slave = YES"
 
-.. index::
-   pair: Configuration Tips; gcache.size
+By reducing the rate of flow control events, these settings may improve replication performance.
 
-.. index::
-   pair: Configuration Tips; wsrep_received_bytes
+.. note:: You can also use this setting as suboptimal in a multi-master setup.
 
-These configuration tips are guidelines only. You may end up using a bigger GCache than suggested by these guidelines, for example, if you must avoid SST as much as possible. 
-
-The GCache size, that is, the ``gcache.size`` parameter value, should be smaller than the database size. However, in this context, the database size depends on the SST method. For example, ``mysqldump`` does not copy InnoDB log files whereas ``rsync`` and ``xtrabackup`` do. As a rule, it is recommended to use the data directory size (including any possible links) minus the size of the ``galera.cache`` parameter.
-
-You can also consider the speed of copying as one variable in the calculation. If you use Incremental State Transfer (IST) as your node provisioning method, you can probably copy the database five times faster through IST than through ``mysqldump``.  With ``xtrabackup``, the factor is approximately 1.5. If this is the case, you can use a relatively big GCache size.
-
-The database write rate indicates the tail length that will be stored in the GCache. You can calculate the write rate by using the ``wsrep_received_bytes`` status variable. Proceed as follows:
-
-1. Read the ``wsrep_received_bytes1`` value at time ``t1``.
-
-2. Read the ``wsrep_received_bytes2`` value at time ``t2``.
-
-3. Calculate the write rate with the following equation::
-
-   (wsrep_received_bytes2 - wsrep_received_bytes1) / (t2 - t1)
 
 
 ------------------------------------
@@ -107,9 +108,14 @@ The database write rate indicates the tail length that will be stored in the GCa
 .. index::
    pair: Configuration; SELinux
 
-If you want to use Galera Cluster with SElinux, start by running SELinux in the permissive mode. In this mode, SELinux will not prohibit any Galera Cluster actions, but will log a warning for all actions that would have been prohibited. Collect these warnings and iteratively create a policy for *Galera Cluster* that allows to use all the different ports and files that you need. When there are no more warnings, switch back to the enforcing mode. 
+When you first enable Galera Cluster on a node that runs SELinux, SELinux prohibits all cluster activities.  In order to enable replication on the node, you need a policy so that SELinux can recognize cluster activities as legitimate.
 
-Virtually every Linux distribution ships with a MySQL SELinux policy. You can use this policy as a starting point and extend it with the above procedure.
+To create a policy for Galera Cluster, set SELinux to run in permissive mode.  Permissive mode does not block cluster activity, but it does log the actions as warnings.  By collecting these warnings, you can iteratively create a policy for Galera Cluster.
 
-.. |---|   unicode:: U+2014 .. EM DASH
-   :trim:
+Once SELinux no longer registers warnings from Galera Cluster, you can switch it back into enforcing mode.  SELinux then uses the new policy to allow the cluster access to the various ports and files it needs.
+
+.. note:: Almost all Linux distributions ship with a MySQL policy for SELinux.  You can use this policy as a starting point for Galera Cluster and extend it, using the above procedure.
+
+
+
+:trim:

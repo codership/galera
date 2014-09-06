@@ -165,11 +165,7 @@ gcs_core_param_set (gcs_core_t* core, const char* key, const char* value);
 extern const char*
 gcs_core_param_get (gcs_core_t* core, const char* key);
 
-extern void
-gcs_core_get_stats (gcs_core_t* core, gcs_backend_stats_t* stats);
-
-extern void
-gcs_core_free_stats (gcs_core_t* core, gcs_backend_stats_t* stats);
+void gcs_core_get_status(gcs_core_t* core, gu::Status& status);
 
 #ifdef GCS_CORE_TESTING
 
@@ -191,6 +187,13 @@ gcs_core_send_lock_step (gcs_core_t* core, bool enable);
 // returns positive number if there was a send thread waiting for it.
 extern long
 gcs_core_send_step (gcs_core_t* core, long timeout_ms);
+
+extern void
+gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid);
+
+#include "gcs_group.hpp"
+extern const gcs_group_t*
+gcs_core_get_group (gcs_core_t* core);
 
 #endif /* GCS_CORE_TESTING */
 

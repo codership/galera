@@ -8,32 +8,26 @@
 ==========
 
 
------------
-Database Parameters and Reference
------------
-
-- :doc:`galeraparameters`
-- :doc:`mysqlwsrepoptions`
-- :doc:`galerastatusvariables`
-- :doc:`glossary`
-
------------
-Version and Legal Information
------------
-
-- :doc:`versioninginformation`
-- :doc:`thirdpartygaleraimplementations`
-- :doc:`legalnotice`
-
+---------------------
+Database Parameters
+---------------------
 
 .. toctree::
-	:hidden:
+   :maxdepth: 2
 
-	galeraparameters
-	mysqlwsrepoptions
-	galerastatusvariables
-	glossary
-	versioninginformation
-	thirdpartygaleraimplementations
-	legalnotice
+   galeraparameters
+   mysqlwsrepoptions
+   galerastatusvariables
 
+
+-------------------------
+Miscellaneous Reference
+-------------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   glossary
+   versoninginformation
+   thirdpartygaleraimplementations
+   legalnotice

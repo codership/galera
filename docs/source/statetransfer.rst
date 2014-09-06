@@ -49,7 +49,9 @@ Some of these methods, for example ``xtrabackup``, can be made non-blocking on d
 .. seealso:: Chapter :ref:`Comparison of State Snapshot Transfer Methods <Comparison of State Snapshot Transfer Methods>`
   
 You can configure the state snapshot transfer method
-with the ``wsrep_sst_method`` variable. For example::
+with the ``wsrep_sst_method`` variable. For example:
+
+.. code-block:: ini
 
      wsrep_sst_method=rsync_wan
 

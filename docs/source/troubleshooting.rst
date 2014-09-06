@@ -2,25 +2,25 @@
  Troubleshooting
 =================
 
------------------
+---------------------------
 Frequently Asked Questions
------------------
+---------------------------
+.. _`troubleshooting-faq`:
 
-- :doc:`faq`
-- :doc:`symptomsolution`
+.. toctree::
+   :maxdepth: 2
+
+   faq
+   symptomsolution
 
 ------------------
 Tutorials
 ------------------
-
-- :doc:`detectingaslownode`
-- :doc:`dealingwithmultimasterconflicts`
+.. _`tutorials`:
 
 .. toctree::
-	:hidden:
+   :maxdepth: 2
 
-	faq	
-	symptomsolution
-	detectingaslownode
-	dealingwithmultimasterconflicts
+   detectingaslownode
+   dealingwithmultimasterconflicts
 

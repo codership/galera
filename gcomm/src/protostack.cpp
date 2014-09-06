@@ -5,16 +5,18 @@
 #include "gcomm/protostack.hpp"
 #include "socket.hpp"
 #include "gcomm/util.hpp"
-#include "stats.hpp"
 
 void gcomm::Protostack::push_proto(Protolay* p)
 {
     Critical<Protostack> crit(*this);
-    std::deque<Protolay*>::iterator prev_begin(protos_.begin());
     protos_.push_front(p);
-    if (prev_begin != protos_.end())
+	
+    // connect the pushed Protolay that's now on top
+    // with the one that was previously on top,
+    // if we had one, of course.
+    if (protos_.size() > 1)
     {
-        gcomm::connect(*prev_begin, p);
+        gcomm::connect(protos_[1], p);
     }
 }
 
@@ -73,13 +75,4 @@ bool gcomm::Protostack::set_param(const std::string& key,
         ret |= (*i)->set_param(key, val);
     }
     return ret;
-}
-
-void gcomm::Protostack::get_stats(Stats& stats)
-{
-    for (std::deque<Protolay*>::iterator i(protos_.begin());
-         i != protos_.end(); ++i)
-    {
-        (*i)->get_stats(stats);
-    }
 }

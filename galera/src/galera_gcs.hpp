@@ -12,6 +12,7 @@
 #include "gu_throw.hpp"
 #include "gu_config.hpp"
 #include "gu_buf.hpp"
+#include "gu_status.hpp"
 
 #include <GCache.hpp>
 #include <cerrno>
@@ -46,7 +47,8 @@ namespace galera
         virtual ssize_t interrupt(ssize_t) = 0;
         virtual ssize_t resume_recv() = 0;
         virtual ssize_t set_last_applied(gcs_seqno_t) = 0;
-        virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
+        virtual ssize_t request_state_transfer(int version,
+                                               const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
                                                const gu_uuid_t& ist_uuid,
                                                gcs_seqno_t ist_seqno,
@@ -55,10 +57,8 @@ namespace galera
         virtual void    join(gcs_seqno_t seqno) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
-        virtual void free_stats(gcs_stats* stats) const = 0;
-
         virtual void    flush_stats() = 0;
-
+        virtual void    get_status(gu::Status&) const = 0;
         /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
                                    const std::string& value) = 0;
@@ -159,13 +159,16 @@ namespace galera
             return gcs_set_last_applied(conn_, last_applied);
         }
 
-        ssize_t request_state_transfer(const void* req, ssize_t req_len,
+        ssize_t request_state_transfer(int version,
+                                       const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
                                        const gu_uuid_t& ist_uuid,
                                        gcs_seqno_t ist_seqno,
                                        gcs_seqno_t* seqno_l)
         {
-            return gcs_request_state_transfer(conn_, req, req_len,
+            return gcs_request_state_transfer(conn_,
+                                              version,
+                                              req, req_len,
                                               sst_donor.c_str(),
                                               &ist_uuid, ist_seqno,
                                               seqno_l);
@@ -196,14 +199,14 @@ namespace galera
             return gcs_get_stats(conn_, stats);
         }
 
-        void free_stats(gcs_stats* stats) const
-        {
-            return gcs_free_stats(conn_, stats);
-        }
-
         void flush_stats()
         {
             return gcs_flush_stats(conn_);
+        }
+
+        void get_status(gu::Status& status) const
+        {
+            gcs_get_status(conn_, status);
         }
 
         void param_set (const std::string& key, const std::string& value)
@@ -332,7 +335,8 @@ namespace galera
 
         gcs_seqno_t last_applied() const { return last_applied_; }
 
-        ssize_t request_state_transfer(const void* req, ssize_t req_len,
+        ssize_t request_state_transfer(int version,
+                                       const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
                                        const gu_uuid_t& ist_uuid,
                                        gcs_seqno_t ist_seqno,
@@ -364,9 +368,10 @@ namespace galera
             memset (stats, 0, sizeof(*stats));
         }
 
-        void free_stats(gcs_stats* stats) const {}
-
         void flush_stats() {}
+
+        void get_status(gu::Status& status) const
+        {}
 
         void  param_set (const std::string& key, const std::string& value)
         {}

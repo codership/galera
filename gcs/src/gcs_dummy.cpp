@@ -209,6 +209,11 @@ GCS_BACKEND_OPEN_FN(dummy_open)
         return -EBADFD;
     }
 
+    if (!bootstrap) {
+        dummy->state = DUMMY_TRANS;
+        return 0;
+    }
+
     comp = gcs_comp_msg_new (true, false, 0, 1);
 
     if (comp) {
@@ -268,13 +273,7 @@ GCS_BACKEND_PARAM_GET_FN(dummy_param_get)
     return NULL;
 }
 
-static
-GCS_BACKEND_STATS_GET_FN(dummy_stats_get)
-{
-}
-
-static
-GCS_BACKEND_STATS_FREE_FN(dummy_stats_free)
+GCS_BACKEND_STATUS_GET_FN(dummy_status_get)
 {
 }
 
@@ -304,8 +303,7 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     backend->msg_size  = dummy_msg_size;
     backend->param_set = dummy_param_set;
     backend->param_get = dummy_param_get;
-    backend->stats_get = dummy_stats_get;
-    backend->stats_free = dummy_stats_free;
+    backend->status_get = dummy_status_get;
 
     backend->conn = dummy;         // set data
 

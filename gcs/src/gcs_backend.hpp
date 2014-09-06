@@ -154,23 +154,13 @@ const char* fn (gcs_backend_t* backend,     \
 /*!
  * @param backend
  *        backend handle
- * @param stats
- *        output stats, NULL terminated.
+ * @param status
+ *        reference to status variable map
  */
-#define GCS_BACKEND_STATS_GET_FN(fn)            \
-    void fn (gcs_backend_t* backend,            \
-             gcs_backend_stats_t* stats)
+#define GCS_BACKEND_STATUS_GET_FN(fn)           \
+    void fn(gcs_backend_t* backend,             \
+            gu::Status& status)
 
-/*!
- * @param backend
-          backend handle
- * @param stats
-          output stats, NULL terminated.
- * @see GCS_BACKEND_STATS_GET_FN
- */
-#define GCS_BACKEND_STATS_FREE_FN(fn)           \
-    void fn (gcs_backend_t* backend,            \
-             gcs_backend_stats_t* stats)
 
 typedef GCS_BACKEND_CREATE_FN    ((*gcs_backend_create_t));
 typedef GCS_BACKEND_DESTROY_FN   ((*gcs_backend_destroy_t));
@@ -182,8 +172,7 @@ typedef GCS_BACKEND_NAME_FN      ((*gcs_backend_name_t));
 typedef GCS_BACKEND_MSG_SIZE_FN  ((*gcs_backend_msg_size_t));
 typedef GCS_BACKEND_PARAM_SET_FN ((*gcs_backend_param_set_t));
 typedef GCS_BACKEND_PARAM_GET_FN ((*gcs_backend_param_get_t));
-typedef GCS_BACKEND_STATS_GET_FN ((*gcs_backend_stats_get_t));
-typedef GCS_BACKEND_STATS_FREE_FN ((*gcs_backend_stats_free_t));
+typedef GCS_BACKEND_STATUS_GET_FN ((*gcs_backend_status_get_t));
 
 struct gcs_backend
 {
@@ -197,8 +186,7 @@ struct gcs_backend
     gcs_backend_msg_size_t  msg_size;
     gcs_backend_param_set_t param_set;
     gcs_backend_param_get_t param_get;
-    gcs_backend_stats_get_t stats_get;
-    gcs_backend_stats_free_t stats_free;
+    gcs_backend_status_get_t status_get;
 };
 
 /*!

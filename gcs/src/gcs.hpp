@@ -11,10 +11,6 @@
 #ifndef _gcs_h_
 #define _gcs_h_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -25,6 +21,8 @@ extern "C" {
 #include "gcache.h"
 #include "gu_errno.h"
 #include "gu_uuid.h"
+
+#include "gu_status.hpp"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -190,7 +188,7 @@ static inline long gcs_send (gcs_conn_t*    const conn,
                              gcs_act_type_t const act_type,
                              bool           const scheduled)
 {
-    struct gu_buf const buf = { act, (ssize_t)act_size };
+    struct gu_buf const buf = { act, static_cast<ssize_t>(act_size) };
     return gcs_sendv (conn, &buf, act_size, act_type, scheduled);
 }
 
@@ -291,6 +289,7 @@ extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
  * suitable group members.
  *
  * @param conn  connection to group
+ * @param ver   STR version.
  * @param req   opaque byte array that contains data required for
  *              the state transfer (application dependent)
  * @param size  request size
@@ -303,6 +302,7 @@ extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
  *         is unavailable)
  */
 extern long gcs_request_state_transfer (gcs_conn_t  *conn,
+                                        int          ver,
                                         const void  *req,
                                         size_t       size,
                                         const char  *donor,
@@ -435,7 +435,11 @@ struct gcs_stats
     long long fc_received;    //! flow control stops received
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length
+    int       recv_q_len_max; //! maximum recv queue length
+    int       recv_q_len_min; //! minimum recv queue length
     int       send_q_len;     //! current send queue length
+    int       send_q_len_max; //! maximum send queue length
+    int       send_q_len_min; //! minimum send queue length
     gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
@@ -443,14 +447,10 @@ struct gcs_stats
 extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
 /*! flushes stats counters */
 extern void gcs_flush_stats(gcs_conn_t *conn);
-/*! free stats struct */
-extern void gcs_free_stats(gcs_conn_t* conn, struct gcs_stats* stats);
+
+void gcs_get_status(gcs_conn_t* conn, gu::Status& status);
 
 /*! A node with this name will be treated as a stateless arbitrator */
 #define GCS_ARBITRATOR_NAME "garb"
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // _gcs_h_

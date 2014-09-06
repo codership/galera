@@ -35,6 +35,8 @@ typedef struct gcs_sm_stats
     long long paused_sample; // paused_ns at the beginning of the sample
     long long send_q_samples;
     long long send_q_len;
+    long long send_q_len_max;
+    long long send_q_len_min;
 }
 gcs_sm_stats_t;
 
@@ -51,6 +53,8 @@ typedef struct gcs_sm
     unsigned long wait_q_head;
     unsigned long wait_q_tail;
     long          users;
+    long          users_min;
+    long          users_max;
     long          entered;
     long          ret;
 #ifdef GCS_SM_CONCURRENCY
@@ -110,6 +114,9 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
             assert (NULL == sm->wait_q[sm->wait_q_head].cond);
             gu_debug ("Skipping interrupted: %lu", sm->wait_q_head);
             sm->users--;
+            if (gu_unlikely(sm->users < sm->users_min)) {
+                sm->users_min = sm->users;
+            }
             GCS_SM_INCREMENT(sm->wait_q_head);
         }
     }
@@ -144,6 +151,9 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
 
     assert (sm->users > 0);
     sm->users--;
+    if (gu_unlikely(sm->users < sm->users_min)) {
+        sm->users_min = sm->users;
+    }
     assert (false == sm->wait_q[sm->wait_q_head].wait);
     assert (NULL  == sm->wait_q[sm->wait_q_head].cond);
     GCS_SM_INCREMENT(sm->wait_q_head);
@@ -192,6 +202,9 @@ gcs_sm_schedule (gcs_sm_t* sm)
     if (gu_likely((sm->users < (long)sm->wait_q_len) && (0 == ret))) {
 
         sm->users++;
+        if (gu_unlikely(sm->users > sm->users_max)) {
+            sm->users_max = sm->users;
+        }
         GCS_SM_INCREMENT(sm->wait_q_tail); /* even if we don't queue, cursor
                                             * needs to be advanced */
         sm->stats.send_q_samples++;
@@ -366,6 +379,8 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
  * @param q_len      current send queue length
  * @param q_len_avg  set to an average number of preceding users seen by each
  *                   new one (not including itself) (-1 if stats overflown)
+ * @param q_len_max  maximum send queue length since last call
+ * @param q_len_min  minimum send queue length since last call
  * @param paused_ns  total time paused (nanoseconds)
  * @param paused_avg set to a fraction of time which monitor spent in a paused
  *                   state (-1 if stats overflown)
@@ -373,11 +388,13 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
 extern void
 gcs_sm_stats_get (gcs_sm_t*  sm,
                   int*       q_len,
+                  int*       q_len_max,
+                  int*       q_len_min,
                   double*    q_len_avg,
                   long long* paused_ns,
                   double*    paused_avg);
 
-/*! resets average stats calculation */
+/*! resets average/max/min stats calculation */
 extern void
 gcs_sm_stats_flush(gcs_sm_t* sm);
 

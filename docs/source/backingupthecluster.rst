@@ -1,7 +1,7 @@
 =========================
- Backing up Cluster Data
+ Backing Up Cluster Data
 =========================
-.. _`Backing up Cluster Data`:
+.. _`backing-up-cluster-data`:
 
 .. index::
    pair: Logs; mysqld error log
@@ -14,22 +14,31 @@
 .. index::
    single: Galera Arbitrator
 
-Galera Cluster backups can be performed just as regular MySQL backups, using a backup script. Since all the cluster nodes are identical, backing up one node backs up the entire cluster.
+You can perform backups with Galera Cluster at the same regularity as with the standard MySQL server, using a backup scrip.  Given that replication ensures that all nodes carry the same data, running the script on one node backs up the data on all nodes in the cluster.
 
-However, such backups will have no global transaction IDs associated with them. You can use these backups to recover data, but they cannot be used to recover a Galera Cluster node to a well-defined state. Furthermore, the backup procedure may block the cluster operation for the duration of backup, in the case of a blocking backup.
+The problem with such backups is that they lack a :term:`Global Transaction ID`.  You can use backups of this kind to recover data, but they are insufficient for use in recovering nodes to a well-defined state.  Furthermore, some backup procedures can block cluster operations for the duration of the backup.
 
-You can associate a :term:`Global Transaction ID` with the backup and avoid cluster stalling by carrying out the backup in the same manner as a state snapshot transfer between the nodes. For that:
+Getting backups with the associated :term:`Global Transaction ID` requires a different approach.
 
-- A special backup script must be installed in the ``mysqld`` path on the node that will be a backup source.
+----------------------
+Replication as Backup
+----------------------
 
-- The backup must be initiated through the Galera Cluster replication system.
+.. _`replication-backup`:
 
-For example, the command below will cause the chosen donor node to the ``run wsrep_sst_backup`` script and pass the corresponding :term:`Global Transaction ID` to it::
+In order to associate a :term:`Global Transaction ID` with your data backups, you need to use a special backup script in the ``mysqld`` path of the donor node and the Galera Arbitrator, to trigger a state snapshot transfer through the cluster.  
 
-    $ /usr/bin/garbd --address \
-    	gcomm://donor_address?gmcast.listen_addr=tcp://0.0.0.0:4444 \
-    	--group cluster_name --donor donor_cluster_name --sst backup
+For example,
 
-.. note:: In the command, the ``?gmcast.listen_addr=tcp://0.0.0.0:4444`` section is an arbitrary listen socket address that the ``garbd`` will have to open to communicate with the cluster. You only have to specify it if the default socket address (``0.0.0.0:4567``) is busy.
+.. code-block:: console
 
-.. note:: The ``garbd`` may immediately exit with confusing diagnostic after making a successful SST request. This is not a failure. The backup script is being run by the donor ``mysqld``. You can monitor its progress in the donor ``mysqld`` error log and/or in the script log
+   $ garbd --address gcomm://192.168.1.2?gmcast.listen_addr=tcp://0.0.0.0:444 \
+     --group example_cluster --donor example_donor --sst backup
+
+When this command runs, the Galera Arbitrator triggers the **wsrep_sst_backup** script in the ``mysqld`` directory on the donor node.  The script initiates a state snapshop transfer, sending the results to the Galera Arbitrator on the receiving machine.
+
+In the command, ``?gmcast.listen_addr=tcp://0.0.0.0:4444`` is an arbitrary listen socket address that the Galera Arbitrator opens to communicate with the cluster.  You only need to specify this in the event that the default socket address, (that is, ``0.0.0.0:4567``), is busy.
+
+.. note:: When you run the **garbd** script, it may exit immediately with confusing diagnostics, even after it manages a successful state snapshot transfer request.  This is not a failure.  The donor **mysqld** still runs the backup script.  You can monitor it's progress through the error and script logs on the donor machine.
+
+
