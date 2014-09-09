@@ -37,6 +37,9 @@ Table legend:
 | :ref:`cert.log_conflicts              | *no*                  | 2.0                   | n/a                | Yes      |
 | <cert.log_conflicts>`                 |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
+| :ref:`debug                           | *no*                  | 2.0                   | n/a                | Yes      |
+| <debug>`                              |                       |                       |                    |          |
++---------------------------------------+-----------------------+-----------------------+--------------------+----------+
 | :ref:`protonet.backend                | *asio*                | 1.0                   | n/a                | No       |
 | <protonet.backend>`                   |                       |                       |                    |          |
 +---------------------------------------+-----------------------+-----------------------+--------------------+----------+
@@ -254,6 +257,14 @@ Global variable for internal use. Should not be set manually.
    pair: Parameters; cert.log_conflicts
 
 Log details of certification failures.
+
+
+.. rubric:: ``debug``
+.. _`debug`:
+.. index::
+   pair: Parameters; debug
+
+Enable debugging.
 
 
 .. rubric:: ``protonet.backend``
