@@ -1,7 +1,6 @@
 #!/usr/bin/make -f
 
-DH_VERBOSE = 1
-TMP = $(CURDIR)/debian/tmp
+export DH_VERBOSE=1
 
 # Parse DEB_BUILD_OPTIONS
 
@@ -24,27 +23,24 @@ print_vars:
 override_dh_auto_build: print_vars
 	scons -j $(JOBS) tests=$(TESTS)
 
-override_dh_auto_install:
-	install -D -m 644 $(CURDIR)/garb/files/garb.cnf $(TMP)/etc/default/garb
-	install -D -m 755 $(CURDIR)/garb/files/garb.sh $(TMP)/etc/init.d/garb
-	install -D -m 755 $(CURDIR)/garb/garbd $(TMP)/usr/bin/garbd
-	install -D -m 755 $(CURDIR)/libgalera_smm.so $(TMP)/usr/lib/galera/libgalera_smm.so
-	echo /usr/lib/galera > $(CURDIR)/galera.conf
-	install -D -m 644 $(CURDIR)/galera.conf $(TMP)/etc/ld.so.conf.d/galera.conf
-	install -D -m 644 $(CURDIR)/LICENSE $(TMP)/usr/share/doc/galera/COPYING
-	install -D -m 644 $(CURDIR)/asio/LICENSE_1_0.txt $(TMP)/usr/share/doc/galera/LICENSE.asio
-	install -D -m 644 $(CURDIR)/www.evanjones.ca/LICENSE $(TMP)/usr/share/doc/galera/LICENSE.crc32c
-	install -D -m 644 $(CURDIR)/chromium/LICENSE $(TMP)/usr/share/doc/galera/LICENSE.chromium
-	install -D -m 644 $(CURDIR)/README $(TMP)/usr/share/doc/galera/README
-
 override_dh_auto_clean:
 	scons -c
 	rm config.log
 
-.PHONY: override_dh_strip
+override_dh_installdocs:
+	dh_installdocs
+	install -m 644 asio/LICENSE_1_0.txt debian/galera/usr/share/doc/galera/LICENSE.asio
+	install -m 644 chromium/LICENSE debian/galera/usr/share/doc/galera/LICENSE.chromium
+	install -m 644 www.evanjones.ca/LICENSE debian/galera/usr/share/doc/galera/LICENSE.crc32c
+
+# Start earlier than MySQL which has value 19
+override_dh_installinit-arch:
+	dh_installinit --name=garb -- defaults 18 22
 
 override_dh_strip:
 	dh_strip --dbg-package=galera-dbg
 
 %:
 	dh $@
+
+.PHONY: override_dh_strip

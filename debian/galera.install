@@ -1,10 +1,2 @@
-etc/default/garb
-etc/init.d/garb
-etc/ld.so.conf.d/galera.conf
-usr/bin/garbd
-usr/lib/galera/libgalera_smm.so
-usr/share/doc/galera/COPYING
-usr/share/doc/galera/LICENSE.asio
-usr/share/doc/galera/LICENSE.crc32c
-usr/share/doc/galera/LICENSE.chromium
-usr/share/doc/galera/README
+garb/garbd usr/bin
+libgalera_smm.so usr/lib/galera
