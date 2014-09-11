@@ -2,26 +2,28 @@
 
 export DH_VERBOSE=1
 
-# Parse DEB_BUILD_OPTIONS
-
-# Number of parallel jobs
-JOBS = 1
+# Parallel build support as adviced
+# at https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules-options
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-	JOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += -j $(NUMJOBS)
+	# Don't use MAKEFLAGS as it has strange 'w' and '--jobserver-fds=3,4' by default
 endif
 
-# Whether to run tests
-TESTS = 1
-ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	TESTS = 0
+# Add support for verbose builds
+ifneq (,$(filter verbose,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += VERBOSE=1
+endif
+
+# Run tests by default
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += tests=1
 endif
 
 
-print_vars:
-	@echo $(DEB_BUILD_OPTIONS)
-
-override_dh_auto_build: print_vars
-	scons -j $(JOBS) tests=$(TESTS)
+override_dh_auto_build:
+	@echo $(SCONS_ARGS)
+	scons $(SCONS_ARGS)
 
 override_dh_auto_clean:
 	scons -c
