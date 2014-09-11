@@ -8,11 +8,11 @@
 # config: /etc/sysconfig/garb | /etc/default/garb
 
 ### BEGIN INIT INFO
-# Provides:          garbd
-# Required-Start:    $network
-# Required-Stop:     $network
-# Default-Start:     3 4 5
-# Default-Stop:      0 1 2 6
+# Provides:          garb
+# Required-Start:    $network $local_fs
+# Required-Stop:     $network $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
 # Description:       Galera Arbitrator Daemon is used
 #                    as part of clusters that have only two
