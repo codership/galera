@@ -4,7 +4,7 @@ Upstream-Contact: Codership Oy <info@codership.com>
 Source: http://github.com/codership/galera
 Comments:
  Codership have added an additional clause to cover use of OpenSSL with
- Galera under the GPL-2 license.  This is commited to the 2.x branch
+ Galera under the GPL-2 license.  This is committed to the 2.x branch
  upstream:
  .
    http://bazaar.launchpad.net/~codership/galera/2.x/revision/167
