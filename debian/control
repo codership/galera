@@ -22,9 +22,9 @@ Conflicts: garbd-2,
            garbd2,
            percona-xtradb-cluster-galera,
            percona-xtradb-cluster-galera-2.x,
-           percona-xtradb-cluster-galera-3,
            percona-xtradb-cluster-galera-3.x,
-           percona-xtradb-cluster-garbd-2.x
+           percona-xtradb-cluster-garbd-2.x,
+           percona-xtradb-cluster-garbd-3.x
 Provides: galera3, wsrep
 Homepage: http://galeracluster.com/
 Description: Replication framework for transactional applications
