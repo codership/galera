@@ -46,40 +46,24 @@ public:
 
     std::ostream& to_stream(std::ostream& os, bool full) const
     {
-        static const char buf[37] = { 0, };
-        const uint32_t* i = reinterpret_cast<const uint32_t*>(uuid_.data);
-
-        if (i[0] != 0 &&
-            memcmp(i + 1, buf, sizeof(uuid_) - sizeof(*i)) == 0)
+        std::ios_base::fmtflags saved = os.flags();
+        if (full == true)
         {
-            // if all of UUID is contained in the first 4 bytes
-            os << i[0]; // should this be converted to certain endianness?
+            os << uuid_;
         }
         else
         {
-
-
-            std::ios_base::fmtflags saved = os.flags();
-            if (full == true)
-            {
-                const uint16_t* s(reinterpret_cast<const uint16_t*>(
-                                      uuid_.data));
-                os << std::hex
-                   << std::setfill('0') << std::setw(8) << gu_be32(i[0]) << '-'
-                   << std::setfill('0') << std::setw(4) << gu_be16(s[2]) << '-'
-                   << std::setfill('0') << std::setw(4) << gu_be16(s[3]) << '-'
-                   << std::setfill('0') << std::setw(4) << gu_be16(s[4]) << '-'
-                   << std::setfill('0') << std::setw(4) << gu_be16(s[5])
-                   << std::setfill('0') << std::setw(8) << gu_be32(i[3]);
-            }
-            else
-            {
-                os << std::hex
-                   << std::setfill('0') << std::setw(8) << gu_be32(i[0]);
-            }
-            os.flags(saved);
+            os << std::hex
+               << std::setfill('0') << std::setw(2)
+               << static_cast<int>(uuid_.data[0])
+               << std::setfill('0') << std::setw(2)
+               << static_cast<int>(uuid_.data[1])
+               << std::setfill('0') << std::setw(2)
+               << static_cast<int>(uuid_.data[2])
+               << std::setfill('0') << std::setw(2)
+               << static_cast<int>(uuid_.data[3]);
         }
-
+        os.flags(saved);
         return os;
     }
 
