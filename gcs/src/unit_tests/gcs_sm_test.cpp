@@ -2,10 +2,15 @@
 
 // $Id$
 
+
+#include "../gcs_sm.hpp"
+
 #include <check.h>
 #include <string.h>
+
 #include "gcs_sm_test.hpp"
-#include "../gcs_sm.hpp"
+
+
 
 #define TEST_USLEEP 10000
 
@@ -25,7 +30,7 @@ START_TEST (gcs_sm_test_basic)
 
     int i;
     for (i = 1; i < 5; i++) {
-        ret = gcs_sm_enter(sm, &cond, false);
+        ret = gcs_sm_enter(sm, &cond, false, true);
         fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
         fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
         fail_if(sm->entered != 1, "entered = %d, expected 1", sm->entered);
@@ -51,7 +56,7 @@ static void* simple_thread(void* arg)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    if (0 == (simple_ret = gcs_sm_enter (sm, &cond, false))) {
+    if (0 == (simple_ret = gcs_sm_enter (sm, &cond, false, true))) {
         usleep(1000);
         gcs_sm_leave (sm);
     }
@@ -71,7 +76,7 @@ START_TEST (gcs_sm_test_simple)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    ret = gcs_sm_enter(sm, &cond, false);
+    ret = gcs_sm_enter(sm, &cond, false, true);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
     fail_if(sm->entered != true, "entered = %d, expected %d",
@@ -146,7 +151,7 @@ START_TEST (gcs_sm_test_close)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    int ret = gcs_sm_enter(sm, &cond, false);
+    int ret = gcs_sm_enter(sm, &cond, false, true);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
     fail_if(order != 0);
@@ -195,7 +200,7 @@ static void* pausing_thread (void* data)
     gu_info ("pausing_thread scheduled, pause_order = %d", pause_order);
     fail_if (pause_order != 0, "pause_order = %d, expected 0");
     pause_order = 1;
-    gcs_sm_enter (sm, &cond, true);
+    gcs_sm_enter (sm, &cond, true, true);
     gu_info ("pausing_thread entered, pause_order = %d", pause_order);
     fail_if (pause_order != 2, "pause_order = %d, expected 2");
     pause_order = 3;
@@ -283,7 +288,7 @@ START_TEST (gcs_sm_test_pause)
     fail_if (pause_order != 3, "pause_order = %d, expected 3");
     pause_order = 0;
 
-    int ret = gcs_sm_enter(sm, &cond, true);
+    int ret = gcs_sm_enter(sm, &cond, true, true);
     fail_if (ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     // released monitor lock, thr should continue and schedule,
     // set pause_order to 1
@@ -348,7 +353,7 @@ START_TEST (gcs_sm_test_pause)
     fail_if (paused_avg <= 0.0);
     fail_if (q_len_avg  != 0.0);
 
-    gcs_sm_enter (sm, &cond, false); // by now paused thread exited monitor
+    gcs_sm_enter (sm, &cond, false, true); // by now paused thread exited monitor
     fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);
     fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
     fail_if(0 != sm->wait_q_head, "wait_q_head = %lu, expected 0",
@@ -384,7 +389,7 @@ static void* interrupt_thread(void* arg)
         pthread_cond_t cond;
         pthread_cond_init (&cond, NULL);
 
-        if (0 == (global_ret = gcs_sm_enter (sm, &cond, true))) {
+        if (0 == (global_ret = gcs_sm_enter (sm, &cond, true, true))) {
             gcs_sm_leave (sm);
         }
         pthread_cond_destroy (&cond);
@@ -428,7 +433,7 @@ START_TEST (gcs_sm_test_interrupt)
     fail_if (sm->wait_q_tail != 1, "wait_q_tail = %lu, expected 1",
              sm->wait_q_tail);
 
-    long ret = gcs_sm_enter (sm, &cond, true);
+    long ret = gcs_sm_enter (sm, &cond, true, true);
     fail_if (ret != 0);
 
     /* 1. Test interrupting blocked by previous thread */
@@ -476,7 +481,7 @@ START_TEST (gcs_sm_test_interrupt)
     gcs_sm_continue (sm);
 
     /* check that monitor is still functional */
-    ret = gcs_sm_enter (sm, &cond, false);
+    ret = gcs_sm_enter (sm, &cond, false, true);
     fail_if (ret != 0);
 
     fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",

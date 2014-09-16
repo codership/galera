@@ -11,6 +11,7 @@
 #ifndef _gcs_sm_h_
 #define _gcs_sm_h_
 
+#include "gu_datetime.hpp"
 #include <galerautils.h>
 #include <errno.h>
 
@@ -61,6 +62,7 @@ typedef struct gcs_sm
     long          cc;
 #endif /* GCS_SM_CONCURRENCY */
     bool          pause;
+    gu::datetime::Period wait_time;
     gcs_sm_user_t wait_q[];
 }
 gcs_sm_t;
@@ -162,18 +164,53 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
 }
 
 static inline bool
-_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
+_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block)
 {
     unsigned long tail = sm->wait_q_tail;
 
     sm->wait_q[tail].cond = cond;
     sm->wait_q[tail].wait = true;
-    gu_cond_wait (cond, &sm->lock);
-    assert(tail == sm->wait_q_head || false == sm->wait_q[tail].wait);
-    assert(sm->wait_q[tail].cond == cond || false == sm->wait_q[tail].wait);
-    sm->wait_q[tail].cond = NULL;
-    bool ret = sm->wait_q[tail].wait;
-    sm->wait_q[tail].wait = false;
+    bool ret;
+    if (block == true)
+    {
+        gu_cond_wait (cond, &sm->lock);
+        assert(tail == sm->wait_q_head || false == sm->wait_q[tail].wait);
+        assert(sm->wait_q[tail].cond == cond || false == sm->wait_q[tail].wait);
+        sm->wait_q[tail].cond = NULL;
+        ret = sm->wait_q[tail].wait;
+        sm->wait_q[tail].wait = false;
+    }
+    else
+    {
+        gu::datetime::Date abstime(gu::datetime::Date::calendar());
+        abstime = abstime + sm->wait_time;
+        struct timespec ts;
+        abstime._timespec(ts);
+        int waitret = gu_cond_timedwait(cond, &sm->lock, &ts);
+        sm->wait_q[tail].cond = NULL;
+        // sm->wait_time is incremented by second each time cond wait
+        // times out, reset back to one second when cond wait
+        // succeeds.
+        if (waitret == 0)
+        {
+            ret = sm->wait_q[tail].wait;
+            sm->wait_time = gu::datetime::Sec;
+        }
+        else if (waitret == ETIMEDOUT)
+        {
+            gu_warn("send monitor wait timed out, waited for %s",
+                    to_string(sm->wait_time).c_str());
+            ret = false;
+            sm->wait_time = sm->wait_time + gu::datetime::Sec;
+        }
+        else
+        {
+            gu_error("send monitor timedwait failed with %d: %s",
+                     waitret, strerror(waitret));
+            ret = false;
+        }
+        sm->wait_q[tail].wait = false;
+    }
     return ret;
 }
 
@@ -235,6 +272,8 @@ gcs_sm_schedule (gcs_sm_t* sm)
  *
  * @param sm   send monitor object
  * @param cond condition to signal to wake up thread in case of wait
+ * @param block if true block until entered or send monitor is closed,
+ *              if false enter wait times out eventually
  *
  * @retval -EAGAIN - out of space
  * @retval -EBADFD - monitor closed
@@ -242,14 +281,14 @@ gcs_sm_schedule (gcs_sm_t* sm)
  * @retval 0 - successfully entered
  */
 static inline long
-gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
+gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
 {
     long ret = 0; /* if scheduled and no queue */
 
     if (gu_likely (scheduled || (ret = gcs_sm_schedule(sm)) >= 0)) {
 
         if (GCS_SM_HAS_TO_WAIT) {
-            if (gu_likely(_gcs_sm_enqueue_common (sm, cond))) {
+            if (gu_likely(_gcs_sm_enqueue_common (sm, cond, block))) {
                 ret = sm->ret;
             }
             else {
