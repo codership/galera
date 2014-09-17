@@ -194,12 +194,21 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block)
         if (waitret == 0)
         {
             ret = sm->wait_q[tail].wait;
-            sm->wait_time = gu::datetime::Sec;
+            sm->wait_time = std::max(sm->wait_time*2/3,
+                                     gu::datetime::Period(gu::datetime::Sec));
         }
         else if (waitret == ETIMEDOUT)
         {
-            gu_warn("send monitor wait timed out, waited for %s",
-                    to_string(sm->wait_time).c_str());
+            if (sm->wait_time < 10 * gu::datetime::Sec)
+            {
+                gu_debug("send monitor wait timed out, waited for %s",
+                         to_string(sm->wait_time).c_str());
+            }
+            else
+            {
+                gu_warn("send monitor wait timed out, waited for %s",
+                        to_string(sm->wait_time).c_str());
+            }
             ret = false;
             sm->wait_time = sm->wait_time + gu::datetime::Sec;
         }
