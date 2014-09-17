@@ -1178,8 +1178,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     }
 
     try {
-        // #557 - remove this if() when we return back to joining after SST
-        if (rcode < 0) gcs_.join(seqno);
+        gcs_.join(seqno);
         return WSREP_OK;
     }
     catch (gu::Exception& e)
