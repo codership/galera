@@ -118,7 +118,8 @@ namespace galera
                         wsrep_seqno_t first,
                         wsrep_seqno_t last,
                         AsyncSenderMap& asmap,
-                        int version)
+                        int version,
+                        bool join)
                 :
                 Sender (conf, asmap.gcache(), peer, version),
                 conf_  (conf),
@@ -126,7 +127,8 @@ namespace galera
                 first_ (first),
                 last_  (last),
                 asmap_ (asmap),
-                thread_()
+                thread_(),
+                join_(join)
             { }
 
             const gu::Config&  conf()   { return conf_;   }
@@ -135,6 +137,7 @@ namespace galera
             wsrep_seqno_t      last()   { return last_;   }
             AsyncSenderMap&    asmap()  { return asmap_;  }
             pthread_t          thread() { return thread_; }
+            bool               join() { return join_; }
 
         private:
 
@@ -145,6 +148,7 @@ namespace galera
             wsrep_seqno_t      last_;
             AsyncSenderMap&    asmap_;
             pthread_t          thread_;
+            bool               join_;
         };
     }
 }
@@ -824,10 +828,11 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
                                       const std::string& peer,
                                       wsrep_seqno_t      first,
                                       wsrep_seqno_t      last,
-                                      int                version)
+                                      int                version,
+                                      bool               join)
 {
     gu::Critical crit(monitor_);
-    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
+    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version, join));
     int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {
@@ -847,6 +852,9 @@ void galera::ist::AsyncSenderMap::remove(AsyncSender* as, wsrep_seqno_t seqno)
         throw gu::NotFound();
     }
     senders_.erase(i);
+    if (as->join()) {
+        gcs_.join(seqno);
+    }
 }
 
 

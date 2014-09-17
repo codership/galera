@@ -350,6 +350,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         if (streq->ist_len())
         {
             IST_request istr;
+            bool join_in_ist = true;
             get_ist_request(streq, &istr);
 
             if (istr.uuid() == state_uuid_)
@@ -376,7 +377,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                            streq->sst_req(),
                                            streq->sst_len(),
                                            &state_id, 0, 0, true);
-// this must be reset only in sst_sent() call            ist_sst_ = false;
+                    // we will join in sst_sent.
+                    join_in_ist = false;
                 }
 
                 if (rcode >= 0)
@@ -393,7 +395,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          istr.peer(),
                                          istr.last_applied() + 1,
                                          cc_seqno_,
-                                         protocol_version_);
+                                         protocol_version_,
+                                         join_in_ist);
                     }
                     catch (gu::Exception& e)
                     {
