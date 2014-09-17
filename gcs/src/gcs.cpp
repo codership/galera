@@ -1487,7 +1487,8 @@ gcs_seqno_t gcs_caused(gcs_conn_t* conn)
 long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 const struct gu_buf* const act_in,    //!<in
                 struct gcs_action*   const act,       //!<inout
-                bool                 const scheduled) //!<in
+                bool                 const scheduled, //!<in
+                bool                 const bypass_sm) //!<in
 {
     if (gu_unlikely((size_t)act->size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
 
@@ -1513,7 +1514,8 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
         // 1. serializes gcs_core_send() access between gcs_repl() and
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
-        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled, true)))
+        if (bypass_sm == true ||
+            !(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled, true)))
         {
             struct gcs_repl_act** act_ptr;
 
@@ -1555,7 +1557,10 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 }
             }
 
-            gcs_sm_leave (conn->sm);
+            if (bypass_sm == false)
+            {
+                gcs_sm_leave (conn->sm);
+            }
 
             assert(ret);
 
@@ -1668,7 +1673,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         action.size = (ssize_t)rst_size;
         action.type = GCS_ACT_STATE_REQ;
 
-        ret = gcs_repl(conn, &action, false);
+        ret = gcs_repl(conn, &action, false, true);
 
         gu_free (rst);
 

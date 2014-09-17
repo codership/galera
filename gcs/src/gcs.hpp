@@ -210,21 +210,24 @@ struct gcs_action {
  * @param act_in    action buffer vector (total size is passed in action)
  * @param action    action struct
  * @param scheduled whether the call was preceded by gcs_schedule()
+ * @param bypass_sm bypass send monitor
  * @return          negative error code, action size in case of success
  * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
  */
 extern long gcs_replv (gcs_conn_t*          conn,
                        const struct gu_buf* act_in,
                        struct gcs_action*   action,
-                       bool                 scheduled);
+                       bool                 scheduled,
+                       bool                 bypass_sm);
 
 /*! A wrapper for single buffer communication */
 static inline long gcs_repl (gcs_conn_t*        const conn,
                              struct gcs_action* const action,
-                             bool               const scheduled)
+                             bool               const scheduled,
+                             bool               const bypass_sm)
 {
     struct gu_buf const buf = { action->buf, action->size };
-    return gcs_replv (conn, &buf, action, scheduled);
+    return gcs_replv (conn, &buf, action, scheduled, bypass_sm);
 }
 
 /*! @brief Receives an action from group.

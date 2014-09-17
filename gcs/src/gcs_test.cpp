@@ -381,7 +381,7 @@ void *gcs_test_repl (void *arg)
         if (ret < 0) break;
 
         /* replicate message */
-        ret = gcs_repl (gcs, &thread->act, false);
+        ret = gcs_repl (gcs, &thread->act, false, false);
 
         if (ret < 0) {
             assert (thread->act.seqno_g == GCS_SEQNO_ILL);
