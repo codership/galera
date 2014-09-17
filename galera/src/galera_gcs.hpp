@@ -132,12 +132,12 @@ namespace galera
         ssize_t replv(const WriteSetVector& actv,
                       struct gcs_action& act, bool scheduled)
         {
-            return gcs_replv(conn_, &actv[0], &act, scheduled);
+            return gcs_replv(conn_, &actv[0], &act, scheduled, false);
         }
 
         ssize_t repl(struct gcs_action& act, bool scheduled)
         {
-            return gcs_repl(conn_, &act, scheduled);
+            return gcs_repl(conn_, &act, scheduled, false);
         }
 
         gcs_seqno_t caused() { return gcs_caused(conn_);   }
