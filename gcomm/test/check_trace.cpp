@@ -309,12 +309,10 @@ static void check_traces(const Trace& t1, const Trace& t2)
             Trace::ViewTraceMap::const_iterator j_next(j); ++j_next;
 
             if (type == V_TRANS) {
-                // if next reg view has same members, then view and msgs are the same.
+                // if next reg view is same, then views and msgs are the same.
                 if (i_next != t1.view_traces().end() &&
                     j_next != t2.view_traces().end() &&
-                    i_next->first == j_next->first &&
-                    i_next->second.view().members() ==
-                    j_next->second.view().members()) {
+                    i_next->first == j_next->first) {
                     gcomm_assert(*i == *j) <<
                             "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
                             "next views: \n\n" << *i_next << "\n\n" << *j_next;
@@ -322,18 +320,30 @@ static void check_traces(const Trace& t1, const Trace& t2)
             }
 
             if (type == V_REG) {
-                // members are all the same.
+                // members are same all the times.
                 gcomm_assert(i->second.view().members() == j->second.view().members()) <<
                         "trace differ: \n\n" << *i << "\n\n" << *j;
 
                 // if next trans view has same members, then msgs are the same.
                 if (i_next != t1.view_traces().end() &&
-                    j_next != t2.view_traces().end() &&
-                    i_next->second.view().members() ==
-                    j_next->second.view().members()) {
-                    gcomm_assert(i->second.msgs() == j->second.msgs()) <<
-                            "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
-                            "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                    j_next != t2.view_traces().end()) {
+                    if (i_next->second.view().members() ==
+                        j_next->second.view().members()) {
+                        gcomm_assert(i->second.msgs() == j->second.msgs()) <<
+                                "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                                "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                    } else {
+                        // if not, then members should be disjoint.
+                        std::map<gcomm::UUID, gcomm::Node> output;
+                        std::set_intersection(i_next->second.view().members().begin(),
+                                              i_next->second.view().members().end(),
+                                              j_next->second.view().members().begin(),
+                                              j_next->second.view().members().end(),
+                                              std::inserter(output,output.begin()));
+                        gcomm_assert(output.size() == 0) << 
+                                "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                                "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                    }
                 }
                 // if previous trans view id is the same.
                 // the reg view should be the same.
@@ -351,28 +361,32 @@ static void check_traces(const Trace& t1, const Trace& t2)
                             "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
                             "previous views: \n\n" << *i_prev << "\n\n" << *j_prev;
                 } else {
-                    typedef std::pair<gcomm::UUID, gcomm::Node> Element;
-                    std::vector< Element> output(20); // note: I guess it's should be large enough.
-                    std::vector< Element >::iterator it ;
+                    std::map<gcomm::UUID, gcomm::Node> output;
                     int joined_size = 0, left_size = 0, part_size = 0;
-                    it = std::set_intersection(i->second.view().joined().begin(),
-                                               i->second.view().joined().end(),
-                                               j->second.view().joined().begin(),
-                                               j->second.view().joined().end(),
-                                               output.begin());
-                    joined_size = it - output.begin();
-                    it = std::set_intersection(i->second.view().left().begin(),
-                                               i->second.view().left().end(),
-                                               j->second.view().left().begin(),
-                                               j->second.view().left().end(),
-                                               output.begin());
-                    left_size = it - output.begin();
-                    it = std::set_intersection(i->second.view().partitioned().begin(),
-                                               i->second.view().partitioned().end(),
-                                               j->second.view().partitioned().begin(),
-                                               j->second.view().partitioned().end(),
-                                               output.begin());
-                    part_size = it - output.begin();
+                    std::set_intersection(i->second.view().joined().begin(),
+                                          i->second.view().joined().end(),
+                                          j->second.view().joined().begin(),
+                                          j->second.view().joined().end(),
+                                          std::inserter(output, output.begin()));
+                    joined_size = output.size();
+                    output.clear();
+
+                    std::set_intersection(i->second.view().left().begin(),
+                                          i->second.view().left().end(),
+                                          j->second.view().left().begin(),
+                                          j->second.view().left().end(),
+                                          std::inserter(output, output.begin()));
+                    left_size = output.size();
+                    output.clear();
+
+                    std::set_intersection(i->second.view().partitioned().begin(),
+                                          i->second.view().partitioned().end(),
+                                          j->second.view().partitioned().begin(),
+                                          j->second.view().partitioned().end(),
+                                          std::inserter(output, output.begin()));
+                    part_size = output.size();
+                    output.clear();
+
                     gcomm_assert(i->second.view().members() == j->second.view().members() &&
                                  joined_size == 0 && left_size == 0 && part_size == 0) <<
                             "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
