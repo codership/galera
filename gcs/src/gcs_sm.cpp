@@ -63,6 +63,7 @@ gcs_sm_create (long len, long n)
         sm->cc          = n; // concurrency param.
 #endif /* GCS_SM_CONCURRENCY */
         sm->pause       = false;
+        sm->wait_time   = gu::datetime::Sec;
         memset (sm->wait_q, 0, sm->wait_q_len * sizeof(sm->wait_q[0]));
     }
 
@@ -93,7 +94,7 @@ gcs_sm_close (gcs_sm_t* sm)
     while (sm->users > 0) { // wait for cleared queue
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
-        _gcs_sm_enqueue_common (sm, &cond);
+        _gcs_sm_enqueue_common (sm, &cond, true);
         sm->users--;
         GCS_SM_INCREMENT(sm->wait_q_head);
     }

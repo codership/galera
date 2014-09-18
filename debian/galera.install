@@ -1,0 +1,2 @@
+garb/garbd usr/bin
+libgalera_smm.so usr/lib/galera

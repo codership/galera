@@ -1,0 +1,46 @@
+Source: galera
+Maintainer: Codership Oy <info@codership.com>
+Uploaders: Otto Kekäläinen <otto@seravo.fi>
+Section: database
+Priority: optional
+Standards-Version: 3.9.5
+Build-Depends: check,
+               debhelper (>= 7.0.50~),
+               libboost-dev (>= 1.41),
+               libboost-program-options-dev (>= 1.41),
+               libssl-dev,
+               scons (>= 2)
+Homepage: http://www.galeracluster.com/
+Vcs-Git: git://github.com/codership/galera.git
+Vcs-Browser: http://github.com/codership/galera.git
+
+Package: galera
+Architecture: any
+Section: libs
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Conflicts: garbd-2,
+           garbd2,
+           percona-xtradb-cluster-galera,
+           percona-xtradb-cluster-galera-2.x,
+           percona-xtradb-cluster-galera-3.x,
+           percona-xtradb-cluster-garbd-2.x,
+           percona-xtradb-cluster-garbd-3.x
+Provides: galera3, wsrep
+Homepage: http://galeracluster.com/
+Description: Replication framework for transactional applications
+ Galera is a fast synchronous multimaster wsrep provider (replication engine)
+ for transactional databases and similar applications. For more information
+ about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+ replication engine see http://galeracluster.com.
+
+Package: galera-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Conflicts: percona-xtradb-cluster-galera-2.x-dbg,
+           percona-xtradb-cluster-galera-3-dbg,
+           percona-xtradb-cluster-galera-3.x-dbg
+Depends: galera (= ${binary:Version}), ${misc:Depends}
+Description: Replication framework for transactional applications, debugging symbols
+ A special package that contains the Galera library and arbitator binaries
+ with debugging symbols.

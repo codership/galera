@@ -40,6 +40,15 @@ START_TEST(test_uuid)
     UUID uuid2(0, 0);
 
     fail_unless(uuid1 < uuid2);
+
+    // Verify that short UUID notation matches with first 8 chars
+    // of full uuid string.
+    std::string full(uuid1.full_str());
+    std::ostringstream os;
+    os << uuid1;
+    fail_unless(full.compare(0, 8, os.str()) == 0,
+                "%s != %s", full.c_str(), os.str().c_str());
+
 }
 END_TEST
 
