@@ -28,6 +28,6 @@ Miscellaneous Reference
    :maxdepth: 2
 
    glossary
-   versoninginformation
+   versioninginformation
    thirdpartygaleraimplementations
    legalnotice

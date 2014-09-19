@@ -1,100 +1,123 @@
 ==============================
  Cluster Deployment Variants
 ==============================
-.. _`Cluster Deployment Variants`:
+.. _`deployment-variants`:
 
-Galera Cluster consists of nodes. We recommend that you have at least three nodes in your cluster. Each cluster node is a regular MySQL server and you convert your existing MySQL server into a node and use that server as the cluster base. 
+An instance of Galera Cluster consists of a series of nodes, preferably three or more.  Each node is an instance of MySQL, MariaDB or Percona XtraDB that you convert to Galera Cluster, allowing you to use that node as a cluster base.
 
-Due to its synchronous multi-master qualities, the Galera Cluster can be seen as a single server listening at many interfaces. To give you an idea of what Galera Cluster is capable of, we will consider a typical N-tier application and discuss different benefits and considerations of deploying Galera Cluster in that context.
+Galera Cluster provides synchronous multi-master replication, meaning that you can think of the cluster as a single database server that listens through many interfaces.  To give you with an idea of what Galera Cluster is capable of, consider a typical *n*-tier application and the various benefits that would come from deploying it with Galera Cluster.
+
+
 
 -------------------
  No Clustering
 -------------------
+.. _`no-clustering`:
 
-The figure below depicts an N-tier application cluster without clustering. Since the upper tiers are usually stateless, you can start up as many instances as necessary without any concern for synchronization; the instances store their data in the data tier.
+In the typical *n*-tier application cluster without database clustering, there is no concern for database replication or synchronization.
 
-This is a simple and easy-to-manage solution. However, the :abbr:`DBMS (Database Management System)` server at the data tier is a :abbr:`SPoF (Single Point Of Failure)` and a performance bottleneck.
+Internet traffic filters down to your application servers, all of which read and write from the same :abbr:`DBMS (Database Management System)` server.  Given that the upper tiers usually remain stateless, you can start up as many instances as you need to meet the demand from the internet as each instance in turn stores its data in the data tier.
+
 
 .. figure:: images/galerausecases0.png
 
    *No Clustering*
 
---------------------
- Whole Stack Cluster
---------------------
 
-The figure below depicts an N-tier application cluster using whole stack clustering, where each stack has a dedicated database server.
+This solution is simple and easy to manage, but suffers a particular weakness in the data tier's lack of redundancy.  
+
+For example, should for any reason the :abbr:`DBMS (Database Management System)` server become unavailable, your application also becomes unavailable.  This is the same whether the server crashes or if you need to take it down for maintenance. 
+
+Similarly, this deployment also introduces performance concerns.  While you can start as many instances as you need to meet the demands on your web and application servers, they can only put so much load on the :abbr:`DBMS (Database Management System)` server before the load begins to slow down the experience for end users.
+
+
+----------------------------
+ Whole Stack Clustering
+----------------------------
+.. _`whole-stack-cluster`:
+
+In the typical *n*-tier application cluster you can avoid the performance bottleneck by building a whole stack cluster.  
+
+Internet traffic filters down to the application server, which stores data on its own dedicated :abbr:`DBMS (Database Management System)` server.  Galera Cluster then replicates the data through to the cluster, ensuring that it remains synchronous.
+
+
 
 .. figure:: images/galerausecases1.png
 
    *Whole Stack Cluster*
 
-This is a simple and easy-to-manage solution, especially if you can install the whole stack in one physical machine. Due to the direct connection from the application tier to the :abbr:`DBMS (Database Management System)`, the solution has low latencies.
+This solution is simple and easy to manage, especially if you can install the whole stack of each node on one physical machine.  The direct connection from the application tier to the data tier ensures low latency.
 
-Whole stack clustering has the following challenges:
+There are, however, certain disadvantages to whole stack clustering:
 
-- :abbr:`DBMS (Database Management System)` failure fails the whole stack.
+- **Lack of Redundancy within the Stack** When the database server fails the whole stack fails.  This is because the application server uses a dedicated database server, if the database server fails there's no alternative for the application server, so the whole stack goes down.
 
-- Inefficient resource usage:
+- **Inefficient Resource Usage** A dedicated :abbr:`DBMS (Database Management System)` server for each application server is overuse.  This is poor resource consolidation.  For instance, one server with a 7 GB buffer pool is much faster than two servers with 4 GB buffer pools.
 
-  - Having a dedicated database server for each application stack is overuse.
-  
-  - Poor resource consolidation. One server with a 7Gb buffer pool is much faster than two servers with 4Gb buffer pools.
+- **Increased Unproductive Overhead**  Each server reproduces the work of the other servers in the cluster.
 
-- Increased unproductive overhead: each server duplicates the work of others.
+- **Increased Rollback Rate** Given that each application server writes to a dedicated database server, cluster-wide conflicts are more likely, which can increases the likelihood of corrective rollbacks.
 
-- Increased rollback rate due to cluster-wide conflicts.
+- **Inflexibility** There is no way for you to limit the number of master nodes or to perform intelligent load balancing.
 
-- Inflexibility. There is no way to limit the number of master nodes, or perform intelligent load-balancing.
-  
-Despite a long list of considerations, this setup can be usable
-for several applications. 
+Despite the disadvantages, however, this setup can prove very usable for several applications.  It depends on your needs.
 
 
--------------------
- DBMS-tier Cluster
--------------------
+-----------------------
+Data Tier Clustering
+-----------------------
+.. _`data-tier-cluster`:
 
-To address the shortcomings of the whole stack cluster scheme, we can cluster the data tier separately and present it to the application as a single virtual server. The figure below depicts this solution.
+To compensate for the shortcomings in whole stack clusters, you can cluster the data tier separate from your web and application servers. 
+
+Here, the :abbr:`DBMS (Database Management System)` servers form a cluster distinct from your *n*-tier application cluster.  The application servers treat the database cluster as a single virtual server, making their calls through load balancers to the data tier.
 
 .. figure:: images/galerausecases2.png
 
-   *DBMS-tier Cluster*
+   *Data Tier Clustering*
 
-In this solution, the failure of one node does not affect the rest of the cluster. Furthermore, resources are consolidated better and the setup is flexible: nodes can be assigned different roles by using intelligent load balancing.
+In a data tier cluster, the failure of one node does not effect the rest of the cluster.  Furthermore, resources are consolidated better and the setup is flexible.  That is, you can assign nodes different roles using intelligent load balancing.
 
-DBMS-tier clustering has the following challenges:
+There are, however, certain disadvantages to consider in data tier clustering:
 
-- The structure is complex. A load balancer is involved and it must be backed up in case of failures. This typically means that you must have two more servers and a failover solutions between them.
+- **Complex Structure**  Load balancers are involved and you must back them up in case of failures.  This typical means that you have two more servers than you would otherwise, as well as a failover solution between them.
 
-- Management is more complex. The load balancer must be configured and reconfigured, when a :abbr:`DBMS (Database Management System)` node is added to or removed from the cluster.
+- **Complex Management**  You need to configure and reconfigure the load balancers whenever a :abbr:`DBMS (Database Management System)` server is added to or removed from the cluster.
 
-- Connections to the :abbr:`DBMS (Database Management System)` servers are not direct. If you place a proxy between the application and the server, you end up with increased latencies for each query.  This can easily become a performance bottleneck (load-balancing servers should be very powerful).
+- **Indirect Connections** The load balancers between the application cluster and the data tier cluster increase the latency for each query.  As such, this can easily become a performance bottleneck.  You need powerful load balancing servers to avoid this.
 
-- An attempt to spread this setup over several datacenters may cancel resource consolidation benefits, as each datacenter will have to have at least two :abbr:`DBMS (Database Management System)` servers.
-  
-DBMS-tier Cluster with Distributed Load Balancing
-=================================================
+- **Scalability** The scheme does not scale well over several datacenters.  Attempts to do so may remove any benefits you gain from resource consolidation, given that each datacenter must include at least two :abbr:`DBMS (Database Management System)` servers.
 
-We can improve the DBMS-tier cluster by placing a dedicated load balancer on each application server. The figure below depicts this solution.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Data Tier Clustering with Distributed Load Balancing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _`data-tier-load-balancers`:
+
+One solution to the limitations of data tier clustering is to deploy them with distributed load balancing.  This scheme roughly follows the standard data tier cluster, but includes a dedicated load balancer installed on each application server.
 
 .. figure:: images/galerausecases3.png
 
-   *DBMS-tier Cluster with Distributed Load Balancing*
+   *Data Tier Cluster with Distributed Load Balancing*
 
-In DBMS-tier cluster with distributed load balancing the load balancer is no longer a single point of failure. Furthermore, the load balancer scales with the application cluster and is unlikely to become a bottlenecks. Finally, the client-server communication latencies are lower.
+In this deployment, the load balancer is no longer a single point of failure.  Furthermore, the load balancer scales with the application cluster and thus is unlikely to become a bottleneck.  Additionally, it keeps down the client-server communications latency.
 
-DBMS-tier clustering with distributed load balancing has the following challenges:
+Data tier clustering with distributed load balancing has the following disadvantage:
 
-- There are N load balancers to manage and reconfigure when the database cluster configuration changes.
+- **Complex Management** Each application server you deploy to meet the needs of your *n*-tier application cluster means another load balancer that you need to set up, manage and reconfigure whenever you change or otherwise update the database cluster configuring.
 
-Aggregated Stack Cluster
-========================
 
-We can also create a hybrid setup where we can aggregate several application stacks to use a single :abbr:`DBMS (Database Management System)` server. The figure below depicts this solution.
+--------------------------------
+Aggregated Stack Clustering
+--------------------------------
+.. _`aggregated-stack-cluster`:
+
+In addition to these deployment schemes, you also have the option of a hybrid setup that integrates whole stack and data tier clustering by aggregating several application stacks around single :abbr:`DBMS (Database Management System)` servers.
 
 .. figure:: images/galerausecases4.png
 
-   *DBMS-tier Cluster with Distributed Load Balancing*
+   *Aggregated Stack Clustering*
 
-This solution improves the resource utilization of the whole stack cluster and still maintains its relative simplicity and direct DBMS connections benefits. This is how a DBMS-tier cluster with distributed load balancing would look like, if we only use one :abbr:`DBMS (Database Management System)` node per datacenter.  This can be a good setup for sites, which are not very big, but still are hosted at more than one datacenter.
+This scheme improves on the resource utilization of the whole stack cluster while maintaining it's relative simplicity and direct :abbr:`DBMS (Database Management System)` connection benefits.  It is also how a data tier cluster with distributed load balancing with look if you were to use only one  :abbr:`DBMS (Database Management System)` server per datacenter.
+
+The aggregated stack cluster is a good setup for sites that are not very big, but still are hosted at more than one datacenter.
