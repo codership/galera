@@ -173,8 +173,17 @@ void gcomm::PC::connect(const gu::URI& uri)
 
 void gcomm::PC::close(bool force)
 {
-
-    if (force == false)
+    if (force == true)
+    {
+        log_info << "Forced PC close";
+        gmcast_->close();
+        // Don't bother closing PC and EVS at this point. Currently
+        // there is no way of knowing why forced close was issued,
+        // so graceful close of PC and/or EVS may not be safe.
+        // pc_->close();
+        // evs_->close();
+    }
+    else
     {
         log_debug << "PC/EVS Proto leaving";
         pc_->close();
@@ -200,10 +209,6 @@ void gcomm::PC::close(bool force)
         }
 
         gmcast_->close();
-    }
-    else
-    {
-        log_info << "Forced PC close";
     }
     pnet().erase(&pstack_);
     pstack_.pop_proto(this);

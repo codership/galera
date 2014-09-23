@@ -257,7 +257,8 @@ public:
                                       const Datagram&,
                                       Message*);
     void handle_msg(const Message& msg,
-                    const Datagram& dg = Datagram());
+                    const Datagram& dg = Datagram(),
+                    bool direct = true);
     // Protolay
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
     int handle_down(Datagram& wb, const ProtoDownMeta& dm);

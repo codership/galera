@@ -267,7 +267,7 @@ public:
         log_info << "gcomm: joining thread";
         pthread_join(thd_, 0);
         log_info << "gcomm: closing backend";
-        tp_->close(error_ != 0);
+        tp_->close(error_ != 0 || force == true);
         gcomm::disconnect(tp_, this);
         delete tp_;
         tp_ = 0;
@@ -389,6 +389,8 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
     if (um.err_no() != 0)
     {
         error_ = um.err_no();
+        // force backend close
+        close(true);
         recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
     }
     else if (um.has_view() == true)
@@ -703,6 +705,7 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
@@ -728,6 +731,7 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     GCommConn& conn(*ref.get());
     try
     {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.close();
     }
     catch (Exception& e)
@@ -845,7 +849,7 @@ GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
     }
 
     GCommConn& conn(*ref.get());
-
+    gcomm::Critical<Protonet> crit(conn.get_pnet());
     conn.get_status(status);
 
 }

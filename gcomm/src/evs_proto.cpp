@@ -2224,7 +2224,8 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 }
 
 void gcomm::evs::Proto::handle_msg(const Message& msg,
-                                   const Datagram& rb)
+                                   const Datagram& rb,
+                                   bool direct)
 {
     assert(msg.type() <= Message::T_EVICT_LIST);
     if (msg.type() > Message::T_EVICT_LIST)
@@ -2268,7 +2269,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     }
 
     Node& node(NodeMap::value(ii));
-    node.set_seen_tstamp(gu::datetime::Date::now());
+    if (direct == true)
+    {
+        node.set_seen_tstamp(gu::datetime::Date::now());
+    }
 
     if (node.operational()                 == false &&
         node.leave_message()               == 0     &&
@@ -2456,7 +2460,8 @@ void gcomm::evs::Proto::handle_up(const void* cid,
     {
         size_t offset;
         gu_trace(offset = unserialize_message(um.source(), rb, &msg));
-        handle_msg(msg, Datagram(rb, offset));
+        handle_msg(msg, Datagram(rb, offset),
+                   (msg.flags() & Message::F_RETRANS) == 0);
     }
     catch (gu::Exception& e)
     {
@@ -3402,7 +3407,7 @@ void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
     Message umsg;
     size_t offset;
     gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
-    gu_trace(handle_msg(umsg, Datagram(rb, offset)));
+    gu_trace(handle_msg(umsg, Datagram(rb, offset), false));
 }
 
 
@@ -4614,9 +4619,9 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
                 evicts.insert(
                     std::make_pair(
                         elm_i->first, std::make_pair(0, 0))));
-            evs_log_info(I_STATE) << "eir " << eir.first->first
-                                  << " " << eir.first->second.first
-                                  << " " << eir.first->second.second;
+            evs_log_debug(D_STATE) << "eir " << eir.first->first
+                                   << " " << eir.first->second.first
+                                   << " " << eir.first->second.second;
             ++eir.first->second.second; // total count
             if (elm_i->second >= auto_evict_)
             {

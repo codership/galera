@@ -222,7 +222,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     }
 
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-    log_debug << v;
+    log_info << v;
     send_up(Datagram(), um);
     set_stable_view(v);
 
