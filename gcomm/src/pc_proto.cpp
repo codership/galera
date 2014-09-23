@@ -1484,10 +1484,24 @@ void gcomm::pc::Proto::handle_up(const void* cid,
 
 int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    if (gu_unlikely(state() != S_PRIM))
+    switch (state())
     {
+    case S_CLOSED:
+    case S_NON_PRIM:
+        // Not connected to primary component
+        return ENOTCONN;
+    case S_STATES_EXCH:
+    case S_INSTALL:
+    case S_TRANS:
+        // Transient error
         return EAGAIN;
+    case S_PRIM:
+        // Allowed to send, fall through
+        break;
+    case S_MAX:
+        gu_throw_fatal << "invalid state " << state();
     }
+
     if (gu_unlikely(dg.len() > mtu()))
     {
         return EMSGSIZE;

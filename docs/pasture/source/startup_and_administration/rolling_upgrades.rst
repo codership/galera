@@ -1,4 +1,0 @@
-Rolling Upgrades
-================
-
-TODO
