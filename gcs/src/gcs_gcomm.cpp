@@ -316,8 +316,7 @@ public:
 
     void        get_status(gu::Status& status) const
     {
-        gcomm::Critical<gcomm::Protonet> crit(*net_);
-        tp_->get_status(status);
+        if (tp_ != 0) tp_->get_status(status);
     }
 
     class Ref
@@ -620,20 +619,9 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         }
         else if (um.err_no() != 0)
         {
-            gcs_comp_msg_t* cm(gcs_comp_msg_leave());
-            const ssize_t cm_size(gcs_comp_msg_size(cm));
-            msg->size = cm_size;
-            if (gu_likely(cm_size <= msg->buf_len))
-            {
-                memcpy(msg->buf, cm, cm_size);
-                recv_buf.pop_front();
-                msg->type = GCS_MSG_COMPONENT;
-            }
-            else
-            {
-                msg->type = GCS_MSG_ERROR;
-            }
-            gcs_comp_msg_delete(cm);
+            // Error from backend, consider it closed
+            msg->type = GCS_MSG_ERROR;
+            return -EBADFD;
         }
         else
         {
