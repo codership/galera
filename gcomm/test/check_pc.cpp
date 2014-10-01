@@ -36,16 +36,16 @@ START_TEST(test_pc_messages)
     pc::NodeMap& sim(pcs.node_map());
 
     sim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(true, false, 6,
+                              pc::Node(true, false, false, 6,
                                        ViewId(V_PRIM,
                                               UUID(0, 0), 9),
                                        42, -1)));
     sim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(false, true, 88, ViewId(V_PRIM,
+                              pc::Node(false, true, false, 88, ViewId(V_PRIM,
                                                          UUID(0, 0), 3),
                                        472, 0)));
     sim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(true, false, 78, ViewId(V_PRIM,
+                              pc::Node(true, false, true, 78, ViewId(V_PRIM,
                                                         UUID(0, 0), 87),
                                        52, 1)));
 
@@ -58,16 +58,16 @@ START_TEST(test_pc_messages)
     pc::NodeMap& iim = pci.node_map();
 
     iim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(true, true, 6, ViewId(V_PRIM,
+                              pc::Node(true, true, true, 6, ViewId(V_PRIM,
                                                              UUID(0, 0), 9), 42, -1)));
     iim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(false, false, 88, ViewId(V_NON_PRIM,
+                              pc::Node(false, false, false, 88, ViewId(V_NON_PRIM,
                                                          UUID(0, 0), 3), 472, 0)));
     iim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(true, false, 78, ViewId(V_PRIM,
+                              pc::Node(true, false, false, 78, ViewId(V_PRIM,
                                                         UUID(0, 0), 87), 52, 1)));
     iim.insert(std::make_pair(UUID(0,0),
-                              pc::Node(false, true, 457, ViewId(V_NON_PRIM,
+                              pc::Node(false, true, true, 457, ViewId(V_NON_PRIM,
                                                           UUID(0, 0), 37), 56, 0xff)));
 
     expt_size = 4 // hdr
@@ -1501,11 +1501,11 @@ START_TEST(test_trac_191)
     StateMessage sm3(0);
     pc::NodeMap& im3(sm3.node_map());
     im3.insert_unique(make_pair(uuid1,
-                                pc::Node(true, false, 254, ViewId(V_PRIM, uuid1, 3), 20)));
+                                pc::Node(true, false, false, 254, ViewId(V_PRIM, uuid1, 3), 20)));
     im3.insert_unique(make_pair(uuid2,
-                                pc::Node(true, false, 254, ViewId(V_PRIM, uuid1, 3), 20)));
+                                pc::Node(true, false, false, 254, ViewId(V_PRIM, uuid1, 3), 20)));
     im3.insert_unique(make_pair(uuid3,
-                                pc::Node(false, false, 254, ViewId(V_PRIM, uuid1, 3), 25)));
+                                pc::Node(false, false, false, 254, ViewId(V_PRIM, uuid1, 3), 25)));
     p.handle_msg(sm3, Datagram(), ProtoUpMeta(uuid3));
     p.handle_msg(sm4, Datagram(), ProtoUpMeta(uuid4));
 }
@@ -3602,6 +3602,163 @@ START_TEST(test_gh_92)
 }
 END_TEST
 
+// Nodes 1, 2, 3. Node 3 will be evicted from group while group is
+// fully partitioned. After remerging 1 and 2 they should reach
+// primary component.
+START_TEST(test_prim_after_evict)
+{
+    UUID uuid1(1), uuid2(2), uuid3(3);
+    gu::Config conf1;
+    gcomm::Conf::register_params(conf1);
+    ProtoUpMeta pum1(uuid1);
+    Proto pc1(conf1, uuid1, 0);
+    DummyTransport tp1;
+    PCUser pu1(conf1, uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+
+    gu::Config conf2;
+    gcomm::Conf::register_params(conf2);
+    ProtoUpMeta pum2(uuid2);
+    Proto pc2(conf2, uuid2, 0);
+    DummyTransport tp2;
+    PCUser pu2(conf2, uuid2, &tp2, &pc2);
+    double_boot(&pu1, &pu2);
+
+    gu::Config conf3;
+    gcomm::Conf::register_params(conf3);
+    ProtoUpMeta pum3(uuid3);
+    Proto pc3(conf3, uuid3, 0);
+    DummyTransport tp3;
+    PCUser pu3(conf3, uuid3, &tp3, &pc3);
+    triple_boot(&pu1, &pu2, &pu3);
+
+    // Node 1 partitions
+    {
+        // Trans view
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pc1.uuid(), 0);
+        tr1.add_partitioned(pc2.uuid(), 0);
+        tr1.add_partitioned(pc3.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        // Reg view
+        View reg1(ViewId(V_REG, pc1.uuid(), tr1.id().seq() + 1));
+        reg1.add_member(pc1.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
+        // States exch
+        Datagram* dg(tp1.out());
+        fail_unless(dg != 0);
+        pc1.handle_up(0, *dg, ProtoUpMeta(pc1.uuid()));
+        delete dg;
+        // Non-prim
+        dg = tp1.out();
+        fail_unless(dg == 0);
+        fail_unless(pc1.state() == Proto::S_NON_PRIM);
+    }
+
+    // Node 2 partitions
+    {
+        // Trans view
+        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        tr2.add_member(pc2.uuid(), 0);
+        tr2.add_partitioned(pc1.uuid(), 0);
+        tr2.add_partitioned(pc3.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
+        // Reg view
+        View reg2(ViewId(V_REG, pc2.uuid(), tr2.id().seq() + 1));
+        reg2.add_member(pc2.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
+        // States exch
+        Datagram* dg(tp2.out());
+        fail_unless(dg != 0);
+        pc2.handle_up(0, *dg, ProtoUpMeta(pc2.uuid()));
+        delete dg;
+        // Non-prim
+        dg = tp2.out();
+        fail_unless(dg == 0);
+        fail_unless(pc2.state() == Proto::S_NON_PRIM);
+    }
+
+    // Just forget about node3, it is gone forever
+    // Nodes 1 and 2 set node3 evicted
+
+    pc1.evict(pc3.uuid());
+    pc2.evict(pc3.uuid());
+
+    // Nodes 1 and 2 merge and should reach Prim
+
+    {
+        // Trans view for node 1
+        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        tr1.add_member(pc1.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
+        Datagram *dg(tp1.out());
+        fail_unless(dg == 0);
+        fail_unless(pc1.state() == Proto::S_TRANS);
+
+        // Trans view for node 2
+        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        tr2.add_member(pc2.uuid(), 0);
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
+        dg = tp2.out();
+        fail_unless(dg == 0);
+        fail_unless(pc2.state() == Proto::S_TRANS);
+
+        // Reg view for nodes 1 and 2
+        View reg(ViewId(V_REG, pc1.uuid(), tr1.id().seq() + 1));
+        reg.add_member(pc1.uuid(), 0);
+        reg.add_member(pc2.uuid(), 0);
+        pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg));
+        pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg));
+
+        // States exchange
+        fail_unless(pc1.state() == Proto::S_STATES_EXCH);
+        fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+
+        // State message from node 1
+        dg = tp1.out();
+        fail_unless(dg != 0);
+        pc1.handle_up(0, *dg, ProtoUpMeta(pc1.uuid()));
+        pc2.handle_up(0, *dg, ProtoUpMeta(pc1.uuid()));
+        delete dg;
+        dg = tp1.out();
+        fail_unless(dg == 0);
+
+        // State message from node 2
+        dg = tp2.out();
+        fail_unless(dg != 0);
+        pc1.handle_up(0, *dg, ProtoUpMeta(pc2.uuid()));
+        pc2.handle_up(0, *dg, ProtoUpMeta(pc2.uuid()));
+        delete dg;
+        dg = tp2.out();
+        fail_unless(dg == 0);
+
+        // Install
+        fail_unless(pc1.state() == Proto::S_INSTALL, "state is %s",
+                    Proto::to_string(pc1.state()).c_str());
+        fail_unless(pc2.state() == Proto::S_INSTALL, "state is %s",
+                    Proto::to_string(pc2.state()).c_str());
+
+        // Install message from node 1
+        dg = tp1.out();
+        fail_unless(dg != 0);
+        pc1.handle_up(0, *dg, ProtoUpMeta(pc1.uuid()));
+        pc2.handle_up(0, *dg, ProtoUpMeta(pc1.uuid()));
+        delete dg;
+
+        // Prim
+        dg = tp1.out();
+        fail_unless(dg == 0);
+        dg = tp2.out();
+        fail_unless(dg == 0);
+        fail_unless(pc1.state() == Proto::S_PRIM);
+        fail_unless(pc2.state() == Proto::S_PRIM);
+    }
+
+
+}
+END_TEST
+
+
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
@@ -3742,6 +3899,10 @@ Suite* pc_suite()
 
         tc = tcase_create("test_gh_92");
         tcase_add_test(tc, test_gh_92);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_prim_after_evict");
+        tcase_add_test(tc, test_prim_after_evict);
         suite_add_tcase(s, tc);
     }
 

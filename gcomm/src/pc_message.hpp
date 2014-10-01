@@ -36,13 +36,15 @@ class gcomm::pc::Node
 public:
     enum Flags
     {
-        F_PRIM   = 0x1,
-        F_WEIGHT = 0x2,
-        F_UN     = 0x4
+        F_PRIM    = 0x1,
+        F_WEIGHT  = 0x2,
+        F_UN      = 0x4,
+        F_EVICTED = 0x8
     };
 
     Node(const bool     prim      = false,
          const bool     un        = false,
+         const bool     evicted   = false,
          const uint32_t last_seq  = std::numeric_limits<uint32_t>::max(),
          const ViewId&  last_prim = ViewId(V_NON_PRIM),
          const int64_t  to_seq    = -1,
@@ -51,6 +53,7 @@ public:
         :
         prim_      (prim     ),
         un_        (un       ),
+        evicted_   (evicted  ),
         last_seq_  (last_seq ),
         last_prim_ (last_prim),
         to_seq_    (to_seq   ),
@@ -60,6 +63,7 @@ public:
 
     void set_prim      (const bool val)          { prim_      = val      ; }
     void set_un        (const bool un)           { un_        = un       ; }
+    void set_evicted   (const bool evicted)      { evicted_   = evicted  ; }
     void set_last_seq  (const uint32_t seq)      { last_seq_  = seq      ; }
     void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
     void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
@@ -68,30 +72,39 @@ public:
 
     bool          prim()      const { return prim_     ; }
     bool          un()        const { return un_       ; }
+    bool          evicted()   const { return evicted_  ; }
     uint32_t      last_seq()  const { return last_seq_ ; }
     const ViewId& last_prim() const { return last_prim_; }
     int64_t       to_seq()    const { return to_seq_   ; }
     int           weight()    const { return weight_   ; }
     SegmentId     segment()   const { return segment_  ; }
 
+    //
+    // Serialized header
+    //  0                   1                   2                   3
+    //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    // |             flags             |   segment id  |    weight     ¡
+    //
+
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
     {
         size_t   off = offset;
-        uint32_t flags;
+        uint32_t header;
 
-        gu_trace (off = gu::unserialize4(buf, buflen, off, flags));
+        gu_trace (off = gu::unserialize4(buf, buflen, off, header));
 
-        prim_ = flags & F_PRIM;
-        un_   = flags & F_UN;
-        if (flags & F_WEIGHT)
+        prim_ = header & F_PRIM;
+        un_   = header & F_UN;
+        if (header & F_WEIGHT)
         {
-            weight_ = flags >> 24;
+            weight_ = header >> 24;
         }
         else
         {
             weight_ = -1;
         }
-        segment_ = (flags >> 16) & 0xff;
+        evicted_ = header & F_EVICTED;
+        segment_ = (header >> 16) & 0xff;
         gu_trace (off = gu::unserialize4(buf, buflen, off, last_seq_));
         gu_trace (off = last_prim_.unserialize(buf, buflen, off));
         gu_trace (off = gu::unserialize8(buf, buflen, off, to_seq_));
@@ -102,17 +115,18 @@ public:
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t   off   = offset;
-        uint32_t flags = 0;
+        uint32_t header = 0;
 
-        flags |= prim_ ? F_PRIM : 0;
-        flags |= un_   ? F_UN   : 0;
+        header |= prim_ ? F_PRIM : 0;
+        header |= un_   ? F_UN   : 0;
         if (weight_ >= 0)
         {
-            flags |= F_WEIGHT;
-            flags |= weight_ << 24;
+            header |= F_WEIGHT;
+            header |= weight_ << 24;
         }
-        flags |= static_cast<uint32_t>(segment_) << 16;
-        gu_trace (off = gu::serialize4(flags, buf, buflen, off));
+        header |= evicted_ ? F_EVICTED : 0;
+        header |= static_cast<uint32_t>(segment_) << 16;
+        gu_trace (off = gu::serialize4(header, buf, buflen, off));
         gu_trace (off = gu::serialize4(last_seq_, buf, buflen, off));
         gu_trace (off = last_prim_.serialize(buf, buflen, off));
         gu_trace (off = gu::serialize8(to_seq_, buf, buflen, off));
@@ -126,7 +140,7 @@ public:
     {
         Node* node(reinterpret_cast<Node*>(0));
 
-        //             flags
+        //             header
         return (sizeof(uint32_t) + sizeof(node->last_seq_) +
                 ViewId::serial_size() + sizeof(node->to_seq_));
     }
@@ -161,6 +175,7 @@ private:
 
     bool      prim_;      // Is node in prim comp
     bool      un_;        // The prim status of the node is unknown
+    bool      evicted_;   // Node has been evicted permanently from the group
     uint32_t  last_seq_;  // Last seen message seq from the node
     ViewId    last_prim_; // Last known prim comp view id for the node
     int64_t   to_seq_;    // Last known TO seq for the node
