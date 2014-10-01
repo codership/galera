@@ -333,7 +333,14 @@ public:
 
     bool is_evicted(const UUID& uuid) const
     {
-        return (evict_list_.find(uuid) != evict_list_.end());
+        if (down_context_.empty())
+        {
+            return (evict_list_.find(uuid) != evict_list_.end());
+        }
+        else
+        {
+            return (*down_context_.begin())->is_evicted(uuid);
+        }
     }
 
     const EvictList& evict_list() const { return evict_list_; }
