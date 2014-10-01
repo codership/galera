@@ -751,7 +751,7 @@ START_TEST (gcs_core_test_gh74)
     memcpy(uuid_buf, &state_uuid, uuid_len);
 
     gcs_state_msg_t* state_msg = NULL;
-    const gcs_group_t* group = gcs_core_get_group(Core);
+    gcs_group_t* group = gcs_core_get_group(Core);
 
     // state exchange message from node1
     state_msg = gcs_group_get_state(const_cast<gcs_group_t*>(group));
@@ -789,7 +789,12 @@ START_TEST (gcs_core_test_gh74)
     gu_free(prim);
     CORE_RECV_START(&act_r); // we have to start another thread here.
     // otherwise messages to node1 can not be in right order.
-    usleep(10000); // make sure node1 already changed its status to WAIT_STATE_MSG
+    for(;;) {
+        usleep(10000); // make sure node1 already changed its status to WAIT_STATE_MSG
+        if (gcs_group_state(group) == GCS_GROUP_WAIT_STATE_MSG) {
+            break;
+        }
+    }
     // then STR sneaks before new configuration is delivered.
     fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
              (int)msg_size);
@@ -880,10 +885,20 @@ START_TEST (gcs_core_test_gh74)
 
     // STR sneaks.
     // we have to make same message exists in sender queue too.
+    // otherwise we will get following log
+    // "FIFO violation: queue empty when local action received"
     const struct gu_buf act = {act_ptr, (ssize_t)act_size};
     action_t act_s(&act, NULL, NULL, act_size, GCS_ACT_STATE_REQ, -1, (gu_thread_t)-1);
     CORE_SEND_START(&act_s);
-    usleep(10000);
+    for(;;) {
+        usleep(10000);
+        gcs_fifo_lite_t* fifo = gcs_core_get_fifo(Core);
+        void* item = gcs_fifo_lite_get_head(fifo);
+        if (item) {
+            gcs_fifo_lite_release(fifo);
+            break;
+        }
+    }
     fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
              (int)msg_size);
 

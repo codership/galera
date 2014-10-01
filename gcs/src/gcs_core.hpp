@@ -192,8 +192,12 @@ extern void
 gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid);
 
 #include "gcs_group.hpp"
-extern const gcs_group_t*
+extern gcs_group_t*
 gcs_core_get_group (gcs_core_t* core);
+
+#include "gcs_fifo_lite.hpp"
+extern gcs_fifo_lite_t*
+gcs_core_get_fifo (gcs_core_t* core);
 
 #endif /* GCS_CORE_TESTING */
 
