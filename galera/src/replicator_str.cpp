@@ -344,13 +344,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                    );
 
     wsrep_seqno_t rcode (0);
+    bool join_now = true;
 
     if (!skip_state_transfer)
     {
         if (streq->ist_len())
         {
             IST_request istr;
-            bool join_in_ist = true;
             get_ist_request(streq, &istr);
 
             if (istr.uuid() == state_uuid_)
@@ -378,7 +378,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                            streq->sst_len(),
                                            &state_id, 0, 0, true);
                     // we will join in sst_sent.
-                    join_in_ist = false;
+                    join_now = false;
                 }
 
                 if (rcode >= 0)
@@ -395,8 +395,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          istr.peer(),
                                          istr.last_applied() + 1,
                                          cc_seqno_,
-                                         protocol_version_,
-                                         join_in_ist);
+                                         protocol_version_);
                     }
                     catch (gu::Exception& e)
                     {
@@ -425,6 +424,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
                                    &state_id, 0, 0, false);
+            // we will join in sst_sent.
+            join_now = false;
         }
         else
         {
@@ -438,7 +439,7 @@ out:
 
     local_monitor_.leave(lo);
 
-    if (skip_state_transfer || rcode < 0)
+    if (skip_state_transfer || rcode < 0 || join_now)
     {
         gcs_.join(rcode < 0 ? rcode : donor_seq);
     }

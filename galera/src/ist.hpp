@@ -144,7 +144,7 @@ namespace galera
                      const std::string& peer,
                      wsrep_seqno_t,
                      wsrep_seqno_t,
-                     int, bool);
+                     int);
             void remove(AsyncSender*, wsrep_seqno_t);
             void cancel();
             gcache::GCache& gcache() { return gcache_; }
