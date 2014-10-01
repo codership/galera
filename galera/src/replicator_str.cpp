@@ -439,7 +439,7 @@ out:
 
     local_monitor_.leave(lo);
 
-    if (skip_state_transfer || rcode < 0 || join_now)
+    if (join_now || rcode < 0)
     {
         gcs_.join(rcode < 0 ? rcode : donor_seq);
     }
