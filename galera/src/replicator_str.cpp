@@ -344,6 +344,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                    );
 
     wsrep_seqno_t rcode (0);
+    bool join_now = true;
 
     if (!skip_state_transfer)
     {
@@ -370,16 +371,14 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
-                    ist_sst_ = true; // gcs_.join() shall be called by IST
-                    gcs_.join(donor_seq);
-
                     wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
 
                     rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                            streq->sst_req(),
                                            streq->sst_len(),
                                            &state_id, 0, 0, true);
-// this must be reset only in sst_sent() call            ist_sst_ = false;
+                    // we will join in sst_sent.
+                    join_now = false;
                 }
 
                 if (rcode >= 0)
@@ -425,6 +424,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
                                    &state_id, 0, 0, false);
+            // we will join in sst_sent.
+            join_now = false;
         }
         else
         {
@@ -438,7 +439,7 @@ out:
 
     local_monitor_.leave(lo);
 
-    if (skip_state_transfer || rcode < 0)
+    if (join_now || rcode < 0)
     {
         gcs_.join(rcode < 0 ? rcode : donor_seq);
     }
