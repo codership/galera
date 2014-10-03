@@ -1110,7 +1110,7 @@ static void *gcs_recv_thread (void *arg)
     // To avoid race between gcs_open() and the following state check in while()
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    gcs_sm_enter(conn->sm, &tmp_cond, false);
+    gcs_sm_enter(conn->sm, &tmp_cond, false, true);
     gcs_sm_leave(conn->sm);
     gu_cond_destroy (&tmp_cond);
 
@@ -1271,7 +1271,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
 
-    if ((ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
+    if ((ret = gcs_sm_enter (conn->sm, &tmp_cond, false, true)))
     {
         gu_error("Failed to enter send monitor: %d (%s)", ret, strerror(-ret));
         return ret;
@@ -1388,7 +1388,7 @@ long gcs_destroy (gcs_conn_t *conn)
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
 
-    if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false))) // need an error here
+    if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false, true))) // need an error here
     {
         if (GCS_CONN_CLOSED != conn->state)
         {
@@ -1456,7 +1456,7 @@ long gcs_sendv (gcs_conn_t*          const conn,
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
 
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled, true)))
     {
         while ((GCS_CONN_OPEN >= conn->state) &&
                (ret = gcs_core_send (conn->core, act_bufs,
@@ -1513,7 +1513,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
         // 1. serializes gcs_core_send() access between gcs_repl() and
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
-        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled)))
+        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled, true)))
         {
             struct gcs_repl_act** act_ptr;
 
@@ -1855,7 +1855,7 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    long ret = gcs_sm_enter (conn->sm, &cond, false);
+    long ret = gcs_sm_enter (conn->sm, &cond, false, false);
 
     if (!ret) {
         ret = gcs_core_set_last_applied (conn->core, seqno);

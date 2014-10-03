@@ -115,10 +115,11 @@ namespace gcomm
     class Node
     {
     public:
-        Node(SegmentId segment) : segment_(segment)
+        Node(SegmentId segment = 0) : segment_(segment)
         { }
         SegmentId segment() const { return segment_; }
         bool operator==(const Node& cmp) const { return true; }
+        bool operator<(const Node& cmp) const { return true; }
         std::ostream& write_stream(std::ostream& os) const
         {
             os << static_cast<int>(segment_);

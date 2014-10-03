@@ -9,14 +9,17 @@
 #
 #### BEGIN INIT INFO
 # Provides:          garbd
-# Required-Start:    $network
+# Required-Start:    $network $local_fs
 # Should-Start:
-# Required-Stop:     $network
+# Required-Stop:     $network $local_fs
 # Should-Stop:
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
-# Description:       Galera Arbitrator Daemon
+# Description:       Galera Arbitrator Daemon is used
+#                    as part of clusters that have only two
+#                    real Galera servers and need an extra
+#                    node to arbitrate split brain situations.
 ### END INIT INFO
 
 # Source function library.
@@ -168,7 +171,7 @@ case "$1" in
   status)
 	program_status
 	;;
-  restart|reload)
+  restart|reload|force-reload)
 	restart
 	;;
   condrestart)
@@ -182,4 +185,4 @@ case "$1" in
 	exit 2
 esac
 
-exit $?
+exit 0

@@ -1,5 +1,0 @@
-Starting the cluster
-====================
-
-
-TODO

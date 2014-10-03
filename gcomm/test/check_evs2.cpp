@@ -2158,11 +2158,12 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_gh_40);
         tcase_set_timeout(tc, 5);
         suite_add_tcase(s, tc);
-    }
 
-    tc = tcase_create("test_gh_100");
-    tcase_add_test(tc, test_gh_100);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_gh_100");
+        tcase_add_test(tc, test_gh_100);
+        suite_add_tcase(s, tc);
+
+    }
 
     return s;
 }

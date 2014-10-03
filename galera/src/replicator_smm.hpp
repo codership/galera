@@ -478,7 +478,6 @@ namespace galera
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
-        bool          ist_sst_;
 
         // services
         gcache::GCache gcache_;
