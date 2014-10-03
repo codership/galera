@@ -106,8 +106,8 @@ export CXX=g++-4.7
 scons
 
 %install
-RBR=$RPM_BUILD_ROOT
-RBD=$RPM_BUILD_DIR
+RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3.x-17.1.x86_64
+RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
 
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
@@ -131,7 +131,7 @@ install -m 644 $RBD/chromium/LICENSE              $RBR%{docs}/LICENSE.chromium
 install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
-install -d $RBR%{_mandir}
+install -d $RBR%{_mandir}/man1
 install -m 644 $RBD/garb/files/garbd.troff        $RBR%{_mandir}/man1/garbd.1
 
 %pre
