@@ -1,0 +1,159 @@
+Codership Oy
+http://www.codership.com
+<info@codership.com>
+
+DISCLAIMER
+
+THIS SOFTWARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
+EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+IN NO EVENT SHALL CODERSHIP OY BE HELD LIABLE TO ANY PARTY FOR ANY DAMAGES
+RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
+
+Trademark Information.
+
+MySQL and other trademarks are the property of their respective owners.
+
+Licensing Information.
+
+Please see COPYING file that came with this distribution.
+
+Source code can be found at http://www.codership.com/en/downloads/galera
+
+ABOUT THIS DOCUMENT
+
+This document briefly explains how to use Galera wsrep provider with MySQL
+RDBMS. For more information check http://www.codership.com/wiki/doku.php
+
+
+                     Using MySQL with GALERA v2.x
+
+CONTENTS:
+=========
+1. WHAT IS MYSQL/GALERA CLUSTER
+2. MYSQL/GALERA NODE SETUP
+3. CONNECTING TO CLUSTER
+4. LIMITATIONS
+
+
+1. WHAT IS MYSQL/GALERA CLUSTER
+
+MySQL/Galera cluster is a synchronous multi-master cluster solution for InnoDB
+engine based on wsrep API (https://launchpad.net/wsrep) which Galera is
+implementation of. It requires MySQL server patched to use this API
+(https://launchpad.net/codership-mysql).
+
+Node states are synchronized by replicating transaction changes at commit time.
+The cluster is virtually synchronous: this means that each node commits
+transactions in exactly the same order, although not necessarily at the same
+physical moment. (The latter is not that important as it may seem, since in most
+cases DBMS gives no guarantee on when the transaction is actually processed.)
+Built-in flow control keeps nodes within fraction of a second from each other,
+this is more than enough for most practical purposes.
+
+From the client perspective that means:
+
+ * Truly highly available: no committed transaction is ever lost in case of
+   a node crash.
+
+ * Highly transparent: with few exceptions each node can be treated as a normal
+   standalone MySQL/InnoDB server.
+
+ * True multi-master: all cluster nodes can modify the same table concurrently.
+
+ * Scalable even with WRITE-intensive applications.
+
+
+2. MYSQL/GALERA NODE SETUP
+
+To setup MySQL/Galera node you will need to
+
+1) Install wsrep-patched MySQL from https://launchpad.net/codership-mysql/0.7.
+   Please see the documentation that comes with it about first time node setup.
+
+2) Configure it to use Galera library as a wsrep provider. For that set
+   wsrep_provider option to
+   wsrep_provider=/usr/lib/galera/libgalera_smm.so   (DEB systems) or
+   wsrep_provider=/usr/lib64/galera/libgalera_smm.so (RPM systems).
+
+3) Start MySQL server.
+
+
+3. CONNECTING TO CLUSTER
+
+To join the cluster you will need to set global wsrep_cluster_address variable
+either in wsrep.cnf file or from the command line (the latter is recommended to
+avoid automatic connection to failed nodes). E.g.
+
+mysql> SET GLOBAL wsrep_cluster_address='gcomm://';
+
+to bootstrap a new cluster, or
+
+mysql> SET GLOBAL wsrep_cluster_address='gcomm://<another node address>:4567';
+
+to join existing cluster. Upon connecting to initial node, the server will
+obtain the list of other nodes and connect to each of them.
+
+There is a number of options that can be passed to Galera with the
+wsrep_cluster_address string. See README for details.
+
+After connecting to cluster the new node will synchronize its state by receiving
+state snapshot form one of the peers. For the duration of this procedure both
+nodes may be unable to process client requests. Other nodes are unaffected by
+this.
+
+
+4. SETTING GALERA PARAMETERS IN MYSQL
+
+To configure Galera parameteres set wsrep_provider_options variable either
+in my.cnf or in the command line:
+
+   wsrep_provider_options="gcs.fc_limit = 128; gcs.fc_master_slave = yes"
+
+Certain parameteres can be changed in runtime:
+
+   mysql> SET GLOBAL wsrep_provider_options="evs.send_window=16";
+
+will only change the value of evs.send_window parameter. For the list of all
+Galera parameters see main README and http://www.codership.com/wiki.
+
+   mysql> SHOW VARIABLES like 'wsrep_provider_options';
+
+Will show all parameters and their current values.
+
+
+5. LIMITATIONS
+
+1) Currently replication works only with InnoDB storage engine. Any writes to 
+   tables of other types, including system (mysql.*) tables are not replicated. 
+   However, DDL statements are replicated in statement level, and changes
+   to mysql.* tables will get replicated that way. 
+   So, you can safely issue: CREATE USER..., 
+   but issuing: INSERT INTO mysql.user..., will not be replicated.
+
+2) DELETE operation is unsupported on tables without primary keys.
+   Rows in tables without primary keys may appear in different order on
+   different nodes. As a result SELECT...LIMIT... may return slightly
+   different sets.
+
+3) Unsupported queries:
+    * LOCK/UNLOCK tables is not supported in multimaster configuration.
+    * lock functions (GET_LOCK(), RELEASE_LOCK()... )
+
+4) Query log cannot be directed to table. If you enable query logging,
+   you must forward the log to a file:
+       log_output = FILE
+   Use general_log and general_log_file to choose query logging and the 
+   log file name
+
+5) Maximum allowed transaction size is defined by wsrep_max_ws_rows and
+   wsrep_max_ws_size. Anything bigger (e.g. huge LOAD DATA) will be rejected.
+
+6) Due to cluster level optimistic concurrency control, transaction issuing
+   COMMIT may still be aborted at that stage. There can be two transactions 
+   writing to same rows and committing in separate cluster nodes, and only one
+   of the them can successfully commit. The failing one will be aborted.
+   For cluster level aborts, MySQL/galera cluster gives back deadlock error 
+   code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
+
+7) XA transactions can not be supported due to possible rollback on commit.
