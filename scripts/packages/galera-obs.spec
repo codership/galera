@@ -27,7 +27,7 @@ Summary:       Galera: a synchronous multi-master wsrep provider (replication en
 Group:         System Environment/Libraries
 Version:       %{version}
 Release:       %{release}
-License:       GPLv2
+License:       GPL-2.0
 Source:        %{version}.tar.gz
 URL:           http://www.codership.com/
 Packager:      Codership Oy
@@ -44,30 +44,33 @@ BuildRequires: libtool
 BuildRequires: openssl-devel
 BuildRequires: scons
 %if 0%{?suse_version} == 11
-%if 0%{?suse_version} == 1120
+  %if 0%{?suse_version} == 1120
 # gcc43 seems to be the default
 BuildRequires: libgcc46
 BuildRequires: libgomp46
 BuildRequires: gcc46
 BuildRequires: gcc46-c++
-%endif
-%if 0%{?suse_version} == 1130
+  %endif
+  %if 0%{?suse_version} == 1130
 BuildRequires: gcc47
 BuildRequires: gcc47-c++
-%endif
+  %endif
 %else
 BuildRequires: gcc-c++
 %endif
+
 %if %{defined fedora}
 BuildRequires: python
 %endif
 
-Requires:      libssl0.9.8
+
 %if 0%{?suse_version}
 Requires:      lsb-release
 %else
 Requires:      lsb-release
 %endif
+
+Requires:      libssl0.9.8
 Requires:      chkconfig
 
 Provides:      wsrep, %{name} = %{version}-%{release}
@@ -85,22 +88,18 @@ This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
-#%setup -T -a 0 -c -n galera-%{version}
 %setup -q
 
 %build
 %if 0%{?suse_version} == 11
-
-%if 0%{?suse_version} == 1120
+  %if 0%{?suse_version} == 1120
 export CC=gcc-4.6
 export CXX=g++-4.6
-%endif
-
-%if 0%{?suse_version} == 1130
+  %endif
+  %if 0%{?suse_version} == 1130
 export CC=gcc-4.7
 export CXX=g++-4.7
-%endif
-
+  %endif
 %endif
 
 scons
@@ -113,9 +112,16 @@ RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
-install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
-install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
+install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+
+%if 0%{?suse_version}
+install -d $RBR/var/adm/fillup-templates/
+install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.%{name}
+%else
+install -d $RBR%{_sysconfdir}/sysconfig
+install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
+%endif
 
 install -d $RBR%{_bindir}
 install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
@@ -134,16 +140,23 @@ install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 install -d $RBR%{_mandir}/man1
 install -m 644 $RBD/garb/files/garbd.troff        $RBR%{_mandir}/man1/garbd.1
 
-%pre
-
 %post
+%fillup_and_insserv
 
 %preun
+%stop_on_removal
 rm -f $(find %{libs} -type l)
+
+%postun
+%restart_on_update
 
 %files
 %defattr(-,root,root,0755)
+%if 0%{?suse_version}
+%config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.%{name}
+%else
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
+%endif
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
 
 %attr(0755,root,root) %{_bindir}/garbd

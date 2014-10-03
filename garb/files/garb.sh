@@ -9,13 +9,12 @@
 
 ### BEGIN INIT INFO
 # Provides:          garb
-# Required-Start:    $network $local_fs
-# Required-Stop:     $network $local_fs
-# Default-Start:     2 3 4 5
+# Required-Start:    $network $local_fs $remote_fs
+# Required-Stop:     $network $local_fs $remote_fs
+# Default-Start:     2 3 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
-# Description:       Galera Arbitrator Daemon is used
-#                    as part of clusters that have only two
+# Description:       Garbd is used as part of clusters that have only two
 #                    real Galera servers and need an extra
 #                    node to arbitrate split brain situations.
 ### END INIT INFO
@@ -96,7 +95,7 @@ start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
 
-	if grep -q -E '^# REMOVE' $config;then 
+	if grep -q -E '^# REMOVE' $config; then
 	    log_failure "Garbd config $config is not configured yet"
 	    return 0
 	fi
