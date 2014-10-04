@@ -1328,6 +1328,7 @@ static void *gcs_recv_thread (void *arg)
     {
         /* In case of error call _close() to release repl_q waiters. */
         (void)_close(conn, false);
+        gcs_shift_state (conn, GCS_CONN_CLOSED);
     }
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
@@ -1602,7 +1603,13 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
             if (ret >= 0) {
                 gu_cond_wait (&repl_act.wait_cond, &repl_act.wait_mutex);
 #ifndef GCS_FOR_GARB
-                assert (act->buf != 0);
+                /* assert (act->buf != 0); */
+                if (act->buf == 0)
+                {
+                    /* Recv thread purged repl_q before action was delivered */
+                    ret = -ENOTCONN;
+                    goto out;
+                }
 #else
                 assert (act->buf == 0);
 #endif /* GCS_FOR_GARB */
@@ -1633,6 +1640,9 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 }
             }
         }
+#ifndef GCS_FOR_GARB
+    out:
+#endif /* GCS_FOR_GARB */
         gu_mutex_unlock  (&repl_act.wait_mutex);
     }
     gu_mutex_destroy (&repl_act.wait_mutex);
