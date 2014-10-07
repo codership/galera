@@ -1904,7 +1904,7 @@ START_TEST(test_gh_100)
     mark_point();
     Proto p1(conf, uuid1, 0, gu::URI("evs://"), 10000, 0);
     // Start p2 view seqno from higher value than p1
-    View p2_rst_view(ViewId(V_REG, uuid2, 3));
+    View p2_rst_view(0, ViewId(V_REG, uuid2, 3));
     Proto p2(conf, uuid2, 0, gu::URI("evs://"), 10000, &p2_rst_view);
 
     gcomm::connect(&t1, &p1);

@@ -38,8 +38,6 @@ using namespace std::rel_ops;
     else log_info << self_string() << ": "
 
 
-// const int gcomm::evs::Proto::max_version_(GCOMM_EVS_MAX_VERSION);
-
 gcomm::evs::Proto::Proto(gu::Config&    conf,
                          const UUID&    my_uuid,
                          SegmentId      segment,
@@ -51,7 +49,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     timers_(),
     version_(check_range(Conf::EvsVersion,
                          param<int>(conf, uri, Conf::EvsVersion, "0"),
-                         0, max_version_ + 1)),
+                         0, GCOMM_EVS_MAX_VERSION + 1)),
     debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report_(gu::datetime::Date::now()),
@@ -146,7 +144,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     causal_keepalive_period_(retrans_period_),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
-    current_view_(ViewId(V_TRANS, my_uuid,
+    current_view_(0, ViewId(V_TRANS, my_uuid,
                          rst_view ? rst_view -> id().seq() + 1 : 0)),
     previous_view_(),
     previous_views_(),
@@ -1027,7 +1025,7 @@ void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
                                          const View& prev_view)
 {
 
-    View view(im.install_view_id());
+    View view(im.version(), im.install_view_id());
     for (MessageNodeList::const_iterator i(im.node_list().begin());
          i != im.node_list().end(); ++i)
     {
@@ -1101,7 +1099,8 @@ void gcomm::evs::Proto::deliver_trans_view(const InstallMessage& im,
     // and members going to be in the next view that come from
     // curr_view according to install message
 
-    View view(ViewId(V_TRANS,
+    View view(current_view_.version(),
+              ViewId(V_TRANS,
                      curr_view.id().uuid(),
                      curr_view.id().seq()));
 
@@ -1162,7 +1161,7 @@ void gcomm::evs::Proto::deliver_trans_view(const InstallMessage& im,
 
 void gcomm::evs::Proto::deliver_empty_view()
 {
-    View view(V_REG);
+    View view(0, V_REG);
 
     evs_log_info(I_VIEWS) << "delivering view " << view;
 
@@ -1797,24 +1796,47 @@ struct ViewIdCmp
 };
 
 
+struct ProtoVerCmp
+{
+    bool operator()(const gcomm::evs::NodeMap::value_type& a,
+                    const gcomm::evs::NodeMap::value_type& b) const
+    {
+        using gcomm::evs::NodeMap;
+        gcomm_assert(NodeMap::value(a).join_message() != 0 &&
+                     NodeMap::value(b).join_message() != 0);
+        return (NodeMap::value(a).join_message()->version() <
+                NodeMap::value(b).join_message()->version());
+
+    }
+};
+
 void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
 {
     gcomm_assert(consensus_.is_consensus() == true &&
                  is_representative(uuid()) == true) << *this;
 
+    // Select list of operational nodes from known
     NodeMap oper_list;
     for_each(known_.begin(), known_.end(), OperationalSelect(oper_list));
     NodeMap::const_iterator max_node =
         max_element(oper_list.begin(), oper_list.end(), ViewIdCmp());
 
+    // Compute maximum known view id seq
     max_view_id_seq_ =
         std::max(max_view_id_seq_,
                  NodeMap::value(max_node).join_message()->source_view_id().seq());
 
+    // Compute highest commonly supported protocol version.
+    // Oper_list is non-empty, join message existence is asserted.
+    const int version(
+        NodeMap::value(
+            std::min_element(oper_list.begin(), oper_list.end(),
+                             ProtoVerCmp())).join_message()->version());
+
     MessageNodeList node_list;
     populate_node_list(&node_list);
 
-    InstallMessage imsg(version_,
+    InstallMessage imsg(version,
                         uuid(),
                         current_view_.id(),
                         ViewId(V_REG, uuid(), max_view_id_seq_ + attempt_seq_),
@@ -2453,7 +2475,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                                            NodeMap::value(self_i_).index()),
                                        input_map_->range(
                                            NodeMap::value(self_i_).index()))));
-        InstallMessage im(version_,
+        InstallMessage im(0,
                           uuid(),
                           current_view_.id(),
                           ViewId(V_REG, uuid(), current_view_.id().seq() + 1),
@@ -2574,7 +2596,8 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                   std::inserter(previous_views_, previous_views_.end()));
         gather_views_.clear();
 
-        current_view_ = View(install_message_->install_view_id());
+        current_view_ = View(install_message_->version(),
+                             install_message_->install_view_id());
         size_t idx = 0;
 
         const MessageNodeList& imnl(install_message_->node_list());

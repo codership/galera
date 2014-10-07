@@ -30,7 +30,9 @@ namespace gcomm
         try
         {
             (void)c.serialize(buf, expected_size, 1);
-            fail("exception not thrown");
+            std::ostringstream os;
+            os << c;
+            fail("exception not thrown for %s", os.str().c_str());
         }
         catch (gu::Exception& e)
         {
@@ -40,17 +42,27 @@ namespace gcomm
 
         T c2(default_c);
 
-        try
-        {
-            (void)c2.unserialize(buf, expected_size, 1);
-            fail("exception not thrown");
-        }
-        catch (gu::Exception& e)
-        {
-            // OK
-        }
+        // Commented out. This test happened to work because default
+        // protocol version for messages was zero and if the second
+        // byte of the buffer contained something else, exception was
+        // thrown. Now that the version can be different from zero,
+        // the outcome of this check depends on message structure.
+        // try
+        // {
+        //     size_t res(c2.unserialize(buf, expected_size, 1));
+        //     std::ostringstream os;
+        //     os << c;
+        //     fail("exception not thrown for %s, result %zu expected %zu",
+        //          os.str().c_str(), res, expected_size);
+        // }
+        // catch (gu::Exception& e)
+        // {
+        //     // OK
+        // }
+
         ret = c2.unserialize(buf, expected_size, 0);
-        fail_unless(ret == expected_size, "expected %z ret %z", expected_size, ret);
+        fail_unless(ret == expected_size,
+                    "expected %zu ret %zu", expected_size, ret);
         if ((c == c2) == false)
         {
             log_warn << "\n\t" << c << " !=\n\t" << c2;

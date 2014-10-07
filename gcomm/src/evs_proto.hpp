@@ -22,6 +22,7 @@
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
 #include "evs_consensus.hpp"
+#include "evs_version.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -29,10 +30,6 @@
 #include <deque>
 #include <vector>
 #include <limits>
-
-#ifndef GCOMM_EVS_MAX_VERSION
-#define GCOMM_EVS_MAX_VERSION 0
-#endif // GCOMM_EVS_MAX_VERSION
 
 namespace gcomm
 {
@@ -369,7 +366,6 @@ public:
 private:
 
     int version_;
-    static const int max_version_ = GCOMM_EVS_MAX_VERSION;
     int debug_mask_;
     int info_mask_;
     gu::datetime::Date last_stats_report_;

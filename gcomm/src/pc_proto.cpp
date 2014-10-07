@@ -205,7 +205,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
 
 void gcomm::pc::Proto::deliver_view(bool bootstrap)
 {
-    View v(pc_view_.id(), bootstrap);
+    View v(pc_view_.version(), pc_view_.id(), bootstrap);
 
     for (NodeMap::const_iterator i = instances_.begin();
          i != instances_.end(); ++i)
@@ -290,7 +290,8 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
 
 void gcomm::pc::Proto::mark_non_prim()
 {
-    pc_view_ = ViewId(V_NON_PRIM, current_view_.id());
+    pc_view_ = View(current_view_.version(),
+                    ViewId(V_NON_PRIM, current_view_.id()));
     for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
          ++i)
     {
@@ -345,7 +346,8 @@ void gcomm::pc::Proto::shift_to(const State s)
         break;
     case S_PRIM:
     {
-        pc_view_ = ViewId(V_PRIM, current_view_.id());
+        pc_view_ = View(current_view_.version(),
+                        ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
              ++i)
         {
@@ -1270,7 +1272,8 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
     }
     else
     {
-        View new_pc_view(ViewId(V_PRIM, current_view_.id()));
+        View new_pc_view(current_view_.version(),
+                         ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
              ++i)
         {
