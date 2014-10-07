@@ -176,7 +176,7 @@ void gcs_core_get_status(gcs_core_t* core, gu::Status& status);
 #include "gcs_msg_type.hpp"
 #include "gcs_backend.hpp"
 
-extern gcs_backend_t*
+extern const gcs_backend_t*
 gcs_core_get_backend (gcs_core_t* core);
 
 // switches lock-step mode on/off
@@ -192,11 +192,11 @@ extern void
 gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid);
 
 #include "gcs_group.hpp"
-extern gcs_group_t*
+extern const gcs_group_t*
 gcs_core_get_group (gcs_core_t* core);
 
 #include "gcs_fifo_lite.hpp"
-extern gcs_fifo_lite_t*
+extern const gcs_fifo_lite_t*
 gcs_core_get_fifo (gcs_core_t* core);
 
 #endif /* GCS_CORE_TESTING */

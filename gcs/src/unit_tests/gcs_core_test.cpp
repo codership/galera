@@ -339,7 +339,7 @@ core_test_init (bool bootstrap = true,
 
     fail_if (NULL == Core);
 
-    Backend = gcs_core_get_backend (Core);
+    Backend = const_cast<gcs_backend_t*>(gcs_core_get_backend (Core));
     fail_if (NULL == Backend);
 
     Seqno = 0; // reset seqno
@@ -751,10 +751,10 @@ START_TEST (gcs_core_test_gh74)
     memcpy(uuid_buf, &state_uuid, uuid_len);
 
     gcs_state_msg_t* state_msg = NULL;
-    gcs_group_t* group = gcs_core_get_group(Core);
+    gcs_group_t* group = const_cast<gcs_group_t*>(gcs_core_get_group(Core));
 
     // state exchange message from node1
-    state_msg = gcs_group_get_state(const_cast<gcs_group_t*>(group));
+    state_msg = gcs_group_get_state(group);
     state_msg->state_uuid = state_uuid;
     size_t state_len = gcs_state_msg_len (state_msg);
     char state_buf[state_len];
@@ -847,7 +847,7 @@ START_TEST (gcs_core_test_gh74)
     memcpy(uuid_buf, &state_uuid, uuid_len);
 
     // state exchange message from node3
-    group = gcs_core_get_group(Core);
+    group = const_cast<gcs_group_t*>(gcs_core_get_group(Core));
     state_msg = gcs_state_msg_create(&state_uuid,
                                      &GU_UUID_NIL,
                                      &GU_UUID_NIL,
@@ -868,8 +868,8 @@ START_TEST (gcs_core_test_gh74)
     gcs_state_msg_destroy (state_msg);
 
     // updating state message from node1.
-    group = gcs_core_get_group(Core);
-    state_msg = gcs_group_get_state(const_cast<gcs_group_t*>(group));
+    group = const_cast<gcs_group_t*>(gcs_core_get_group(Core));
+    state_msg = gcs_group_get_state(group);
     state_msg->flags = GCS_STATE_FREP | GCS_STATE_FCLA;
     state_msg->prim_state = GCS_NODE_STATE_JOINED;
     state_msg->current_state = GCS_NODE_STATE_SYNCED;
@@ -892,7 +892,7 @@ START_TEST (gcs_core_test_gh74)
     CORE_SEND_START(&act_s);
     for(;;) {
         usleep(10000);
-        gcs_fifo_lite_t* fifo = gcs_core_get_fifo(Core);
+        gcs_fifo_lite_t* fifo = const_cast<gcs_fifo_lite_t*>(gcs_core_get_fifo(Core));
         void* item = gcs_fifo_lite_get_head(fifo);
         if (item) {
             gcs_fifo_lite_release(fifo);

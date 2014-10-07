@@ -1383,7 +1383,7 @@ void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
 
 #ifdef GCS_CORE_TESTING
 
-gcs_backend_t*
+const gcs_backend_t*
 gcs_core_get_backend (gcs_core_t* core)
 {
     return &core->backend;
@@ -1407,13 +1407,13 @@ gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid)
     core->state_uuid = *uuid;
 }
 
-gcs_group_t*
+const gcs_group_t*
 gcs_core_get_group (gcs_core_t* core)
 {
     return &core->group;
 }
 
-gcs_fifo_lite_t*
+const gcs_fifo_lite_t*
 gcs_core_get_fifo (gcs_core_t* core)
 {
     return core->fifo;
