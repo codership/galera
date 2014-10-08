@@ -703,7 +703,6 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
-        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
@@ -729,7 +728,6 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     GCommConn& conn(*ref.get());
     try
     {
-        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.close();
     }
     catch (Exception& e)
@@ -848,7 +846,6 @@ GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
 
     GCommConn& conn(*ref.get());
 
-    gcomm::Critical<Protonet> crit(conn.get_pnet());
     conn.get_status(status);
 
 }
