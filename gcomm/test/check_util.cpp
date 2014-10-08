@@ -182,7 +182,7 @@ START_TEST(test_view_state)
     ViewId view_id(V_TRANS, view_uuid, 789);
     UUID m1(NULL, 0);
     UUID m2(NULL, 0);
-    View view(view_id, true);
+    View view(0, view_id, true);
     view.add_member(m1, 0);
     view.add_member(m2, 1);
     View view2;

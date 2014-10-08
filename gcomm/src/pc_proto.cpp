@@ -123,7 +123,7 @@ void gcomm::pc::Proto::send_state()
 {
     log_debug << self_id() << " sending state";
 
-    StateMessage pcs(version_);
+    StateMessage pcs(current_view_.version());
 
     NodeMap& im(pcs.node_map());
 
@@ -156,7 +156,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
     gcomm_assert(bootstrap == false || weight == -1);
     log_debug << self_id() << " send install";
 
-    InstallMessage pci(version_);
+    InstallMessage pci(current_view_.version());
 
     NodeMap& im(pci.node_map());
 
@@ -205,7 +205,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
 
 void gcomm::pc::Proto::deliver_view(bool bootstrap)
 {
-    View v(pc_view_.id(), bootstrap);
+    View v(pc_view_.version(), pc_view_.id(), bootstrap);
 
     for (NodeMap::const_iterator i = instances_.begin();
          i != instances_.end(); ++i)
@@ -290,7 +290,8 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
 
 void gcomm::pc::Proto::mark_non_prim()
 {
-    pc_view_ = ViewId(V_NON_PRIM, current_view_.id());
+    pc_view_ = View(current_view_.version(),
+                    ViewId(V_NON_PRIM, current_view_.id()));
     for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
          ++i)
     {
@@ -345,7 +346,8 @@ void gcomm::pc::Proto::shift_to(const State s)
         break;
     case S_PRIM:
     {
-        pc_view_ = ViewId(V_PRIM, current_view_.id());
+        pc_view_ = View(current_view_.version(),
+                        ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
              ++i)
         {
@@ -508,6 +510,7 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     gcomm_assert(view.id().type() == V_TRANS);
     gcomm_assert(view.id().uuid() == current_view_.id().uuid() &&
                  view.id().seq()  == current_view_.id().seq());
+    gcomm_assert(view.version() == current_view_.version());
 
     log_debug << self_id() << " \n\n current view " << current_view_
               << "\n\n next view " << view
@@ -560,6 +563,17 @@ void gcomm::pc::Proto::handle_reg(const View& view)
                        << current_view_.id()
                        << " new view "
                        << view.id();
+    }
+
+    if (current_view_.version() < view.version())
+    {
+        log_info << "PC protocol upgrade " << current_view_.version()
+                 << " -> " << view.version();
+    }
+    else if (current_view_.version() > view.version())
+    {
+        log_info << "PC protocol downgrade " << current_view_.version()
+                 << " -> " << view.version();
     }
 
     current_view_ = view;
@@ -1270,7 +1284,8 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
     }
     else
     {
-        View new_pc_view(ViewId(V_PRIM, current_view_.id()));
+        View new_pc_view(current_view_.version(),
+                         ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
              ++i)
         {
@@ -1366,6 +1381,10 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
                          const Datagram&    rb,
                          const ProtoUpMeta& um)
 {
+    // EVS provides send view delivery, so this assertion
+    // should always hold.
+    assert(msg.version() == current_view_.version());
+
     enum Verdict
     {
         ACCEPT,
@@ -1382,7 +1401,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
         {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL
 
-        {  FAIL,   FAIL,    ACCEPT,     ACCEPT  },  // PRIM
+        {  FAIL,   FAIL,    ACCEPT,   ACCEPT  },  // PRIM
 
         {  FAIL,   DROP,    ACCEPT,   ACCEPT  },  // TRANS
 
@@ -1399,8 +1418,8 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
     }
     else if (verdict == DROP)
     {
-        log_warn << "Dropping input, message " << msg.to_string()
-                 << " in state " << to_string(state());
+        log_debug << "Dropping input, message " << msg.to_string()
+                  << " in state " << to_string(state());
         return;
     }
 
@@ -1508,7 +1527,7 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
     }
 
     uint32_t    seq(dm.order() == O_SAFE ? last_sent_seq_ + 1 : last_sent_seq_);
-    UserMessage um(version_, seq);
+    UserMessage um(current_view_.version(), seq);
 
     push_header(um, dg);
     if (checksum_ == true)
