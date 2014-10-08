@@ -214,7 +214,7 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
         // version check is not applicable.
         break;
     default:
-        if (version_ > GCOMM_EVS_MAX_VERSION)
+        if (version_ > GCOMM_PROTOCOL_MAX_VERSION)
         {
             gu_throw_error(EPROTONOSUPPORT) << "protocol version "
                                             << static_cast<int>(version_)

@@ -1071,9 +1071,10 @@ static_gu_conf()
 }
 
 static DummyNode* create_dummy_node(size_t idx,
+                                    int version,
                                     const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT1H",
+                                    const string& retrans_period = "PT20M",
                                     int weight = 1)
 {
     gu::Config& gu_conf(static_gu_conf());
@@ -1085,21 +1086,16 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsInstallTimeout + "=" + inactive_timeout + "&"
-        + Conf::PcWeight + "=" + gu::to_string(weight);
+        + Conf::PcWeight + "=" + gu::to_string(weight) + "&"
+        + Conf::EvsVersion + "=" + gu::to_string<int>(version) + "&"
+        + Conf::EvsInfoLogMask + "=" + "0x3";
     list<Protolay*> protos;
-    try
-    {
-        UUID uuid(static_cast<int32_t>(idx));
-        protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
-        protos.push_back(new Proto(gu_conf, uuid, 0, conf));
-        return new DummyNode(gu_conf, idx, protos);
-    }
-    catch (...)
-    {
-        for_each(protos.begin(), protos.end(), DeleteObject());
-        throw;
-    }
+
+    UUID uuid(static_cast<int32_t>(idx));
+    protos.push_back(new DummyTransport(uuid, false));
+    protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
+    protos.push_back(new Proto(gu_conf, uuid, 0, conf));
+    return new DummyNode(gu_conf, idx, protos);
 }
 
 namespace
@@ -1133,7 +1129,7 @@ START_TEST(test_pc_split_merge)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1194,7 +1190,7 @@ START_TEST(test_pc_split_merge_w_user_msg)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1255,7 +1251,7 @@ START_TEST(test_pc_complete_split_merge)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         log_info << "i " << i;
         gu_trace(join_node(&prop, dn[i], i == 0));
@@ -1310,6 +1306,50 @@ START_TEST(test_pc_complete_split_merge)
 }
 END_TEST
 
+
+START_TEST(test_pc_protocol_upgrade)
+{
+    log_info << "START (test_pc_protocol_upgrade)";
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    uint32_t view_seq(0);
+
+    for (int i(0); i <= GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1, i));
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+        ++view_seq;
+        for (int j(0); j <= i; ++j)
+        {
+            fail_unless(pc_from_dummy(dn[j])->current_view().version() == 0);
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+    }
+
+    for (int i(0); i < GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        for (int j(i); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        dn[i]->close();
+        dn[i]->set_cvi(V_NON_PRIM);
+        set_cvi(dn, i + 1, GCOMM_PROTOCOL_MAX_VERSION, view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(true));
+        ++view_seq;
+        for (int j(i + 1); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        gu_trace(prop.propagate_until_empty());
+    }
+    fail_unless(pc_from_dummy(dn[GCOMM_PROTOCOL_MAX_VERSION])->current_view().version() == GCOMM_PROTOCOL_MAX_VERSION);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
 
 class PCUser2 : public Toplay
 {
@@ -1913,7 +1953,7 @@ START_TEST(test_trac_277)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1976,13 +2016,13 @@ START_TEST(test_trac_622_638)
 
     // Create two node cluster and make it split. First node is
     // considered crashed after split (stay isolated in non-prim).
-    dn.push_back(create_dummy_node(1, suspect_timeout,
+    dn.push_back(create_dummy_node(1, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[0], true));
     set_cvi(dn, 0, 0, ++view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(false));
 
-    dn.push_back(create_dummy_node(2, suspect_timeout,
+    dn.push_back(create_dummy_node(2, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[1], false));
     set_cvi(dn, 0, 1, ++view_seq, V_PRIM);
@@ -2002,7 +2042,7 @@ START_TEST(test_trac_622_638)
 
     // Add third node which will be connected with node 2. This will
     // be started with prim status.
-    dn.push_back(create_dummy_node(3, suspect_timeout,
+    dn.push_back(create_dummy_node(3, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[2], true));
     prop.split(1, 3); // avoid 1 <-> 3 communication
@@ -2028,7 +2068,7 @@ START_TEST(test_weighted_quorum)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout,
                                        retrans_period, i));
         gu_trace(join_node(&prop, dn[i], i == 0));
@@ -3109,7 +3149,7 @@ START_TEST(test_trac_762)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1,
+        dn.push_back(create_dummy_node(i + 1, 0,
                                        suspect_timeout,
                                        inactive_timeout,
                                        retrans_period));
@@ -3658,6 +3698,11 @@ Suite* pc_suite()
 
         tc = tcase_create("test_pc_complete_split_merge");
         tcase_add_test(tc, test_pc_complete_split_merge);
+        tcase_set_timeout(tc, 25);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_pc_protocol_upgrade");
+        tcase_add_test(tc, test_pc_protocol_upgrade);
         tcase_set_timeout(tc, 25);
         suite_add_tcase(s, tc);
 

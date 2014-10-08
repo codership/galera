@@ -22,7 +22,7 @@
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
 #include "evs_consensus.hpp"
-#include "evs_version.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -210,6 +210,7 @@ public:
 
     void shift_to(const State, const bool send_j = true);
     bool is_all_suspected(const UUID& uuid) const;
+    const View& current_view() const { return current_view_; }
 
     // Message handlers
 private:

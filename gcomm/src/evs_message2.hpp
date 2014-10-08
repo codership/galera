@@ -13,7 +13,7 @@
 #include "gcomm/map.hpp"
 
 #include "evs_seqno.hpp"
-#include "evs_version.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 #include "gu_convert.hpp"

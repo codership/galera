@@ -170,7 +170,7 @@ namespace gcomm
 
         ~View() {}
 
-        int version() { return version_; }
+        int version() const { return version_; }
 
         void add_member  (const UUID& pid, SegmentId segment);
 

@@ -49,7 +49,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     timers_(),
     version_(check_range(Conf::EvsVersion,
                          param<int>(conf, uri, Conf::EvsVersion, "0"),
-                         0, GCOMM_EVS_MAX_VERSION + 1)),
+                         0, GCOMM_PROTOCOL_MAX_VERSION + 1)),
     debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report_(gu::datetime::Date::now()),
@@ -2090,9 +2090,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         return;
     }
 
-    if (msg.version() != version_)
+    if (msg.version() > GCOMM_PROTOCOL_MAX_VERSION)
     {
-        log_info << "incompatible protocol version " << msg.version();
+        log_info << "incompatible protocol version "
+                 << static_cast<int>(msg.version());
         return;
     }
 
@@ -2595,6 +2596,17 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         std::copy(gather_views_.begin(), gather_views_.end(),
                   std::inserter(previous_views_, previous_views_.end()));
         gather_views_.clear();
+
+        if (install_message_->version() > current_view_.version())
+        {
+            log_info << "EVS version upgrade " << current_view_.version()
+                     << " -> " << static_cast<int>(install_message_->version());
+        }
+        else if (install_message_->version() < current_view_.version())
+        {
+            log_info << "EVS version downgrade " << current_view_.version()
+                     << " -> " << static_cast<int>(install_message_->version());
+        }
 
         current_view_ = View(install_message_->version(),
                              install_message_->install_view_id());
