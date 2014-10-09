@@ -252,7 +252,16 @@ gcomm::evs::Proto::~Proto()
 bool
 gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 {
-    if (key == gcomm::Conf::EvsSendWindow)
+    if (key == gcomm::Conf::EvsVersion)
+    {
+        version_ = check_range(Conf::EvsVersion,
+                               gu::from_string<int>(val),
+                               0, GCOMM_PROTOCOL_MAX_VERSION);
+        // trigger configuration change to propagate version
+        shift_to(S_GATHER, true);
+        return true;
+    }
+    else if (key == gcomm::Conf::EvsSendWindow)
     {
         send_window_ = check_range(Conf::EvsSendWindow,
                                    gu::from_string<seqno_t>(val),
@@ -922,7 +931,7 @@ void gcomm::evs::Proto::check_inactive()
 
     bool has_inactive(false);
     size_t n_suspected(0);
-    bool do_send_evict_list(false);
+    bool do_send_delayed_list(false);
 
     // Iterate over known nodes and check inactive/suspected/delayed status
     for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
@@ -999,7 +1008,7 @@ void gcomm::evs::Proto::check_inactive()
                 // todo(dirlt): make threshold as a configurable variable ?
                 if (dli->second.state_change_cnt() > 0)
                 {
-                    do_send_evict_list = true;
+                    do_send_delayed_list = true;
                 }
             }
         }
@@ -1017,7 +1026,7 @@ void gcomm::evs::Proto::check_inactive()
                     ", cur_cnt = " << dli->second.state_change_cnt();
             if (dli->second.state_change_cnt() > 0)
             {
-                do_send_evict_list = true;
+                do_send_delayed_list = true;
             }
         }
     }
@@ -1043,18 +1052,19 @@ void gcomm::evs::Proto::check_inactive()
         for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
         {
             Node& node(NodeMap::value(i));
-            const EvictListMessage* const elm(node.evict_list_message());
+            const DelayedListMessage* const elm(node.delayed_list_message());
             if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
             {
                 log_info << "discarding expired elm from " << elm->source();
-                node.set_evict_list_message(0);
+                node.set_delayed_list_message(0);
             }
         }
     }
 
-    if (do_send_evict_list == true && auto_evict_ > 0)
+    if (current_view_.version() > 0 &&
+        do_send_delayed_list == true && auto_evict_ > 0)
     {
-        send_evict_list();
+        send_delayed_list();
     }
 
     // All other nodes are under suspicion, set all others as inactive.
@@ -2026,9 +2036,9 @@ void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
 }
 
 
-void gcomm::evs::Proto::send_evict_list()
+void gcomm::evs::Proto::send_delayed_list()
 {
-    EvictListMessage elm(version_, uuid(), current_view_.id(), ++fifo_seq_);
+    DelayedListMessage elm(version_, uuid(), current_view_.id(), ++fifo_seq_);
     for (DelayedList::const_iterator i(delayed_list_.begin());
          i != delayed_list_.end(); ++i)
     {
@@ -2038,7 +2048,7 @@ void gcomm::evs::Proto::send_evict_list()
     serialize(elm, buf);
     Datagram dg(buf);
     (void)send_down(dg, ProtoDownMeta());
-    handle_evict_list(elm, self_i_);
+    handle_delayed_list(elm, self_i_);
 }
 
 void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
@@ -2249,8 +2259,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
                                    const Datagram& rb,
                                    bool direct)
 {
-    assert(msg.type() <= Message::T_EVICT_LIST);
-    if (msg.type() > Message::T_EVICT_LIST)
+    assert(msg.type() <= Message::T_DELAYED_LIST);
+    if (msg.type() > Message::T_DELAYED_LIST)
     {
         return;
     }
@@ -2397,9 +2407,9 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     case Message::T_INSTALL:
         gu_trace(handle_install(static_cast<const InstallMessage&>(msg), ii));
         break;
-    case Message::T_EVICT_LIST:
-        gu_trace(handle_evict_list(
-                     static_cast<const EvictListMessage&>(msg), ii));
+    case Message::T_DELAYED_LIST:
+        gu_trace(handle_delayed_list(
+                     static_cast<const DelayedListMessage&>(msg), ii));
         break;
     default:
         log_warn << "invalid message type " << msg.type();
@@ -2456,8 +2466,8 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
         gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_EVICT_LIST:
-        gu_trace(offset = static_cast<EvictListMessage&>(*msg).unserialize(
+    case Message::T_DELAYED_LIST:
+        gu_trace(offset = static_cast<DelayedListMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
     }
@@ -4595,7 +4605,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
 }
 
 
-void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
+void gcomm::evs::Proto::handle_delayed_list(const DelayedListMessage& msg,
                                           NodeMap::iterator ii)
 {
     if (auto_evict_ == 0)
@@ -4605,7 +4615,7 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
     }
 
     Node& node(NodeMap::value(ii));
-    node.set_evict_list_message(&msg);
+    node.set_delayed_list_message(&msg);
     gu::datetime::Date now(gu::datetime::Date::now());
 
     // Construct a list of evict candidates that appear in evict list messages
@@ -4619,31 +4629,31 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
 
     for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
     {
-        const EvictListMessage* const elm(
-            NodeMap::value(i).evict_list_message());
-        if (elm == 0)
+        const DelayedListMessage* const dlm(
+            NodeMap::value(i).delayed_list_message());
+        if (dlm == 0)
         {
             continue;
         }
-        else if (elm->evict_list().find(uuid()) != elm->evict_list().end())
+        else if (dlm->delayed_list().find(uuid()) != dlm->delayed_list().end())
         {
             evs_log_debug(D_STATE)
                 << "found self " << uuid() << " from evict list from "
                 << msg.source() << " at " << get_address(msg.source());
             continue;
         }
-        else if (elm->tstamp() + delayed_keep_period_ < now)
+        else if (dlm->tstamp() + delayed_keep_period_ < now)
         {
             evs_log_debug(D_STATE) << "ignoring expired evict message";
             continue;
         }
 
-        for (EvictListMessage::EvictList::const_iterator
-                 elm_i(elm->evict_list().begin());
-             elm_i != elm->evict_list().end();
-             ++elm_i)
+        for (DelayedListMessage::DelayedList::const_iterator
+                 dlm_i(dlm->delayed_list().begin());
+             dlm_i != dlm->delayed_list().end();
+             ++dlm_i)
         {
-            if (elm_i->second <= 1)
+            if (dlm_i->second <= 1)
             {
                 // Don't consider entries with single delayed event as
                 // evict candidates.
@@ -4653,12 +4663,12 @@ void gcomm::evs::Proto::handle_evict_list(const EvictListMessage& msg,
             std::pair<Evicts::iterator, bool> eir(
                 evicts.insert(
                     std::make_pair(
-                        elm_i->first, std::make_pair(0, 0))));
+                        dlm_i->first, std::make_pair(0, 0))));
             evs_log_debug(D_STATE) << "eir " << eir.first->first
                                    << " " << eir.first->second.first
                                    << " " << eir.first->second.second;
             ++eir.first->second.second; // total count
-            if (elm_i->second >= auto_evict_)
+            if (dlm_i->second >= auto_evict_)
             {
                 ++eir.first->second.first; // over threshold count
                 found = true;

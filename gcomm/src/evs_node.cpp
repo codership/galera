@@ -43,8 +43,8 @@ gcomm::evs::Node::Node(const Node& n)
                       new JoinMessage(*n.join_message_) : 0),
     leave_message_   (n.leave_message_ != 0 ?
                       new LeaveMessage(*n.leave_message_) : 0),
-    evict_list_message_ (n.evict_list_message_ != 0 ?
-                         new EvictListMessage(*n.evict_list_message_) : 0),
+    delayed_list_message_ (n.delayed_list_message_ != 0 ?
+                         new DelayedListMessage(*n.delayed_list_message_) : 0),
     tstamp_          (n.tstamp_),
     seen_tstamp_     (n.seen_tstamp_),
     fifo_seq_        (n.fifo_seq_),
@@ -92,13 +92,13 @@ void gcomm::evs::Node::set_leave_message(const LeaveMessage* lm)
     }
 }
 
-void gcomm::evs::Node::set_evict_list_message(const EvictListMessage* elm)
+void gcomm::evs::Node::set_delayed_list_message(const DelayedListMessage* elm)
 {
-    if (evict_list_message_ != 0)
+    if (delayed_list_message_ != 0)
     {
-        delete evict_list_message_;
+        delete delayed_list_message_;
     }
-    evict_list_message_ = (elm == 0 ? 0 : new EvictListMessage(*elm));
+    delayed_list_message_ = (elm == 0 ? 0 : new DelayedListMessage(*elm));
 }
 
 bool gcomm::evs::Node::is_suspected() const

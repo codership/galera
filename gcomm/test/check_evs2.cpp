@@ -97,11 +97,11 @@ START_TEST(test_message)
     check_serialization(lm, lm.serial_size(), LeaveMessage());
 
 
-    EvictListMessage elm(0, uuid1, view_id, 4576);
-    elm.add(UUID(2), 23);
-    elm.add(UUID(3), 45);
-    elm.add(UUID(5), 255);
-    check_serialization(elm, elm.serial_size(), EvictListMessage());
+    DelayedListMessage dlm(0, uuid1, view_id, 4576);
+    dlm.add(UUID(2), 23);
+    dlm.add(UUID(3), 45);
+    dlm.add(UUID(5), 255);
+    check_serialization(dlm, dlm.serial_size(), DelayedListMessage());
 }
 END_TEST
 

@@ -47,7 +47,7 @@ public:
         installed_         (false),
         join_message_      (0),
         leave_message_     (0),
-        evict_list_message_(0),
+        delayed_list_message_(0),
         tstamp_            (gu::datetime::Date::now()),
         seen_tstamp_       (tstamp_),
         fifo_seq_          (-1),
@@ -87,10 +87,10 @@ public:
 
     const LeaveMessage* leave_message() const { return leave_message_; }
 
-    void set_evict_list_message(const EvictListMessage* msg);
+    void set_delayed_list_message(const DelayedListMessage* msg);
 
-    const EvictListMessage *evict_list_message() const
-    { return evict_list_message_; }
+    const DelayedListMessage *delayed_list_message() const
+    { return delayed_list_message_; }
 
 
     void set_tstamp(const gu::datetime::Date& t) { tstamp_ = t; }
@@ -127,8 +127,8 @@ private:
     JoinMessage* join_message_;
     // Leave message
     LeaveMessage* leave_message_;
-    // Evict list message
-    EvictListMessage* evict_list_message_;
+    // Delayed list message
+    DelayedListMessage* delayed_list_message_;
     // Timestamp denoting the last time a message from node
     // advanced input map state or membership protocol. This is used
     // for determining if the node should become suspected/inactive.

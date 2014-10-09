@@ -171,7 +171,7 @@ public:
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
     void send_install(EVS_CALLER_ARG);
-    void send_evict_list();
+    void send_delayed_list();
 
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
@@ -247,7 +247,7 @@ private:
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
-    void handle_evict_list(const EvictListMessage&, NodeMap::iterator);
+    void handle_delayed_list(const DelayedListMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
     void isolate(gu::datetime::Period period);
 public:
@@ -517,7 +517,7 @@ private:
         {
             if (state == S_DELAYED && state_ != state)
             {
-                // Limit to 0xff, see EvictList format in EvictListMessage
+                // Limit to 0xff, see DelayedList format in DelayedListMessage
                 // restricts this value to uint8_t max.
                 if (state_change_cnt_ < 0xff)
                     ++state_change_cnt_;
