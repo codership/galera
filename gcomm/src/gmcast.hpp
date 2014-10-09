@@ -43,7 +43,7 @@ namespace gcomm
         void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
         int  handle_down(Datagram&, const ProtoDownMeta&);
         void handle_stable_view(const View& view);
-        void handle_fencing(const UUID& uuid);
+        void handle_evict(const UUID& uuid);
         std::string handle_get_address(const UUID& uuid) const;
         bool set_param(const std::string& key, const std::string& val);
         // Transport interface

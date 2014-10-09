@@ -95,6 +95,13 @@ START_TEST(test_message)
     LeaveMessage lm(0, uuid1, view_id, 45, 88, 3456);
     lm.set_source(uuid1);
     check_serialization(lm, lm.serial_size(), LeaveMessage());
+
+
+    DelayedListMessage dlm(0, uuid1, view_id, 4576);
+    dlm.add(UUID(2), 23);
+    dlm.add(UUID(3), 45);
+    dlm.add(UUID(5), 255);
+    check_serialization(dlm, dlm.serial_size(), DelayedListMessage());
 }
 END_TEST
 
