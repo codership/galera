@@ -160,7 +160,7 @@ void single_boot(PCUser* pu1)
 
     ProtoUpMeta sum1(pu1->uuid());
 
-    View vt0(ViewId(V_TRANS, pu1->uuid(), 0));
+    View vt0(0, ViewId(V_TRANS, pu1->uuid(), 0));
     vt0.add_member(pu1->uuid(), 0);
     ProtoUpMeta um1(UUID::nil(), ViewId(), &vt0);
     pu1->pc()->connect(true);
@@ -168,7 +168,7 @@ void single_boot(PCUser* pu1)
     pu1->pc()->handle_up(0, Datagram(), um1);
     fail_unless(pu1->pc()->state() == Proto::S_TRANS);
 
-    View vr1(ViewId(V_REG, pu1->uuid(), 1));
+    View vr1(0, ViewId(V_REG, pu1->uuid(), 1));
     vr1.add_member(pu1->uuid(), 0);
     ProtoUpMeta um2(UUID::nil(), ViewId(), &vr1);
     pu1->pc()->handle_up(0, Datagram(), um2);
@@ -223,19 +223,19 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     ProtoUpMeta pum1(pu1->uuid());
     ProtoUpMeta pum2(pu2->uuid());
 
-    View t11(ViewId(V_TRANS, pu1->pc()->current_view().id()));
+    View t11(0, ViewId(V_TRANS, pu1->pc()->current_view().id()));
     t11.add_member(pu1->uuid(), 0);
     pu1->pc()->handle_view(t11);
     fail_unless(pu1->pc()->state() == Proto::S_TRANS);
 
-    View t12(ViewId(V_TRANS, pu2->uuid(), 0));
+    View t12(0, ViewId(V_TRANS, pu2->uuid(), 0));
     t12.add_member(pu2->uuid(), 0);
     // pu2->pc()->shift_to(Proto::S_JOINING);
     pu2->pc()->connect(false);
     pu2->pc()->handle_view(t12);
     fail_unless(pu2->pc()->state() == Proto::S_TRANS);
 
-    View r1(ViewId(V_REG,
+    View r1(0, ViewId(V_REG,
                    pu1->uuid(),
                    pu1->pc()->current_view().id().seq() + 1));
     r1.add_member(pu1->uuid(), 0);
@@ -312,7 +312,7 @@ static void triple_boot(PCUser* pu1, PCUser* pu2, PCUser* pu3)
 
     // trans views
     {
-        View tr12(ViewId(V_TRANS, pu1->pc()->current_view().id()));
+        View tr12(0, ViewId(V_TRANS, pu1->pc()->current_view().id()));
         tr12.add_member(pu1->uuid(), 0);
         tr12.add_member(pu2->uuid(), 0);
 
@@ -324,7 +324,7 @@ static void triple_boot(PCUser* pu1, PCUser* pu2, PCUser* pu3)
         fail_unless(pu2->pc()->state() == Proto::S_TRANS);
 
         pu3->pc()->connect(false);
-        View tr3(ViewId(V_TRANS, pu3->uuid(), 0));
+        View tr3(0, ViewId(V_TRANS, pu3->uuid(), 0));
         tr3.add_member(pu3->uuid(), 0);
         ProtoUpMeta trum3(UUID::nil(), ViewId(), &tr3);
         pu3->pc()->handle_up(0, Datagram(), trum3);
@@ -334,7 +334,7 @@ static void triple_boot(PCUser* pu1, PCUser* pu2, PCUser* pu3)
 
     // reg view
     {
-        View reg(
+        View reg(0,
             ViewId(V_REG,
                    pu1->uuid(), pu1->pc()->current_view().id().seq() + 1));
         reg.add_member(pu1->uuid(), 0);
@@ -418,11 +418,11 @@ START_TEST(test_pc_view_changes_double)
 
     Datagram* rb;
 
-    View tnp(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tnp(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tnp.add_member(uuid1, 0);
     pu1.pc()->handle_view(tnp);
     fail_unless(pu1.pc()->state() == Proto::S_TRANS);
-    View reg(ViewId(V_REG, uuid1,
+    View reg(0, ViewId(V_REG, uuid1,
                     pu1.pc()->current_view().id().seq() + 1));
     reg.add_member(uuid1, 0);
     pu1.pc()->handle_view(reg);
@@ -433,15 +433,15 @@ START_TEST(test_pc_view_changes_double)
     fail_unless(pu1.pc()->state() == Proto::S_NON_PRIM);
     delete rb;
 
-    View tpv2(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+    View tpv2(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
     tpv2.add_member(uuid2, 0);
     tpv2.add_left(uuid1, 0);
     pu2.pc()->handle_view(tpv2);
     fail_unless(pu2.pc()->state() == Proto::S_TRANS);
     fail_unless(pu2.tp()->out() == 0);
 
-    View rp2(ViewId(V_REG, uuid2,
-                                 pu1.pc()->current_view().id().seq() + 1));
+    View rp2(0, ViewId(V_REG, uuid2,
+                       pu1.pc()->current_view().id().seq() + 1));
     rp2.add_member(uuid2, 0);
     rp2.add_left(uuid1, 0);
     pu2.pc()->handle_view(rp2);
@@ -517,7 +517,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu2.pc()->state() == Proto::S_PRIM);
 
     // PRIM -> TRANS -> STATES_EXCH -> RTR -> TRANS -> STATES_EXCH -> RTR ->PRIM
-    View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr1.add_member(uuid1, 0);
     tr1.add_member(uuid2, 0);
     pu1.pc()->handle_view(tr1);
@@ -529,7 +529,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu1.tp()->out() == 0);
     fail_unless(pu2.tp()->out() == 0);
 
-    View reg2(ViewId(V_REG, uuid1,
+    View reg2(0, ViewId(V_REG, uuid1,
                      pu1.pc()->current_view().id().seq() + 1));
     reg2.add_member(uuid1, 0);
     reg2.add_member(uuid2, 0);
@@ -554,7 +554,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu1.pc()->state() == Proto::S_INSTALL);
     fail_unless(pu2.pc()->state() == Proto::S_INSTALL);
 
-    View tr2(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr2(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr2.add_member(uuid1, 0);
     tr2.add_member(uuid2, 0);
 
@@ -585,8 +585,8 @@ START_TEST(test_pc_state1)
     fail_unless(pu2.pc()->state() == Proto::S_TRANS);
 
 
-    View reg3(ViewId(V_REG, uuid1,
-                     pu1.pc()->current_view().id().seq() + 1));
+    View reg3(0, ViewId(V_REG, uuid1,
+                        pu1.pc()->current_view().id().seq() + 1));
 
     reg3.add_member(uuid1, 0);
     reg3.add_member(uuid2, 0);
@@ -656,7 +656,7 @@ START_TEST(test_pc_state2)
     fail_unless(pu2.pc()->state() == Proto::S_PRIM);
 
     // PRIM -> TRANS -> STATES_EXCH -> TRANS -> STATES_EXCH -> RTR -> PRIM
-    View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr1.add_member(uuid1, 0);
     tr1.add_member(uuid2, 0);
     pu1.pc()->handle_view(tr1);
@@ -668,8 +668,8 @@ START_TEST(test_pc_state2)
     fail_unless(pu1.tp()->out() == 0);
     fail_unless(pu2.tp()->out() == 0);
 
-    View reg2(ViewId(V_REG, uuid1,
-                     pu1.pc()->current_view().id().seq() + 1));
+    View reg2(0, ViewId(V_REG, uuid1,
+                        pu1.pc()->current_view().id().seq() + 1));
     reg2.add_member(uuid1, 0);
     reg2.add_member(uuid2, 0);
     pu1.pc()->handle_view(reg2);
@@ -680,7 +680,7 @@ START_TEST(test_pc_state2)
 
 
 
-    View tr2(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr2(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr2.add_member(uuid1, 0);
     tr2.add_member(uuid2, 0);
 
@@ -707,8 +707,8 @@ START_TEST(test_pc_state2)
     fail_unless(pu2.pc()->state() == Proto::S_TRANS);
 
 
-    View reg3(ViewId(V_REG, uuid1,
-                     pu1.pc()->current_view().id().seq() + 1));
+    View reg3(0, ViewId(V_REG, uuid1,
+                        pu1.pc()->current_view().id().seq() + 1));
 
     reg3.add_member(uuid1, 0);
     reg3.add_member(uuid2, 0);
@@ -780,11 +780,11 @@ START_TEST(test_pc_state3)
 
     // PRIM -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM -> STATES_EXCH -> ...
     //      -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM
-    View tr11(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr11(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr11.add_member(uuid1, 0);
     pu1.pc()->handle_view(tr11);
 
-    View tr12(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr12(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr12.add_member(uuid2, 0);
     pu2.pc()->handle_view(tr12);
 
@@ -794,14 +794,14 @@ START_TEST(test_pc_state3)
     fail_unless(pu1.tp()->out() == 0);
     fail_unless(pu2.tp()->out() == 0);
 
-    View reg21(ViewId(V_REG, uuid1,
-                      pu1.pc()->current_view().id().seq() + 1));
+    View reg21(0, ViewId(V_REG, uuid1,
+                         pu1.pc()->current_view().id().seq() + 1));
     reg21.add_member(uuid1, 0);
     pu1.pc()->handle_view(reg21);
     fail_unless(pu1.pc()->state() == Proto::S_STATES_EXCH);
 
-    View reg22(ViewId(V_REG, uuid2,
-                      pu2.pc()->current_view().id().seq() + 1));
+    View reg22(0, ViewId(V_REG, uuid2,
+                         pu2.pc()->current_view().id().seq() + 1));
     reg22.add_member(uuid2, 0);
     pu2.pc()->handle_view(reg22);
     fail_unless(pu2.pc()->state() == Proto::S_STATES_EXCH);
@@ -819,11 +819,11 @@ START_TEST(test_pc_state3)
 
 
 
-    View tr21(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr21(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr21.add_member(uuid1, 0);
     pu1.pc()->handle_view(tr21);
 
-    View tr22(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+    View tr22(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
     tr22.add_member(uuid2, 0);
     pu2.pc()->handle_view(tr22);
 
@@ -833,8 +833,8 @@ START_TEST(test_pc_state3)
     fail_unless(pu1.tp()->out() == 0);
     fail_unless(pu2.tp()->out() == 0);
 
-    View reg3(ViewId(V_REG, uuid1,
-                     pu1.pc()->current_view().id().seq() + 1));
+    View reg3(0, ViewId(V_REG, uuid1,
+                        pu1.pc()->current_view().id().seq() + 1));
     reg3.add_member(uuid1, 0);
     reg3.add_member(uuid2, 0);
 
@@ -897,14 +897,14 @@ START_TEST(test_pc_conflicting_prims)
     PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
 
-    View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr1.add_member(uuid1, 0);
     pu1.pc()->handle_view(tr1);
-    View tr2(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+    View tr2(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
     tr2.add_member(uuid2, 0);
     pu2.pc()->handle_view(tr2);
 
-    View reg(ViewId(V_REG, uuid1, tr1.id().seq() + 1));
+    View reg(0, ViewId(V_REG, uuid1, tr1.id().seq() + 1));
     reg.add_member(uuid1, 0);
     reg.add_member(uuid2, 0);
     pu1.pc()->handle_view(reg);
@@ -934,10 +934,10 @@ START_TEST(test_pc_conflicting_prims)
 
     fail_unless(pu1.tp()->out() == 0);
 
-    View tr3(ViewId(V_TRANS, reg.id()));
+    View tr3(0, ViewId(V_TRANS, reg.id()));
     tr3.add_member(uuid1, 0);
     pu1.pc()->handle_view(tr3);
-    View reg3(ViewId(V_REG, uuid1, tr3.id().seq() + 1));
+    View reg3(0, ViewId(V_REG, uuid1, tr3.id().seq() + 1));
     reg3.add_member(uuid1, 0);
     pu1.pc()->handle_view(reg3);
 
@@ -971,14 +971,14 @@ START_TEST(test_pc_conflicting_prims_npvo)
     PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
 
-    View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+    View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
     tr1.add_member(uuid1, 0);
     pu1.pc()->handle_view(tr1);
-    View tr2(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+    View tr2(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
     tr2.add_member(uuid2, 0);
     pu2.pc()->handle_view(tr2);
 
-    View reg(ViewId(V_REG, uuid1, tr1.id().seq() + 1));
+    View reg(0, ViewId(V_REG, uuid1, tr1.id().seq() + 1));
     reg.add_member(uuid1, 0);
     reg.add_member(uuid2, 0);
     pu1.pc()->handle_view(reg);
@@ -1008,10 +1008,10 @@ START_TEST(test_pc_conflicting_prims_npvo)
 
     fail_unless(pu2.tp()->out() == 0);
 
-    View tr3(ViewId(V_TRANS, reg.id()));
+    View tr3(0, ViewId(V_TRANS, reg.id()));
     tr3.add_member(uuid2, 0);
     pu2.pc()->handle_view(tr3);
-    View reg3(ViewId(V_REG, uuid2, tr3.id().seq() + 1));
+    View reg3(0, ViewId(V_REG, uuid2, tr3.id().seq() + 1));
     reg3.add_member(uuid2, 0);
     pu2.pc()->handle_view(reg3);
 
@@ -1071,9 +1071,10 @@ static_gu_conf()
 }
 
 static DummyNode* create_dummy_node(size_t idx,
+                                    int version,
                                     const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT1H",
+                                    const string& retrans_period = "PT20M",
                                     int weight = 1)
 {
     gu::Config& gu_conf(static_gu_conf());
@@ -1085,21 +1086,16 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsInstallTimeout + "=" + inactive_timeout + "&"
-        + Conf::PcWeight + "=" + gu::to_string(weight);
+        + Conf::PcWeight + "=" + gu::to_string(weight) + "&"
+        + Conf::EvsVersion + "=" + gu::to_string<int>(version) + "&"
+        + Conf::EvsInfoLogMask + "=" + "0x3";
     list<Protolay*> protos;
-    try
-    {
-        UUID uuid(static_cast<int32_t>(idx));
-        protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
-        protos.push_back(new Proto(gu_conf, uuid, 0, conf));
-        return new DummyNode(gu_conf, idx, protos);
-    }
-    catch (...)
-    {
-        for_each(protos.begin(), protos.end(), DeleteObject());
-        throw;
-    }
+
+    UUID uuid(static_cast<int32_t>(idx));
+    protos.push_back(new DummyTransport(uuid, false));
+    protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
+    protos.push_back(new Proto(gu_conf, uuid, 0, conf));
+    return new DummyNode(gu_conf, idx, protos);
 }
 
 namespace
@@ -1133,7 +1129,7 @@ START_TEST(test_pc_split_merge)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1194,7 +1190,7 @@ START_TEST(test_pc_split_merge_w_user_msg)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1255,7 +1251,7 @@ START_TEST(test_pc_complete_split_merge)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         log_info << "i " << i;
         gu_trace(join_node(&prop, dn[i], i == 0));
@@ -1310,6 +1306,50 @@ START_TEST(test_pc_complete_split_merge)
 }
 END_TEST
 
+
+START_TEST(test_pc_protocol_upgrade)
+{
+    log_info << "START (test_pc_protocol_upgrade)";
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    uint32_t view_seq(0);
+
+    for (int i(0); i <= GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1, i));
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+        ++view_seq;
+        for (int j(0); j <= i; ++j)
+        {
+            fail_unless(pc_from_dummy(dn[j])->current_view().version() == 0);
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+    }
+
+    for (int i(0); i < GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        for (int j(i); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        dn[i]->close();
+        dn[i]->set_cvi(V_NON_PRIM);
+        set_cvi(dn, i + 1, GCOMM_PROTOCOL_MAX_VERSION, view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(true));
+        ++view_seq;
+        for (int j(i + 1); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        gu_trace(prop.propagate_until_empty());
+    }
+    fail_unless(pc_from_dummy(dn[GCOMM_PROTOCOL_MAX_VERSION])->current_view().version() == GCOMM_PROTOCOL_MAX_VERSION);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
 
 class PCUser2 : public Toplay
 {
@@ -1480,11 +1520,11 @@ START_TEST(test_trac_191)
     PCUser pu(conf, uuid4, &tp, &p);
 
     p.shift_to(Proto::S_NON_PRIM);
-    View t0(ViewId(V_TRANS, uuid4, 0));
+    View t0(0, ViewId(V_TRANS, uuid4, 0));
     t0.add_member(uuid4, 0);
     p.handle_view(t0);
 
-    View r5(ViewId(V_REG, uuid2, 5));
+    View r5(0, ViewId(V_REG, uuid2, 5));
     r5.add_member(uuid3, 0);
     r5.add_member(uuid4, 0);
 
@@ -1548,13 +1588,13 @@ START_TEST(test_trac_413)
 
     // boot to first prim
     {
-        gcomm::View tr(ViewId(V_TRANS, n1.uuid(), 0));
+        gcomm::View tr(0, ViewId(V_TRANS, n1.uuid(), 0));
         tr.members().insert_unique(std::make_pair(n1.uuid(), 0));
         n1.p().connect(true);
         n1.p().handle_view(tr);
         Datagram* dg(n1.tp().out());
         fail_unless(dg == 0 && n1.p().state() == gcomm::pc::Proto::S_TRANS);
-        gcomm::View reg(ViewId(V_REG, n1.uuid(), 1));
+        gcomm::View reg(0, ViewId(V_REG, n1.uuid(), 1));
         reg.members().insert_unique(std::make_pair(n1.uuid(), 0));
         n1.p().handle_view(reg);
         dg = n1.tp().out();
@@ -1573,25 +1613,25 @@ START_TEST(test_trac_413)
 
     // add remaining nodes
     {
-        gcomm::View tr(ViewId(V_TRANS, n1.uuid(), 1));
+        gcomm::View tr(0, ViewId(V_TRANS, n1.uuid(), 1));
         tr.members().insert_unique(std::make_pair(n1.uuid(), 0));
         n1.p().handle_view(tr);
     }
     {
-        gcomm::View tr(ViewId(V_TRANS, n2.uuid(), 0));
+        gcomm::View tr(0, ViewId(V_TRANS, n2.uuid(), 0));
         tr.members().insert_unique(std::make_pair(n2.uuid(), 0));
         n2.p().connect(false);
         n2.p().handle_view(tr);
     }
     {
-        gcomm::View tr(ViewId(V_TRANS, n3.uuid(), 0));
+        gcomm::View tr(0, ViewId(V_TRANS, n3.uuid(), 0));
         tr.members().insert_unique(std::make_pair(n3.uuid(), 0));
         n3.p().connect(false);
         n3.p().handle_view(tr);
     }
 
     {
-        gcomm::View reg(ViewId(V_REG, n1.uuid(), 2));
+        gcomm::View reg(0, ViewId(V_REG, n1.uuid(), 2));
         reg.members().insert_unique(std::make_pair(n1.uuid(), 0));
         reg.members().insert_unique(std::make_pair(n2.uuid(), 0));
         reg.members().insert_unique(std::make_pair(n3.uuid(), 0));
@@ -1639,14 +1679,14 @@ START_TEST(test_trac_413)
     // drop n1 from view and deliver only state messages in
     // the following reg view
     {
-        gcomm::View tr(gcomm::ViewId(V_TRANS, n1.uuid(), 2));
+        gcomm::View tr(0, gcomm::ViewId(V_TRANS, n1.uuid(), 2));
         tr.members().insert_unique(std::make_pair(n2.uuid(), 0));
         tr.members().insert_unique(std::make_pair(n3.uuid(), 0));
 
         n2.p().handle_view(tr);
         n3.p().handle_view(tr);
 
-        gcomm::View reg(gcomm::ViewId(V_REG, n2.uuid(), 3));
+        gcomm::View reg(0, gcomm::ViewId(V_REG, n2.uuid(), 3));
         reg.members().insert_unique(std::make_pair(n2.uuid(), 0));
         reg.members().insert_unique(std::make_pair(n3.uuid(), 0));
         n2.p().handle_view(reg);
@@ -1667,13 +1707,13 @@ START_TEST(test_trac_413)
     mark_point();
     // drop n2 from view and make sure that n3 ends in non-prim
     {
-        gcomm::View tr(gcomm::ViewId(V_TRANS, n2.uuid(), 3));
+        gcomm::View tr(0, gcomm::ViewId(V_TRANS, n2.uuid(), 3));
         tr.members().insert_unique(std::make_pair(n3.uuid(), 0));
         n3.p().handle_view(tr);
         fail_unless(n3.tp().out() == 0 &&
                     n3.p().state() == gcomm::pc::Proto::S_TRANS);
 
-        gcomm::View reg(gcomm::ViewId(V_REG, n3.uuid(), 4));
+        gcomm::View reg(0, gcomm::ViewId(V_REG, n3.uuid(), 4));
         reg.members().insert_unique(std::make_pair(n3.uuid(), 0));
         n3.p().handle_view(reg);
 
@@ -1913,7 +1953,7 @@ START_TEST(test_trac_277)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout, retrans_period));
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
@@ -1976,13 +2016,13 @@ START_TEST(test_trac_622_638)
 
     // Create two node cluster and make it split. First node is
     // considered crashed after split (stay isolated in non-prim).
-    dn.push_back(create_dummy_node(1, suspect_timeout,
+    dn.push_back(create_dummy_node(1, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[0], true));
     set_cvi(dn, 0, 0, ++view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(false));
 
-    dn.push_back(create_dummy_node(2, suspect_timeout,
+    dn.push_back(create_dummy_node(2, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[1], false));
     set_cvi(dn, 0, 1, ++view_seq, V_PRIM);
@@ -2002,7 +2042,7 @@ START_TEST(test_trac_622_638)
 
     // Add third node which will be connected with node 2. This will
     // be started with prim status.
-    dn.push_back(create_dummy_node(3, suspect_timeout,
+    dn.push_back(create_dummy_node(3, 0, suspect_timeout,
                                    inactive_timeout, retrans_period));
     gu_trace(join_node(&prop, dn[2], true));
     prop.split(1, 3); // avoid 1 <-> 3 communication
@@ -2028,7 +2068,7 @@ START_TEST(test_weighted_quorum)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1, suspect_timeout,
+        dn.push_back(create_dummy_node(i + 1, 0, suspect_timeout,
                                        inactive_timeout,
                                        retrans_period, i));
         gu_trace(join_node(&prop, dn[i], i == 0));
@@ -2098,13 +2138,13 @@ START_TEST(test_weighted_partitioning_1)
 
     // trans views
     {
-        View tr1(ViewId(V_TRANS, uuid1, 0));
+        View tr1(0, ViewId(V_TRANS, uuid1, 0));
         tr1.add_member(uuid1, 0);
         pu1.pc()->connect(false);
         ProtoUpMeta um1(UUID::nil(), ViewId(), &tr1);
         pu1.pc()->handle_up(0, Datagram(), um1);
 
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(uuid2, 0);
         tr23.add_member(uuid3, 0);
         ProtoUpMeta um23(UUID::nil(), ViewId(), &tr23);
@@ -2115,8 +2155,8 @@ START_TEST(test_weighted_partitioning_1)
 
     // reg view
     {
-        View reg(
-            ViewId(V_REG, uuid1, pu2.pc()->current_view().id().seq() + 1));
+        View reg(0,
+                 ViewId(V_REG, uuid1, pu2.pc()->current_view().id().seq() + 1));
         reg.add_member(uuid1, 0);
         reg.add_member(uuid2, 0);
         reg.add_member(uuid3, 0);
@@ -2162,7 +2202,7 @@ START_TEST(test_weighted_partitioning_1)
         fail_unless(pu1.pc()->state() == Proto::S_PRIM);
 
         // trans view for 2 and 3
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(uuid2, 0);
         tr23.add_member(uuid3, 0);
         tr23.add_partitioned(uuid1, 0);
@@ -2177,7 +2217,7 @@ START_TEST(test_weighted_partitioning_1)
         delete dg;
 
         // reg view for 2 and 3
-        View reg23(ViewId(V_REG, uuid2, pu2.pc()->current_view().id().seq() + 1));
+        View reg23(0, ViewId(V_REG, uuid2, pu2.pc()->current_view().id().seq() + 1));
         reg23.add_member(uuid2, 0);
         reg23.add_member(uuid3, 0);
         ProtoUpMeta rum23(UUID::nil(), ViewId(), &reg23);
@@ -2255,13 +2295,13 @@ START_TEST(test_weighted_partitioning_2)
 
     // trans views
     {
-        View tr1(ViewId(V_TRANS, uuid1, 0));
+        View tr1(0, ViewId(V_TRANS, uuid1, 0));
         tr1.add_member(uuid1, 0);
         pu1.pc()->connect(false);
         ProtoUpMeta um1(UUID::nil(), ViewId(), &tr1);
         pu1.pc()->handle_up(0, Datagram(), um1);
 
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(uuid2, 0);
         tr23.add_member(uuid3, 0);
         ProtoUpMeta um23(UUID::nil(), ViewId(), &tr23);
@@ -2272,8 +2312,8 @@ START_TEST(test_weighted_partitioning_2)
 
     // reg view
     {
-        View reg(
-            ViewId(V_REG, uuid1, pu2.pc()->current_view().id().seq() + 1));
+        View reg(0,
+                 ViewId(V_REG, uuid1, pu2.pc()->current_view().id().seq() + 1));
         reg.add_member(uuid1, 0);
         reg.add_member(uuid2, 0);
         reg.add_member(uuid3, 0);
@@ -2316,7 +2356,7 @@ START_TEST(test_weighted_partitioning_2)
         fail_unless(dg != 0);
 
         // trans view for 1
-        View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
         tr1.add_member(uuid1, 0);
         tr1.add_partitioned(uuid2, 0);
         tr1.add_partitioned(uuid3, 0);
@@ -2330,7 +2370,7 @@ START_TEST(test_weighted_partitioning_2)
 
 
         // trans view for 2 and 3
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(uuid2, 0);
         tr23.add_member(uuid3, 0);
         tr23.add_partitioned(uuid1, 0);
@@ -2349,14 +2389,14 @@ START_TEST(test_weighted_partitioning_2)
         delete dg;
 
         // reg view for 1
-        View reg1(ViewId(V_REG, uuid1, pu1.pc()->current_view().id().seq() + 1));
+        View reg1(0, ViewId(V_REG, uuid1, pu1.pc()->current_view().id().seq() + 1));
         reg1.add_member(uuid1, 0);
         ProtoUpMeta rum1(UUID::nil(), ViewId(), &reg1);
         pu1.pc()->handle_up(0, Datagram(), rum1);
         fail_unless(pu1.pc()->state() == Proto::S_STATES_EXCH);
 
         // reg view for 2 and 3
-        View reg23(ViewId(V_REG, uuid2, pu2.pc()->current_view().id().seq() + 1));
+        View reg23(0, ViewId(V_REG, uuid2, pu2.pc()->current_view().id().seq() + 1));
         reg23.add_member(uuid2, 0);
         reg23.add_member(uuid3, 0);
         ProtoUpMeta rum23(UUID::nil(), ViewId(), &reg23);
@@ -2451,7 +2491,7 @@ START_TEST(test_weight_change_partitioning_1)
         // node 1 handle weight change install, proceed to singleton prim
         pu1.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
-        View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_partitioned(pu2.uuid(), 0);
         tr1.add_partitioned(pu3.uuid(), 0);
@@ -2459,8 +2499,8 @@ START_TEST(test_weight_change_partitioning_1)
         pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pu1.pc()->state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, pu1.uuid(),
-                         pu1.pc()->current_view().id().seq() + 1));
+        View reg1(0, ViewId(V_REG, pu1.uuid(),
+                            pu1.pc()->current_view().id().seq() + 1));
         reg1.add_member(pu1.uuid(), 0);
         pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
         fail_unless(pu1.pc()->state() == Proto::S_STATES_EXCH);
@@ -2478,7 +2518,7 @@ START_TEST(test_weight_change_partitioning_1)
         fail_unless(pu1.pc()->state() == Proto::S_PRIM);
 
         // nodes 2 and 3 go to trans, handle install
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(pu2.uuid(), 0);
         tr23.add_member(pu3.uuid(), 0);
         tr23.add_partitioned(pu1.uuid(), 0);
@@ -2493,8 +2533,8 @@ START_TEST(test_weight_change_partitioning_1)
         pu2.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
         pu3.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
-        View reg23(ViewId(V_REG, pu2.uuid(),
-                          pu2.pc()->current_view().id().seq() + 1));
+        View reg23(0, ViewId(V_REG, pu2.uuid(),
+                             pu2.pc()->current_view().id().seq() + 1));
         reg23.add_member(pu2.uuid(), 0);
         reg23.add_member(pu3.uuid(), 0);
 
@@ -2579,7 +2619,7 @@ START_TEST(test_weight_change_partitioning_2)
         // node 1 handle weight change install, proceed to singleton prim
         pu1.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
-        View tr1(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_partitioned(pu2.uuid(), 0);
         tr1.add_partitioned(pu3.uuid(), 0);
@@ -2587,8 +2627,8 @@ START_TEST(test_weight_change_partitioning_2)
         pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pu1.pc()->state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, pu1.uuid(),
-                         pu1.pc()->current_view().id().seq() + 1));
+        View reg1(0, ViewId(V_REG, pu1.uuid(),
+                            pu1.pc()->current_view().id().seq() + 1));
         reg1.add_member(pu1.uuid(), 0);
         pu1.pc()->handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
         fail_unless(pu1.pc()->state() == Proto::S_STATES_EXCH);
@@ -2600,7 +2640,7 @@ START_TEST(test_weight_change_partitioning_2)
         fail_unless(pu1.pc()->state() == Proto::S_NON_PRIM);
 
         // nodes 2 and 3 go to trans, handle install
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(pu2.uuid(), 0);
         tr23.add_member(pu3.uuid(), 0);
         tr23.add_partitioned(pu1.uuid(), 0);
@@ -2615,8 +2655,8 @@ START_TEST(test_weight_change_partitioning_2)
         pu2.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
         pu3.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
-        View reg23(ViewId(V_REG, pu2.uuid(),
-                          pu2.pc()->current_view().id().seq() + 1));
+        View reg23(0, ViewId(V_REG, pu2.uuid(),
+                             pu2.pc()->current_view().id().seq() + 1));
         reg23.add_member(pu2.uuid(), 0);
         reg23.add_member(pu3.uuid(), 0);
 
@@ -2696,7 +2736,7 @@ START_TEST(test_weight_change_joining)
 
         // trans views
         {
-            View tr12(ViewId(V_TRANS, pu1.pc()->current_view().id()));
+            View tr12(0, ViewId(V_TRANS, pu1.pc()->current_view().id()));
             tr12.add_member(pu1.uuid(), 0);
             tr12.add_member(pu2.uuid(), 0);
 
@@ -2712,7 +2752,7 @@ START_TEST(test_weight_change_joining)
             pu2.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
             pu3.pc()->connect(false);
-            View tr3(ViewId(V_TRANS, pu3.uuid(), 0));
+            View tr3(0, ViewId(V_TRANS, pu3.uuid(), 0));
             tr3.add_member(pu3.uuid(), 0);
             ProtoUpMeta trum3(UUID::nil(), ViewId(), &tr3);
             pu3.pc()->handle_up(0, Datagram(), trum3);
@@ -2722,9 +2762,9 @@ START_TEST(test_weight_change_joining)
 
         // reg view
         {
-            View reg(
-                ViewId(V_REG,
-                       pu1.uuid(), pu1.pc()->current_view().id().seq() + 1));
+            View reg(0,
+                     ViewId(V_REG,
+                            pu1.uuid(), pu1.pc()->current_view().id().seq() + 1));
             reg.add_member(pu1.uuid(), 0);
             reg.add_member(pu2.uuid(), 0);
             reg.add_member(pu3.uuid(), 0);
@@ -2834,7 +2874,7 @@ START_TEST(test_weight_change_leaving)
         fail_unless(install_dg != 0);
 
         // nodes 2 and 3 go to trans, handle install
-        View tr23(ViewId(V_TRANS, pu2.pc()->current_view().id()));
+        View tr23(0, ViewId(V_TRANS, pu2.pc()->current_view().id()));
         tr23.add_member(pu2.uuid(), 0);
         tr23.add_member(pu3.uuid(), 0);
         tr23.add_left(pu1.uuid(), 0);
@@ -2849,8 +2889,8 @@ START_TEST(test_weight_change_leaving)
         pu2.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
         pu3.pc()->handle_up(0, *install_dg, ProtoUpMeta(pu1.uuid()));
 
-        View reg23(ViewId(V_REG, pu2.uuid(),
-                          pu2.pc()->current_view().id().seq() + 1));
+        View reg23(0, ViewId(V_REG, pu2.uuid(),
+                             pu2.pc()->current_view().id().seq() + 1));
         reg23.add_member(pu2.uuid(), 0);
         reg23.add_member(pu3.uuid(), 0);
 
@@ -2900,7 +2940,7 @@ static void _test_join_split_cluster(
 {
     // construct restored view.
     const UUID& prim_uuid = uuid1 < uuid2 ? uuid1 : uuid2;
-    View rst_view(ViewId(V_PRIM, prim_uuid, 0));
+    View rst_view(0, ViewId(V_PRIM, prim_uuid, 0));
     rst_view.add_member(uuid1, 0);
     rst_view.add_member(uuid2, 0);
 
@@ -2931,7 +2971,7 @@ static void _test_join_split_cluster(
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
     // assume previous cluster is node1 and node3.
     const UUID& prim_uuid2 = uuid1 < uuid3 ? uuid1 : uuid3;
-    View rst_view2(ViewId(V_PRIM, prim_uuid2, 0));
+    View rst_view2(0, ViewId(V_PRIM, prim_uuid2, 0));
     rst_view2.add_member(uuid1, 0);
     rst_view2.add_member(uuid3, 0);
     pc3.set_restored_view(&rst_view2);
@@ -2943,13 +2983,13 @@ static void _test_join_split_cluster(
                                             ? pu1.uuid() : pu3.uuid();
 
         // node1
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_partitioned(pu2.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pc1.state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, reg_uuid, seq + 1));
+        View reg1(0, ViewId(V_REG, reg_uuid, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         reg1.add_member(pu3.uuid(), 0);
         reg1.add_joined(pu3.uuid(), 0);
@@ -2958,13 +2998,13 @@ static void _test_join_split_cluster(
         fail_unless(pc1.state() == Proto::S_STATES_EXCH);
 
         // node3
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu3.uuid(), 0);
         pc3.connect(false);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
         fail_unless(pc3.state() == Proto::S_TRANS);
 
-        View reg3(ViewId(V_REG, reg_uuid, seq + 1));
+        View reg3(0, ViewId(V_REG, reg_uuid, seq + 1));
         reg3.add_member(pu1.uuid(), 0);
         reg3.add_member(pu3.uuid(), 0);
         reg3.add_joined(pu1.uuid(), 0);
@@ -2989,13 +3029,13 @@ static void _test_join_split_cluster(
     {
         // node2
         uint32_t seq = pc2.current_view().id().seq();
-        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        View tr2(0, ViewId(V_TRANS, pc2.current_view().id()));
         tr2.add_member(pu2.uuid(), 0);
         tr2.add_partitioned(pu1.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View reg2(ViewId(V_REG, pc2.uuid(), seq + 1));
+        View reg2(0, ViewId(V_REG, pc2.uuid(), seq + 1));
         reg2.add_member(pu2.uuid(), 0);
         reg2.add_partitioned(pu1.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
@@ -3007,18 +3047,18 @@ static void _test_join_split_cluster(
         fail_unless(pc2.state() == Proto::S_NON_PRIM);
     }
     {
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_member(pu3.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pc1.state() == Proto::S_TRANS);
 
-        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        View tr2(0, ViewId(V_TRANS, pc2.current_view().id()));
         tr2.add_member(pu2.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu1.uuid(), 0);
         tr3.add_member(pu3.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
@@ -3027,7 +3067,7 @@ static void _test_join_split_cluster(
         int seq = pc1.current_view().id().seq();
         const UUID& reg_uuid1 = pu1.uuid() < pu2.uuid() ? pu1.uuid() : pu2.uuid();
         const UUID& reg_uuid = reg_uuid1 < pu3.uuid() ? reg_uuid1 : pu3.uuid();
-        View reg1(ViewId(V_REG, reg_uuid, seq + 1));
+        View reg1(0, ViewId(V_REG, reg_uuid, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         reg1.add_member(pu2.uuid(), 0);
         reg1.add_member(pu3.uuid(), 0);
@@ -3037,7 +3077,7 @@ static void _test_join_split_cluster(
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
         fail_unless(pc3.state() == Proto::S_STATES_EXCH);
 
-        View reg2(ViewId(V_REG, reg_uuid, seq + 1));
+        View reg2(0, ViewId(V_REG, reg_uuid, seq + 1));
         reg2.add_member(pu1.uuid(), 0);
         reg2.add_member(pu2.uuid(), 0);
         reg2.add_member(pu3.uuid(), 0);
@@ -3109,7 +3149,7 @@ START_TEST(test_trac_762)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i + 1,
+        dn.push_back(create_dummy_node(i + 1, 0,
                                        suspect_timeout,
                                        inactive_timeout,
                                        retrans_period));
@@ -3167,18 +3207,18 @@ START_TEST(test_trac_762)
     // install message in reg view and reach prim view, node 3 partitions and
     // handles install in trans view and marks nodes 1 and 2 to have un state
     {
-        View tr1(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        View tr1(0, ViewId(V_TRANS, tp1->uuid(), view_seq));
         tr1.add_member(tp1->uuid(), 0);
         tr1.add_member(tp2->uuid(), 0);
         pc1->handle_view(tr1);
         pc2->handle_view(tr1);
 
-        View tr2(ViewId(V_TRANS, tp3->uuid(), view_seq));
+        View tr2(0, ViewId(V_TRANS, tp3->uuid(), view_seq));
         tr2.add_member(tp3->uuid(), 0);
         pc3->handle_view(tr2);
 
         ++view_seq;
-        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        View reg(0, ViewId(V_REG, tp1->uuid(), view_seq));
         reg.add_member(tp1->uuid(), 0);
         reg.add_member(tp2->uuid(), 0);
         reg.add_member(tp3->uuid(), 0);
@@ -3215,7 +3255,7 @@ START_TEST(test_trac_762)
         pc1->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
         pc2->handle_up(0, *dg, ProtoUpMeta(tp1->uuid()));
 
-        View tr3(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        View tr3(0, ViewId(V_TRANS, tp1->uuid(), view_seq));
         tr3.add_member(tp1->uuid(), 0);
         tr3.add_member(tp2->uuid(), 0);
         tr3.add_partitioned(tp3->uuid(), 0);
@@ -3223,7 +3263,7 @@ START_TEST(test_trac_762)
         pc1->handle_view(tr3);
         pc2->handle_view(tr3);
 
-        View tr4(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        View tr4(0, ViewId(V_TRANS, tp1->uuid(), view_seq));
         tr4.add_member(tp3->uuid(), 0);
         tr4.add_partitioned(tp1->uuid(), 0);
         tr4.add_partitioned(tp2->uuid(), 0);
@@ -3237,13 +3277,13 @@ START_TEST(test_trac_762)
     // 1 and 2
     {
 
-        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        View reg(0, ViewId(V_REG, tp1->uuid(), view_seq));
         reg.add_member(tp1->uuid(), 0);
         reg.add_member(tp2->uuid(), 0);
         pc1->handle_view(reg);
         pc2->handle_view(reg);
 
-        View tr(ViewId(V_TRANS, tp1->uuid(), view_seq));
+        View tr(0, ViewId(V_TRANS, tp1->uuid(), view_seq));
         tr.add_member(tp1->uuid(), 0);
         tr.add_member(tp2->uuid(), 0);
         pc1->handle_view(tr);
@@ -3263,7 +3303,7 @@ START_TEST(test_trac_762)
     }
     // 3
     {
-        View reg(ViewId(V_REG, tp3->uuid(), view_seq));
+        View reg(0, ViewId(V_REG, tp3->uuid(), view_seq));
         reg.add_member(tp3->uuid(), 0);
         pc3->handle_view(reg);
 
@@ -3272,7 +3312,7 @@ START_TEST(test_trac_762)
         pc3->handle_up(0, *dg, ProtoUpMeta(tp3->uuid()));
         delete dg;
 
-        View tr(ViewId(V_TRANS, tp3->uuid(), view_seq));
+        View tr(0, ViewId(V_TRANS, tp3->uuid(), view_seq));
         tr.add_member(tp3->uuid(), 0);
         pc3->handle_view(tr);
     }
@@ -3280,7 +3320,7 @@ START_TEST(test_trac_762)
     // Remerge and PC crash should occur if bug is present.
     ++view_seq;
     {
-        View reg(ViewId(V_REG, tp1->uuid(), view_seq));
+        View reg(0, ViewId(V_REG, tp1->uuid(), view_seq));
         reg.add_member(tp1->uuid(), 0);
         reg.add_member(tp2->uuid(), 0);
         reg.add_member(tp3->uuid(), 0);
@@ -3359,14 +3399,14 @@ START_TEST(test_gh_92)
 
     // they split into three parts.
     {
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_partitioned(pu2.uuid(), 0);
         tr1.add_partitioned(pu3.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pc1.state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        View reg1(0, ViewId(V_REG, uuid1, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
         fail_unless(pc1.state() == Proto::S_STATES_EXCH);
@@ -3374,14 +3414,14 @@ START_TEST(test_gh_92)
         pc1.handle_up(0, *dg, ProtoUpMeta(pu1.uuid()));
         fail_unless(pc1.state() == Proto::S_NON_PRIM);
 
-        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        View tr2(0, ViewId(V_TRANS, pc2.current_view().id()));
         tr2.add_member(pu2.uuid(), 0);
         tr2.add_partitioned(pu1.uuid(), 0);
         tr2.add_partitioned(pu3.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View reg2(ViewId(V_REG, uuid2, seq + 1));
+        View reg2(0, ViewId(V_REG, uuid2, seq + 1));
         reg2.add_member(pu2.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
         fail_unless(pc2.state() == Proto::S_STATES_EXCH);
@@ -3389,14 +3429,14 @@ START_TEST(test_gh_92)
         pc2.handle_up(0, *dg, ProtoUpMeta(pu2.uuid()));
         fail_unless(pc2.state() == Proto::S_NON_PRIM);
 
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu3.uuid(), 0);
         tr3.add_partitioned(pu1.uuid(), 0);
         tr3.add_partitioned(pu2.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
         fail_unless(pc3.state() == Proto::S_TRANS);
 
-        View reg3(ViewId(V_REG, uuid3, seq + 1));
+        View reg3(0, ViewId(V_REG, uuid3, seq + 1));
         reg3.add_member(pu3.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
         fail_unless(pc3.state() == Proto::S_STATES_EXCH);
@@ -3408,12 +3448,12 @@ START_TEST(test_gh_92)
 
     // they try to merge into a primary component, but fails when sending install message.
     {
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
         fail_unless(pc1.state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        View reg1(0, ViewId(V_REG, uuid1, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         reg1.add_member(pu2.uuid(), 0);
         reg1.add_member(pu3.uuid(), 0);
@@ -3422,12 +3462,12 @@ START_TEST(test_gh_92)
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg1));
         fail_unless(pc1.state() == Proto::S_STATES_EXCH);
 
-        View tr2(ViewId(V_TRANS, pc2.current_view().id()));
+        View tr2(0, ViewId(V_TRANS, pc2.current_view().id()));
         tr2.add_member(pu2.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr2));
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View reg2(ViewId(V_REG, uuid1, seq + 1));
+        View reg2(0, ViewId(V_REG, uuid1, seq + 1));
         reg2.add_member(pu1.uuid(), 0);
         reg2.add_member(pu2.uuid(), 0);
         reg2.add_member(pu3.uuid(), 0);
@@ -3436,12 +3476,12 @@ START_TEST(test_gh_92)
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
         fail_unless(pc2.state() == Proto::S_STATES_EXCH);
 
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu3.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
         fail_unless(pc3.state() == Proto::S_TRANS);
 
-        View reg3(ViewId(V_REG, uuid1, seq + 1));
+        View reg3(0, ViewId(V_REG, uuid1, seq + 1));
         reg3.add_member(pu1.uuid(), 0);
         reg3.add_member(pu2.uuid(), 0);
         reg3.add_member(pu3.uuid(), 0);
@@ -3480,7 +3520,7 @@ START_TEST(test_gh_92)
     // node3 is separate from node1 and node2.
     // they get the stale install message when they get transient view.
     {
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_member(pu2.uuid(), 0);
         tr1.add_partitioned(pu3.uuid(), 0);
@@ -3493,7 +3533,7 @@ START_TEST(test_gh_92)
         fail_unless(pc1.state() == Proto::S_TRANS);
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        View reg1(0, ViewId(V_REG, uuid1, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         reg1.add_member(pu2.uuid(), 0);
         reg1.add_partitioned(pu3.uuid(), 0);
@@ -3512,7 +3552,7 @@ START_TEST(test_gh_92)
         fail_unless(pc1.state() == Proto::S_NON_PRIM);
         fail_unless(pc2.state() == Proto::S_NON_PRIM);
 
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu3.uuid(), 0);
         tr3.add_partitioned(pu1.uuid(), 0);
         tr3.add_partitioned(pu2.uuid(), 0);
@@ -3521,7 +3561,7 @@ START_TEST(test_gh_92)
         pc3.handle_up(0, *im, ProtoUpMeta(pu1.uuid()));
         fail_unless(pc3.state() == Proto::S_TRANS);
 
-        View reg3(ViewId(V_REG, uuid3, seq + 1));
+        View reg3(0, ViewId(V_REG, uuid3, seq + 1));
         reg3.add_member(pu3.uuid(), 0);
         reg3.add_partitioned(pu1.uuid(), 0);
         reg3.add_partitioned(pu2.uuid(), 0);
@@ -3536,7 +3576,7 @@ START_TEST(test_gh_92)
 
     // then they try to merge into a primary component again.
     {
-        View tr1(ViewId(V_TRANS, pc1.current_view().id()));
+        View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
         tr1.add_member(pu1.uuid(), 0);
         tr1.add_member(pu2.uuid(), 0);
         pc1.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr1));
@@ -3544,7 +3584,7 @@ START_TEST(test_gh_92)
         fail_unless(pc1.state() == Proto::S_TRANS);
         fail_unless(pc2.state() == Proto::S_TRANS);
 
-        View reg1(ViewId(V_REG, uuid1, seq + 1));
+        View reg1(0, ViewId(V_REG, uuid1, seq + 1));
         reg1.add_member(pu1.uuid(), 0);
         reg1.add_member(pu2.uuid(), 0);
         reg1.add_member(pu3.uuid(), 0);
@@ -3554,12 +3594,12 @@ START_TEST(test_gh_92)
         fail_unless(pc1.state() == Proto::S_STATES_EXCH);
         fail_unless(pc2.state() == Proto::S_STATES_EXCH);
 
-        View tr3(ViewId(V_TRANS, pc3.current_view().id()));
+        View tr3(0, ViewId(V_TRANS, pc3.current_view().id()));
         tr3.add_member(pu3.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &tr3));
         fail_unless(pc3.state() == Proto::S_TRANS);
 
-        View reg3(ViewId(V_REG, uuid1, seq + 1));
+        View reg3(0, ViewId(V_REG, uuid1, seq + 1));
         reg3.add_member(pu1.uuid(), 0);
         reg3.add_member(pu2.uuid(), 0);
         reg3.add_member(pu3.uuid(), 0);
@@ -3815,6 +3855,11 @@ Suite* pc_suite()
 
         tc = tcase_create("test_pc_complete_split_merge");
         tcase_add_test(tc, test_pc_complete_split_merge);
+        tcase_set_timeout(tc, 25);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_pc_protocol_upgrade");
+        tcase_add_test(tc, test_pc_protocol_upgrade);
         tcase_set_timeout(tc, 25);
         suite_add_tcase(s, tc);
 

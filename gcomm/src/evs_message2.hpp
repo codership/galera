@@ -13,6 +13,7 @@
 #include "gcomm/map.hpp"
 
 #include "evs_seqno.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 #include "gu_convert.hpp"
@@ -379,6 +380,12 @@ protected:
 
     size_t serial_size() const;
 
+    // Version number:
+    // For User, Gap, Leave messages that are exchanged only within a group
+    // the version is minimum commonly supported version among the group,
+    // computed during GATHER phase.
+    // For Join, Install messages version is maximum supported protocol
+    // version by the joiner.
     uint8_t            version_;
     Type               type_;
     uint8_t            user_type_;
@@ -534,14 +541,14 @@ public:
 class gcomm::evs::JoinMessage : public Message
 {
 public:
-    JoinMessage(const int     version   = -1,
+    JoinMessage(const int              max_version    = 0,
                 const UUID&            source         = UUID::nil(),
                 const ViewId&          source_view_id = ViewId(),
-                const seqno_t            seq            = -1,
-                const seqno_t            aru_seq        = -1,
+                const seqno_t          seq            = -1,
+                const seqno_t          aru_seq        = -1,
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
-        Message(version,
+        Message(max_version,
                 Message::T_JOIN,
                 source,
                 source_view_id,
@@ -566,15 +573,15 @@ public:
 class gcomm::evs::InstallMessage : public Message
 {
 public:
-    InstallMessage(const int     version   = -1,
+    InstallMessage(const int              max_version     = 0,
                    const UUID&            source          = UUID::nil(),
                    const ViewId&          source_view_id  = ViewId(),
                    const ViewId&          install_view_id = ViewId(),
-                   const seqno_t            seq             = -1,
-                   const seqno_t            aru_seq         = -1,
+                   const seqno_t          seq             = -1,
+                   const seqno_t          aru_seq         = -1,
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
-        Message(version,
+                Message(max_version,
                 Message::T_INSTALL,
                 source,
                 source_view_id,
@@ -599,11 +606,11 @@ public:
 class gcomm::evs::LeaveMessage : public Message
 {
 public:
-    LeaveMessage(const int     version   = -1,
+    LeaveMessage(const int     version        = -1,
                  const UUID&   source         = UUID::nil(),
                  const ViewId& source_view_id = ViewId(),
-                 const seqno_t   seq            = -1,
-                 const seqno_t   aru_seq        = -1,
+                 const seqno_t seq            = -1,
+                 const seqno_t aru_seq        = -1,
                  const int64_t fifo_seq       = -1,
                  const uint8_t flags          = 0) :
         Message(version,

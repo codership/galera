@@ -22,6 +22,7 @@
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
 #include "evs_consensus.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -29,10 +30,6 @@
 #include <deque>
 #include <vector>
 #include <limits>
-
-#ifndef GCOMM_EVS_MAX_VERSION
-#define GCOMM_EVS_MAX_VERSION 0
-#endif // GCOMM_EVS_MAX_VERSION
 
 namespace gcomm
 {
@@ -214,6 +211,7 @@ public:
 
     void shift_to(const State, const bool send_j = true);
     bool is_all_suspected(const UUID& uuid) const;
+    const View& current_view() const { return current_view_; }
 
     // Message handlers
 private:
@@ -372,7 +370,6 @@ public:
 private:
 
     int version_;
-    static const int max_version_ = GCOMM_EVS_MAX_VERSION;
     int debug_mask_;
     int info_mask_;
     gu::datetime::Date last_stats_report_;

@@ -117,17 +117,59 @@ bool gcomm::evs::Message::operator==(const Message& cmp) const
             node_list_       == cmp.node_list_);
 }
 
+//
+// Header format:
+//   0               1               2               3
+// | 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 |
+// |-----------------------------------------------------------------|
+// | zv |  t  |  o  |     flags     |  real version |    reserved    |
+// |-----------------------------------------------------------------|
+// |                            fifo_seq                             |
+// |                              ...                                |
+// |-----------------------------------------------------------------|
+// |                            source                               |
+// |                              ...                                |
+// |                              ...                                |
+// |                              ...                                |
+// |-----------------------------------------------------------------|
+// |-----------------------------------------------------------------|
+// |                        source view id                           |
+// |                              ...                                |
+// |                              ...                                |
+// |                              ...                                |
+// |                              ...                                |
+// |-----------------------------------------------------------------|
+//
+//
+// zv - zeroversion
+//      if zeroversion is 0, message version is 0, otherwise it is
+//      read from real version
+// t  - type
+// o  - order
+//
 
 size_t gcomm::evs::Message::serialize(gu::byte_t* const buf,
                                       size_t      const buflen,
                                       size_t            offset) const
 {
 
-    uint8_t b = static_cast<uint8_t>(version_ | (type_ << 2) | (order_ << 5));
+    uint8_t zeroversion;
+    switch (type_)
+    {
+    case T_JOIN:
+    case T_INSTALL:
+        zeroversion = 0;
+        break;
+    default:
+        zeroversion = (version_ != 0 ? 1 : 0);
+    }
+    uint8_t b = static_cast<uint8_t>(zeroversion
+                                     | (type_ << 2)
+                                     | (order_ << 5));
     gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
     gu_trace(offset = gu::serialize1(flags_, buf, buflen, offset));
-    uint16_t pad(0);
-    gu_trace(offset = gu::serialize2(pad, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(version_, buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(uint8_t(0), buf, buflen, offset));
     gu_trace(offset = gu::serialize8(fifo_seq_, buf, buflen, offset));
     if (flags_ & F_SOURCE)
     {
@@ -145,12 +187,9 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
 
-    version_ = static_cast<uint8_t>(b & 0x3);
-    if (version_ != 0)
-    {
-        gu_throw_error(EPROTONOSUPPORT) << "protocol version not supported: "
-                                        << version_;
-    }
+    // The message version will be read from offset 16 regardless what is
+    // the zeroversion value. The only purpose of zeroversion is to
+    // make pre 3.8 nodes to discard messages in new format.
 
     type_    = static_cast<Type>((b >> 2) & 0x7);
     if (type_ <= T_NONE || type_ > T_EVICT_LIST)
@@ -166,14 +205,25 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     }
 
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, flags_));
-
-    uint16_t pad;
-    gu_trace(offset = gu::unserialize2(buf, buflen, offset, pad));
-
-    if (pad != 0)
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, version_));
+    switch (type_)
     {
-        gu_throw_error(EINVAL) << "invalid pad" << pad;
+    case T_JOIN:
+    case T_INSTALL:
+        // Join and install message will always remain protocol zero,
+        // version check is not applicable.
+        break;
+    default:
+        if (version_ > GCOMM_PROTOCOL_MAX_VERSION)
+        {
+            gu_throw_error(EPROTONOSUPPORT) << "protocol version "
+                                            << static_cast<int>(version_)
+                                            << " not supported";
+        }
+        break;
     }
+    uint8_t reserved;
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, reserved));
 
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, fifo_seq_));
 
