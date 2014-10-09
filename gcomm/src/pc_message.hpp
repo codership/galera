@@ -11,6 +11,7 @@
 #include "gcomm/map.hpp"
 
 #include "gu_serialize.hpp"
+#include "protocol_version.hpp"
 
 #include <limits>
 
@@ -212,7 +213,13 @@ public:
         seq_     (seq     ),
         crc16_   (0       ),
         node_map_(node_map)
-    { }
+    {
+        // Note:
+        // PC message wire format has room only for version numbers up to 15.
+        // At version 15 (latest) the wire format must change to match
+        // 8 bit version width of EVS.
+        assert(version < 15);
+    }
 
     Message(const Message& msg)
         :
@@ -265,10 +272,10 @@ public:
         gu_trace (off = gu::unserialize4(buf, buflen, offset, b));
 
         version_ = b & 0x0f;
-        flags_   = (b & 0xf0) >> 4;
-        if (version_ != 0)
+        if (version_ > GCOMM_PROTOCOL_MAX_VERSION)
             gu_throw_error (EPROTONOSUPPORT)
                 << "Unsupported protocol varsion: " << version_;
+        flags_   = (b & 0xf0) >> 4;
 
         type_ = static_cast<Type>((b >> 8) & 0xff);
         if (type_ <= T_NONE || type_ >= T_MAX)

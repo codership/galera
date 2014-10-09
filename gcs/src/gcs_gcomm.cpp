@@ -267,7 +267,7 @@ public:
         log_info << "gcomm: joining thread";
         pthread_join(thd_, 0);
         log_info << "gcomm: closing backend";
-        tp_->close(error_ != 0);
+        tp_->close(error_ != 0 || force == true);
         gcomm::disconnect(tp_, this);
         delete tp_;
         tp_ = 0;
@@ -316,8 +316,7 @@ public:
 
     void        get_status(gu::Status& status) const
     {
-        gcomm::Critical<gcomm::Protonet> crit(*net_);
-        tp_->get_status(status);
+        if (tp_ != 0) tp_->get_status(status);
     }
 
     class Ref
@@ -389,6 +388,8 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
     if (um.err_no() != 0)
     {
         error_ = um.err_no();
+        // force backend close
+        close(true);
         recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
     }
     else if (um.has_view() == true)
@@ -618,20 +619,9 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         }
         else if (um.err_no() != 0)
         {
-            gcs_comp_msg_t* cm(gcs_comp_msg_leave());
-            const ssize_t cm_size(gcs_comp_msg_size(cm));
-            msg->size = cm_size;
-            if (gu_likely(cm_size <= msg->buf_len))
-            {
-                memcpy(msg->buf, cm, cm_size);
-                recv_buf.pop_front();
-                msg->type = GCS_MSG_COMPONENT;
-            }
-            else
-            {
-                msg->type = GCS_MSG_ERROR;
-            }
-            gcs_comp_msg_delete(cm);
+            // Error from backend, consider it closed
+            msg->type = GCS_MSG_ERROR;
+            return -EBADFD;
         }
         else
         {
@@ -847,7 +837,6 @@ GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
     }
 
     GCommConn& conn(*ref.get());
-
     gcomm::Critical<Protonet> crit(conn.get_pnet());
     conn.get_status(status);
 
