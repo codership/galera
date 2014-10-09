@@ -154,13 +154,13 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                                       gu::URI(hs.node_address()).get_port());
 
 
-            if (gmcast_.is_fenced(remote_uuid_) == true)
+            if (gmcast_.is_evicted(remote_uuid_) == true)
             {
                 log_info << "peer " << remote_uuid_
                          << " from " << remote_addr_
-                         << " has been fenced out, rejecting connection";
+                         << " has been evicted out, rejecting connection";
                 Message failed(version_, Message::T_FAIL,
-                               gmcast_.uuid(), local_segment_, "fenced");
+                               gmcast_.uuid(), local_segment_, "evicted");
                 send_msg(failed);
                 set_state(S_FAILED);
                 return;
@@ -200,10 +200,13 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
              << remote_addr_ << " failed: '"
              << hs.error() << "'";
     set_state(S_FAILED);
-    if (hs.error() == "fenced")
+    if (hs.error() == "evicted")
     {
-        gu_throw_error(EPERM)
-            << "this node has been fenced out of the cluster, "
+        // otherwise node use the uuid in view state file.
+        // which is probably still in other nodes evict list.
+        ViewState::remove_file();
+        gu_throw_fatal
+            << "this node has been evicted out of the cluster, "
             << "gcomm backend restart is required";
     }
 }
@@ -297,4 +300,3 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
         gu_throw_fatal << "invalid message type: " << msg.type();
     }
 }
-

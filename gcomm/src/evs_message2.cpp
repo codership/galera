@@ -16,7 +16,7 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::MessageNode& node)
     os << " {";
     os << "o=" << node.operational() << ",";
     os << "s=" << node.suspected() << ",";
-    os << "f=" << node.fenced() << ",";
+    os << "e=" << node.evicted() << ",";
     os << "ls=" << node.leave_seq() << ",";
     os << "vid=" << node.view_id() << ",";
     os << "ss=" << node.safe_seq() << ",";
@@ -55,7 +55,7 @@ size_t gcomm::evs::MessageNode::serialize(gu::byte_t* const buf,
     uint8_t b =
         static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) |
                              (suspected_   == true ? F_SUSPECTED   : 0) |
-                             (fenced_      == true ? F_FENCED      : 0));
+                             (evicted_     == true ? F_EVICTED      : 0));
     gu_trace(offset = gu::serialize1(b, buf, buflen, offset));
     gu_trace(offset = gu::serialize1(segment_, buf, buflen, offset));
     gu_trace(offset = gu::serialize8(leave_seq_, buf, buflen, offset));
@@ -72,13 +72,13 @@ size_t gcomm::evs::MessageNode::unserialize(const gu::byte_t* const buf,
 {
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
-    if ((b & ~(F_OPERATIONAL | F_SUSPECTED | F_FENCED)) != 0)
+    if ((b & ~(F_OPERATIONAL | F_SUSPECTED | F_EVICTED)) != 0)
     {
         log_warn << "unknown flags: " << static_cast<int>(b);
     }
     operational_ = b & F_OPERATIONAL;
     suspected_   = b & F_SUSPECTED;
-    fenced_      = b & F_FENCED;
+    evicted_      = b & F_EVICTED;
 
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, segment_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, leave_seq_));
@@ -192,7 +192,7 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     // make pre 3.8 nodes to discard messages in new format.
 
     type_    = static_cast<Type>((b >> 2) & 0x7);
-    if (type_ <= T_NONE || type_ > T_LEAVE)
+    if (type_ <= T_NONE || type_ > T_DELAYED_LIST)
     {
         gu_throw_error(EINVAL) << "invalid type " << type_;
     }
@@ -492,4 +492,54 @@ size_t gcomm::evs::LeaveMessage::unserialize(const gu::byte_t* const buf,
 size_t gcomm::evs::LeaveMessage::serial_size() const
 {
     return (Message::serial_size() + 2 * sizeof(seqno_t));
+}
+
+size_t gcomm::evs::DelayedListMessage::serialize(gu::byte_t* const buf,
+                                               size_t      const buflen,
+                                               size_t            offset) const
+{
+    gu_trace(offset = Message::serialize(buf, buflen, offset));
+    gu_trace(offset = gu::serialize1(static_cast<uint8_t>(delayed_list_.size()),
+                                     buf, buflen, offset));
+    for (DelayedList::const_iterator i(delayed_list_.begin());
+         i != delayed_list_.end(); ++i)
+    {
+        gu_trace(offset = i->first.serialize(buf, buflen, offset));
+        gu_trace(offset = gu::serialize1(i->second, buf, buflen, offset));
+    }
+    return offset;
+}
+
+size_t gcomm::evs::DelayedListMessage::unserialize(const gu::byte_t* const buf,
+                                                 size_t            const buflen,
+                                                 size_t                  offset,
+                                                 bool skip_header)
+{
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
+    delayed_list_.clear();
+    uint8_t list_sz(0);
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, list_sz));
+    for (uint8_t i(0); i < list_sz; ++i)
+    {
+        UUID uuid;
+        uint8_t cnt;
+        gu_trace(offset = uuid.unserialize(buf, buflen, offset));
+        gu_trace(offset = gu::unserialize1(buf, buflen, offset, cnt));
+        delayed_list_.insert(std::make_pair(uuid, cnt));
+    }
+
+    return offset;
+}
+
+size_t gcomm::evs::DelayedListMessage::serial_size() const
+{
+    return (Message::serial_size()
+            + gu::serial_size(uint8_t(0))
+            + std::min(
+                delayed_list_.size(),
+                static_cast<size_t>(std::numeric_limits<uint8_t>::max()))
+            * (UUID::serial_size() + gu::serial_size(uint8_t(0))));
 }
