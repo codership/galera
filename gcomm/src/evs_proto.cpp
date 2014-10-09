@@ -256,7 +256,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     {
         version_ = check_range(Conf::EvsVersion,
                                gu::from_string<int>(val),
-                               0, GCOMM_PROTOCOL_MAX_VERSION);
+                               0, GCOMM_PROTOCOL_MAX_VERSION + 1);
         // trigger configuration change to propagate version
         shift_to(S_GATHER, true);
         return true;
