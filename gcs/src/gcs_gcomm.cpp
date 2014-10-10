@@ -262,16 +262,21 @@ public:
             log_warn << "gcomm: backend already closed";
             return;
         }
-        log_info << "gcomm: terminating thread";
-        terminate();
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: terminating thread";
+            terminate();
+        }
         log_info << "gcomm: joining thread";
         pthread_join(thd_, 0);
-        log_info << "gcomm: closing backend";
-        tp_->close(error_ != 0 || force == true);
-        gcomm::disconnect(tp_, this);
-        delete tp_;
-        tp_ = 0;
-
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: closing backend";
+            tp_->close(error_ != 0 || force == true);
+            gcomm::disconnect(tp_, this);
+            delete tp_;
+            tp_ = 0;
+        }
         const Message* msg;
 
         while ((msg = get_next_msg()) != 0)
@@ -719,7 +724,8 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     GCommConn& conn(*ref.get());
     try
     {
-        gcomm::Critical<Protonet> crit(conn.get_pnet());
+        // Critical section is entered inside close() call.
+        // gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.close();
     }
     catch (Exception& e)
