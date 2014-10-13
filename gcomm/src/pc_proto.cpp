@@ -135,6 +135,10 @@ void gcomm::pc::Proto::send_state()
         {
             local_state.set_to_seq(to_seq());
         }
+        if (is_evicted(NodeMap::key(i)) == true)
+        {
+            local_state.set_evicted(true);
+        }
         im.insert_unique(std::make_pair(NodeMap::key(i), local_state));
     }
 
@@ -222,7 +226,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     }
 
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-    log_debug << v;
+    log_info << v;
     send_up(Datagram(), um);
     set_stable_view(v);
 
@@ -834,7 +838,7 @@ bool gcomm::pc::Proto::is_prim() const
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
 
-        // first determine if there are any nodes still in unknown state
+        // First determine if there are any nodes still in unknown state.
         std::set<UUID> un;
         for (NodeMap::const_iterator i(instances_.begin());
              i != instances_.end(); ++i)
@@ -857,8 +861,9 @@ bool gcomm::pc::Proto::is_prim() const
             return false;
         }
 
-
+        // Collect last prim members and evicted from state messages
         MultiMap<ViewId, UUID> last_prim_uuids;
+        std::set<UUID> evicted;
 
         for (SMMap::const_iterator i = state_msgs_.begin();
              i != state_msgs_.end();
@@ -881,6 +886,10 @@ bool gcomm::pc::Proto::is_prim() const
                 {
                     last_prim_uuids.insert(std::make_pair(inst.last_prim(), uuid));
                 }
+                if (inst.evicted() == true)
+                {
+                    evicted.insert(uuid);
+                }
             }
         }
 
@@ -890,27 +899,38 @@ bool gcomm::pc::Proto::is_prim() const
             return false;
         }
 
-        const ViewId greatest_view_id(last_prim_uuids.rbegin()->first);
+        // Construct greatest view set of UUIDs ignoring evicted ones
         std::set<UUID> greatest_view;
+        // Get range of UUIDs in greatest views
+        const ViewId greatest_view_id(last_prim_uuids.rbegin()->first);
         std::pair<MultiMap<ViewId, UUID>::const_iterator,
                   MultiMap<ViewId, UUID>::const_iterator> gvi =
             last_prim_uuids.equal_range(greatest_view_id);
+        // Iterate over range and insert into greatest view if not evicted
         for (MultiMap<ViewId, UUID>::const_iterator i = gvi.first;
              i != gvi.second; ++i)
         {
-            std::pair<std::set<UUID>::iterator, bool>
-                iret = greatest_view.insert(
-                    MultiMap<ViewId, UUID>::value(i));
-            gcomm_assert(iret.second == true);
+            if (evicted.find(MultiMap<ViewId, UUID>::value(i)) == evicted.end())
+            {
+                std::pair<std::set<UUID>::iterator, bool>
+                    iret = greatest_view.insert(
+                        MultiMap<ViewId, UUID>::value(i));
+                // Assert that inserted UUID was unique
+                gcomm_assert(iret.second == true);
+            }
         }
         log_debug << self_id()
                   << " greatest view id " << greatest_view_id;
+        // Compute list of present view members
         std::set<UUID> present;
         for (NodeList::const_iterator i = current_view_.members().begin();
              i != current_view_.members().end(); ++i)
         {
             present.insert(NodeList::key(i));
         }
+        // Compute intersection of present and greatest view. If the
+        // intersection size is the same as greatest view size,
+        // it is safe to rebootstrap PC.
         std::set<UUID> intersection;
         set_intersection(greatest_view.begin(), greatest_view.end(),
                          present.begin(), present.end(),
