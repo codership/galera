@@ -1117,7 +1117,12 @@ _close(gcs_conn_t* conn, bool join_recv_thread)
         // there are two possible reasons.
         // 1. gcs_core_close is called.
         // 2. GCommConn::run() caught exception.
-        (void)gcs_core_close (conn->core);
+        //
+        // If the close was called by gcs_recv_thread(), the
+        // exit happends due to error in backend and graceful
+        // close may not be possible. Call gcs_core_close() with
+        // force set to true.
+        (void)gcs_core_close (conn->core, join_recv_thread == false);
 
         if (join_recv_thread)
         {

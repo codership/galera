@@ -1146,7 +1146,7 @@ out:
     return ret;
 }
 
-long gcs_core_close (gcs_core_t* core)
+long gcs_core_close (gcs_core_t* core, bool force)
 {
     long ret;
 
@@ -1160,6 +1160,7 @@ long gcs_core_close (gcs_core_t* core)
         ret = core->backend.close (&core->backend);
         gcs_fifo_lite_close (core->fifo);
     }
+    if (force) core->state = CORE_CLOSED;
     gu_mutex_unlock (&core->send_lock);
 
     return ret;
