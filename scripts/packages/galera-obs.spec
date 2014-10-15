@@ -43,18 +43,9 @@ BuildRequires: glibc-devel
 BuildRequires: libtool
 BuildRequires: openssl-devel
 BuildRequires: scons
-%if 0%{?suse_version} == 11
-  %if 0%{?suse_version} == 1120
-# gcc43 seems to be the default
-BuildRequires: libgcc46
-BuildRequires: libgomp46
-BuildRequires: gcc46
-BuildRequires: gcc46-c++
-  %endif
-  %if 0%{?suse_version} == 1130
-BuildRequires: gcc47
+%if 0%{?suse_version} == 1110
+# On SLES11 SPx use the linked gcc47 to build instead of default gcc43
 BuildRequires: gcc47-c++
-  %endif
 %else
 BuildRequires: gcc-c++
 %endif
@@ -84,19 +75,19 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %setup -q
 
 %build
-echo "SUSE-VERSION: %{?suse_version}"
-echo "SUSE-VERSION: %{?suse_version}"
-echo "SUSE-VERSION: %{suse_version}"
-
-%if 0%{?suse_version} == 11
-  %if 0%{?suse_version} == 1120
-export CC=gcc-4.6
-export CXX=g++-4.6
-  %endif
-  %if 0%{?suse_version} == 1130
+# Debug info:
+echo "suse_version: %{suse_version}"
+%if 0%{?suse_version} == 1110
 export CC=gcc-4.7
 export CXX=g++-4.7
-  %endif
+%endif
+%if 0%{?suse_version} == 1120
+export CC=gcc-4.6
+export CXX=g++-4.6
+%endif
+%if 0%{?suse_version} == 1130
+export CC=gcc-4.7
+export CXX=g++-4.7
 %endif
 
 scons
