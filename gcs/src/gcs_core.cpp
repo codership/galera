@@ -794,7 +794,17 @@ core_handle_comp_msg (gcs_core_t*          core,
                 }
 
                 if (gcs_group_my_idx(group) == -1) { // self-leave
+                    gcs_fifo_lite_close (core->fifo);
                     core->state = CORE_CLOSED;
+                    if (gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf)) {
+                        ret = -gcs_comp_msg_error(
+                            (const gcs_comp_msg_t*)msg->buf);
+                        free(const_cast<void*>(act->buf));
+                        act->buf = NULL;
+                        act->buf_len = 0;
+                        act->type = GCS_ACT_ERROR;
+                        gu_info("comp msg error in core %d", -ret);
+                    }
                 }
                 else {                               // regular non-prim
                     core->state = CORE_NON_PRIMARY;
@@ -805,7 +815,7 @@ core_handle_comp_msg (gcs_core_t*          core,
             }
         }
         gu_mutex_unlock (&core->send_lock);
-        assert (ret == act->buf_len);
+        assert (ret == act->buf_len || ret < 0);
         break;
     case GCS_GROUP_WAIT_STATE_MSG:
         gu_fatal ("Internal error: gcs_group_handle_comp() returned "
@@ -1146,7 +1156,7 @@ out:
     return ret;
 }
 
-long gcs_core_close (gcs_core_t* core, bool force)
+long gcs_core_close (gcs_core_t* core)
 {
     long ret;
 
@@ -1158,9 +1168,8 @@ long gcs_core_close (gcs_core_t* core, bool force)
     }
     else {
         ret = core->backend.close (&core->backend);
-        gcs_fifo_lite_close (core->fifo);
     }
-    if (force) core->state = CORE_CLOSED;
+
     gu_mutex_unlock (&core->send_lock);
 
     return ret;

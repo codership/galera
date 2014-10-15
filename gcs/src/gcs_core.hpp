@@ -76,7 +76,7 @@ gcs_core_open  (gcs_core_t* conn,
  * negative - error code
  */
 extern long
-gcs_core_close (gcs_core_t* conn, bool force = false);
+gcs_core_close (gcs_core_t* conn);
 
 /*
  * gcs_core_destroy() frees resources allocated by gcs_core_create()

@@ -1122,7 +1122,7 @@ _close(gcs_conn_t* conn, bool join_recv_thread)
         // exit happends due to error in backend and graceful
         // close may not be possible. Call gcs_core_close() with
         // force set to true.
-        (void)gcs_core_close (conn->core, join_recv_thread == false);
+        (void)gcs_core_close (conn->core);
 
         if (join_recv_thread)
         {
