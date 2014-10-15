@@ -63,13 +63,6 @@ BuildRequires: gcc-c++
 BuildRequires: python
 %endif
 
-
-%if 0%{?suse_version}
-Requires:      lsb-release
-%else
-Requires:      lsb-release
-%endif
-
 Requires:      libssl0.9.8
 Requires:      chkconfig
 
@@ -91,6 +84,10 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %setup -q
 
 %build
+echo "SUSE-VERSION: %{?suse_version}"
+echo "SUSE-VERSION: %{?suse_version}"
+echo "SUSE-VERSION: %{suse_version}"
+
 %if 0%{?suse_version} == 11
   %if 0%{?suse_version} == 1120
 export CC=gcc-4.6
