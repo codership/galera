@@ -13,7 +13,7 @@
  * minimum space when there are few items in the queue.
  */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdio.h>
 #include <string.h>
