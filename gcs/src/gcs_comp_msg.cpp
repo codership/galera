@@ -22,7 +22,7 @@ comp_msg_size (int memb_num)
 
 /*! Allocates membership object and zeroes it */
 gcs_comp_msg_t*
-gcs_comp_msg_new (bool prim, bool bootstrap, int my_idx, int memb_num)
+gcs_comp_msg_new (bool prim, bool bootstrap, int my_idx, int memb_num, int error)
 {
     gcs_comp_msg_t* ret;
 
@@ -35,15 +35,16 @@ gcs_comp_msg_new (bool prim, bool bootstrap, int my_idx, int memb_num)
         ret->bootstrap = bootstrap;
         ret->my_idx    = my_idx;
         ret->memb_num  = memb_num;
+        ret->error     = error;
     }
 
     return ret;
 }
 
 gcs_comp_msg_t*
-gcs_comp_msg_leave ()
+gcs_comp_msg_leave (int error)
 {
-    return gcs_comp_msg_new (false, false, -1, 0);
+    return gcs_comp_msg_new (false, false, -1, 0, error);
 }
 
 /*! Destroys component message */
@@ -161,3 +162,8 @@ gcs_comp_msg_num    (const gcs_comp_msg_t* comp)
     return comp->memb_num;
 }
 
+
+int gcs_comp_msg_error(const gcs_comp_msg_t* comp)
+{
+    return comp->error;
+}
