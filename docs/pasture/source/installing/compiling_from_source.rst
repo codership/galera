@@ -1,4 +1,0 @@
-Compiling from source
-=====================
-
-TODO

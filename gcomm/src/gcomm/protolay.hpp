@@ -192,7 +192,7 @@ private:
 class gcomm::Protolay
 {
 public:
-    typedef Map<UUID, gu::datetime::Date> FenceList;
+    typedef Map<UUID, gu::datetime::Date> EvictList;
 
     virtual ~Protolay() {}
 
@@ -308,35 +308,42 @@ public:
     }
 
 
-    virtual void handle_fencing(const UUID& uuid) { }
+    virtual void handle_evict(const UUID& uuid) { }
 
-    void fence(const UUID& uuid)
+    void evict(const UUID& uuid)
     {
-        fence_list_.insert(std::make_pair(uuid, gu::datetime::Date::now()));
-        handle_fencing(uuid);
+        evict_list_.insert(std::make_pair(uuid, gu::datetime::Date::now()));
+        handle_evict(uuid);
         for (CtxList::iterator i(down_context_.begin());
              i != down_context_.end(); ++i)
         {
-            (*i)->fence(uuid);
+            (*i)->evict(uuid);
         }
     }
 
-    void unfence(const UUID& uuid)
+    void unevict(const UUID& uuid)
     {
-        fence_list_.erase(uuid);
+        evict_list_.erase(uuid);
         for (CtxList::iterator i(down_context_.begin());
              i != down_context_.end(); ++i)
         {
-            (*i)->unfence(uuid);
+            (*i)->unevict(uuid);
         }
     }
 
-    bool is_fenced(const UUID& uuid) const
+    bool is_evicted(const UUID& uuid) const
     {
-        return (fence_list_.find(uuid) != fence_list_.end());
+        if (down_context_.empty())
+        {
+            return (evict_list_.find(uuid) != evict_list_.end());
+        }
+        else
+        {
+            return (*down_context_.begin())->is_evicted(uuid);
+        }
     }
 
-    const FenceList& fence_list() const { return fence_list_; }
+    const EvictList& evict_list() const { return evict_list_; }
 
     virtual void handle_get_status(gu::Status& status) const
     { }
@@ -382,7 +389,7 @@ protected:
         conf_(conf),
         up_context_(0),
         down_context_(0),
-        fence_list_()
+        evict_list_()
     { }
 
     gu::Config& conf_;
@@ -392,7 +399,7 @@ private:
     CtxList     up_context_;
     CtxList     down_context_;
 
-    FenceList   fence_list_;
+    EvictList   evict_list_;
 
 
     Protolay (const Protolay&);

@@ -60,8 +60,9 @@ namespace gcache
         static ssize_t pad_size()
         {
             RingBuffer* rb(0);
-            // cppcheck-suppress nullPounter
+            // cppcheck-suppress nullPointer
             return (PREAMBLE_LEN * sizeof(*(rb->preamble_)) +
+                    // cppcheck-suppress nullPointer
                     HEADER_LEN   * sizeof(*(rb->header_)));
         }
 

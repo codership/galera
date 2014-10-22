@@ -1,4 +1,4 @@
-Import('env', 'arch', 'x86', 'sysname')
+Import('env', 'x86', 'sysname')
 
 libgalerautils_env = env.Clone()
 

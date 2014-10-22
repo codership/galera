@@ -158,7 +158,8 @@ struct gcs_conn
     gcs_core_t*  core; // the context that is returned by
                        // the core group communication system
 
-    int close_count; // how many gcs_close has been called.
+    int inner_close_count; // how many times _close has been called.
+    int outer_close_count; // how many times gcs_close has been called.
 };
 
 // Oh C++, where art thou?
@@ -1098,6 +1099,71 @@ _check_recv_queue_growth (gcs_conn_t* conn, ssize_t size)
     }
 }
 
+static long
+_close(gcs_conn_t* conn, bool join_recv_thread)
+{
+    /* all possible races in connection closing should be resolved by
+     * the following call, it is thread-safe */
+
+    long ret;
+
+    if (gu_atomic_fetch_and_add(&conn->inner_close_count, 1) != 0) {
+        return -EALREADY;
+    }
+
+    if (!(ret = gcs_sm_close (conn->sm))) {
+        // we ignore return value on purpose. the reason is
+        // we can not tell why self-leave message is generated.
+        // there are two possible reasons.
+        // 1. gcs_core_close is called.
+        // 2. GCommConn::run() caught exception.
+        (void)gcs_core_close (conn->core);
+
+        if (join_recv_thread)
+        {
+            /* if called from gcs_close(), we need to synchronize with
+               gcs_recv_thread at this point */
+            if ((ret = gu_thread_join (conn->recv_thread, NULL))) {
+                gu_error ("Failed to join recv_thread(): %d (%s)",
+                          -ret, strerror(-ret));
+            }
+            else {
+                gu_info ("recv_thread() joined.");
+            }
+            /* recv_thread() is supposed to set state to CLOSED when exiting */
+            assert (GCS_CONN_CLOSED == conn->state);
+        }
+
+        gu_info ("Closing replication queue.");
+        struct gcs_repl_act** act_ptr;
+        /* At this point (state == CLOSED) no new threads should be able to
+         * queue for repl (check gcs_repl()), and recv thread is joined, so no
+         * new actions will be received. Abort threads that are still waiting
+         * in repl queue */
+        while ((act_ptr =
+                (struct gcs_repl_act**)gcs_fifo_lite_get_head (conn->repl_q))) {
+            struct gcs_repl_act* act = *act_ptr;
+            gcs_fifo_lite_pop_head (conn->repl_q);
+
+            /* This will wake up repl threads in repl_q -
+             * they'll quit on their own,
+             * they don't depend on the conn object after waking */
+            gu_mutex_lock   (&act->wait_mutex);
+            gu_cond_signal  (&act->wait_cond);
+            gu_mutex_unlock (&act->wait_mutex);
+        }
+        gcs_fifo_lite_close (conn->repl_q);
+
+        /* wake all gcs_recv() threads () */
+        // FIXME: this can block waiting for applicaiton threads to fetch all
+        // items. In certain situations this can block forever. Ticket #113
+        gu_info ("Closing slave action queue.");
+        gu_fifo_close (conn->recv_q);
+    }
+
+    return ret;
+}
+
 /*
  * gcs_recv_thread() receives whatever actions arrive from group,
  * and performs necessary actions based on action type.
@@ -1110,7 +1176,7 @@ static void *gcs_recv_thread (void *arg)
     // To avoid race between gcs_open() and the following state check in while()
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    gcs_sm_enter(conn->sm, &tmp_cond, false);
+    gcs_sm_enter(conn->sm, &tmp_cond, false, true);
     gcs_sm_leave(conn->sm);
     gu_cond_destroy (&tmp_cond);
 
@@ -1255,7 +1321,15 @@ static void *gcs_recv_thread (void *arg)
         }
     }
 
-    if (ret > 0) ret = 0;
+    if (ret > 0) {
+        ret = 0;
+    }
+    else if (ret < 0)
+    {
+        /* In case of error call _close() to release repl_q waiters. */
+        (void)_close(conn, false);
+        gcs_shift_state (conn, GCS_CONN_CLOSED);
+    }
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
 }
@@ -1271,7 +1345,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
 
-    if ((ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
+    if ((ret = gcs_sm_enter (conn->sm, &tmp_cond, false, true)))
     {
         gu_error("Failed to enter send monitor: %d (%s)", ret, strerror(-ret));
         return ret;
@@ -1289,7 +1363,8 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
                 gu_fifo_open(conn->recv_q);
                 gcs_shift_state (conn, GCS_CONN_OPEN);
                 gu_info ("Opened channel '%s'", channel);
-                conn->close_count = 0;
+                conn->inner_close_count = 0;
+                conn->outer_close_count = 0;
                 goto out;
             }
             else {
@@ -1321,24 +1396,17 @@ out:
  * on it. */
 long gcs_close (gcs_conn_t *conn)
 {
-    /* all possible races in connection closing should be resolved by
-     * the following call, it is thread-safe */
-
     long ret;
 
-    if (gu_atomic_fetch_and_add(&conn->close_count, 1) != 0) {
+    if (gu_atomic_fetch_and_add(&conn->outer_close_count, 1) != 0) {
         return -EALREADY;
     }
 
-    if (!(ret = gcs_sm_close (conn->sm))) {
-        // we ignore return value on purpose. the reason is
-        // we can not tell why self-leave message is generated.
-        // there are two possible reasons.
-        // 1. gcs_core_close is called.
-        // 2. GCommConn::run() caught exception.
-        (void)gcs_core_close (conn->core);
-
-        /* here we synchronize with SELF_LEAVE event caused by gcs_core_close */
+    if ((ret = _close(conn, true)) == -EALREADY)
+    {
+        gu_info("recv_thread() already closing, joining thread.");
+        /* _close() has already been called by gcs_recv_thread() and it
+           is taking care of cleanup, just join the thread */
         if ((ret = gu_thread_join (conn->recv_thread, NULL))) {
             gu_error ("Failed to join recv_thread(): %d (%s)",
                       -ret, strerror(-ret));
@@ -1346,37 +1414,9 @@ long gcs_close (gcs_conn_t *conn)
         else {
             gu_info ("recv_thread() joined.");
         }
-
-        /* recv_thread() is supposed to set state to CLOSED when exiting */
-        assert (GCS_CONN_CLOSED == conn->state);
-
-        gu_info ("Closing replication queue.");
-        struct gcs_repl_act** act_ptr;
-        /* At this point (state == CLOSED) no new threads should be able to
-         * queue for repl (check gcs_repl()), and recv thread is joined, so no
-         * new actions will be received. Abort threads that are still waiting
-         * in repl queue */
-        while ((act_ptr =
-                (struct gcs_repl_act**)gcs_fifo_lite_get_head (conn->repl_q))) {
-            struct gcs_repl_act* act = *act_ptr;
-            gcs_fifo_lite_pop_head (conn->repl_q);
-
-            /* This will wake up repl threads in repl_q -
-             * they'll quit on their own,
-             * they don't depend on the conn object after waking */
-            gu_mutex_lock   (&act->wait_mutex);
-            gu_cond_signal  (&act->wait_cond);
-            gu_mutex_unlock (&act->wait_mutex);
-        }
-        gcs_fifo_lite_close (conn->repl_q);
-
-        /* wake all gcs_recv() threads () */
-        // FIXME: this can block waiting for applicaiton threads to fetch all
-        // items. In certain situations this can block forever. Ticket #113
-        gu_info ("Closing slave action queue.");
-        gu_fifo_close (conn->recv_q);
     }
-
+    /* recv_thread() is supposed to set state to CLOSED when exiting */
+    assert (GCS_CONN_CLOSED == conn->state);
     return ret;
 }
 
@@ -1388,7 +1428,7 @@ long gcs_destroy (gcs_conn_t *conn)
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
 
-    if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false))) // need an error here
+    if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false, true))) // need an error here
     {
         if (GCS_CONN_CLOSED != conn->state)
         {
@@ -1456,7 +1496,7 @@ long gcs_sendv (gcs_conn_t*          const conn,
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
 
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled, true)))
     {
         while ((GCS_CONN_OPEN >= conn->state) &&
                (ret = gcs_core_send (conn->core, act_bufs,
@@ -1513,7 +1553,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
         // 1. serializes gcs_core_send() access between gcs_repl() and
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
-        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled)))
+        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled, true)))
         {
             struct gcs_repl_act** act_ptr;
 
@@ -1563,7 +1603,13 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
             if (ret >= 0) {
                 gu_cond_wait (&repl_act.wait_cond, &repl_act.wait_mutex);
 #ifndef GCS_FOR_GARB
-                assert (act->buf != 0);
+                /* assert (act->buf != 0); */
+                if (act->buf == 0)
+                {
+                    /* Recv thread purged repl_q before action was delivered */
+                    ret = -ENOTCONN;
+                    goto out;
+                }
 #else
                 assert (act->buf == 0);
 #endif /* GCS_FOR_GARB */
@@ -1594,6 +1640,9 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 }
             }
         }
+#ifndef GCS_FOR_GARB
+    out:
+#endif /* GCS_FOR_GARB */
         gu_mutex_unlock  (&repl_act.wait_mutex);
     }
     gu_mutex_destroy (&repl_act.wait_mutex);
@@ -1855,7 +1904,7 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    long ret = gcs_sm_enter (conn->sm, &cond, false);
+    long ret = gcs_sm_enter (conn->sm, &cond, false, false);
 
     if (!ret) {
         ret = gcs_core_set_last_applied (conn->core, seqno);

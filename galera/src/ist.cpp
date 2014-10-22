@@ -851,7 +851,6 @@ void galera::ist::AsyncSenderMap::remove(AsyncSender* as, wsrep_seqno_t seqno)
         throw gu::NotFound();
     }
     senders_.erase(i);
-    gcs_.join(seqno);
 }
 
 

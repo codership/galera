@@ -123,7 +123,7 @@ void gcomm::pc::Proto::send_state()
 {
     log_debug << self_id() << " sending state";
 
-    StateMessage pcs(version_);
+    StateMessage pcs(current_view_.version());
 
     NodeMap& im(pcs.node_map());
 
@@ -134,6 +134,10 @@ void gcomm::pc::Proto::send_state()
         if (current_view_.is_member(NodeMap::key(i)) == true)
         {
             local_state.set_to_seq(to_seq());
+        }
+        if (is_evicted(NodeMap::key(i)) == true)
+        {
+            local_state.set_evicted(true);
         }
         im.insert_unique(std::make_pair(NodeMap::key(i), local_state));
     }
@@ -156,7 +160,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
     gcomm_assert(bootstrap == false || weight == -1);
     log_debug << self_id() << " send install";
 
-    InstallMessage pci(version_);
+    InstallMessage pci(current_view_.version());
 
     NodeMap& im(pci.node_map());
 
@@ -205,7 +209,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
 
 void gcomm::pc::Proto::deliver_view(bool bootstrap)
 {
-    View v(pc_view_.id(), bootstrap);
+    View v(pc_view_.version(), pc_view_.id(), bootstrap);
 
     for (NodeMap::const_iterator i = instances_.begin();
          i != instances_.end(); ++i)
@@ -222,7 +226,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
     }
 
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-    log_debug << v;
+    log_info << v;
     send_up(Datagram(), um);
     set_stable_view(v);
 
@@ -290,7 +294,8 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
 
 void gcomm::pc::Proto::mark_non_prim()
 {
-    pc_view_ = ViewId(V_NON_PRIM, current_view_.id());
+    pc_view_ = View(current_view_.version(),
+                    ViewId(V_NON_PRIM, current_view_.id()));
     for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
          ++i)
     {
@@ -345,7 +350,8 @@ void gcomm::pc::Proto::shift_to(const State s)
         break;
     case S_PRIM:
     {
-        pc_view_ = ViewId(V_PRIM, current_view_.id());
+        pc_view_ = View(current_view_.version(),
+                        ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
              ++i)
         {
@@ -508,6 +514,7 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     gcomm_assert(view.id().type() == V_TRANS);
     gcomm_assert(view.id().uuid() == current_view_.id().uuid() &&
                  view.id().seq()  == current_view_.id().seq());
+    gcomm_assert(view.version() == current_view_.version());
 
     log_debug << self_id() << " \n\n current view " << current_view_
               << "\n\n next view " << view
@@ -560,6 +567,17 @@ void gcomm::pc::Proto::handle_reg(const View& view)
                        << current_view_.id()
                        << " new view "
                        << view.id();
+    }
+
+    if (current_view_.version() < view.version())
+    {
+        log_info << "PC protocol upgrade " << current_view_.version()
+                 << " -> " << view.version();
+    }
+    else if (current_view_.version() > view.version())
+    {
+        log_info << "PC protocol downgrade " << current_view_.version()
+                 << " -> " << view.version();
     }
 
     current_view_ = view;
@@ -820,7 +838,7 @@ bool gcomm::pc::Proto::is_prim() const
         gcomm_assert(last_prim == ViewId(V_NON_PRIM))
             << last_prim << " != " << ViewId(V_NON_PRIM);
 
-        // first determine if there are any nodes still in unknown state
+        // First determine if there are any nodes still in unknown state.
         std::set<UUID> un;
         for (NodeMap::const_iterator i(instances_.begin());
              i != instances_.end(); ++i)
@@ -843,8 +861,9 @@ bool gcomm::pc::Proto::is_prim() const
             return false;
         }
 
-
+        // Collect last prim members and evicted from state messages
         MultiMap<ViewId, UUID> last_prim_uuids;
+        std::set<UUID> evicted;
 
         for (SMMap::const_iterator i = state_msgs_.begin();
              i != state_msgs_.end();
@@ -867,6 +886,10 @@ bool gcomm::pc::Proto::is_prim() const
                 {
                     last_prim_uuids.insert(std::make_pair(inst.last_prim(), uuid));
                 }
+                if (inst.evicted() == true)
+                {
+                    evicted.insert(uuid);
+                }
             }
         }
 
@@ -876,27 +899,38 @@ bool gcomm::pc::Proto::is_prim() const
             return false;
         }
 
-        const ViewId greatest_view_id(last_prim_uuids.rbegin()->first);
+        // Construct greatest view set of UUIDs ignoring evicted ones
         std::set<UUID> greatest_view;
+        // Get range of UUIDs in greatest views
+        const ViewId greatest_view_id(last_prim_uuids.rbegin()->first);
         std::pair<MultiMap<ViewId, UUID>::const_iterator,
                   MultiMap<ViewId, UUID>::const_iterator> gvi =
             last_prim_uuids.equal_range(greatest_view_id);
+        // Iterate over range and insert into greatest view if not evicted
         for (MultiMap<ViewId, UUID>::const_iterator i = gvi.first;
              i != gvi.second; ++i)
         {
-            std::pair<std::set<UUID>::iterator, bool>
-                iret = greatest_view.insert(
-                    MultiMap<ViewId, UUID>::value(i));
-            gcomm_assert(iret.second == true);
+            if (evicted.find(MultiMap<ViewId, UUID>::value(i)) == evicted.end())
+            {
+                std::pair<std::set<UUID>::iterator, bool>
+                    iret = greatest_view.insert(
+                        MultiMap<ViewId, UUID>::value(i));
+                // Assert that inserted UUID was unique
+                gcomm_assert(iret.second == true);
+            }
         }
         log_debug << self_id()
                   << " greatest view id " << greatest_view_id;
+        // Compute list of present view members
         std::set<UUID> present;
         for (NodeList::const_iterator i = current_view_.members().begin();
              i != current_view_.members().end(); ++i)
         {
             present.insert(NodeList::key(i));
         }
+        // Compute intersection of present and greatest view. If the
+        // intersection size is the same as greatest view size,
+        // it is safe to rebootstrap PC.
         std::set<UUID> intersection;
         set_intersection(greatest_view.begin(), greatest_view.end(),
                          present.begin(), present.end(),
@@ -1270,7 +1304,8 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
     }
     else
     {
-        View new_pc_view(ViewId(V_PRIM, current_view_.id()));
+        View new_pc_view(current_view_.version(),
+                         ViewId(V_PRIM, current_view_.id()));
         for (NodeMap::iterator i(instances_.begin()); i != instances_.end();
              ++i)
         {
@@ -1366,6 +1401,10 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
                          const Datagram&    rb,
                          const ProtoUpMeta& um)
 {
+    // EVS provides send view delivery, so this assertion
+    // should always hold.
+    assert(msg.version() == current_view_.version());
+
     enum Verdict
     {
         ACCEPT,
@@ -1382,7 +1421,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
         {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL
 
-        {  FAIL,   FAIL,    ACCEPT,     ACCEPT  },  // PRIM
+        {  FAIL,   FAIL,    ACCEPT,   ACCEPT  },  // PRIM
 
         {  FAIL,   DROP,    ACCEPT,   ACCEPT  },  // TRANS
 
@@ -1399,8 +1438,8 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
     }
     else if (verdict == DROP)
     {
-        log_warn << "Dropping input, message " << msg.to_string()
-                 << " in state " << to_string(state());
+        log_debug << "Dropping input, message " << msg.to_string()
+                  << " in state " << to_string(state());
         return;
     }
 
@@ -1484,17 +1523,31 @@ void gcomm::pc::Proto::handle_up(const void* cid,
 
 int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    if (gu_unlikely(state() != S_PRIM))
+    switch (state())
     {
+    case S_CLOSED:
+    case S_NON_PRIM:
+        // Not connected to primary component
+        return ENOTCONN;
+    case S_STATES_EXCH:
+    case S_INSTALL:
+    case S_TRANS:
+        // Transient error
         return EAGAIN;
+    case S_PRIM:
+        // Allowed to send, fall through
+        break;
+    case S_MAX:
+        gu_throw_fatal << "invalid state " << state();
     }
+
     if (gu_unlikely(dg.len() > mtu()))
     {
         return EMSGSIZE;
     }
 
     uint32_t    seq(dm.order() == O_SAFE ? last_sent_seq_ + 1 : last_sent_seq_);
-    UserMessage um(version_, seq);
+    UserMessage um(current_view_.version(), seq);
 
     push_header(um, dg);
     if (checksum_ == true)
