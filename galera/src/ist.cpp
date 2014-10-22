@@ -8,7 +8,6 @@
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
 
-#include "GCache.hpp"
 #include "galera_common.hpp"
 #include <boost/bind.hpp>
 #include <fstream>
@@ -165,7 +164,8 @@ galera::ist::register_params(gu::Config& conf)
 }
 
 galera::ist::Receiver::Receiver(gu::Config&           conf,
-                                TrxHandle::SlavePool& sp,
+                                TrxHandleSlave::Pool& sp,
+                                gcache::GCache&       gc,
                                 const char*           addr)
     :
     io_service_   (),
@@ -178,6 +178,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     last_seqno_   (-1),
     conf_         (conf),
     trx_pool_     (sp),
+    gcache_       (gc),
     thread_       (),
     error_code_   (0),
     version_      (-1),
@@ -389,8 +390,8 @@ void galera::ist::Receiver::run()
     int ec(0);
     try
     {
-        Proto p(trx_pool_, version_,
-                conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        bool const keep_keys(conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        Proto p(trx_pool_, gcache_, version_, keep_keys);
 
         if (use_ssl_ == true)
         {
@@ -406,7 +407,7 @@ void galera::ist::Receiver::run()
         }
         while (true)
         {
-            TrxHandle* trx;
+            TrxHandleSlave* trx;
             if (use_ssl_ == true)
             {
                 trx = p.recv_trx(ssl_stream);
@@ -494,7 +495,7 @@ void galera::ist::Receiver::ready()
     cond_.signal();
 }
 
-int galera::ist::Receiver::recv(TrxHandle** trx)
+int galera::ist::Receiver::recv(TrxHandleSlave** trx)
 {
     Consumer cons;
     gu::Lock lock(mutex_);
@@ -586,8 +587,9 @@ void galera::ist::Receiver::interrupt()
             ssl_stream.lowest_layer().connect(*i);
             set_fd_options(ssl_stream.lowest_layer());
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p(trx_pool_, version_,
-                    conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+            Proto p(trx_pool_,
+                    gcache_,
+                    version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(ssl_stream);
             p.send_ctrl(ssl_stream, Ctrl::C_EOF);
             p.recv_ctrl(ssl_stream);
@@ -597,8 +599,9 @@ void galera::ist::Receiver::interrupt()
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
             set_fd_options(socket);
-            Proto p(trx_pool_, version_,
-                    conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+            Proto p(trx_pool_,
+                    gcache_,
+                    version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(socket);
             p.send_ctrl(socket, Ctrl::C_EOF);
             p.recv_ctrl(socket);
@@ -682,9 +685,10 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
     }
     try
     {
-        TrxHandle::SlavePool unused(1, 0, "");
-        Proto p(unused, version_,
-                conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        TrxHandleSlave::Pool unused(1, 0, "");
+        Proto p(unused,
+                gcache_,
+                version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
 
         if (use_ssl_ == true)

@@ -35,30 +35,8 @@ namespace galera
     {
     public:
 
-        /* signed int here is to detect SIZE < sizeof(TrxHandle) */
-        static int const LOCAL_STORAGE_SIZE = GU_PAGE_SIZE * 2; // 8K
-
-        struct Params
-        {
-            std::string     working_dir_;
-            int             version_;
-            KeySet::Version key_format_;
-            int             max_write_set_size_;
-
-            Params (const std::string& wdir, int ver, KeySet::Version kformat,
-                    int max_write_set_size = WriteSetNG::MAX_SIZE) :
-                working_dir_(wdir), version_(ver), key_format_(kformat),
-                max_write_set_size_(max_write_set_size) {}
-
-            Params () :
-                working_dir_(), version_(), key_format_(), max_write_set_size_()
-            {}
-        };
-
-        static const Params Defaults;
-
         enum Flags
-        {
+      {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
             F_OOC         = 1 << 2,
@@ -158,6 +136,8 @@ namespace galera
             S_ROLLED_BACK
         } State;
 
+        static void print_state(std::ostream&, State);
+
         class Transition
         {
         public:
@@ -190,69 +170,169 @@ namespace galera
         };
 
         typedef FSM<State, Transition> Fsm;
-        static Fsm::TransMap trans_map_;
+        static Fsm::TransMap trans_map_master;
+        static Fsm::TransMap trans_map_slave;
 
-        // Placeholder for message authentication code
-        class Mac
-        {
-        public:
-            Mac() { }
-            ~Mac() { }
-
-            size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)
-                const;
-            size_t unserialize(const gu::byte_t* buf, size_t buflen,
-                               size_t offset);
-            size_t serial_size() const;
-        };
-
-        /* slave trx factory */
-        typedef gu::MemPool<true> SlavePool;
-        static TrxHandle* New(SlavePool& pool)
-        {
-            assert(pool.buf_size() == sizeof(TrxHandle));
-
-            void* const buf(pool.acquire());
-
-            return new(buf) TrxHandle(pool);
-        }
-
-        /* local trx factory */
-        typedef gu::MemPool<true> LocalPool;
-        static TrxHandle* New(LocalPool&          pool,
-                              const Params&       params,
-                              const wsrep_uuid_t& source_id,
-                              wsrep_conn_id_t     conn_id,
-                              wsrep_trx_id_t      trx_id)
-        {
-            size_t const buf_size(pool.buf_size());
-
-            assert(buf_size >= (sizeof(TrxHandle) + sizeof(WriteSetOut)));
-
-            void* const buf(pool.acquire());
-
-            return new(buf)
-                TrxHandle(pool, params, source_id, conn_id, trx_id, buf_size);
-        }
-
-        void lock()   const { mutex_.lock();   }
-        void unlock() const { mutex_.unlock(); }
+        virtual void lock()   const = 0;
+#ifndef NDEBUG
+        virtual bool locked() const = 0;
+#endif
+        virtual void unlock() const = 0;
 
         int  version()     const { return version_; }
-        bool new_version() const { return version() >= WS_NG_VERSION; }
 
         const wsrep_uuid_t& source_id() const { return source_id_; }
         wsrep_trx_id_t      trx_id()    const { return trx_id_;    }
-        wsrep_conn_id_t     conn_id()   const { return conn_id_;   }
+        bool                is_local()  const { return local_; }
 
+        wsrep_conn_id_t conn_id() const { return conn_id_;   }
         void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
 
-        bool is_local()     const { return local_; }
+        State state() const { return state_(); }
+        void  set_state(State state)
+        {
+#ifndef NDEBUG
+//            print_set_state(state);
+            assert(locked());
+#endif
+            state_.shift_to(state);
+        }
+
+        void print_set_state(State state) const;
+
+        uint32_t flags() const { return write_set_flags_; }
+        void set_flags(uint32_t flags) { write_set_flags_ = flags; }
+
+        uint64_t timestamp() const { return timestamp_; }
+
+        virtual void   ref()   = 0;
+        virtual void   unref() = 0;
+
+        bool local() const { return local_; }
+
+        virtual int refcnt() const  = 0;
+
+        void print(std::ostream& os) const;
+
+        virtual ~TrxHandle() {}
+
+    protected:
+
+        /* slave trx ctor */
+        explicit
+        TrxHandle()
+            :
+            source_id_         (WSREP_UUID_UNDEFINED),
+            conn_id_           (-1),
+            trx_id_            (-1),
+            state_             (&trans_map_slave, S_REPLICATING),
+            timestamp_         (),
+            version_           (-1),
+            write_set_flags_   (0),
+            local_             (false)
+        {}
+
+        /* local trx ctor */
+        TrxHandle(const wsrep_uuid_t& source_id,
+                  wsrep_conn_id_t     conn_id,
+                  wsrep_trx_id_t      trx_id,
+                  int                 version)
+            :
+            source_id_         (source_id),
+            conn_id_           (conn_id),
+            trx_id_            (trx_id),
+            state_             (&trans_map_master, S_EXECUTING),
+            timestamp_         (gu_time_calendar()),
+            version_           (version),
+            write_set_flags_   (0),
+            local_             (true)
+        {}
+
+        wsrep_uuid_t           source_id_;
+        wsrep_conn_id_t        conn_id_;
+        wsrep_trx_id_t         trx_id_;
+        FSM<State, Transition> state_;
+        int64_t                timestamp_;
+        int                    version_;
+        uint32_t               write_set_flags_;
+        bool                   local_;
+
+    private:
+
+        TrxHandle(const TrxHandle&);
+        void operator=(const TrxHandle& other);
+
+        friend class Wsdb;
+        friend class Certification;
+
+    }; /* class TrxHandle */
+
+    std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
+    std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
+
+    class TrxHandleSlave : public TrxHandle
+    {
+    public:
+
+        typedef gu::MemPool<true> Pool;
+        static TrxHandleSlave* New(Pool& pool)
+        {
+            assert(pool.buf_size() == sizeof(TrxHandleSlave));
+
+            void* const buf(pool.acquire());
+
+        return new(buf) TrxHandleSlave(pool, buf);
+        }
+
+        void lock()   const { mutex_.lock(); }
+#ifndef NDEBUG
+        bool locked() const { return mutex_.locked(); }
+#endif /* NDEBUG */
+        void unlock() const
+        {
+            assert(locked());
+            mutex_.unlock();
+        }
+
+        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
+
+        void verify_checksum() const /* throws */
+        {
+            write_set_in_.verify_checksum();
+        }
+
+        void update_stats(gu::Atomic<long long>& kc,
+                          gu::Atomic<long long>& kb,
+                          gu::Atomic<long long>& db,
+                          gu::Atomic<long long>& ub)
+        {
+            assert(version() >= WS_NG_VERSION);
+
+            kc += write_set_in_.keyset().count();
+            kb += write_set_in_.keyset().size();
+            db += write_set_in_.dataset().size();
+            ub += write_set_in_.unrdset().size();
+        }
+
+        void set_received (const void*   action,
+                           wsrep_seqno_t seqno_l,
+                           wsrep_seqno_t seqno_g)
+        {
+            action_       = action;
+            local_seqno_  = seqno_l;
+            global_seqno_ = seqno_g;
+
+            if (flags() & F_PREORDERED)
+            {
+                last_seen_seqno_ = global_seqno_ - 1;
+            }
+        }
+
         bool is_certified() const { return certified_; }
 
         void mark_certified()
         {
-            if (new_version())
+            if (write_set_in_.size() > 0)
             {
                 int dw(0);
 
@@ -267,42 +347,22 @@ namespace galera
             certified_ = true;
         }
 
-        bool is_committed() const { return committed_; }
-        void mark_committed() { committed_ = true; }
-
-        void set_received (const void*   action,
-                           wsrep_seqno_t seqno_l,
-                           wsrep_seqno_t seqno_g)
-        {
-            action_       = action;
-            local_seqno_  = seqno_l;
-            global_seqno_ = seqno_g;
-            if (write_set_flags_ & F_PREORDERED)
-            {
-                last_seen_seqno_ = global_seqno_ - 1;
-            }
-        }
-
-        void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
-        {
-            assert (last_seen_seqno >= 0);
-            if (new_version())
-                write_set_out().set_last_seen(last_seen_seqno);
-            last_seen_seqno_ = last_seen_seqno;
-        }
-
         void set_depends_seqno(wsrep_seqno_t seqno_lt)
         {
             depends_seqno_ = seqno_lt;
         }
 
-        State state() const { return state_(); }
-        void set_state(State state) { state_.shift_to(state); }
+        void apply(void*                   recv_ctx,
+                   wsrep_apply_cb_t        apply_cb,
+                   const wsrep_trx_meta_t& meta) const /* throws */;
 
-        long gcs_handle() const { return gcs_handle_; }
-        void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
+        bool is_committed() const { return committed_; }
+        void mark_committed()     { committed_ = true; }
 
-        const void* action() const { return action_; }
+        void unordered(void*                recv_ctx,
+                       wsrep_unordered_cb_t apply_cb) const;
+
+        const void*   action()          const { return action_; }
 
         wsrep_seqno_t local_seqno()     const { return local_seqno_; }
 
@@ -312,76 +372,212 @@ namespace galera
 
         wsrep_seqno_t depends_seqno()   const { return depends_seqno_; }
 
-        uint32_t      flags()           const { return write_set_flags_; }
+        const WriteSetIn&  write_set_in () const { return write_set_in_;  }
+
+        bool   exit_loop() const { return exit_loop_; }
+        void   set_exit_loop(bool x) { exit_loop_ |= x; }
+
+        typedef gu::UnorderedMap<KeyEntryOS*,
+                                 std::pair<bool, bool>,
+                                 KeyEntryPtrHash,
+                                 KeyEntryPtrEqualAll> CertKeySet;
+
+        CertKeySet& cert_keys() { return cert_keys_; }
+
+        void print(std::ostream& os) const;
+
+        void ref()   { ++refcnt_; }
+        void unref()
+        {
+            if (refcnt_.sub_and_fetch(1) == 0) // delete and return to pool
+            {
+                assert(!locked());
+
+                void* const buf(buf_);
+                gu::MemPool<true>& mp(mem_pool_);
+
+#if 1
+                if (buf == static_cast<void*>(this))
+                {
+                    this->~TrxHandleSlave();
+                }
+                else
+                {
+                    destroy_local(buf);
+                }
+#else
+                (static_cast<TrxHandle*>(buf))->~TrxHandle();
+#endif
+
+                mp.recycle(buf);
+            }
+        }
+
+        int refcnt() const { return refcnt_(); }
+
+    protected:
+
+        explicit
+        TrxHandleSlave(gu::MemPool<true>& mp, void* buf) :
+            TrxHandle          (),
+            local_seqno_       (WSREP_SEQNO_UNDEFINED),
+            global_seqno_      (WSREP_SEQNO_UNDEFINED),
+            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
+            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
+            mem_pool_          (mp),
+            write_set_in_      (),
+            cert_keys_         (),
+            mutex_             (),
+            buf_               (buf),
+            action_            (0),
+            refcnt_            (1),
+            certified_         (false),
+            committed_         (false),
+            exit_loop_         (false)
+        {
+//            lock();
+        }
+
+        friend class TrxHandleMaster;
+
+    private:
+
+        wsrep_seqno_t          local_seqno_;
+        wsrep_seqno_t          global_seqno_;
+        wsrep_seqno_t          last_seen_seqno_;
+        wsrep_seqno_t          depends_seqno_;
+        gu::MemPool<true>&     mem_pool_;
+        WriteSetIn             write_set_in_;
+        CertKeySet             cert_keys_;
+        gu::Mutex mutable      mutex_;
+        void* const            buf_;
+        const void*            action_;
+        gu::Atomic<int>        refcnt_;
+        bool                   certified_;
+        bool                   committed_;
+        bool                   exit_loop_;
+
+        TrxHandleSlave(const TrxHandleSlave&);
+        void operator=(const TrxHandleSlave& other);
+
+        ~TrxHandleSlave() { }
+
+        void destroy_local(void* ptr);
+
+    }; /* TrxHandleSlave */
+
+    std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& trx);
+
+    class TrxHandleMaster : public TrxHandle
+    {
+    public:
+        /* signed int here is to detect SIZE < sizeof(TrxHandle) */
+        static int const LOCAL_STORAGE_SIZE = GU_PAGE_SIZE * 2; // 8K
+
+        struct Params
+        {
+            std::string     working_dir_;
+            int             version_;
+            KeySet::Version key_format_;
+            int             max_write_set_size_;
+
+            Params (const std::string& wdir, int ver, KeySet::Version kformat,
+                    int max_write_set_size = WriteSetNG::MAX_SIZE) :
+                working_dir_(wdir), version_(ver), key_format_(kformat),
+                max_write_set_size_(max_write_set_size) {}
+
+            Params () :
+                working_dir_(), version_(), key_format_(), max_write_set_size_()
+            {}
+        };
+
+        static const Params Defaults;
+
+        typedef gu::MemPool<true> Pool;
+        static TrxHandleMaster* New(Pool&               pool,
+                                    const Params&       params,
+                                    const wsrep_uuid_t& source_id,
+                                    wsrep_conn_id_t     conn_id,
+                                    wsrep_trx_id_t      trx_id)
+        {
+            size_t const buf_size(pool.buf_size());
+
+            assert(buf_size >= (sizeof(TrxHandleMaster) + sizeof(WriteSetOut)));
+
+            void* const buf(pool.acquire());
+
+            return new(buf) TrxHandleMaster(pool, params,
+                                            source_id, conn_id, trx_id,
+                                            buf_size);
+        }
+
+        void lock()   const
+        {
+            assert(repl_.size() > 0);
+            repl_.back()->lock();
+        }
+
+#ifndef NDEBUG
+        bool locked() const { return repl_.back()->locked(); }
+#endif /* NDEBUG */
+
+        void unlock() const
+        {
+            assert(repl_.size() > 0);
+            assert(locked());
+            repl_.back()->unlock();
+        }
+
+        void set_state(TrxHandle::State const s)
+        {
+            TrxHandle::set_state(s);
+            if (gu_unlikely(TrxHandle::S_MUST_ABORT == s))
+            {
+                if (tr_.state() != s) tr_.set_state(s);
+            }
+        }
+
+        long gcs_handle() const { return gcs_handle_; }
+        void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
 
         void set_flags(uint32_t flags)
         {
-            write_set_flags_ = flags;
+            TrxHandle::set_flags(flags);
 
-            if (new_version())
-            {
-                uint16_t ws_flags(flags & 0x07);
-                if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
-                if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
-                write_set_out().set_flags(ws_flags);
-            }
+            uint16_t ws_flags(flags & 0x07);
+            if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
+            if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
+            write_set_out().set_flags(ws_flags);
         }
 
         void append_key(const KeyData& key)
         {
             /*! protection against protocol change during trx lifetime */
-            if (key.proto_ver != version_)
+            if (key.proto_ver != version())
             {
                 gu_throw_error(EINVAL) << "key version '" << key.proto_ver
                                        << "' does not match to trx version' "
-                                       << version_ << "'";
+                                       << version() << "'";
             }
 
-            if (new_version())
-            {
-                write_set_out().append_key(key);
-            }
-            else
-            {
-                write_set_.append_key(key);
-            }
+            write_set_out().append_key(key);
         }
 
         void append_data(const void* data, const size_t data_len,
                          wsrep_data_type_t type, bool store)
         {
-            if (new_version())
+            switch (type)
             {
-                switch (type)
-                {
-                case WSREP_DATA_ORDERED:
-                    write_set_out().append_data(data, data_len, store);
-                    break;
-                case WSREP_DATA_UNORDERED:
-                    write_set_out().append_unordered(data, data_len, store);
-                    break;
-                case WSREP_DATA_ANNOTATION:
-                    write_set_out().append_annotation(data, data_len, store);
-                    break;
-                }
-            }
-            else
-            {
-                switch (type)
-                {
-                case WSREP_DATA_ORDERED:
-                    write_set_.append_data(data, data_len);
-                    break;
-                case WSREP_DATA_UNORDERED:
-                    // just ignore unordered for compatibility with
-                    // previous versions
-                    break;
-                case WSREP_DATA_ANNOTATION:
-                    append_annotation(reinterpret_cast<const gu::byte_t*>(data),
-                                      data_len);
-                    break;
-                }
-            }
+            case WSREP_DATA_ORDERED:
+                write_set_out().append_data(data, data_len, store);
+                break;
+            case WSREP_DATA_UNORDERED:
+                write_set_out().append_unordered(data, data_len, store);
+                break;
+            case WSREP_DATA_ANNOTATION:
+                write_set_out().append_annotation(data, data_len, store);
+                break;
+            };
         }
 
         static const size_t max_annotation_size_ = (1 << 16);
@@ -393,59 +589,14 @@ namespace galera
             annotation_.insert(annotation_.end(), buf, buf + buf_len);
         }
 
-        const gu::Buffer& annotation() const { return annotation_; }
+        const gu::Buffer& annotation()  const { return annotation_; }
 
-        const WriteSet& write_set() const { return write_set_; }
-
-        size_t prepare_write_set_collection()
-        {
-            if (new_version()) assert(0);
-
-            size_t offset;
-            if (write_set_collection_.empty() == true)
-            {
-                offset = serial_size();
-                write_set_collection_.resize(offset);
-            }
-            else
-            {
-                offset = write_set_collection_.size();
-            }
-            (void)serialize(&write_set_collection_[0], offset, 0);
-            return offset;
-        }
-
-        void append_write_set(const void* data, size_t data_len)
-        {
-            if (new_version()) assert(0);
-
-            const size_t offset(prepare_write_set_collection());
-            write_set_collection_.resize(offset + data_len);
-            std::copy(reinterpret_cast<const gu::byte_t*>(data),
-                      reinterpret_cast<const gu::byte_t*>(data) + data_len,
-                      &write_set_collection_[0] + offset);
-        }
-
-        void append_write_set(const gu::Buffer& ws)
-        {
-            if (new_version())
-            {
-                /* trx->unserialize() must have done all the job */
-            }
-            else
-            {
-                const size_t offset(prepare_write_set_collection());
-                write_set_collection_.resize(offset + ws.size());
-                std::copy(ws.begin(), ws.end(),
-                          &write_set_collection_[0] + offset);
-            }
-        }
 
         MappedBuffer& write_set_collection()
         {
             return write_set_collection_;
         }
-
+#if 0 //remove
         void set_write_set_buffer(const gu::byte_t* buf, size_t buf_len)
         {
             write_set_buffer_.first  = buf;
@@ -471,60 +622,65 @@ namespace galera
             }
             return write_set_buffer_;
         }
+#endif
+        const WriteSet&   write_set()   const { return write_set_; }
 
         bool empty() const
         {
-            if (new_version())
-            {
-                return write_set_out().is_empty();
-            }
-            else
-            {
-                return (write_set_.empty() == true &&
-                        write_set_collection_.size() <= serial_size());
-            }
+            return write_set_out().is_empty();
         }
 
-        void flush(size_t mem_limit)
+        void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
-            if (new_version()) { assert(0); return; }
+            assert (last_seen_seqno >= 0);
+            write_set_out().set_last_seen(last_seen_seqno);
+        }
 
-            if (write_set_.get_key_buf().size() + write_set_.get_data().size()
-                > mem_limit || mem_limit == 0)
-            {
-                gu::Buffer buf(write_set_.serial_size());
-                (void)write_set_.serialize(&buf[0], buf.size(), 0);
-                append_write_set(buf);
-                write_set_.clear();
-            }
+        /* Serializes wiriteset into a single buffer (for unit test purposes) */
+        void serialize(const wsrep_seqno_t&     last_seen,
+                       std::vector<gu::byte_t>& ret)
+        {
+            write_set_out().serialize(source_id(), conn_id(), trx_id(),
+                                      last_seen, ret);
         }
 
         void clear()
         {
-            if (new_version())
-            {
-                release_write_set_out();
-            }
-            else
-            {
-                write_set_.clear();
-                write_set_collection_.clear();
-            }
+            release_write_set_out();
         }
 
-        void   ref()   { ++refcnt_; }
-        void   unref()
+        typedef std::vector<TrxHandleSlave*> Replicated;
+
+        const Replicated& replicated() const
         {
-            if (refcnt_.sub_and_fetch(1) == 0) // delete and return to pool
-            {
-                void* const ptr(this);
-                gu::MemPool<true>& mp(mem_pool_);
-                this->~TrxHandle();
-                mp.recycle(ptr);
-            }
+            return repl_;
         }
 
-        size_t refcnt() const { return refcnt_(); }
+        wsrep_seqno_t global_seqno() const
+        {
+            if (gu_likely(repl_.size() > 0))
+                return repl_.back()->global_seqno();
+            else
+                return WSREP_SEQNO_UNDEFINED;
+        }
+
+        wsrep_seqno_t last_seen_seqno() const
+        {
+            if (gu_likely(repl_.size() > 0))
+                return repl_.back()->last_seen_seqno();
+            else
+                return WSREP_SEQNO_UNDEFINED;
+        }
+
+        void add_replicated(TrxHandleSlave* const ts)
+        {
+            assert(locked());
+            assert(ts->locked());
+            ts->ref();
+            repl_.push_back(ts);
+            // unlock previous fragment
+            if (repl_.size() > 1) repl_[repl_.size() - 2]->unlock();
+        }
 
         WriteSetOut& write_set_out()
         {
@@ -532,78 +688,10 @@ namespace galera
              * collection stage. Since it may allocate considerable resources
              * we dont't want it to linger as long as TrxHandle is needed and
              * want to destroy it ASAP. So it is located immediately after
-             * TrxHandle in the buffer allocated by TrxHandleWithStore.
-             * I'll be damned if this+1 is not sufficiently well aligned. */
-            assert(new_version());
-            if (gu_unlikely(!wso_))
-                init_write_set_out(params_,
-                                   static_cast<gu_byte_t*>(wso_buf()),
-                                   wso_buf_size_);
+             * TrxHandle in the buffer allocated by TrxHandleWithStore. */
+            if (gu_unlikely(!wso_)) init_write_set_out();
             assert(wso_);
             return *static_cast<WriteSetOut*>(wso_buf());
-        }
-        const WriteSetOut& write_set_out() const { return write_set_out(); }
-
-        const WriteSetIn&  write_set_in () const { return write_set_in_;  }
-
-        void apply(void*                   recv_ctx,
-                   wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
-
-        void unordered(void*                recv_ctx,
-                       wsrep_unordered_cb_t apply_cb) const;
-
-        void verify_checksum() const /* throws */
-        {
-            write_set_in_.verify_checksum();
-        }
-
-        void update_stats(gu::Atomic<long long>& kc,
-                          gu::Atomic<long long>& kb,
-                          gu::Atomic<long long>& db,
-                          gu::Atomic<long long>& ub)
-        {
-            assert(new_version());
-            kc += write_set_in_.keyset().count();
-            kb += write_set_in_.keyset().size();
-            db += write_set_in_.dataset().size();
-            ub += write_set_in_.unrdset().size();
-        }
-
-        bool   exit_loop() const { return exit_loop_; }
-        void   set_exit_loop(bool x) { exit_loop_ |= x; }
-
-        typedef gu::UnorderedMap<KeyEntryOS*,
-                                 std::pair<bool, bool>,
-                                 KeyEntryPtrHash,
-                                 KeyEntryPtrEqualAll> CertKeySet;
-
-        CertKeySet& cert_keys() { return cert_keys_; }
-
-        size_t serial_size() const;
-        size_t serialize  (gu::byte_t* buf, size_t buflen, size_t offset) const;
-        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
-
-        void
-        init_write_set_out(const Params& params,
-                           gu_byte_t*    store,
-                           size_t        store_size)
-        {
-            assert(!wso_);
-            assert(store);
-            assert(store_size > sizeof(WriteSetOut));
-
-            new (store) WriteSetOut (params.working_dir_,
-                                     trx_id_, params.key_format_,
-                                     store      + sizeof(WriteSetOut),
-                                     store_size - sizeof(WriteSetOut),
-                                     0,
-                                     WriteSetNG::MAX_VERSION,
-                                     DataSet::MAX_VERSION,
-                                     DataSet::MAX_VERSION,
-                                     params.max_write_set_size_);
-
-            wso_ = true;
         }
 
         void release_write_set_out()
@@ -615,136 +703,93 @@ namespace galera
             }
         }
 
+        void ref()   { tr_.ref();   }
+        void unref() { tr_.unref(); }
+
+        int  refcnt() const { return tr_.refcnt(); }
+
     private:
 
-        /* slave trx ctor */
-        explicit
-        TrxHandle(gu::MemPool<true>& mp)
-            :
-            params_            (),
-            source_id_         (WSREP_UUID_UNDEFINED),
-            conn_id_           (-1),
-            trx_id_            (-1),
-            mutex_             (),
-            write_set_collection_(Defaults.working_dir_),
-            state_             (&trans_map_, S_EXECUTING),
-            local_seqno_       (WSREP_SEQNO_UNDEFINED),
-            global_seqno_      (WSREP_SEQNO_UNDEFINED),
-            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
-            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
-            timestamp_         (),
-            write_set_         (Defaults.version_),
-            write_set_in_      (),
-            annotation_        (),
-            cert_keys_         (),
-            write_set_buffer_  (0, 0),
-            mem_pool_          (mp),
-            action_            (0),
-            wso_buf_size_      (),
-            gcs_handle_        (-1),
-            version_           (Defaults.version_),
-            refcnt_            (1),
-            write_set_flags_   (0),
-            local_             (false),
-            certified_         (false),
-            committed_         (false),
-            exit_loop_         (false),
-            wso_               (false),
-            mac_               ()
-        {}
+        void init_write_set_out()
+        {
+            assert(!wso_);
+            assert(wso_buf_size_ > sizeof(WriteSetOut));
 
-        /* local trx ctor */
-        TrxHandle(gu::MemPool<true>&  mp,
-                  const Params&       params,
-                  const wsrep_uuid_t& source_id,
-                  wsrep_conn_id_t     conn_id,
-                  wsrep_trx_id_t      trx_id,
-                  size_t              reserved_size)
+            gu::byte_t* const wso(static_cast<gu::byte_t*>(wso_buf()));
+            gu::byte_t* const store(wso + sizeof(WriteSetOut));
+
+            new (wso) WriteSetOut (params_.working_dir_,
+                                   trx_id(), params_.key_format_,
+                                   store,
+                                   wso_buf_size_ - sizeof(WriteSetOut),
+                                   0,
+                                   WriteSetNG::MAX_VERSION,
+                                   DataSet::MAX_VERSION,
+                                   DataSet::MAX_VERSION,
+                                   params_.max_write_set_size_);
+
+            wso_ = true;
+        }
+
+        const WriteSetOut& write_set_out() const { return write_set_out(); }
+
+        TrxHandleMaster(gu::MemPool<true>&  mp,
+                        const Params&       params,
+                        const wsrep_uuid_t& source_id,
+                        wsrep_conn_id_t     conn_id,
+                        wsrep_trx_id_t      trx_id,
+                        size_t              reserved_size)
             :
+            TrxHandle(source_id, conn_id, trx_id, params.version_),
             params_            (params),
-            source_id_         (source_id),
-            conn_id_           (conn_id),
-            trx_id_            (trx_id),
-            mutex_             (),
+            tr_                (mp, this),
+            repl_              (1, &tr_),
             write_set_collection_(params_.working_dir_),
-            state_             (&trans_map_, S_EXECUTING),
-            local_seqno_       (WSREP_SEQNO_UNDEFINED),
-            global_seqno_      (WSREP_SEQNO_UNDEFINED),
-            last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
-            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
-            timestamp_         (gu_time_calendar()),
             write_set_         (params_.version_),
-            write_set_in_      (),
             annotation_        (),
-            cert_keys_         (),
             write_set_buffer_  (0, 0),
-            mem_pool_          (mp),
-            action_            (0),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
-            version_           (params_.version_),
-            refcnt_            (1),
-            write_set_flags_   (0),
-            local_             (true),
-            certified_         (false),
-            committed_         (false),
-            exit_loop_         (false),
-            wso_               (false),
-            mac_               ()
-        {}
+            wso_               (false)
+        {
+            assert(reserved_size > sizeof(*this) + 1024);
+        }
 
         void* wso_buf()
         {
             return static_cast<void*>(this + 1);
         }
 
-        ~TrxHandle() { release_write_set_out(); }
+        ~TrxHandleMaster()
+        {
+            release_write_set_out();
 
-        TrxHandle(const TrxHandle&);
-        void operator=(const TrxHandle& other);
+            assert(refcnt() == 0);
+            assert(repl_[0] == &tr_);
+            assert(repl_[0]->refcnt() == 0);
+
+            for (unsigned int i(1); i < repl_.size(); ++i)
+            {
+                repl_[i]->unref();
+            }
+        }
 
         Params const           params_;
-        wsrep_uuid_t           source_id_;
-        wsrep_conn_id_t        conn_id_;
-        wsrep_trx_id_t         trx_id_;
-        mutable gu::Mutex      mutex_;
+        TrxHandleSlave         tr_;
+        Replicated             repl_;
         MappedBuffer           write_set_collection_;
-        FSM<State, Transition> state_;
-        wsrep_seqno_t          local_seqno_;
-        wsrep_seqno_t          global_seqno_;
-        wsrep_seqno_t          last_seen_seqno_;
-        wsrep_seqno_t          depends_seqno_;
-        int64_t                timestamp_;
         WriteSet               write_set_;
-        WriteSetIn             write_set_in_;
         gu::Buffer             annotation_;
-        CertKeySet             cert_keys_;
 
         // Write set buffer location if stored outside TrxHandle.
         std::pair<const gu::byte_t*, size_t> write_set_buffer_;
 
-        gu::MemPool<true>&     mem_pool_;
-        const void*            action_;
         size_t const           wso_buf_size_;
         long                   gcs_handle_;
-        int                    version_;
-        gu::Atomic<int>        refcnt_;
-        uint32_t               write_set_flags_;
-        bool                   local_;
-        bool                   certified_;
-        bool                   committed_;
-        bool                   exit_loop_;
         bool                   wso_;
-        Mac                    mac_;
 
-        friend class Wsdb;
-        friend class Certification;
-        friend std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
-        friend class TrxHandleWithStore;
-
-    }; /* class TrxHandle */
-
-    std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
+        friend class TrxHandleSlave;
+    };
 
     class TrxHandleLock
     {

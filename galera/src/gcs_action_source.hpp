@@ -20,7 +20,7 @@ namespace galera
     {
     public:
 
-        GcsActionSource(TrxHandle::SlavePool& sp,
+        GcsActionSource(TrxHandleSlave::Pool& sp,
                         GCS_IMPL&             gcs,
                         Replicator&           replicator,
                         gcache::GCache&       gcache)
@@ -46,7 +46,7 @@ namespace galera
 
         void dispatch(void*, const gcs_action&, bool& exit_loop);
 
-        TrxHandle::SlavePool& trx_pool_;
+        TrxHandleSlave::Pool& trx_pool_;
         GCS_IMPL&             gcs_;
         Replicator&           replicator_;
         gcache::GCache&       gcache_;
@@ -57,13 +57,13 @@ namespace galera
     class GcsActionTrx
     {
     public:
-        GcsActionTrx(TrxHandle::SlavePool& sp, const struct gcs_action& act);
+        GcsActionTrx(TrxHandleSlave::Pool& sp, const struct gcs_action& act);
         ~GcsActionTrx();
-        TrxHandle* trx() const { return trx_; }
+        TrxHandleSlave* trx() const { return trx_; }
     private:
         GcsActionTrx(const GcsActionTrx&);
         void operator=(const GcsActionTrx&);
-        TrxHandle* trx_;
+        TrxHandleSlave* trx_;
     };
 
 }

@@ -29,8 +29,6 @@ namespace gcache
 
 namespace galera
 {
-    class TrxHandle;
-
     namespace ist
     {
         void register_params(gu::Config& conf);
@@ -40,12 +38,13 @@ namespace galera
         public:
             static std::string const RECV_ADDR;
 
-            Receiver(gu::Config& conf, TrxHandle::SlavePool&, const char* addr);
+            Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
+                     const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
             void          ready();
-            int           recv(TrxHandle** trx);
+            int           recv(TrxHandleSlave** trx);
             wsrep_seqno_t finished();
             void          run();
 
@@ -67,21 +66,22 @@ namespace galera
                 Consumer() : cond_(), trx_(0) { }
                 ~Consumer() { }
 
-                gu::Cond&  cond()              { return cond_; }
-                void       trx(TrxHandle* trx) { trx_ = trx;   }
-                TrxHandle* trx() const         { return trx_;  }
+                gu::Cond&       cond()                   { return cond_; }
+                void            trx(TrxHandleSlave* trx) { trx_ = trx;   }
+                TrxHandleSlave* trx() const              { return trx_;  }
 
             private:
 
-                gu::Cond   cond_;
-                TrxHandle* trx_;
+                gu::Cond        cond_;
+                TrxHandleSlave* trx_;
             };
 
             std::stack<Consumer*> consumers_;
             wsrep_seqno_t         current_seqno_;
             wsrep_seqno_t         last_seqno_;
             gu::Config&           conf_;
-            TrxHandle::SlavePool& trx_pool_;
+            TrxHandleSlave::Pool& trx_pool_;
+            gcache::GCache&       gcache_;
             pthread_t             thread_;
             int                   error_code_;
             int                   version_;

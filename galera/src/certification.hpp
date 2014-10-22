@@ -36,9 +36,9 @@ namespace galera
 
     private:
 
-        typedef std::multiset<wsrep_seqno_t>        DepsSet;
+        typedef std::multiset<wsrep_seqno_t>             DepsSet;
 
-        typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
+        typedef std::map<wsrep_seqno_t, TrxHandleSlave*> TrxMap;
 
     public:
 
@@ -52,8 +52,8 @@ namespace galera
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
-        TestResult append_trx(TrxHandle*);
-        TestResult test(TrxHandle*, bool = true);
+        TestResult append_trx(TrxHandleSlave*);
+        TestResult test(TrxHandleSlave*, bool = true);
         wsrep_seqno_t position() const { return position_; }
 
         wsrep_seqno_t
@@ -77,8 +77,8 @@ namespace galera
 
         // Set trx corresponding to handle committed. Return purge seqno if
         // index purge is required, -1 otherwise.
-        wsrep_seqno_t set_trx_committed(TrxHandle*);
-        TrxHandle* get_trx(wsrep_seqno_t);
+        wsrep_seqno_t set_trx_committed(TrxHandleSlave*);
+        TrxHandleSlave* get_trx(wsrep_seqno_t);
 
         // statistics section
         void stats_get(double& avg_cert_interval,
@@ -118,13 +118,11 @@ namespace galera
 
     private:
 
-        TestResult do_test(TrxHandle*, bool);
-        TestResult do_test_v1to2(TrxHandle*, bool);
-        TestResult do_test_v3(TrxHandle*, bool);
-        TestResult do_test_preordered(TrxHandle*);
-        void purge_for_trx(TrxHandle*);
-        void purge_for_trx_v1to2(TrxHandle*);
-        void purge_for_trx_v3(TrxHandle*);
+        TestResult do_test(TrxHandleSlave*, bool);
+        TestResult do_test_v3(TrxHandleSlave*, bool);
+        TestResult do_test_preordered(TrxHandleSlave*);
+        void purge_for_trx(TrxHandleSlave*);
+        void purge_for_trx_v3(TrxHandleSlave*);
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
@@ -139,8 +137,8 @@ namespace galera
             void operator()(TrxMap::value_type& vt) const
             {
                 {
-                    TrxHandle* trx(vt.second);
-                    TrxHandleLock lock(*trx);
+                    TrxHandleSlave* trx(vt.second);
+                    TrxHandleLock   lock(*trx);
 
                     if (trx->is_committed() == false)
                     {

@@ -17,6 +17,9 @@ static const std::string GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
 static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
 
+const std::string&
+gcache::GCache::PARAMS_DIR                 (GCACHE_PARAMS_DIR);
+
 void
 gcache::GCache::Params::register_params(gu::Config& cfg)
 {
@@ -46,7 +49,7 @@ name_value (gu::Config& cfg, const std::string& data_dir)
      * the latter is not an absolute path */
     if ('/' != rb_name[0] && !dir.empty())
     {
-        rb_name = dir + '/' + GCACHE_DEFAULT_RB_NAME;
+        rb_name = dir + '/' + rb_name;
         cfg.set (GCACHE_PARAMS_RB_NAME, rb_name);
     }
 

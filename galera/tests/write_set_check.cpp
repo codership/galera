@@ -35,7 +35,6 @@ namespace
 
     private:
 
-// REMOVE    galera::Certification::register_params(conf);
         gu::Config         conf_;
         galera::ReplicatorSMM::InitConfig init_;
         gcache::GCache     gcache_;

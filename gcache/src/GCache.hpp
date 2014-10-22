@@ -25,6 +25,8 @@ namespace gcache
     {
     public:
 
+        static const std::string& PARAMS_DIR;
+
         static void register_params(gu::Config& cfg)
         {
             Params::register_params(cfg);

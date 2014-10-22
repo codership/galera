@@ -530,6 +530,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
     catch (...)
     {
         log_fatal << "State request preparation failed, aborting: unknown exception";
+        throw;
     }
     abort();
 }
@@ -747,7 +748,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         while (true)
         {
-            TrxHandle* trx(0);
+            TrxHandleSlave* trx(0);
             int err;
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
@@ -770,7 +771,6 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                 {
                     // replicating and certifying stages have been
                     // processed on donor, just adjust states here
-                    trx->set_state(TrxHandle::S_REPLICATING);
                     trx->set_state(TrxHandle::S_CERTIFYING);
                     apply_trx(recv_ctx, trx);
                 }

@@ -581,6 +581,28 @@ namespace galera
             header_.set_last_seen(ls);
         }
 
+        /* Serializes wiriteset into a single buffer (for unit test purposes) */
+        void serialize(const wsrep_uuid_t&      source,
+                       const wsrep_conn_id_t&   conn,
+                       const wsrep_trx_id_t&    trx,
+                       const wsrep_seqno_t&     last_seen,
+                       std::vector<gu::byte_t>& ret)
+        {
+            WriteSetNG::GatherVector out;
+            size_t const out_size(gather(source, conn, trx, out));
+            set_last_seen(last_seen);
+
+            ret.clear(); ret.reserve(out_size);
+
+            /* concatenate all out buffers into ret */
+            for (size_t i(0); i < out->size(); ++i)
+            {
+                const gu::byte_t* ptr
+                    (static_cast<const gu::byte_t*>(out[i].ptr));
+                ret.insert (ret.end(), ptr, ptr + out[i].size);
+            }
+        }
+
         void set_preordered (ssize_t pa_range)
         {
             assert (pa_range >= 0);
@@ -718,6 +740,7 @@ namespace galera
             delete annt_;
         }
 
+        ssize_t       size()      const { return size_;               }
         uint16_t      flags()     const { return header_.flags();     }
         bool          is_toi()    const
         { return flags() & WriteSetNG::F_TOI; }

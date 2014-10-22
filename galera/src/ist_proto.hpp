@@ -13,6 +13,8 @@
 #include "gu_serialize.hpp"
 #include "gu_vector.hpp"
 
+#include <string>
+
 //
 // Sender                            Receiver
 // connect()                 ----->  accept()
@@ -224,9 +226,14 @@ namespace galera
         {
         public:
 
-            Proto(TrxHandle::SlavePool& sp, int version, bool keep_keys)
+            Proto(TrxHandleSlave::Pool& sp,
+//                  const std::string& data_dir,
+                  gcache::GCache&       gc,
+                  int version, bool keep_keys)
                 :
                 trx_pool_ (sp),
+//                data_dir_ (data_dir),
+                gcache_   (gc),
                 raw_sent_ (0),
                 real_sent_(0),
                 version_  (version),
@@ -466,7 +473,7 @@ namespace galera
 
 
             template <class ST>
-            galera::TrxHandle*
+            galera::TrxHandleSlave*
             recv_trx(ST& socket)
             {
                 Message    msg(version_);
@@ -506,7 +513,10 @@ namespace galera
                     offset = gu::unserialize8(&buf[0], buf.size(), offset,
                                               seqno_d);
 
-                    galera::TrxHandle* trx(galera::TrxHandle::New(trx_pool_));
+                    galera::TrxHandleSlave*
+                        trx(galera::TrxHandleSlave::New(trx_pool_));
+
+                    void* wbuf;
 
                     if (seqno_d == WSREP_SEQNO_UNDEFINED)
                     {
@@ -516,30 +526,38 @@ namespace galera
                                 << "message size " << msg.len()
                                 << " does not match expected size " << offset;
                         }
+
+                        wbuf = gcache_.malloc(GU_WORDSIZE/8);
                     }
                     else
                     {
-                        MappedBuffer& wbuf(trx->write_set_collection());
                         size_t const wsize(msg.len() - offset);
-                        wbuf.resize(wsize);
+                        wbuf = gcache_.malloc(wsize);
 
                         n = asio::read(socket,
-                                       asio::buffer(&wbuf[0], wbuf.size()));
+                                       asio::buffer(wbuf, wsize));
 
-                        if (gu_unlikely(n != wbuf.size()))
+                        if (gu_unlikely(n != wsize))
                         {
                             gu_throw_error(EPROTO)
                                 << "error reading write set data";
                         }
 
-                        trx->unserialize(&wbuf[0], wbuf.size(), 0);
+                        trx->unserialize(static_cast<gu::byte_t*>(wbuf),wsize,0);
                     }
 
                     trx->set_received(0, -1, seqno_g);
                     trx->set_depends_seqno(seqno_d);
                     trx->mark_certified();
 
-                    log_debug << "received trx body: " << *trx;
+                    gcache_.seqno_assign(wbuf, seqno_g, seqno_d);
+
+//                    log_debug << "received trx body: " << *trx;
+                    std::ostringstream os;
+                    os << "received trx body: ";
+                    os << *trx;
+                    log_debug << os;
+
                     return trx;
                 }
                 case Message::T_CTRL:
@@ -569,7 +587,9 @@ namespace galera
 
         private:
 
-            TrxHandle::SlavePool& trx_pool_;
+            TrxHandleSlave::Pool& trx_pool_;
+
+            gcache::GCache& gcache_;
 
             uint64_t raw_sent_;
             uint64_t real_sent_;

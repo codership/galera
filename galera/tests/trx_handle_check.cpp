@@ -12,14 +12,18 @@ using namespace galera;
 
 START_TEST(test_states)
 {
-    TrxHandle::LocalPool tp(TrxHandle::LOCAL_STORAGE_SIZE, 16, "test_states");
+    TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 16,
+                             "test_states_master");
+    TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "test_states_slave");
+
     wsrep_uuid_t uuid = {{1, }};
 
     // first check basic stuff
     // 1) initial state is executing
     // 2) invalid state changes are caught
     // 3) valid state changes change state
-    TrxHandle* trx(TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1));
+    TrxHandleMaster* trx(TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1));
+    trx->lock();
 
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
@@ -37,149 +41,189 @@ START_TEST(test_states)
 #endif
 
     trx->set_state(TrxHandle::S_REPLICATING);
-    fail_unless(trx->state() == TrxHandle::S_REPLICATING);
+    trx->set_state(TrxHandle::S_COMMITTING);
+    fail_unless(trx->state() == TrxHandle::S_COMMITTING);
+    trx->unlock();
     trx->unref();
 
     // abort before replication
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
+    trx->unlock();
     trx->unref();
 
     // aborted during replication and does not certify
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
+    trx->unlock();
     trx->unref();
 
     // aborted during replication and certifies but does not certify
     // during replay (is this even possible?)
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-    trx->set_state(TrxHandle::S_CERTIFYING);
+//    trx->set_state(TrxHandle::S_EXECUTING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
+    trx->unlock();
     trx->unref();
 
     // aborted during replication, certifies and commits
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-    trx->set_state(TrxHandle::S_CERTIFYING);
+//    trx->set_state(TrxHandle::S_EXECUTING);
     trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
     trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
     trx->set_state(TrxHandle::S_MUST_REPLAY);
     trx->set_state(TrxHandle::S_REPLAYING);
     trx->set_state(TrxHandle::S_COMMITTED);
+    trx->unlock();
     trx->unref();
 
     // aborted during certification, replays and commits
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_CERTIFYING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-    trx->set_state(TrxHandle::S_CERTIFYING);
+//    trx->set_state(TrxHandle::S_EXECUTING);
     trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
     trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
     trx->set_state(TrxHandle::S_MUST_REPLAY);
     trx->set_state(TrxHandle::S_REPLAYING);
     trx->set_state(TrxHandle::S_COMMITTED);
+    trx->unlock();
     trx->unref();
 
     // aborted while waiting applying, replays and commits
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_CERTIFYING);
-    trx->set_state(TrxHandle::S_APPLYING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
     trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
     trx->set_state(TrxHandle::S_MUST_REPLAY);
     trx->set_state(TrxHandle::S_REPLAYING);
     trx->set_state(TrxHandle::S_COMMITTED);
+    trx->unlock();
     trx->unref();
 
     // aborted while waiting for commit order, replays and commits
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_CERTIFYING);
-    trx->set_state(TrxHandle::S_APPLYING);
     trx->set_state(TrxHandle::S_COMMITTING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
     trx->set_state(TrxHandle::S_MUST_REPLAY);
     trx->set_state(TrxHandle::S_REPLAYING);
     trx->set_state(TrxHandle::S_COMMITTED);
+    trx->unlock();
     trx->unref();
 
-
-    // smooth operation
-    trx = TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1);
+    // smooth operation master
+    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
+    trx->lock();
     trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_CERTIFYING);
-    trx->set_state(TrxHandle::S_APPLYING);
     trx->set_state(TrxHandle::S_COMMITTING);
     trx->set_state(TrxHandle::S_COMMITTED);
+    trx->unlock();
     trx->unref();
+
+    // smooth operation slave
+    TrxHandleSlave* txs(TrxHandleSlave::New(sp));
+    txs->lock();
+    txs->set_state(TrxHandle::S_CERTIFYING);
+    txs->set_state(TrxHandle::S_APPLYING);
+    txs->set_state(TrxHandle::S_COMMITTING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
+
+    // certification failure slave
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_CERTIFYING);
+    txs->set_state(TrxHandle::S_MUST_ABORT);
+    txs->set_state(TrxHandle::S_ROLLED_BACK);
+    txs->unlock();
+    txs->unref();
 }
 END_TEST
 
 
 START_TEST(test_serialization)
 {
-    TrxHandle::LocalPool lp(4096, 16, "serialization_lp");
-    TrxHandle::SlavePool sp(sizeof(TrxHandle), 16, "serialization_sp");
+    TrxHandleMaster::Pool lp(4096, 16, "serialization_lp");
+    TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "serialization_sp");
 
-    int const version(0);
-    galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
+    int const version(3);
+    galera::TrxHandleMaster::Params const trx_params("", version,KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
-    TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid, 4567, 8910));
+    TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
 
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
+//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
     trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->append_annotation(reinterpret_cast<const gu::byte_t*>("foobar"),
                            strlen("foobar"));
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
+//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
     trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
-    trx->set_last_seen_seqno(0);
+//    trx->set_last_seen_seqno(0);
 
-    TrxHandle* trx2(TrxHandle::New(sp));
+//    std::vector<gu::byte_t> buf(trx->serial_size());
+//    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
+//    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    std::vector<gu::byte_t> buf;
+    trx->serialize(0, buf);
+    fail_unless(buf.size() > 0);
 
-    std::vector<gu::byte_t> buf(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    TrxHandleSlave* txs1(TrxHandleSlave::New(sp));
+    fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
+    txs1->unref();
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
-    buf.resize(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+//    buf.resize(trx->serial_size());
+    trx->serialize(0, buf);
+    fail_unless(buf.size() > 0);
+
+    TrxHandleSlave* txs2(TrxHandleSlave::New(sp));
+    fail_unless(txs2->unserialize(&buf[0], buf.size(), 0) > 0);
+    txs2->unref();
 
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    buf.resize(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->serial_size() == trx->serial_size(),
-                "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
-                trx2->serial_size(), trx->serial_size());
+    trx->serialize(0, buf);
+    fail_unless(buf.size() > 0);
 
-    trx2->unref();
+    TrxHandleSlave* txs3(TrxHandleSlave::New(sp));
+    fail_unless(txs3->unserialize(&buf[0], buf.size(), 0) > 0);
+// remove    fail_unless(trx2->serial_size() == trx->serial_size(),
+//                "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
+//                trx2->serial_size(), trx->serial_size());
+
+    txs3->unref();
     trx->unref();
 }
 END_TEST

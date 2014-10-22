@@ -15,7 +15,7 @@ typedef Suite* (*suite_creator_t) (void);
 extern Suite* data_set_suite();
 extern Suite* key_set_suite();
 extern Suite* write_set_ng_suite();
-extern Suite* write_set_suite();
+//extern Suite* write_set_suite();
 extern Suite* trx_handle_suite();
 extern Suite* service_thd_suite();
 extern Suite* ist_suite();
@@ -26,7 +26,7 @@ static suite_creator_t suites[] =
     data_set_suite,
     key_set_suite,
     write_set_ng_suite,
-    write_set_suite,
+//remove    write_set_suite,
     trx_handle_suite,
     service_thd_suite,
     ist_suite,

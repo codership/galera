@@ -69,7 +69,7 @@ static pthread_barrier_t start_barrier;
 class TestOrder
 {
 public:
-    TestOrder(galera::TrxHandle& trx) : trx_(trx) { }
+    TestOrder(galera::TrxHandleSlave& trx) : trx_(trx) { }
     void lock() { }
     void unlock() { }
     wsrep_seqno_t seqno() const { return trx_.global_seqno(); }
@@ -79,7 +79,7 @@ public:
         return (last_left >= trx_.depends_seqno());
     }
 private:
-    galera::TrxHandle& trx_;
+    galera::TrxHandleSlave& trx_;
 };
 
 struct sender_args
@@ -109,18 +109,21 @@ struct receiver_args
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
     size_t        n_receivers_;
-    TrxHandle::SlavePool& trx_pool_;
+    TrxHandleSlave::Pool& trx_pool_;
+    gcache::GCache& gcache_;
     int           version_;
 
     receiver_args(const std::string listen_addr,
                   wsrep_seqno_t first, wsrep_seqno_t last,
-                  size_t n_receivers, TrxHandle::SlavePool& sp, int version)
+                  size_t n_receivers, TrxHandleSlave::Pool& sp,
+                  gcache::GCache& gc, int version)
         :
         listen_addr_(listen_addr),
         first_      (first),
         last_       (last),
         n_receivers_(n_receivers),
         trx_pool_   (sp),
+        gcache_     (gc),
         version_    (version)
     { }
 };
@@ -148,6 +151,7 @@ extern "C" void* sender_thd(void* arg)
                                sargs->version_);
     mark_point();
     sender.send(sargs->first_, sargs->last_);
+    mark_point();
     return 0;
 }
 
@@ -158,7 +162,7 @@ extern "C" void* trx_thread(void* arg)
     targs->receiver_.ready();
     while (true)
     {
-        galera::TrxHandle* trx(0);
+        galera::TrxHandleSlave* trx(0);
         int err;
         if ((err = targs->receiver_.recv(&trx)) != 0)
         {
@@ -186,7 +190,7 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    galera::ist::Receiver receiver(conf, rargs->trx_pool_, 0);
+    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
 
@@ -199,6 +203,8 @@ extern "C" void* receiver_thd(void* arg)
         log_info << "starting trx thread " << i;
         pthread_create(&threads[0] + i, 0, &trx_thread, &trx_thd_args);
     }
+
+    mark_point();
 
     trx_thd_args.monitor_.set_initial_position(rargs->first_ - 1);
     pthread_barrier_wait(&start_barrier);
@@ -240,29 +246,39 @@ static void test_ist_common(int const version)
     using galera::TrxHandle;
     using galera::KeyOS;
 
-    TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE, 4, "ist_common");
-    TrxHandle::SlavePool sp(sizeof(TrxHandle), 4, "ist_common");
+    TrxHandleMaster::Pool lp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 4, "ist_common");
+    TrxHandleSlave::Pool sp(sizeof(TrxHandleSlave), 4, "ist_common");
 
     int const trx_version(select_trx_version(version));
-    TrxHandle::Params const trx_params("", trx_version,
+    TrxHandleMaster::Params const trx_params("", trx_version,
                                        galera::KeySet::MAX_VERSION);
-    gu::Config conf;
-    galera::ReplicatorSMM::InitConfig(conf, NULL);
-    std::string gcache_file("ist_check.cache");
-    conf.set("gcache.name", gcache_file);
-    std::string dir(".");
+
+    std::string const dir(".");
+
+    gu::Config conf_sender;
+    galera::ReplicatorSMM::InitConfig(conf_sender, NULL);
+    std::string const gcache_sender_file("ist_sender.cache");
+    conf_sender.set("gcache.name", gcache_sender_file);
+    conf_sender.set("gcache.size", "16M");
+    gcache::GCache* gcache_sender = new gcache::GCache(conf_sender, dir);
+
+    gu::Config conf_receiver;
+    galera::ReplicatorSMM::InitConfig(conf_receiver, NULL);
+    std::string const gcache_receiver_file("ist_receiver.cache");
+    conf_receiver.set("gcache.name", gcache_receiver_file);
+    conf_receiver.set("gcache.size", "16M");
+    gcache::GCache* gcache_receiver = new gcache::GCache(conf_receiver, dir);
+
     std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
-
-    gcache::GCache* gcache = new gcache::GCache(conf, dir);
 
     mark_point();
 
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid, 1234+i, 5678+i));
+        TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i, 5678+i));
 
         const wsrep_buf_t key[2] = {
             {"key1", 4},
@@ -279,10 +295,7 @@ static void test_ist_common(int const version)
 
         if (trx_version < 3)
         {
-            trx->set_last_seen_seqno(last_seen);
-            size_t trx_size(trx->serial_size());
-            ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
-            trx->serialize(ptr, trx_size, 0);
+            fail("WS version %d not supported any more", trx_version);
         }
         else
         {
@@ -292,7 +305,7 @@ static void test_ist_common(int const version)
                                                          trx->trx_id(),
                                                          bufs));
             trx->set_last_seen_seqno(last_seen);
-            ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
+            ptr = static_cast<gu::byte_t*>(gcache_sender->malloc(trx_size));
 
             /* concatenate buffer vector */
             gu::byte_t* p(ptr);
@@ -311,14 +324,14 @@ static void test_ist_common(int const version)
             assert (wsi.pa_range()  == pa_range);
         }
 
-        gcache->seqno_assign(ptr, i, i - pa_range);
+        gcache_sender->seqno_assign(ptr, i, i - pa_range);
         trx->unref();
     }
 
     mark_point();
 
-    receiver_args rargs(receiver_addr, 1, 10, 1, sp, version);
-    sender_args sargs(*gcache, rargs.listen_addr_, 1, 10, version);
+    receiver_args rargs(receiver_addr, 1, 10, 1, sp, *gcache_receiver, version);
+    sender_args sargs(*gcache_sender, rargs.listen_addr_, 1, 10, version);
 
     pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
 
@@ -335,39 +348,13 @@ static void test_ist_common(int const version)
 
     mark_point();
 
-    delete gcache;
+    delete gcache_sender;
+    delete gcache_receiver;
 
     mark_point();
-    unlink(gcache_file.c_str());
+    unlink(gcache_sender_file.c_str());
+    unlink(gcache_receiver_file.c_str());
 }
-
-
-START_TEST(test_ist_v1)
-{
-    test_ist_common(1);
-}
-END_TEST
-
-
-START_TEST(test_ist_v2)
-{
-    test_ist_common(2);
-}
-END_TEST
-
-
-START_TEST(test_ist_v3)
-{
-    test_ist_common(3);
-}
-END_TEST
-
-
-START_TEST(test_ist_v4)
-{
-    test_ist_common(4);
-}
-END_TEST
 
 START_TEST(test_ist_v5)
 {
@@ -383,27 +370,6 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_message");
     tcase_add_test(tc, test_ist_message);
     suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_ist_v1");
-    tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v1);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_ist_v2");
-    tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v2);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_ist_v3");
-    tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v3);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_ist_v4");
-    tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v4);
-    suite_add_tcase(s, tc);
-
     tc = tcase_create("test_ist_v5");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v5);
