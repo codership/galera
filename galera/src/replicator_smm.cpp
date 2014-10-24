@@ -433,29 +433,37 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
     /* at this point any exception in apply_trx_ws() is fatal, not
      * catching anything. */
 
-    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-    {
-        gu_trace(commit_monitor_.enter(co));
-    }
-    trx->set_state(TrxHandle::S_COMMITTING);
-
     wsrep_bool_t exit_loop(false);
-    wsrep_cb_status_t const rcode(
-        commit_cb_(
-            recv_ctx,
-            TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
-            &meta,
-            &exit_loop,
-            true));
 
-    if (gu_unlikely (rcode > 0))
-        gu_throw_fatal << "Commit failed. Trx: " << trx;
-
-    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+    if (gu_likely((trx->flags() & TrxHandle::F_COMMIT) != 0))
     {
-        commit_monitor_.leave(co);
+        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+        {
+            gu_trace(commit_monitor_.enter(co));
+        }
+        trx->set_state(TrxHandle::S_COMMITTING);
+
+        wsrep_cb_status_t const rcode(
+            commit_cb_(
+                recv_ctx,
+                TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
+                &meta,
+                &exit_loop,
+                true));
+
+        if (gu_unlikely (rcode > 0))
+            gu_throw_fatal << "Commit failed. Trx: " << trx;
+
+        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+        {
+            commit_monitor_.leave(co);
+        }
+        trx->set_state(TrxHandle::S_COMMITTED);
     }
-    trx->set_state(TrxHandle::S_COMMITTED);
+    else
+    {
+        gu_trace(commit_monitor_.self_cancel(co));
+    }
 
     if (trx->local_seqno() != -1)
     {
@@ -830,7 +838,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         else             trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
         retval = WSREP_BF_ABORT;
     }
-    else if ((tr->flags() & TrxHandle::F_COMMIT) != 0)
+    else if (gu_likely((tr->flags() & TrxHandle::F_COMMIT) != 0))
     {
         trx->set_state(TrxHandle::S_COMMITTING);
         tr->set_state(TrxHandle::S_COMMITTING);
@@ -862,10 +870,13 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
     }
     else
     {
-        // continue streaming - andd new fragment handle
+        // continue streaming - add a new fragment handle
+
+        gu_trace(commit_monitor_.self_cancel(co));
+        trx->set_state(TrxHandle::S_EXECUTING);
+
         TrxHandleSlave* const tr(TrxHandleSlave::New(slave_pool_));
         trx->add_replicated(tr);
-        trx->set_state(TrxHandle::S_EXECUTING);
     }
 
     assert((retval == WSREP_OK && (tr->state() == TrxHandle::S_COMMITTING ||
