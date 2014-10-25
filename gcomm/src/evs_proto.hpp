@@ -22,6 +22,7 @@
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
 #include "evs_consensus.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -29,10 +30,6 @@
 #include <deque>
 #include <vector>
 #include <limits>
-
-#ifndef GCOMM_EVS_MAX_VERSION
-#define GCOMM_EVS_MAX_VERSION 0
-#endif // GCOMM_EVS_MAX_VERSION
 
 namespace gcomm
 {
@@ -174,6 +171,7 @@ public:
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
     void send_install(EVS_CALLER_ARG);
+    void send_delayed_list();
 
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
@@ -187,7 +185,7 @@ public:
     // Clean up foreign nodes according to install message.
     void cleanup_foreign(const InstallMessage&);
     void cleanup_views();
-    void cleanup_fenced();
+    void cleanup_evicted();
     void cleanup_joins();
 
     size_t n_operational() const;
@@ -213,6 +211,7 @@ public:
 
     void shift_to(const State, const bool send_j = true);
     bool is_all_suspected(const UUID& uuid) const;
+    const View& current_view() const { return current_view_; }
 
     // Message handlers
 private:
@@ -248,6 +247,7 @@ private:
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
+    void handle_delayed_list(const DelayedListMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
     void isolate(gu::datetime::Period period);
 public:
@@ -255,7 +255,8 @@ public:
                                       const Datagram&,
                                       Message*);
     void handle_msg(const Message& msg,
-                    const Datagram& dg = Datagram());
+                    const Datagram& dg = Datagram(),
+                    bool direct = true);
     // Protolay
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
     int handle_down(Datagram& wb, const ProtoDownMeta& dm);
@@ -369,7 +370,6 @@ public:
 private:
 
     int version_;
-    static const int max_version_ = GCOMM_EVS_MAX_VERSION;
     int debug_mask_;
     int info_mask_;
     gu::datetime::Date last_stats_report_;
@@ -400,6 +400,8 @@ private:
     SegmentId segment_;
     //
     // Known instances
+    friend class Node;
+    friend class InspectNode;
     NodeMap known_;
     NodeMap::iterator self_i_;
     //
@@ -412,6 +414,9 @@ private:
     gu::datetime::Period join_retrans_period_;
     gu::datetime::Period stats_report_period_;
     gu::datetime::Period causal_keepalive_period_;
+
+    gu::datetime::Period delay_margin_;
+    gu::datetime::Period delayed_keep_period_;
 
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;
@@ -485,6 +490,59 @@ private:
     int shift_to_rfcnt_;
     bool pending_leave_;
     gu::datetime::Date isolation_end_;
+
+    class DelayedEntry
+    {
+    public:
+        typedef enum
+        {
+            S_OK,
+            S_DELAYED
+        } State;
+        DelayedEntry(const std::string& addr)
+            :
+            addr_      (addr),
+            tstamp_(gu::datetime::Date::now()),
+            state_(S_DELAYED),
+            state_change_cnt_(1)
+        { }
+        const std::string& addr() const { return addr_; }
+
+        void set_tstamp(gu::datetime::Date tstamp) { tstamp_ = tstamp; }
+        gu::datetime::Date tstamp() const { return tstamp_; }
+
+        void set_state(State state,
+                       const gu::datetime::Period decay_period,
+                       const gu::datetime::Date now)
+        {
+            if (state == S_DELAYED && state_ != state)
+            {
+                // Limit to 0xff, see DelayedList format in DelayedListMessage
+                // restricts this value to uint8_t max.
+                if (state_change_cnt_ < 0xff)
+                    ++state_change_cnt_;
+            }
+            else if (state == S_OK &&
+                     tstamp_ + decay_period < now)
+            {
+                if (state_change_cnt_ > 0)
+                    --state_change_cnt_;
+            }
+            state_ = state;
+        }
+        State state() const {return state_; }
+        size_t state_change_cnt() const { return state_change_cnt_; }
+    private:
+        const std::string addr_;
+        gu::datetime::Date tstamp_;
+        State  state_;
+        size_t state_change_cnt_;
+    };
+
+    typedef std::map<UUID, DelayedEntry> DelayedList;
+    DelayedList delayed_list_;
+    size_t      auto_evict_;
+
     // non-copyable
     Proto(const Proto&);
     void operator=(const Proto&);

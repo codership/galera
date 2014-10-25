@@ -40,7 +40,7 @@ virtual_job()
         eval "$cmd" 1>"$out"
     else
 #        ssh_job "$cmd" 1>"$out"
-        ssh -ax ${NODE_LOCATION[$node]} "$cmd" 1>"$out"
+        ssh -ax -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${NODE_LOCATION[$node]} "$cmd" 1>"$out"
     fi
 
 }

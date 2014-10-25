@@ -95,6 +95,13 @@ START_TEST(test_message)
     LeaveMessage lm(0, uuid1, view_id, 45, 88, 3456);
     lm.set_source(uuid1);
     check_serialization(lm, lm.serial_size(), LeaveMessage());
+
+
+    DelayedListMessage dlm(0, uuid1, view_id, 4576);
+    dlm.add(UUID(2), 23);
+    dlm.add(UUID(3), 45);
+    dlm.add(UUID(5), 255);
+    check_serialization(dlm, dlm.serial_size(), DelayedListMessage());
 }
 END_TEST
 
@@ -610,6 +617,7 @@ END_TEST
 static gu::Config gu_conf;
 
 static DummyNode* create_dummy_node(size_t idx,
+                                    int version,
                                     const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT10M")
@@ -624,25 +632,18 @@ static DummyNode* create_dummy_node(size_t idx,
 
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsInfoLogMask + "=0x7";
+        + Conf::EvsInfoLogMask + "=0x7" + "&"
+        + Conf::EvsVersion + "=" + gu::to_string<int>(version);
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
         conf += "&" + Conf::EvsDebugLogMask + "="
             + ::getenv("EVS_DEBUG_MASK");
     }
     list<Protolay*> protos;
-    try
-    {
-        UUID uuid(static_cast<int32_t>(idx));
-        protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new Proto(gu_conf, uuid, 0, conf));
-        return new DummyNode(gu_conf, idx, protos);
-    }
-    catch (...)
-    {
-        for_each(protos.begin(), protos.end(), DeleteObject());
-        throw;
-    }
+    UUID uuid(static_cast<int32_t>(idx));
+    protos.push_back(new DummyTransport(uuid, false));
+    protos.push_back(new Proto(gu_conf, uuid, 0, conf));
+    return new DummyNode(gu_conf, idx, protos);
 }
 
 namespace
@@ -713,7 +714,7 @@ START_TEST(test_proto_join_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i)));
+        gu_trace(dn.push_back(create_dummy_node(i, 0)));
     }
 
     uint32_t max_view_seq(0);
@@ -747,7 +748,7 @@ START_TEST(test_proto_join_n_w_user_msg)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -792,7 +793,7 @@ START_TEST(test_proto_join_n_lossy)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -831,7 +832,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -870,7 +871,7 @@ START_TEST(test_proto_leave_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i)));
+        gu_trace(dn.push_back(create_dummy_node(i, 0)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -912,7 +913,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -959,7 +960,7 @@ START_TEST(test_proto_leave_n_lossy)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1014,7 +1015,7 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1070,7 +1071,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1226,7 +1227,7 @@ START_TEST(test_proto_stop_cont)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1271,7 +1272,7 @@ START_TEST(test_proto_arbitrate)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i,
+                     create_dummy_node(i, 0,
                                        suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
@@ -1316,7 +1317,7 @@ START_TEST(test_proto_split_two)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1358,7 +1359,7 @@ START_TEST(test_aggreg)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1396,7 +1397,7 @@ START_TEST(test_trac_538)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout,
                                        retrans_period)));
     }
@@ -1445,7 +1446,7 @@ START_TEST(test_trac_552)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1501,7 +1502,7 @@ START_TEST(test_trac_607)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1559,7 +1560,7 @@ START_TEST(test_trac_724)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1624,7 +1625,7 @@ START_TEST(test_trac_760)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1683,7 +1684,7 @@ START_TEST(test_gh_41)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1748,7 +1749,7 @@ START_TEST(test_gh_37)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1801,7 +1802,7 @@ START_TEST(test_gh_40)
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(
-                     create_dummy_node(i, suspect_timeout,
+                     create_dummy_node(i, 0, suspect_timeout,
                                        inactive_timeout, retrans_period)));
     }
 
@@ -1854,14 +1855,14 @@ START_TEST(test_gh_40)
 
     // dn[0] ack dn[1] msg(seq=1) with flags F_RETRANS.
     Datagram dg1 = dn[0]->create_datagram();
-    UserMessage msg1(GCOMM_EVS_MAX_VERSION,
+    UserMessage msg1(0,
                      dn[0]->uuid(),
                      ViewId(V_REG, dn[0]->uuid(), max_view_seq),
                      1, 0, 0, O_DROP, 1, 0xff,
                      Message::F_RETRANS);
     // dn[0] msg(seq=2) leak into dn[1] input_map.
     Datagram dg2 = dn[0]->create_datagram();
-    UserMessage msg2(GCOMM_EVS_MAX_VERSION,
+    UserMessage msg2(0,
                      dn[0]->uuid(),
                      ViewId(V_REG, dn[0]->uuid(), max_view_seq),
                      2, 0, 0, O_SAFE, 2, 0xff,
@@ -1904,7 +1905,7 @@ START_TEST(test_gh_100)
     mark_point();
     Proto p1(conf, uuid1, 0, gu::URI("evs://"), 10000, 0);
     // Start p2 view seqno from higher value than p1
-    View p2_rst_view(ViewId(V_REG, uuid2, 3));
+    View p2_rst_view(0, ViewId(V_REG, uuid2, 3));
     Proto p2(conf, uuid2, 0, gu::URI("evs://"), 10000, &p2_rst_view);
 
     gcomm::connect(&t1, &p1);
@@ -1991,6 +1992,50 @@ START_TEST(test_gh_100)
     fail_unless(im2.type() == Message::T_INSTALL);
     fail_unless(im2.install_view_id().seq() > im.install_view_id().seq());
 
+}
+END_TEST
+
+START_TEST(test_evs_protocol_upgrade)
+{
+    log_info << "START (test_evs_protocol_upgrade)";
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    uint32_t view_seq(0);
+    for (int i(0); i <= GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        gu_trace(dn.push_back(create_dummy_node(i + 1, i)));
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, view_seq + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+        ++view_seq;
+        for (int j(0); j <= i; ++j)
+        {
+            fail_unless(evs_from_dummy(dn[j])->current_view().version() == 0);
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+    }
+
+    for (int i(0); i < GCOMM_PROTOCOL_MAX_VERSION; ++i)
+    {
+        for (int j(i); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        dn[i]->close();
+        dn[i]->set_cvi(V_REG);
+        set_cvi(dn, i + 1, GCOMM_PROTOCOL_MAX_VERSION, view_seq);
+        gu_trace(prop.propagate_until_cvi(true));
+        ++view_seq;
+        for (int j(i + 1); j <= GCOMM_PROTOCOL_MAX_VERSION; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        gu_trace(prop.propagate_until_empty());
+    }
+    fail_unless(evs_from_dummy(dn[GCOMM_PROTOCOL_MAX_VERSION])->current_view().version() == GCOMM_PROTOCOL_MAX_VERSION);
+    check_trace(dn);
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -2163,6 +2208,9 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_gh_100);
         suite_add_tcase(s, tc);
 
+        tc = tcase_create("test_evs_protocol_upgrade");
+        tcase_add_test(tc, test_evs_protocol_upgrade);
+        suite_add_tcase(s, tc);
     }
 
     return s;

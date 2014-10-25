@@ -543,8 +543,8 @@ START_TEST (gcs_core_test_own)
     action_t act_r(act, NULL, NULL, -1, (gcs_act_type_t)-1, -1, (gu_thread_t)-1);
 
     // Create primary and non-primary component messages
-    gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1);
-    gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, false, 0, 1);
+    gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1, 0);
+    gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, false, 0, 1, 0);
     fail_if (NULL == prim);
     fail_if (NULL == non_prim);
     gcs_comp_msg_add (prim,     "node1", 0);
@@ -710,7 +710,7 @@ START_TEST (gcs_core_test_gh74)
     core_test_set_payload_size(1024);
 
     // new primary comp message.
-    gcs_comp_msg_t* prim = gcs_comp_msg_new (true, false, 0, 2);
+    gcs_comp_msg_t* prim = gcs_comp_msg_new (true, false, 0, 2, 0);
     fail_if (NULL == prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
@@ -814,7 +814,7 @@ START_TEST (gcs_core_test_gh74)
     gu_info ("set payload size = 1024");
     core_test_set_payload_size(1024);
 
-    prim = gcs_comp_msg_new (true, false, 1, 2);
+    prim = gcs_comp_msg_new (true, false, 1, 2, 0);
     fail_if (NULL == prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
@@ -833,7 +833,7 @@ START_TEST (gcs_core_test_gh74)
     free(act_r.out);
 
     // then node3 joins.
-    prim = gcs_comp_msg_new (true, false, 1, 3);
+    prim = gcs_comp_msg_new (true, false, 1, 3, 0);
     fail_if (NULL == prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
