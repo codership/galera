@@ -1,4 +1,0 @@
-Galera configuration options
-============================
-
-TODO
