@@ -1417,8 +1417,8 @@ gcs_core_set_state_uuid (gcs_core_t* core, const gu_uuid_t* uuid)
     core->state_uuid = *uuid;
 }
 
-gcs_group_t*
-gcs_core_get_group (gcs_core_t* core)
+const gcs_group_t*
+gcs_core_get_group (const gcs_core_t* core)
 {
     return &core->group;
 }

@@ -751,7 +751,7 @@ START_TEST (gcs_core_test_gh74)
     memcpy(uuid_buf, &state_uuid, uuid_len);
 
     gcs_state_msg_t* state_msg = NULL;
-    gcs_group_t* group = gcs_core_get_group(Core);
+    const gcs_group_t* group = gcs_core_get_group(Core);
 
     // state exchange message from node1
     state_msg = gcs_group_get_state(group);

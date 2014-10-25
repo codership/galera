@@ -974,7 +974,7 @@ struct wsrep {
                                const char* donor_spec);
 
   /*!
-   * @brief Returns an array fo status variables.
+   * @brief Returns an array of status variables.
    *        Array is terminated by Null variable name.
    *
    * @param wsrep provider handle
