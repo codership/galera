@@ -942,14 +942,13 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
         trx->set_state(TrxHandle::S_REPLAYING);
         try
         {
-            const TrxHandleMaster::Replicated& repld(trx->replicated());
+            const TrxHandleMaster::ReplVector& repld(trx->replicated());
 
             // TODO: here we must guarantee that all of the slave writesets
             // are still in gcache...
-            for (TrxHandleMaster::Replicated::const_iterator i(repld.begin());
-                 i != repld.end(); ++i)
+            for (unsigned int i(0); i < repld.size(); ++i)
             {
-                TrxHandleSlave* const tr(*i);
+                TrxHandleSlave* const tr(repld[i]);
                 wsrep_trx_meta_t meta = {{state_uuid_, tr->global_seqno() },
                                          tr->depends_seqno()};
 
@@ -963,7 +962,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
                         TrxHandle::trx_flags_to_wsrep_flags(tr->flags()),
                         &meta,
                         &unused,
-                        true));
+                        i + 1 == repld.size())); // commit only last fragment
 
                 if (gu_unlikely(rcode > 0))
                     gu_throw_fatal << "Commit failed. Trx: " << *tr;

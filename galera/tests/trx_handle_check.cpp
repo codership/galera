@@ -177,25 +177,6 @@ START_TEST(test_serialization)
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
     TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
 
-//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
-
-    trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
-//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
-    trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
-//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
-
-    trx->append_annotation(reinterpret_cast<const gu::byte_t*>("foobar"),
-                           strlen("foobar"));
-    trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
-    trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
-//    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
-
-//    trx->set_last_seen_seqno(0);
-
-//    std::vector<gu::byte_t> buf(trx->serial_size());
-//    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-//    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
     std::vector<gu::byte_t> buf;
     trx->serialize(0, buf);
     fail_unless(buf.size() > 0);
@@ -219,9 +200,6 @@ START_TEST(test_serialization)
 
     TrxHandleSlave* txs3(TrxHandleSlave::New(sp));
     fail_unless(txs3->unserialize(&buf[0], buf.size(), 0) > 0);
-// remove    fail_unless(trx2->serial_size() == trx->serial_size(),
-//                "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
-//                trx2->serial_size(), trx->serial_size());
 
     txs3->unref();
     trx->unref();

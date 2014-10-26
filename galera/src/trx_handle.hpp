@@ -21,6 +21,7 @@
 #include "gu_utils.hpp"
 #include "gu_macros.hpp"
 #include "gu_mem_pool.hpp"
+#include "gu_vector.hpp"
 
 #include <set>
 
@@ -396,7 +397,7 @@ namespace galera
                 void* const buf(buf_);
                 gu::MemPool<true>& mp(mem_pool_);
 
-#if 1
+#if 1 // use if()
                 if (buf == static_cast<void*>(this))
                 {
                     this->~TrxHandleSlave();
@@ -405,7 +406,7 @@ namespace galera
                 {
                     destroy_local(buf);
                 }
-#else
+#else // use virtual dtor
                 (static_cast<TrxHandle*>(buf))->~TrxHandle();
 #endif
 
@@ -434,9 +435,7 @@ namespace galera
             certified_         (false),
             committed_         (false),
             exit_loop_         (false)
-        {
-//            lock();
-        }
+        {}
 
         friend class TrxHandleMaster;
 
@@ -580,51 +579,6 @@ namespace galera
             };
         }
 
-        static const size_t max_annotation_size_ = (1 << 16);
-
-        void append_annotation(const gu::byte_t* buf, size_t buf_len)
-        {
-            buf_len = std::min(buf_len,
-                               max_annotation_size_ - annotation_.size());
-            annotation_.insert(annotation_.end(), buf, buf + buf_len);
-        }
-
-        const gu::Buffer& annotation()  const { return annotation_; }
-
-
-        MappedBuffer& write_set_collection()
-        {
-            return write_set_collection_;
-        }
-#if 0 //remove
-        void set_write_set_buffer(const gu::byte_t* buf, size_t buf_len)
-        {
-            write_set_buffer_.first  = buf;
-            write_set_buffer_.second = buf_len;
-        }
-
-        std::pair<const gu::byte_t*, size_t>
-        write_set_buffer() const
-        {
-            // If external write set buffer location not specified,
-            // return location from write_set_collection_. This is still
-            // needed for unit tests and IST which don't use GCache
-            // storage.
-            if (write_set_buffer_.first == 0)
-            {
-                size_t off(serial_size());
-                if (write_set_collection_.size() < off)
-                {
-                    gu_throw_fatal << "Write set buffer not populated";
-                }
-                return std::make_pair(&write_set_collection_[0] + off,
-                                      write_set_collection_.size() - off);
-            }
-            return write_set_buffer_;
-        }
-#endif
-        const WriteSet&   write_set()   const { return write_set_; }
-
         bool empty() const
         {
             return write_set_out().is_empty();
@@ -649,9 +603,9 @@ namespace galera
             release_write_set_out();
         }
 
-        typedef std::vector<TrxHandleSlave*> Replicated;
+        typedef gu::Vector<TrxHandleSlave*, 1> ReplVector;
 
-        const Replicated& replicated() const
+        const ReplVector& replicated() const
         {
             return repl_;
         }
@@ -687,8 +641,8 @@ namespace galera
             /* WriteSetOut is a temporary object needed only at the writeset
              * collection stage. Since it may allocate considerable resources
              * we dont't want it to linger as long as TrxHandle is needed and
-             * want to destroy it ASAP. So it is located immediately after
-             * TrxHandle in the buffer allocated by TrxHandleWithStore. */
+             * want to destroy it ASAP. So it is constructed in the buffer
+             * allocated by TrxHandle::New() immediately following this object */
             if (gu_unlikely(!wso_)) init_write_set_out();
             assert(wso_);
             return *static_cast<WriteSetOut*>(wso_buf());
@@ -743,16 +697,22 @@ namespace galera
             TrxHandle(source_id, conn_id, trx_id, params.version_),
             params_            (params),
             tr_                (mp, this),
-            repl_              (1, &tr_),
-            write_set_collection_(params_.working_dir_),
-            write_set_         (params_.version_),
-            annotation_        (),
-            write_set_buffer_  (0, 0),
+            repl_              (),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
             wso_               (false)
         {
             assert(reserved_size > sizeof(*this) + 1024);
+
+            /* There will be at least (and normally) one replicated writeset per
+             * transaction. We initialized its handle in initialization list
+             * and now add it as the first element to the vector that will hold
+             * pointers to all such handles belonging to this transaction. */
+            assert(repl_.size() == 0);
+            repl_.push_back(&tr_);
+            assert(NULL != repl_[0]);
+            assert(!repl_.in_heap()); //there should happen no dynamic allocation
+            assert(repl_.size() == 1);
         }
 
         void* wso_buf()
@@ -776,14 +736,7 @@ namespace galera
 
         Params const           params_;
         TrxHandleSlave         tr_;
-        Replicated             repl_;
-        MappedBuffer           write_set_collection_;
-        WriteSet               write_set_;
-        gu::Buffer             annotation_;
-
-        // Write set buffer location if stored outside TrxHandle.
-        std::pair<const gu::byte_t*, size_t> write_set_buffer_;
-
+        ReplVector             repl_;
         size_t const           wso_buf_size_;
         long                   gcs_handle_;
         bool                   wso_;
