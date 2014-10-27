@@ -262,16 +262,21 @@ public:
             log_warn << "gcomm: backend already closed";
             return;
         }
-        log_info << "gcomm: terminating thread";
-        terminate();
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: terminating thread";
+            terminate();
+        }
         log_info << "gcomm: joining thread";
         pthread_join(thd_, 0);
-        log_info << "gcomm: closing backend";
-        tp_->close(error_ != 0);
-        gcomm::disconnect(tp_, this);
-        delete tp_;
-        tp_ = 0;
-
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: closing backend";
+            tp_->close(error_ != 0 || force == true);
+            gcomm::disconnect(tp_, this);
+            delete tp_;
+            tp_ = 0;
+        }
         const Message* msg;
 
         while ((msg = get_next_msg()) != 0)
@@ -316,8 +321,7 @@ public:
 
     void        get_status(gu::Status& status) const
     {
-        gcomm::Critical<gcomm::Protonet> crit(*net_);
-        tp_->get_status(status);
+        if (tp_ != 0) tp_->get_status(status);
     }
 
     class Ref
@@ -389,6 +393,8 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
     if (um.err_no() != 0)
     {
         error_ = um.err_no();
+        // force backend close
+        close(true);
         recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
     }
     else if (um.has_view() == true)
@@ -618,10 +624,9 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         }
         else if (um.err_no() != 0)
         {
-            gcs_comp_msg_t* cm(gcs_comp_msg_leave());
+            gcs_comp_msg_t* cm(gcs_comp_msg_leave(ECONNABORTED));
             const ssize_t cm_size(gcs_comp_msg_size(cm));
-            msg->size = cm_size;
-            if (gu_likely(cm_size <= msg->buf_len))
+            if (cm_size <= msg->buf_len)
             {
                 memcpy(msg->buf, cm, cm_size);
                 recv_buf.pop_front();
@@ -644,7 +649,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             gcs_comp_msg_t* cm(gcs_comp_msg_new(view.type() == V_PRIM,
                                                 view.is_bootstrap(),
                                                 view.is_empty() ? -1 : 0,
-                                                view.members().size()));
+                                                view.members().size(), 0));
 
             const ssize_t cm_size(gcs_comp_msg_size(cm));
 
@@ -703,6 +708,7 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
@@ -728,6 +734,8 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     GCommConn& conn(*ref.get());
     try
     {
+        // Critical section is entered inside close() call.
+        // gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.close();
     }
     catch (Exception& e)
@@ -845,7 +853,7 @@ GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
     }
 
     GCommConn& conn(*ref.get());
-
+    gcomm::Critical<Protonet> crit(conn.get_pnet());
     conn.get_status(status);
 
 }

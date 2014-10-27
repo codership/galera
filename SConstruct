@@ -20,7 +20,15 @@ import string
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
-print 'Host: ' + sysname + ' ' + machine
+bits = platform.architecture()[0]
+print 'Host: ' + sysname + ' ' + machine + ' ' + bits
+
+x86 = 0
+if bits == '32bit':
+    x86 = 32
+elif bits == '64bit':
+    x86 = 64
+
 
 #
 # Print Help
@@ -32,7 +40,6 @@ Default target: all
 
 Commandline Options:
     debug=n             debug build with optimization level n
-    arch=str            target architecture [i686|x86_64]
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
     boost_pool=[0|1]    use or not use boost pool allocator
@@ -79,16 +86,6 @@ elif debug_lvl == 3:
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
-# Target arch
-arch = ARGUMENTS.get('arch', machine)
-print 'Target: ' + sysname + ' ' + arch
-
-if arch == 'i386' or arch == 'i686':
-    x86 = 32
-elif arch == 'x86_64' or arch == 'amd64' or arch == 'i86pc':
-    x86 = 64
-else:
-    x86 = 0
 
 if x86 == 32:
     compile_arch = ' -m32 -march=i686'
@@ -100,7 +97,7 @@ elif x86 == 64 and sysname != 'sunos':
     link_arch    = compile_arch
     if sysname == 'linux':
         link_arch = link_arch + ' -Wl,-melf_x86_64'
-elif arch == 'ppc64':
+elif machine == 'ppc64':
     compile_arch = ' -mtune=native'
     link_arch    = ''
 elif sysname == 'sunos':
@@ -110,6 +107,7 @@ else:
     compile_arch = ''
     link_arch    = ''
 
+
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 ssl        = int(ARGUMENTS.get('ssl', 1))
@@ -117,7 +115,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.6dev')
+GALERA_VER = ARGUMENTS.get('version', '3.8')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -406,7 +404,7 @@ if strict_build_flags == 1:
     conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
 
 env = conf.Finish()
-Export('arch', 'x86', 'env', 'sysname', 'libboost_program_options')
+Export('x86', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

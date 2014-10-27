@@ -39,6 +39,8 @@ namespace gcomm
 
         size_t mtu() const;
 
+        void handle_get_status(gu::Status& status) const;
+
     private:
 
         GMCast*     gmcast_;             // GMCast transport

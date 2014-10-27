@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE=1
+
+# Parallel build support as adviced
+# at https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules-options
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += -j $(NUMJOBS)
+	# Don't use MAKEFLAGS as it has strange 'w' and '--jobserver-fds=3,4' by default
+endif
+
+# Add support for verbose builds
+ifneq (,$(filter verbose,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += VERBOSE=1
+endif
+
+# Run tests by default
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += tests=1
+endif
+
+
+override_dh_auto_build:
+	@echo $(SCONS_ARGS)
+	scons $(SCONS_ARGS)
+
+override_dh_auto_clean:
+	scons -c
+	rm config.log
+
+override_dh_installdocs:
+	dh_installdocs
+	install -m 644 asio/LICENSE_1_0.txt debian/galera/usr/share/doc/galera/LICENSE.asio
+	install -m 644 chromium/LICENSE debian/galera/usr/share/doc/galera/LICENSE.chromium
+	install -m 644 www.evanjones.ca/LICENSE debian/galera/usr/share/doc/galera/LICENSE.crc32c
+
+# Start earlier than MySQL which has value 19
+override_dh_installinit-arch:
+	dh_installinit --name=garb -- defaults 18 22
+
+override_dh_strip:
+	dh_strip --dbg-package=galera-dbg
+
+%:
+	dh $@
+
+.PHONY: override_dh_strip

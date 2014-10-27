@@ -47,12 +47,30 @@ copy_config()
             local remote="${NODE_LOCATION[$node]}"
             ([ -n "$common_cnf" ] && cat "$common_cnf" && \
              [ -n "$cnf_src" ]    && cat "$cnf_src")    | \
-            ssh "$remote" "cat > $cnf_dst"
+            ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$remote" "cat > $cnf_dst"
 
-            cat "$key_src"  | ssh "$remote" "cat > $key_dst"
-            cat "$cert_src" | ssh "$remote" "cat > $cert_dst"
+            cat "$key_src"  | ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$remote" "cat > $key_dst"
+            cat "$cert_src" | ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$remote" "cat > $cert_dst"
         fi
     fi
+}
+
+copy_file_node()
+{
+    set -x
+    local -r src_file="$1"
+    local -r dst_file="$2"
+    local -r node="$3"
+
+    cat "$src_file" | ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "${NODE_LOCATION[$node]}" "cat - > ${NODE_TEST_DIR[$node]}/$dst_file"
+
+}
+
+copy_file()
+{
+    local -r src_file="$1"
+    local -r dst_file="$2"
+    start_jobs copy_file_node "$src_file" "$dst_file"
 }
 
 install_node()

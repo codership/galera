@@ -13,6 +13,7 @@
 #include "gcomm/map.hpp"
 
 #include "evs_seqno.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 #include "gu_convert.hpp"
@@ -34,6 +35,7 @@ namespace gcomm
         class JoinMessage;
         class LeaveMessage;
         class InstallMessage;
+        class DelayedListMessage;
         class SelectNodesOp;
         class RangeLuCmp;
         class RangeHsCmp;
@@ -49,7 +51,7 @@ public:
     MessageNode(const bool    operational  = false,
                 const bool    suspected    = false,
                 const SegmentId segment    = 0,
-                const bool    fenced       = false,
+                const bool    evicted      = false,
                 const seqno_t leave_seq    = -1,
                 const ViewId& view_id      = ViewId(V_REG),
                 const seqno_t safe_seq     = -1,
@@ -57,7 +59,7 @@ public:
         operational_(operational),
         suspected_  (suspected  ),
         segment_    (segment    ),
-        fenced_     (fenced     ),
+        evicted_    (evicted    ),
         leave_seq_  (leave_seq  ),
         view_id_    (view_id    ),
         safe_seq_   (safe_seq   ),
@@ -69,7 +71,7 @@ public:
         operational_ (mn.operational_),
         suspected_   (mn.suspected_  ),
         segment_     (mn.segment_    ),
-        fenced_      (mn.fenced_     ),
+        evicted_     (mn.evicted_    ),
         leave_seq_   (mn.leave_seq_  ),
         view_id_     (mn.view_id_    ),
         safe_seq_    (mn.safe_seq_   ),
@@ -78,7 +80,7 @@ public:
 
     bool          operational() const { return operational_       ; }
     bool          suspected()   const { return suspected_         ; }
-    bool          fenced()      const { return fenced_            ; }
+    bool          evicted()     const { return evicted_           ; }
     bool          leaving()     const { return (leave_seq_ != -1) ; }
     seqno_t       leave_seq()   const { return leave_seq_         ; }
     const ViewId& view_id()     const { return view_id_           ; }
@@ -104,12 +106,12 @@ private:
     {
         F_OPERATIONAL = 1 << 0,
         F_SUSPECTED   = 1 << 1,
-        F_FENCED      = 1 << 2
+        F_EVICTED     = 1 << 2
     };
     bool      operational_;  // Is operational
     bool      suspected_;
     SegmentId segment_;
-    bool      fenced_;        // Fenced out of the cluster
+    bool      evicted_;       // Evicted out of the cluster
     seqno_t   leave_seq_;
     ViewId    view_id_;       // Current view as seen by source of this message
     seqno_t   safe_seq_;      // Safe seq as seen...
@@ -135,9 +137,11 @@ public:
         T_GAP      = 3, /*!< Gap message            */
         T_JOIN     = 4, /*!< Join message           */
         T_INSTALL  = 5, /*!< Install message        */
-        T_LEAVE    = 6  /*!< Leave message          */
+        T_LEAVE    = 6, /*!< Leave message          */
+        T_DELAYED_LIST = 7 /*!< Evict list message */
     };
 
+    typedef std::map<UUID, uint8_t> DelayedList;
 
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
     static const uint8_t F_RETRANS  = 0x2; /*!< Message is resent upon request    */
@@ -171,7 +175,8 @@ public:
      */
     bool is_membership() const
     {
-        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE);
+        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE ||
+                type_ == T_DELAYED_LIST);
     }
 
     /*!
@@ -305,7 +310,8 @@ public:
         range_uuid_      (msg.range_uuid_),
         range_           (msg.range_),
         tstamp_          (msg.tstamp_),
-        node_list_       (msg.node_list_)
+        node_list_       (msg.node_list_),
+        delayed_list_    (msg.delayed_list_)
     { }
 
     Message& operator=(const Message& msg)
@@ -326,6 +332,7 @@ public:
         range_           = msg.range_;
         tstamp_          = msg.tstamp_;
         node_list_       = msg.node_list_;
+        delayed_list_    = msg.delayed_list_;
         return *this;
     }
 
@@ -363,7 +370,8 @@ public:
         range_uuid_      (range_uuid),
         range_           (range),
         tstamp_          (gu::datetime::Date::now()),
-        node_list_       (node_list)
+        node_list_       (node_list),
+        delayed_list_    ()
     { }
 
 protected:
@@ -372,6 +380,12 @@ protected:
 
     size_t serial_size() const;
 
+    // Version number:
+    // For User, Gap, Leave messages that are exchanged only within a group
+    // the version is minimum commonly supported version among the group,
+    // computed during GATHER phase.
+    // For Join, Install messages version is maximum supported protocol
+    // version by the joiner.
     uint8_t            version_;
     Type               type_;
     uint8_t            user_type_;
@@ -388,8 +402,7 @@ protected:
     Range              range_;
     gu::datetime::Date tstamp_;
     MessageNodeList    node_list_;
-
-
+    DelayedList        delayed_list_;
 };
 
 /*!
@@ -528,14 +541,14 @@ public:
 class gcomm::evs::JoinMessage : public Message
 {
 public:
-    JoinMessage(const int     version   = -1,
+    JoinMessage(const int              max_version    = 0,
                 const UUID&            source         = UUID::nil(),
                 const ViewId&          source_view_id = ViewId(),
-                const seqno_t            seq            = -1,
-                const seqno_t            aru_seq        = -1,
+                const seqno_t          seq            = -1,
+                const seqno_t          aru_seq        = -1,
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
-        Message(version,
+        Message(max_version,
                 Message::T_JOIN,
                 source,
                 source_view_id,
@@ -560,15 +573,15 @@ public:
 class gcomm::evs::InstallMessage : public Message
 {
 public:
-    InstallMessage(const int     version   = -1,
+    InstallMessage(const int              max_version     = 0,
                    const UUID&            source          = UUID::nil(),
                    const ViewId&          source_view_id  = ViewId(),
                    const ViewId&          install_view_id = ViewId(),
-                   const seqno_t            seq             = -1,
-                   const seqno_t            aru_seq         = -1,
+                   const seqno_t          seq             = -1,
+                   const seqno_t          aru_seq         = -1,
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
-        Message(version,
+                Message(max_version,
                 Message::T_INSTALL,
                 source,
                 source_view_id,
@@ -593,11 +606,11 @@ public:
 class gcomm::evs::LeaveMessage : public Message
 {
 public:
-    LeaveMessage(const int     version   = -1,
+    LeaveMessage(const int     version        = -1,
                  const UUID&   source         = UUID::nil(),
                  const ViewId& source_view_id = ViewId(),
-                 const seqno_t   seq            = -1,
-                 const seqno_t   aru_seq        = -1,
+                 const seqno_t seq            = -1,
+                 const seqno_t aru_seq        = -1,
                  const int64_t fifo_seq       = -1,
                  const uint8_t flags          = 0) :
         Message(version,
@@ -619,6 +632,42 @@ public:
     size_t serial_size() const;
 };
 
+class gcomm::evs::DelayedListMessage : public Message
+{
+public:
+    DelayedListMessage(const int     version = -1,
+                     const UUID&   source  = UUID::nil(),
+                     const ViewId& source_view_id = ViewId(),
+                     const seqno_t fifo_seq = -1)
+        :
+        Message(version,
+                T_DELAYED_LIST,
+                source,
+                source_view_id,
+                ViewId(),
+                0xff,
+                O_DROP,
+                fifo_seq)
+    { }
+
+    void add(const UUID& uuid, uint16_t cnt)
+    {
+        delayed_list_.insert(std::make_pair(uuid, cnt));
+    }
+
+    const DelayedList& delayed_list() const { return delayed_list_; }
+
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const;
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false);
+    size_t serial_size() const;
+    bool operator==(const DelayedListMessage& cmp) const
+    {
+        return (delayed_list_ == cmp.delayed_list_);
+    }
+private:
+
+};
 
 class gcomm::evs::SelectNodesOp
 {

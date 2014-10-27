@@ -125,7 +125,7 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size)
             return GU_TIME_ETERNITY;
         }
         else {
-            gu_error ("Recv queue hard limit exceded. Can't continue.");
+            gu_error ("Recv queue hard limit exceeded. Can't continue.");
             return -ENOMEM;
         }
     }
