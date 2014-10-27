@@ -1249,7 +1249,7 @@ group_select_donor (gcs_group_t* group,
                 break;
             case EAGAIN: err = "There are no suitable donor nodes currently in the same segment";
                 break;
-            case EHOSTUNREACH: err = "The donor doesn't exist";
+            case EHOSTUNREACH: err = "The donor with wsrep_node_name doesn't exist";
                 break;
             case EDEADLK: err = "Donor not in JOINER state yet";
                 break;
