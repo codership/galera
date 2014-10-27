@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "25"
+#define WSREP_INTERFACE_VERSION "25sr"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -238,6 +238,13 @@ wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid);
 extern int
 wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
 
+/*!
+ * Source/server transaction ID (trx ID assigned at originating node)
+ */
+typedef struct wsrep_stid {
+    wsrep_uuid_t      node;    //!< source node ID
+    wsrep_trx_id_t    trx;     //!< local trx ID at source
+} wsrep_stid_t;
 
 /*!
  * Transaction meta data
@@ -245,8 +252,9 @@ wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
 typedef struct wsrep_trx_meta
 {
     wsrep_gtid_t  gtid;       /*!< Global transaction identifier */
-    wsrep_seqno_t depends_on; /*!< Sequence number part of the last transaction
-                                   this transaction depends on */
+    wsrep_stid_t  stid;       /*!< Source transaction identifier */
+    wsrep_seqno_t depends_on; /*!< Sequence number of the last transaction
+                                   this transaction may depend on */
 } wsrep_trx_meta_t;
 
 
@@ -342,6 +350,7 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
     void**                   sst_req,
     size_t*                  sst_req_len
 );
+
 
 
 /*!

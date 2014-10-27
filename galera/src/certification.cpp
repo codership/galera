@@ -69,7 +69,7 @@ length_check(const gu::Config& conf)
 void
 galera::Certification::purge_for_trx_v3(TrxHandleSlave* trx)
 {
-    const KeySetIn& keys(trx->write_set_in().keyset());
+    const KeySetIn& keys(trx->write_set().keyset());
     keys.rewind();
 
     // Unref all referenced and remove if was referenced only by us
@@ -220,7 +220,7 @@ galera::Certification::do_test_v3(TrxHandleSlave* const trx, bool store_keys)
     size_t prev_cert_index_size(cert_index_.size());
 #endif // NDEBUG
 
-    const KeySetIn& key_set(trx->write_set_in().keyset());
+    const KeySetIn& key_set(trx->write_set().keyset());
     long const      key_count(key_set.count());
     long            processed(0);
 
@@ -426,7 +426,7 @@ galera::Certification::do_test_preordered(TrxHandleSlave* trx)
     }
 
     trx->set_depends_seqno(last_preordered_seqno_ -
-                           trx->write_set_in().pa_range() + 1);
+                           trx->write_set().pa_range() + 1);
     // +1 compensates for subtracting from a previous seqno, rather than own.
 
     last_preordered_seqno_ = trx->global_seqno();

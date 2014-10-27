@@ -91,10 +91,10 @@ void galera::TrxHandleSlave::print(std::ostream& os) const
        << ", d: "        << depends_seqno_
        << ")";
 
-    if (write_set_in().annotated())
+    if (write_set().annotated())
     {
         os << "\nAnnotation:\n";
-        write_set_in().write_annotation(os);
+        write_set().write_annotation(os);
         os << std::endl;
     }
 }
@@ -206,22 +206,22 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
         switch (version_)
         {
         case 3:
-            write_set_in_.read_buf (buf, buflen);
-            write_set_flags_ = wsng_flags_to_trx_flags(write_set_in_.flags());
-            source_id_       = write_set_in_.source_id();
-            conn_id_         = write_set_in_.conn_id();
-            trx_id_          = write_set_in_.trx_id();
-            if (write_set_in_.certified())
+            write_set_.read_buf (buf, buflen);
+            write_set_flags_ = wsng_flags_to_trx_flags(write_set_.flags());
+            source_id_       = write_set_.source_id();
+            conn_id_         = write_set_.conn_id();
+            trx_id_          = write_set_.trx_id();
+            if (write_set_.certified())
             {
                 last_seen_seqno_ = WSREP_SEQNO_UNDEFINED;
                 write_set_flags_ |= F_PREORDERED;
             }
             else
             {
-                last_seen_seqno_ = write_set_in_.last_seen();
+                last_seen_seqno_ = write_set_.last_seen();
                 assert(last_seen_seqno_ >= 0);
             }
-            timestamp_       = write_set_in_.timestamp();
+            timestamp_       = write_set_.timestamp();
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT);
@@ -254,7 +254,7 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
 
     assert(version() >= WS_NG_VERSION);
 
-    const DataSetIn& ws(write_set_in_.dataset());
+    const DataSetIn& ws(write_set_.dataset());
 
     ws.rewind(); // make sure we always start from the beginning
 
@@ -291,9 +291,9 @@ galera::TrxHandleSlave::unordered(void*                recv_ctx,
 {
     assert(version() >= WS_NG_VERSION);
 
-    if (NULL != cb && write_set_in_.unrdset().count() > 0)
+    if (NULL != cb && write_set_.unrdset().count() > 0)
     {
-        const DataSetIn& unrd(write_set_in_.unrdset());
+        const DataSetIn& unrd(write_set_.unrdset());
         for (int i(0); i < unrd.count(); ++i)
         {
             const gu::Buf data = unrd.next();

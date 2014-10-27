@@ -299,7 +299,7 @@ namespace galera
 
         void verify_checksum() const /* throws */
         {
-            write_set_in_.verify_checksum();
+            write_set_.verify_checksum();
         }
 
         void update_stats(gu::Atomic<long long>& kc,
@@ -309,10 +309,10 @@ namespace galera
         {
             assert(version() >= WS_NG_VERSION);
 
-            kc += write_set_in_.keyset().count();
-            kb += write_set_in_.keyset().size();
-            db += write_set_in_.dataset().size();
-            ub += write_set_in_.unrdset().size();
+            kc += write_set_.keyset().count();
+            kb += write_set_.keyset().size();
+            db += write_set_.dataset().size();
+            ub += write_set_.unrdset().size();
         }
 
         void set_received (const void*   action,
@@ -333,7 +333,7 @@ namespace galera
 
         void mark_certified()
         {
-            if (write_set_in_.size() > 0)
+            if (write_set_.size() > 0)
             {
                 int dw(0);
 
@@ -342,7 +342,7 @@ namespace galera
                     dw = global_seqno_ - depends_seqno_;
                 }
 
-                write_set_in_.set_seqno(global_seqno_, dw);
+                write_set_.set_seqno(global_seqno_, dw);
             }
 
             certified_ = true;
@@ -373,7 +373,11 @@ namespace galera
 
         wsrep_seqno_t depends_seqno()   const { return depends_seqno_; }
 
-        const WriteSetIn&  write_set_in () const { return write_set_in_;  }
+        const wsrep_uuid_t& source_id() const { return write_set_.source_id(); }
+        wsrep_conn_id_t     conn_id()   const { return write_set_.conn_id();   }
+        wsrep_trx_id_t      trx_id()    const { return write_set_.trx_id();    }
+
+        const WriteSetIn&  write_set () const { return write_set_;  }
 
         bool   exit_loop() const { return exit_loop_; }
         void   set_exit_loop(bool x) { exit_loop_ |= x; }
@@ -382,8 +386,6 @@ namespace galera
                                  std::pair<bool, bool>,
                                  KeyEntryPtrHash,
                                  KeyEntryPtrEqualAll> CertKeySet;
-
-        CertKeySet& cert_keys() { return cert_keys_; }
 
         void print(std::ostream& os) const;
 
@@ -426,8 +428,7 @@ namespace galera
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             mem_pool_          (mp),
-            write_set_in_      (),
-            cert_keys_         (),
+            write_set_         (),
             mutex_             (),
             buf_               (buf),
             action_            (0),
@@ -446,8 +447,7 @@ namespace galera
         wsrep_seqno_t          last_seen_seqno_;
         wsrep_seqno_t          depends_seqno_;
         gu::MemPool<true>&     mem_pool_;
-        WriteSetIn             write_set_in_;
-        CertKeySet             cert_keys_;
+        WriteSetIn             write_set_;
         gu::Mutex mutable      mutex_;
         void* const            buf_;
         const void*            action_;

@@ -426,8 +426,9 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
     gu_trace(apply_monitor_.enter(ao));
     trx->set_state(TrxHandle::S_APPLYING);
 
-    wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
-                             trx->depends_seqno()};
+    wsrep_trx_meta_t meta = { { state_uuid_,      trx->global_seqno() },
+                              { trx->source_id(), trx->trx_id()       },
+                              trx->depends_seqno() };
 
     gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx, meta));
     /* at this point any exception in apply_trx_ws() is fatal, not
