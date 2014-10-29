@@ -352,6 +352,36 @@ namespace gcomm
         static std::string const EvsMaxInstallTimeouts;
 
         /*!
+         * @brief Margin over keepalive period after which node is declared
+         *        delayed. This should be greater than the largest RTT
+         *        between cluster nodes.
+         */
+        static std::string const EvsDelayMargin;
+
+        /*!
+         * @brief Period which determines how long delayed node is kept in
+         *        delayed list after it becomes responsive again.
+         *
+         * The actual time that node stays in delayed list is
+         * EvsDelayedKeepPeriod times the number of changes between
+         * OK and DELAYED state.
+         */
+        static std::string const EvsDelayedKeepPeriod;
+
+        /*!
+         * @brief List of nodes (UUIDs) that should be evicted permanently from
+         * cluster.
+         *
+         * Setting value to nil UUID will clear the evict list.
+         */
+        static std::string const EvsEvict;
+
+        /*!
+         * @brief Autoevict threshold.
+         */
+        static std::string const EvsAutoEvict;
+
+        /*!
          * @brief PC scheme for transport URI ("pc")
          */
         static std::string const PcScheme;

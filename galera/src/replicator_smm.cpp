@@ -163,7 +163,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
-    ist_sst_            (false),
     gcache_             (config_, data_dir_),
     gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -385,9 +384,22 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     {
         if (state_() != S_CLOSING)
         {
-            log_warn << "Broken shutdown sequence, provider state: "
-                     << state_() << ", retval: " << retval;
-            assert (0);
+            if (retval == WSREP_OK)
+            {
+                log_warn << "Broken shutdown sequence, provider state: "
+                         << state_() << ", retval: " << retval;
+                assert (0);
+            }
+            else
+            {
+                // Generate zero view before exit to notify application
+                wsrep_view_info_t* err_view(galera_view_info_create(0, false));
+                void* fake_sst_req(0);
+                size_t fake_sst_req_len(0);
+                view_cb_(app_ctx_, recv_ctx, err_view, 0, 0,
+                         &fake_sst_req, &fake_sst_req_len);
+                free(err_view);
+            }
             /* avoid abort in production */
             state_.shift_to(S_CLOSING);
         }
@@ -1179,9 +1191,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     }
 
     try {
-        // #557 - remove this if() when we return back to joining after SST
-        if (!ist_sst_ || rcode < 0) gcs_.join(seqno);
-        ist_sst_ = false;
+        gcs_.join(seqno);
         return WSREP_OK;
     }
     catch (gu::Exception& e)

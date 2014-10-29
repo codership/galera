@@ -38,8 +38,6 @@ using namespace std::rel_ops;
     else log_info << self_string() << ": "
 
 
-// const int gcomm::evs::Proto::max_version_(GCOMM_EVS_MAX_VERSION);
-
 gcomm::evs::Proto::Proto(gu::Config&    conf,
                          const UUID&    my_uuid,
                          SegmentId      segment,
@@ -51,7 +49,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     timers_(),
     version_(check_range(Conf::EvsVersion,
                          param<int>(conf, uri, Conf::EvsVersion, "0"),
-                         0, max_version_ + 1)),
+                         0, GCOMM_PROTOCOL_MAX_VERSION + 1)),
     debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report_(gu::datetime::Date::now()),
@@ -144,9 +142,15 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                         Defaults::EvsStatsReportPeriodMin),
                     gu::datetime::Period::max())),
     causal_keepalive_period_(retrans_period_),
+    delay_margin_(param<gu::datetime::Period>(
+                      conf, uri, Conf::EvsDelayMargin,
+                      Defaults::EvsDelayMargin)),
+    delayed_keep_period_(param<gu::datetime::Period>(
+                             conf, uri, Conf::EvsDelayedKeepPeriod,
+                             Defaults::EvsDelayedKeepPeriod)),
     last_inactive_check_   (gu::datetime::Date::now()),
     last_causal_keepalive_ (gu::datetime::Date::now()),
-    current_view_(ViewId(V_TRANS, my_uuid,
+    current_view_(0, ViewId(V_TRANS, my_uuid,
                          rst_view ? rst_view -> id().seq() + 1 : 0)),
     previous_view_(),
     previous_views_(),
@@ -186,7 +190,10 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     state_(S_CLOSED),
     shift_to_rfcnt_(0),
     pending_leave_(false),
-    isolation_end_(gu::datetime::Date::zero())
+    isolation_end_(gu::datetime::Date::zero()),
+    delayed_list_(),
+    auto_evict_(param<size_t>(conf, uri, Conf::EvsAutoEvict,
+                              Defaults::EvsAutoEvict))
 {
     log_info << "EVS version " << version_;
 
@@ -208,12 +215,13 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     conf.set(Conf::EvsDebugLogMask, gu::to_string(debug_mask_, std::hex));
     conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask_, std::hex));
     conf.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts_));
-
+    conf.set(Conf::EvsDelayMargin, gu::to_string(delay_margin_));
+    conf.set(Conf::EvsDelayedKeepPeriod, gu::to_string(delayed_keep_period_));
+    conf.set(Conf::EvsAutoEvict, gu::to_string(auto_evict_));
     //
 
     known_.insert_unique(
-        std::make_pair(my_uuid_,
-                       Node(inactive_timeout_, suspect_timeout_)));
+        std::make_pair(my_uuid_, Node(*this)));
     self_i_ = known_.begin();
     assert(NodeMap::value(self_i_).operational() == true);
 
@@ -244,7 +252,17 @@ gcomm::evs::Proto::~Proto()
 bool
 gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 {
-    if (key == gcomm::Conf::EvsSendWindow)
+    if (key == gcomm::Conf::EvsVersion)
+    {
+        version_ = check_range(Conf::EvsVersion,
+                               gu::from_string<int>(val),
+                               0, GCOMM_PROTOCOL_MAX_VERSION + 1);
+        conf_.set(Conf::EvsVersion, gu::to_string(version_));
+        // trigger configuration change to propagate version
+        shift_to(S_GATHER, true);
+        return true;
+    }
+    else if (key == gcomm::Conf::EvsSendWindow)
     {
         send_window_ = check_range(Conf::EvsSendWindow,
                                    gu::from_string<seqno_t>(val),
@@ -303,10 +321,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsSuspectTimeoutMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsSuspectTimeout, gu::to_string(suspect_timeout_));
-        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
-        {
-            NodeMap::value(i).set_suspect_timeout(suspect_timeout_);
-        }
         reset_timer(T_INACTIVITY);
         return true;
     }
@@ -318,10 +332,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<gu::datetime::Period>(Defaults::EvsInactiveTimeoutMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsInactiveTimeout, gu::to_string(inactive_timeout_));
-        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
-        {
-            NodeMap::value(i).set_inactive_timeout(inactive_timeout_);
-        }
         reset_timer(T_INACTIVITY);
         return true;
     }
@@ -375,6 +385,51 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         conf_.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate_));
         return true;
     }
+    else if (key == Conf::EvsDelayMargin)
+    {
+        delay_margin_ = gu::from_string<gu::datetime::Period>(val);
+        conf_.set(Conf::EvsDelayMargin, gu::to_string(delay_margin_));
+        return true;
+    }
+    else if (key == Conf::EvsDelayedKeepPeriod)
+    {
+        delayed_keep_period_ = gu::from_string<gu::datetime::Period>(val);
+        conf_.set(Conf::EvsDelayedKeepPeriod,
+                  gu::to_string(delayed_keep_period_));
+        return true;
+    }
+    else if (key == Conf::EvsEvict)
+    {
+        if (val.size())
+        {
+            UUID uuid;
+            std::istringstream is(val);
+            uuid.read_stream(is);
+            log_info << "Evicting node " << uuid << " permanently from cluster";
+            evict(uuid);
+            if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)
+            {
+                shift_to(S_GATHER, true);
+            }
+        }
+        else
+        {
+            Protolay::EvictList::const_iterator i, i_next;
+            for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
+            {
+                i_next = i, ++i_next;
+                log_info << "unevicting " << Protolay::EvictList::key(i);
+                unevict(Protolay::EvictList::key(i));
+            }
+        }
+        return true;
+    }
+    else if (key == Conf::EvsAutoEvict)
+    {
+        auto_evict_ = gu::from_string<size_t>(val);
+        conf_.set(Conf::EvsAutoEvict, gu::to_string(auto_evict_));
+        return true;
+    }
     else if (key == Conf::EvsViewForgetTimeout ||
              key == Conf::EvsInactiveCheckPeriod)
     {
@@ -387,7 +442,39 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
 
 void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
 {
+    status.insert("evs_state", to_string(state_));
     status.insert("evs_repl_latency", safe_deliv_latency_.to_string());
+    std::string delayed_list_str;
+    for (DelayedList::const_iterator i(delayed_list_.begin());
+         i != delayed_list_.end(); ++i)
+    {
+        if (is_evicted(i->first)              == false ||
+            current_view_.is_member(i->first) == true)
+        {
+            delayed_list_str += i->first.full_str()
+                + ":"
+                + i->second.addr()
+                + ":"
+                + gu::to_string(i->second.state_change_cnt());
+            delayed_list_str += ",";
+        }
+    }
+    // Strip trailing comma
+    if (delayed_list_str.empty() == false)
+    {
+        delayed_list_str.resize(delayed_list_str.size() - 1);
+    }
+    status.insert("evs_delayed", delayed_list_str);
+
+    std::string evict_list_str;
+    for (Protolay::EvictList::const_iterator i(evict_list().begin());
+         i != evict_list().end(); )
+    {
+        evict_list_str += EvictList::key(i).full_str();
+        if (++i != evict_list().end()) evict_list_str += ",";
+    }
+    status.insert("evs_evict_list", evict_list_str);
+
     if (info_mask_ & I_STATISTICS)
     {
         status.insert("evs_safe_hs", hs_safe_.to_string());
@@ -522,7 +609,7 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 {
     gu_trace(check_inactive());
     gu_trace(cleanup_views());
-    gu_trace(cleanup_fenced());
+    gu_trace(cleanup_evicted());
 }
 
 
@@ -826,7 +913,6 @@ gu::datetime::Date gcomm::evs::Proto::handle_timers()
 }
 
 
-
 void gcomm::evs::Proto::check_inactive()
 {
     const gu::datetime::Date now(gu::datetime::Date::now());
@@ -844,9 +930,13 @@ void gcomm::evs::Proto::check_inactive()
 
     bool has_inactive(false);
     size_t n_suspected(0);
+    bool do_send_delayed_list(false);
 
-    for (NodeMap::iterator i = known_.begin(); i != known_.end(); ++i)
+    // Iterate over known nodes and check inactive/suspected/delayed status
+    for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
     {
+        if (i == self_i_) continue; // No need to check self
+
         const UUID& node_uuid(NodeMap::key(i));
         Node& node(NodeMap::value(i));
         if (node_uuid                  != uuid()    &&
@@ -878,22 +968,102 @@ void gcomm::evs::Proto::check_inactive()
             has_inactive = true;
         }
 
-        if (node.index() != std::numeric_limits<size_t>::max() &&
-            node.tstamp() + retrans_period_*3 <= now)
+        DelayedList::iterator dli(delayed_list_.find(node_uuid));
+        if (node.seen_tstamp() + retrans_period_ + delay_margin_ <= now)
         {
-            Range range(input_map_->range(node.index()));
-            evs_log_info(I_STATE) << "delayed "
-                                  << node_uuid << " requesting range "
-                                  << Range(range.lu(), last_sent_);
-            if (last_sent_ >= range.lu())
+            if (node.index() != std::numeric_limits<size_t>::max())
             {
-                // Request recovering message from all nodes (indicated
-                // by last arg) to increase probablity of receiving the
-                // message.
-                gu_trace(send_gap(EVS_CALLER, node_uuid, current_view_.id(),
-                                  Range(range.lu(), last_sent_), false, true));
+                // Delayed node in group, check input map state and request
+                // message recovery if necessary
+                Range range(input_map_->range(node.index()));
+                evs_log_info(I_STATE) << "delayed "
+                                      << node_uuid << " requesting range "
+                                      << Range(range.lu(), last_sent_);
+                if (last_sent_ >= range.lu())
+                {
+                    // Request recovering message from all nodes (indicated
+                    // by last arg) to increase probablity of receiving the
+                    // message.
+                    gu_trace(send_gap(EVS_CALLER, node_uuid, current_view_.id(),
+                                      Range(range.lu(), last_sent_),
+                                      false, true));
+                }
+            }
+
+            if (dli == delayed_list_.end())
+            {
+                delayed_list_.insert(
+                    std::make_pair(node_uuid,
+                                   DelayedEntry(get_address(node_uuid))));
+            }
+            else
+            {
+                dli->second.set_tstamp(now);
+                dli->second.set_state(DelayedEntry::S_DELAYED,
+                                      delayed_keep_period_, now);
+                evs_log_debug(D_STATE) << "set '" << dli->first <<
+                        "' delayed state to S_DELAYED , cnt = " <<
+                        dli->second.state_change_cnt();
+                // todo(dirlt): make threshold as a configurable variable ?
+                if (dli->second.state_change_cnt() > 0)
+                {
+                    do_send_delayed_list = true;
+                }
             }
         }
+        else if (dli != delayed_list_.end())
+        {
+            const size_t prev_cnt(dli->second.state_change_cnt());
+            dli->second.set_state(DelayedEntry::S_OK,
+                                  delayed_keep_period_, now);
+            if (prev_cnt != dli->second.state_change_cnt())
+            {
+                dli->second.set_tstamp(now);
+            }
+            evs_log_debug(D_STATE) << "set '" << dli->first <<
+                    "' delayed state to S_OK. prev_cnt = " << prev_cnt <<
+                    ", cur_cnt = " << dli->second.state_change_cnt();
+            if (dli->second.state_change_cnt() > 0)
+            {
+                do_send_delayed_list = true;
+            }
+        }
+    }
+
+    // Clean up delayed list and evict list messages
+    {
+        DelayedList::iterator i, i_next;
+        for (i = delayed_list_.begin(); i != delayed_list_.end(); i = i_next)
+        {
+            i_next = i, ++i_next;
+            // State change count has decayed back to zero
+            // or node is already evicted and not in the current view
+            // anymore.
+            if ((i->second.state_change_cnt() == 0 &&
+                 i->second.state() == DelayedEntry::S_OK) ||
+                (is_evicted(i->first) == true &&
+                 current_view_.is_member(i->first) == false))
+            {
+                log_debug << "remove '" << i->first << "' from delayed_list";
+                delayed_list_.erase(i);
+            }
+        }
+        for (NodeMap::iterator i(known_.begin()); i != known_.end(); ++i)
+        {
+            Node& node(NodeMap::value(i));
+            const DelayedListMessage* const elm(node.delayed_list_message());
+            if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
+            {
+                log_info << "discarding expired elm from " << elm->source();
+                node.set_delayed_list_message(0);
+            }
+        }
+    }
+
+    if (current_view_.version() > 0 &&
+        do_send_delayed_list == true && auto_evict_ > 0)
+    {
+        send_delayed_list();
     }
 
     // All other nodes are under suspicion, set all others as inactive.
@@ -939,7 +1109,6 @@ void gcomm::evs::Proto::check_inactive()
         log_info << "ending isolation";
         isolation_end_ = gu::datetime::Date::zero();
     }
-
 }
 
 
@@ -997,17 +1166,17 @@ void gcomm::evs::Proto::cleanup_views()
     }
 }
 
-void gcomm::evs::Proto::cleanup_fenced()
+void gcomm::evs::Proto::cleanup_evicted()
 {
     gu::datetime::Date now(gu::datetime::Date::now());
-    Protolay::FenceList::const_iterator i, i_next;
-    for (i = fence_list().begin(); i != fence_list().end(); i = i_next)
+    Protolay::EvictList::const_iterator i, i_next;
+    for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
     {
         i_next = i, ++i_next;
-        if (Protolay::FenceList::value(i) + view_forget_timeout_ <= now)
+        if (Protolay::EvictList::value(i) + view_forget_timeout_ <= now)
         {
-            log_info << "unfencing " << Protolay::FenceList::key(i);
-            unfence(Protolay::FenceList::key(i));
+            log_info << "unevicting " << Protolay::EvictList::key(i);
+            unevict(Protolay::EvictList::key(i));
         }
     }
 }
@@ -1027,7 +1196,7 @@ void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
                                          const View& prev_view)
 {
 
-    View view(im.install_view_id());
+    View view(im.version(), im.install_view_id());
     for (MessageNodeList::const_iterator i(im.node_list().begin());
          i != im.node_list().end(); ++i)
     {
@@ -1057,9 +1226,9 @@ void gcomm::evs::Proto::deliver_reg_view(const InstallMessage& im,
             // Partitioned set is constructed after this loop
         }
 
-        // If node has been fenced, it should have been added to
-        // fenced list via JOIN messages.
-        assert(mn.fenced() == false || is_fenced(uuid) == true);
+        // If node has been evicted, it should have been added to
+        // evicted list via JOIN messages.
+        assert(mn.evicted() == false || is_evicted(uuid) == true);
     }
 
     // Loop over previous view and add each node not in new view
@@ -1101,7 +1270,8 @@ void gcomm::evs::Proto::deliver_trans_view(const InstallMessage& im,
     // and members going to be in the next view that come from
     // curr_view according to install message
 
-    View view(ViewId(V_TRANS,
+    View view(current_view_.version(),
+              ViewId(V_TRANS,
                      curr_view.id().uuid(),
                      curr_view.id().seq()));
 
@@ -1162,7 +1332,7 @@ void gcomm::evs::Proto::deliver_trans_view(const InstallMessage& im,
 
 void gcomm::evs::Proto::deliver_empty_view()
 {
-    View view(V_REG);
+    View view(0, V_REG);
 
     evs_log_info(I_VIEWS) << "delivering view " << view;
 
@@ -1576,7 +1746,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         const UUID& node_uuid(NodeMap::key(i));
         const Node& node(NodeMap::value(i));
         MessageNode mnode(node.operational(), node.suspected(),
-                          is_fenced(node_uuid));
+                          is_evicted(node_uuid));
         if (node_uuid != uuid())
         {
             const JoinMessage* jm(node.join_message());
@@ -1590,7 +1760,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     -1,
                                     jm->source_view_id(),
                                     (nsv == current_view_.id() ?
@@ -1606,7 +1776,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     lm->seq(),
                                     nsv,
                                     (nsv == current_view_.id() ?
@@ -1621,7 +1791,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 mnode = MessageNode(node.operational(),
                                     node.is_suspected(),
                                     node.segment(),
-                                    is_fenced(node_uuid),
+                                    is_evicted(node_uuid),
                                     -1,
                                     current_view_.id(),
                                     input_map_->safe_seq(node.index()),
@@ -1633,7 +1803,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             mnode = MessageNode(true,
                                 false,
                                 node.segment(),
-                                is_fenced(node_uuid),
+                                is_evicted(node_uuid),
                                 -1,
                                 current_view_.id(),
                                 input_map_->safe_seq(node.index()),
@@ -1642,15 +1812,16 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         gu_trace((void)node_list->insert_unique(std::make_pair(node_uuid, mnode)));
     }
 
-    // Iterate over fenced_list and add fenced nodes not yet in node list.
-    for (Protolay::FenceList::const_iterator i(fence_list().begin());
-         i != fence_list().end(); ++i)
+    // Iterate over evicted_list and add evicted nodes not yet in node list.
+    for (Protolay::EvictList::const_iterator i(evict_list().begin());
+         i != evict_list().end(); ++i)
     {
-        if (node_list->find(Protolay::FenceList::key(i)) == node_list->end())
+        if (node_list->find(Protolay::EvictList::key(i)) == node_list->end())
         {
-            MessageNode mnode(false, false, true);
+            // default arguments are evil.
+            MessageNode mnode(false, false, 0, true);
             gu_trace((void)node_list->insert_unique(
-                         std::make_pair(Protolay::FenceList::key(i), mnode)));
+                         std::make_pair(Protolay::EvictList::key(i), mnode)));
         }
     }
 
@@ -1797,24 +1968,47 @@ struct ViewIdCmp
 };
 
 
+struct ProtoVerCmp
+{
+    bool operator()(const gcomm::evs::NodeMap::value_type& a,
+                    const gcomm::evs::NodeMap::value_type& b) const
+    {
+        using gcomm::evs::NodeMap;
+        gcomm_assert(NodeMap::value(a).join_message() != 0 &&
+                     NodeMap::value(b).join_message() != 0);
+        return (NodeMap::value(a).join_message()->version() <
+                NodeMap::value(b).join_message()->version());
+
+    }
+};
+
 void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
 {
     gcomm_assert(consensus_.is_consensus() == true &&
                  is_representative(uuid()) == true) << *this;
 
+    // Select list of operational nodes from known
     NodeMap oper_list;
     for_each(known_.begin(), known_.end(), OperationalSelect(oper_list));
     NodeMap::const_iterator max_node =
         max_element(oper_list.begin(), oper_list.end(), ViewIdCmp());
 
+    // Compute maximum known view id seq
     max_view_id_seq_ =
         std::max(max_view_id_seq_,
                  NodeMap::value(max_node).join_message()->source_view_id().seq());
 
+    // Compute highest commonly supported protocol version.
+    // Oper_list is non-empty, join message existence is asserted.
+    const int version(
+        NodeMap::value(
+            std::min_element(oper_list.begin(), oper_list.end(),
+                             ProtoVerCmp())).join_message()->version());
+
     MessageNodeList node_list;
     populate_node_list(&node_list);
 
-    InstallMessage imsg(version_,
+    InstallMessage imsg(version,
                         uuid(),
                         current_view_.id(),
                         ViewId(V_REG, uuid(), max_view_id_seq_ + attempt_seq_),
@@ -1840,6 +2034,21 @@ void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
     handle_install(imsg, self_i_);
 }
 
+
+void gcomm::evs::Proto::send_delayed_list()
+{
+    DelayedListMessage elm(version_, uuid(), current_view_.id(), ++fifo_seq_);
+    for (DelayedList::const_iterator i(delayed_list_.begin());
+         i != delayed_list_.end(); ++i)
+    {
+        elm.add(i->first, i->second.state_change_cnt());
+    }
+    gu::Buffer buf;
+    serialize(elm, buf);
+    Datagram dg(buf);
+    (void)send_down(dg, ProtoDownMeta());
+    handle_delayed_list(elm, self_i_);
+}
 
 void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
 {
@@ -2021,8 +2230,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     NodeMap::iterator i;
     gu_trace(i = known_.insert_unique(
-                 std::make_pair(
-                     source, Node(inactive_timeout_, suspect_timeout_))));
+                 std::make_pair(source, Node(*this))));
     assert(NodeMap::value(i).operational() == true);
 
     if (state() == S_JOINING || state() == S_GATHER ||
@@ -2047,9 +2255,15 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 }
 
 void gcomm::evs::Proto::handle_msg(const Message& msg,
-                                   const Datagram& rb)
+                                   const Datagram& rb,
+                                   bool direct)
 {
-    assert(msg.type() <= Message::T_LEAVE);
+    assert(msg.type() <= Message::T_DELAYED_LIST);
+    if (msg.type() > Message::T_DELAYED_LIST)
+    {
+        return;
+    }
+
     if (state() == S_CLOSED)
     {
         return;
@@ -2068,9 +2282,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         return;
     }
 
-    if (msg.version() != version_)
+    if (msg.version() > GCOMM_PROTOCOL_MAX_VERSION)
     {
-        log_info << "incompatible protocol version " << msg.version();
+        log_info << "incompatible protocol version "
+                 << static_cast<int>(msg.version());
         return;
     }
 
@@ -2086,6 +2301,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     }
 
     Node& node(NodeMap::value(ii));
+    if (direct == true)
+    {
+        node.set_seen_tstamp(gu::datetime::Date::now());
+    }
 
     if (node.operational()                 == false &&
         node.leave_message()               == 0     &&
@@ -2187,6 +2406,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     case Message::T_INSTALL:
         gu_trace(handle_install(static_cast<const InstallMessage&>(msg), ii));
         break;
+    case Message::T_DELAYED_LIST:
+        gu_trace(handle_delayed_list(
+                     static_cast<const DelayedListMessage&>(msg), ii));
+        break;
     default:
         log_warn << "invalid message type " << msg.type();
     }
@@ -2242,6 +2465,10 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
         gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
+    case Message::T_DELAYED_LIST:
+        gu_trace(offset = static_cast<DelayedListMessage&>(*msg).unserialize(
+                     begin, available, offset, true));
+        break;
     }
     return (offset + rb.offset());
 }
@@ -2253,7 +2480,7 @@ void gcomm::evs::Proto::handle_up(const void* cid,
 
     Message msg;
 
-    if (state() == S_CLOSED || um.source() == uuid())
+    if (state() == S_CLOSED || um.source() == uuid() || is_evicted(um.source()))
     {
         // Silent drop
         return;
@@ -2265,7 +2492,8 @@ void gcomm::evs::Proto::handle_up(const void* cid,
     {
         size_t offset;
         gu_trace(offset = unserialize_message(um.source(), rb, &msg));
-        handle_msg(msg, Datagram(rb, offset));
+        handle_msg(msg, Datagram(rb, offset),
+                   (msg.flags() & Message::F_RETRANS) == 0);
     }
     catch (gu::Exception& e)
     {
@@ -2453,7 +2681,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                                            NodeMap::value(self_i_).index()),
                                        input_map_->range(
                                            NodeMap::value(self_i_).index()))));
-        InstallMessage im(version_,
+        InstallMessage im(0,
                           uuid(),
                           current_view_.id(),
                           ViewId(V_REG, uuid(), current_view_.id().seq() + 1),
@@ -2574,7 +2802,19 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                   std::inserter(previous_views_, previous_views_.end()));
         gather_views_.clear();
 
-        current_view_ = View(install_message_->install_view_id());
+        if (install_message_->version() > current_view_.version())
+        {
+            log_info << "EVS version upgrade " << current_view_.version()
+                     << " -> " << static_cast<int>(install_message_->version());
+        }
+        else if (install_message_->version() < current_view_.version())
+        {
+            log_info << "EVS version downgrade " << current_view_.version()
+                     << " -> " << static_cast<int>(install_message_->version());
+        }
+
+        current_view_ = View(install_message_->version(),
+                             install_message_->install_view_id());
         size_t idx = 0;
 
         const MessageNodeList& imnl(install_message_->node_list());
@@ -3211,7 +3451,7 @@ void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
     Message umsg;
     size_t offset;
     gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
-    gu_trace(handle_msg(umsg, Datagram(rb, offset)));
+    gu_trace(handle_msg(umsg, Datagram(rb, offset), false));
 }
 
 
@@ -3985,8 +4225,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     }
 
     // Collect view ids to gather_views_ list.
-    // Add unseen nodes to known list and fenced nodes to fenced list.
-    // Fenced nodes must also be added to known list for GATHER time
+    // Add unseen nodes to known list and evicted nodes to evicted list.
+    // Evicted nodes must also be added to known list for GATHER time
     // bookkeeping.
     // No need to adjust node state here, it is done later on in
     // check_suspects()/cross_check_inactives().
@@ -4001,15 +4241,17 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (ni == known_.end())
         {
             known_.insert_unique(
-                std::make_pair(mn_uuid,
-                               Node(inactive_timeout_, suspect_timeout_)));
+                std::make_pair(mn_uuid, Node(*this)));
         }
 
-        // Fence nodes according to join message
-        if (mn_uuid != uuid() && mn.fenced() == true)
+        // Evict nodes according to join message
+        if (mn_uuid != uuid() && mn.evicted() == true)
         {
             set_inactive(mn_uuid);
-            fence(mn_uuid);
+            if (is_evicted(mn_uuid) == false)
+            {
+                evict(mn_uuid);
+            }
         }
     }
 
@@ -4358,5 +4600,115 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         profile_enter(shift_to_prof_);
         gu_trace(shift_to(S_GATHER, true));
         profile_leave(shift_to_prof_);
+    }
+}
+
+
+void gcomm::evs::Proto::handle_delayed_list(const DelayedListMessage& msg,
+                                          NodeMap::iterator ii)
+{
+    if (auto_evict_ == 0)
+    {
+        // Ignore evict list messages if auto_evict_ is disabled.
+        return;
+    }
+
+    Node& node(NodeMap::value(ii));
+    node.set_delayed_list_message(&msg);
+    gu::datetime::Date now(gu::datetime::Date::now());
+
+    // Construct a list of evict candidates that appear in evict list messages
+    // with cnt greater than local auto_evict_. If evict candidate is reported
+    // by majority of the current group, evict process is triggered.
+
+    // UUID -> over auto_evict_, total count
+    typedef std::map<UUID, std::pair<size_t, size_t> > Evicts;
+    Evicts evicts;
+    bool found(false);
+
+    for (NodeMap::const_iterator i(known_.begin()); i != known_.end(); ++i)
+    {
+        const DelayedListMessage* const dlm(
+            NodeMap::value(i).delayed_list_message());
+        if (dlm == 0)
+        {
+            continue;
+        }
+        else if (dlm->delayed_list().find(uuid()) != dlm->delayed_list().end())
+        {
+            evs_log_debug(D_STATE)
+                << "found self " << uuid() << " from evict list from "
+                << msg.source() << " at " << get_address(msg.source());
+            continue;
+        }
+        else if (dlm->tstamp() + delayed_keep_period_ < now)
+        {
+            evs_log_debug(D_STATE) << "ignoring expired evict message";
+            continue;
+        }
+
+        for (DelayedListMessage::DelayedList::const_iterator
+                 dlm_i(dlm->delayed_list().begin());
+             dlm_i != dlm->delayed_list().end();
+             ++dlm_i)
+        {
+            if (dlm_i->second <= 1)
+            {
+                // Don't consider entries with single delayed event as
+                // evict candidates.
+                continue;
+            }
+
+            std::pair<Evicts::iterator, bool> eir(
+                evicts.insert(
+                    std::make_pair(
+                        dlm_i->first, std::make_pair(0, 0))));
+            evs_log_debug(D_STATE) << "eir " << eir.first->first
+                                   << " " << eir.first->second.first
+                                   << " " << eir.first->second.second;
+            ++eir.first->second.second; // total count
+            if (dlm_i->second >= auto_evict_)
+            {
+                ++eir.first->second.first; // over threshold count
+                found = true;
+            }
+        }
+    }
+
+    // Evict candidates that have reached threshold count
+    for (Evicts::const_iterator i(evicts.begin());
+         found == true && i != evicts.end(); ++i)
+    {
+        if (is_evicted(i->first) == true)
+        {
+            // Already evicted, avoid spamming
+            continue;
+        }
+        evs_log_info(I_STATE) << "evict candidate "
+                              << i->first << " " << i->second.first
+                              << " " << i->second.second;
+        // If the candidate is in the current view, require majority
+        // of the view to agree. If the candidate is not in the current
+        // view, require majority of known nodes to agree. Ability to
+        // evict nodes outside of the group (even while in non-PC) is
+        // needed to stabilize cluster also in the case that nodes
+        // have already partitioned.
+
+        // TODO: Record stable views from PC and use weights from there
+        // accordingly (need to be added to view).
+        if (i->second.first != 0 &&
+            ((current_view_.is_member(i->first) &&
+              i->second.second > current_view_.members().size()/2) ||
+             i->second.second > known_.size()/2))
+        {
+            log_warn << "evicting member " << i->first
+                     << " at " << get_address(i->first)
+                     << " permanently from group";
+            evict(i->first);
+            if (state() == S_OPERATIONAL)
+            {
+                shift_to(S_GATHER, true);
+            }
+        }
     }
 }

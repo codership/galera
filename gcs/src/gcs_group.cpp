@@ -809,7 +809,7 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
 }
 
 static int
-group_find_node_by_state (gcs_group_t*     const group,
+group_find_node_by_state (const gcs_group_t*     const group,
                           int              const joiner_idx,
                           gcs_node_state_t const status)
 {
@@ -850,7 +850,7 @@ group_find_node_by_state (gcs_group_t*     const group,
 }
 
 static int
-group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
+group_find_node_by_name (const gcs_group_t* const group, int const joiner_idx,
                          const char* const name, int const name_len,
                          gcs_node_state_t const status)
 {
@@ -884,7 +884,7 @@ group_find_node_by_name (gcs_group_t* const group, int const joiner_idx,
 /* Calls group_find_node_by_name() for each name in comma-separated list,
  * falls back to group_find_node_by_state() if name (or list) is empty. */
 static int
-group_for_each_donor_in_string (gcs_group_t* const group,
+group_for_each_donor_in_string (const gcs_group_t* const group,
                                 int const str_version,
                                 int const joiner_idx,
                                 const char* const str, int const str_len,
@@ -944,7 +944,7 @@ group_for_each_donor_in_string (gcs_group_t* const group,
 }
 
 static gcs_seqno_t
-group_lowest_cached_seqno(gcs_group_t* const group)
+group_lowest_cached_seqno(const gcs_group_t* const group)
 {
     gcs_seqno_t ret = GCS_SEQNO_ILL;
     int idx = 0;
@@ -963,7 +963,7 @@ group_lowest_cached_seqno(gcs_group_t* const group)
 }
 
 static int
-group_find_ist_donor_by_name (gcs_group_t* const group,
+group_find_ist_donor_by_name (const gcs_group_t* const group,
                               int joiner_idx,
                               const char* name, int  name_len,
                               gcs_seqno_t ist_seqno,
@@ -989,7 +989,7 @@ group_find_ist_donor_by_name (gcs_group_t* const group,
 
 static int
 group_find_ist_donor_by_name_in_string (
-    gcs_group_t* const group,
+    const gcs_group_t* const group,
     int joiner_idx,
     const char* str, int str_len,
     gcs_seqno_t ist_seqno,
@@ -1039,7 +1039,7 @@ group_find_ist_donor_by_name_in_string (
 }
 
 static int
-group_find_ist_donor_by_state (gcs_group_t* const group,
+group_find_ist_donor_by_state (const gcs_group_t* const group,
                                int joiner_idx,
                                gcs_seqno_t ist_seqno,
                                gcs_node_state_t status)
@@ -1094,7 +1094,7 @@ group_find_ist_donor_by_state (gcs_group_t* const group,
 }
 
 static int
-group_find_ist_donor (gcs_group_t* const group,
+group_find_ist_donor (const gcs_group_t* const group,
                       int str_version,
                       int joiner_idx,
                       const char* str, int str_len,
@@ -1140,7 +1140,7 @@ group_find_ist_donor (gcs_group_t* const group,
 }
 
 int
-gcs_group_find_donor(gcs_group_t* group,
+gcs_group_find_donor(const gcs_group_t* group,
                      int const str_version,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,
@@ -1451,7 +1451,7 @@ gcs_group_act_conf (gcs_group_t*    group,
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)
 static gcs_state_msg_t*
-group_get_node_state (gcs_group_t* const group, long const node_idx)
+group_get_node_state (const gcs_group_t* const group, long const node_idx)
 {
     const gcs_node_t* const node = &group->nodes[node_idx];
 
@@ -1490,7 +1490,7 @@ group_get_node_state (gcs_group_t* const group, long const node_idx)
 
 /*! Returns state message object for this node */
 gcs_state_msg_t*
-gcs_group_get_state (gcs_group_t* group)
+gcs_group_get_state (const gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
