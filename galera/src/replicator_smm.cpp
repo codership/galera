@@ -950,7 +950,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
             for (unsigned int i(0); i < repld.size(); ++i)
             {
                 TrxHandleSlave* const tr(repld[i]);
-                wsrep_trx_meta_t meta = {{state_uuid_, tr->global_seqno() },
+                wsrep_trx_meta_t meta = {{ state_uuid_,     tr->global_seqno() },
+                                         { tr->source_id(), tr->trx_id()       },
                                          tr->depends_seqno()};
 
                 gu_trace(
