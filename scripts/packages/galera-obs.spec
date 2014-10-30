@@ -16,7 +16,7 @@
 # MA  02110-1301  USA.
 
 %define name galera
-%define version 3.x
+%define version %(echo ${GALERA_VERSION:-"3.x"})
 %define release 1
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
@@ -28,19 +28,16 @@ Group:         System Environment/Libraries
 Version:       %{version}
 Release:       %{release}
 License:       GPL-2.0
-Source:        %{version}.tar.gz
+Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
 Packager:      Codership Oy
 Vendor:        Codership Oy
 
 BuildRoot:     %{_tmppath}/%{name}-%{version}-build
 
-BuildRequires: autoconf
-BuildRequires: automake
 BuildRequires: boost-devel
 BuildRequires: check-devel
 BuildRequires: glibc-devel
-BuildRequires: libtool
 BuildRequires: openssl-devel
 BuildRequires: scons
 %if 0%{?suse_version} == 1110
@@ -90,7 +87,7 @@ export CC=gcc-4.7
 export CXX=g++-4.7
 %endif
 
-scons
+scons -j$(echo ${NUM_JOBS:-"1"})
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3.x-17.1.x86_64
