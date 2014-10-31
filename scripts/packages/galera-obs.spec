@@ -16,8 +16,8 @@
 # MA  02110-1301  USA.
 
 %define name galera
-%define version %(echo ${GALERA_VERSION:-"3.x"})
-%define release 1
+%{!?version: %define version 3.x}
+%{!?release: %define release 1}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
