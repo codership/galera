@@ -45,9 +45,21 @@ BuildRequires: openssl-devel
 BuildRequires: scons
 %if 0%{?suse_version} == 1110
 # On SLES11 SPx use the linked gcc47 to build instead of default gcc43
-BuildRequires: gcc47-c++
+BuildRequires: gcc47 gcc47-c++
 # On SLES11 SP2 the libgfortran.3.so provider must be explicitly defined
 BuildRequires: libgfortran3
+# On SLES11 we got error "conflict for provider of libgcc_s1 >= 4.7.4_20140612-2.1
+# needed by gcc47, (provider libgcc_s1 conflicts with installed libgcc43),
+# conflict for provider of libgomp1 >= 4.7.4_20140612-2.1 needed by gcc47,
+# (provider libgomp1 conflicts with installed libgomp43), conflict for provider
+# of libstdc++6 >= 4.7.4_20140612-2.1 needed by libstdc++47-devel,
+# (provider libstdc++6 conflicts with installed libstdc++43)
+# therefore:
+Prefer: libgcc_s1
+Prefer: libgomp1
+Prefer: libstdc++6
+# SLES11 SP2 in addition also showed error "nothing provides ia32el needed by
+# libgcc_s1-x86, nothing provides glibc-x86 needed by libgcc_s1-x86"
 %else
 BuildRequires: gcc-c++
 %endif
