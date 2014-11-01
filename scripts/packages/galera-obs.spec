@@ -55,9 +55,9 @@ BuildRequires: libgfortran3
 # of libstdc++6 >= 4.7.4_20140612-2.1 needed by libstdc++47-devel,
 # (provider libstdc++6 conflicts with installed libstdc++43)
 # therefore:
-Prefer: libgcc_s1
-Prefer: libgomp1
-Prefer: libstdc++6
+BuildRequires: libgcc_s1
+BuildRequires: libgomp1
+BuildRequires: libstdc++6
 # SLES11 SP2 in addition also showed error "nothing provides ia32el needed by
 # libgcc_s1-x86, nothing provides glibc-x86 needed by libgcc_s1-x86"
 %else
