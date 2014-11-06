@@ -257,6 +257,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         version_ = check_range(Conf::EvsVersion,
                                gu::from_string<int>(val),
                                0, GCOMM_PROTOCOL_MAX_VERSION + 1);
+        conf_.set(Conf::EvsVersion, gu::to_string(version_));
         // trigger configuration change to propagate version
         shift_to(S_GATHER, true);
         return true;
@@ -399,12 +400,19 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
     }
     else if (key == Conf::EvsEvict)
     {
-        UUID uuid;
-        std::istringstream is(val);
-        uuid.read_stream(is);
-        conf_.set(Conf::EvsEvict, val);
-
-        if (uuid == UUID::nil())
+        if (val.size())
+        {
+            UUID uuid;
+            std::istringstream is(val);
+            uuid.read_stream(is);
+            log_info << "Evicting node " << uuid << " permanently from cluster";
+            evict(uuid);
+            if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)
+            {
+                shift_to(S_GATHER, true);
+            }
+        }
+        else
         {
             Protolay::EvictList::const_iterator i, i_next;
             for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
@@ -412,15 +420,6 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
                 i_next = i, ++i_next;
                 log_info << "unevicting " << Protolay::EvictList::key(i);
                 unevict(Protolay::EvictList::key(i));
-            }
-        }
-        else
-        {
-            log_info << "Evicting node " << uuid << " permanently from cluster";
-            evict(uuid);
-            if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)
-            {
-                shift_to(S_GATHER, true);
             }
         }
         return true;

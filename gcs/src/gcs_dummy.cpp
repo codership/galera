@@ -214,7 +214,7 @@ GCS_BACKEND_OPEN_FN(dummy_open)
         return 0;
     }
 
-    comp = gcs_comp_msg_new (true, false, 0, 1);
+    comp = gcs_comp_msg_new (true, false, 0, 1, 0);
 
     if (comp) {
         ret = gcs_comp_msg_add (comp, "11111111-2222-3333-4444-555555555555",0);
@@ -243,7 +243,7 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
 
     if (!dummy) return -EBADFD;
 
-    comp = gcs_comp_msg_leave ();
+    comp = gcs_comp_msg_leave (0);
 
     if (comp) {
         ret = gcs_comp_msg_size(comp);
