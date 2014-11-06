@@ -7,7 +7,7 @@
 # chkconfig: - 99 01
 # config: /etc/sysconfig/garb | /etc/default/garb
 #
-# Provides:          garbd
+# Provides:          garb
 # Required-Start:    $network $local_fs $remote_fs
 # Required-Stop:     $network $local_fs $remote_fs
 # Default-Start:     2 3 4 5
@@ -121,7 +121,7 @@ start() {
 	# Find a working node
 	for ADDRESS in ${GALERA_NODES} 0; do
 		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
-		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
+		PORT=$(echo $ADDRESS | cut -s -d \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
 		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
                     nc -z $HOST $PORT >/dev/null && break
