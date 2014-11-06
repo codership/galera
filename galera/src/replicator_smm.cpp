@@ -874,6 +874,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         // continue streaming - add a new fragment handle
 
         gu_trace(commit_monitor_.self_cancel(co));
+        gu_trace(apply_monitor_.self_cancel(ao));
         trx->set_state(TrxHandle::S_EXECUTING);
 
         TrxHandleSlave* const tr(TrxHandleSlave::New(slave_pool_));
