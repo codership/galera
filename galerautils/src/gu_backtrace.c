@@ -3,7 +3,7 @@
 #include "gu_backtrace.h"
 #include "gu_log.h"
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__OpenBSD__)
 #include <execinfo.h>
 #include <stdlib.h>
 
