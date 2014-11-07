@@ -40,7 +40,7 @@ gcache::Page::drop_fs_cache() const
 {
     mmap_.dont_need();
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__OpenBSD__)
     int const err (posix_fadvise (fd_.get(), 0, fd_.size(),
                                   POSIX_FADV_DONTNEED));
     if (err != 0)
