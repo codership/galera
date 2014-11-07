@@ -629,11 +629,14 @@ namespace galera
         void add_replicated(TrxHandleSlave* const ts)
         {
             assert(locked());
-            assert(ts->locked());
+            assert(!ts->locked());
+            ts->lock();
             ts->ref();
             repl_.push_back(ts);
+            assert(repl_.size() > 1); // it should be 1 in ctor already
             // unlock previous fragment
-            if (repl_.size() > 1) repl_[repl_.size() - 2]->unlock();
+            repl_[repl_.size() - 2]->unlock();
+            assert(locked());
         }
 
         WriteSetOut& write_set_out()
