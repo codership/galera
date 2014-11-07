@@ -390,8 +390,8 @@ if ssl == 1:
         print 'ssl support required but asio/ssl.hpp not found or not usable'
         print 'compile with ssl=0 or check that openssl devel headers are usable'
         Exit(1)
-    if conf.CheckLib('ssl'):
-        conf.CheckLib('crypto')
+    if conf.CheckLib('crypto'):
+        conf.CheckLib('ssl')
     else:
         print 'ssl support required but openssl library not found'
         print 'compile with ssl=0 or check that openssl library is usable'
