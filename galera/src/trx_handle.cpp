@@ -228,7 +228,8 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             set_write_set_buffer(buf + offset, buflen - offset);
 
             break;
-        case 3:
+        case WriteSetNG::VER3:
+        case WriteSetNG::VER4:
             write_set_in_.read_buf (buf, buflen);
             write_set_flags_ = wsng_flags_to_trx_flags(write_set_in_.flags());
             source_id_       = write_set_in_.source_id();

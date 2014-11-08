@@ -744,6 +744,7 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
         res = do_test_v1to2(trx, store_keys);
         break;
     case 3:
+    case 4:
         res = do_test_v3(trx, store_keys);
         break;
     default:
@@ -862,6 +863,7 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     case 1:
     case 2:
     case 3:
+    case 4:
         break;
     default:
         gu_throw_fatal << "certification/trx version "

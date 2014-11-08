@@ -37,11 +37,12 @@ namespace galera
 
         enum Version
         {
-            VER3 = 3
+            VER3 = 3,
+            VER4 = 4
         };
 
         /* Max header version that we can understand */
-        static Version const MAX_VERSION = VER3;
+        static Version const MAX_VERSION = VER4;
 
         /* Parses beginning of the header to detect writeset version and
          * returns it as raw integer for backward compatibility
@@ -87,6 +88,7 @@ namespace galera
             switch (v)
             {
             case VER3: return VER3;
+            case VER4: return VER4;
             }
 
             gu_throw_error (EPROTO) << "Unrecognized writeset version: " << v;
@@ -130,7 +132,9 @@ namespace galera
             {
                 switch (ver)
                 {
-                case VER3: return V3_SIZE;
+                case VER3:
+                case VER4:
+                    return V3_SIZE;
                 }
 
                 log_fatal << "Unknown writeset version: " << ver;
