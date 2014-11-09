@@ -36,7 +36,7 @@ deliver_component_msg (struct group* group, bool prim)
 
     for (i = 0; i < group->nodes_num; i++) {
         gcs_comp_msg_t* msg = gcs_comp_msg_new (prim, false, i,
-                                                group->nodes_num);
+                                                group->nodes_num, 0);
         if (msg) {
             int j;
 

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -205,12 +205,14 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
 
         switch (version_)
         {
-        case 3:
+        case WriteSetNG::VER3:
+        case WriteSetNG::VER4:
             write_set_.read_buf (buf, buflen);
             write_set_flags_ = wsng_flags_to_trx_flags(write_set_.flags());
             source_id_       = write_set_.source_id();
             conn_id_         = write_set_.conn_id();
             trx_id_          = write_set_.trx_id();
+
             if (write_set_.certified())
             {
                 last_seen_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -221,10 +223,12 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
                 last_seen_seqno_ = write_set_.last_seen();
                 assert(last_seen_seqno_ >= 0);
             }
+
             timestamp_       = write_set_.timestamp();
             break;
         default:
-            gu_throw_error(EPROTONOSUPPORT);
+            gu_throw_error(EPROTONOSUPPORT) << "Unsupported WS version: "
+                                            << version_;
         }
 
         return buflen;

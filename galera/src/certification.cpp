@@ -107,7 +107,7 @@ galera::Certification::purge_for_trx_v3(TrxHandleSlave* trx)
 void
 galera::Certification::purge_for_trx(TrxHandleSlave* trx)
 {
-    assert(trx->version() == 3);
+    assert(trx->version() == 3 || trx->version() == 4);
     purge_for_trx_v3(trx);
 }
 
@@ -380,6 +380,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     case 2:
         break;
     case 3:
+    case 4:
         res = do_test_v3(trx, store_keys);
         break;
     default:
@@ -498,6 +499,7 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     case 1:
     case 2:
     case 3:
+    case 4:
         break;
     default:
         gu_throw_fatal << "certification/trx version "

@@ -624,9 +624,19 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         }
         else if (um.err_no() != 0)
         {
-            // Error from backend, consider it closed
-            msg->type = GCS_MSG_ERROR;
-            return -EBADFD;
+            gcs_comp_msg_t* cm(gcs_comp_msg_leave(ECONNABORTED));
+            const ssize_t cm_size(gcs_comp_msg_size(cm));
+            if (cm_size <= msg->buf_len)
+            {
+                memcpy(msg->buf, cm, cm_size);
+                recv_buf.pop_front();
+                msg->type = GCS_MSG_COMPONENT;
+            }
+            else
+            {
+                msg->type = GCS_MSG_ERROR;
+            }
+            gcs_comp_msg_delete(cm);
         }
         else
         {
@@ -639,7 +649,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             gcs_comp_msg_t* cm(gcs_comp_msg_new(view.type() == V_PRIM,
                                                 view.is_bootstrap(),
                                                 view.is_empty() ? -1 : 0,
-                                                view.members().size()));
+                                                view.members().size(), 0));
 
             const ssize_t cm_size(gcs_comp_msg_size(cm));
 

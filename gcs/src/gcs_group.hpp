@@ -201,19 +201,19 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
 }
 
 static inline gcs_group_state_t
-gcs_group_state (gcs_group_t* group)
+gcs_group_state (const gcs_group_t* group)
 {
     return group->state;
 }
 
 static inline bool
-gcs_group_is_primary (gcs_group_t* group)
+gcs_group_is_primary (const gcs_group_t* group)
 {
     return (GCS_GROUP_PRIMARY == group->state);
 }
 
 static inline int
-gcs_group_my_idx (gcs_group_t* group)
+gcs_group_my_idx (const gcs_group_t* group)
 {
     return group->my_idx;
 }
@@ -229,7 +229,7 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act, int* proto);
 
 /*! Returns state object for state message */
 extern gcs_state_msg_t*
-gcs_group_get_state (gcs_group_t* group);
+gcs_group_get_state (const gcs_group_t* group);
 
 /*!
  * find a donor and return its index, if available. pure function.
@@ -239,7 +239,7 @@ gcs_group_get_state (gcs_group_t* group);
  * -EAGAIN if no node in proper state.
  */
 extern int
-gcs_group_find_donor(gcs_group_t* group,
+gcs_group_find_donor(const gcs_group_t* group,
                      int const str_version,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,

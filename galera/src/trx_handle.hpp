@@ -680,7 +680,7 @@ namespace galera
                                    store,
                                    wso_buf_size_ - sizeof(WriteSetOut),
                                    0,
-                                   WriteSetNG::MAX_VERSION,
+                                   WriteSetNG::Version(params_.version_),
                                    DataSet::MAX_VERSION,
                                    DataSet::MAX_VERSION,
                                    params_.max_write_set_size_);
