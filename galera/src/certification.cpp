@@ -370,8 +370,10 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     }
     else
     {
-        trx->set_depends_seqno(
-            trx_map_.begin()->second->global_seqno() - 1);
+        wsrep_seqno_t const ds
+            (std::max(trx->depends_seqno(),
+                      trx_map_.begin()->second->global_seqno() - 1));
+        trx->set_depends_seqno(ds);
     }
 
     switch (version_)
@@ -404,7 +406,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 galera::Certification::TestResult
 galera::Certification::do_test_preordered(TrxHandleSlave* trx)
 {
-    assert(trx->version() == 3);
+    assert(trx->version() >= 3);
     assert(trx->preordered());
 
     /* we don't want to go any further unless the writeset checksum is ok */

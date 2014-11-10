@@ -208,6 +208,7 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
         case WriteSetNG::VER3:
         case WriteSetNG::VER4:
             write_set_.read_buf (buf, buflen);
+            assert(version_ == write_set_.version());
             write_set_flags_ = wsng_flags_to_trx_flags(write_set_.flags());
             source_id_       = write_set_.source_id();
             conn_id_         = write_set_.conn_id();
@@ -215,13 +216,22 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
 
             if (write_set_.certified())
             {
-                last_seen_seqno_ = WSREP_SEQNO_UNDEFINED;
+                last_seen_seqno_ = WSREP_SEQNO_UNDEFINED; // why do we need this?
                 write_set_flags_ |= F_PREORDERED;
             }
             else
             {
                 last_seen_seqno_ = write_set_.last_seen();
                 assert(last_seen_seqno_ >= 0);
+
+                if (gu_likely(version_) >= WriteSetNG::VER4)
+                {
+                    depends_seqno_ = last_seen_seqno_ - write_set_.pa_range();
+                }
+                else
+                {
+                    assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+                }
             }
 
             timestamp_       = write_set_.timestamp();

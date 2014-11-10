@@ -98,14 +98,18 @@ WriteSetNG::Header::gather (KeySet::Version const  kver,
 
 
 void
-WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
+WriteSetNG::Header::finalize(const wsrep_seqno_t& last_seen,
+                             int const            pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
+    assert (pa_range >= -1);
 
-    uint64_t*   const ls  (reinterpret_cast<uint64_t*>(ptr_ +V3_LAST_SEEN_OFF));
-    uint64_t*   const ts  (reinterpret_cast<uint64_t*>(ptr_ +V3_TIMESTAMP_OFF));
+    uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
+    uint64_t* const ls(reinterpret_cast<uint64_t*>(ptr_ + V3_LAST_SEEN_OFF));
+    uint64_t* const ts(reinterpret_cast<uint64_t*>(ptr_ + V3_TIMESTAMP_OFF));
 
+    *pa = gu::htog<uint16_t>(std::min(int(MAX_PA_RANGE), pa_range));
     *ls = gu::htog<uint64_t>(last_seen);
     *ts = gu::htog<uint64_t>(gu_time_monotonic());
 
@@ -121,10 +125,13 @@ WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno,
     assert (size_ > 0);
     assert (seqno > 0);
 
+    uint16_t* const fl(reinterpret_cast<uint16_t*>(ptr_ + V3_FLAGS_OFF));
     uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
     uint64_t* const sq(reinterpret_cast<uint64_t*>(ptr_ + V3_SEQNO_OFF));
 
-    *pa = gu::htog<uint16_t>(pa_range);
+    uint16_t  const flags(gu::htog<uint16_t>(*fl));
+    *fl = gu::htog<uint16_t>(flags | F_CERTIFIED); // certification happened
+    *pa = gu::htog<uint16_t>(pa_range);            // certification outcome
     *sq = gu::htog<uint64_t>(seqno);
 
     update_checksum (ptr_, size() - V3_CHECKSUM_SIZE);

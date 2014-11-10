@@ -58,7 +58,7 @@ START_TEST (ver3_basic)
     wsrep_seqno_t const seqno(2);
     int const           pa_range(seqno - last_seen);
 
-    wso.set_last_seen(last_seen);
+    wso.finalize(last_seen, 0);
 
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in;
@@ -300,7 +300,7 @@ START_TEST (ver3_annotation)
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
 
     wsrep_seqno_t const last_seen(1);
-    wso.set_last_seen(last_seen);
+    wso.finalize(last_seen, 0);
 
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in;

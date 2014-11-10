@@ -104,7 +104,8 @@ namespace galera
             F_TOI         = 1 << 2,
             F_PA_UNSAFE   = 1 << 3,
             F_COMMUTATIVE = 1 << 4,
-            F_NATIVE      = 1 << 5
+            F_NATIVE      = 1 << 5,
+            F_CERTIFIED   = 1 << 6  // should be used only for VER4 and up.
         };
 
         /* this takes care of converting wsrep API flags to on-the-wire flags */
@@ -161,17 +162,13 @@ namespace galera
                            GatherVector&          out);
 
             /* records last_seen, timestamp and CRC before replication */
-            void set_last_seen (const wsrep_seqno_t& ls);
+            void finalize(const wsrep_seqno_t& ls, int pa_range);
 
             /* records partial seqno, pa_range, timestamp and CRC before
              * replication (for preordered events)*/
-            void set_preordered (uint16_t pa_range)
+            void finalize_preordered(uint16_t pa_range)
             {
-                uint16_t* const pa(reinterpret_cast<uint16_t*>
-                                   (ptr_ + V3_PA_RANGE_OFF));
-
-                *pa = gu::htog<uint16_t>(pa_range);
-                set_last_seen (0);
+                finalize(0, pa_range);
             }
 
             /* This is for WriteSetIn */
@@ -254,7 +251,7 @@ namespace galera
 
             wsrep_seqno_t    last_seen() const
             {
-                assert (pa_range() == 0);
+                assert (pa_range() == 0 || version() >= VER4);
                 return seqno_priv();
             }
 
@@ -264,7 +261,7 @@ namespace galera
                 return seqno_priv();
             }
 
-            long long     timestamp() const
+            long long        timestamp() const
             {
                 return gu::gtoh(
                     *(reinterpret_cast<const uint64_t*>(ptr_+ V3_TIMESTAMP_OFF))
@@ -580,9 +577,9 @@ namespace galera
             return out_size;
         }
 
-        void set_last_seen (const wsrep_seqno_t& ls)
+        void finalize(const wsrep_seqno_t& ls, int pa_range)
         {
-            header_.set_last_seen(ls);
+            header_.finalize(ls, pa_range);
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */
@@ -594,7 +591,7 @@ namespace galera
         {
             WriteSetNG::GatherVector out;
             size_t const out_size(gather(source, conn, trx, out));
-            set_last_seen(last_seen);
+            finalize(last_seen, -1);
 
             ret.clear(); ret.reserve(out_size);
 
@@ -607,7 +604,7 @@ namespace galera
             }
         }
 
-        void set_preordered (ssize_t pa_range)
+        void finalize_preordered (ssize_t pa_range)
         {
             assert (pa_range >= 0);
 
@@ -615,11 +612,7 @@ namespace galera
              * 0 meaning failed certification. */
             pa_range++;
 
-            /* cap PA range by maximum we can represent */
-            if (gu_unlikely(pa_range > WriteSetNG::MAX_PA_RANGE))
-                pa_range = WriteSetNG::MAX_PA_RANGE;
-
-            header_.set_preordered(pa_range + 1);
+            header_.finalize_preordered(pa_range);
         }
 
     private:
@@ -744,14 +737,21 @@ namespace galera
             delete annt_;
         }
 
+        WriteSetNG::Version version()   const { return header_.version(); }
+
         ssize_t       size()      const { return size_;               }
         uint16_t      flags()     const { return header_.flags();     }
-        bool          is_toi()    const
-        { return flags() & WriteSetNG::F_TOI; }
+        bool          is_toi()    const { return flags() & WriteSetNG::F_TOI; }
         bool          pa_unsafe() const
         { return flags() & WriteSetNG::F_PA_UNSAFE; }
         int           pa_range()  const { return header_.pa_range();  }
-        bool          certified() const { return header_.pa_range();  }
+        bool          certified() const
+        {
+            if (gu_likely(version() >= WriteSetNG::VER4))
+                return (flags() & WriteSetNG::F_CERTIFIED);
+            else
+                return (pa_range()); // VER3
+        }
         wsrep_seqno_t last_seen() const { return header_.last_seen(); }
         wsrep_seqno_t seqno()     const { return header_.seqno();     }
         long long     timestamp() const { return header_.timestamp(); }

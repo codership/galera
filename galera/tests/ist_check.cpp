@@ -233,7 +233,10 @@ static int select_trx_version(int protocol_version)
     case 4:
         return 2;
     case 5:
+    case 6:
         return 3;
+    case 7:
+        return 4;
     }
     fail("unknown protocol version %i", protocol_version);
     return -1;
@@ -246,7 +249,7 @@ static void test_ist_common(int const version)
     using galera::TrxHandle;
     using galera::KeyOS;
 
-    TrxHandleMaster::Pool lp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 4, "ist_common");
+    TrxHandleMaster::Pool lp(TrxHandleMaster::LOCAL_STORAGE_SIZE,4,"ist_common");
     TrxHandleSlave::Pool sp(sizeof(TrxHandleSlave), 4, "ist_common");
 
     int const trx_version(select_trx_version(version));
@@ -304,7 +307,7 @@ static void test_ist_common(int const version)
                                                          trx->conn_id(),
                                                          trx->trx_id(),
                                                          bufs));
-            trx->set_last_seen_seqno(last_seen);
+            trx->finalize(last_seen);
             ptr = static_cast<gu::byte_t*>(gcache_sender->malloc(trx_size));
 
             /* concatenate buffer vector */
@@ -318,7 +321,8 @@ static void test_ist_common(int const version)
             gu::Buf ws_buf = { ptr, trx_size };
             galera::WriteSetIn wsi(ws_buf);
             assert (wsi.last_seen() == last_seen);
-            assert (wsi.pa_range()  == 0);
+            assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER4 ?
+                                        0 : WriteSetNG::MAX_PA_RANGE));
             wsi.set_seqno(i, pa_range);
             assert (wsi.seqno()     == int64_t(i));
             assert (wsi.pa_range()  == pa_range);
@@ -362,6 +366,12 @@ START_TEST(test_ist_v5)
 }
 END_TEST
 
+START_TEST(test_ist_v7)
+{
+    test_ist_common(7);
+}
+END_TEST
+
 Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
@@ -373,6 +383,10 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_v5");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v5);
+    suite_add_tcase(s, tc);
+    tc = tcase_create("test_ist_v7");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v7);
     suite_add_tcase(s, tc);
 
     return s;

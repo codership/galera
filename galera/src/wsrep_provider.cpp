@@ -829,12 +829,12 @@ galera_preordered_collect (wsrep_t* const gh,
 
 
 extern "C" wsrep_status_t
-galera_preordered_commit (wsrep_t* const gh,
-                          wsrep_po_handle_t*      const handle,
-                          const wsrep_uuid_t*     const source_id,
-                          uint32_t                const flags,
-                          int                     const pa_range,
-                          wsrep_bool_t            const commit)
+galera_preordered_commit (wsrep_t*            const gh,
+                          wsrep_po_handle_t*  const handle,
+                          const wsrep_uuid_t* const source_id,
+                          uint32_t            const flags,
+                          int                 const pa_range,
+                          wsrep_bool_t        const commit)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);

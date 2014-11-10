@@ -584,10 +584,23 @@ namespace galera
             return write_set_out().is_empty();
         }
 
-        void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
+        void finalize(const wsrep_seqno_t& last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);
-            write_set_out().set_last_seen(last_seen_seqno);
+
+            int pa_range(version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
+
+            if (gu_unlikely(repl_.size() > 1))
+            {
+                /* make sure this fragment depends on the previous */
+                assert(version() >= 4);
+                TrxHandleSlave* tr(repl_[repl_.size() - 2]);
+                assert(tr->global_seqno() <= last_seen_seqno);
+                pa_range = std::min(wsrep_seqno_t(pa_range),
+                                    last_seen_seqno - tr->global_seqno());
+            }
+
+            write_set_out().finalize(last_seen_seqno, pa_range);
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */

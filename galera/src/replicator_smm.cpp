@@ -537,7 +537,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
         trx->set_gcs_handle(gcs_handle);
 
         assert(trx->version() >= WS_NG_VERSION);
-        trx->set_last_seen_seqno(last_committed());
+        trx->finalize(last_committed());
         trx->unlock();
         assert (act.buf == NULL); // just a sanity check
         rcode = gcs_.replv(actv, act, true);
@@ -1233,11 +1233,11 @@ galera::ReplicatorSMM::preordered_collect(wsrep_po_handle_t&            handle,
 
 
 wsrep_status_t
-galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
-                                         const wsrep_uuid_t&           source,
-                                         uint64_t                const flags,
-                                         int                     const pa_range,
-                                         bool                    const commit)
+galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
+                                         const wsrep_uuid_t&        source,
+                                         uint64_t             const flags,
+                                         int                  const pa_range,
+                                         bool                 const commit)
 {
     if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
         return WSREP_NOT_IMPLEMENTED;
@@ -1246,7 +1246,8 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
 
     if (gu_likely(true == commit))
     {
-        ws->set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags));
+        ws->set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags) |
+                       WriteSetNG::F_CERTIFIED);
 
         /* by loooking at trx_id we should be able to detect gaps / lost events
          * (however resending is not implemented yet). Something like
@@ -1260,7 +1261,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
 
         size_t const actv_size(ws->gather(source, 0, trx_id, actv));
 
-        ws->set_preordered (pa_range); // also adds CRC
+        ws->finalize_preordered(pa_range); // also adds checksum
 
         int rcode;
         do
@@ -1322,7 +1323,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandleSlave* trx)
     assert(trx->local_seqno() > 0);
     assert(trx->global_seqno() > 0);
     assert(trx->last_seen_seqno() >= 0);
-    assert(trx->depends_seqno() == -1);
+    assert(trx->depends_seqno() == -1 || trx->version() >= 4);
     assert(trx->state() == TrxHandle::S_REPLICATING);
 
     wsrep_status_t const retval(cert_and_catch(trx));
