@@ -748,12 +748,8 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
     if (retval != WSREP_OK) // galera_to_execute_end() won't be called
     {
+        assert(trx->refcnt() == 1);
         repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
-
-        if (trx->global_seqno() < 0) // no seqno -> no index -> no automatic purging
-        {
-            trx->unref(); // implicit destructor
-        }
     }
 
     return retval;

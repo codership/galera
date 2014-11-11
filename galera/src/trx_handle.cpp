@@ -320,6 +320,7 @@ galera::TrxHandleSlave::unordered(void*                recv_ctx,
 void
 galera::TrxHandleSlave::destroy_local(void*  ptr)
 {
+    assert(ptr);
     (static_cast<TrxHandleMaster*>(ptr))->~TrxHandleMaster();
 }
 
