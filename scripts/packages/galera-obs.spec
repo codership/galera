@@ -69,7 +69,6 @@ BuildRequires: python
 Requires:      openssl
 
 Provides:      wsrep, %{name} = %{version}-%{release}
-Obsoletes:     %{name} < %{version}-%{release}
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
