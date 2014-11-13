@@ -44,7 +44,20 @@ BuildRequires: openssl-devel
 BuildRequires: scons
 %if 0%{?suse_version} == 1110
 # On SLES11 SPx use the linked gcc47 to build instead of default gcc43
-BuildRequires: gcc47-c++
+BuildRequires: gcc47 gcc47-c++
+# On SLES11 SP2 the libgfortran.3.so provider must be explicitly defined
+BuildRequires: libgfortran3
+# On SLES11 we got error "conflict for provider of libgcc_s1 >= 4.7.4_20140612-2.1
+# needed by gcc47, (provider libgcc_s1 conflicts with installed libgcc43),
+# conflict for provider of libgomp1 >= 4.7.4_20140612-2.1 needed by gcc47,
+# (provider libgomp1 conflicts with installed libgomp43), conflict for provider
+# of libstdc++6 >= 4.7.4_20140612-2.1 needed by libstdc++47-devel,
+# (provider libstdc++6 conflicts with installed libstdc++43)
+# therefore:
+BuildRequires: libgcc_s1
+BuildRequires: libgomp1
+BuildRequires: libstdc++6
+#!BuildIgnore: libgcc43
 %else
 BuildRequires: gcc-c++
 %endif
@@ -54,7 +67,6 @@ BuildRequires: python
 %endif
 
 Requires:      openssl
-Requires:      chkconfig
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 Obsoletes:     %{name} < %{version}-%{release}
@@ -76,6 +88,7 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %build
 # Debug info:
 echo "suse_version: %{suse_version}"
+# 1110 = SLE-11 SPx
 %if 0%{?suse_version} == 1110
 export CC=gcc-4.7
 export CXX=g++-4.7
