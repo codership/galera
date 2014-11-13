@@ -57,8 +57,7 @@ BuildRequires: libgfortran3
 BuildRequires: libgcc_s1
 BuildRequires: libgomp1
 BuildRequires: libstdc++6
-# SLES11 SP2 in addition also showed error "nothing provides ia32el needed by
-# libgcc_s1-x86, nothing provides glibc-x86 needed by libgcc_s1-x86"
+#!BuildIgnore: libgcc43
 %else
 BuildRequires: gcc-c++
 %endif
@@ -89,6 +88,7 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %build
 # Debug info:
 echo "suse_version: %{suse_version}"
+# 1110 = SLE-11 SPx
 %if 0%{?suse_version} == 1110
 export CC=gcc-4.7
 export CXX=g++-4.7
