@@ -40,27 +40,55 @@ log_failure() {
 
 PIDFILE=/var/run/garbd
 
-prog=$(which garbd)
+prog="/usr/bin/garbd"
 
 program_start() {
 	local rcode
+	local gpid
 	if [ -f /etc/redhat-release ]; then
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    echo -n $"Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        echo -n $"Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        echo -n $"Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
 		echo -n $"Starting $prog: "
 		sudo -u nobody $prog $* >/dev/null
 		rcode=$?
+		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure
 		echo
 	else
+
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    log_daemon_msg "Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        log_daemon_msg "Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        log_daemon_msg "Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
+                if [ -r $PIDFILE ];then
+                    log_daemon_msg "Stale pid file with $(cat $PIDFILE)"
+                fi
 		log_daemon_msg "Starting $prog: "
 		start-stop-daemon --start --quiet --background \
 		                  --exec $prog -- $*
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork
-		sleep 1
+		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE
 		log_end_msg $rcode
-	fi
+            fi
 	return $rcode
 }
 
