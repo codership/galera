@@ -68,7 +68,6 @@ BuildRequires: python
 %endif
 
 Requires:      openssl
-Requires:      chkconfig
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 Obsoletes:     %{name} < %{version}-%{release}
