@@ -117,7 +117,7 @@ install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 # Symlink required by SUSE policy
 %if 0%{?suse_version}
 install -d $RBR/usr/sbin
-ln -sf $RBR%{_sysconfdir}/init.d/garb $RBR/usr/sbin/rcgarb
+ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
 %endif
 
 %if 0%{?suse_version}
