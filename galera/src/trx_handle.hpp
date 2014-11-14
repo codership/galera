@@ -37,72 +37,32 @@ namespace galera
     public:
 
         enum Flags
-      {
+        {
             F_COMMIT      = 1 << 0,
             F_ROLLBACK    = 1 << 1,
-            F_OOC         = 1 << 2,
-            F_MAC_HEADER  = 1 << 3,
-            F_MAC_PAYLOAD = 1 << 4,
-            F_ANNOTATION  = 1 << 5,
-            F_ISOLATION   = 1 << 6,
-            F_PA_UNSAFE   = 1 << 7,
-            F_PREORDERED  = 1 << 8
+            F_ISOLATION   = 1 << 2,
+            F_PA_UNSAFE   = 1 << 3,
+            F_COMMUTATIVE = 1 << 4,
+            F_NATIVE      = 1 << 5,
+            F_BEGIN       = 1 << 6,
+            /*
+             * reserved for extension
+             */
+            F_PREORDERED  = 1 << 31 // flag specific to TrxHandle
         };
 
-        static inline uint32_t wsrep_flags_to_trx_flags (uint32_t flags)
-        {
-            GU_COMPILE_ASSERT(
-                WSREP_FLAG_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
-                WSREP_FLAG_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
-                flags_dont_match1);
+        static bool const FLAGS_MATCH_API_FLAGS =
+                                 (WSREP_FLAG_COMMIT      == F_COMMIT       &&
+                                  WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
+                                  WSREP_FLAG_ISOLATION   == F_ISOLATION    &&
+                                  WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
+                                  WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
+                                  WSREP_FLAG_NATIVE      == F_NATIVE       &&
+                                  WSREP_FLAG_BEGIN       == F_BEGIN);
 
-            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
-
-            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
-            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
-
-            return ret;
-        }
-
-        static inline uint32_t trx_flags_to_wsrep_flags (uint32_t flags)
-        {
-            GU_COMPILE_ASSERT(
-                WSREP_FLAG_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
-                WSREP_FLAG_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
-                flags_dont_match2);
-
-            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
-
-            if (flags & F_ISOLATION)   ret |= WSREP_FLAG_ISOLATION;
-            if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
-
-            return ret;
-        }
-
-        static inline uint32_t wsng_flags_to_trx_flags (uint32_t flags)
-        {
-            GU_COMPILE_ASSERT(
-                WriteSetNG::F_COMMIT   == int(F_COMMIT)   && F_COMMIT   == 1 &&
-                WriteSetNG::F_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
-                flags_dont_match3);
-
-            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
-
-            if (flags & WriteSetNG::F_TOI)       ret |= F_ISOLATION;
-            if (flags & WriteSetNG::F_PA_UNSAFE) ret |= F_PA_UNSAFE;
-
-            return ret;
-        }
-
-        bool has_mac() const
-        {
-            return ((write_set_flags_ & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
-        }
-
-        bool has_annotation() const /* shall return 0 for new writeset ver */
-        {
-            return ((write_set_flags_ & F_ANNOTATION) != 0);
-        }
+        static uint32_t wsrep_flags_to_trx_flags (uint32_t flags);
+        static uint32_t trx_flags_to_wsrep_flags (uint32_t flags);
+        static uint32_t ws_flags_to_trx_flags    (uint32_t flags);
 
         bool is_toi() const
         {
@@ -168,7 +128,7 @@ namespace galera
 
             State from_;
             State to_;
-        };
+        }; // class Transition
 
         typedef FSM<State, Transition> Fsm;
         static Fsm::TransMap trans_map_master;
@@ -266,7 +226,85 @@ namespace galera
         friend class Wsdb;
         friend class Certification;
 
+        template <bool>
+        static inline uint32_t wsrep_flags_to_trx_flags_tmpl (uint32_t flags)
+        {
+            assert(0); // remove when needed
+            uint32_t ret(0);
+
+            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
+            if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
+            if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
+            if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
+            if (flags & WSREP_FLAG_BEGIN)       ret |= F_BEGIN;
+
+            return ret;
+        }
+
+        template <bool>
+        static inline uint32_t trx_flags_to_wsrep_flags_tmpl (uint32_t flags)
+        {
+            assert(0); // remove when needed
+            uint32_t ret(0);
+
+            if (flags & F_COMMIT)      ret |= WSREP_FLAG_COMMIT;
+            if (flags & F_ROLLBACK)    ret |= WSREP_FLAG_ROLLBACK;
+            if (flags & F_ISOLATION)   ret |= WSREP_FLAG_ISOLATION;
+            if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
+            if (flags & F_COMMUTATIVE) ret |= WSREP_FLAG_COMMUTATIVE;
+            if (flags & F_NATIVE)      ret |= WSREP_FLAG_NATIVE;
+            if (flags & F_BEGIN)       ret |= WSREP_FLAG_BEGIN;
+
+            return ret;
+        }
+
+        template <bool>
+        static inline uint32_t ws_flags_to_trx_flags_tmpl (uint32_t flags)
+        {
+            assert(0); // remove when needed
+            uint32_t ret(0);
+
+            if (flags & WriteSetNG::F_COMMIT)      ret |= F_COMMIT;
+            if (flags & WriteSetNG::F_ROLLBACK)    ret |= F_ROLLBACK;
+            if (flags & WriteSetNG::F_TOI)         ret |= F_ISOLATION;
+            if (flags & WriteSetNG::F_PA_UNSAFE)   ret |= F_PA_UNSAFE;
+            if (flags & WriteSetNG::F_COMMUTATIVE) ret |= F_COMMUTATIVE;
+            if (flags & WriteSetNG::F_NATIVE)      ret |= F_NATIVE;
+            if (flags & WriteSetNG::F_BEGIN)       ret |= F_BEGIN;
+
+            return ret;
+        }
+
     }; /* class TrxHandle */
+
+    template <> inline uint32_t
+    TrxHandle::wsrep_flags_to_trx_flags_tmpl<true>(uint32_t const flags)
+    { return flags; }
+
+    inline uint32_t
+    TrxHandle::wsrep_flags_to_trx_flags (uint32_t const flags)
+    { return wsrep_flags_to_trx_flags_tmpl<FLAGS_MATCH_API_FLAGS>(flags); }
+
+    template <> inline uint32_t
+    TrxHandle::trx_flags_to_wsrep_flags_tmpl<true>(uint32_t flags)
+    { return (flags & WSREP_FLAGS_MASK); }
+
+    inline uint32_t
+    TrxHandle::trx_flags_to_wsrep_flags (uint32_t const flags)
+    { return trx_flags_to_wsrep_flags_tmpl<FLAGS_MATCH_API_FLAGS>(flags); }
+
+    template <> inline uint32_t
+    TrxHandle::ws_flags_to_trx_flags_tmpl<true>(uint32_t flags)
+    {
+                                                 // clear ws-specific flags
+        return wsrep_flags_to_trx_flags(flags & WSREP_FLAGS_MASK);
+    }
+
+    inline uint32_t
+    TrxHandle::ws_flags_to_trx_flags (uint32_t const flags)
+    { return ws_flags_to_trx_flags_tmpl<FLAGS_MATCH_API_FLAGS>(flags); }
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
     std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
@@ -539,13 +577,15 @@ namespace galera
         long gcs_handle() const { return gcs_handle_; }
         void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
 
-        void set_flags(uint32_t flags)
+        void set_flags(uint32_t const flags) // wsrep flags
         {
+            assert(repl_.size() > 0);
             TrxHandle::set_flags(flags);
 
-            uint16_t ws_flags(flags & 0x07);
-            if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
-            if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
+            uint16_t ws_flags(WriteSetNG::wsrep_flags_to_ws_flags(flags));
+
+            if (repl_.size() == 1)   ws_flags |= WriteSetNG::F_BEGIN;
+
             write_set_out().set_flags(ws_flags);
         }
 

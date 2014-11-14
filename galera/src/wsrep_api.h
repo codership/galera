@@ -123,6 +123,8 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
  * COMMUTATIVE  the order in which the writeset is applied does not matter
  * NATIVE       the writeset contains another writeset in this provider format
  *
+ * BEGIN        shall be set on the first trx fragment by provider
+ *
  * Note that some of the flags are mutually exclusive (e.g. COMMIT and
  * ROLLBACK).
  */
@@ -132,6 +134,10 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_FLAG_PA_UNSAFE            ( 1ULL << 3 )
 #define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 4 )
 #define WSREP_FLAG_NATIVE               ( 1ULL << 5 )
+#define WSREP_FLAG_BEGIN                ( 1ULL << 6 )
+
+#define WSREP_FLAGS_LAST                WSREP_FLAG_BEGIN
+#define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
 
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID

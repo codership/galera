@@ -185,23 +185,6 @@ START_TEST(test_serialization)
     fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
     txs1->unref();
 
-    trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
-//    buf.resize(trx->serial_size());
-    trx->serialize(0, buf);
-    fail_unless(buf.size() > 0);
-
-    TrxHandleSlave* txs2(TrxHandleSlave::New(sp));
-    fail_unless(txs2->unserialize(&buf[0], buf.size(), 0) > 0);
-    txs2->unref();
-
-    trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    trx->serialize(0, buf);
-    fail_unless(buf.size() > 0);
-
-    TrxHandleSlave* txs3(TrxHandleSlave::New(sp));
-    fail_unless(txs3->unserialize(&buf[0], buf.size(), 0) > 0);
-
-    txs3->unref();
     trx->unref();
 }
 END_TEST

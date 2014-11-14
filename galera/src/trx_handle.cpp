@@ -209,7 +209,7 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
         case WriteSetNG::VER4:
             write_set_.read_buf (buf, buflen);
             assert(version_ == write_set_.version());
-            write_set_flags_ = wsng_flags_to_trx_flags(write_set_.flags());
+            write_set_flags_ = ws_flags_to_trx_flags(write_set_.flags());
             source_id_       = write_set_.source_id();
             conn_id_         = write_set_.conn_id();
             trx_id_          = write_set_.trx_id();
