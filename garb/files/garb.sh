@@ -9,9 +9,11 @@
 
 ### BEGIN INIT INFO
 # Provides:          garb
-# Required-Start:    $network $local_fs $remote_fs
-# Required-Stop:     $network $local_fs $remote_fs
-# Default-Start:     2 3 5
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
+# Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
 # Description:       Garbd is used as part of clusters that have only two
