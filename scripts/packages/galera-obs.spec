@@ -69,7 +69,6 @@ BuildRequires: python
 Requires:      openssl
 
 Provides:      wsrep, %{name} = %{version}-%{release}
-Obsoletes:     %{name} < %{version}-%{release}
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
@@ -115,6 +114,12 @@ mkdir -p $RBR
 install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
+# Symlink required by SUSE policy
+%if 0%{?suse_version}
+install -d $RBR/usr/sbin
+ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
+%endif
+
 %if 0%{?suse_version}
 install -d $RBR/var/adm/fillup-templates/
 install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.%{name}
@@ -149,6 +154,7 @@ rm -f $(find %{libs} -type l)
 
 %postun
 %restart_on_update
+%insserv_cleanup
 
 %files
 %defattr(-,root,root,0755)
@@ -158,6 +164,11 @@ rm -f $(find %{libs} -type l)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %endif
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+
+# Symlink required by SUSE policy
+%if 0%{?suse_version}
+%attr(0755,root,root) /usr/sbin/rcgarb
+%endif
 
 %attr(0755,root,root) %{_bindir}/garbd
 
