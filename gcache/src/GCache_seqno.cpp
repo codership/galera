@@ -134,7 +134,17 @@ namespace gcache
 #endif
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {
-                assert (seqno_released + 1 == it->first || seqno_released == 0);
+#ifndef NDEBUG
+                if (!(seqno_released + 1 == it->first || seqno_released == 0))
+                {
+                    log_info << "seqno_released: " << seqno_released
+                             << "; it->first: " << it->first
+                             << "\nstart: " << start << "; end: " << end
+                             << "batch_size: " << batch_size << "; gap: "
+                             << new_gap << "; seqno_max: " << seqno_max;
+                    assert(seqno_released + 1 == it->first || seqno_released == 0);
+                }
+#endif
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
                 seqno_released = it->first;
