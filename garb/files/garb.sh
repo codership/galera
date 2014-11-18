@@ -28,7 +28,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garbd
+	config=/etc/default/garb
 fi
 
 log_failure() {
@@ -49,7 +49,7 @@ program_start() {
 	local rcode
 	if [ -f /etc/redhat-release ]; then
 		echo -n $"Starting $prog: "
-		sudo -u nobody $prog $* >/dev/null
+		runuser -u nobody -- $prog $* >/dev/null
 		rcode=$?
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure
