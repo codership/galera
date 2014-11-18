@@ -29,6 +29,7 @@ public:
     const std::string& options() const { return options_; }
     const std::string& cfg()     const { return cfg_    ; }
     const std::string& log()     const { return log_    ; }
+    bool               exit()    const { return exit_   ; }
 
 private:
 
@@ -41,6 +42,7 @@ private:
     std::string options_;
     std::string log_;
     std::string cfg_;
+    bool exit_; /* Exit on --help or --version */
 
 }; /* class Config */
 
