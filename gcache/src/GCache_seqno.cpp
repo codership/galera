@@ -24,6 +24,8 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
+        seqno_released = 0;
+
         if (gu_unlikely(seqno2ptr.empty())) return;
 
         /* order is significant here */
@@ -31,8 +33,6 @@ namespace gcache
         mem.seqno_reset();
 
         seqno2ptr.clear();
-
-        seqno_released = 0;
     }
 
     /*!
@@ -140,7 +140,7 @@ namespace gcache
                     log_info << "seqno_released: " << seqno_released
                              << "; it->first: " << it->first
                              << "\nstart: " << start << "; end: " << end
-                             << "batch_size: " << batch_size << "; gap: "
+                             << " batch_size: " << batch_size << "; gap: "
                              << new_gap << "; seqno_max: " << seqno_max;
                     assert(seqno_released + 1 == it->first || seqno_released == 0);
                 }

@@ -15,14 +15,25 @@ namespace gcache
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {
-            seqno2ptr_t::iterator j(i); ++i;
-            BufferHeader* bh(ptr2BH (j->second));
+            BufferHeader* bh(ptr2BH (i->second));
 
             if (gu_likely(BH_is_released(bh)))
             {
                 assert (bh->seqno_g <= seqno);
 
-                seqno2ptr.erase (j);
+#ifndef NDEBUG
+                if (!(seqno_released + 1 == i->first || 0 == seqno_released))
+                {
+                    log_fatal << "OOO release: released " << seqno_released
+                              << ", releasing " << i->first;
+                    assert(0);
+                }
+                else
+#endif
+                seqno_released = i->first;
+
+                seqno2ptr.erase (i++); // post ++ is significant!
+
                 bh->seqno_g = SEQNO_ILL; // will never be reused
 
                 switch (bh->store)
