@@ -66,7 +66,7 @@ BuildRequires: gcc-c++
 BuildRequires: python
 %endif
 
-Requires:      openssl
+Requires:      openssl nmap
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 
