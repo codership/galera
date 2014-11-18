@@ -28,7 +28,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garbd
+	config=/etc/default/garb
 fi
 
 log_failure() {
