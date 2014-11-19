@@ -11,7 +11,6 @@ namespace gcache
     bool
     GCache::discard_seqno (int64_t seqno)
     {
-//        seqno = std::min(seqno, seqno_released);
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {
@@ -19,18 +18,9 @@ namespace gcache
 
             if (gu_likely(BH_is_released(bh)))
             {
+                assert (bh->seqno_g == i->first);
                 assert (bh->seqno_g <= seqno);
-
-#ifndef NDEBUG
-                if (!(seqno_released + 1 == i->first || 0 == seqno_released))
-                {
-                    log_fatal << "OOO release: released " << seqno_released
-                              << ", releasing " << i->first;
-                    assert(0);
-                }
-                else
-#endif
-                seqno_released = i->first;
+                assert (bh->seqno_g <= seqno_released);
 
                 seqno2ptr.erase (i++); // post ++ is significant!
 
@@ -82,7 +72,20 @@ namespace gcache
     {
         assert(bh->seqno_g != SEQNO_ILL);
         BH_release(bh);
-
+        if (gu_likely(SEQNO_NONE != bh->seqno_g))
+        {
+#ifndef NDEBUG
+            if (!(seqno_released + 1 == bh->seqno_g ||
+                  SEQNO_NONE == seqno_released))
+            {
+                log_fatal << "OOO release: seqno_released " << seqno_released
+                          << ", releasing " << bh->seqno_g;
+            }
+            assert(seqno_released + 1 == bh->seqno_g ||
+                   SEQNO_NONE == seqno_released);
+#endif
+            seqno_released = bh->seqno_g;
+        }
 #ifndef NDEBUG
         void* const ptr(bh + 1);
         std::set<const void*>::iterator it = buf_tracker.find(ptr);
