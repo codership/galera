@@ -154,6 +154,13 @@ public:
     template <class T> void operator()(T* t) { delete t; }
 };
 
+/*! swap method for arrays, which does't seem to be built in all compilers */
+template <typename T, size_t N>
+inline void
+swap_array(T (&a)[N], T (&b)[N])
+{
+    for (size_t n(0); n < N; ++n) std::swap(a[n], b[n]);
+}
 
 } // namespace gu
 

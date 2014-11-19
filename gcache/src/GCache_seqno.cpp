@@ -53,8 +53,6 @@ namespace gcache
 
         if (gu_likely(seqno_g > seqno_max))
         {
-            assert(seqno_max + 1 == seqno_g || 0 == seqno_max);
-
             seqno2ptr.insert (seqno2ptr.end(), seqno2ptr_pair_t(seqno_g, ptr));
             seqno_max = seqno_g;
         }
@@ -69,14 +67,6 @@ namespace gcache
                 gu_throw_fatal <<"Attempt to reuse the same seqno: " << seqno_g
                                <<". New ptr = " << ptr << ", previous ptr = "
                                << res.first->second;
-            }
-            else
-            {
-#ifndef NDEBUG
-                log_warn << "OOO seqno assign: seqno_g " << seqno_g
-                         << ", seqno_max " << seqno_max;
-#endif
-                assert(0);
             }
         }
 
