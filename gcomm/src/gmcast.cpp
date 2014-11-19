@@ -243,9 +243,18 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
                 port = Defaults::GMCastTcpPort;
             }
         }
-        std::string initial_addr = gu::net::resolve(
-            uri_string(get_scheme(use_ssl_), host, port)
-            ).to_string();
+
+        std::string initial_uri = uri_string(get_scheme(use_ssl_), host, port);
+        std::string initial_addr;
+        try
+        {
+            initial_addr = gu::net::resolve(initial_uri).to_string();
+        }
+        catch (gu::Exception& )
+        {
+            log_warn << "Failed to resolve " << initial_uri;
+            continue;
+        }
 
         // resolving sets scheme to tcp, have to rewrite for ssl
         if (use_ssl_ == true)
@@ -266,6 +275,12 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
 
 }
 
+void gcomm::GMCast::connect_precheck(bool start_prim)
+{
+    if (!start_prim && mcast_addr_.empty() && initial_addrs_.empty()) {
+        gu_throw_fatal << "No address to connect";
+    }
+}
 
 void gcomm::GMCast::connect()
 {
