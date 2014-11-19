@@ -30,7 +30,7 @@ namespace gu
 
         Atomic<I>& operator=(const I i)
         {
-            gu_atomic_set(&i_, &i);
+            gu_atomic_set(&i_, const_cast<I*>(&i));
             return *this;
         }
 
