@@ -158,7 +158,7 @@ install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README     \
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README-MySQL \
     $RPM_BUILD_ROOT%{docs}/README-MySQL
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/asio/LICENSE_1_0.txt    \
-    $RPM_BUILD_ROOT{docs}/LICENSE.asio
+    $RPM_BUILD_ROOT%{docs}/LICENSE.asio
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/www.evanjones.ca/LICENSE \
     $RPM_BUILD_ROOT%{docs}/LICENSE.crc32c
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/chromium/LICENSE       \
