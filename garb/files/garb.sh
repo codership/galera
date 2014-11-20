@@ -60,7 +60,7 @@ program_start() {
                     fi
                 fi
 		echo -n $"Starting $prog: "
-		runuser -u nobody -- $prog $* >/dev/null
+		runuser nobody -c "$prog $*" >/dev/null
 		rcode=$?
 		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
@@ -83,7 +83,7 @@ program_start() {
                     log_daemon_msg "Stale pid file with $(cat $PIDFILE)"
                 fi
 		log_daemon_msg "Starting $prog: "
-		start-stop-daemon --start --quiet --background \
+		start-stop-daemon --start --quiet -c nobody --background \
 		                  --exec $prog -- $*
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork
