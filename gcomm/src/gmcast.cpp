@@ -277,7 +277,7 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
 
 void gcomm::GMCast::connect_precheck(bool start_prim)
 {
-    if (!start_prim && mcast_addr_.empty() && initial_addrs_.empty()) {
+    if (!start_prim && initial_addrs_.empty()) {
         gu_throw_fatal << "No address to connect";
     }
 }
