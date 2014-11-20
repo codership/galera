@@ -157,12 +157,22 @@ install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README     \
     $RPM_BUILD_ROOT%{docs}/README
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README-MySQL \
     $RPM_BUILD_ROOT%{docs}/README-MySQL
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/asio/LICENSE_1_0.txt    \
+    $RPM_BUILD_ROOT{docs}/LICENSE.asio
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/www.evanjones.ca/LICENSE \
+    $RPM_BUILD_ROOT%{docs}/LICENSE.crc32c
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/chromium/LICENSE       \
+    $RPM_BUILD_ROOT%{docs}/LICENSE.chromium
 
 install -d $RPM_BUILD_ROOT%{docs2}
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/COPYING                     \
     $RPM_BUILD_ROOT%{docs2}/COPYING
 install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README     \
     $RPM_BUILD_ROOT%{docs2}/README
+
+install -d $RPM_BUILD_ROOT%{_mandir}
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garbd.troff  \
+    $RPM_BUILD_ROOT%{_mandir}/man1/garbd.1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -176,6 +186,10 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0644,root,root) %{docs}/COPYING
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
+%doc %attr(0644,root,root) %{docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
+
 
 %files -n Percona-XtraDB-Cluster-garbd-3
 %defattr(-,root,root,-)
@@ -189,6 +203,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755,root,root) %{_bindir}/garbd
 %doc %attr(0644,root,root) %{docs2}/COPYING
 %doc %attr(0644,root,root) %{docs2}/README
+%doc %attr(644, root, man) %{_mandir}/man1/garbd.1*
 
 %post -n Percona-XtraDB-Cluster-garbd-3
 %if 0%{?systemd}
