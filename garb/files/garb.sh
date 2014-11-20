@@ -8,8 +8,10 @@
 # config: /etc/sysconfig/garb | /etc/default/garb
 #
 # Provides:          garb
-# Required-Start:    $network $local_fs $remote_fs
-# Required-Stop:     $network $local_fs $remote_fs
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
@@ -25,7 +27,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garbd
+	config=/etc/default/garb
 fi
 
 log_failure() {
@@ -58,7 +60,7 @@ program_start() {
                     fi
                 fi
 		echo -n $"Starting $prog: "
-		sudo -u nobody $prog $* >/dev/null
+		runuser -u nobody -- $prog $* >/dev/null
 		rcode=$?
 		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \

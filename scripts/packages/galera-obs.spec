@@ -15,12 +15,14 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-%define name galera
+%{!?name: %define name galera}
 %{!?version: %define version 3.x}
 %{!?release: %define release 1}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
+
+%dump
 
 Name:          %{name}
 Summary:       Galera: a synchronous multi-master wsrep provider (replication engine)
@@ -42,7 +44,20 @@ BuildRequires: openssl-devel
 BuildRequires: scons
 %if 0%{?suse_version} == 1110
 # On SLES11 SPx use the linked gcc47 to build instead of default gcc43
-BuildRequires: gcc47-c++
+BuildRequires: gcc47 gcc47-c++
+# On SLES11 SP2 the libgfortran.3.so provider must be explicitly defined
+BuildRequires: libgfortran3
+# On SLES11 we got error "conflict for provider of libgcc_s1 >= 4.7.4_20140612-2.1
+# needed by gcc47, (provider libgcc_s1 conflicts with installed libgcc43),
+# conflict for provider of libgomp1 >= 4.7.4_20140612-2.1 needed by gcc47,
+# (provider libgomp1 conflicts with installed libgomp43), conflict for provider
+# of libstdc++6 >= 4.7.4_20140612-2.1 needed by libstdc++47-devel,
+# (provider libstdc++6 conflicts with installed libstdc++43)
+# therefore:
+BuildRequires: libgcc_s1
+BuildRequires: libgomp1
+BuildRequires: libstdc++6
+#!BuildIgnore: libgcc43
 %else
 BuildRequires: gcc-c++
 %endif
@@ -51,11 +66,9 @@ BuildRequires: gcc-c++
 BuildRequires: python
 %endif
 
-Requires:      libssl0.9.8
-Requires:      chkconfig
+Requires:      openssl nmap
 
 Provides:      wsrep, %{name} = %{version}-%{release}
-Obsoletes:     %{name} < %{version}-%{release}
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
@@ -74,6 +87,7 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %build
 # Debug info:
 echo "suse_version: %{suse_version}"
+# 1110 = SLE-11 SPx
 %if 0%{?suse_version} == 1110
 export CC=gcc-4.7
 export CXX=g++-4.7
@@ -99,6 +113,12 @@ mkdir -p $RBR
 
 install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+
+# Symlink required by SUSE policy
+%if 0%{?suse_version}
+install -d $RBR/usr/sbin
+ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
+%endif
 
 %if 0%{?suse_version}
 install -d $RBR/var/adm/fillup-templates/
@@ -134,6 +154,7 @@ rm -f $(find %{libs} -type l)
 
 %postun
 %restart_on_update
+%insserv_cleanup
 
 %files
 %defattr(-,root,root,0755)
@@ -143,6 +164,11 @@ rm -f $(find %{libs} -type l)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %endif
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+
+# Symlink required by SUSE policy
+%if 0%{?suse_version}
+%attr(0755,root,root) /usr/sbin/rcgarb
+%endif
 
 %attr(0755,root,root) %{_bindir}/garbd
 
