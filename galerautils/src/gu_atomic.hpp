@@ -19,7 +19,7 @@ namespace gu
     class Atomic
     {
     public:
-        Atomic<I>(const I i = 0) : i_(i) { }
+        Atomic<I>(I i = 0) : i_(i) { }
 
         I operator()() const
         {
@@ -28,7 +28,7 @@ namespace gu
             return i;
         }
 
-        Atomic<I>& operator=(const I i)
+        Atomic<I>& operator=(I i)
         {
             gu_atomic_set(&i_, &i);
             return *this;
@@ -39,17 +39,17 @@ namespace gu
             return gu_atomic_fetch_and_and(&i_, 0);
         }
 
-        I fetch_and_add(const I i)
+        I fetch_and_add(I i)
         {
             return gu_atomic_fetch_and_add(&i_, i);
         }
 
-        I add_and_fetch(const I i)
+        I add_and_fetch(I i)
         {
             return gu_atomic_add_and_fetch(&i_, i);
         }
 
-        I sub_and_fetch(const I i)
+        I sub_and_fetch(I i)
         {
             return gu_atomic_sub_and_fetch(&i_, i);
         }
@@ -65,13 +65,13 @@ namespace gu
             return *this;
         }
 
-        Atomic<I>& operator+=(const I i)
+        Atomic<I>& operator+=(I i)
         {
             gu_atomic_fetch_and_add(&i_, i);
             return *this;
         }
 
-        bool operator!=(const I i)
+        bool operator!=(I i)
         {
             return (operator()() != i);
         }
