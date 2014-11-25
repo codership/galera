@@ -46,9 +46,11 @@ case "$GCS_TYPE" in
 *) echo "Urecognized GCS_TYPE: '$GCS_TYPE'" ; exit 1 ;;
 esac
 
-# Extra parameters passed to gcomm backend.
+# Define extra parameters passed to gcomm backend if needed,
+# e.g. using multicast:
 #
 # export GCOMM_EXTRA_PARAMS=${GCOMM_EXTRA_PARAMS:-"gmcast.mcast_addr=239.192.0.11"}
+export GCOMM_EXTRA_PARAMS=""
 
 # default replication port
 export GCS_PORT=4567
