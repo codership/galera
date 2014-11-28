@@ -66,7 +66,17 @@ BuildRequires: gcc-c++
 BuildRequires: python
 %endif
 
-Requires:      openssl
+# Systemd
+%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7
+%define systemd 1
+BuildRequires: systemd
+%else
+%define systemd 0
+%endif
+
+
+
+Requires:      openssl nmap
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 
@@ -111,6 +121,10 @@ RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
+%if 0%{?systemd}
+install -D -m 644 $RBD/garb/files/garb.service $RBR%{_unitdir}/garb.service
+install -D -m 755 $RBD/garb/files/garb-systemd $RBR%{_bindir}/garb-systemd
+%else
 install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
@@ -118,6 +132,7 @@ install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 %if 0%{?suse_version}
 install -d $RBR/usr/sbin
 ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
+%endif
 %endif
 
 %if 0%{?suse_version}
@@ -163,11 +178,18 @@ rm -f $(find %{libs} -type l)
 %else
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %endif
+
+
+%if 0%{?systemd}
+%attr(0644,root,root) %{_unitdir}/garb.service
+%attr(0755,root,root) %{_bindir}/garb-systemd
+%else
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
 
 # Symlink required by SUSE policy
 %if 0%{?suse_version}
 %attr(0755,root,root) /usr/sbin/rcgarb
+%endif
 %endif
 
 %attr(0755,root,root) %{_bindir}/garbd

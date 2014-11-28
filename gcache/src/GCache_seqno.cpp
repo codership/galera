@@ -24,6 +24,8 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
+        seqno_released = SEQNO_NONE;
+
         if (gu_unlikely(seqno2ptr.empty())) return;
 
         /* order is significant here */
@@ -31,8 +33,6 @@ namespace gcache
         mem.seqno_reset();
 
         seqno2ptr.clear();
-
-        seqno_released = 0;
     }
 
     /*!
@@ -134,12 +134,25 @@ namespace gcache
 #endif
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {
-                assert (seqno_released + 1 == it->first || seqno_released == 0);
+                assert(it->first != SEQNO_NONE);
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
-                seqno_released = it->first;
+#ifndef NDEBUG
+                if (!(seqno_released + 1 == it->first ||
+                      seqno_released == SEQNO_NONE))
+                {
+                    log_info << "seqno_released: " << seqno_released
+                             << "; it->first: " << it->first
+                             << "; seqno2ptr.begin: " <<seqno2ptr.begin()->first
+                             << "\nstart: " << start << "; end: " << end
+                             << " batch_size: " << batch_size << "; gap: "
+                             << new_gap << "; seqno_max: " << seqno_max;
+                    assert(seqno_released + 1 == it->first ||
+                           seqno_released == SEQNO_NONE);
+                }
+#endif
                 ++it; /* free_common() below may erase current element,
-                       * so advance iterator before calling free_common() */
+                       * so advance iterator before calling free_common()*/
                 if (gu_likely(!BH_is_released(bh))) free_common(bh);
             }
 

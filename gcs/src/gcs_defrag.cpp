@@ -4,12 +4,12 @@
  * $Id$
  */
 
+#include "gcs_act_proto.hpp"
+#include "gcs_defrag.hpp"
+
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-
-#include "gcs_act_proto.hpp"
-#include "gcs_defrag.hpp"
 
 #define DF_ALLOC()                                              \
     do {                                                        \
@@ -82,6 +82,15 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                     DF_ALLOC();
 #endif /* GCS_FOR_GARB */
                 }
+            }
+            else if (frg->act_id == df->sent_id && frg->frag_no < df->frag_no) {
+                /* gh172: tolerate duplicate fragments in production. */
+                gu_warn ("Duplicate fragment %lld:%ld, expected %lld:%ld. "
+                         "Skipping.",
+                         frg->act_id, frg->frag_no, df->sent_id, df->frag_no);
+                df->frag_no--; // revert counter in hope that we get good frag
+                assert(0);
+                return 0;
             }
             else {
                 gu_error ("Unordered fragment received. Protocol error.");

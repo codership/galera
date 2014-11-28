@@ -107,6 +107,7 @@ void gcomm::PC::connect(bool start_prim)
     pstack_.push_proto(this);
     pnet().insert(&pstack_);
 
+    gmcast_->connect_precheck(start_prim);
     gmcast_->connect();
 
     closed_ = false;

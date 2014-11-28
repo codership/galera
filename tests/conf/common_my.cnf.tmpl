@@ -1,0 +1,28 @@
+[mysqld]
+core-file
+bind-address=127.0.1.1
+binlog_cache_size=4096
+innodb_flush_log_at_trx_commit=0
+innodb_buffer_pool_size=64M
+innodb_log_file_size=64M
+innodb_locks_unsafe_for_binlog=1
+innodb_lock_wait_timeout=50
+innodb_autoinc_lock_mode=2
+
+#
+query_cache_size=1M
+query_cache_type=1
+
+max_connections=1024
+max_connect_errors=4294967295
+performance_schema=OFF
+binlog_format=ROW
+default-storage-engine=innodb
+
+wsrep_slave_threads=4
+
+# Some regression tests use causal reads to determine if
+# all pending queries have been processed. Set to sufficiently high
+# time to avoid timing out too early.
+wsrep_provider_options="repl.causal_read_timeout=PT10H;evs.info_log_mask=0x3"
+
