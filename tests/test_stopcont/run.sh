@@ -15,7 +15,7 @@ TRIES=${1:-"-1"} # -1 stands for indefinite loop
 MIN_PAUSE=${2:-"3"}
 PAUSE_RND=${3:-"20"}
 
-#restart # cluster restart should be triggered by user
+restart # cluster restart should be triggered by user
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
@@ -24,7 +24,8 @@ DYLD_INSERT_LIBRARIES=$GLB_PRELOAD \
 DYLD_FORCE_FLAT_NAMESPACE=1 \
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
         --port $DBMS_PORT --users $DBMS_CLIENTS --duration 999999999 \
-        --stat-interval 99999999 >/dev/null 2>$BASE_RUN/seesaw.err &
+        --rows 100000 --trans-min 50 --trans-max 500 \
+        --stat-interval 99999999 >/dev/null 2>$BASE_RUN/stopcont.err &
 declare -r sqlgen_pid=$!
 disown # forget about the job, disable waiting for it
 
@@ -39,7 +40,8 @@ trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
 
 trap "kill $sqlgen_pid || :" EXIT
 
-pause 10 10
+pause 30 1 # 30 seconds to create big enough tables
+
 consistency_check $sqlgen_pid
 # kills a node and restarts it after a while
 cycle()

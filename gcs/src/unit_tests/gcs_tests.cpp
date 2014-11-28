@@ -38,21 +38,24 @@ static suite_creator_t suites[] =
 	gcs_group_suite,
 	gcs_backend_suite,
 	gcs_core_suite,
-    gcs_fc_suite,
+	gcs_fc_suite,
 	NULL
     };
 
 int main(int argc, char* argv[])
 {
-  int no_fork = ((argc > 1) && !strcmp(argv[1], "nofork")) ? 1 : 0;
+  bool const nofork(((argc > 1) && !strcmp(argv[1], "nofork")) ? true : false);
   int i       = 0;
   int failed  = 0;
 
   FILE* log_file = NULL;
 
-  log_file = fopen ("gcs_tests.log", "w");
-  if (!log_file) return EXIT_FAILURE;
-  gu_conf_set_log_file (log_file);
+  if (!nofork)
+  {
+    log_file = fopen ("gcs_tests.log", "w");
+    if (!log_file) return EXIT_FAILURE;
+    gu_conf_set_log_file (log_file);
+  }
   gu_conf_debug_on();
   gu_conf_self_tstamp_on();
 
@@ -62,14 +65,14 @@ int main(int argc, char* argv[])
       gu_info ("#########################");
       gu_info ("Test %d.", i);
       gu_info ("#########################");
-      if (no_fork) srunner_set_fork_status(sr, CK_NOFORK);
+      if (nofork) srunner_set_fork_status(sr, CK_NOFORK);
       srunner_run_all (sr, CK_NORMAL);
       failed += srunner_ntests_failed (sr);
       srunner_free (sr);
       i++;
   }
 
-  fclose (log_file);
+  if (log_file) fclose (log_file);
   printf ("Total test failed: %d\n", failed);
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

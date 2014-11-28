@@ -166,10 +166,16 @@ START_TEST(test_serialization)
     fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
     fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
 
+    trx2->unref();
+    trx2 = TrxHandle::New(sp);
+
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
     buf.resize(trx->serial_size());
     fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
     fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+
+    trx2->unref();
+    trx2 = TrxHandle::New(sp);
 
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
     buf.resize(trx->serial_size());

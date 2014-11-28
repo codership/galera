@@ -59,9 +59,9 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 (df->sent_id == frg->act_id) && (0 == frg->frag_no)) {
                 /* df->sent_id was aborted halfway and is being taken care of
                  * by the sender thread. Forget about it.
-                 * Reinit counters and continue with the new action.
-                 * Note that for local actions no memory allocation is made.*/
-                gu_debug ("Local action %lld reset.", frg->act_id);
+                 * Reinit counters and continue with the new action. */
+                gu_debug ("Local action %lld, size %ld reset.",
+                          frg->act_id, frg->act_size);
                 df->frag_no  = 0;
                 df->received = 0;
                 df->tail     = df->head;
@@ -124,8 +124,8 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
             if (!local && df->reset) {
                 /* can happen after configuration change,
                    just ignore this message calmly */
-                gu_debug ("Ignoring fragment %lld:%ld after action reset",
-                          frg->act_id, frg->frag_no);
+                gu_debug ("Ignoring fragment %lld:%ld (size %d) after reset",
+                          frg->act_id, frg->frag_no, frg->act_size);
                 return 0;
             }
             else {
@@ -155,6 +155,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     assert (NULL == df->head);
 #endif
 
+#if 1
     if (df->received == df->size) {
         act->buf     = df->head;
         act->buf_len = df->received;
@@ -164,4 +165,37 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     else {
         return 0;
     }
+#else
+    /* Refs gh185. Above original logic is preserved which relies on resetting
+     * group->frag_reset when local action needs to be resent. However a proper
+     * solution seems to be to use reset flag of own defrag channel (at least
+     * it is per channel, not global like group->frag_reset). This proper logic
+     * is shown below. Note that for it to work gcs_group_handle_act_msg()
+     * must be able to handle -ERESTART return code. */
+    int ret;
+
+    if (df->received == df->size) {
+        act->buf     = df->head;
+        act->buf_len = df->received;
+        if (gu_likely(!df->reset))
+        {
+            ret = act->buf_len;
+        }
+        else
+        {
+            /* foreign action should simply never get here, only local actions
+             * are allowed to complete in reset state (to return -ERESTART) to
+             * a sending thread. */
+            assert(local);
+            ret = -ERESTART;
+        }
+        gcs_defrag_init (df, df->cache); // this also clears df->reset flag
+        assert(!df->reset);
+    }
+    else {
+        ret = 0;
+    }
+
+    return ret;
+#endif
 }
