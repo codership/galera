@@ -15,7 +15,7 @@ TRIES=${1:-"-1"} # -1 stands for indefinite loop
 MIN_PAUSE=${2:-"3"}
 PAUSE_RND=${3:-"20"}
 
-restart # cluster restart should be triggered by user
+#restart # cluster restart should be triggered by user
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
@@ -24,7 +24,7 @@ DYLD_INSERT_LIBRARIES=$GLB_PRELOAD \
 DYLD_FORCE_FLAT_NAMESPACE=1 \
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
         --port $DBMS_PORT --users $DBMS_CLIENTS --duration 999999999 \
-        --rows 100000 --trans-min 50 --trans-max 500 \
+        --rows 40 --trans-min 4 --trans-max 20 \
         --stat-interval 99999999 >/dev/null 2>$BASE_RUN/stopcont.err &
 declare -r sqlgen_pid=$!
 disown # forget about the job, disable waiting for it
