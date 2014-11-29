@@ -81,7 +81,6 @@ gcs_group_init_history (gcs_group_t*     group,
         return -EINVAL;
     }
 
-    assert(group->act_id_ < 0);
     group->act_id_    = seqno;
     group->group_uuid = *uuid;
     return 0;
