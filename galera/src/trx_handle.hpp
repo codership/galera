@@ -271,11 +271,21 @@ namespace galera
                            wsrep_seqno_t seqno_l,
                            wsrep_seqno_t seqno_g)
         {
+#ifndef NDEBUG
+            if (last_seen_seqno_ >= seqno_g)
+            {
+                log_fatal << "S: seqno_g: " << seqno_g << ", last_seen: "
+                          << last_seen_seqno_ << ", checksum: "
+                          << reinterpret_cast<void*>(write_set_in_.get_checksum());
+            }
+            assert(last_seen_seqno_ < seqno_g);
+#endif
             action_       = action;
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
             if (write_set_flags_ & F_PREORDERED)
             {
+                assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
                 last_seen_seqno_ = global_seqno_ - 1;
             }
         }
@@ -283,6 +293,7 @@ namespace galera
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);
+            assert (last_seen_seqno >= last_seen_seqno_);
             if (new_version())
                 write_set_out().set_last_seen(last_seen_seqno);
             last_seen_seqno_ = last_seen_seqno;
@@ -544,6 +555,22 @@ namespace galera
         void verify_checksum() const /* throws */
         {
             write_set_in_.verify_checksum();
+        }
+
+        uint64_t get_checksum() const
+        {
+            if (new_version())
+                return write_set_in_.get_checksum();
+            else
+                return 0;
+        }
+
+        size_t size() const
+        {
+            if (new_version())
+                return write_set_in_.size();
+            else
+                return serial_size();
         }
 
         void update_stats(gu::Atomic<long long>& kc,

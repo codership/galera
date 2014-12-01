@@ -510,7 +510,7 @@ core_handle_act_msg (gcs_core_t*          core,
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
-    bool  not_commonly_supported_version = false;
+    bool  commonly_supported_version = true;
 
     assert (GCS_MSG_ACTION == msg->type);
 
@@ -521,7 +521,7 @@ core_handle_act_msg (gcs_core_t*          core,
             gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
                      gcs_act_proto_ver(msg->buf),
                      gcs_core_group_protocol_version(core));
-            not_commonly_supported_version = true;
+            commonly_supported_version = false;
             if (!my_msg) {
                 gu_info ("Discard message from member %d because of "
                          "not commonly supported version.", msg->sender_idx);
@@ -542,15 +542,14 @@ core_handle_act_msg (gcs_core_t*          core,
         }
 
         ret = gcs_group_handle_act_msg (group, &frg, msg, act,
-                                        not_commonly_supported_version);
+                                        commonly_supported_version);
 
         if (ret > 0) { /* complete action received */
-            assert (ret  == act->act.buf_len);
+            assert (act->act.buf_len == ret);
 #ifndef GCS_FOR_GARB
             assert (NULL != act->act.buf);
 #else
             assert (NULL == act->act.buf);
-//            act->act.buf_len = 0;
 #endif
             act->sender_idx = msg->sender_idx;
 
@@ -1035,7 +1034,7 @@ static long core_msg_causal(gcs_core_t* conn,
 
     gcs_seqno_t const causal_seqno =
         GCS_GROUP_PRIMARY == conn->group.state ?
-        conn->group.act_id : GCS_SEQNO_ILL;
+        conn->group.act_id_ : GCS_SEQNO_ILL;
 
     act = (causal_act_t*)msg->buf;
     gu_mutex_lock(act->mtx);
@@ -1076,7 +1075,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
 
         ret = core_msg_recv (&conn->backend, recv_msg, timeout);
         if (gu_unlikely (ret <= 0)) {
-           goto out; /* backend error while receiving message */
+            goto out; /* backend error while receiving message */
         }
 
         switch (recv_msg->type) {
@@ -1251,6 +1250,10 @@ gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
                  pkt_size, pkt_size + (hdr_size - msg_size + 1));
         msg_size = hdr_size + 1;
     }
+
+    /* even if backend may not support limiting packet size force max message
+     * size at this level */
+    msg_size = std::min(pkt_size, msg_size);
 
     gu_info ("Changing maximum packet size to %ld, resulting msg size: %ld",
               pkt_size, msg_size);

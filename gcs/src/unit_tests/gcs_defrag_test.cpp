@@ -106,20 +106,21 @@ START_TEST (gcs_defrag_test)
     fail_if (defrag.tail != defrag.head + defrag.received);
     tail = defrag.tail;
 
-#define TRY_WRONG_2ND_FRAGMENT(frag)                                \
-    ret = gcs_defrag_handle_frag (&defrag, frag, &recv_act, FALSE); \
-    fail_if (ret != -EPROTO);                                       \
-    fail_if (defrag.received != frag1_len);                         \
+#define TRY_WRONG_2ND_FRAGMENT(frag)                                    \
+    ret = gcs_defrag_handle_frag (&defrag, &frag, &recv_act, FALSE);    \
+    if (defrag.frag_no < frag.frag_no) fail_if (ret != -EPROTO);        \
+    else fail_if (ret != 0);                                            \
+    fail_if (defrag.received != frag1_len);                             \
     fail_if (defrag.tail != tail);
 
     // 3. Try first fragment again
-    TRY_WRONG_2ND_FRAGMENT(&frg1);
+    TRY_WRONG_2ND_FRAGMENT(frg1);
 
     // 4. Try third fragment
-    TRY_WRONG_2ND_FRAGMENT(&frg3);
+    TRY_WRONG_2ND_FRAGMENT(frg3);
 
     // 5. Try fouth fragment
-    TRY_WRONG_2ND_FRAGMENT(&frg4);
+    TRY_WRONG_2ND_FRAGMENT(frg4);
 
     // 6. Try second fragment
     ret = gcs_defrag_handle_frag (&defrag, &frg2, &recv_act, FALSE);

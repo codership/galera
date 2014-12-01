@@ -26,7 +26,7 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
 {
     // here we also create default node instance.
     group->cache        = cache;
-    group->act_id       = GCS_SEQNO_ILL;
+    group->act_id_      = GCS_SEQNO_ILL;
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
@@ -68,8 +68,8 @@ gcs_group_init_history (gcs_group_t*     group,
                         gcs_seqno_t      seqno,
                         const gu_uuid_t* uuid)
 {
-    bool negative_seqno = (seqno < 0);
-    bool nil_uuid = !gu_uuid_compare (uuid, &GU_UUID_NIL);
+    bool const negative_seqno(seqno < 0);
+    bool const nil_uuid(!gu_uuid_compare (uuid, &GU_UUID_NIL));
 
     if (negative_seqno && !nil_uuid) {
         gu_error ("Non-nil history UUID with negative seqno (%lld) makes "
@@ -80,7 +80,8 @@ gcs_group_init_history (gcs_group_t*     group,
         gu_error ("Non-negative state seqno requires non-nil history UUID.");
         return -EINVAL;
     }
-    group->act_id     = seqno;
+
+    group->act_id_    = seqno;
     group->group_uuid = *uuid;
     return 0;
 }
@@ -297,7 +298,7 @@ group_post_state_exchange (gcs_group_t* group)
     }
     else {
         gu_fatal ("Negative quorum version: %d", quorum->version);
-        abort();
+        gu_abort();
     }
 
     // Update each node state based on quorum outcome:
@@ -310,8 +311,16 @@ group_post_state_exchange (gcs_group_t* group)
         // primary configuration
         if (new_exchange) {
             // new state exchange happened
+            if (!gu_uuid_compare(&group->group_uuid, &quorum->group_uuid) &&
+                group->act_id_ > quorum->act_id)
+            {
+                gu_fatal("Reversing history: %lld -> %lld, this member has "
+                         "applied %lld more events than the primary component."
+                         "Data loss is possible. Aborting.");
+                gu_abort();
+            }
             group->state      = GCS_GROUP_PRIMARY;
-            group->act_id     = quorum->act_id;
+            group->act_id_    = quorum->act_id;
             group->conf_id    = quorum->conf_id + 1;
             group->group_uuid = quorum->group_uuid;
             group->prim_uuid  = group->state_uuid;
@@ -451,9 +460,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 group->prim_num   = 1;
                 group->state      = GCS_GROUP_PRIMARY;
 
-                if (group->act_id < 0) {
+                if (group->act_id_ < 0) {
                     // no history provided: start a new one
-                    group->act_id  = GCS_SEQNO_NIL;
+                    group->act_id_ = GCS_SEQNO_NIL;
                     gu_uuid_generate (&group->group_uuid, NULL, 0);
                     gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
@@ -1403,7 +1412,7 @@ gcs_group_act_conf (gcs_group_t*    group,
     if (conf) {
         long idx;
 
-        conf->seqno          = group->act_id;
+        conf->seqno          = group->act_id_;
         conf->conf_id        = group->conf_id;
         conf->memb_num       = group->num;
         conf->my_idx         = group->my_idx;
@@ -1474,7 +1483,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         &group->group_uuid,
         &group->prim_uuid,
         group->prim_seqno,
-        group->act_id,
+        group->act_id_,
         cached,
         group->prim_num,
         group->prim_state,
