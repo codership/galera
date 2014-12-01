@@ -83,9 +83,13 @@ void gcomm::PC::connect(bool start_prim)
         start_prim = true;
     }
 
+    log_info << "uri " << uri_;
+    std::string option(uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim));
+    log_info << "option " << option;
+
     bool wait_prim(
-        gu::from_string<bool>(
-            uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
+        gu::from_string<bool>(option
+            ));
 
     const gu::datetime::Period wait_prim_timeout(
         gu::from_string<gu::datetime::Period>(
@@ -97,7 +101,7 @@ void gcomm::PC::connect(bool start_prim)
     // should take precedence. otherwise it's not able to bootstrap.
     if (start_prim) {
         log_info << "start_prim is enabled, turn off pc_recovery";
-    } else if (pc_recovery_) {
+    } else if (/* pc_recovery_*/ rst_view_.type() == V_PRIM) {
         wait_prim = false;
     }
 
@@ -144,6 +148,7 @@ void gcomm::PC::connect(bool start_prim)
     // - Due to #658 we loop here only if node is told to start in prim.
     // - Fix for #680, bypass waiting prim only if explicitly required
     try_until = gu::datetime::Date::now() + wait_prim_timeout;
+    log_info << "wait prim " << wait_prim << " wait prim timeout " << wait_prim_timeout;
     while ((wait_prim == true || start_prim == true) &&
            pc_->state() != pc::Proto::S_PRIM)
     {

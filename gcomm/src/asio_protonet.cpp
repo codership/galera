@@ -5,7 +5,6 @@
 
 #include "asio_tcp.hpp"
 #include "asio_udp.hpp"
-#include "asio_addr.hpp"
 #include "asio_protonet.hpp"
 
 #include "socket.hpp"
@@ -39,7 +38,7 @@ namespace
         }
     }
 
-
+#if 0
     static void set_cipher_list(SSL_CTX* ssl_ctx, gu::Config& conf)
     {
         std::string cipher_list(
@@ -52,6 +51,7 @@ namespace
         conf.set(gcomm::Conf::SocketSslCipherList, cipher_list);
     }
 
+
     static void set_compression(gu::Config& conf)
     {
         bool compression(
@@ -63,7 +63,7 @@ namespace
         }
         conf.set(gcomm::Conf::SocketSslCompression, compression);
     }
-
+#endif // 0
 }
 
 
@@ -116,9 +116,11 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     {
         conf_.set(Conf::SocketUseSsl, true);
         log_info << "initializing ssl context";
-        set_compression(conf_);
-        set_cipher_list(ssl_context_.impl(), conf_);
-        ssl_context_.set_verify_mode(asio::ssl::context::verify_peer);
+        gu::compression(conf_);
+        gu::cipher(ssl_context_, conf_);
+        ssl_context_.set_verify_mode(
+            asio::ssl::context::verify_peer |
+            asio::ssl::context::verify_fail_if_no_peer_cert);
         ssl_context_.set_password_callback(
             boost::bind(&gcomm::AsioProtonet::get_ssl_password, this));
 

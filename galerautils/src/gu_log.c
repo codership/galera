@@ -136,8 +136,8 @@ gu_log (gu_log_severity_t severity,
         ...)
 {
     va_list ap;
-    int   max_string = 2048;
-    char  string[max_string]; /** @note: this can cause stack overflow
+    int   max_string = 4096;
+    char  string[4096]; /** @note: this can cause stack overflow
                                * in kernel mode (both Linux and Windows). */
     char* str = string;
     int   len;
