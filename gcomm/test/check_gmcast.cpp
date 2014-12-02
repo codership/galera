@@ -9,6 +9,8 @@
 #include "gmcast.hpp"
 #include "gmcast_message.hpp"
 
+#include "gu_asio.hpp" // gu::ssl_register_params()
+
 using namespace std;
 using namespace gcomm;
 using namespace gcomm::gmcast;
@@ -31,6 +33,7 @@ START_TEST(test_gmcast_multicast)
 
     string uri1("gmcast://?gmcast.group=test&gmcast.mcast_addr=239.192.0.11");
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* gm1(Transport::create(*pnet, uri1));
@@ -154,6 +157,7 @@ START_TEST(test_gmcast_w_user_messages)
 
     log_info << "START";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     mark_point();
     auto_ptr<Protonet> pnet(Protonet::create(conf));
@@ -256,6 +260,7 @@ START_TEST(test_gmcast_auto_addr)
 {
     log_info << "START";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
@@ -291,6 +296,7 @@ START_TEST(test_gmcast_forget)
     gu_conf_self_tstamp_on();
     log_info << "START";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://"
@@ -353,6 +359,7 @@ START_TEST(test_trac_380)
     gu_conf_self_tstamp_on();
     log_info << "START";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
@@ -386,6 +393,7 @@ START_TEST(test_trac_828)
     gu_conf_self_tstamp_on();
     log_info << "START (test_trac_828)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
