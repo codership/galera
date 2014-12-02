@@ -130,6 +130,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     config_             (),
     init_config_        (config_, args->node_address),
     parse_options_      (config_, args->options),
+    init_ssl_           (config_),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
     proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),
