@@ -710,6 +710,7 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
     {
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
+        log_info << "returng gcs::gcomm::connect";
     }
     catch (Exception& e)
     {

@@ -236,14 +236,14 @@ size_t gcomm::AsioUdpSocket::mtu() const
 
 std::string gcomm::AsioUdpSocket::local_addr() const
 {
-    return uri_string(UDP_SCHEME,
+    return uri_string(gu::scheme::udp,
                       gu::escape_addr(socket_.local_endpoint().address()),
                       gu::to_string(socket_.local_endpoint().port()));
 }
 
 std::string gcomm::AsioUdpSocket::remote_addr() const
 {
-    return uri_string(UDP_SCHEME,
+    return uri_string(gu::scheme::udp,
                       gu::escape_addr(socket_.remote_endpoint().address()),
                       gu::to_string(socket_.remote_endpoint().port()));
 }

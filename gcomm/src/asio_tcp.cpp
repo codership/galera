@@ -168,7 +168,7 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
 
 #ifdef HAVE_ASIO_SSL_HPP
-        if (uri.get_scheme() == SSL_SCHEME)
+        if (uri.get_scheme() == gu::scheme::ssl)
         {
             ssl_socket_ = new asio::ssl::stream<asio::ip::tcp::socket>(
                 net_.io_service_, net_.ssl_context_
@@ -587,7 +587,7 @@ void gcomm::AsioTcpSocket::assign_local_addr()
     if (ssl_socket_ != 0)
     {
         local_addr_ = gcomm::uri_string(
-            gcomm::SSL_SCHEME,
+            gu::scheme::ssl,
             gu::escape_addr(
                 ssl_socket_->lowest_layer().local_endpoint().address()),
             gu::to_string(
@@ -598,7 +598,7 @@ void gcomm::AsioTcpSocket::assign_local_addr()
     {
 #endif /* HAVE_ASIO_SSL_HPP */
         local_addr_ = gcomm::uri_string(
-            gcomm::TCP_SCHEME,
+            gu::scheme::tcp,
             gu::escape_addr(socket_.local_endpoint().address()),
             gu::to_string(socket_.local_endpoint().port())
             );
@@ -613,7 +613,7 @@ void gcomm::AsioTcpSocket::assign_remote_addr()
     if (ssl_socket_ != 0)
     {
         remote_addr_ = gcomm::uri_string(
-            gcomm::SSL_SCHEME,
+            gu::scheme::ssl,
             gu::escape_addr(
                 ssl_socket_->lowest_layer().remote_endpoint().address()),
             gu::to_string(
@@ -624,7 +624,7 @@ void gcomm::AsioTcpSocket::assign_remote_addr()
     {
 #endif /* HAVE_ASIO_SSL_HPP */
         remote_addr_ = uri_string(
-            gcomm::TCP_SCHEME,
+            gu::scheme::tcp,
             gu::escape_addr(socket_.remote_endpoint().address()),
             gu::to_string(socket_.remote_endpoint().port())
             );
@@ -700,7 +700,7 @@ void gcomm::AsioTcpAcceptor::accept_handler(
         }
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri_));
 #ifdef HAVE_ASIO_SSL_HPP
-        if (uri_.get_scheme() == SSL_SCHEME)
+        if (uri_.get_scheme() == gu::scheme::ssl)
         {
             new_socket->ssl_socket_ =
                 new asio::ssl::stream<asio::ip::tcp::socket>(
@@ -748,7 +748,7 @@ void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
         acceptor_.listen();
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));
 #ifdef HAVE_ASIO_SSL_HPP
-        if (uri_.get_scheme() == SSL_SCHEME)
+        if (uri_.get_scheme() == gu::scheme::ssl)
         {
             new_socket->ssl_socket_ =
                 new asio::ssl::stream<asio::ip::tcp::socket>(

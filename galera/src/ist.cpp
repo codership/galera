@@ -18,28 +18,6 @@ namespace
 {
     static std::string const CONF_KEEP_KEYS     ("ist.keep_keys");
     static bool        const CONF_KEEP_KEYS_DEFAULT (true);
-
-    static std::string const CONF_SSL_KEY       (COMMON_CONF_SSL_KEY);
-    static std::string const CONF_SSL_CERT      (COMMON_CONF_SSL_CERT);
-    static std::string const CONF_SSL_CA        (COMMON_CONF_SSL_CA);
-    static std::string const CONF_SSL_PSWD_FILE (COMMON_CONF_SSL_PSWD_FILE);
-
-    static void prepare_ssl_ctx(const gu::Config& conf, asio::ssl::context& ctx)
-    {
-        // Here we blindly assume that ssl globals have been initialized
-        // by gcomm.
-        ctx.set_verify_mode(asio::ssl::context::verify_peer |
-                            asio::ssl::context::verify_fail_if_no_peer_cert);
-        gu::SSLPasswordCallback cb(conf);
-        ctx.set_password_callback(
-            boost::bind(&gu::SSLPasswordCallback::get_password, &cb));
-        ctx.use_private_key_file(conf.get(CONF_SSL_KEY),
-                                 asio::ssl::context::pem);
-        ctx.use_certificate_file(conf.get(CONF_SSL_CERT),
-                                 asio::ssl::context::pem);
-        ctx.load_verify_file(conf.get(CONF_SSL_CA,
-                                      conf.get(CONF_SSL_CERT)));
-    }
 }
 
 
@@ -95,10 +73,6 @@ galera::ist::register_params(gu::Config& conf)
 {
     conf.add(Receiver::RECV_ADDR);
     conf.add(CONF_KEEP_KEYS);
-    conf.add(CONF_SSL_KEY);
-    conf.add(CONF_SSL_CERT);
-    conf.add(CONF_SSL_CA);
-    conf.add(CONF_SSL_PSWD_FILE);
 }
 
 galera::ist::Receiver::Receiver(gu::Config&           conf,
@@ -185,7 +159,7 @@ IST_determine_recv_addr (gu::Config& conf)
 
         try
         {
-            std::string ssl_key = conf.get(CONF_SSL_KEY);
+            std::string ssl_key = conf.get(gu::conf::ssl_key);
             if (ssl_key.length() != 0) ssl = true;
         }
         catch (gu::NotSet&) {}
@@ -246,7 +220,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
-            prepare_ssl_ctx(conf_, ssl_ctx_);
+            gu::ssl_prepare_context(conf_, ssl_ctx_);
         }
 
         asio::ip::tcp::resolver resolver(io_service_);
@@ -559,7 +533,7 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
     io_service_(),
     socket_    (io_service_),
     ssl_ctx_   (io_service_, asio::ssl::context::sslv23),
-    ssl_stream_(io_service_, ssl_ctx_),
+    ssl_stream_(0),
     conf_      (conf),
     gcache_    (gcache),
     version_   (version),
@@ -581,10 +555,13 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
         if (use_ssl_ == true)
         {
             log_info << "IST sender using ssl";
-            prepare_ssl_ctx(conf, ssl_ctx_);
-            ssl_stream_.lowest_layer().connect(*i);
-            gu::set_fd_options(ssl_stream_.lowest_layer());
-            ssl_stream_.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
+            ssl_prepare_context(conf, ssl_ctx_);
+            // ssl_stream must be created after ssl_ctx_ is prepared...
+            ssl_stream_ = new asio::ssl::stream<asio::ip::tcp::socket>(
+                io_service_, ssl_ctx_);
+            ssl_stream_->lowest_layer().connect(*i);
+            gu::set_fd_options(ssl_stream_->lowest_layer());
+            ssl_stream_->handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
         }
         else
         {
@@ -604,7 +581,8 @@ galera::ist::Sender::~Sender()
 {
     if (use_ssl_ == true)
     {
-        ssl_stream_.lowest_layer().close();
+        ssl_stream_->lowest_layer().close();
+        delete ssl_stream_;
     }
     else
     {
@@ -629,9 +607,9 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 
         if (use_ssl_ == true)
         {
-            p.recv_handshake(ssl_stream_);
-            p.send_handshake_response(ssl_stream_);
-            ctrl = p.recv_ctrl(ssl_stream_);
+            p.recv_handshake(*ssl_stream_);
+            p.send_handshake_response(*ssl_stream_);
+            ctrl = p.recv_ctrl(*ssl_stream_);
         }
         else
         {
@@ -657,7 +635,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 // log_info << "sending " << buf_vec[i].seqno_g();
                 if (use_ssl_ == true)
                 {
-                    p.send_trx(ssl_stream_, buf_vec[i]);
+                    p.send_trx(*ssl_stream_, buf_vec[i]);
                 }
                 else
                 {
@@ -668,7 +646,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 {
                     if (use_ssl_ == true)
                     {
-                        p.send_ctrl(ssl_stream_, Ctrl::C_EOF);
+                        p.send_ctrl(*ssl_stream_, Ctrl::C_EOF);
                     }
                     else
                     {
@@ -681,7 +659,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                         size_t n;
                         if (use_ssl_ == true)
                         {
-                            n = asio::read(ssl_stream_, asio::buffer(&b, 1));
+                            n = asio::read(*ssl_stream_, asio::buffer(&b, 1));
                         }
                         else
                         {

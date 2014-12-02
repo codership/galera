@@ -44,6 +44,7 @@ const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
                                               const char* const node_address)
 {
+    gu::ssl_register_params(conf);
     Replicator::register_params(conf);
 
     std::map<std::string, std::string>::const_iterator i;

@@ -13,6 +13,8 @@
 #include "gcomm/conf.hpp"
 #include "gu_errno.h"
 
+#include "gu_asio.hpp" // gu::ssl_register_params()
+
 #include <check.h>
 
 #include <list>
@@ -207,6 +209,7 @@ START_TEST(test_pc_view_changes_single)
 {
     log_info << "START (test_pc_view_changes_single)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(0, 0);
     Proto pc1(conf, uuid1, 0);
@@ -400,6 +403,7 @@ START_TEST(test_pc_view_changes_double)
 {
     log_info << "START (test_pc_view_changes_double)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -470,6 +474,7 @@ START_TEST(test_pc_view_changes_reverse)
 {
     log_info << "START (test_pc_view_changes_reverse)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -495,6 +500,7 @@ START_TEST(test_pc_state1)
 {
     log_info << "START (test_pc_state1)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -634,6 +640,7 @@ START_TEST(test_pc_state2)
 {
     log_info << "START (test_pc_state2)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -757,6 +764,7 @@ START_TEST(test_pc_state3)
 {
     log_info << "START (test_pc_state3)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -882,6 +890,7 @@ START_TEST(test_pc_conflicting_prims)
 {
     log_info << "START (test_pc_conflicting_prims)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -956,6 +965,7 @@ START_TEST(test_pc_conflicting_prims_npvo)
 {
     log_info << "START (test_pc_conflicting_npvo)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -1078,6 +1088,7 @@ static DummyNode* create_dummy_node(size_t idx,
                                     int weight = 1)
 {
     gu::Config& gu_conf(static_gu_conf());
+    gu::ssl_register_params(gu_conf);
     gcomm::Conf::register_params(gu_conf);
     const string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
@@ -1451,6 +1462,7 @@ START_TEST(test_pc_transport)
 {
     log_info << "START (test_pc_transport)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
@@ -1512,6 +1524,7 @@ START_TEST(test_trac_191)
 {
     log_info << "START (test_trac_191)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
     Proto p(conf, uuid4, 0);
@@ -1581,6 +1594,7 @@ START_TEST(test_trac_413)
     };
 
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
 
     TN n1(conf, 1), n2(conf, 2), n3(conf, 3);
@@ -1736,6 +1750,7 @@ START_TEST(test_fifo_violation)
 {
     log_info << "START (test_fifo_violation)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -1770,6 +1785,7 @@ START_TEST(test_checksum)
 {
     log_info << "START (test_checksum)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     conf.set(Conf::PcChecksum, gu::to_string(true));
     UUID uuid1(1);
@@ -1810,6 +1826,7 @@ START_TEST(test_set_param)
 {
     log_info << "START (test_pc_transport)";
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
@@ -1880,6 +1897,7 @@ START_TEST(test_trac_599)
     };
 
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     D d(conf);
     std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
@@ -1911,6 +1929,7 @@ END_TEST
 START_TEST(test_trac_620)
 {
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     Transport* tp(Transport::create(*net, "pc://?"
@@ -2107,6 +2126,7 @@ START_TEST(test_weighted_partitioning_1)
 {
     log_info << "START (test_weighted_partitioning_1)";
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2117,6 +2137,7 @@ START_TEST(test_weighted_partitioning_1)
     single_boot(0, &pu3);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
@@ -2128,6 +2149,7 @@ START_TEST(test_weighted_partitioning_1)
     double_boot(0, &pu3, &pu2);
 
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
@@ -2264,6 +2286,7 @@ START_TEST(test_weighted_partitioning_2)
 {
     log_info << "START (test_weighted_partitioning_2)";
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2274,6 +2297,7 @@ START_TEST(test_weighted_partitioning_2)
     single_boot(0, &pu3);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
@@ -2285,6 +2309,7 @@ START_TEST(test_weighted_partitioning_2)
     double_boot(0, &pu3, &pu2);
 
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
@@ -2451,6 +2476,7 @@ START_TEST(test_weight_change_partitioning_1)
 {
     log_info << "START (test_weight_change_partitioning_1)";
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
@@ -2461,6 +2487,7 @@ START_TEST(test_weight_change_partitioning_1)
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
@@ -2472,6 +2499,7 @@ START_TEST(test_weight_change_partitioning_1)
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2579,6 +2607,7 @@ START_TEST(test_weight_change_partitioning_2)
 {
     log_info << "START (test_weight_change_partitioning_2)";
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
@@ -2589,6 +2618,7 @@ START_TEST(test_weight_change_partitioning_2)
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
@@ -2600,6 +2630,7 @@ START_TEST(test_weight_change_partitioning_2)
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2697,6 +2728,7 @@ START_TEST(test_weight_change_joining)
 {
     log_info << "START (test_weight_change_joining)";
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "1");
     UUID uuid1(1);
@@ -2707,6 +2739,7 @@ START_TEST(test_weight_change_joining)
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "1");
     UUID uuid2(2);
@@ -2718,6 +2751,7 @@ START_TEST(test_weight_change_joining)
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2835,6 +2869,7 @@ START_TEST(test_weight_change_leaving)
 {
     log_info << "START (test_weight_change_leaving)";
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     conf1.set("pc.weight", "3");
     UUID uuid1(1);
@@ -2845,6 +2880,7 @@ START_TEST(test_weight_change_leaving)
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     conf2.set("pc.weight", "2");
     UUID uuid2(2);
@@ -2856,6 +2892,7 @@ START_TEST(test_weight_change_leaving)
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     conf3.set("pc.weight", "1");
     UUID uuid3(3);
@@ -2945,6 +2982,7 @@ static void _test_join_split_cluster(
     rst_view.add_member(uuid2, 0);
 
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf1, uuid1, 0);
@@ -2954,6 +2992,7 @@ static void _test_join_split_cluster(
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     ProtoUpMeta pum2(uuid2);
     Proto pc2(conf2, uuid2, 0);
@@ -2964,6 +3003,7 @@ static void _test_join_split_cluster(
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     ProtoUpMeta pum3(uuid3);
     Proto pc3(conf3, uuid3, 0);
@@ -3370,6 +3410,7 @@ START_TEST(test_gh_92)
 {
     UUID uuid1(1), uuid2(2), uuid3(3);
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf1, uuid1, 0);
@@ -3378,6 +3419,7 @@ START_TEST(test_gh_92)
     single_boot(0, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     ProtoUpMeta pum2(uuid2);
     Proto pc2(conf2, uuid2, 0);
@@ -3386,6 +3428,7 @@ START_TEST(test_gh_92)
     double_boot(0, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     ProtoUpMeta pum3(uuid3);
     Proto pc3(conf3, uuid3, 0);
@@ -3650,6 +3693,7 @@ START_TEST(test_prim_after_evict)
     log_info << "START(test_prim_after_evict)";
     UUID uuid1(1), uuid2(2), uuid3(3);
     gu::Config conf1;
+    gu::ssl_register_params(conf1);
     gcomm::Conf::register_params(conf1);
     ProtoUpMeta pum1(uuid1);
     Proto pc1(conf1, uuid1, 0);
@@ -3658,6 +3702,7 @@ START_TEST(test_prim_after_evict)
     single_boot(1, &pu1);
 
     gu::Config conf2;
+    gu::ssl_register_params(conf2);
     gcomm::Conf::register_params(conf2);
     ProtoUpMeta pum2(uuid2);
     Proto pc2(conf2, uuid2, 0);
@@ -3666,6 +3711,7 @@ START_TEST(test_prim_after_evict)
     double_boot(1, &pu1, &pu2);
 
     gu::Config conf3;
+    gu::ssl_register_params(conf3);
     gcomm::Conf::register_params(conf3);
     ProtoUpMeta pum3(uuid3);
     Proto pc3(conf3, uuid3, 0);

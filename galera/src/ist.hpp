@@ -103,7 +103,7 @@ namespace galera
             {
                 if (use_ssl_ == true)
                 {
-                    ssl_stream_.lowest_layer().close();
+                    ssl_stream_->lowest_layer().close();
                 }
                 else
                 {
@@ -113,14 +113,14 @@ namespace galera
 
         private:
 
-            asio::io_service                         io_service_;
-            asio::ip::tcp::socket                    socket_;
-            asio::ssl::context                       ssl_ctx_;
-            asio::ssl::stream<asio::ip::tcp::socket> ssl_stream_;
-            const gu::Config&                        conf_;
-            gcache::GCache&                          gcache_;
-            int                                      version_;
-            bool                                     use_ssl_;
+            asio::io_service                          io_service_;
+            asio::ip::tcp::socket                     socket_;
+            asio::ssl::context                        ssl_ctx_;
+            asio::ssl::stream<asio::ip::tcp::socket>* ssl_stream_;
+            const gu::Config&                         conf_;
+            gcache::GCache&                           gcache_;
+            int                                       version_;
+            bool                                      use_ssl_;
 
             Sender(const Sender&);
             void operator=(const Sender&);
