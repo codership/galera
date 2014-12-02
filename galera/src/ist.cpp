@@ -274,7 +274,6 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 void galera::ist::Receiver::run()
 {
     asio::ip::tcp::socket socket(io_service_);
-    // asio::ssl::context ssl_ctx(io_service_, asio::ssl::context::sslv23);
     asio::ssl::stream<asio::ip::tcp::socket> ssl_stream(io_service_, ssl_ctx_);
     try
     {

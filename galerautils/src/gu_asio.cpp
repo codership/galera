@@ -25,7 +25,7 @@ void gu::ssl_init_options(gu::Config& conf)
     bool use_ssl(conf.is_set(conf::ssl_key) ||
                  conf.is_set(conf::ssl_cert));
 
-    // However, it can be turned of explicitly using socket.use_ssl
+    // However, it can be turned off explicitly using socket.use_ssl
     if (conf.is_set(conf::use_ssl))
     {
         use_ssl = conf.get<bool>(conf::use_ssl);
