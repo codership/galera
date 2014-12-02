@@ -53,7 +53,7 @@ env.Append(LIBS = File('#/gcache/src/libgcache.a'))
 env.Append(LIBS = File('#/gcomm/src/libgcomm.a'))
 env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
 env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
-env.Append(LIBS = ['m'])
+env.Append(LIBS = ['m', 'ssl', 'crypto'])
 
 gcs_tests = env.Program(target    = 'gcs_tests',
                         source    = gcs_tests_sources,
