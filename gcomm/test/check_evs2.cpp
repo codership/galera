@@ -21,6 +21,8 @@
 
 #include "gcomm/conf.hpp"
 
+#include "gu_asio.hpp" // gu::ssl_register_params()
+
 #include <stdexcept>
 #include <vector>
 #include <set>
@@ -456,6 +458,7 @@ START_TEST(test_proto_single_join)
     log_info << "START";
     gu::Config conf;
     mark_point();
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid(1);
     DummyTransport t(uuid);
@@ -594,6 +597,7 @@ START_TEST(test_proto_double_join)
     log_info << "START";
     gu::Config conf;
     mark_point();
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
@@ -624,6 +628,7 @@ static DummyNode* create_dummy_node(size_t idx,
 {
     // reset conf to avoid stale config in case of nofork
     gu_conf = gu::Config();
+    gu::ssl_register_params(gu_conf);
     gcomm::Conf::register_params(gu_conf);
     string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
@@ -1895,6 +1900,7 @@ START_TEST(test_gh_100)
     log_info << "START (test_gh_100)";
     gu::Config conf;
     mark_point();
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     conf.set("evs.info_log_mask", "0x3");
     conf.set("evs.debug_log_mask", "0xa0");

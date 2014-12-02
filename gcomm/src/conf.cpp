@@ -16,20 +16,6 @@ std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 static std::string const SocketPrefix("socket" + Delim);
 std::string const gcomm::Conf::TcpNonBlocking =
     SocketPrefix + "non_blocking";
-std::string const gcomm::Conf::SocketUseSsl =
-    SocketPrefix + "ssl";
-std::string const gcomm::Conf::SocketSslVerifyFile =
-    COMMON_CONF_SSL_CA;
-std::string const gcomm::Conf::SocketSslCertificateFile =
-    COMMON_CONF_SSL_CERT;
-std::string const gcomm::Conf::SocketSslPrivateKeyFile =
-    COMMON_CONF_SSL_KEY;
-std::string const gcomm::Conf::SocketSslPasswordFile =
-    COMMON_CONF_SSL_PSWD_FILE;
-std::string const gcomm::Conf::SocketSslCipherList =
-    SocketPrefix + "ssl_cipher";
-std::string const gcomm::Conf::SocketSslCompression =
-    SocketPrefix + "ssl_compression";
 std::string const gcomm::Conf::SocketChecksum =
     SocketPrefix + "checksum";
 
@@ -137,13 +123,6 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
 
     GCOMM_CONF_ADD        (TcpNonBlocking);
-    GCOMM_CONF_ADD        (SocketUseSsl);
-    GCOMM_CONF_ADD        (SocketSslVerifyFile);
-    GCOMM_CONF_ADD        (SocketSslCertificateFile);
-    GCOMM_CONF_ADD        (SocketSslPrivateKeyFile);
-    GCOMM_CONF_ADD        (SocketSslPasswordFile);
-    GCOMM_CONF_ADD        (SocketSslCipherList);
-    GCOMM_CONF_ADD        (SocketSslCompression);
     GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
 
     GCOMM_CONF_ADD_DEFAULT(GMCastVersion);

@@ -3,7 +3,6 @@
  */
 
 #include "asio_udp.hpp"
-#include "asio_addr.hpp"
 
 #include "gcomm/util.hpp"
 #include "gcomm/common.hpp"
@@ -76,7 +75,7 @@ void gcomm::AsioUdpSocket::connect(const gu::URI& uri)
     Critical<AsioProtonet> crit(net_);
     asio::ip::udp::resolver resolver(net_.io_service_);
 
-    asio::ip::udp::resolver::query query(unescape_addr(uri.get_host()),
+    asio::ip::udp::resolver::query query(gu::unescape_addr(uri.get_host()),
                                    uri.get_port());
     asio::ip::udp::resolver::iterator conn_i(resolver.resolve(query));
 
@@ -85,14 +84,14 @@ void gcomm::AsioUdpSocket::connect(const gu::URI& uri)
     socket_.open(conn_i->endpoint().protocol());
     socket_.set_option(asio::ip::udp::socket::reuse_address(true));
     socket_.set_option(asio::ip::udp::socket::linger(true, 1));
-    set_fd_options(socket_);
+    gu::set_fd_options(socket_);
     asio::ip::udp::socket::non_blocking_io cmd(true);
     socket_.io_control(cmd);
 
     const std::string if_addr(
-        unescape_addr(
+        gu::unescape_addr(
             uri.get_option("socket.if_addr",
-                           anyaddr(conn_i->endpoint().address()))));
+                           gu::any_addr(conn_i->endpoint().address()))));
     asio::ip::address local_if(asio::ip::address::from_string(if_addr));
 
     if (is_multicast(conn_i->endpoint()) == true)
@@ -237,14 +236,14 @@ size_t gcomm::AsioUdpSocket::mtu() const
 
 std::string gcomm::AsioUdpSocket::local_addr() const
 {
-    return uri_string(UDP_SCHEME,
-                      escape_addr(socket_.local_endpoint().address()),
+    return uri_string(gu::scheme::udp,
+                      gu::escape_addr(socket_.local_endpoint().address()),
                       gu::to_string(socket_.local_endpoint().port()));
 }
 
 std::string gcomm::AsioUdpSocket::remote_addr() const
 {
-    return uri_string(UDP_SCHEME,
-                      escape_addr(socket_.remote_endpoint().address()),
+    return uri_string(gu::scheme::udp,
+                      gu::escape_addr(socket_.remote_endpoint().address()),
                       gu::to_string(socket_.remote_endpoint().port()));
 }
