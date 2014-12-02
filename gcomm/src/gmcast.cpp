@@ -12,6 +12,7 @@
 #include "defaults.hpp"
 #include "gu_convert.hpp"
 #include "gu_resolver.hpp"
+#include "gu_asio.hpp" // gu::conf::use_ssl
 
 using namespace std::rel_ops;
 
@@ -32,17 +33,17 @@ static void set_tcp_defaults (gu::URI* uri)
 
 static bool check_tcp_uri(const gu::URI& uri)
 {
-    return (uri.get_scheme() == gcomm::TCP_SCHEME ||
-            uri.get_scheme() == gcomm::SSL_SCHEME);
+    return (uri.get_scheme() == gu::scheme::tcp ||
+            uri.get_scheme() == gu::scheme::ssl);
 }
 
 static std::string get_scheme(bool use_ssl)
 {
     if (use_ssl == true)
     {
-        return gcomm::SSL_SCHEME;
+        return gu::scheme::ssl;
     }
-    return gcomm::TCP_SCHEME;
+    return gu::scheme::tcp;
 }
 
 gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
@@ -56,7 +57,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
                           param<int>(conf_, uri, Conf::GMCastSegment, "0"),
                           0, 255)),
     my_uuid_      (my_uuid ? *my_uuid : UUID(0, 0)),
-    use_ssl_      (param<bool>(conf_, uri, Conf::SocketUseSsl, "false")),
+    use_ssl_      (param<bool>(conf_, uri, gu::conf::use_ssl, "false")),
     // @todo: technically group name should be in path component
     group_name_   (param<std::string>(conf_, uri, Conf::GMCastGroup, "")),
     listen_addr_  (
@@ -164,7 +165,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     // resolving sets scheme to tcp, have to rewrite for ssl
     if (use_ssl_ == true)
     {
-        listen_addr_.replace(0, 3, gcomm::SSL_SCHEME);
+        listen_addr_.replace(0, 3, gu::scheme::ssl);
     }
 
     std::set<std::string>::iterator iaself(initial_addrs_.find(listen_addr_));
@@ -184,7 +185,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
         catch (gu::NotFound&) {}
 
         mcast_addr_ = gu::net::resolve(
-            uri_string(gcomm::UDP_SCHEME, mcast_addr_, port)).to_string();
+            uri_string(gu::scheme::udp, mcast_addr_, port)).to_string();
     }
 
     log_info << self_string() << " listening at " << listen_addr_;
@@ -259,7 +260,7 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
         // resolving sets scheme to tcp, have to rewrite for ssl
         if (use_ssl_ == true)
         {
-            initial_addr.replace(0, 3, gcomm::SSL_SCHEME);
+            initial_addr.replace(0, 3, gu::scheme::ssl);
         }
 
         if (check_tcp_uri(initial_addr) == false)

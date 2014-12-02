@@ -421,7 +421,13 @@ namespace galera
         {
             ParseOptions(gu::Config&, const char* opts);
         }
-            parse_options_; // parse oprtion string supplied on initialization
+            parse_options_; // parse option string supplied on initialization
+
+        class InitSSL
+        {
+        public:
+            InitSSL(gu::Config& conf) { gu::ssl_init_options(conf); }
+        } init_ssl_; // initialize global SSL parameters
 
         static int const       MAX_PROTO_VER;
         /*
