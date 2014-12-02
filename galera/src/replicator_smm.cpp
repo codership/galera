@@ -1387,16 +1387,18 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     if (WSREP_CB_SUCCESS != rcode)
     {
         assert(app_req_len <= 0);
+        log_fatal << "View callback failed. This is unrecoverable, "
+                  << "restart required.";
         close();
-        gu_throw_fatal << "View callback failed. This is unrecoverable, "
-            "restart required.";
+        abort();
     }
     else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
     {
+        log_fatal << "Local state UUID " << state_uuid_
+                  << " is different from group state UUID " << group_uuid
+                  << ", and SST request is null: restart required.";
         close();
-        gu_throw_fatal << "Local state UUID " << state_uuid_
-                       << " is different from group state UUID " << group_uuid
-                       << ", and SST request is null: restart required.";
+        abort();
     }
 
     if (view_info.view >= 0) // Primary configuration
@@ -1493,6 +1495,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             log_fatal << "Internal error: unexpected next state for "
                       << "non-prim: " << next_state << ". Restart required.";
+            close();
             abort();
         }
 
