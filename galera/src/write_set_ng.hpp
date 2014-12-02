@@ -304,6 +304,16 @@ namespace galera
                 return ptr_ + size();
             }
 
+            uint64_t get_checksum() const
+            {
+                const void* const checksum_ptr
+                    (reinterpret_cast<const gu::byte_t*>(ptr_) + size_ -
+                     V3_CHECKSUM_SIZE);
+
+                return gu::gtoh<Checksum::type_t>(
+                    *(static_cast<const Checksum::type_t*>(checksum_ptr)));
+            }
+
             /* to set seqno and parallel applying range after certification */
             void set_seqno(const wsrep_seqno_t& seqno, uint16_t pa_range);
 
@@ -779,6 +789,13 @@ namespace galera
                 check_thr_ = false;
                 checksum_fin();
             }
+        }
+
+        uint64_t get_checksum() const
+        {
+            /* since data segment is the only thing that definitely stays
+             * unchanged through WS lifetime, it is the WS signature */
+            return (data_.get_checksum());
         }
 
         void set_seqno(const wsrep_seqno_t& seqno, ssize_t pa_range)

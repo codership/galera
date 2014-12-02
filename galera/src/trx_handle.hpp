@@ -357,12 +357,22 @@ namespace galera
                            wsrep_seqno_t seqno_l,
                            wsrep_seqno_t seqno_g)
         {
+#ifndef NDEBUG
+            if (last_seen_seqno_ >= seqno_g)
+            {
+                log_fatal << "S: seqno_g: " << seqno_g << ", last_seen: "
+                          << last_seen_seqno_ << ", checksum: "
+                          << reinterpret_cast<void*>(write_set_.get_checksum());
+            }
+            assert(last_seen_seqno_ < seqno_g);
+#endif
             action_       = action;
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
 
             if (flags() & F_PREORDERED)
             {
+                assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
                 last_seen_seqno_ = global_seqno_ - 1;
             }
         }
@@ -455,6 +465,10 @@ namespace galera
         }
 
         int refcnt() const { return refcnt_(); }
+
+        uint64_t get_checksum() const { return write_set_.get_checksum(); }
+
+        size_t   size()         const { return write_set_.size(); }
 
     protected:
 
@@ -627,6 +641,7 @@ namespace galera
         void finalize(const wsrep_seqno_t& last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);
+            assert (last_seen_seqno >= this->last_seen_seqno());
 
             int pa_range(version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
 

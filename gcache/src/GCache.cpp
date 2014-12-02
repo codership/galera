@@ -21,8 +21,9 @@ namespace gcache
         mallocs  = 0;
         reallocs = 0;
 
-        seqno_locked = SEQNO_NONE;
-        seqno_max    = SEQNO_NONE;
+        seqno_locked   = SEQNO_NONE;
+        seqno_max      = SEQNO_NONE;
+        seqno_released = SEQNO_NONE;
 
         seqno2ptr.clear();
 

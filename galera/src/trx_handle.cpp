@@ -213,9 +213,14 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
             source_id_       = write_set_.source_id();
             conn_id_         = write_set_.conn_id();
             trx_id_          = write_set_.trx_id();
-
+#ifndef NDEBUG
+            write_set_.verify_checksum();
+            assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
+#endif
             if (write_set_.certified())
             {
+                assert(!local_);
+                assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
                 last_seen_seqno_ = WSREP_SEQNO_UNDEFINED; // why do we need this?
                 write_set_flags_ |= F_PREORDERED;
             }
@@ -234,7 +239,7 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
                 }
             }
 
-            timestamp_       = write_set_.timestamp();
+            timestamp_ = write_set_.timestamp();
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT) << "Unsupported WS version: "

@@ -306,6 +306,8 @@ public:
 
     void checksum() const; // throws if checksum fails
 
+    uint64_t get_checksum() const;
+
     gu::Buf buf() const
     {
         gu::Buf ret = { head_, size_ }; return ret;
@@ -418,7 +420,6 @@ public:
     void next (Buf& n) const { next_base<R> (n); }
 
     R next () const { return next_base<R> (); }
-
 }; /* class RecordSetIn */
 
 #if defined(__GNUG__)

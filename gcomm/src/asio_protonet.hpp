@@ -9,13 +9,7 @@
 #include "socket.hpp"
 
 #include "gu_monitor.hpp"
-
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#include "asio.hpp"
-#ifdef HAVE_ASIO_SSL_HPP
-#include "asio/ssl.hpp"
-#endif // HAVE_ASIO_SSL_HPP
+#include "gu_asio.hpp"
 
 #include <vector>
 #include <deque>

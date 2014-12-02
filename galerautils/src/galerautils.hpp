@@ -23,6 +23,7 @@
 //#include "gu_string.hpp"
 #include "gu_config.hpp"
 #include "gu_prodcons.hpp"
+#include "gu_asio.hpp"
 
 extern "C" {
 

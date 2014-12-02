@@ -39,6 +39,7 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     {
         log_error << e.what();
     }
+#ifdef NDEBUG
     catch (std::exception& e)
     {
         log_error << e.what();
@@ -47,7 +48,6 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     {
         /* Unrecognized parameter (logged by gu::Config::set()) */
     }
-#ifdef NDEBUG
     catch (...)
     {
         log_fatal << "non-standard exception";
@@ -178,6 +178,13 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         return repl->connect(cluster_name, cluster_url,
                              state_donor ? state_donor : "", bootstrap);
     }
+    catch (gu::Exception& e)
+    {
+        log_error << "Failed to connect to cluster: "
+                  << e.what();
+        return WSREP_NODE_FAIL;
+    }
+#ifdef NDEBUG
     catch (std::exception& e)
     {
         log_error << e.what();
@@ -188,6 +195,7 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
+#endif // ! NDEBUG
 }
 
 

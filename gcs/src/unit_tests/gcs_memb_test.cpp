@@ -230,7 +230,7 @@ static long
 deliver_join_sync_msg (struct group* const group, int const src,
                        gcs_msg_type_t type)
 {
-    gcs_seqno_t    seqno = group->nodes[src]->group.act_id;
+    gcs_seqno_t    seqno = group->nodes[src]->group.act_id_;
     gcs_recv_msg_t msg(&seqno,
                        sizeof (seqno),
                        sizeof (seqno),

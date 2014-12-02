@@ -9,13 +9,14 @@
 
 ### BEGIN INIT INFO
 # Provides:          garb
-# Required-Start:    $network $local_fs
-# Required-Stop:     $network $local_fs
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
-# Description:       Galera Arbitrator Daemon is used
-#                    as part of clusters that have only two
+# Description:       Garbd is used as part of clusters that have only two
 #                    real Galera servers and need an extra
 #                    node to arbitrate split brain situations.
 ### END INIT INFO
@@ -27,7 +28,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garbd
+	config=/etc/default/garb
 fi
 
 log_failure() {
@@ -48,14 +49,14 @@ program_start() {
 	local rcode
 	if [ -f /etc/redhat-release ]; then
 		echo -n $"Starting $prog: "
-		sudo -u nobody $prog $* >/dev/null
+		runuser nobody -- $prog $* >/dev/null
 		rcode=$?
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure
 		echo
 	else
 		log_daemon_msg "Starting $prog: "
-		start-stop-daemon --start --quiet --background \
+		start-stop-daemon --start --quiet -c nobody --background \
 		                  --exec $prog -- $*
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork
@@ -96,7 +97,7 @@ start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
 
-	if grep -q -E '^# REMOVE' $config;then 
+	if grep -q -E '^# REMOVE' $config; then
 	    log_failure "Garbd config $config is not configured yet"
 	    return 0
 	fi

@@ -112,7 +112,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     {
         assert(act.seqno_g > 0);
         GcsActionTrx trx(trx_pool_, act);
-        replicator_.process_trx(recv_ctx, trx.trx());
+        gu_trace(replicator_.process_trx(recv_ctx, trx.trx()));
         exit_loop = trx.trx()->exit_loop(); // this is the end of trx lifespan
         break;
     }
@@ -121,7 +121,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         wsrep_seqno_t seq;
         gu::unserialize8(static_cast<const gu::byte_t*>(act.buf), act.size, 0,
                          seq);
-        replicator_.process_commit_cut(seq, act.seqno_l);
+        gu_trace(replicator_.process_commit_cut(seq, act.seqno_l));
         break;
     }
     case GCS_ACT_CONF:
@@ -132,9 +132,10 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
             galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
             );
 
-        replicator_.process_conf_change(recv_ctx, *view_info,
-                                        conf->repl_proto_ver,
-                                        state2repl(*conf), act.seqno_l);
+        gu_trace(replicator_.process_conf_change(recv_ctx, *view_info,
+                                                 conf->repl_proto_ver,
+                                                 state2repl(*conf),
+                                                 act.seqno_l));
         free(view_info);
 
         if (conf->conf_id < 0 && conf->memb_num == 0) {
@@ -146,19 +147,19 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         break;
     }
     case GCS_ACT_STATE_REQ:
-        replicator_.process_state_req(recv_ctx, act.buf, act.size, act.seqno_l,
-                                      act.seqno_g);
+        gu_trace(replicator_.process_state_req(recv_ctx, act.buf, act.size,
+                                               act.seqno_l, act.seqno_g));
         break;
     case GCS_ACT_JOIN:
     {
         wsrep_seqno_t seq;
         gu::unserialize8(static_cast<const gu::byte_t*>(act.buf),
                          act.size, 0, seq);
-        replicator_.process_join(seq, act.seqno_l);
+        gu_trace(replicator_.process_join(seq, act.seqno_l));
         break;
     }
     case GCS_ACT_SYNC:
-        replicator_.process_sync(act.seqno_l);
+        gu_trace(replicator_.process_sync(act.seqno_l));
         break;
     default:
         gu_throw_fatal << "unrecognized action type: " << act.type;
@@ -176,7 +177,7 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
         Release release(act, gcache_);
         ++received_;
         received_bytes_ += rc;
-        dispatch(recv_ctx, act, exit_loop);
+        gu_trace(dispatch(recv_ctx, act, exit_loop));
     }
     return rc;
 }

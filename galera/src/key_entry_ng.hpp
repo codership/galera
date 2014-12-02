@@ -80,7 +80,7 @@ namespace galera
         void swap(KeyEntryNG& other) throw()
         {
             using std::swap;
-            swap(refs_, other.refs_);
+            gu::swap_array(refs_, other.refs_);
             swap(key_,  other.key_);
         }
 
