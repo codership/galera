@@ -518,8 +518,6 @@ void galera::ist::Receiver::interrupt()
     catch (asio::system_error& e)
     {
         // ignore
-        log_error << "connecting IST receiver failed: " << e.what() << ": "
-                  << gu::extra_error_info(e.code());
     }
 }
 
