@@ -193,6 +193,16 @@ private:
 static TransMapBuilder master(galera::TrxHandle::trans_map_master);
 static TransMapBuilder slave(galera::TrxHandle::trans_map_slave);
 
+void
+galera::TrxHandleSlave::sanity_checks() const
+{
+    if (gu_unlikely((flags() & (F_ROLLBACK | F_BEGIN)) ==
+                    (F_ROLLBACK | F_BEGIN)))
+    {
+        log_warn << "Both F_BEGIN and F_ROLLBACK are set on trx. "
+                 << "This trx should not have been replicated at all: " << this;
+    }
+}
 
 size_t
 galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
@@ -221,7 +231,6 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
             {
                 assert(!local_);
                 assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
-                last_seen_seqno_ = WSREP_SEQNO_UNDEFINED; // why do we need this?
                 write_set_flags_ |= F_PREORDERED;
             }
             else
@@ -240,6 +249,9 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
             }
 
             timestamp_ = write_set_.timestamp();
+
+            sanity_checks();
+
             break;
         default:
             gu_throw_error(EPROTONOSUPPORT) << "Unsupported WS version: "

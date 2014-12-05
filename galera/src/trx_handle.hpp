@@ -515,6 +515,8 @@ namespace galera
 
         void destroy_local(void* ptr);
 
+        void sanity_checks() const;
+
     }; /* TrxHandleSlave */
 
     std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& trx);

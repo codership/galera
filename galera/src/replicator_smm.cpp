@@ -437,7 +437,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
 
     wsrep_bool_t exit_loop(false);
 
-    if (gu_likely((trx->flags() & TrxHandle::F_COMMIT) != 0))
+    uint32_t const trx_end_flags
+        (trx->flags() & (TrxHandle::F_COMMIT | TrxHandle::F_ROLLBACK));
+    /* commit only if ROLLBACK flag is not set */
+    bool const do_commit(!(trx_end_flags & TrxHandle::F_ROLLBACK));
+
+    if (gu_likely(trx_end_flags != 0))
     {
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
@@ -451,10 +456,11 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
                 TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
                 &meta,
                 &exit_loop,
-                true));
+                do_commit));
 
         if (gu_unlikely (rcode > 0))
-            gu_throw_fatal << "Commit failed. Trx: " << trx;
+            gu_throw_fatal << (do_commit ? "Commit" : "Rollback")
+                           << " failed. Trx: " << trx;
 
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
