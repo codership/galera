@@ -42,7 +42,11 @@
 #endif
 
 #if defined(__sun__)
-# define GU_WORDSIZE 64 /* Solaris 11 is only 64-bit ATM */
+# if defined (_LP64)
+#  define GU_WORDSIZE 64
+# else
+#  define GU_WORDSIZE 32
+# endif
 #elif defined(__APPLE__) || defined(__FreeBSD__)
 # include <stdint.h>
 # define GU_WORDSIZE __WORDSIZE
