@@ -79,7 +79,8 @@ namespace gu
     void ssl_init_options(gu::Config&);
 
     // prepare asio::ssl::context using parameters from config
-    void ssl_prepare_context(const gu::Config&, asio::ssl::context&);
+    void ssl_prepare_context(const gu::Config&, asio::ssl::context&,
+                             bool verify_peer_cert = true);
 
     //
     // Address manipulation helpers

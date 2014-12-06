@@ -220,7 +220,11 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
-            gu::ssl_prepare_context(conf_, ssl_ctx_);
+            // Protocol versions prior 7 had a bug on sender side
+            // which made sender to return null cert in handshake.
+            // Therefore peer cert verfification must be enabled
+            // only at protocol version 7 or higher.
+            gu::ssl_prepare_context(conf_, ssl_ctx_, version >= 7);
         }
 
         asio::ip::tcp::resolver resolver(io_service_);
