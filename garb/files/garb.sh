@@ -49,14 +49,14 @@ program_start() {
 	local rcode
 	if [ -f /etc/redhat-release ]; then
 		echo -n $"Starting $prog: "
-		runuser -u nobody -- $prog $* >/dev/null
+		runuser nobody -- $prog $* >/dev/null
 		rcode=$?
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure
 		echo
 	else
 		log_daemon_msg "Starting $prog: "
-		start-stop-daemon --start --quiet --background \
+		start-stop-daemon --start --quiet -c nobody --background \
 		                  --exec $prog -- $*
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork
@@ -123,8 +123,8 @@ start() {
 
 	# Find a working node
 	for ADDRESS in ${GALERA_NODES} 0; do
-		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
-		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
+		HOST=$(echo $ADDRESS | cut  -d \: -f 1 )
+		PORT=$(echo $ADDRESS | cut -sd \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
 		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
                     nc -z $HOST $PORT >/dev/null && break

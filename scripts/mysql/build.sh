@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -eu
 
 if test -z "$MYSQL_SRC"
 then
@@ -42,7 +42,7 @@ else
 fi
 
 # Initializing variables to defaults
-uname -m | grep -q i686 && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
+uname -p | grep -q 'i[36]86' && CPU=pentium || CPU=amd64 # this works for x86 Solaris too
 BOOTSTRAP=no
 DEBUG=no
 DEBUG_LEVEL=0
@@ -70,7 +70,7 @@ case "$OS" in
     "Linux")
         JOBS=$(grep -c ^processor /proc/cpuinfo) ;;
     "SunOS")
-        JOBS=$(psrinfo | wc -l) ;;
+        JOBS=$(psrinfo | wc -l | tr -d ' ') ;;
     "Darwin" | "FreeBSD")
         JOBS="$(sysctl -n hw.ncpu)" ;;
     *)
@@ -151,10 +151,11 @@ do
             SCRATCH="yes"   # Build from scratch (run make clean)
             ;;
         -o|--opt)
-            OPT="yes"       # Compile without debug
+            CONFIGURE="yes" # Reconfigure without debug
             ;;
         -d|--debug)
-            DEBUG="yes"     # Compile with debug
+            DEBUG="yes"     # Reconfigure with debug
+            CONFIGURE="yes"
             NO_STRIP="yes"  # Don't strip the binaries
             ;;
         --dl|--debug-level)
@@ -270,15 +271,13 @@ then
     fi
 fi
 
-if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
 which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
 
 # export command options for Galera build
-export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
+export BOOTSTRAP CONFIGURE SCRATCH DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
        PACKAGE CPU TARGET SKIP_BUILD RELEASE DEBIAN SCONS JOBS DEBUG_LEVEL
 
 set -eu
@@ -315,9 +314,8 @@ then
         debug_opt="-d"
     fi
     scripts/build.sh $debug_opt # options are passed via environment variables
-    GALERA_REV=$(bzr revno --tree -q) || \
-    GALERA_REV=$(svn info >&/dev/null && svnversion | sed s/\:/,/g) || \
-    GALERA_REV=$(echo "XXXX")
+    # sadly we can't easily pass GALERA_REV from Galera build script
+    GALERA_REV=${GALERA_REV:-"XXXX"}
 fi
 
 ######################################
@@ -327,8 +325,10 @@ fi
 ######################################
 # Obtain MySQL version and revision number
 cd $MYSQL_SRC
-WSREP_REV=$(bzr revno --tree -q) || \
+WSREP_REV=$(git log --pretty=oneline | wc -l) || \
+WSREP_REV=$(bzr revno --tree -q)              || \
 WSREP_REV="XXXX"
+WSREP_REV=${WSREP_REV//[[:space:]]/}
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 
 if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
@@ -684,7 +684,7 @@ if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]; then
         sleep 1
     fi
     # Pack the release
-    tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
+    tar -czf $RELEASE_NAME.tgz $RELEASE_NAME && rm -rf $RELEASE_NAME
 
 fi # if [ $TAR == "yes"  || "$BIN_DIST" == "yes" ]
 
