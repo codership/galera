@@ -132,6 +132,7 @@ END_TEST
 START_TEST(test_asio)
 {
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     AsioProtonet pn(conf);
     string uri_str("tcp://127.0.0.1:0");
@@ -169,6 +170,7 @@ END_TEST
 START_TEST(test_protonet)
 {
     gu::Config conf;
+    gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     Protonet* pn(Protonet::create(conf));
     pn->event_loop(1);

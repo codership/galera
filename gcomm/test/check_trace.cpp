@@ -10,6 +10,7 @@
 
 #include "check_trace.hpp"
 #include "gcomm/conf.hpp"
+#include "gu_asio.hpp" // gu::ssl_register_params()
 
 using namespace std;
 using namespace gu;
@@ -19,6 +20,7 @@ struct CheckTraceConfInit
 {
     explicit CheckTraceConfInit(gu::Config& conf)
     {
+        gu::ssl_register_params(conf);
         gcomm::Conf::register_params(conf);
     }
 };
@@ -282,7 +284,7 @@ size_t gcomm::PropagationMatrix::count_channel_msgs() const
 
 bool gcomm::PropagationMatrix::all_in_cvi() const
 {
-    for (map<size_t, DummyNode*>::const_iterator i = tp_.begin();
+    for (std::map<size_t, DummyNode*>::const_iterator i = tp_.begin();
          i != tp_.end(); ++i)
     {
         if (i->second->in_cvi() == false)

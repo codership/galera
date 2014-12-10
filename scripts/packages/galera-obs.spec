@@ -15,7 +15,7 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-%{!?name: %define name galera}
+%{!?name: %define name galera-3}
 %{!?version: %define version 3.x}
 %{!?release: %define release 1}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.

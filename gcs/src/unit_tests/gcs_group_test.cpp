@@ -149,7 +149,7 @@ START_TEST (gcs_group_configuration)
 
 #define TRY_MESSAGE(msg) \
     ret = gcs_act_proto_read (&frg, (msg).buf, (msg).size);     \
-    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act);
+    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act, true);
 
     // 1. Try fragment that is not the first
     memset (&r_act, 0, sizeof(r_act));

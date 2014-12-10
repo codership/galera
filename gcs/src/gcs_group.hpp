@@ -37,7 +37,7 @@ extern const char* gcs_group_state_str[];
 typedef struct gcs_group
 {
     gcache_t*     cache;
-    gcs_seqno_t   act_id;       // current(last) action seqno
+    gcs_seqno_t   act_id_;      // current(last) action seqno
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
     gu_uuid_t     group_uuid;   // group UUID
@@ -144,7 +144,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
                           const gcs_act_frag_t* const frg,
                           const gcs_recv_msg_t* const msg,
                           struct gcs_act_rcvd*  const rcvd,
-                          bool not_commonly_supported_version = false)
+                          bool commonly_supported_version)
 {
     long const sender_idx = msg->sender_idx;
     bool const local      = (sender_idx == group->my_idx);
@@ -156,7 +156,9 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
     assert (frg->act_size > 0);
 
     // clear reset flag if set by own first fragment after reset flag was set
-    group->frag_reset = (group->frag_reset && (!local || (0 != frg->frag_no)));
+    group->frag_reset = (group->frag_reset &&
+                         !(local && 0 == frg->frag_no &&
+                           GCS_GROUP_PRIMARY == group->state));
 
     ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, &rcvd->act,
                                     local);
@@ -171,11 +173,11 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
                       GCS_GROUP_PRIMARY == group->state   &&
                       group->nodes[sender_idx].status >= GCS_NODE_STATE_DONOR &&
                       !(group->frag_reset && local) &&
-                      !not_commonly_supported_version)) {
+                      commonly_supported_version)) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
-            rcvd->id = ++group->act_id;
+            rcvd->id = ++group->act_id_;
         }
         else if (GCS_ACT_TORDERED  == rcvd->act.type) {
             /* Rare situations */

@@ -97,7 +97,7 @@ void gcomm::PC::connect(bool start_prim)
     // should take precedence. otherwise it's not able to bootstrap.
     if (start_prim) {
         log_info << "start_prim is enabled, turn off pc_recovery";
-    } else if (pc_recovery_) {
+    } else if (rst_view_.type() == V_PRIM) {
         wait_prim = false;
     }
 
