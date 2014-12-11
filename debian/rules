@@ -37,6 +37,7 @@ override_dh_installinit-arch:
 
 override_dh_strip:
 	dh_strip --dbg-package=galera-3-dbg
+	dh_strip --dbg-package=garbd-3-dbg
 
 %:
 	dh $@

@@ -20,6 +20,7 @@ Section: libs
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Conflicts: garbd-2,
            garbd2,
+           percona-galera-3,
            percona-xtradb-cluster-galera,
            percona-xtradb-cluster-galera-2.x,
            percona-xtradb-cluster-galera-3.x,
@@ -37,10 +38,28 @@ Package: galera-3-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Conflicts: percona-xtradb-cluster-galera-2.x-dbg,
+Conflicts: percona-galera-3-dbg,
+           percona-xtradb-cluster-galera-2.x-dbg,
            percona-xtradb-cluster-galera-3-dbg,
            percona-xtradb-cluster-galera-3.x-dbg
 Depends: galera-3 (= ${binary:Version}), ${misc:Depends}
 Description: Replication framework for transactional applications, debugging symbols
- A special package that contains the Galera library and arbitator binaries
- with debugging symbols.
+ A special package that contains the Galera library with debugging symbols.
+
+Package: garbd-3
+Architecture: any
+Conflicts: garbd-2, garbd2, percona-xtradb-cluster-garbd-2.x
+Breaks: percona-xtradb-cluster-galera-2.x
+Replaces: percona-xtradb-cluster-galera-2.x
+Depends: netcat-openbsd, ${misc:Depends}, ${shlibs:Depends}
+Description: Galera arbitator daemon
+ This package contains the Galera arbitator daemon.
+
+Package: garbd-3-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Conflicts: percona-xtradb-cluster-galera-2.x-dbg
+Depends: galera-3 (= ${binary:Version}), ${misc:Depends}
+Description: Replication framework for transactional applications, debugging symbols
+ A special package that contains the Galera arbitator with debugging symbols.
