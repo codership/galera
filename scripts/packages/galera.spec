@@ -17,7 +17,7 @@
 
 %define name galera
 # use "rpmbuild --define 'version xxxx'" to define version
-%{!?version: %define version 3.x}
+%{!?version: %define version 25_3.x}
 %{!?release: %define release 1}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
@@ -116,7 +116,7 @@ rm -f $(find %{libs} -type l)
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
 
-%doc %attr(644, root, man) %{_mandir}/man1/garbd.1*
+%doc %attr(644, root, man) %{_mandir}/man8/garbd.1*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
