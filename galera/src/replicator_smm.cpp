@@ -1409,6 +1409,12 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         // include handling dangling comma in donor string.
         break;
     case 7:
+        // Protocol upgrade to handle IST SSL backwards compatibility,
+        // no effect to TRX or STR protocols.
+        trx_params_.version_ = 3;
+        str_proto_ver_ = 2;
+        break;
+    case 8:
         trx_params_.version_ = 4;
         str_proto_ver_ = 2;
         break;

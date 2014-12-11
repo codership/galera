@@ -284,7 +284,7 @@ size_t gcomm::PropagationMatrix::count_channel_msgs() const
 
 bool gcomm::PropagationMatrix::all_in_cvi() const
 {
-    for (map<size_t, DummyNode*>::const_iterator i = tp_.begin();
+    for (std::map<size_t, DummyNode*>::const_iterator i = tp_.begin();
          i != tp_.end(); ++i)
     {
         if (i->second->in_cvi() == false)
