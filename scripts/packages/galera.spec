@@ -89,7 +89,7 @@ install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
 install -d $RBR%{_mandir}
-install -m 644 $RBD/garb/files/garbd.troff        $RBR%{_mandir}/man1/garbd.1
+install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
 
 %pre
 
