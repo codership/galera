@@ -33,6 +33,8 @@ Description: Replication framework for transactional applications
  for transactional databases and similar applications. For more information
  about wsrep API see http://launchpad.net/wsrep. For a description of Galera
  replication engine see http://galeracluster.com.
+ .
+ This package contains the Galera library/plugin.
 
 Package: galera-3-dbg
 Architecture: any
@@ -46,20 +48,25 @@ Depends: galera-3 (= ${binary:Version}), ${misc:Depends}
 Description: Replication framework for transactional applications, debugging symbols
  A special package that contains the Galera library with debugging symbols.
 
-Package: garbd-3
+Package: galera-arbitrator-3
 Architecture: any
 Conflicts: garbd-2, garbd2, percona-xtradb-cluster-garbd-2.x
 Breaks: percona-xtradb-cluster-galera-2.x
 Replaces: percona-xtradb-cluster-galera-2.x
 Depends: netcat-openbsd, ${misc:Depends}, ${shlibs:Depends}
-Description: Galera arbitator daemon
- This package contains the Galera arbitator daemon.
+Description: Galera arbitrator daemon
+ Galera is a fast synchronous multimaster wsrep provider (replication engine)
+ for transactional databases and similar applications. For more information
+ about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+ replication engine see http://galeracluster.com.
+ .
+ This package contains the Galera arbitrator daemon (garbd).
 
-Package: garbd-3-dbg
+Package: galera-arbitrator-3-dbg
 Architecture: any
 Section: debug
 Priority: extra
 Conflicts: percona-xtradb-cluster-galera-2.x-dbg
 Depends: galera-3 (= ${binary:Version}), ${misc:Depends}
 Description: Replication framework for transactional applications, debugging symbols
- A special package that contains the Galera arbitator with debugging symbols.
+ A special package that contains the Galera arbitrator with debugging symbols.

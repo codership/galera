@@ -36,8 +36,8 @@ override_dh_installinit-arch:
 	dh_installinit --name=garb -- defaults 18 22
 
 override_dh_strip:
-	dh_strip --dbg-package=galera-3-dbg
-	dh_strip --dbg-package=garbd-3-dbg
+	dh_strip -pgalera-3 --dbg-package=galera-3-dbg
+	dh_strip -pgalera-arbitrator-3 --dbg-package=galera-arbitrator-3-dbg
 
 %:
 	dh $@
