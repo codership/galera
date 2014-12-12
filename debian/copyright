@@ -29,8 +29,8 @@ Files: asio/*
 Copyright: 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com),
            2008 Rep Invariant Systems, Inc. (info@repinvariant.com),
            2005 Stefan Arentz (stefan at soze dot com)
-License:
- Boost Software License, Version 1.0
+License: other
+ Boost Software License - Version 1.0 - August 17th, 2003
  .
  Permission is hereby granted, free of charge, to any person or organization
  obtaining a copy of the software and accompanying documentation covered by
@@ -57,10 +57,17 @@ License:
 Files: docs/*
 Copyright: 2014 Codership Oy <info@codership.com>
            2007-2011 by the Sphinx team, see AUTHORS
-License: GFDL-1 or CC-BY-SA-3
+License: GFDL-1.1+ or CC-BY-SA-3.0
 
 Files: chromium/*
 Copyright: 2012 The Chromium Authors as listed in AUTHORS file
+License: BSD-3-clause
+
+Files: www.evanjones.ca/*
+Copyright: 2008,2009,2010 Massachusetts Institute of Technology
+           2004-2006 Intel Corporation
+License: BSD-3-clause
+
 License: BSD-3-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
@@ -86,7 +93,27 @@ License: BSD-3-clause
  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  SUCH DAMAGE.
 
-Files: www.evanjones.ca/*
-Copyright: 2008,2009,2010 Massachusetts Institute of Technology
-           2004-2006 Intel Corporation
-License: BSD-3-clause
+License: GFDL-1.1+
+ Permission is granted to copy, distribute and/or modify this
+ document under the terms of the GNU Free Documentation
+ License (GFDL), Version 1.1 or any later version published
+ by the Free Software Foundation with no Invariant Sections,
+ no Front-Cover Texts, and no Back-Cover Texts.
+ .
+ The full text of the GFDL is distributed as in
+ /usr/share/common-licenses/GFDL on Debian systems.
+
+License: CC-BY-SA-3.0
+ You are free:
+ to Share (to copy, distribute and transmit the work) and
+ to Remix (to adapt the work) under the following conditions:
+ .
+ Attribution — You must attribute the work in the manner specified by the
+ author or licensor (but not in any way that suggests that they endorse you
+ or your use of the work).
+ .
+ Share Alike — If you alter, transform, or build upon this work, you may
+ distribute the resulting work only under the same, similar or a compatible
+ license.
+ .
+ For more information, see http://creativecommons.org/licenses/by-sa/3.0/
