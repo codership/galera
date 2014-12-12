@@ -548,12 +548,12 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
 
 galera::Certification::TestResult
-galera::Certification::test(TrxHandleSlave* trx, bool bval)
+galera::Certification::test(TrxHandleSlave* trx, bool store_keys)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
     const TestResult ret
-        (trx->preordered() ? do_test_preordered(trx) : do_test(trx, bval));
+        (trx->preordered() ? do_test_preordered(trx) : do_test(trx, store_keys));
 
     if (gu_unlikely(ret != TEST_OK))
     {
@@ -661,7 +661,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
         }
     }
 
-    const TestResult retval(test(trx));
+    const TestResult retval(test(trx, true));
 
     {
         gu::Lock lock(mutex_);

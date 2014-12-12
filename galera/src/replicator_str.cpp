@@ -393,7 +393,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
-                                         istr.last_applied() + 1,
+                                         protocol_version_ < 8 ?
+                                         istr.last_applied() + 1 :
+                                         cert_.get_safe_to_discard_seqno(),
                                          cc_seqno_,
                                          protocol_version_);
                     }
@@ -421,6 +423,18 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
+            if (protocol_version_ >= 8)
+            {
+                assert(streq->ist_len() > 0);
+                IST_request istr;
+                get_ist_request(streq, &istr);
+                ist::Sender sender(config_, gcache_, istr.peer(),
+                                   protocol_version_);
+                // Send trxs to rebuild cert index.
+                sender.send(cert_.get_safe_to_discard_seqno(),
+                            istr.last_applied());
+
+            }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
                                    &state_id, 0, 0, false);
@@ -451,21 +465,32 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 const wsrep_uuid_t& group_uuid,
                                 wsrep_seqno_t const group_seqno)
 {
+    // Up from protocol version 8 joiner is assumed to be able receive
+    // some transactions to rebuild cert index, so IST receiver must be
+    // prepared regardless of the group.
+    wsrep_seqno_t local_seqno(STATE_SEQNO());
     if (state_uuid_ != group_uuid)
     {
-        gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
-                               << ") does not match group state UUID ("
-                               << group_uuid << ')';
-    }
+        if (protocol_version_ < 8)
+        {
+            gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
+                                   << ") does not match group state UUID ("
+                                   << group_uuid << ')';
 
-    wsrep_seqno_t const local_seqno(STATE_SEQNO());
+        }
+        else
+        {
+            local_seqno = group_seqno;
+        }
+    }
 
     if (local_seqno < 0)
     {
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
 
-    assert(local_seqno < group_seqno);
+
+    assert(protocol_version_ >= 8 || local_seqno < group_seqno);
 
     std::ostringstream os;
 
@@ -793,5 +818,33 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     }
 }
 
+void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
+{
+    assert(trx != 0);
+    log_info << "pre ist hande trx " << *trx;
+    trx->verify_checksum();
+    if (cert_.position() == WSREP_SEQNO_UNDEFINED ||
+        cert_.position() > trx->global_seqno())
+    {
+        // This is the first pre IST trx for rebuilding cert index
+        cert_.assign_initial_position(trx->global_seqno(), trx->version());
+    }
+    Certification::TestResult expected_result(trx->depends_seqno() == WSREP_SEQNO_UNDEFINED ? Certification::TEST_FAILED : Certification::TEST_OK);
+    Certification::TestResult result(cert_.append_trx(trx));
+    if (result != expected_result)
+    {
+        gu_throw_fatal << "Pre IST trx append returned unexpected certification result "
+                       << result << ", expected " << expected_result
+                       << "must abort to maintain consistency";
+    }
+
+    trx->mark_committed();
+    trx->unref();
+}
+
+void ReplicatorSMM::pre_ist_handle_view_change(const wsrep_view_info_t&)
+{
+
+}
 
 } /* namespace galera */

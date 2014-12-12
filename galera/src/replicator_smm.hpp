@@ -31,7 +31,7 @@
 
 namespace galera
 {
-    class ReplicatorSMM : public Replicator
+    class ReplicatorSMM : public Replicator, public ist::PreISTHandler
     {
     public:
 
@@ -154,6 +154,9 @@ namespace galera
 
         void          desync();
         void          resync();
+
+        void pre_ist_handle_trx(TrxHandleSlave* trx);
+        void pre_ist_handle_view_change(const wsrep_view_info_t&);
 
         struct InitConfig
         {

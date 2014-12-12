@@ -30,13 +30,23 @@ namespace galera
     {
         void register_params(gu::Config& conf);
 
+        // Interface to handle events prior to actual IST.
+        // These include trxs and configuration changes received
+        // from donor that have global seqno below IST start.
+        class PreISTHandler
+        {
+        public:
+            virtual void pre_ist_handle_trx(TrxHandleSlave*) = 0;
+            virtual void pre_ist_handle_view_change(const wsrep_view_info_t&) = 0;
+        };
+
         class Receiver
         {
         public:
             static std::string const RECV_ADDR;
 
             Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
-                     const char* addr);
+                     PreISTHandler&, const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
@@ -74,6 +84,7 @@ namespace galera
             };
 
             std::stack<Consumer*> consumers_;
+            wsrep_seqno_t         first_seqno_;
             wsrep_seqno_t         current_seqno_;
             wsrep_seqno_t         last_seqno_;
             gu::Config&           conf_;
@@ -85,6 +96,8 @@ namespace galera
             bool                  use_ssl_;
             bool                  running_;
             bool                  ready_;
+            PreISTHandler&        pre_ist_;
+
         };
 
         class Sender

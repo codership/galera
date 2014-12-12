@@ -171,7 +171,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     slave_pool_         (sizeof(TrxHandleSlave), 1024, "TrxHandleSlave"),
     as_                 (0),
     gcs_as_             (slave_pool_, gcs_, *this, gcache_),
-    ist_receiver_       (config_, slave_pool_, gcache_, args->node_address),
+    ist_receiver_       (config_, slave_pool_, gcache_, *this,
+                         args->node_address),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_, service_thd_),
@@ -1537,7 +1538,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_params_.version_);
+        // From protocol version 8 certification index is rebuilt from IST,
+        // cert position is assigned from pre-IST handler.
+        if (protocol_version_ < 8)
+        {
+            cert_.assign_initial_position(group_seqno, trx_params_.version_);
+        }
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
 

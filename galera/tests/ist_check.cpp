@@ -178,6 +178,13 @@ extern "C" void* trx_thread(void* arg)
     return 0;
 }
 
+class PreIST : public galera::ist::PreISTHandler
+{
+public:
+    void pre_ist_handle_trx(TrxHandleSlave* trx) { }
+    void pre_ist_handle_view_change(const wsrep_view_info_t& view) { }
+};
+
 extern "C" void* receiver_thd(void* arg)
 {
     mark_point();
@@ -190,7 +197,9 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_, 0);
+    PreIST pre_ist;
+    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_,
+                                   pre_ist, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
 

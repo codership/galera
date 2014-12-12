@@ -77,6 +77,7 @@ galera::ist::register_params(gu::Config& conf)
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandleSlave::Pool& sp,
                                 gcache::GCache&       gc,
+                                PreISTHandler&        pre_ist,
                                 const char*           addr)
     :
     io_service_   (),
@@ -85,6 +86,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     mutex_        (),
     cond_         (),
     consumers_    (),
+    first_seqno_  (-1),
     current_seqno_(-1),
     last_seqno_   (-1),
     conf_         (conf),
@@ -95,7 +97,8 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     version_      (-1),
     use_ssl_      (false),
     running_      (false),
-    ready_        (false)
+    ready_        (false),
+    pre_ist_      (pre_ist)
 {
     std::string recv_addr;
 
@@ -255,7 +258,8 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
             << "', asio error '" << e.what() << "'";
     }
 
-    current_seqno_ = first_seqno;
+    first_seqno_   = first_seqno;
+    current_seqno_ = -1;
     last_seqno_    = last_seqno;
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
@@ -331,9 +335,15 @@ void galera::ist::Receiver::run()
             {
                 trx = p.recv_trx(socket);
             }
+
+            // Verify that the sequence of trx is continuous
             if (trx != 0)
             {
-                if (trx->global_seqno() != current_seqno_)
+                if (current_seqno_ == -1)
+                {
+                    current_seqno_ = trx->global_seqno();
+                }
+                else if (trx->global_seqno() != current_seqno_)
                 {
                     log_error << "unexpected trx seqno: " << trx->global_seqno()
                               << " expected: " << current_seqno_;
@@ -342,19 +352,27 @@ void galera::ist::Receiver::run()
                 }
                 ++current_seqno_;
             }
-            gu::Lock lock(mutex_);
-            while (ready_ == false || consumers_.empty())
+
+            if (trx != 0 && trx->global_seqno() < first_seqno_)
             {
-                lock.wait(cond_);
+                pre_ist_.pre_ist_handle_trx(trx);
             }
-            Consumer* cons(consumers_.top());
-            consumers_.pop();
-            cons->trx(trx);
-            cons->cond().signal();
-            if (trx == 0)
+            else
             {
-                log_debug << "eof received, closing socket";
-                break;
+                gu::Lock lock(mutex_);
+                while (ready_ == false || consumers_.empty())
+                {
+                    lock.wait(cond_);
+                }
+                Consumer* cons(consumers_.top());
+                consumers_.pop();
+                cons->trx(trx);
+                cons->cond().signal();
+                if (trx == 0)
+                {
+                    log_debug << "eof received, closing socket";
+                    break;
+                }
             }
         }
     }
