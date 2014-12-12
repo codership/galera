@@ -5,7 +5,7 @@ Section: database
 Priority: optional
 Standards-Version: 3.9.5
 Build-Depends: check,
-               debhelper (>= 7.0.50~),
+               debhelper (>= 9),
                libboost-dev (>= 1.41),
                libboost-program-options-dev (>= 1.41),
                libssl-dev,
