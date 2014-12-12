@@ -512,9 +512,12 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
     if (seqno >= position_)
     {
-        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
-        assert(cert_index_.size() == 0);
-        assert(cert_index_ng_.size() == 0);
+        if (version < 4)
+        {
+            std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+            assert(cert_index_.size() == 0);
+            assert(cert_index_ng_.size() == 0);
+        }
     }
     else
     {

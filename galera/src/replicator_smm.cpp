@@ -1538,12 +1538,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        // From protocol version 8 certification index is rebuilt from IST,
-        // cert position is assigned from pre-IST handler.
-        if (protocol_version_ < 8)
-        {
-            cert_.assign_initial_position(group_seqno, trx_params_.version_);
-        }
+        cert_.assign_initial_position(group_seqno, trx_params_.version_);
+
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
 

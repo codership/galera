@@ -26,8 +26,9 @@ namespace gcache
 
     struct BufferHeader
     {
-        int64_t  seqno_g;
-        int64_t  seqno_d;
+        int64_t  seqno_g; // global seqno
+        int64_t  seqno_d; // depends seqno
+        int64_t  seqno_s; // safe-to-discard seqno
         int64_t  size;    /*! total buffer size, including header */
         MemOps*  ctx;
         uint32_t flags;
@@ -53,6 +54,7 @@ namespace gcache
     {
         assert(0 == bh->seqno_g);
         assert(0 == bh->seqno_d);
+        assert(0 == bh->seqno_s);
         assert(0 == bh->size);
         assert(0 == bh->ctx);
         assert(0 == bh->flags);

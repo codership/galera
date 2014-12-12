@@ -339,6 +339,7 @@ void galera::ist::Receiver::run()
             // Verify that the sequence of trx is continuous
             if (trx != 0)
             {
+                log_info << "IST trx: " << *trx;
                 if (current_seqno_ == -1)
                 {
                     current_seqno_ = trx->global_seqno();
@@ -353,7 +354,7 @@ void galera::ist::Receiver::run()
                 ++current_seqno_;
             }
 
-            if (trx != 0 && trx->global_seqno() < first_seqno_)
+            if (current_seqno_ <= first_seqno_)
             {
                 pre_ist_.pre_ist_handle_trx(trx);
             }
@@ -368,11 +369,12 @@ void galera::ist::Receiver::run()
                 consumers_.pop();
                 cons->trx(trx);
                 cons->cond().signal();
-                if (trx == 0)
-                {
-                    log_debug << "eof received, closing socket";
-                    break;
-                }
+            }
+
+            if (trx == 0)
+            {
+                log_debug << "eof received, closing socket";
+                break;
             }
         }
     }
@@ -612,13 +614,39 @@ galera::ist::Sender::~Sender()
     gcache_.seqno_unlock();
 }
 
+template <class S>
+void send_eof(galera::ist::Proto& p, S& stream)
+{
+
+    p.send_ctrl(stream, galera::ist::Ctrl::C_EOF);
+
+    // wait until receiver closes the connection
+    try
+    {
+        gu::byte_t b;
+        size_t n;
+        n = asio::read(stream, asio::buffer(&b, 1));
+        if (n > 0)
+        {
+            log_warn << "received " << n
+                     << " bytes, expected none";
+        }
+    }
+    catch (asio::system_error& e)
+    { }
+}
+
 void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 {
     if (first > last)
     {
-        gu_throw_error(EINVAL) << "sender send first greater than last: "
-                               << first << " > " << last ;
+        if (version_ < 8)
+        {
+            gu_throw_error(EINVAL) << "sender send first greater than last: "
+                                   << first << " > " << last ;
+        }
     }
+
     try
     {
         TrxHandleSlave::Pool unused(1, 0, "");
@@ -645,6 +673,22 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 << "ist send failed, peer reported error: " << ctrl;
         }
 
+        log_info << "IST sender " << first << " -> " << last;
+
+        if (first > last)
+        {
+            if (use_ssl_ == true)
+            {
+                send_eof(p, *ssl_stream_);
+            }
+            else
+            {
+                send_eof(p, socket_);
+            }
+            return;
+        }
+
+
         std::vector<gcache::GCache::Buffer> buf_vec(
             std::min(static_cast<size_t>(last - first + 1),
                      static_cast<size_t>(1024)));
@@ -668,33 +712,12 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 {
                     if (use_ssl_ == true)
                     {
-                        p.send_ctrl(*ssl_stream_, Ctrl::C_EOF);
+                        send_eof(p, *ssl_stream_);
                     }
                     else
                     {
-                        p.send_ctrl(socket_, Ctrl::C_EOF);
+                        send_eof(p, socket_);
                     }
-                    // wait until receiver closes the connection
-                    try
-                    {
-                        gu::byte_t b;
-                        size_t n;
-                        if (use_ssl_ == true)
-                        {
-                            n = asio::read(*ssl_stream_, asio::buffer(&b, 1));
-                        }
-                        else
-                        {
-                            n = asio::read(socket_, asio::buffer(&b, 1));
-                        }
-                        if (n > 0)
-                        {
-                            log_warn << "received " << n
-                                     << " bytes, expected none";
-                        }
-                    }
-                    catch (asio::system_error& e)
-                    { }
                     return;
                 }
             }

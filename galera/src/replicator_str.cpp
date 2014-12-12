@@ -425,15 +425,15 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             if (protocol_version_ >= 8)
             {
+                log_info << "Sending pre IST";
                 assert(streq->ist_len() > 0);
                 IST_request istr;
                 get_ist_request(streq, &istr);
                 ist::Sender sender(config_, gcache_, istr.peer(),
                                    protocol_version_);
                 // Send trxs to rebuild cert index.
-                sender.send(cert_.get_safe_to_discard_seqno(),
+                sender.send(cert_.get_safe_to_discard_seqno() + 1,
                             istr.last_applied());
-
             }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
@@ -490,7 +490,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     }
 
 
-    assert(protocol_version_ >= 8 || local_seqno < group_seqno);
+    assert((protocol_version_ >= 8 && local_seqno <= group_seqno)
+           || local_seqno < group_seqno);
 
     std::ostringstream os;
 
@@ -820,26 +821,34 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 
 void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
 {
-    assert(trx != 0);
-    log_info << "pre ist hande trx " << *trx;
-    trx->verify_checksum();
-    if (cert_.position() == WSREP_SEQNO_UNDEFINED ||
-        cert_.position() > trx->global_seqno())
+    if (trx != 0)
     {
-        // This is the first pre IST trx for rebuilding cert index
-        cert_.assign_initial_position(trx->global_seqno(), trx->version());
+        log_info << "pre ist hande trx " << *trx;
+        trx->verify_checksum();
+        if (cert_.position() == WSREP_SEQNO_UNDEFINED ||
+            cert_.position() > trx->global_seqno())
+        {
+            // This is the first pre IST trx for rebuilding cert index
+            cert_.assign_initial_position(trx->global_seqno(), trx->version());
+        }
+        Certification::TestResult expected_result(trx->depends_seqno() == WSREP_SEQNO_UNDEFINED ? Certification::TEST_FAILED : Certification::TEST_OK);
+        Certification::TestResult result(cert_.append_trx(trx));
+        if (result != expected_result)
+        {
+            gu_throw_fatal << "Pre IST trx append returned unexpected certification result "
+                           << result << ", expected " << expected_result
+                           << "must abort to maintain consistency";
+        }
+        trx->mark_committed();
+        trx->unref();
     }
-    Certification::TestResult expected_result(trx->depends_seqno() == WSREP_SEQNO_UNDEFINED ? Certification::TEST_FAILED : Certification::TEST_OK);
-    Certification::TestResult result(cert_.append_trx(trx));
-    if (result != expected_result)
+    else
     {
-        gu_throw_fatal << "Pre IST trx append returned unexpected certification result "
-                       << result << ", expected " << expected_result
-                       << "must abort to maintain consistency";
+        log_info << "Pre IST cert init";
+        // IST finished without delivering any actual IST messages, need to
+        // assign initial position for certification
+        // cert_.assign_initial_position(STATE_SEQNO(), trx_params_.version_);
     }
-
-    trx->mark_committed();
-    trx->unref();
 }
 
 void ReplicatorSMM::pre_ist_handle_view_change(const wsrep_view_info_t&)
