@@ -410,7 +410,16 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    discard_local_trx(repl, ws_handle, trx);
+    switch(trx->state())
+    {
+    case TrxHandle::S_COMMITTED:
+        discard_local_trx(repl, ws_handle, trx);
+    case TrxHandle::S_EXECUTING:
+        /* trx ready for new fragment */
+        break;
+    default:
+        assert(0);
+    }
 
     return retval;
 }

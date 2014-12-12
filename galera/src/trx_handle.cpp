@@ -141,7 +141,7 @@ public:
             add(TrxHandle::S_REPLICATING, TrxHandle::S_COMMITTING);
             add(TrxHandle::S_REPLICATING, TrxHandle::S_ROLLED_BACK);
             // streaming trx
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_EXECUTING);
+            add(TrxHandle::S_COMMITTING, TrxHandle::S_EXECUTING);
 
             add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
             add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_AM);
