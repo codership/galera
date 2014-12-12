@@ -51,6 +51,11 @@ namespace galera
                 T_TRX = 4
             } Type;
 
+            typedef enum
+            {
+                F_REBUILD = 0x1
+            } Flag;
+
             Message(int       version = -1,
                     Type      type    = T_NONE,
                     uint8_t   flags   = 0,
@@ -215,9 +220,9 @@ namespace galera
         class Trx : public Message
         {
         public:
-            Trx(int version = -1, uint64_t len = 0)
+            Trx(int version = -1, uint64_t len = 0, uint8_t flags = 0)
                 :
-                Message(version, Message::T_TRX, 0, 0, len)
+                Message(version, Message::T_TRX, flags, 0, len)
             { }
         };
 
@@ -408,7 +413,8 @@ namespace galera
 
             template <class ST>
             void send_trx(ST&                           socket,
-                          const gcache::GCache::Buffer& buffer)
+                          const gcache::GCache::Buffer& buffer,
+                          bool                          rebuild_flag)
             {
                 const bool rolled_back(buffer.seqno_d() == -1);
 
@@ -448,7 +454,8 @@ namespace galera
                     8 /* serial_size(buffer.seqno_d()) */
                     );
 
-                Trx trx_msg(version_, trx_meta_size + payload_size);
+                Trx trx_msg(version_, trx_meta_size + payload_size,
+                            (version_ >= 8 && rebuild_flag) ? Message::F_REBUILD : 0);
 
                 gu::Buffer buf(trx_msg.serial_size() + trx_meta_size);
                 size_t  offset(trx_msg.serialize(&buf[0], buf.size(), 0));
@@ -473,7 +480,7 @@ namespace galera
 
 
             template <class ST>
-            galera::TrxHandleSlave*
+            std::pair<galera::TrxHandleSlave*, bool>
             recv_trx(ST& socket)
             {
                 Message    msg(version_);
@@ -558,13 +565,14 @@ namespace galera
                     os << *trx;
                     log_debug << os;
 
-                    return trx;
+                    return std::make_pair(trx,
+                                          msg.flags() & Message::F_REBUILD);
                 }
                 case Message::T_CTRL:
                     switch (msg.ctrl())
                     {
                     case Ctrl::C_EOF:
-                        return 0;
+                        return std::make_pair<TrxHandleSlave*, bool>(0, false);
                     default:
                         if (msg.ctrl() >= 0)
                         {
@@ -582,7 +590,7 @@ namespace galera
                 }
 
                 gu_throw_fatal; throw;
-                return 0; // keep compiler happy
+                return std::make_pair<TrxHandleSlave*, bool>(0, false); // keep compiler happy
             }
 
         private:

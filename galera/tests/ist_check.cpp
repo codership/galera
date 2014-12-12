@@ -150,7 +150,7 @@ extern "C" void* sender_thd(void* arg)
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
     mark_point();
-    sender.send(sargs->first_, sargs->last_);
+    sender.send(sargs->first_, sargs->last_, sargs->first_);
     mark_point();
     return 0;
 }

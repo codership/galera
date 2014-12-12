@@ -110,7 +110,12 @@ namespace galera
                    int version);
             ~Sender();
 
-            void send(wsrep_seqno_t first, wsrep_seqno_t last);
+            // first - first trx seqno
+            // last  - last trx seqno
+            // rebuild_start - the seqno from which sent transactions
+            // are accompanied with index rebuild flag
+            void send(wsrep_seqno_t first, wsrep_seqno_t last,
+                      wsrep_seqno_t rebuild_start);
 
             void cancel()
             {
@@ -152,6 +157,7 @@ namespace galera
                 gcache_(gcache) { }
             void run(const gu::Config& conf,
                      const std::string& peer,
+                     wsrep_seqno_t,
                      wsrep_seqno_t,
                      wsrep_seqno_t,
                      int);

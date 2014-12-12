@@ -150,6 +150,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
     cc_seqno_           (WSREP_SEQNO_UNDEFINED),
+    cc_safe_to_discard_seqno_(WSREP_SEQNO_UNDEFINED),
     pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
@@ -251,6 +252,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     update_state_uuid (uuid);
 
     cc_seqno_ = seqno; // is it needed here?
+    cc_safe_to_discard_seqno_ = cert_.get_safe_to_discard_seqno();
     apply_monitor_.set_initial_position(seqno);
 
     if (co_mode_ != CommitOrder::BYPASS)
@@ -1534,12 +1536,27 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (view_info.view >= 0) // Primary configuration
     {
+        int prev_protocol_version(protocol_version_);
         establish_protocol_versions (repl_proto);
+
+        bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_params_.version_);
-
+        // Starting from protocol_version_ 8 cert index reset is skipped
+        // if there is no need for state transfer.
+        if (protocol_version_ < 8 ||
+            prev_protocol_version != protocol_version_ ||
+            (st_required && app_wants_st))
+        {
+            log_info << "Cert index reset " << protocol_version_
+                     << " " << app_wants_st;
+            cert_.assign_initial_position(group_seqno, trx_params_.version_);
+        }
+        else
+        {
+            log_info << "Skipping cert index reset";
+        }
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
 
@@ -1550,8 +1567,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
-
-        bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
+        cc_safe_to_discard_seqno_ = cert_.get_safe_to_discard_seqno();
 
         if (st_required && app_wants_st)
         {
@@ -1634,6 +1650,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         state_.shift_to(next_state);
     }
 
+    double foo, bar;
+    size_t index_size;
+    cert_.stats_get(foo, bar, index_size);
+    log_info << "Cert index size: " << index_size;
     local_monitor_.leave(lo);
     gcs_.resume_recv();
     free(app_req);

@@ -512,12 +512,9 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
     if (seqno >= position_)
     {
-        if (version < 4)
-        {
-            std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
-            assert(cert_index_.size() == 0);
-            assert(cert_index_ng_.size() == 0);
-        }
+        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        assert(cert_index_.size() == 0);
+        assert(cert_index_ng_.size() == 0);
     }
     else
     {
@@ -534,8 +531,11 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     }
 
     trx_map_.clear();
-    service_thd_.release_seqno(position_);
-    service_thd_.flush();
+    if (seqno >= position_)
+    {
+        service_thd_.release_seqno(position_);
+        service_thd_.flush();
+    }
 
     log_info << "Assign initial position for certification: " << seqno
              << ", protocol version: " << version;
@@ -553,7 +553,7 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 galera::Certification::TestResult
 galera::Certification::test(TrxHandleSlave* trx, bool store_keys)
 {
-    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
+    assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
 
     const TestResult ret
         (trx->preordered() ? do_test_preordered(trx) : do_test(trx, store_keys));
@@ -615,7 +615,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
 {
     // todo: enable when source id bug is fixed
     assert(trx->source_id() != WSREP_UUID_UNDEFINED);
-    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
+    assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 
     trx->ref();
@@ -685,7 +685,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
 
 wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave* trx)
 {
-    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0 &&
+    assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */  &&
            trx->is_committed() == false);
 
     wsrep_seqno_t ret(-1);

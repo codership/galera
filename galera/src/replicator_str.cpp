@@ -395,8 +395,10 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          istr.peer(),
                                          protocol_version_ < 8 ?
                                          istr.last_applied() + 1 :
-                                         cert_.get_safe_to_discard_seqno(),
+                                         std::min(cc_safe_to_discard_seqno_ + 1,
+                                                  istr.last_applied() + 1),
                                          cc_seqno_,
+                                         cc_safe_to_discard_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -432,8 +434,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 ist::Sender sender(config_, gcache_, istr.peer(),
                                    protocol_version_);
                 // Send trxs to rebuild cert index.
-                sender.send(cert_.get_safe_to_discard_seqno() + 1,
-                            istr.last_applied());
+                sender.send(cc_safe_to_discard_seqno_ + 1,
+                            cc_seqno_,
+                            cc_safe_to_discard_seqno_);
             }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
@@ -821,7 +824,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 
 void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
 {
-    if (trx != 0)
+    if (trx != 0 && trx->depends_seqno() != WSREP_SEQNO_UNDEFINED)
     {
         log_info << "pre ist hande trx " << *trx;
         trx->verify_checksum();
@@ -829,25 +832,30 @@ void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
             cert_.position() > trx->global_seqno())
         {
             // This is the first pre IST trx for rebuilding cert index
-            cert_.assign_initial_position(trx->global_seqno(), trx->version());
+            cert_.assign_initial_position(trx->global_seqno() - 1, trx->version());
         }
-        Certification::TestResult expected_result(trx->depends_seqno() == WSREP_SEQNO_UNDEFINED ? Certification::TEST_FAILED : Certification::TEST_OK);
+
         Certification::TestResult result(cert_.append_trx(trx));
-        if (result != expected_result)
+        if (result != Certification::TEST_OK)
         {
             gu_throw_fatal << "Pre IST trx append returned unexpected certification result "
-                           << result << ", expected " << expected_result
+                           << result << ", expected " << Certification::TEST_OK
                            << "must abort to maintain consistency";
         }
-        trx->mark_committed();
+        // trx->mark_committed();
+        cert_.set_trx_committed(trx);
         trx->unref();
     }
-    else
+    else if (trx == 0)
     {
         log_info << "Pre IST cert init";
         // IST finished without delivering any actual IST messages, need to
         // assign initial position for certification
         // cert_.assign_initial_position(STATE_SEQNO(), trx_params_.version_);
+    }
+    else
+    {
+        trx->unref();
     }
 }
 

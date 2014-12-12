@@ -31,6 +31,7 @@ namespace galera
                         const std::string& peer,
                         wsrep_seqno_t first,
                         wsrep_seqno_t last,
+                        wsrep_seqno_t rebuild_start,
                         AsyncSenderMap& asmap,
                         int version)
                 :
@@ -39,6 +40,7 @@ namespace galera
                 peer_  (peer),
                 first_ (first),
                 last_  (last),
+                rebuild_start_(rebuild_start),
                 asmap_ (asmap),
                 thread_()
             { }
@@ -47,6 +49,7 @@ namespace galera
             const std::string& peer()   { return peer_;   }
             wsrep_seqno_t      first()  { return first_;  }
             wsrep_seqno_t      last()   { return last_;   }
+            wsrep_seqno_t      rebuild_start() { return rebuild_start_; }
             AsyncSenderMap&    asmap()  { return asmap_;  }
             pthread_t          thread() { return thread_; }
 
@@ -57,6 +60,7 @@ namespace galera
             const std::string  peer_;
             wsrep_seqno_t      first_;
             wsrep_seqno_t      last_;
+            wsrep_seqno_t      rebuild_start_;
             AsyncSenderMap&    asmap_;
             pthread_t          thread_;
         };
@@ -327,19 +331,20 @@ void galera::ist::Receiver::run()
         while (true)
         {
             TrxHandleSlave* trx;
+            std::pair<TrxHandleSlave*, bool> ret;
             if (use_ssl_ == true)
             {
-                trx = p.recv_trx(ssl_stream);
+                ret = p.recv_trx(ssl_stream);
             }
             else
             {
-                trx = p.recv_trx(socket);
+                ret = p.recv_trx(socket);
             }
+            trx = ret.first;
 
             // Verify that the sequence of trx is continuous
             if (trx != 0)
             {
-                log_info << "IST trx: " << *trx;
                 if (current_seqno_ == -1)
                 {
                     current_seqno_ = trx->global_seqno();
@@ -354,11 +359,12 @@ void galera::ist::Receiver::run()
                 ++current_seqno_;
             }
 
-            if (current_seqno_ <= first_seqno_)
+            if (ret.second == true)
             {
+                // Trx was received with index rebuild flag on
                 pre_ist_.pre_ist_handle_trx(trx);
             }
-            else
+            if (trx != 0 && current_seqno_ > first_seqno_)
             {
                 gu::Lock lock(mutex_);
                 while (ready_ == false || consumers_.empty())
@@ -636,7 +642,8 @@ void send_eof(galera::ist::Proto& p, S& stream)
     { }
 }
 
-void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
+void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
+                               wsrep_seqno_t rebuild_start)
 {
     if (first > last)
     {
@@ -699,13 +706,14 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
                 // log_info << "sending " << buf_vec[i].seqno_g();
+                bool rebuild_flag(buf_vec[i].seqno_g() >= rebuild_start);
                 if (use_ssl_ == true)
                 {
-                    p.send_trx(*ssl_stream_, buf_vec[i]);
+                    p.send_trx(*ssl_stream_, buf_vec[i], rebuild_flag);
                 }
                 else
                 {
-                    p.send_trx(socket_, buf_vec[i]);
+                    p.send_trx(socket_, buf_vec[i], rebuild_flag);
                 }
 
                 if (buf_vec[i].seqno_g() == last)
@@ -752,7 +760,7 @@ void* run_async_sender(void* arg)
     wsrep_seqno_t join_seqno;
     try
     {
-        as->send(as->first(), as->last());
+        as->send(as->first(), as->last(), as->rebuild_start());
         join_seqno = as->last();
     }
     catch (gu::Exception& e)
@@ -787,10 +795,12 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
                                       const std::string& peer,
                                       wsrep_seqno_t      first,
                                       wsrep_seqno_t      last,
+                                      wsrep_seqno_t      rebuild_start,
                                       int                version)
 {
     gu::Critical crit(monitor_);
-    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
+    AsyncSender* as(new AsyncSender(conf, peer, first, last, rebuild_start,
+                                    *this, version));
     int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {
