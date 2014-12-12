@@ -56,15 +56,13 @@ apply_trx_ws(void*                    recv_ctx,
 
                 if (err > 0)
                 {
+                    uint32_t const flags
+                        (TrxHandle::trx_flags_to_wsrep_flags(trx.flags()) |
+                         WSREP_FLAG_ROLLBACK);
                     wsrep_bool_t unused(false);
-                    int const rcode(
-                        commit_cb(
-                            recv_ctx,
-                            TrxHandle::trx_flags_to_wsrep_flags(trx.flags()),
-                            &meta,
-                            &unused,
-                            false));
-                    if (WSREP_OK != rcode)
+                    int const rcode(commit_cb(recv_ctx, flags, &meta, &unused));
+
+                    if (WSREP_CB_SUCCESS != rcode)
                     {
                         gu_throw_fatal << "Rollback failed. Trx: " << trx;
                     }
@@ -437,41 +435,26 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
 
     wsrep_bool_t exit_loop(false);
 
-    uint32_t const trx_end_flags
-        (trx->flags() & (TrxHandle::F_COMMIT | TrxHandle::F_ROLLBACK));
-    /* commit only if ROLLBACK flag is not set */
-    bool const do_commit(!(trx_end_flags & TrxHandle::F_ROLLBACK));
-
-    if (gu_likely(trx_end_flags != 0))
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
-        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-        {
-            gu_trace(commit_monitor_.enter(co));
-        }
-        trx->set_state(TrxHandle::S_COMMITTING);
-
-        wsrep_cb_status_t const rcode(
-            commit_cb_(
-                recv_ctx,
-                TrxHandle::trx_flags_to_wsrep_flags(trx->flags()),
-                &meta,
-                &exit_loop,
-                do_commit));
-
-        if (gu_unlikely (rcode > 0))
-            gu_throw_fatal << (do_commit ? "Commit" : "Rollback")
-                           << " failed. Trx: " << trx;
-
-        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-        {
-            commit_monitor_.leave(co);
-        }
-        trx->set_state(TrxHandle::S_COMMITTED);
+        gu_trace(commit_monitor_.enter(co));
     }
-    else
+    trx->set_state(TrxHandle::S_COMMITTING);
+
+    uint32_t const flags(TrxHandle::trx_flags_to_wsrep_flags(trx->flags()));
+
+    wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, flags, &meta,&exit_loop));
+
+    if (gu_unlikely (rcode > 0))
+        gu_throw_fatal << (trx->flags() & TrxHandle::F_ROLLBACK ?
+                           "Rollback" : "Commit")
+                       << " failed. Trx: " << trx;
+
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
-        gu_trace(commit_monitor_.self_cancel(co));
+        commit_monitor_.leave(co);
     }
+    trx->set_state(TrxHandle::S_COMMITTED);
 
     if (trx->local_seqno() != -1)
     {
@@ -962,19 +945,15 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
                                          { tr->source_id(), tr->trx_id()       },
                                          tr->depends_seqno()};
 
-                gu_trace(
-                    apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr, meta));
+                gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr,meta));
 
+                uint32_t const flags
+                    (TrxHandle::trx_flags_to_wsrep_flags(tr->flags()));
                 wsrep_bool_t unused(false);
-                wsrep_cb_status_t rcode(
-                    commit_cb_(
-                        trx_ctx,
-                        TrxHandle::trx_flags_to_wsrep_flags(tr->flags()),
-                        &meta,
-                        &unused,
-                        i + 1 == repld.size())); // commit only last fragment
 
-                if (gu_unlikely(rcode > 0))
+                wsrep_cb_status_t rcode(commit_cb_(trx_ctx,flags,&meta,&unused));
+
+                if (gu_unlikely(rcode != WSREP_CB_SUCCESS))
                     gu_throw_fatal << "Commit failed. Trx: " << *tr;
             }
         }

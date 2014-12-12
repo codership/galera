@@ -730,7 +730,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(
-                           WSREP_FLAG_COMMIT |
+                           WSREP_FLAG_TRX_END |
                            WSREP_FLAG_ISOLATION));
 
         retval = repl->replicate(trx, meta);
