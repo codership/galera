@@ -23,6 +23,8 @@ const std::string galera::ReplicatorSMM::Param::key_format =
     common_prefix + "key_format";
 const std::string galera::ReplicatorSMM::Param::max_write_set_size =
     common_prefix + "max_ws_size";
+const std::string galera::ReplicatorSMM::Param::keep_fragments =
+    common_prefix + "keep_fragments";
 
 int const galera::ReplicatorSMM::MAX_PROTO_VER(8);
 
@@ -36,6 +38,7 @@ galera::ReplicatorSMM::Defaults::Defaults() : map_()
     const int max_write_set_size(galera::WriteSetNG::MAX_SIZE);
     map_.insert(Default(Param::max_write_set_size,
                         gu::to_string(max_write_set_size)));
+    map_.insert(Default(Param::keep_fragments, "no"));
 }
 
 const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
@@ -141,6 +144,10 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     else if (key == Param::max_write_set_size)
     {
         trx_params_.max_write_set_size_ = gu::from_string<int>(value);
+    }
+    else if (key == Param::keep_fragments)
+    {
+        trx_params_.keep_fragments_ = gu::from_string<bool>(value);
     }
     else
     {
