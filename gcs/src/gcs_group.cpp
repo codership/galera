@@ -1164,6 +1164,10 @@ gcs_group_find_donor(const gcs_group_t* group,
         gu_uuid_compare(&group->group_uuid, ist_uuid) == 0 &&
         ist_seqno != GCS_SEQNO_ILL)
     {
+        // FIXME: check if disabling the assertion and allowing ist_seqno to
+        // equal to GCS_SEQNO_ILL requires protocol upgrade
+        // assert(ist_seqno != GCS_SEQNO_ILL);
+
         donor_idx = group_find_ist_donor(group,
                                          str_version,
                                          joiner_idx,

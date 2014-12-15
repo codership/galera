@@ -491,6 +491,7 @@ galera::Certification::~Certification()
     gu::Lock lock(mutex_);
 
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+    trx_map_.clear();
     service_thd_.release_seqno(position_);
     service_thd_.flush();
 }
@@ -516,27 +517,11 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
     gu::Lock lock(mutex_);
 
-    if (seqno >= position_)
-    {
-        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
-        assert(cert_index_.size() == 0);
-        assert(cert_index_ng_.size() == 0);
-    }
-    else
-    {
-        log_warn << "moving position backwards: " << position_ << " -> "
-                 << seqno;
-        std::for_each(cert_index_.begin(), cert_index_.end(),
-                      gu::DeleteObject());
-        std::for_each(cert_index_ng_.begin(), cert_index_ng_.end(),
-                      gu::DeleteObject());
-        std::for_each(trx_map_.begin(), trx_map_.end(),
-                      Unref2nd<TrxMap::value_type>());
-        cert_index_.clear();
-        cert_index_ng_.clear();
-    }
-
+    std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
     trx_map_.clear();
+    assert(cert_index_.empty());
+    assert(cert_index_ng_.empty());
+
     service_thd_.release_seqno(position_);
     service_thd_.flush();
 
