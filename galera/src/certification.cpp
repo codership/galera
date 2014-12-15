@@ -338,9 +338,9 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 
     // trx->is_certified() == true during index rebuild from IST, do_test()
     // must not fail, just populate index
-    if (gu_unlikely((trx->is_certified() == false &&
-                     trx->last_seen_seqno() < initial_position_) ||
-                    trx->global_seqno() - trx->last_seen_seqno() > max_length_))
+    if (gu_unlikely(trx->is_certified() == false &&
+                    (trx->last_seen_seqno() < initial_position_ ||
+                     trx->global_seqno() - trx->last_seen_seqno() > max_length_)))
     {
         if (trx->last_seen_seqno() < initial_position_)
         {

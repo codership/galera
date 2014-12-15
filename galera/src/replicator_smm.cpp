@@ -297,7 +297,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
-    wsrep_seqno_t const seqno(cert_.position());
+    wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
 
     log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
