@@ -353,7 +353,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             IST_request istr;
             get_ist_request(streq, &istr);
 
-            if (istr.uuid() == state_uuid_)
+            if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
             {
                 log_info << "IST request: " << istr;
 
@@ -396,7 +396,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          (protocol_version_ < 8 ||
                                           cc_lowest_trx_seqno_ == 0) ?
                                          istr.last_applied() + 1 :
-                                         std::min(cc_lowest_trx_seqno_ + 1,
+                                         std::min(cc_lowest_trx_seqno_,
                                                   istr.last_applied() + 1),
                                          cc_seqno_,
                                          cc_lowest_trx_seqno_,
@@ -435,7 +435,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 ist::Sender sender(config_, gcache_, istr.peer(),
                                    protocol_version_);
                 // Send trxs to rebuild cert index.
-                sender.send(cc_lowest_trx_seqno_ + 1,
+                sender.send(cc_lowest_trx_seqno_,
                             cc_seqno_,
                             cc_lowest_trx_seqno_);
             }
@@ -488,11 +488,10 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         }
     }
 
-    if (local_seqno < 0)
+    if (local_seqno < 0 && protocol_version_ < 8)
     {
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
-
 
     assert((protocol_version_ >= 8 && local_seqno <= group_seqno)
            || local_seqno < group_seqno);

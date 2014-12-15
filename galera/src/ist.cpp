@@ -364,7 +364,7 @@ void galera::ist::Receiver::run()
                 // Trx was received with index rebuild flag on
                 pre_ist_.pre_ist_handle_trx(trx);
             }
-            if (trx != 0 && current_seqno_ > first_seqno_)
+            if (trx != 0 && first_seqno_ > 0 && current_seqno_ > first_seqno_)
             {
                 gu::Lock lock(mutex_);
                 while (ready_ == false || consumers_.empty())
