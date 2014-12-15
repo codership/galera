@@ -227,14 +227,19 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
             write_set_.verify_checksum();
             assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
 #endif
+
+
             if (write_set_.certified())
             {
                 assert(!local_);
                 assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
-                write_set_flags_ |= F_PREORDERED;
+                // Commented out to make difference between preordered
+                // and regular trxs in IST cert index preload.
+                // write_set_flags_ |= F_PREORDERED;
             }
             else
             {
+
                 last_seen_seqno_ = write_set_.last_seen();
                 assert(last_seen_seqno_ >= 0);
 

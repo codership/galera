@@ -137,8 +137,11 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
         // cert conflict takes place if
         // 1) write sets originated from different nodes, are within cert range
         // 2) ref_trx is in isolation mode, write sets are within cert range
+        // 3) Trx has not been certified yet. Already certified trxs show up
+        //    here during index rebuild.
         if ((trx->source_id() != ref_trx->source_id() || ref_trx->is_toi()) &&
-            ref_seqno >  trx->last_seen_seqno())
+            ref_seqno >  trx->last_seen_seqno() &&
+            trx->is_certified() == false)
         {
             if (gu_unlikely(log_conflict == true))
             {
@@ -333,7 +336,10 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
         return TEST_FAILED;
     }
 
-    if (gu_unlikely(trx->last_seen_seqno() < initial_position_ ||
+    // trx->is_certified() == true during index rebuild from IST, do_test()
+    // must not fail, just populate index
+    if (gu_unlikely((trx->is_certified() == false &&
+                     trx->last_seen_seqno() < initial_position_) ||
                     trx->global_seqno() - trx->last_seen_seqno() > max_length_))
     {
         if (trx->last_seen_seqno() < initial_position_)
@@ -531,11 +537,8 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     }
 
     trx_map_.clear();
-    if (seqno >= position_)
-    {
-        service_thd_.release_seqno(position_);
-        service_thd_.flush();
-    }
+    service_thd_.release_seqno(position_);
+    service_thd_.flush();
 
     log_info << "Assign initial position for certification: " << seqno
              << ", protocol version: " << version;

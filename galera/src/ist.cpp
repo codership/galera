@@ -376,6 +376,10 @@ void galera::ist::Receiver::run()
                 cons->trx(trx);
                 cons->cond().signal();
             }
+            else if (trx != 0)
+            {
+                trx->unref();
+            }
 
             if (trx == 0)
             {
@@ -705,8 +709,12 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
-                // log_info << "sending " << buf_vec[i].seqno_g();
-                bool rebuild_flag(buf_vec[i].seqno_g() >= rebuild_start);
+                // Rebuild start is the seqno of the lowest trx in
+                // cert index at CC. If the cert index was completely
+                // reset, rebuild_start will be zero and no rebuild flag
+                // should be set.
+                bool rebuild_flag(rebuild_start > 0 &&
+                                  buf_vec[i].seqno_g() >= rebuild_start);
                 if (use_ssl_ == true)
                 {
                     p.send_trx(*ssl_stream_, buf_vec[i], rebuild_flag);

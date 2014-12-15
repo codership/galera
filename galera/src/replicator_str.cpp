@@ -393,12 +393,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
-                                         protocol_version_ < 8 ?
+                                         (protocol_version_ < 8 ||
+                                          cc_lowest_trx_seqno_ == 0) ?
                                          istr.last_applied() + 1 :
-                                         std::min(cc_safe_to_discard_seqno_ + 1,
+                                         std::min(cc_lowest_trx_seqno_ + 1,
                                                   istr.last_applied() + 1),
                                          cc_seqno_,
-                                         cc_safe_to_discard_seqno_,
+                                         cc_lowest_trx_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -425,7 +426,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            if (protocol_version_ >= 8)
+            if (protocol_version_ >= 8 && cc_lowest_trx_seqno_ > 0)
             {
                 log_info << "Sending pre IST";
                 assert(streq->ist_len() > 0);
@@ -434,9 +435,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 ist::Sender sender(config_, gcache_, istr.peer(),
                                    protocol_version_);
                 // Send trxs to rebuild cert index.
-                sender.send(cc_safe_to_discard_seqno_ + 1,
+                sender.send(cc_lowest_trx_seqno_ + 1,
                             cc_seqno_,
-                            cc_safe_to_discard_seqno_);
+                            cc_lowest_trx_seqno_);
             }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
@@ -687,13 +688,14 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     st_.mark_unsafe();
 
+    // Make gcache seqno reset to happen before send_state_request()
+    // to avoid gcache reset during IST.
+    gcache_.seqno_reset();
+
     send_state_request (req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
-    /* while waiting for state transfer to complete is a good point
-     * to reset gcache, since it may involve some IO too */
-    gcache_.seqno_reset();
 
     if (sst_req_len != 0)
     {
@@ -828,11 +830,11 @@ void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
     {
         log_info << "pre ist hande trx " << *trx;
         trx->verify_checksum();
-        if (cert_.position() == WSREP_SEQNO_UNDEFINED ||
-            cert_.position() > trx->global_seqno())
+        if (cert_.position() == 0)
         {
             // This is the first pre IST trx for rebuilding cert index
-            cert_.assign_initial_position(trx->global_seqno() - 1, trx->version());
+            cert_.assign_initial_position(trx->global_seqno() - 1,
+                                          trx->version());
         }
 
         Certification::TestResult result(cert_.append_trx(trx));
@@ -842,20 +844,7 @@ void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
                            << result << ", expected " << Certification::TEST_OK
                            << "must abort to maintain consistency";
         }
-        // trx->mark_committed();
         cert_.set_trx_committed(trx);
-        trx->unref();
-    }
-    else if (trx == 0)
-    {
-        log_info << "Pre IST cert init";
-        // IST finished without delivering any actual IST messages, need to
-        // assign initial position for certification
-        // cert_.assign_initial_position(STATE_SEQNO(), trx_params_.version_);
-    }
-    else
-    {
-        trx->unref();
     }
 }
 

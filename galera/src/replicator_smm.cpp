@@ -150,7 +150,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
     cc_seqno_           (WSREP_SEQNO_UNDEFINED),
-    cc_safe_to_discard_seqno_(WSREP_SEQNO_UNDEFINED),
+    cc_lowest_trx_seqno_(WSREP_SEQNO_UNDEFINED),
     pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
@@ -252,13 +252,15 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     update_state_uuid (uuid);
 
     cc_seqno_ = seqno; // is it needed here?
-    cc_safe_to_discard_seqno_ = cert_.get_safe_to_discard_seqno();
     apply_monitor_.set_initial_position(seqno);
 
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
 
-    cert_.assign_initial_position(seqno, trx_proto_ver());
+    // Initialize cert index position to zero in the case recovery information
+    // was provided. This is required to avoid initializing cert position
+    // above index rebuild trx seqnos.
+    cert_.assign_initial_position(seqno < 0 ? seqno : 0, trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
 }
@@ -1541,17 +1543,28 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
-        // we have to reset cert initial position here, SST does not contain
-        // cert index yet (see #197).
-        // Starting from protocol_version_ 8 cert index reset is skipped
-        // if there is no need for state transfer.
+        //
+        // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
+        // from IST.
+        //
+        // The reasons to reset cert index:
+        // - Protocol version lower than 8    (ALL)
+        // - Protocol upgrade                 (ALL)
+        // - State transfer will take a place (JOINER)
+        //
         if (protocol_version_ < 8 ||
             prev_protocol_version != protocol_version_ ||
             (st_required && app_wants_st))
         {
             log_info << "Cert index reset " << protocol_version_
                      << " " << app_wants_st;
-            cert_.assign_initial_position(group_seqno, trx_params_.version_);
+            cert_.assign_initial_position(
+                protocol_version_ < 8 ? STATE_SEQNO() : 0,
+                trx_params_.version_);
+            service_thd_.flush();             // make sure service thd is idle
+
+            if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
+            // make sure all gcache buffers are released
         }
         else
         {
@@ -1560,14 +1573,13 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
 
-        service_thd_.flush();             // make sure service thd is idle
-
-        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-        // make sure all gcache buffers are released
-
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
-        cc_safe_to_discard_seqno_ = cert_.get_safe_to_discard_seqno();
+        // Record lowest trx seqno in cert index to set cert index
+        // rebuild flag appropriately in IST. Notice that if cert index
+        // was completely reset above, the value returned is zero and
+        // no rebuild should happen.
+        cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
 
         if (st_required && app_wants_st)
         {

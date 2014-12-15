@@ -116,6 +116,11 @@ namespace galera
 
         void set_log_conflicts(const std::string& str);
 
+        wsrep_seqno_t lowest_trx_seqno() const
+        {
+            return (trx_map_.empty() ? position_ : trx_map_.begin()->second->global_seqno());
+        }
+
     private:
 
         TestResult do_test(TrxHandleSlave*, bool store_keys);
