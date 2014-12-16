@@ -130,7 +130,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     init_lib_           (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (),
     init_config_        (config_, args->node_address),
-    parse_options_      (config_, args->options),
+    parse_options_      (*this, config_, args->options),
     init_ssl_           (config_),
     str_proto_ver_      (-1),
     protocol_version_   (-1),

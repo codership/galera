@@ -419,7 +419,7 @@ namespace galera
 
         struct ParseOptions
         {
-            ParseOptions(gu::Config&, const char* opts);
+            ParseOptions(Replicator& repl, gu::Config&, const char* opts);
         }
             parse_options_; // parse option string supplied on initialization
 

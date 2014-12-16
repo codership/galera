@@ -3,7 +3,7 @@
 //
 
 #include "saved_state.hpp"
-
+#include "gu_dbug.h"
 #include "uuid.hpp"
 
 #include <fstream>
@@ -30,6 +30,10 @@ SavedState::SavedState  (const std::string& file) :
     total_locks_  (0),
     total_writes_ (0)
 {
+
+    GU_DBUG_EXECUTE("galera_init_invalidate_state",
+                    unlink(file.c_str()););
+
     std::ifstream ifs(file.c_str());
     std::ofstream ofs;
 
