@@ -2,6 +2,7 @@
 
 #include "replicator_smm.hpp"
 #include "uuid.hpp"
+#include "gu_debug_sync.hpp"
 
 // @todo: should be protected static member of the parent class
 static const size_t GALERA_STAGE_MAX(11);
@@ -249,6 +250,9 @@ galera::ReplicatorSMM::stats_get() const
     // Get gcs backend status
     gu::Status status;
     gcs_.get_status(status);
+#ifdef GU_DBUG_ON
+    status.insert("debug_sync_waiters", gu_debug_sync_waiters());
+#endif // GU_DBUG_ON
 
     // Dynamical strings are copied into buffer allocated after stats var array.
     // Compute space needed.
