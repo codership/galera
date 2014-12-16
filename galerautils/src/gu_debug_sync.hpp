@@ -4,9 +4,8 @@
 
 //
 // Define -DGU_DBUG_ON to enable GU_DBUG macros
-// Usage:
 //
-// Together with GU_DBUG_EXECUTE
+// Usage:
 //
 // GU_DBUG_SYNC_WAIT("sync_point_identifier")
 //
@@ -16,7 +15,8 @@
 // Blocking waiters can be signalled by setting "signal=sync_point_identifier"
 // option.
 //
-// List of waiters can be monitored from wsrep debug_sync_waiters
+// List of waiters can be monitored from wsrep debug_sync_waiters status
+// variable.
 //
 
 #ifndef GU_DEBUG_SYNC_HPP

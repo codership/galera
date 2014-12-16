@@ -20,23 +20,23 @@ void gu_debug_sync_wait(const std::string& sync)
 {
     gu::Lock lock(sync_mutex);
     gu::Cond cond;
-    log_info << "enter sync wait";
+    log_debug << "enter sync wait '" << sync << "'";
     SyncMap::iterator i(
         sync_waiters.insert(std::make_pair(sync, &cond)));
     lock.wait(cond);
     sync_waiters.erase(i);
-    log_info << "leave sync wait";
+    log_debug << "leave sync wait '" << sync << "'";
 }
 
 
-void gu_debug_signal(const std::string& sync)
+void gu_debug_sync_signal(const std::string& sync)
 {
     gu::Lock lock(sync_mutex);
     std::pair<SyncMap::iterator, SyncMap::iterator>
         range(sync_waiters.equal_range(sync));
     for (SyncMap::iterator i(range.first); i != range.second; ++i)
     {
-        log_info << "signalling waiter";
+        log_debug << "signalling waiter";
         i->second->signal();
     }
 }
@@ -46,7 +46,6 @@ std::string gu_debug_sync_waiters()
 {
     std::string ret;
     gu::Lock lock(sync_mutex);
-
     for (SyncMap::iterator i(sync_waiters.begin());
          i != sync_waiters.end();)
     {
