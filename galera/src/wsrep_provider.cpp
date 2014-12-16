@@ -410,7 +410,16 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    discard_local_trx(repl, ws_handle, trx);
+    switch(trx->state())
+    {
+    case TrxHandle::S_COMMITTED:
+        discard_local_trx(repl, ws_handle, trx);
+    case TrxHandle::S_EXECUTING:
+        /* trx ready for new fragment */
+        break;
+    default:
+        assert(0);
+    }
 
     return retval;
 }
@@ -730,7 +739,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(
-                           WSREP_FLAG_COMMIT |
+                           WSREP_FLAG_TRX_END |
                            WSREP_FLAG_ISOLATION));
 
         retval = repl->replicate(trx, meta);

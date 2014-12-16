@@ -52,13 +52,13 @@ namespace galera
         };
 
         static bool const FLAGS_MATCH_API_FLAGS =
-                                 (WSREP_FLAG_COMMIT      == F_COMMIT       &&
+                                 (WSREP_FLAG_TRX_END     == F_COMMIT       &&
                                   WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
                                   WSREP_FLAG_ISOLATION   == F_ISOLATION    &&
                                   WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
                                   WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
                                   WSREP_FLAG_NATIVE      == F_NATIVE       &&
-                                  WSREP_FLAG_BEGIN       == F_BEGIN);
+                                  WSREP_FLAG_TRX_START   == F_BEGIN);
 
         static uint32_t wsrep_flags_to_trx_flags (uint32_t flags);
         static uint32_t trx_flags_to_wsrep_flags (uint32_t flags);
@@ -232,13 +232,13 @@ namespace galera
             assert(0); // remove when needed
             uint32_t ret(0);
 
-            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_TRX_END)     ret |= F_COMMIT;
             if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
             if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
-            if (flags & WSREP_FLAG_BEGIN)       ret |= F_BEGIN;
+            if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
 
             return ret;
         }
@@ -249,13 +249,13 @@ namespace galera
             assert(0); // remove when needed
             uint32_t ret(0);
 
-            if (flags & F_COMMIT)      ret |= WSREP_FLAG_COMMIT;
+            if (flags & F_COMMIT)      ret |= WSREP_FLAG_TRX_END;
             if (flags & F_ROLLBACK)    ret |= WSREP_FLAG_ROLLBACK;
             if (flags & F_ISOLATION)   ret |= WSREP_FLAG_ISOLATION;
             if (flags & F_PA_UNSAFE)   ret |= WSREP_FLAG_PA_UNSAFE;
             if (flags & F_COMMUTATIVE) ret |= WSREP_FLAG_COMMUTATIVE;
             if (flags & F_NATIVE)      ret |= WSREP_FLAG_NATIVE;
-            if (flags & F_BEGIN)       ret |= WSREP_FLAG_BEGIN;
+            if (flags & F_BEGIN)       ret |= WSREP_FLAG_TRX_START;
 
             return ret;
         }
