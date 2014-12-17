@@ -533,14 +533,17 @@ namespace galera
             int             version_;
             KeySet::Version key_format_;
             int             max_write_set_size_;
+            bool            keep_fragments_;
 
             Params (const std::string& wdir, int ver, KeySet::Version kformat,
-                    int max_write_set_size = WriteSetNG::MAX_SIZE) :
+                    int max_write_set_size = WriteSetNG::MAX_SIZE,
+                    bool kf = false) :
                 working_dir_(wdir), version_(ver), key_format_(kformat),
-                max_write_set_size_(max_write_set_size) {}
+                max_write_set_size_(max_write_set_size), keep_fragments_(kf) {}
 
             Params () :
-                working_dir_(), version_(), key_format_(), max_write_set_size_()
+                working_dir_(), version_(), key_format_(), max_write_set_size_(),
+                keep_fragments_(false)
             {}
         };
 
@@ -675,9 +678,14 @@ namespace galera
 
         typedef gu::Vector<TrxHandleSlave*, 1> ReplVector;
 
-        const ReplVector& replicated() const
+        const ReplVector& repld_vec() const
         {
             return repl_;
+        }
+
+        TrxHandleSlave* repld() const
+        {
+            return repl_.back();
         }
 
         wsrep_seqno_t global_seqno() const
@@ -700,12 +708,26 @@ namespace galera
         {
             assert(locked());
             assert(!ts->locked());
+
             ts->lock();
             ts->ref();
-            repl_.push_back(ts);
-            assert(repl_.size() > 1); // it should be 1 in ctor already
-            // unlock previous fragment
-            repl_[repl_.size() - 2]->unlock();
+
+            if (!params_.keep_fragments_)
+            {
+                TrxHandleSlave* const old(repl_[0]);
+                repl_[0] = ts;
+
+                old->unlock();
+                old->unref();
+            }
+            else
+            {
+                repl_.push_back(ts);
+                assert(repl_.size() > 1); // it should be 1 in ctor already
+                // unlock previous fragment
+                repl_[repl_.size() - 2]->unlock();
+            }
+
             assert(locked());
         }
 

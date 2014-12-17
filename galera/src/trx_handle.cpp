@@ -9,7 +9,7 @@
 #include "gu_serialize.hpp"
 
 const galera::TrxHandleMaster::Params
-galera::TrxHandleMaster::Defaults(".", -1, KeySet::MAX_VERSION);
+galera::TrxHandleMaster::Defaults(".", -1, KeySet::MAX_VERSION, false);
 
 void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
 {
