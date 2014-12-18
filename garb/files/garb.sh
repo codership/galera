@@ -49,7 +49,7 @@ program_start() {
 	local rcode
 	if [ -f /etc/redhat-release ]; then
 		echo -n $"Starting $prog: "
-		runuser nobody -- $prog $* >/dev/null
+                daemon --user nobody $prog $* >/dev/null
 		rcode=$?
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure

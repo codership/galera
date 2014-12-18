@@ -30,7 +30,7 @@ Group:         System Environment/Libraries
 Version:       %{version}
 Release:       %{release}
 License:       GPL-2.0
-Source:        %{name}_%{version}.tar.gz
+Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
 Packager:      Codership Oy
 Vendor:        Codership Oy
@@ -75,8 +75,11 @@ BuildRequires: systemd
 %endif
 
 
-
 Requires:      openssl nmap
+
+%if 0%{?centos} == 6
+Requires: nc
+%endif
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 
@@ -92,7 +95,7 @@ This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
-%setup -q -n galera-3.x
+%setup -q -n %{name}-%{version}
 # When downloading from GitHub the contents is in a folder
 # that is named by the branch it was exported from.
 
@@ -117,7 +120,7 @@ scons -j$(echo ${NUM_JOBS:-"1"})
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
-RBD=$RPM_BUILD_DIR/galera-3.x # eg. rpmbuild/BUILD/galera-3.x
+RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
 # When downloading from GitHub the contents is in a folder
 # that is named by the branch it was exported from.
 
