@@ -274,10 +274,13 @@ static bool CORE_SEND_END(action_t* act, long ret)
 
 // check if configuration is the one that we expected
 static long
-core_test_check_conf (const gcs_act_conf_t* conf,
+core_test_check_conf (const void* const conf_msg,
                       bool prim, long my_idx, long memb_num)
 {
     long ret = 0;
+
+    const struct gcs_act_conf* const conf
+        (static_cast<const struct gcs_act_conf*>(conf_msg));
 
     if ((conf->conf_id >= 0) != prim) {
         gu_error ("Expected %s conf, received %s",
@@ -364,7 +367,7 @@ core_test_init (bool bootstrap = true,
 
     // receive first configuration message
     fail_if (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act.out, bootstrap, 0, 1));
+    fail_if (core_test_check_conf(act.out, bootstrap, 0, 1));
     free (act.out);
 
     // this will configure backend to have desired fragment size
@@ -525,8 +528,7 @@ DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
     FAIL_IF (gcs_dummy_set_component(Backend, comp), "", NULL);
     FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "", NULL);
     FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF), "", NULL);
-    FAIL_IF (core_test_check_conf((const gcs_act_conf_t*)act.out, primary, my_idx, members),
-             "", NULL);
+    FAIL_IF (core_test_check_conf(act.out, primary, my_idx, members),"", NULL);
     free (act.out);
     return false;
 }
@@ -581,7 +583,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_END (&act_s, act_size));
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, false, 0, 1));
+    fail_if (core_test_check_conf(act_r.out, false, 0, 1));
     free (act_r.out);
     fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_TORDERED));
     fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
@@ -611,7 +613,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, false, 0, 1));
+    fail_if (core_test_check_conf(act_r.out, false, 0, 1));
     free (act_r.out);
 
     /*
@@ -627,7 +629,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
     fail_if (CORE_SEND_END (&act_s, act_size));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, false, 0, 1));
+    fail_if (core_test_check_conf(act_r.out, false, 0, 1));
     free (act_r.out);
     fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_TORDERED));
     fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
@@ -675,7 +677,7 @@ START_TEST (gcs_core_test_own)
     usleep (500000); // fail_if_seq
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, false, 0, 1));
+    fail_if (core_test_check_conf(act_r.out, false, 0, 1));
     free (act_r.out);
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
@@ -690,7 +692,7 @@ START_TEST (gcs_core_test_own)
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf((const gcs_act_conf_t*)act_r.out, false, 0, 1));
+    fail_if (core_test_check_conf(act_r.out, false, 0, 1));
     free (act_r.out);
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 

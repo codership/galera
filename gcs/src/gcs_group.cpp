@@ -1406,8 +1406,10 @@ gcs_group_act_conf (gcs_group_t*    group,
     // gcs requires resending message with correct gcs protocol version.
     *gcs_proto_ver = group->quorum.gcs_proto_ver;
 
-    ssize_t conf_size = sizeof(gcs_act_conf_t) + group_memb_record_size(group);
-    gcs_act_conf_t* conf = static_cast<gcs_act_conf_t*>(malloc (conf_size));
+    ssize_t const conf_size
+        (sizeof(struct gcs_act_conf) + group_memb_record_size(group));
+    struct gcs_act_conf* const conf
+        (static_cast<struct gcs_act_conf*>(malloc (conf_size)));
 
     if (conf) {
         long idx;

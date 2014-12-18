@@ -433,7 +433,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 {
     long ret;
     static gcs_seqno_t conf_id = 0;
-    gcs_act_conf_t* conf = (gcs_act_conf_t*)thread->msg;
+    struct gcs_act_conf* conf(static_cast<struct gcs_act_conf*>(thread->msg));
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 

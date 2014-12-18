@@ -72,7 +72,7 @@ namespace galera
     ssize_t
     DummyGcs::generate_cc (bool primary)
     {
-        cc_size_ = sizeof(gcs_act_conf_t) +
+        cc_size_ = sizeof(struct gcs_act_conf) +
             primary *
             (my_name_.length() + incoming_.length() + GU_UUID_STR_LEN + 3);
 
@@ -84,7 +84,8 @@ namespace galera
             return -ENOMEM;
         }
 
-        gcs_act_conf_t* const cc(reinterpret_cast<gcs_act_conf_t*>(cc_));
+        struct gcs_act_conf* const cc
+            (static_cast<struct gcs_act_conf*>(cc_));
 
         if (primary)
         {
@@ -166,9 +167,8 @@ namespace galera
     ssize_t
     DummyGcs::generate_seqno_action (gcs_action& act, gcs_act_type_t type)
     {
-        gcs_seqno_t* const seqno(
-            reinterpret_cast<gcs_seqno_t*>(
-                ::malloc(sizeof(gcs_seqno_t))));
+        gcs_seqno_t* const seqno
+            (static_cast<gcs_seqno_t*>(::malloc(sizeof(gcs_seqno_t))));
 
         if (!seqno) return -ENOMEM;
 
@@ -205,8 +205,8 @@ namespace galera
                 cc_      = 0;
                 cc_size_ = 0;
 
-                const gcs_act_conf_t* const cc(
-                    reinterpret_cast<const gcs_act_conf_t*>(act.buf));
+                const struct gcs_act_conf* const cc
+                    (static_cast<const struct gcs_act_conf*>(act.buf));
 
                 if (cc->my_idx < 0)
                 {

@@ -44,7 +44,7 @@ private:
 };
 
 
-static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
+static galera::Replicator::State state2repl(const struct gcs_act_conf& conf)
 {
     switch (conf.my_state)
     {
@@ -126,7 +126,8 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     }
     case GCS_ACT_CONF:
     {
-        const gcs_act_conf_t* conf(static_cast<const gcs_act_conf_t*>(act.buf));
+        const struct gcs_act_conf* conf
+            (static_cast<const struct gcs_act_conf*>(act.buf));
 
         wsrep_view_info_t* view_info(
             galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)

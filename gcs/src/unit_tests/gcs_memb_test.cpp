@@ -449,7 +449,8 @@ START_TEST(gcs_memb_test_465)
              ret, strerror (-ret));
     fail_if (ret != act.buf_len);
     fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
-    const gcs_act_conf_t* conf = (const gcs_act_conf_t*)act.buf;
+    const struct gcs_act_conf* conf
+        (static_cast<const struct gcs_act_conf*>(act.buf));
     fail_if (NULL == conf);
     fail_if (conf->my_idx != 1);
     /* according to #465 this was GCS_NODE_STATE_PRIM */

@@ -818,7 +818,9 @@ _join (gcs_conn_t* conn, gcs_seqno_t seqno)
 static void
 gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 {
-    const gcs_act_conf_t* conf = (const gcs_act_conf_t*)action;
+    const struct gcs_act_conf* const conf
+        (static_cast<const struct gcs_act_conf*>(action));
+
     long ret;
 
     conn->my_idx = conf->my_idx;
@@ -991,11 +993,11 @@ gcs_handle_state_change (gcs_conn_t*           conn,
  * @return negative error code, 0 if action should be discarded, 1 if should be
  *         passed to application.
  */
-static long
+static int
 gcs_handle_actions (gcs_conn_t*          conn,
                     struct gcs_act_rcvd* rcvd)
 {
-    long ret = 0;
+    int ret = 0;
 
     switch (rcvd->act.type) {
     case GCS_ACT_FLOW:

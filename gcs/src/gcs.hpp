@@ -147,6 +147,7 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_TORDERED,   //! action representing state change, will be assigned
                         //  global seqno
+//    GCS_ACT_CONF,       //! new configuration
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
@@ -404,7 +405,11 @@ extern const char*
 gcs_node_state_to_str (gcs_node_state_t state);
 
 /*! New configuration action */
-typedef struct gcs_act_conf {
+struct gcs_act_conf
+{
+    static struct gcs_act_conf* read(const struct gcs_action* act);
+    int write(struct gcs_action** act) const;
+
     gcs_seqno_t      seqno;    //! last global seqno applied by this group
     gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
     uint8_t          uuid[GCS_UUID_LEN];/// group UUID
@@ -415,15 +420,15 @@ typedef struct gcs_act_conf {
     int              appl_proto_ver; //! application protocol version to use
     char             data[1];  /*! member array (null-terminated ID, name,
                                 *  incoming address, 8-byte cached seqno) */
-} gcs_act_conf_t;
+};
 
-typedef struct gcs_backend_stats {
+struct gcs_backend_stats {
     struct stats_t {
         const char* key;
         const char* value;
     }* stats;
     void* ctx;
-} gcs_backend_stats_t;
+};
 
 struct gcs_stats
 {
@@ -440,7 +445,7 @@ struct gcs_stats
     int       send_q_len;     //! current send queue length
     int       send_q_len_max; //! maximum send queue length
     int       send_q_len_min; //! minimum send queue length
-    gcs_backend_stats_t backend_stats; //! backend stats.
+    struct gcs_backend_stats backend_stats; //! backend stats.
 };
 
 /*! Fills stats struct */

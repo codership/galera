@@ -74,8 +74,8 @@ RecvLoop::loop()
             break;
         case GCS_ACT_CONF:
         {
-            const gcs_act_conf_t* const cc
-                (reinterpret_cast<const gcs_act_conf_t*>(act.buf));
+            const struct gcs_act_conf* const cc
+                (static_cast<const struct gcs_act_conf*>(act.buf));
 
             if (cc->conf_id > 0) /* PC */
             {
