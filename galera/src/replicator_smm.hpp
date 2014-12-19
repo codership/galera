@@ -242,11 +242,14 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                unlock();
-                mutex.unlock();
-                GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
-                mutex.lock();
-                lock();
+                if (trx_ != 0 && trx_->is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
             }
 #endif // GU_DBUG_ON
         private:
@@ -276,11 +279,14 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                unlock();
-                mutex.unlock();
-                GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
-                mutex.lock();
-                lock();
+                if (trx_.is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
             }
 #endif // GU_DBUG_ON
 
@@ -350,11 +356,14 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                unlock();
-                mutex.unlock();
-                GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
-                mutex.lock();
-                lock();
+                if (trx_.is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
             }
 #endif // GU_DBUG_ON
 
