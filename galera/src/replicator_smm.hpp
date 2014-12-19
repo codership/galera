@@ -26,6 +26,8 @@
 #include "ist.hpp"
 #include "gu_atomic.hpp"
 #include "saved_state.hpp"
+#include "gu_debug_sync.hpp"
+
 
 #include <map>
 
@@ -237,6 +239,16 @@ namespace galera
                 return (last_left + 1 == seqno_);
             }
 
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                unlock();
+                mutex.unlock();
+                GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                mutex.lock();
+                lock();
+            }
+#endif // GU_DBUG_ON
         private:
             LocalOrder(const LocalOrder&);
             wsrep_seqno_t seqno_;
@@ -260,6 +272,17 @@ namespace galera
                 return (trx_.is_local() == true ||
                         last_left >= trx_.depends_seqno());
             }
+
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                unlock();
+                mutex.unlock();
+                GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
+                mutex.lock();
+                lock();
+            }
+#endif // GU_DBUG_ON
 
         private:
             ApplyOrder(const ApplyOrder&);
@@ -323,6 +346,18 @@ namespace galera
                 }
                 gu_throw_fatal << "invalid commit mode value " << mode_;
             }
+
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                unlock();
+                mutex.unlock();
+                GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
+                mutex.lock();
+                lock();
+            }
+#endif // GU_DBUG_ON
+
         private:
             CommitOrder(const CommitOrder&);
             TrxHandle& trx_;

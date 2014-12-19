@@ -78,6 +78,9 @@ public:
     {
         return (last_left >= trx_.depends_seqno());
     }
+#ifdef GU_DBUG_ON
+    void debug_sync(gu::Mutex&) { }
+#endif // GU_DBUG_ON
 private:
     galera::TrxHandle& trx_;
 };

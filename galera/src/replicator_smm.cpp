@@ -562,7 +562,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
             rcode = gcs_.repl(act, true);
         }
 
-        GU_DBUG_SYNC_WAIT("galera_after_replicate")
+        GU_DBUG_SYNC_WAIT("galera_after_replicate_sync")
         trx->lock();
     }
     while (rcode == -EAGAIN && trx->state() != TrxHandle::S_MUST_ABORT &&
