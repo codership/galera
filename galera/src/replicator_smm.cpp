@@ -617,8 +617,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
         else
         {
             assert(ts->state() == TrxHandle::S_REPLICATING);
-//            ts->set_state(TrxHandle::S_REPLICATING);
             trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
+
             if (meta != 0)
             {
                 meta->gtid.uuid  = state_uuid_;
@@ -825,16 +825,22 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         else throw;
     }
 
-    if (gu_unlikely(interrupted || trx->state() == TrxHandle::S_MUST_ABORT))
+    if (gu_unlikely(interrupted || tr->state() == TrxHandle::S_MUST_ABORT))
     {
         if (interrupted) trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
         else             trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+
+        assert(tr->state() == TrxHandle::S_MUST_ABORT);
+        // I wonder if we need to check for interrupt at all...
+
+        tr->set_state(TrxHandle::S_MUST_REPLAY);
         retval = WSREP_BF_ABORT;
     }
     else
     {
         trx->set_state(TrxHandle::S_COMMITTING);
         tr->set_state(TrxHandle::S_COMMITTING);
+
         if (co_mode_ != CommitOrder::BYPASS)
         {
             try
@@ -857,6 +863,12 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             {
                 if (interrupted) trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
                 else             trx->set_state(TrxHandle::S_MUST_REPLAY);
+
+                // this seems totally wrong: why entering commit monitor
+                // may change trx state? But OK...
+                assert(tr->state() == TrxHandle::S_MUST_ABORT);
+                tr->set_state(TrxHandle::S_MUST_REPLAY);
+
                 retval = WSREP_BF_ABORT;
             }
         }
@@ -933,9 +945,12 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
             for (unsigned int i(0); i < repld.size(); ++i)
             {
                 TrxHandleSlave* const tr(repld[i]);
+
                 wsrep_trx_meta_t meta = {{ state_uuid_,     tr->global_seqno() },
                                          { tr->source_id(), tr->trx_id()       },
                                          tr->depends_seqno()};
+
+                tr->set_state(TrxHandle::S_REPLAYING);
 
                 gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr,meta));
 
@@ -947,6 +962,9 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
 
                 if (gu_unlikely(rcode != WSREP_CB_SUCCESS))
                     gu_throw_fatal << "Commit failed. Trx: " << *tr;
+
+                if ((i+1) < repld.size()) tr->set_state(TrxHandle::S_COMMITTED);
+                /* last fragment will be set sommitted in post_commit() */
             }
         }
         catch (gu::Exception& e)
@@ -971,25 +989,29 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
 
 wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandleMaster* trx)
 {
-    if (trx->state() == TrxHandle::S_MUST_ABORT)
+    TrxHandleSlave* const txs(trx->repld());
+
+    if (txs->state() == TrxHandle::S_MUST_ABORT)
     {
+        assert(trx->state() == TrxHandle::S_MUST_ABORT);
         // This is possible in case of ALG: BF applier BF aborts
         // trx that has already grabbed commit monitor and is committing.
         // However, this should be acceptable assuming that commit
         // operation does not reserve any more resources and is able
         // to release already reserved resources.
-        log_debug << "trx was BF aborted during commit: " << *trx;
+        log_debug << "trx was BF aborted during commit: " << *txs;
         // manipulate state to avoid crash
+        txs->set_state(TrxHandle::S_MUST_REPLAY);
+        txs->set_state(TrxHandle::S_REPLAYING);
         trx->set_state(TrxHandle::S_MUST_REPLAY);
         trx->set_state(TrxHandle::S_REPLAYING);
     }
 
+    assert(txs->state() == TrxHandle::S_COMMITTING ||
+           txs->state() == TrxHandle::S_REPLAYING);
     assert(trx->state() == TrxHandle::S_COMMITTING ||
            trx->state() == TrxHandle::S_REPLAYING);
     assert(trx->repld_vec().size() > 0);
-
-    TrxHandleSlave* const txs(trx->repld());
-
     assert(txs->local_seqno() > -1 && txs->global_seqno() > -1);
 
     CommitOrder co(*txs, co_mode_);

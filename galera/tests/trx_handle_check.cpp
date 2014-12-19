@@ -162,6 +162,55 @@ START_TEST(test_states)
     txs->set_state(TrxHandle::S_ROLLED_BACK);
     txs->unlock();
     txs->unref();
+
+    // replaying fragment aborted BEFORE certification
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_MUST_ABORT);
+    txs->set_state(TrxHandle::S_REPLICATING);
+    txs->set_state(TrxHandle::S_REPLAYING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
+
+    // replaying fragment aborted AFTER certification
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_MUST_ABORT);
+    txs->set_state(TrxHandle::S_MUST_REPLAY);
+    txs->set_state(TrxHandle::S_REPLAYING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
+
+    // replaying replicating fragment
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_REPLAYING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
+
+    // replaying certifying fragment
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_CERTIFYING);
+    txs->set_state(TrxHandle::S_REPLAYING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
+
+    // replaying committed fragment
+    txs = TrxHandleSlave::New(sp);
+    txs->lock();
+    txs->set_state(TrxHandle::S_CERTIFYING);
+    txs->set_state(TrxHandle::S_APPLYING);
+    txs->set_state(TrxHandle::S_COMMITTING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->set_state(TrxHandle::S_REPLAYING);
+    txs->set_state(TrxHandle::S_COMMITTED);
+    txs->unlock();
+    txs->unref();
 }
 END_TEST
 
