@@ -74,25 +74,41 @@ BuildRequires: systemd
 %define systemd 0
 %endif
 
-
-Requires:      openssl nmap
-
-%if 0%{?centos} == 6
-Requires: nc
-%endif
-
-Provides:      wsrep, %{name} = %{version}-%{release}
-
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
 for transactional databases and similar applications. For more information
 about wsrep API see http://launchpad.net/wsrep. For a description of Galera
-replication engine see http://www.codership.com.
+replication engine see http://galeracluster.com.
+
+This package contains the Galera library/plugin.
 
 %{copyright}
 
 This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
+
+%package -n galera-arbitrator-3
+Summary:       Galera arbitrator daemon
+Group:         Productivity/Databases/Servers
+Requires:      openssl nmap
+%if 0%{?centos} == 6
+Requires:      nc
+%endif
+Provides:      wsrep, %{name} = %{version}-%{release}
+
+%description -n galera-arbitrator-3
+Galera is a fast synchronous multimaster wsrep provider (replication engine)
+for transactional databases and similar applications. For more information
+about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+replication engine see http://galeracluster.com.
+
+This package contains the Galera arbitrator daemon (garbd).
+
+%{copyright}
+
+This software comes with ABSOLUTELY NO WARRANTY. This is free software,
+and you are welcome to modify and redistribute it under the GPLv2 license.
+
 
 %prep
 %setup -q
@@ -135,7 +151,7 @@ install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 # Symlink required by SUSE policy
 %if 0%{?suse_version}
 install -d $RBR/usr/sbin
-ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
+ln -sf /etc/init.d/garb $RBR%{_sbindir}/rcgarb
 %endif
 %endif
 
@@ -175,28 +191,29 @@ rm -f $(find %{libs} -type l)
 %restart_on_update
 %insserv_cleanup
 
+%pre -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_add_pre garb.service
+%endif
+
+%post -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_add_post garb.service
+%endif
+
+%preun -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_del_preun garb.service
+%endif
+
+%postun -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_del_postun garb.service
+%endif
+
+
 %files
 %defattr(-,root,root,0755)
-%if 0%{?suse_version}
-%config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.%{name}
-%else
-%config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
-%endif
-
-
-%if 0%{?systemd}
-%attr(0644,root,root) %{_unitdir}/garb.service
-%attr(0755,root,root) %{_bindir}/garb-systemd
-%else
-%attr(0755,root,root) %{_sysconfdir}/init.d/garb
-
-# Symlink required by SUSE policy
-%if 0%{?suse_version}
-%attr(0755,root,root) /usr/sbin/rcgarb
-%endif
-%endif
-
-%attr(0755,root,root) %{_bindir}/garbd
 
 %attr(0755,root,root) %dir %{libs}
 %attr(0755,root,root) %{libs}/libgalera_smm.so
@@ -208,6 +225,31 @@ rm -f $(find %{libs} -type l)
 %doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
+
+
+%files -n galera-arbitrator-3
+%defattr(-,root,root,0755)
+
+%if 0%{?suse_version}
+%config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.%{name}
+%else
+%config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
+%endif
+
+%if 0%{?systemd}
+%attr(0644,root,root) %{_unitdir}/garb.service
+%attr(0755,root,root) %{_bindir}/garb-systemd
+%attr(0755,root,root) %{_bindir}/garbd
+%else
+%attr(0755,root,root) %{_sysconfdir}/init.d/garb
+
+# Symlink required by SUSE policy
+%if 0%{?suse_version}
+%attr(0755,root,root) %{_sbindir}/rcgarb
+%endif
+%endif
+
+%attr(0755,root,root) %{_bindir}/garbd
 
 %doc %attr(644, root, man) %{_mandir}/man8/garbd.1*
 
