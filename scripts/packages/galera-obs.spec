@@ -16,7 +16,7 @@
 # MA  02110-1301  USA.
 
 %{!?name: %define name galera-3}
-%{!?version: %define version 25_3.x}
+%{!?version: %define version 25.3.x}
 %{!?release: %define release 1}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
@@ -95,9 +95,7 @@ This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
-%setup -q -n %{name}-%{version}
-# When downloading from GitHub the contents is in a folder
-# that is named by the branch it was exported from.
+%setup -q
 
 %build
 # Debug info:
@@ -121,8 +119,7 @@ scons -j$(echo ${NUM_JOBS:-"1"})
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
 RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
-# When downloading from GitHub the contents is in a folder
-# that is named by the branch it was exported from.
+
 
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
