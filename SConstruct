@@ -121,7 +121,7 @@ GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # Attempt to read from file if not given
 if GALERA_REV == "XXXX" and os.path.isfile("GALERA_REVISION"):
     with open("GALERA_REVISION", "r") as f:
-        GALERA_REV = f.readline()
+        GALERA_REV = f.readline().rstrip("\n")
 
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
