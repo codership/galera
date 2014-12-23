@@ -156,9 +156,11 @@ link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
 
-# Initialize CPPFLAGS and LIBPATH from environment to get user preferences
+# Initialize CPPFLAGS, LIBPATH and LDFLAGS from environment to get user
+# preferences
 env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
 env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
+env.Append(LDFLAGS = os.getenv("LDFLAGS", ""))
 
 # Set -pthread flag explicitly to make sure that pthreads are
 # enabled on all platforms.
