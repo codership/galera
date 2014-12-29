@@ -587,7 +587,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
     assert(ts->global_seqno() == act.seqno_g);
     assert(ts->last_seen_seqno() >= 0);
 
-    assert(trx->repld_vec().size() > 0);
     assert(trx->repld() == ts);
     assert(trx->global_seqno() == ts->global_seqno());
     assert(trx->global_seqno() == act.seqno_g);
@@ -654,8 +653,6 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
         break;
     case TrxHandle::S_REPLICATING:
     {
-        assert(trx->repld_vec().size() > 0);
-
         TrxHandleSlave& tr(*trx->repld());
 
         switch (tr.state())
@@ -712,8 +709,6 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
     }
     case TrxHandle::S_COMMITTING:
     {
-        assert(trx->repld_vec().size() > 0);
-
         TrxHandleSlave& tr(*trx->repld());
 
         switch (tr.state())
@@ -748,7 +743,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                                                  wsrep_trx_meta_t* meta)
 {
     assert(trx->state() == TrxHandle::S_REPLICATING);
-    assert(trx->repld_vec().size() > 0);
 
     TrxHandleSlave* const tr(trx->repld());
     assert(tr->state() == TrxHandle::S_REPLICATING);
@@ -937,35 +931,26 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
         trx->set_state(TrxHandle::S_REPLAYING);
         try
         {
-            const TrxHandleMaster::ReplVector& repld(trx->repld_vec());
+            TrxHandleSlave* const tr(trx->repld());
 
-            // All writesets in the replicated() container are still referenced,
-            // so not destoryed and are still allocated in cache.
-            // here we replay all that is there, i.e. at least the last one.
-            for (unsigned int i(0); i < repld.size(); ++i)
-            {
-                TrxHandleSlave* const tr(repld[i]);
+            wsrep_trx_meta_t meta = {{ state_uuid_,     tr->global_seqno() },
+                                     { tr->source_id(), tr->trx_id()       },
+                                     tr->depends_seqno()};
 
-                wsrep_trx_meta_t meta = {{ state_uuid_,     tr->global_seqno() },
-                                         { tr->source_id(), tr->trx_id()       },
-                                         tr->depends_seqno()};
+            tr->set_state(TrxHandle::S_REPLAYING);
 
-                tr->set_state(TrxHandle::S_REPLAYING);
+            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr,meta));
 
-                gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr,meta));
+            uint32_t const flags
+                (TrxHandle::trx_flags_to_wsrep_flags(tr->flags()));
+            wsrep_bool_t unused(false);
 
-                uint32_t const flags
-                    (TrxHandle::trx_flags_to_wsrep_flags(tr->flags()));
-                wsrep_bool_t unused(false);
+            wsrep_cb_status_t rcode(commit_cb_(trx_ctx,flags,&meta,&unused));
 
-                wsrep_cb_status_t rcode(commit_cb_(trx_ctx,flags,&meta,&unused));
+            if (gu_unlikely(rcode != WSREP_CB_SUCCESS))
+                gu_throw_fatal << "Commit failed. Trx: " << *tr;
 
-                if (gu_unlikely(rcode != WSREP_CB_SUCCESS))
-                    gu_throw_fatal << "Commit failed. Trx: " << *tr;
-
-                if ((i+1) < repld.size()) tr->set_state(TrxHandle::S_COMMITTED);
-                /* last fragment will be set sommitted in post_commit() */
-            }
+            /* fragment will be set sommitted in post_commit() */
         }
         catch (gu::Exception& e)
         {
@@ -1011,7 +996,6 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandleMaster* trx)
            txs->state() == TrxHandle::S_REPLAYING);
     assert(trx->state() == TrxHandle::S_COMMITTING ||
            trx->state() == TrxHandle::S_REPLAYING);
-    assert(trx->repld_vec().size() > 0);
     assert(txs->local_seqno() > -1 && txs->global_seqno() > -1);
 
     CommitOrder co(*txs, co_mode_);
@@ -1111,8 +1095,6 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster*  trx,
                                                          wsrep_trx_meta_t* meta)
 {
-    assert(trx->repld_vec().size() == 1);
-
     TrxHandleSlave* const txs(trx->repld());
 
     if (meta != 0)

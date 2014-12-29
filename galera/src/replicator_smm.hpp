@@ -174,7 +174,6 @@ namespace galera
             static const std::string commit_order;
             static const std::string causal_read_timeout;
             static const std::string max_write_set_size;
-            static const std::string keep_fragments;
         };
 
         typedef std::pair<std::string, std::string> Default;
