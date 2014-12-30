@@ -381,13 +381,13 @@ void galera::ist::Receiver::run()
                 trx->unref();
             }
 
-            ++current_seqno_;
-
             if (trx == 0)
             {
                 log_debug << "eof received, closing socket";
                 break;
             }
+
+            ++current_seqno_;
         }
     }
     catch (asio::system_error& e)
