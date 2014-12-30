@@ -227,8 +227,6 @@ galera::Certification::do_test_v3(TrxHandleSlave* const trx, bool store_keys)
     long const      key_count(key_set.count());
     long            processed(0);
 
-    assert(key_count > 0);
-
     key_set.rewind();
 
     for (; processed < key_count; ++processed)

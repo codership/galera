@@ -369,7 +369,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 static inline void
 discard_local_trx(REPL_CLASS*        repl,
                   wsrep_ws_handle_t* ws_handle,
-                  TrxHandleMaster*         trx)
+                  TrxHandleMaster*   trx)
 {
     repl->unref_local_trx(trx);
     repl->discard_local_trx(trx);
@@ -410,7 +410,16 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    discard_local_trx(repl, ws_handle, trx);
+    switch(trx->state())
+    {
+    case TrxHandle::S_COMMITTED:
+        discard_local_trx(repl, ws_handle, trx);
+    case TrxHandle::S_EXECUTING:
+        /* trx ready for new fragment */
+        break;
+    default:
+        assert(0);
+    }
 
     return retval;
 }
@@ -457,7 +466,7 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
 
 
 static inline void
-append_data_array (TrxHandleMaster*              const trx,
+append_data_array (TrxHandleMaster*        const trx,
                    const struct wsrep_buf* const data,
                    size_t                  const count,
                    wsrep_data_type_t       const type,
@@ -488,7 +497,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, /*rbr_data != 0*/ false));
+    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
 
     if (trx == 0)
     {
@@ -502,8 +511,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
     {
         TrxHandleLock lock(*trx);
         trx->set_conn_id(conn_id);
-//        /* rbr_data should clearly persist over pre_commit() call */
-//        append_data_array (trx, rbr_data, rbr_data_len, false, false);
+
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
 
         retval = repl->replicate(trx, meta);
@@ -730,7 +738,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(
-                           WSREP_FLAG_COMMIT |
+                           WSREP_FLAG_TRX_END |
                            WSREP_FLAG_ISOLATION));
 
         retval = repl->replicate(trx, meta);

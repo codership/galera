@@ -128,15 +128,15 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
  * Note that some of the flags are mutually exclusive (e.g. COMMIT and
  * ROLLBACK).
  */
-#define WSREP_FLAG_COMMIT               ( 1ULL << 0 )
+#define WSREP_FLAG_TRX_END              ( 1ULL << 0 )
 #define WSREP_FLAG_ROLLBACK             ( 1ULL << 1 )
 #define WSREP_FLAG_ISOLATION            ( 1ULL << 2 )
 #define WSREP_FLAG_PA_UNSAFE            ( 1ULL << 3 )
 #define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 4 )
 #define WSREP_FLAG_NATIVE               ( 1ULL << 5 )
-#define WSREP_FLAG_BEGIN                ( 1ULL << 6 )
+#define WSREP_FLAG_TRX_START            ( 1ULL << 6 )
 
-#define WSREP_FLAGS_LAST                WSREP_FLAG_BEGIN
+#define WSREP_FLAGS_LAST                WSREP_FLAG_TRX_START
 #define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
 
 
@@ -404,8 +404,7 @@ typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
     uint32_t                flags,
     const wsrep_trx_meta_t* meta,
-    wsrep_bool_t*           exit,
-    wsrep_bool_t            commit
+    wsrep_bool_t*           exit
 );
 
 
