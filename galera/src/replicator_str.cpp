@@ -70,6 +70,8 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
 
     sst_uuid_  = state_id.uuid;
     sst_seqno_ = rcode ? WSREP_SEQNO_UNDEFINED : state_id.seqno;
+    assert(false == sst_received_);
+    sst_received_ = true;
     sst_cond_.signal();
 
     return WSREP_OK;
@@ -683,18 +685,27 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
                                                   group_uuid, group_seqno));
-    gu::Lock lock(sst_mutex_);
+    gu::Lock sst_lock(sst_mutex_);
+    sst_received_ = false;
 
     st_.mark_unsafe();
-
-    // Make gcache seqno reset to happen before send_state_request()
-    // to avoid gcache reset during IST.
-    gcache_.seqno_reset();
 
     send_state_request (req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
+
+    /* There are two places where we may need to adjust GCache.
+     * This is the first one, which we can do while waiting for SST to complete.
+     * Here we reset seqno map completely if we have different histories.
+     * This MUST be done before IST starts. */
+    bool const first_reset
+        (state_uuid_ /* GCache has */ != group_uuid /* current PC has */);
+    if (first_reset)
+    {
+        log_info << "Resetting GCache seqno map due to different histories.";
+        gcache_.seqno_reset();
+    }
 
     if (sst_req_len != 0)
     {
@@ -703,10 +714,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         {
             sst_uuid_  = group_uuid;
             sst_seqno_ = group_seqno;
+            sst_received_ = true;
         }
         else
         {
-            lock.wait(sst_cond_);
+            while (false == sst_received_) sst_lock.wait(sst_cond_);
         }
 
         if (sst_uuid_ != group_uuid)
@@ -725,6 +737,21 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
+            /* There are two places where we may need to adjust GCache.
+             * This is the second one.
+             * Here we reset seqno map completely if we have gap in seqnos
+             * between the received snapshot and current GCache contents.
+             * This MUST be done before IST starts. */
+            // there may be possible optimization to this when cert index
+            // transfer is implemented (it may close the gap), but not by much.
+            if (!first_reset && (STATE_SEQNO() /* GCache has */ !=
+                                 sst_seqno_    /* current state has */))
+            {
+                log_info << "Resetting GCache seqno map due to seqno gap: "
+                         << STATE_SEQNO() << ".." << sst_seqno_;
+                gcache_.seqno_reset();
+            }
+
             update_state_uuid (sst_uuid_);
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
@@ -735,7 +762,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_debug << "Installed new state: " << state_uuid_ << ":" << sst_seqno_;
+            log_debug << "Installed new state: "
+                      << state_uuid_ << ":" << sst_seqno_;
         }
     }
     else
