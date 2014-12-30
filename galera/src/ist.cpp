@@ -371,11 +371,6 @@ void galera::ist::Receiver::run()
             }
             if (trx != 0 && first_seqno_ > 0 && current_seqno_ >= first_seqno_)
             {
-                gu::Lock lock(mutex_);
-                while (ready_ == false || consumers_.empty())
-                {
-                    lock.wait(cond_);
-                }
                 Consumer* cons(consumers_.top());
                 consumers_.pop();
                 cons->trx(trx);

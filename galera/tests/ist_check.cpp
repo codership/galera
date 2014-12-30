@@ -243,8 +243,9 @@ static int select_trx_version(int protocol_version)
         return 2;
     case 5:
     case 6:
-        return 3;
     case 7:
+        return 3;
+    case 8:
         return 4;
     }
     fail("unknown protocol version %i", protocol_version);

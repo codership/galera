@@ -430,16 +430,31 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             if (protocol_version_ >= 8 && cc_lowest_trx_seqno_ > 0)
             {
-                log_info << "Sending pre IST";
+                try
+                {
+                    gcache_.seqno_lock(cc_lowest_trx_seqno_);
+                }
+                catch (gu::NotFound& nf)
+                {
+                    log_warn << "Cert index preload first seqno "
+                             << cc_lowest_trx_seqno_
+                             << " not found from gcache";
+                    rcode = -ENOMSG;
+                    goto out;
+                }
+
+                log_info << "Cert index preload: " << cc_lowest_trx_seqno_
+                         << " -> " << cc_seqno_;;
                 assert(streq->ist_len() > 0);
                 IST_request istr;
                 get_ist_request(streq, &istr);
-                ist::Sender sender(config_, gcache_, istr.peer(),
-                                   protocol_version_);
                 // Send trxs to rebuild cert index.
-                sender.send(cc_lowest_trx_seqno_,
-                            cc_seqno_,
-                            cc_lowest_trx_seqno_);
+                ist_senders_.run(config_,
+                                 istr.peer(),
+                                 cc_lowest_trx_seqno_,
+                                 cc_seqno_,
+                                 cc_lowest_trx_seqno_,
+                                 protocol_version_);
             }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
