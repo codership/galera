@@ -536,7 +536,7 @@ namespace galera
 
                     galera::TrxHandleSlave* trx(galera::TrxHandleSlave::New(trx_pool_));
                     // Check if cert index preload trx is already in
-                    // gcache. Consider normal trxs
+                    // gcache.
                     if ((msg.flags() & Message::F_REBUILD))
                     {
                         try
@@ -545,9 +545,11 @@ namespace galera
                             int64_t sd;
                             ssize_t sz;
                             wbuf = gcache_.seqno_get_ptr(seqno_g, sd, sz);
-                            gcache_.seqno_unlock(); // <- is this safe?
                             skip_bytes(socket, msg.len() - offset);
                             trx->unserialize(static_cast<const gu::byte_t*>(wbuf), sz, 0);
+                            trx->set_received(0, -1, seqno_g);
+                            trx->set_depends_seqno(sd);
+                            trx->mark_certified();
                             return std::make_pair(trx, true);
                         }
                         catch (gu::NotFound& nf)
