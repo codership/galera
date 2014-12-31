@@ -478,6 +478,19 @@ namespace galera
                 log_debug << "sent " << sent << " bytes";
             }
 
+            template <class ST>
+            void skip_bytes(ST& socket, size_t bytes)
+            {
+                gu::Buffer buf(4092);
+                while (bytes > 0)
+                {
+                    bytes -= asio::read(
+                        socket,
+                        asio::buffer(&buf[0], std::min(buf.size(), bytes)));
+                }
+                assert(bytes == 0);
+            }
+
 
             template <class ST>
             std::pair<galera::TrxHandleSlave*, bool>
@@ -520,8 +533,30 @@ namespace galera
                     offset = gu::unserialize8(&buf[0], buf.size(), offset,
                                               seqno_d);
 
-                    galera::TrxHandleSlave*
-                        trx(galera::TrxHandleSlave::New(trx_pool_));
+
+                    galera::TrxHandleSlave* trx(galera::TrxHandleSlave::New(trx_pool_));
+                    // Check if cert index preload trx is already in
+                    // gcache. Consider normal trxs
+                    if ((msg.flags() & Message::F_REBUILD))
+                    {
+                        try
+                        {
+                            const void* wbuf;
+                            int64_t sd;
+                            ssize_t sz;
+                            wbuf = gcache_.seqno_get_ptr(seqno_g, sd, sz);
+                            gcache_.seqno_unlock(); // <- is this safe?
+                            skip_bytes(socket, msg.len() - offset);
+                            trx->unserialize(static_cast<const gu::byte_t*>(wbuf), sz, 0);
+                            return std::make_pair(trx, true);
+                        }
+                        catch (gu::NotFound& nf)
+                        {
+                            // not found from gcache, continue as normal
+                        }
+                    }
+
+
 
                     void* wbuf;
 

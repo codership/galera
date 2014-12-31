@@ -376,9 +376,9 @@ START_TEST(test_ist_v5)
 }
 END_TEST
 
-START_TEST(test_ist_v7)
+START_TEST(test_ist_v8)
 {
-    test_ist_common(7);
+    test_ist_common(8);
 }
 END_TEST
 
@@ -394,9 +394,9 @@ Suite* ist_suite()
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v5);
     suite_add_tcase(s, tc);
-    tc = tcase_create("test_ist_v7");
+    tc = tcase_create("test_ist_v8");
     tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v7);
+    tcase_add_test(tc, test_ist_v8);
     suite_add_tcase(s, tc);
 
     return s;
