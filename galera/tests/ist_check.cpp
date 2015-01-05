@@ -178,11 +178,11 @@ extern "C" void* trx_thread(void* arg)
     return 0;
 }
 
-class PreIST : public galera::ist::PreISTHandler
+class PreIST : public galera::ist::PreloadHandler
 {
 public:
-    void pre_ist_handle_trx(TrxHandleSlave* trx) { }
-    void pre_ist_handle_view_change(const wsrep_view_info_t& view) { }
+    void preload_trx(TrxHandleSlave* trx) { }
+    void preload_view_change(const wsrep_view_info_t& view) { }
 };
 
 extern "C" void* receiver_thd(void* arg)

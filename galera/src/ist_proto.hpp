@@ -53,7 +53,7 @@ namespace galera
 
             typedef enum
             {
-                F_REBUILD = 0x1
+                F_PRELOAD = 0x1
             } Flag;
 
             Message(int       version = -1,
@@ -414,7 +414,7 @@ namespace galera
             template <class ST>
             void send_trx(ST&                           socket,
                           const gcache::GCache::Buffer& buffer,
-                          bool                          rebuild_flag)
+                          bool                          preload_flag)
             {
                 const bool rolled_back(buffer.seqno_d() == -1);
 
@@ -455,7 +455,7 @@ namespace galera
                     );
 
                 Trx trx_msg(version_, trx_meta_size + payload_size,
-                            (version_ >= 8 && rebuild_flag) ? Message::F_REBUILD : 0);
+                            (version_ >= 8 && preload_flag) ? Message::F_PRELOAD : 0);
 
                 gu::Buffer buf(trx_msg.serial_size() + trx_meta_size);
                 size_t  offset(trx_msg.serialize(&buf[0], buf.size(), 0));
@@ -537,7 +537,7 @@ namespace galera
                     galera::TrxHandleSlave* trx(galera::TrxHandleSlave::New(trx_pool_));
                     // Check if cert index preload trx is already in
                     // gcache.
-                    if ((msg.flags() & Message::F_REBUILD))
+                    if ((msg.flags() & Message::F_PRELOAD))
                     {
                         try
                         {
@@ -603,7 +603,7 @@ namespace galera
                     log_debug << os;
 
                     return std::make_pair(trx,
-                                          msg.flags() & Message::F_REBUILD);
+                                          msg.flags() & Message::F_PRELOAD);
                 }
                 case Message::T_CTRL:
                     switch (msg.ctrl())

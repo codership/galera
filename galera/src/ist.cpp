@@ -31,7 +31,7 @@ namespace galera
                         const std::string& peer,
                         wsrep_seqno_t first,
                         wsrep_seqno_t last,
-                        wsrep_seqno_t rebuild_start,
+                        wsrep_seqno_t preload_start,
                         AsyncSenderMap& asmap,
                         int version)
                 :
@@ -40,7 +40,7 @@ namespace galera
                 peer_  (peer),
                 first_ (first),
                 last_  (last),
-                rebuild_start_(rebuild_start),
+                preload_start_(preload_start),
                 asmap_ (asmap),
                 thread_()
             { }
@@ -49,7 +49,7 @@ namespace galera
             const std::string& peer()   { return peer_;   }
             wsrep_seqno_t      first()  { return first_;  }
             wsrep_seqno_t      last()   { return last_;   }
-            wsrep_seqno_t      rebuild_start() { return rebuild_start_; }
+            wsrep_seqno_t      preload_start() { return preload_start_; }
             AsyncSenderMap&    asmap()  { return asmap_;  }
             pthread_t          thread() { return thread_; }
 
@@ -60,7 +60,7 @@ namespace galera
             const std::string  peer_;
             wsrep_seqno_t      first_;
             wsrep_seqno_t      last_;
-            wsrep_seqno_t      rebuild_start_;
+            wsrep_seqno_t      preload_start_;
             AsyncSenderMap&    asmap_;
             pthread_t          thread_;
         };
@@ -81,7 +81,7 @@ galera::ist::register_params(gu::Config& conf)
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandleSlave::Pool& sp,
                                 gcache::GCache&       gc,
-                                PreISTHandler&        pre_ist,
+                                PreloadHandler&       preload,
                                 const char*           addr)
     :
     io_service_   (),
@@ -101,7 +101,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     use_ssl_      (false),
     running_      (false),
     ready_        (false),
-    pre_ist_      (pre_ist)
+    preload_      (preload)
 {
     std::string recv_addr;
 
@@ -328,6 +328,7 @@ void galera::ist::Receiver::run()
             p.send_ctrl(socket, Ctrl::C_OK);
         }
 
+        bool preload_started(false);
         while (true)
         {
             gu::Lock lock(mutex_);
@@ -366,8 +367,14 @@ void galera::ist::Receiver::run()
 
             if (ret.second == true)
             {
-                // Trx was received with index rebuild flag on
-                pre_ist_.pre_ist_handle_trx(trx);
+                if (preload_started == false)
+                {
+                    log_info << "IST: cert index preload starting at "
+                             << trx->global_seqno();
+                    preload_started = true;
+                }
+                // Trx was received with index preload flag on
+                preload_.preload_trx(trx);
             }
             if (trx != 0 && first_seqno_ > 0 && current_seqno >= first_seqno_)
             {
@@ -653,7 +660,7 @@ void send_eof(galera::ist::Proto& p, S& stream)
 }
 
 void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
-                               wsrep_seqno_t rebuild_start)
+                               wsrep_seqno_t preload_start)
 {
     if (first > last)
     {
@@ -721,19 +728,19 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
-                // Rebuild start is the seqno of the lowest trx in
+                // Preload start is the seqno of the lowest trx in
                 // cert index at CC. If the cert index was completely
-                // reset, rebuild_start will be zero and no rebuild flag
+                // reset, preload_start will be zero and no preload flag
                 // should be set.
-                bool rebuild_flag(rebuild_start > 0 &&
-                                  buf_vec[i].seqno_g() >= rebuild_start);
+                bool preload_flag(preload_start > 0 &&
+                                  buf_vec[i].seqno_g() >= preload_start);
                 if (use_ssl_ == true)
                 {
-                    p.send_trx(*ssl_stream_, buf_vec[i], rebuild_flag);
+                    p.send_trx(*ssl_stream_, buf_vec[i], preload_flag);
                 }
                 else
                 {
-                    p.send_trx(socket_, buf_vec[i], rebuild_flag);
+                    p.send_trx(socket_, buf_vec[i], preload_flag);
                 }
 
                 if (buf_vec[i].seqno_g() == last)
@@ -780,7 +787,7 @@ void* run_async_sender(void* arg)
     wsrep_seqno_t join_seqno;
     try
     {
-        as->send(as->first(), as->last(), as->rebuild_start());
+        as->send(as->first(), as->last(), as->preload_start());
         join_seqno = as->last();
     }
     catch (gu::Exception& e)
@@ -815,11 +822,11 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
                                       const std::string& peer,
                                       wsrep_seqno_t      first,
                                       wsrep_seqno_t      last,
-                                      wsrep_seqno_t      rebuild_start,
+                                      wsrep_seqno_t      preload_start,
                                       int                version)
 {
     gu::Critical crit(monitor_);
-    AsyncSender* as(new AsyncSender(conf, peer, first, last, rebuild_start,
+    AsyncSender* as(new AsyncSender(conf, peer, first, last, preload_start,
                                     *this, version));
     int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)

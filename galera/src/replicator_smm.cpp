@@ -1653,7 +1653,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     double foo, bar;
     size_t index_size;
     cert_.stats_get(foo, bar, index_size);
-    log_info << "Cert index size: " << index_size;
     local_monitor_.leave(lo);
     gcs_.resume_recv();
     free(app_req);

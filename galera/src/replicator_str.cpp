@@ -874,11 +874,10 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     }
 }
 
-void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
+void ReplicatorSMM::preload_trx(TrxHandleSlave* trx)
 {
     if (trx != 0 && trx->depends_seqno() != WSREP_SEQNO_UNDEFINED)
     {
-        log_info << "pre ist hande trx " << *trx;
         trx->verify_checksum();
         if (cert_.position() == 0)
         {
@@ -898,7 +897,7 @@ void ReplicatorSMM::pre_ist_handle_trx(TrxHandleSlave* trx)
     }
 }
 
-void ReplicatorSMM::pre_ist_handle_view_change(const wsrep_view_info_t&)
+void ReplicatorSMM::preload_view_change(const wsrep_view_info_t&)
 {
 
 }

@@ -30,14 +30,14 @@ namespace galera
     {
         void register_params(gu::Config& conf);
 
-        // Interface to handle events prior to actual IST.
+        // Interface to handle cert index preload events.
         // These include trxs and configuration changes received
         // from donor that have global seqno below IST start.
-        class PreISTHandler
+        class PreloadHandler
         {
         public:
-            virtual void pre_ist_handle_trx(TrxHandleSlave*) = 0;
-            virtual void pre_ist_handle_view_change(const wsrep_view_info_t&) = 0;
+            virtual void preload_trx(TrxHandleSlave*) = 0;
+            virtual void preload_view_change(const wsrep_view_info_t&) = 0;
         };
 
         class Receiver
@@ -46,7 +46,7 @@ namespace galera
             static std::string const RECV_ADDR;
 
             Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
-                     PreISTHandler&, const char* addr);
+                     PreloadHandler&, const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
@@ -95,7 +95,7 @@ namespace galera
             bool                  use_ssl_;
             bool                  running_;
             bool                  ready_;
-            PreISTHandler&        pre_ist_;
+            PreloadHandler&       preload_;
 
         };
 
@@ -111,10 +111,10 @@ namespace galera
 
             // first - first trx seqno
             // last  - last trx seqno
-            // rebuild_start - the seqno from which sent transactions
-            // are accompanied with index rebuild flag
+            // preload_start - the seqno from which sent transactions
+            // are accompanied with index preload flag
             void send(wsrep_seqno_t first, wsrep_seqno_t last,
-                      wsrep_seqno_t rebuild_start);
+                      wsrep_seqno_t preload_start);
 
             void cancel()
             {
