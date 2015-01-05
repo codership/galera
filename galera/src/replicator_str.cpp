@@ -428,11 +428,18 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            if (protocol_version_ >= 8 && cc_lowest_trx_seqno_ > 0)
+            if (protocol_version_ >= 8)
             {
                 try
                 {
-                    gcache_.seqno_lock(cc_lowest_trx_seqno_);
+                    if (cc_lowest_trx_seqno_ > 0)
+                    {
+                        gcache_.seqno_lock(cc_lowest_trx_seqno_);
+                    }
+                    else
+                    {
+                        assert(cc_seqno_ == 0);
+                    }
                 }
                 catch (gu::NotFound& nf)
                 {
@@ -791,7 +798,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (req->ist_len() > 0)
     {
         // IST is prepared only with str proto ver 1 and above
-        if (STATE_SEQNO() < group_seqno)
+        // IST is always prepared at protocol version 8 or higher
+        if (STATE_SEQNO() < group_seqno || protocol_version_ >= 8)
         {
             log_info << "Receiving IST: " << (group_seqno - STATE_SEQNO())
                      << " writesets, seqnos " << STATE_SEQNO()

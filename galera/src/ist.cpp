@@ -91,7 +91,6 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     cond_         (),
     consumers_    (),
     first_seqno_  (-1),
-    current_seqno_(-1),
     last_seqno_   (-1),
     conf_         (conf),
     trx_pool_     (sp),
@@ -263,7 +262,6 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     }
 
     first_seqno_   = first_seqno;
-    current_seqno_ = -1;
     last_seqno_    = last_seqno;
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
@@ -311,6 +309,7 @@ void galera::ist::Receiver::run()
     }
     acceptor_.close();
     int ec(0);
+    wsrep_seqno_t current_seqno(-1);
     try
     {
         bool const keep_keys(conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
@@ -328,6 +327,7 @@ void galera::ist::Receiver::run()
             p.recv_handshake_response(socket);
             p.send_ctrl(socket, Ctrl::C_OK);
         }
+
         while (true)
         {
             gu::Lock lock(mutex_);
@@ -351,14 +351,14 @@ void galera::ist::Receiver::run()
             // Verify that the sequence of trx is continuous
             if (trx != 0)
             {
-                if (current_seqno_ == -1)
+                if (current_seqno == -1)
                 {
-                    current_seqno_ = trx->global_seqno();
+                    current_seqno = trx->global_seqno();
                 }
-                else if (trx->global_seqno() != current_seqno_)
+                else if (trx->global_seqno() != current_seqno)
                 {
                     log_error << "unexpected trx seqno: " << trx->global_seqno()
-                              << " expected: " << current_seqno_;
+                              << " expected: " << current_seqno;
                     ec = EINVAL;
                     goto err;
                 }
@@ -369,7 +369,7 @@ void galera::ist::Receiver::run()
                 // Trx was received with index rebuild flag on
                 pre_ist_.pre_ist_handle_trx(trx);
             }
-            if (trx != 0 && first_seqno_ > 0 && current_seqno_ >= first_seqno_)
+            if (trx != 0 && first_seqno_ > 0 && current_seqno >= first_seqno_)
             {
                 Consumer* cons(consumers_.top());
                 consumers_.pop();
@@ -383,11 +383,14 @@ void galera::ist::Receiver::run()
 
             if (trx == 0)
             {
+                // decrement counter to leave it to value of the last
+                // received transaction
+                --current_seqno;
                 log_debug << "eof received, closing socket";
                 break;
             }
 
-            ++current_seqno_;
+            ++current_seqno;
         }
     }
     catch (asio::system_error& e)
@@ -418,10 +421,10 @@ err:
     }
 
     running_ = false;
-    if (ec != EINTR && current_seqno_ - 1 < last_seqno_)
+    if (last_seqno_ > 0 && ec != EINTR && current_seqno != last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
-                  << last_seqno_ << " last received: " << current_seqno_ - 1;
+                  << last_seqno_ << " last received: " << current_seqno;
         ec = EPROTO;
     }
     if (ec != EINTR)
@@ -502,7 +505,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         recv_addr_ = "";
     }
 
-    return (current_seqno_ - 1);
+    return last_seqno_;
 }
 
 
@@ -687,10 +690,12 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
                 << "ist send failed, peer reported error: " << ctrl;
         }
 
-        log_info << "IST sender " << first << " -> " << last;
 
-        if (first > last)
+
+        // send eof even if the set or transactions sent would be empty
+        if (first > last || (first == 0 && last == 0))
         {
+            log_info << "IST sender notifying joiner, not sending anything";
             if (use_ssl_ == true)
             {
                 send_eof(p, *ssl_stream_);
@@ -700,6 +705,10 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
                 send_eof(p, socket_);
             }
             return;
+        }
+        else
+        {
+            log_info << "IST sender " << first << " -> " << last;
         }
 
 
