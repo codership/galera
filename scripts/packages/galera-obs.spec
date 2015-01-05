@@ -18,6 +18,7 @@
 %{!?name: %define name galera-3}
 %{!?version: %define version 25_3.x}
 %{!?release: %define release 1}
+%{!?revision: %define revision XXXX}
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
@@ -116,7 +117,7 @@ export CC=gcc-4.7
 export CXX=g++-4.7
 %endif
 
-scons -j$(echo ${NUM_JOBS:-"1"})
+scons -j$(echo ${NUM_JOBS:-"1"}) revno=%{revision}
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
