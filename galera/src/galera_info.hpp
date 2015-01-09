@@ -8,7 +8,7 @@
 
 /* create view info out of configuration message */
 extern wsrep_view_info_t*
-galera_view_info_create (const struct gcs_act_conf* conf, bool st_required);
+galera_view_info_create (const gcs_act_conf& conf, bool st_required);
 
 /* make a copy of view info object */
 extern wsrep_view_info_t*

@@ -407,20 +407,32 @@ gcs_node_state_to_str (gcs_node_state_t state);
 /*! New configuration action */
 struct gcs_act_conf
 {
-    static struct gcs_act_conf* read(const struct gcs_action* act);
-    int write(struct gcs_action** act) const;
+    gcs_act_conf();
+    gcs_act_conf(const void* buf, int size);
+    ~gcs_act_conf();
+    int write(void** buf) const; // buf allocated by malloc().
 
+    bool operator==(const gcs_act_conf& other) const;
+
+    gu_uuid_t        uuid;     //! group UUID
     gcs_seqno_t      seqno;    //! last global seqno applied by this group
     gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
-    uint8_t          uuid[GCS_UUID_LEN];/// group UUID
-    long             memb_num; //! number of members in configuration
-    long             my_idx;   //! index of this node in the configuration
-    gcs_node_state_t my_state; //! current node state
+    char*            memb;     /*! member array (null-terminated ID, name,
+                                *  incoming address, 8-byte cached seqno) */
+    int              memb_size;//! size of member array (bytes)
+    int              memb_num; //! number of members in configuration
+    int              my_idx;   //! index of this node in the configuration
     int              repl_proto_ver; //! replicator  protocol version to use
     int              appl_proto_ver; //! application protocol version to use
-    char             data[1];  /*! member array (null-terminated ID, name,
-                                *  incoming address, 8-byte cached seqno) */
+    gcs_node_state_t my_state; //! current node state
+
+private:
+    gcs_act_conf(const gcs_act_conf&);
+    gcs_act_conf& operator=(const gcs_act_conf&);
 };
+
+std::ostream&
+operator <<(std::ostream& os, const struct gcs_act_conf& cc);
 
 struct gcs_backend_stats {
     struct stats_t {

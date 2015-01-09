@@ -392,7 +392,8 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             else
             {
                 // Generate zero view before exit to notify application
-                wsrep_view_info_t* err_view(galera_view_info_create(0, false));
+                gcs_act_conf const cc;
+                wsrep_view_info_t* err_view(galera_view_info_create(cc,false));
                 void* fake_sst_req(0);
                 size_t fake_sst_req_len(0);
                 view_cb_(app_ctx_, recv_ctx, err_view, 0, 0,

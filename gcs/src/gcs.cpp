@@ -816,14 +816,13 @@ _join (gcs_conn_t* conn, gcs_seqno_t seqno)
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
 static void
-gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
+gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
 {
-    const struct gcs_act_conf* const conf
-        (static_cast<const struct gcs_act_conf*>(action));
+    gcs_act_conf const conf(act.buf, act.buf_len);
 
     long ret;
 
-    conn->my_idx = conf->my_idx;
+    conn->my_idx = conf.my_idx;
 
     gu_fifo_lock(conn->recv_q);
     {
@@ -831,8 +830,8 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         if (!gu_mutex_lock (&conn->fc_lock)) {
             conn->stop_sent   = 0;
             conn->stop_count  = 0;
-            conn->conf_id     = conf->conf_id;
-            conn->memb_num    = conf->memb_num;
+            conn->conf_id     = conf.conf_id;
+            conn->memb_num    = conf.memb_num;
 
             _set_fc_limits (conn);
 
@@ -850,51 +849,51 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
     gu_fifo_release (conn->recv_q);
 
-    if (conf->conf_id < 0) {
-        if (0 == conf->memb_num) {
-            assert (conf->my_idx < 0);
+    if (conf.conf_id < 0) {
+        if (0 == conf.memb_num) {
+            assert (conf.my_idx < 0);
             gu_info ("Received SELF-LEAVE. Closing connection.");
             gcs_shift_state (conn, GCS_CONN_CLOSED);
         }
         else {
             gu_info ("Received NON-PRIMARY.");
-            assert (GCS_NODE_STATE_NON_PRIM == conf->my_state);
+            assert (GCS_NODE_STATE_NON_PRIM == conf.my_state);
             gcs_become_open (conn);
-            conn->global_seqno = conf->seqno;
+            conn->global_seqno = conf.seqno;
         }
 
         return;
     }
 
-    assert (conf->conf_id  >= 0);
+    assert (conf.conf_id  >= 0);
 
     /* <sanity_checks> */
-    if (conf->memb_num < 1) {
+    if (conf.memb_num < 1) {
         gu_fatal ("Internal error: PRIMARY configuration with %d nodes",
-                  conf->memb_num);
+                  conf.memb_num);
         abort();
     }
 
-    if (conf->my_idx < 0 || conf->my_idx >= conf->memb_num) {
+    if (conf.my_idx < 0 || conf.my_idx >= conf.memb_num) {
         gu_fatal ("Internal error: index of this node (%d) is out of bounds: "
-                  "[%d, %d]", conf->my_idx, 0, conf->memb_num - 1);
+                  "[%d, %d]", conf.my_idx, 0, conf.memb_num - 1);
         abort();
     }
 
-    if (conf->my_state < GCS_NODE_STATE_PRIM) {
+    if (conf.my_state < GCS_NODE_STATE_PRIM) {
         gu_fatal ("Internal error: NON-PRIM node state in PRIM configuraiton");
         abort();
     }
     /* </sanity_checks> */
 
-    conn->global_seqno = conf->seqno;
+    conn->global_seqno = conf.seqno;
 
     /* at this point we have established protocol version,
      * so can set packet size */
 // Ticket #600: commented out as unsafe under load    _reset_pkt_size(conn);
 
     const gcs_conn_state_t old_state = conn->state;
-    switch (conf->my_state) {
+    switch (conf.my_state) {
     case GCS_NODE_STATE_PRIM:   gcs_become_primary(conn);      return;
         /* Below are not real state transitions, rather state recovery,
          * so bypassing state transition matrix */
@@ -904,7 +903,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     case GCS_NODE_STATE_SYNCED: conn->state = GCS_CONN_SYNCED; break;
     default:
         gu_fatal ("Internal error: unrecognized node state: %d",
-                  conf->my_state);
+                  conf.my_state);
         abort();
     }
 
@@ -934,7 +933,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     case GCS_CONN_JOINER:
     case GCS_CONN_DONOR:
         /* #603, #606 - duplicate JOIN msg in case we lost it */
-        assert (conf->conf_id >= 0);
+        assert (conf.conf_id >= 0);
 
         if (conn->need_to_join) _join (conn, conn->join_seqno);
 
@@ -1005,7 +1004,7 @@ gcs_handle_actions (gcs_conn_t*          conn,
         gcs_handle_flow_control (conn, (const gcs_fc_event*)rcvd->act.buf);
         break;
     case GCS_ACT_CONF:
-        gcs_handle_act_conf (conn, rcvd->act.buf);
+        gcs_handle_act_conf (conn, rcvd->act);
         ret = 1;
         break;
     case GCS_ACT_STATE_REQ:

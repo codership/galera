@@ -44,7 +44,7 @@ private:
 };
 
 
-static galera::Replicator::State state2repl(const struct gcs_act_conf& conf)
+static galera::Replicator::State state2repl(const gcs_act_conf& conf)
 {
     switch (conf.my_state)
     {
@@ -126,20 +126,19 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     }
     case GCS_ACT_CONF:
     {
-        const struct gcs_act_conf* conf
-            (static_cast<const struct gcs_act_conf*>(act.buf));
+        const gcs_act_conf conf(act.buf, act.size);
 
         wsrep_view_info_t* view_info(
-            galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
+            galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM)
             );
 
         gu_trace(replicator_.process_conf_change(recv_ctx, *view_info,
-                                                 conf->repl_proto_ver,
-                                                 state2repl(*conf),
+                                                 conf.repl_proto_ver,
+                                                 state2repl(conf),
                                                  act.seqno_l));
         free(view_info);
 
-        if (conf->conf_id < 0 && conf->memb_num == 0) {
+        if (conf.conf_id < 0 && conf.memb_num == 0) {
             log_debug << "Received SELF-LEAVE. Closing connection.";
             // called after being shifted to S_CLOSING state.
             gcs_.close();

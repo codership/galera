@@ -11,32 +11,32 @@ view_info_size (int members)
 }
 
 /* create view info out of configuration message */
-wsrep_view_info_t* galera_view_info_create (const struct gcs_act_conf* conf,
-                                            bool                     st_required)
+wsrep_view_info_t* galera_view_info_create (const gcs_act_conf& conf,
+                                            bool                st_required)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
-        malloc(view_info_size(conf ? conf->memb_num : 0)));
+        ::malloc(view_info_size(conf.memb_num)));
 
     if (ret) {
-        if (conf)
+//remove        if (conf)
         {
-            const char* str = conf->data;
+            const char* str = conf.memb;
             int m;
 
             wsrep_uuid_t  uuid;
-            memcpy(uuid.data, conf->uuid, sizeof(uuid.data));
-            wsrep_seqno_t seqno = conf->seqno != GCS_SEQNO_ILL ?
-                conf->seqno : WSREP_SEQNO_UNDEFINED;
+            memcpy(uuid.data, conf.uuid.data, sizeof(uuid.data));
+            wsrep_seqno_t seqno = conf.seqno != GCS_SEQNO_ILL ?
+                conf.seqno : WSREP_SEQNO_UNDEFINED;
             wsrep_gtid_t  gtid  = { uuid, seqno };
 
             ret->state_id  = gtid;
-            ret->view      = conf->conf_id;
-            ret->status    = conf->conf_id != -1 ?
+            ret->view      = conf.conf_id;
+            ret->status    = conf.conf_id != -1 ?
                 WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
             ret->state_gap = st_required;
-            ret->my_idx    = conf->my_idx;
-            ret->memb_num  = conf->memb_num;
-            ret->proto_ver = conf->appl_proto_ver;
+            ret->my_idx    = conf.my_idx;
+            ret->memb_num  = conf.memb_num;
+            ret->proto_ver = conf.appl_proto_ver;
 
             for (m = 0; m < ret->memb_num; m++) {
                 wsrep_member_info_t* member = &ret->members[m];
@@ -57,6 +57,7 @@ wsrep_view_info_t* galera_view_info_create (const struct gcs_act_conf* conf,
                 str += sizeof(gcs_seqno_t); // skip cached seqno.
             }
         }
+#if 0 //remove
         else
         {
             memset(&ret->state_id, 0, sizeof(ret->state_id));
@@ -67,6 +68,7 @@ wsrep_view_info_t* galera_view_info_create (const struct gcs_act_conf* conf,
             ret->memb_num = 0;
             ret->proto_ver = -1;
         }
+#endif
     }
 
     return ret;

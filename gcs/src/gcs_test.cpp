@@ -433,14 +433,14 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 {
     long ret;
     static gcs_seqno_t conf_id = 0;
-    struct gcs_act_conf* conf(static_cast<struct gcs_act_conf*>(thread->msg));
+    gcs_act_conf const conf(thread->act.buf, thread->act.size);
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
-             "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
-             (long long)conf->conf_id, (long long)conf->seqno,
-             conf->memb_num, conf->my_idx, (long long)thread->act.seqno_l);
+             "seqno: %lld, members: %d, my idx: %d, local seqno: %lld\n",
+             (long long)conf.conf_id, (long long)conf.seqno,
+             conf.memb_num, conf.my_idx, (long long)thread->act.seqno_l);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
@@ -448,18 +448,18 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     //       so for simplicity, just check conf_id.
     while (-EAGAIN == (ret = gu_to_grab (to, thread->act.seqno_l)));
     if (0 == ret) {
-        if (conf->my_state == GCS_NODE_STATE_PRIM) {
+        if (conf.my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
             fprintf (stdout,"Gap in configurations: ours: %lld, group: %lld.\n",
-                     (long long)conf_id, (long long)conf->conf_id);
+                     (long long)conf_id, (long long)conf.conf_id);
             fflush (stdout);
 
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
-                     (long long)conf->seqno, // this is global seqno
-                     strerror (-gcs_request_state_transfer (gcs, 0, &conf->seqno,
-                                                            sizeof(conf->seqno),
-                                                            "", &ist_uuid, ist_seqno,
-                                                            &seqno)));
+                     (long long)conf.seqno, // this is global seqno
+                     strerror (-gcs_request_state_transfer(gcs, 0, &conf.seqno,
+                                                           sizeof(conf.seqno),"",
+                                                           &ist_uuid, ist_seqno,
+                                                           &seqno)));
 
             // pretend that state transfer is complete, cancel every action up
             // to seqno
@@ -477,7 +477,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     else {
         fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
     }
-    conf_id = conf->conf_id;
+    conf_id = conf.conf_id;
 }
 
 void *gcs_test_recv (void *arg)

@@ -74,18 +74,17 @@ RecvLoop::loop()
             break;
         case GCS_ACT_CONF:
         {
-            const struct gcs_act_conf* const cc
-                (static_cast<const struct gcs_act_conf*>(act.buf));
+            gcs_act_conf const cc(act.buf, act.size);
 
-            if (cc->conf_id > 0) /* PC */
+            if (cc.conf_id > 0) /* PC */
             {
-                if (GCS_NODE_STATE_PRIM == cc->my_state)
+                if (GCS_NODE_STATE_PRIM == cc.my_state)
                 {
                     gcs_.request_state_transfer (config_.sst(),config_.donor());
-                    gcs_.join(cc->seqno);
+                    gcs_.join(cc.seqno);
                 }
             }
-            else if (cc->memb_num == 0) // SELF-LEAVE after closing connection
+            else if (cc.memb_num == 0) // SELF-LEAVE after closing connection
             {
                 log_info << "Exiting main loop";
                 return;

@@ -72,33 +72,20 @@ namespace galera
     ssize_t
     DummyGcs::generate_cc (bool primary)
     {
-        cc_size_ = sizeof(struct gcs_act_conf) +
-            primary *
-            (my_name_.length() + incoming_.length() + GU_UUID_STR_LEN + 3);
-
-        cc_ = ::malloc(cc_size_);
-
-        if (!cc_)
-        {
-            cc_size_ = 0;
-            return -ENOMEM;
-        }
-
-        struct gcs_act_conf* const cc
-            (static_cast<struct gcs_act_conf*>(cc_));
+        gcs_act_conf cc;
 
         if (primary)
         {
-            cc->seqno = global_seqno_;
-            cc->conf_id = 1;
-            memcpy (cc->uuid, &uuid_, sizeof(uuid_));
-            cc->memb_num = 1;
-            cc->my_idx = 0;
-            cc->my_state = GCS_NODE_STATE_JOINED;
-            cc->repl_proto_ver = repl_proto_ver_;
-            cc->appl_proto_ver = appl_proto_ver_;
+            cc.seqno = global_seqno_;
+            cc.conf_id = 1;
+            memcpy (cc.uuid.data, &uuid_, sizeof(uuid_));
+            cc.memb_num = 1;
+            cc.my_idx = 0;
+            cc.my_state = GCS_NODE_STATE_JOINED;
+            cc.repl_proto_ver = repl_proto_ver_;
+            cc.appl_proto_ver = appl_proto_ver_;
 
-            char* const str(cc->data);
+            char* const str(cc.memb);
             ssize_t offt(0);
             offt += gu_uuid_print (&uuid_, str, GU_UUID_STR_LEN+1) + 1;
             offt += sprintf (str + offt, "%s", my_name_.c_str()) + 1;
@@ -106,12 +93,21 @@ namespace galera
         }
         else
         {
-            cc->seqno    = GCS_SEQNO_ILL;
-            cc->conf_id  = -1;
-            cc->memb_num = 0;
-            cc->my_idx   = -1;
-            cc->my_state = GCS_NODE_STATE_NON_PRIM;
+            cc.seqno    = GCS_SEQNO_ILL;
+            cc.conf_id  = -1;
+            cc.memb_num = 0;
+            cc.my_idx   = -1;
+            cc.my_state = GCS_NODE_STATE_NON_PRIM;
         }
+
+        cc_size_ = cc.write(&cc_);
+
+        if (!cc_)
+        {
+            cc_size_ = 0;
+            return -ENOMEM;
+        }
+
 
         return cc_size_;
     }
@@ -205,17 +201,16 @@ namespace galera
                 cc_      = 0;
                 cc_size_ = 0;
 
-                const struct gcs_act_conf* const cc
-                    (static_cast<const struct gcs_act_conf*>(act.buf));
+                gcs_act_conf const cc(act.buf, act.size);
 
-                if (cc->my_idx < 0)
+                if (cc.my_idx < 0)
                 {
-                    assert (0 == cc->memb_num);
+                    assert (0 == cc.memb_num);
                     state_ = S_CLOSED;
                 }
                 else
                 {
-                    assert (1 == cc->memb_num);
+                    assert (1 == cc.memb_num);
                     state_ = S_CONNECTED;
                 }
 

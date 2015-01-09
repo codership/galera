@@ -1406,58 +1406,54 @@ gcs_group_act_conf (gcs_group_t*    group,
     // gcs requires resending message with correct gcs protocol version.
     *gcs_proto_ver = group->quorum.gcs_proto_ver;
 
-    ssize_t const conf_size
-        (sizeof(struct gcs_act_conf) + group_memb_record_size(group));
-    struct gcs_act_conf* const conf
-        (static_cast<struct gcs_act_conf*>(malloc (conf_size)));
+    struct gcs_act_conf conf;
 
-    if (conf) {
-        long idx;
+    conf.memb_size = group_memb_record_size(group);
+    conf.memb = static_cast<char*>(::operator new(conf.memb_size));
 
-        conf->seqno          = group->act_id_;
-        conf->conf_id        = group->conf_id;
-        conf->memb_num       = group->num;
-        conf->my_idx         = group->my_idx;
-        conf->repl_proto_ver = group->quorum.repl_proto_ver;
-        conf->appl_proto_ver = group->quorum.appl_proto_ver;
+    long idx;
 
-        memcpy (conf->uuid, &group->group_uuid, sizeof (gu_uuid_t));
+    conf.seqno          = group->act_id_;
+    conf.conf_id        = group->conf_id;
+    conf.memb_num       = group->num;
+    conf.my_idx         = group->my_idx;
+    conf.repl_proto_ver = group->quorum.repl_proto_ver;
+    conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
-        if (group->num) {
-            assert (conf->my_idx >= 0);
+    memcpy (conf.uuid.data, &group->group_uuid, sizeof (gu_uuid_t));
 
-            conf->my_state = group->nodes[group->my_idx].status;
+    if (group->num) {
+        assert (conf.my_idx >= 0);
 
-            char* ptr = &conf->data[0];
-            for (idx = 0; idx < group->num; idx++)
-            {
-                strcpy (ptr, group->nodes[idx].id);
-                ptr += strlen(ptr) + 1;
-                strcpy (ptr, group->nodes[idx].name);
-                ptr += strlen(ptr) + 1;
-                strcpy (ptr, group->nodes[idx].inc_addr);
-                ptr += strlen(ptr) + 1;
-                gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
-                memcpy(ptr, &cached, sizeof(cached));
-                ptr += sizeof(cached);
-            }
+        conf.my_state = group->nodes[group->my_idx].status;
+
+        char* ptr(conf.memb);
+        for (idx = 0; idx < group->num; idx++)
+        {
+            strcpy (ptr, group->nodes[idx].id);
+            ptr += strlen(ptr) + 1;
+            strcpy (ptr, group->nodes[idx].name);
+            ptr += strlen(ptr) + 1;
+            strcpy (ptr, group->nodes[idx].inc_addr);
+            ptr += strlen(ptr) + 1;
+            gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
+            memcpy(ptr, &cached, sizeof(cached));
+            ptr += sizeof(cached);
         }
-        else {
-            // self leave message
-            assert (conf->conf_id < 0);
-            assert (conf->my_idx  < 0);
-            conf->my_state = GCS_NODE_STATE_NON_PRIM;
-        }
-
-        act->buf     = conf;
-        act->buf_len = conf_size;
-        act->type    = GCS_ACT_CONF;
-
-        return conf_size;
     }
     else {
-        return -ENOMEM;
+        // self leave message
+        assert (conf.conf_id < 0);
+        assert (conf.my_idx  < 0);
+        conf.my_state = GCS_NODE_STATE_NON_PRIM;
     }
+
+    void* tmp;
+    act->buf_len = conf.write(&tmp);
+    act->buf     = tmp;
+    act->type    = GCS_ACT_CONF;
+
+    return act->buf_len;
 }
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)

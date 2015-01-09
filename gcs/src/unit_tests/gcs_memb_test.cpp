@@ -449,12 +449,10 @@ START_TEST(gcs_memb_test_465)
              ret, strerror (-ret));
     fail_if (ret != act.buf_len);
     fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
-    const struct gcs_act_conf* conf
-        (static_cast<const struct gcs_act_conf*>(act.buf));
-    fail_if (NULL == conf);
-    fail_if (conf->my_idx != 1);
+    const gcs_act_conf conf(act.buf, act.buf_len);
+    fail_if (conf.my_idx != 1);
     /* according to #465 this was GCS_NODE_STATE_PRIM */
-    fail_if (conf->my_state != GCS_NODE_STATE_SYNCED);
+    fail_if (conf.my_state != GCS_NODE_STATE_SYNCED);
 
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
     fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
