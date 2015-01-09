@@ -320,7 +320,7 @@ namespace galera
 
             void* const buf(pool.acquire());
 
-        return new(buf) TrxHandleSlave(pool, buf);
+            return new(buf) TrxHandleSlave(pool, buf);
         }
 
         void lock()   const { mutex_.lock(); }
@@ -440,25 +440,24 @@ namespace galera
         void ref()   { ++refcnt_; }
         void unref()
         {
-            if (refcnt_.sub_and_fetch(1) == 0) // delete and return to pool
+            int const count(refcnt_.sub_and_fetch(1));
+
+            if (count == 0)
             {
                 assert(!locked());
 
                 void* const buf(buf_);
+                bool  const local(buf != static_cast<void*>(this));
                 gu::MemPool<true>& mp(mem_pool_);
 
-#if 1 // use if()
-                if (buf == static_cast<void*>(this))
-                {
-                    this->~TrxHandleSlave();
-                }
-                else
+                if (local)
                 {
                     destroy_local(buf);
                 }
-#else // use virtual dtor
-                (static_cast<TrxHandle*>(buf))->~TrxHandle();
-#endif
+                else
+                {
+                    this->~TrxHandleSlave();
+                }
 
                 mp.recycle(buf);
             }
@@ -533,17 +532,15 @@ namespace galera
             int             version_;
             KeySet::Version key_format_;
             int             max_write_set_size_;
-            bool            keep_fragments_;
 
             Params (const std::string& wdir, int ver, KeySet::Version kformat,
-                    int max_write_set_size = WriteSetNG::MAX_SIZE,
-                    bool kf = false) :
+                    int max_write_set_size = WriteSetNG::MAX_SIZE) :
                 working_dir_(wdir), version_(ver), key_format_(kformat),
-                max_write_set_size_(max_write_set_size), keep_fragments_(kf) {}
+                max_write_set_size_(max_write_set_size)
+            {}
 
             Params () :
-                working_dir_(), version_(), key_format_(), max_write_set_size_(),
-                keep_fragments_(false)
+                working_dir_(), version_(), key_format_(), max_write_set_size_()
             {}
         };
 
@@ -569,19 +566,17 @@ namespace galera
 
         void lock()   const
         {
-            assert(repl_.size() > 0);
-            repl_.back()->lock();
+            repl_->lock();
         }
 
 #ifndef NDEBUG
-        bool locked() const { return repl_.back()->locked(); }
+        bool locked() const { return repl_->locked(); }
 #endif /* NDEBUG */
 
         void unlock() const
         {
-            assert(repl_.size() > 0);
             assert(locked());
-            repl_.back()->unlock();
+            repl_->unlock();
         }
 
         void set_state(TrxHandle::State const s)
@@ -598,12 +593,11 @@ namespace galera
 
         void set_flags(uint32_t const flags) // wsrep flags
         {
-            assert(repl_.size() > 0);
             TrxHandle::set_flags(flags);
 
             uint16_t ws_flags(WriteSetNG::wsrep_flags_to_ws_flags(flags));
 
-            if (repl_.size() == 1)   ws_flags |= WriteSetNG::F_BEGIN;
+            ws_flags |= (trx_start_ * WriteSetNG::F_BEGIN);
 
             write_set_out().set_flags(ws_flags);
         }
@@ -650,14 +644,14 @@ namespace galera
 
             int pa_range(version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
 
-            if (gu_unlikely(repl_.size() > 1))
+            if (gu_unlikely(false == trx_start_))
             {
                 /* make sure this fragment depends on the previous */
                 assert(version() >= 4);
-                TrxHandleSlave* tr(repl_[repl_.size() - 2]);
-                assert(tr->global_seqno() <= last_seen_seqno);
+                wsrep_seqno_t const prev_seqno(repl_->global_seqno());
+                assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
-                                    last_seen_seqno - tr->global_seqno());
+                                    last_seen_seqno - prev_seqno);
             }
 
             write_set_out().finalize(last_seen_seqno, pa_range);
@@ -676,32 +670,19 @@ namespace galera
             release_write_set_out();
         }
 
-        typedef gu::Vector<TrxHandleSlave*, 1> ReplVector;
-
-        const ReplVector& repld_vec() const
+        TrxHandleSlave* repld() const
         {
             return repl_;
         }
 
-        TrxHandleSlave* repld() const
-        {
-            return repl_.back();
-        }
-
         wsrep_seqno_t global_seqno() const
         {
-            if (gu_likely(repl_.size() > 0))
-                return repl_.back()->global_seqno();
-            else
-                return WSREP_SEQNO_UNDEFINED;
+            return repl_->global_seqno();
         }
 
         wsrep_seqno_t last_seen_seqno() const
         {
-            if (gu_likely(repl_.size() > 0))
-                return repl_.back()->last_seen_seqno();
-            else
-                return WSREP_SEQNO_UNDEFINED;
+            return repl_->last_seen_seqno();
         }
 
         void add_replicated(TrxHandleSlave* const ts)
@@ -710,23 +691,15 @@ namespace galera
             assert(!ts->locked());
 
             ts->lock();
-            ts->ref();
+            assert(ts->refcnt() == 1);
 
-            if (!params_.keep_fragments_)
-            {
-                TrxHandleSlave* const old(repl_[0]);
-                repl_[0] = ts;
+            TrxHandleSlave* const old(repl_);
+            repl_ = ts; // this might be dangerous
 
-                old->unlock();
-                old->unref();
-            }
-            else
-            {
-                repl_.push_back(ts);
-                assert(repl_.size() > 1); // it should be 1 in ctor already
-                // unlock previous fragment
-                repl_[repl_.size() - 2]->unlock();
-            }
+            old->unlock();
+            if (old != &tr_) { old->unref(); }
+
+            trx_start_ = false;
 
             assert(locked());
         }
@@ -792,22 +765,13 @@ namespace galera
             TrxHandle(source_id, conn_id, trx_id, params.version_),
             params_            (params),
             tr_                (mp, this),
-            repl_              (),
+            repl_              (&tr_),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
+            trx_start_         (true),
             wso_               (false)
         {
             assert(reserved_size > sizeof(*this) + 1024);
-
-            /* There will be at least (and normally) one replicated writeset per
-             * transaction. We initialized its handle in initialization list
-             * and now add it as the first element to the vector that will hold
-             * pointers to all such handles belonging to this transaction. */
-            assert(repl_.size() == 0);
-            repl_.push_back(&tr_);
-            assert(NULL != repl_[0]);
-            assert(!repl_.in_heap()); //there should happen no dynamic allocation
-            assert(repl_.size() == 1);
         }
 
         void* wso_buf()
@@ -820,23 +784,24 @@ namespace galera
             release_write_set_out();
 
             assert(refcnt() == 0);
-            assert(repl_[0] == &tr_);
-            assert(repl_[0]->refcnt() == 0);
 
-            for (unsigned int i(1); i < repl_.size(); ++i)
-            {
-                repl_[i]->unref();
-            }
+            if (repl_ != &tr_) { repl_->unref(); }
         }
 
         Params const           params_;
-        TrxHandleSlave         tr_;
-        ReplVector             repl_;
+        TrxHandleSlave         tr_;   // first fragment handle (there will be
+                                      // at least one)
+        TrxHandleSlave*        repl_; // current fragment handle ptr
         size_t const           wso_buf_size_;
-        long                   gcs_handle_;
+        int                    gcs_handle_;
+        bool                   trx_start_;
         bool                   wso_;
 
         friend class TrxHandleSlave;
+
+        // overrides
+        TrxHandleMaster(const TrxHandleMaster&);
+        TrxHandleMaster& operator=(const TrxHandleMaster&);
     };
 
     class TrxHandleLock

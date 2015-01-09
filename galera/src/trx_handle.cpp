@@ -152,12 +152,9 @@ public:
 
             add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
             add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_ABORT);
-//            add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
 
             add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
             add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
-            add(TrxHandle::S_MUST_REPLAY,    TrxHandle::S_REPLAYING);
-            add(TrxHandle::S_REPLAYING,      TrxHandle::S_COMMITTED);
 
             add(TrxHandle::S_ABORTING,       TrxHandle::S_ROLLED_BACK);
         }
@@ -166,16 +163,21 @@ public:
             add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
             add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
 
-            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_MUST_ABORT);
             add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
+            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_MUST_ABORT);
 
-            add(TrxHandle::S_APPLYING,    TrxHandle::S_MUST_ABORT);
             add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
+            add(TrxHandle::S_APPLYING,    TrxHandle::S_MUST_ABORT);
+
+            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_ROLLED_BACK);
 
             // in case of replay
-            add(TrxHandle::S_COMMITTED,  TrxHandle::S_MUST_ABORT);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ROLLED_BACK);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_REPLICATING);
+            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_REPLICATING);//before cert
+            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_MUST_REPLAY);//after cert
+            add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLAYING);
+            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_REPLAYING);
+            add(TrxHandle::S_COMMITTED,   TrxHandle::S_REPLAYING);
+
 #ifdef NDEBUG
             add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_ABORT);
 #endif
@@ -183,6 +185,8 @@ public:
 
         add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
         add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
+        add(TrxHandle::S_MUST_REPLAY,TrxHandle::S_REPLAYING);
+        add(TrxHandle::S_REPLAYING,  TrxHandle::S_COMMITTED);
     }
 
 private:
