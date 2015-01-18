@@ -38,6 +38,7 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     {
         log_error << e.what();
     }
+#ifdef NDEBUG
     catch (std::exception& e)
     {
         log_error << e.what();
@@ -46,7 +47,6 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     {
         /* Unrecognized parameter (logged by gu::Config::set()) */
     }
-#ifdef NDEBUG
     catch (...)
     {
         log_fatal << "non-standard exception";
@@ -177,6 +177,13 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         return repl->connect(cluster_name, cluster_url,
                              state_donor ? state_donor : "", bootstrap);
     }
+    catch (gu::Exception& e)
+    {
+        log_error << "Failed to connect to cluster: "
+                  << e.what();
+        return WSREP_NODE_FAIL;
+    }
+#ifdef NDEBUG
     catch (std::exception& e)
     {
         log_error << e.what();
@@ -187,6 +194,7 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
+#endif // ! NDEBUG
 }
 
 
@@ -916,8 +924,12 @@ struct wsrep_stats_var* galera_stats_get (wsrep_t* gh)
 extern "C"
 void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 {
-    // REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    REPL_CLASS::stats_free(s);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    REPL_CLASS* repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    return repl->stats_free(s);
+    //REPL_CLASS::stats_free(s);
 }
 
 
@@ -1118,4 +1130,3 @@ int wsrep_loader(wsrep_t *hptr)
 
     return WSREP_OK;
 }
-

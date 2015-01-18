@@ -3,7 +3,7 @@
 #ifndef _GARB_GCS_HPP_
 #define _GARB_GCS_HPP_
 
-#include <gcs.h>
+#include <gcs.hpp>
 #include <galerautils.hpp>
 
 namespace garb

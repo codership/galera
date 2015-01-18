@@ -1,4 +1,5 @@
-# Copyright (c) 2011, Codership Oy <info@codership.com>. All rights reserved.
+# Copyright (c) 2011-2014, Codership Oy <info@codership.com>.
+# All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -87,6 +88,9 @@ install -m 644 $RBD/chromium/LICENSE              $RBR%{docs}/LICENSE.chromium
 install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
+install -d $RBR%{_mandir}
+install -m 644 $RBD/garb/files/garbd.troff        $RBR%{_mandir}/man1/garbd.1
+
 %pre
 
 %post
@@ -111,6 +115,8 @@ rm -f $(find %{libs} -type l)
 %doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
+
+%doc %attr(644, root, man) %{_mandir}/man1/garbd.1*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;

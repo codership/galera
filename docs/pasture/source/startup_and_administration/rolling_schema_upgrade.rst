@@ -1,5 +1,0 @@
-Rolling Schema Upgrade
-======================
-
-
-TODO

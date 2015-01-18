@@ -56,51 +56,6 @@ namespace gcomm
         static std::string const TcpNonBlocking;
 
         /*!
-         * @brief Use SSL sockets for communication
-         *
-         * Boolean describing whether underlying transport should use SSL
-         * connections.
-         */
-        static std::string const SocketUseSsl;
-
-        /*!
-         * @brief File containing CA certificates in PEM format
-         *        ("socket.ssl_verify_file")
-         */
-        static std::string const SocketSslVerifyFile;
-
-        /*!
-         * @brief File containing certificate to use in PEM format
-         *        ("socket.ssl_certificate_file")
-         */
-        static std::string const SocketSslCertificateFile;
-
-        /*!
-         * @brief File containing private key associated with certificate
-         *        ("socket.ssl_private_key_file")
-         *
-         * If private key file is protected with password,
-         * SocketSslPasswordFile ("socket.ssl_password_file") must also be set.
-         */
-        static std::string const SocketSslPrivateKeyFile;
-
-        /*!
-         * @brief File containing password used to protect private key file
-         *        ("socket.ssl_password_file")
-         */
-        static std::string const SocketSslPasswordFile;
-
-        /*!
-         * @brief Cipher list for SSL connections (socket.ssl_cipher_list)
-         */
-        static std::string const SocketSslCipherList;
-
-        /*!
-         * @brief Disable compression boolean (socket.ssl_disable_compression)
-         */
-        static std::string const SocketSslCompression;
-
-        /*!
          * @brief Algorithm for message checksums:
          * 0 - none    (backward compatible)
          * 1 - CRC-32  (backward compatible)
@@ -352,6 +307,36 @@ namespace gcomm
         static std::string const EvsMaxInstallTimeouts;
 
         /*!
+         * @brief Margin over keepalive period after which node is declared
+         *        delayed. This should be greater than the largest RTT
+         *        between cluster nodes.
+         */
+        static std::string const EvsDelayMargin;
+
+        /*!
+         * @brief Period which determines how long delayed node is kept in
+         *        delayed list after it becomes responsive again.
+         *
+         * The actual time that node stays in delayed list is
+         * EvsDelayedKeepPeriod times the number of changes between
+         * OK and DELAYED state.
+         */
+        static std::string const EvsDelayedKeepPeriod;
+
+        /*!
+         * @brief List of nodes (UUIDs) that should be evicted permanently from
+         * cluster.
+         *
+         * Setting value to nil UUID will clear the evict list.
+         */
+        static std::string const EvsEvict;
+
+        /*!
+         * @brief Autoevict threshold.
+         */
+        static std::string const EvsAutoEvict;
+
+        /*!
          * @brief PC scheme for transport URI ("pc")
          */
         static std::string const PcScheme;
@@ -419,6 +404,11 @@ namespace gcomm
          * @brief Node weight in prim comp voting
          */
         static std::string const PcWeight;
+
+        /*!
+         * @brief PC recovery from cluster crash
+         */
+        static std::string const PcRecovery;
 
         static void register_params(gu::Config&);
     };

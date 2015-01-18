@@ -2,14 +2,12 @@
 Import('check_env')
 
 env = check_env.Clone()
-env.Append(LIBS=File('#/gcache/src/libgcache.a'))
-env.Append(LIBS=File('#/galera/src/libgalera++.a'))
-env.Append(LIBS=File('#/gcs/src/libgcs.a'))
-env.Append(LIBS=File('#/gcomm/src/libgcomm.a'))
-env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
-env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
-#env.Append(LIBS = ['pthread',
-#                   'rt'])
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
+env.Prepend(LIBS=File('#/gcs/src/libgcs.a'))
+env.Prepend(LIBS=File('#/galera/src/libgalera++.a'))
+env.Prepend(LIBS=File('#/gcache/src/libgcache.a'))
 
 galera_check = env.Program(target='galera_check',
                            source=Split('''

@@ -106,6 +106,11 @@
 #define ARCH_CPU_ARMEL 1
 #define ARCH_CPU_32_BITS 1
 #define ARCH_CPU_LITTLE_ENDIAN 1
+#elif defined(__aarch64__)
+#define ARCH_CPU_ARM_FAMILY 1
+#define ARCH_CPU_ARMEL 1
+#define ARCH_CPU_64_BITS 1
+#define ARCH_CPU_LITTLE_ENDIAN 1
 #elif defined(__pnacl__)
 #define ARCH_CPU_32_BITS 1
 #elif defined(__MIPSEL__)
@@ -113,6 +118,13 @@
 #define ARCH_CPU_MIPSEL 1
 #define ARCH_CPU_32_BITS 1
 #define ARCH_CPU_LITTLE_ENDIAN 1
+#elif defined(__PPC__)
+#if defined(__PPC64__)
+#define ARCH_CPU_64_BITS 1
+#else
+#define ARCH_CPU_32_BITS 1
+#endif
+#define ARCH_CPU_BIG_ENDIAN 1
 #else
 #error Please add support for your architecture in build/build_config.h
 #endif

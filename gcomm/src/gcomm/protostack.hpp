@@ -9,6 +9,7 @@
 
 #include "gu_lock.hpp"
 
+#include <vector>
 #include <deque>
 
 namespace gcomm

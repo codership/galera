@@ -1,4 +1,4 @@
-Import('env', 'arch', 'x86', 'sysname')
+Import('env', 'x86', 'sysname')
 
 libgalerautils_env = env.Clone()
 
@@ -29,6 +29,7 @@ libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_env = env.Clone()
+crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
 
@@ -77,7 +78,10 @@ libgalerautilsxx_sources = [
     'gu_mmap.cpp',
     'gu_alloc.cpp',
     'gu_rset.cpp',
-    'gu_resolver.cpp'
+    'gu_resolver.cpp',
+    'gu_histogram.cpp',
+    'gu_stats.cpp',
+    'gu_asio.cpp'
 ]
 
 #libgalerautilsxx_objs  = libgalerautilsxx_env.Object(
@@ -93,7 +97,7 @@ hexdump_sobj = libgalerautilsxx_env.SharedObject('gu_hexdump++','gu_hexdump.cpp'
 libgalerautilsxx_sobjs += hexdump_sobj
 
 #if '-DGALERA_USE_GU_NETWORK' in libgalerautils_env['CPPFLAGS']:
-#    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
+#    libgalerautilsxx_sources = [libgalerautilsxx_sources,
 #                                'gu_resolver.cpp']
 
 libgalerautilsxx_env.StaticLibrary('galerautils++',

@@ -11,17 +11,11 @@
  */
 
 
-extern "C"
-{
-#include "gcs_gcomm.h"
-}
+#include "gcs_gcomm.hpp"
 
 // We access data comp msg struct directly
-extern "C"
-{
 #define GCS_COMP_MSG_ACCESS 1
-#include "gcs_comp_msg.h"
-}
+#include "gcs_comp_msg.hpp"
 
 
 #include <galerautils.hpp>
@@ -200,7 +194,7 @@ public:
         delete net_;
     }
 
-    const UUID& get_uuid() const { return uuid_; }
+    const gcomm::UUID& get_uuid() const { return uuid_; }
 
     static void* run_fn(void* arg)
     {
@@ -268,16 +262,21 @@ public:
             log_warn << "gcomm: backend already closed";
             return;
         }
-        log_info << "gcomm: terminating thread";
-        terminate();
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: terminating thread";
+            terminate();
+        }
         log_info << "gcomm: joining thread";
         pthread_join(thd_, 0);
-        log_info << "gcomm: closing backend";
-        tp_->close(error_ != 0);
-        gcomm::disconnect(tp_, this);
-        delete tp_;
-        tp_ = 0;
-
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            log_info << "gcomm: closing backend";
+            tp_->close(error_ != 0 || force == true);
+            gcomm::disconnect(tp_, this);
+            delete tp_;
+            tp_ = 0;
+        }
         const Message* msg;
 
         while ((msg = get_next_msg()) != 0)
@@ -319,6 +318,11 @@ public:
     Protonet&   get_pnet()                { return *net_; }
     gu::Config& get_conf()                { return conf_; }
     int         get_error() const         { return error_; }
+
+    void        get_status(gu::Status& status) const
+    {
+        if (tp_ != 0) tp_->get_status(status);
+    }
 
     class Ref
     {
@@ -368,7 +372,7 @@ private:
     void unref() { }
 
     gu::Config& conf_;
-    UUID        uuid_;
+    gcomm::UUID        uuid_;
     pthread_t   thd_;
     URI         uri_;
     Protonet*   net_;
@@ -389,6 +393,8 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
     if (um.err_no() != 0)
     {
         error_ = um.err_no();
+        // force backend close
+        close(true);
         recv_buf_.push_back(RecvBufData(numeric_limits<size_t>::max(), dg, um));
     }
     else if (um.has_view() == true)
@@ -463,7 +469,7 @@ void GCommConn::run()
             // Backtrace().print(std::cerr);
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -485,7 +491,7 @@ void GCommConn::run()
 
             gcomm::Critical<Protonet> crit(get_pnet());
             handle_up(0, Datagram(),
-                      ProtoUpMeta(UUID::nil(),
+                      ProtoUpMeta(gcomm::UUID::nil(),
                                   ViewId(V_NON_PRIM),
                                   0,
                                   0xff,
@@ -545,7 +551,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 }
 
 
-static void fill_cmp_msg(const View& view, const UUID& my_uuid,
+static void fill_cmp_msg(const View& view, const gcomm::UUID& my_uuid,
                          gcs_comp_msg_t* cm)
 {
     size_t n(0);
@@ -553,7 +559,7 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     for (NodeList::const_iterator i = view.members().begin();
          i != view.members().end(); ++i)
     {
-        const UUID& uuid(NodeList::key(i));
+        const gcomm::UUID& uuid(NodeList::key(i));
 
         log_debug << "member: " << n << " uuid: " << uuid
                   << " segment: " << static_cast<int>(i->second.segment());
@@ -618,10 +624,9 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
         }
         else if (um.err_no() != 0)
         {
-            gcs_comp_msg_t* cm(gcs_comp_msg_leave());
+            gcs_comp_msg_t* cm(gcs_comp_msg_leave(ECONNABORTED));
             const ssize_t cm_size(gcs_comp_msg_size(cm));
-            msg->size = cm_size;
-            if (gu_likely(cm_size <= msg->buf_len))
+            if (cm_size <= msg->buf_len)
             {
                 memcpy(msg->buf, cm, cm_size);
                 recv_buf.pop_front();
@@ -644,7 +649,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             gcs_comp_msg_t* cm(gcs_comp_msg_new(view.type() == V_PRIM,
                                                 view.is_bootstrap(),
                                                 view.is_empty() ? -1 : 0,
-                                                view.members().size()));
+                                                view.members().size(), 0));
 
             const ssize_t cm_size(gcs_comp_msg_size(cm));
 
@@ -703,6 +708,7 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
@@ -728,6 +734,8 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
     GCommConn& conn(*ref.get());
     try
     {
+        // Critical section is entered inside close() call.
+        // gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.close();
     }
     catch (Exception& e)
@@ -736,7 +744,7 @@ static GCS_BACKEND_CLOSE_FN(gcomm_close)
                   << e.get_errno() << ": " << e.what();
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.handle_up(0, Datagram(),
-                       ProtoUpMeta(UUID::nil(),
+                       ProtoUpMeta(gcomm::UUID::nil(),
                                    ViewId(V_NON_PRIM),
                                    0,
                                    0xff,
@@ -835,6 +843,21 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
     return NULL;
 }
 
+static
+GCS_BACKEND_STATUS_GET_FN(gcomm_status_get)
+{
+    GCommConn::Ref ref(backend);
+    if (ref.get() == 0)
+    {
+        gu_throw_error(-EBADFD);
+    }
+
+    GCommConn& conn(*ref.get());
+    gcomm::Critical<Protonet> crit(conn.get_pnet());
+    conn.get_status(status);
+
+}
+
 
 GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
 {
@@ -883,6 +906,8 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->msg_size  = gcomm_msg_size;
     backend->param_set = gcomm_param_set;
     backend->param_get = gcomm_param_get;
+    backend->status_get = gcomm_status_get;
+
     backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;

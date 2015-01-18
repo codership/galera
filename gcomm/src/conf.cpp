@@ -16,20 +16,6 @@ std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 static std::string const SocketPrefix("socket" + Delim);
 std::string const gcomm::Conf::TcpNonBlocking =
     SocketPrefix + "non_blocking";
-std::string const gcomm::Conf::SocketUseSsl =
-    SocketPrefix + "ssl";
-std::string const gcomm::Conf::SocketSslVerifyFile =
-    COMMON_CONF_SSL_CA;
-std::string const gcomm::Conf::SocketSslCertificateFile =
-    COMMON_CONF_SSL_CERT;
-std::string const gcomm::Conf::SocketSslPrivateKeyFile =
-    COMMON_CONF_SSL_KEY;
-std::string const gcomm::Conf::SocketSslPasswordFile =
-    COMMON_CONF_SSL_PSWD_FILE;
-std::string const gcomm::Conf::SocketSslCipherList =
-    SocketPrefix + "ssl_cipher";
-std::string const gcomm::Conf::SocketSslCompression =
-    SocketPrefix + "ssl_compression";
 std::string const gcomm::Conf::SocketChecksum =
     SocketPrefix + "checksum";
 
@@ -96,6 +82,14 @@ std::string const gcomm::Conf::EvsCausalKeepalivePeriod =
     EvsPrefix + "causal_keepalive_period";
 std::string const gcomm::Conf::EvsMaxInstallTimeouts =
     EvsPrefix + "max_install_timeouts";
+std::string const gcomm::Conf::EvsDelayMargin =
+    EvsPrefix + "delay_margin";
+std::string const gcomm::Conf::EvsDelayedKeepPeriod =
+    EvsPrefix + "delayed_keep_period";
+std::string const gcomm::Conf::EvsEvict =
+    EvsPrefix + "evict";
+std::string const gcomm::Conf::EvsAutoEvict =
+    EvsPrefix + "auto_evict";
 
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
@@ -114,6 +108,7 @@ std::string const gcomm::Conf::PcWaitPrim = PcPrefix + "wait_prim";
 std::string const gcomm::Conf::PcWaitPrimTimeout =
     PcPrefix + "wait_prim_timeout";
 std::string const gcomm::Conf::PcWeight = PcPrefix + "weight";
+std::string const gcomm::Conf::PcRecovery = PcPrefix + "recovery";
 
 void
 gcomm::Conf::register_params(gu::Config& cnf)
@@ -128,13 +123,6 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
 
     GCOMM_CONF_ADD        (TcpNonBlocking);
-    GCOMM_CONF_ADD        (SocketUseSsl);
-    GCOMM_CONF_ADD        (SocketSslVerifyFile);
-    GCOMM_CONF_ADD        (SocketSslCertificateFile);
-    GCOMM_CONF_ADD        (SocketSslPrivateKeyFile);
-    GCOMM_CONF_ADD        (SocketSslPasswordFile);
-    GCOMM_CONF_ADD        (SocketSslCipherList);
-    GCOMM_CONF_ADD        (SocketSslCompression);
     GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
 
     GCOMM_CONF_ADD_DEFAULT(GMCastVersion);
@@ -167,6 +155,10 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD        (EvsUseAggregate);
     GCOMM_CONF_ADD        (EvsCausalKeepalivePeriod);
     GCOMM_CONF_ADD_DEFAULT(EvsMaxInstallTimeouts);
+    GCOMM_CONF_ADD_DEFAULT(EvsDelayMargin);
+    GCOMM_CONF_ADD_DEFAULT(EvsDelayedKeepPeriod);
+    GCOMM_CONF_ADD        (EvsEvict);
+    GCOMM_CONF_ADD_DEFAULT(EvsAutoEvict);
 
     GCOMM_CONF_ADD_DEFAULT(PcVersion);
     GCOMM_CONF_ADD_DEFAULT(PcIgnoreSb);
@@ -179,6 +171,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(PcWaitPrim);
     GCOMM_CONF_ADD_DEFAULT(PcWaitPrimTimeout);
     GCOMM_CONF_ADD_DEFAULT(PcWeight);
+    GCOMM_CONF_ADD_DEFAULT(PcRecovery);
 
 #undef GCOMM_CONF_ADD
 #undef GCOMM_CONF_ADD_DEFAULT

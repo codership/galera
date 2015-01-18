@@ -64,14 +64,10 @@ public:
     Proto(gu::Config&    conf,
           const UUID&    uuid,
           SegmentId      segment,
-          const gu::URI& uri = gu::URI("pc://"))
+          const gu::URI& uri = gu::URI("pc://"),
+          View*          rst_view = NULL)
         :
         Protolay(conf),
-        version_(
-            check_range(Conf::PcVersion,
-                        param<int>(conf, uri, Conf::PcVersion,
-                                   Defaults::PcVersion),
-                        0, max_version_ + 1)),
         my_uuid_       (uuid),
         start_prim_    (),
         npvo_          (param<bool>(conf, uri, Conf::PcNpvo, Defaults::PcNpvo)),
@@ -87,20 +83,22 @@ public:
         instances_     (),
         self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
         state_msgs_    (),
-        current_view_  (V_NONE),
-        pc_view_       (V_NON_PRIM),
+        current_view_  (0, V_NONE),
+        pc_view_       (0, V_NON_PRIM),
         views_         (),
         mtu_           (std::numeric_limits<int32_t>::max()),
         weight_        (check_range(Conf::PcWeight,
                                     param<int>(conf, uri, Conf::PcWeight,
                                                Defaults::PcWeight),
-                                    0, 0xff))
+                                    0, 0xff)),
+        rst_view_      ()
     {
-        log_info << "PC version " << version_;
         set_weight(weight_);
         NodeMap::value(self_i_).set_segment(segment);
+        if (rst_view) {
+            set_restored_view(rst_view);
+        }
 
-        conf.set(Conf::PcVersion,      gu::to_string(version_));
         conf.set(Conf::PcNpvo,         gu::to_string(npvo_));
         conf.set(Conf::PcIgnoreQuorum, gu::to_string(ignore_quorum_));
         conf.set(Conf::PcIgnoreSb,     gu::to_string(ignore_sb_));
@@ -181,6 +179,17 @@ public:
     bool set_param(const std::string& key, const std::string& val);
     void set_mtu(size_t mtu) { mtu_ = mtu; }
     size_t mtu() const { return mtu_; }
+    void set_restored_view(View* rst_view) {
+        gcomm_assert(state_ == S_CLOSED);
+        rst_view_ = rst_view;
+        NodeMap::value(self_i_).set_last_prim(
+            // set last prim just for exchanging uuid and seq.
+            // but actually restored view is not actual prim view.
+            ViewId(V_NON_PRIM,
+                   rst_view -> id().uuid(),
+                   rst_view -> id().seq()));
+    }
+    const View* restored_view() const { return rst_view_; }
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);
     Proto (const Proto&);
@@ -199,8 +208,6 @@ private:
                      const ProtoUpMeta&);
     void deliver_view(bool bootstrap = false);
 
-    int               version_;
-    static const int  max_version_ = GCOMM_PC_MAX_VERSION;
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              npvo_;          // Newer prim view overrides
@@ -219,6 +226,7 @@ private:
     std::list<View>   views_;         // List of seen views
     size_t            mtu_;           // Maximum transmission unit
     int               weight_;        // Node weight in voting
+    View*             rst_view_;      // restored PC view
 };
 
 

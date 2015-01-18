@@ -1,22 +1,48 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 
-.PHONY: override_dh_strip
+# Parallel build support as adviced
+# at https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules-options
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += -j $(NUMJOBS)
+	# Don't use MAKEFLAGS as it has strange 'w' and '--jobserver-fds=3,4' by default
+endif
 
-build:
-	scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd libgalera_smm.so $(SCONS_ARGS)
+# Add support for verbose builds
+ifneq (,$(filter verbose,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += VERBOSE=1
+endif
+
+# Run tests by default
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += tests=1
+endif
+
+
+override_dh_auto_build:
+	@echo $(SCONS_ARGS)
+	scons $(SCONS_ARGS)
+
+override_dh_auto_clean:
+	scons -c
+	rm config.log
+
+override_dh_installdocs:
+	dh_installdocs
+	install -m 644 asio/LICENSE_1_0.txt debian/galera-3/usr/share/doc/galera-3/LICENSE.asio
+	install -m 644 chromium/LICENSE debian/galera-3/usr/share/doc/galera-3/LICENSE.chromium
+	install -m 644 www.evanjones.ca/LICENSE debian/galera-3/usr/share/doc/galera-3/LICENSE.crc32c
+
+# Start earlier than MySQL which has value 19
+override_dh_installinit-arch:
+	dh_installinit --name=garb -- defaults 18 22
 
 override_dh_strip:
-	dh_strip -ppercona-xtradb-cluster-galera-3.x --dbg-package=percona-xtradb-cluster-galera-3.x-dbg
-	dh_strip -ppercona-xtradb-cluster-garbd-3.x --dbg-package=percona-xtradb-cluster-garbd-3.x-dbg
+	dh_strip --dbg-package=galera-3-dbg
 
 %:
-	dh $@ 
+	dh $@
+
+.PHONY: override_dh_strip

@@ -80,6 +80,7 @@ int
 main (int argc, char* argv[])
 {
     Config config(argc, argv);
+    if (config.exit()) return 0;
 
     log_info << "Read config: " <<  config << std::endl;
 

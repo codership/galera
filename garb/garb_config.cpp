@@ -3,7 +3,7 @@
 #include "gu_crc32c.h"
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
-#include "gcs.h"
+#include "gcs.hpp"
 
 #include <wsrep_api.h>
 
@@ -27,12 +27,13 @@ Config::Config (int argc, char* argv[])
       donor_   (),
       options_ (),
       log_     (),
-      cfg_     ()
+      cfg_     (),
+      exit_    (false)
 {
     po::options_description other ("Other options");
     other.add_options()
-        ("version,v", "Print version")
-        ("help,h",    "Show help message")
+        ("version,v", "Print version & exit")
+        ("help,h",    "Show help message & exit")
         ;
 
     // only these are read from cfg file
@@ -70,12 +71,15 @@ Config::Config (int argc, char* argv[])
     {
         std::cerr << "\nUsage: " << argv[0] << " [options] [group address]\n"
                   << cmdline_opts << std::endl;
-        throw gu::Exception("Exit", 0);
+        exit_= true;
+        return;
     }
 
     if (vm.count("version"))
     {
         log_info << GALERA_VER << ".r" << GALERA_REV;
+        exit_= true;
+        return;
     }
 
     if (vm.count("cfg"))

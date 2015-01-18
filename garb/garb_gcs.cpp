@@ -108,7 +108,8 @@ Gcs::request_state_transfer (const std::string& request,
     {
         gu_uuid_t ist_uuid = {{0, }};
         gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
-        ret = gcs_request_state_transfer (gcs_, req_str, req_len, donor.c_str(),
+        // for garb we use the lowest str_version.
+        ret = gcs_request_state_transfer (gcs_, 0, req_str, req_len, donor.c_str(),
                                           &ist_uuid, ist_seqno,
                                           &order);
     }

@@ -87,6 +87,21 @@ namespace gcomm
             return !(*this == cmp);
         }
 
+        std::ostream& write_stream(std::ostream& os) const {
+            os << static_cast<int>(type_) << " ";
+            uuid_.write_stream(os);
+            os << " " << seq_;
+            return os;
+        }
+        std::istream& read_stream(std::istream& is) {
+            int t;
+            is >> t;
+            type_ = static_cast<ViewType>(t);
+            uuid_.read_stream(is);
+            is >> seq_;
+            return is;
+        }
+
     private:
         ViewType type_;
         UUID     uuid_; // uniquely identifies the sequence of group views (?)
@@ -100,10 +115,23 @@ namespace gcomm
     class Node
     {
     public:
-        Node(SegmentId segment) : segment_(segment)
+        Node(SegmentId segment = 0) : segment_(segment)
         { }
         SegmentId segment() const { return segment_; }
         bool operator==(const Node& cmp) const { return true; }
+        bool operator<(const Node& cmp) const { return true; }
+        std::ostream& write_stream(std::ostream& os) const
+        {
+            os << static_cast<int>(segment_);
+            return os;
+        }
+        std::istream& read_stream(std::istream& is)
+        {
+            int seg;
+            is >> seg;
+            segment_ = static_cast<SegmentId>(seg);
+            return is;
+        }
     private:
         SegmentId segment_;
     };
@@ -121,6 +149,7 @@ namespace gcomm
     public:
 
         View() :
+            version_     (-1),
             bootstrap_   (false),
             view_id_     (V_NONE),
             members_     (),
@@ -129,7 +158,8 @@ namespace gcomm
             partitioned_ ()
         { }
 
-        View(const ViewId& view_id, bool bootstrap = false) :
+        View(int version, const ViewId& view_id, bool bootstrap = false) :
+            version_     (version),
             bootstrap_   (bootstrap),
             view_id_     (view_id),
             members_     (),
@@ -139,6 +169,8 @@ namespace gcomm
         { }
 
         ~View() {}
+
+        int version() const { return version_; }
 
         void add_member  (const UUID& pid, SegmentId segment);
 
@@ -176,7 +208,10 @@ namespace gcomm
         bool is_empty() const;
         bool is_bootstrap() const { return bootstrap_; }
 
+        std::ostream& write_stream(std::ostream& os) const;
+        std::istream& read_stream(std::istream& is);
     private:
+        int      version_;     // view protocol version, derived from evs group
         bool     bootstrap_;   // Flag indicating if view was bootstrapped
         ViewId   view_id_;     // View identifier
         NodeList members_;     // List of members in view
@@ -188,6 +223,27 @@ namespace gcomm
     bool operator==(const gcomm::View&, const gcomm::View&);
     std::ostream& operator<<(std::ostream&, const View&);
 
+    class ViewState
+    {
+    public:
+        ViewState(UUID& my_uuid, View& view):
+                my_uuid_(my_uuid),
+                view_(view)
+        { }
+        std::ostream& write_stream(std::ostream& os) const;
+        std::istream& read_stream(std::istream& is);
+        void write_file(const char* fname = NULL) const;
+        bool read_file(const char* fname = NULL);
+        static void remove_file(const char* fname = NULL);
+        bool operator== (const ViewState& vst) const
+        {
+            return my_uuid_ == vst.my_uuid_ &&
+                    view_ == vst.view_;
+        }
+    private:
+        UUID& my_uuid_;
+        View& view_;
+    };
 } // namespace gcomm
 
 #endif // _GCOMM_VIEW_HPP_

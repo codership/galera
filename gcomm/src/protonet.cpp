@@ -58,7 +58,6 @@ bool gcomm::Protonet::set_param(const std::string& key, const std::string& val)
     return ret;
 }
 
-
 gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 {
     const std::string backend(conf.get(Conf::ProtonetBackend));

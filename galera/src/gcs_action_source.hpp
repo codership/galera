@@ -6,7 +6,7 @@
 #define GALERA_GCS_ACTION_SOURCE_HPP
 
 #include "action_source.hpp"
-#include "gcs.hpp"
+#include "galera_gcs.hpp"
 #include "replicator.hpp"
 #include "trx_handle.hpp"
 

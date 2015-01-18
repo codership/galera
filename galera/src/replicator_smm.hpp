@@ -134,7 +134,7 @@ namespace galera
 
         const struct wsrep_stats_var* stats_get()  const;
         void                          stats_reset();
-        static void                   stats_free(struct wsrep_stats_var*);
+        void                   stats_free(struct wsrep_stats_var*);
 
         /*! @throws NotFound */
         void           set_param (const std::string& key,
@@ -421,7 +421,13 @@ namespace galera
         {
             ParseOptions(gu::Config&, const char* opts);
         }
-            parse_options_; // parse oprtion string supplied on initialization
+            parse_options_; // parse option string supplied on initialization
+
+        class InitSSL
+        {
+        public:
+            InitSSL(gu::Config& conf) { gu::ssl_init_options(conf); }
+        } init_ssl_; // initialize global SSL parameters
 
         static int const       MAX_PROTO_VER;
         /*
@@ -433,6 +439,8 @@ namespace galera
          * |                 3 |              2 |              1 |
          * |                 4 |              2 |              1 |
          * |                 5 |              3 |              1 |
+         * |                 6 |              3 |              2 |
+         * |                 7 |              3 |              2 |
          * -------------------------------------------------------
          */
 
@@ -477,7 +485,6 @@ namespace galera
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
-        bool          ist_sst_;
 
         // services
         gcache::GCache gcache_;

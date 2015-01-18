@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Coedership Oy
+# Copyright (C) 2012 Codership Oy
 # This config file is to be sourced by garb service script.
 
 # REMOVE THIS AFTER CONFIGURATION
@@ -14,5 +14,6 @@
 # GALERA_OPTIONS=""
 
 # Log file for garbd. Optional, by default logs to syslog
+# Deprecated for CentOS7, use journalctl to query the log for garbd
 # LOG_FILE=""
 

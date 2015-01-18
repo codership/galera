@@ -5,7 +5,7 @@
  *
  * $Id$
  */
- 
+
 #ifndef _gu_mutex_h_
 #define _gu_mutex_h_
 
@@ -38,12 +38,12 @@ int gu_mutex_unlock_dbg  (struct gu_mutex *mutex,
 int gu_mutex_destroy_dbg (struct gu_mutex *mutex,
                           const char *file, unsigned int line);
 int gu_cond_wait_dbg     (pthread_cond_t *cond,
-                          struct gu_mutex *mutex, 
+                          struct gu_mutex *mutex,
                           const char *file, unsigned int line);
 /*@}*/
 
 /** Shorter mutex API for applications.
- *  Depending on compile-time flags application will either use 
+ *  Depending on compile-time flags application will either use
  *  debug or normal version of the mutex API */
 /*@{*/
 #ifdef DEBUG_MUTEX

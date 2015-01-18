@@ -19,6 +19,16 @@
 void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
+    if (pc_recovery_ &&
+        um.err_no() == 0 &&
+        um.has_view() &&
+        um.view().id().type() == V_PRIM)
+    {
+        ViewState vst(const_cast<UUID&>(uuid()),
+                      const_cast<View&>(um.view()));
+        log_info << "save pc into disk";
+        vst.write_file();
+    }
     send_up(rb, um);
 }
 
@@ -73,7 +83,7 @@ void gcomm::PC::connect(bool start_prim)
         start_prim = true;
     }
 
-    const bool wait_prim(
+    bool wait_prim(
         gu::from_string<bool>(
             uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
 
@@ -82,12 +92,22 @@ void gcomm::PC::connect(bool start_prim)
             uri_.get_option(Conf::PcWaitPrimTimeout,
                             Defaults::PcWaitPrimTimeout)));
 
+    // --wsrep-new-cluster specified in command line
+    // or cluster address as gcomm://0.0.0.0 or gcomm://
+    // should take precedence. otherwise it's not able to bootstrap.
+    if (start_prim) {
+        log_info << "start_prim is enabled, turn off pc_recovery";
+    } else if (rst_view_.type() == V_PRIM) {
+        wait_prim = false;
+    }
+
     pstack_.push_proto(gmcast_);
     pstack_.push_proto(evs_);
     pstack_.push_proto(pc_);
     pstack_.push_proto(this);
     pnet().insert(&pstack_);
 
+    gmcast_->connect_precheck(start_prim);
     gmcast_->connect();
 
     closed_ = false;
@@ -154,8 +174,17 @@ void gcomm::PC::connect(const gu::URI& uri)
 
 void gcomm::PC::close(bool force)
 {
-
-    if (force == false)
+    if (force == true)
+    {
+        log_info << "Forced PC close";
+        gmcast_->close();
+        // Don't bother closing PC and EVS at this point. Currently
+        // there is no way of knowing why forced close was issued,
+        // so graceful close of PC and/or EVS may not be safe.
+        // pc_->close();
+        // evs_->close();
+    }
+    else
     {
         log_debug << "PC/EVS Proto leaving";
         pc_->close();
@@ -182,19 +211,20 @@ void gcomm::PC::close(bool force)
 
         gmcast_->close();
     }
-    else
-    {
-        log_info << "Forced PC close";
-    }
     pnet().erase(&pstack_);
     pstack_.pop_proto(this);
     pstack_.pop_proto(pc_);
     pstack_.pop_proto(evs_);
     pstack_.pop_proto(gmcast_);
+    ViewState::remove_file();
 
     closed_ = true;
 }
 
+void gcomm::PC::handle_get_status(gu::Status& status) const
+{
+    status.insert("gcomm_uuid", uuid().full_str());
+}
 
 gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     Transport (net, uri),
@@ -206,17 +236,35 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
                     conf_, uri, Conf::PcLinger, "PT20S")),
     announce_timeout_(param<gu::datetime::Period>(
                           conf_, uri, Conf::PcAnnounceTimeout,
-                          Defaults::PcAnnounceTimeout))
+                          Defaults::PcAnnounceTimeout)),
+    pc_recovery_ (param<bool>(conf_, uri,
+                              Conf::PcRecovery, Defaults::PcRecovery)),
+    rst_uuid_(),
+    rst_view_()
+
 {
     if (uri_.get_scheme() != Conf::PcScheme)
     {
         log_fatal << "invalid uri: " << uri_.to_string();
     }
 
-    gmcast_ = new GMCast(pnet(), uri_);
+    conf_.set(Conf::PcRecovery, gu::to_string(pc_recovery_));
+    bool restored = false;
+    ViewState vst(rst_uuid_, rst_view_);
+    if (pc_recovery_) {
+        if (vst.read_file()) {
+            log_info << "restore pc from disk successfully";
+            restored = true;
+        } else {
+            log_info << "restore pc from disk failed";
+        }
+    } else {
+        log_info << "skip pc recovery and remove state file";
+        ViewState::remove_file();
+    }
 
+    gmcast_ = new GMCast(pnet(), uri_, restored ? &rst_uuid_ : NULL);
     const UUID& uuid(gmcast_->uuid());
-
     if (uuid == UUID::nil())
     {
         gu_throw_fatal << "invalid UUID: " << uuid;
@@ -224,9 +272,10 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     evs::UserMessage evsum;
     evs_ = new evs::Proto(pnet().conf(),
                           uuid, gmcast_->segment(),
-                          uri_, gmcast_->mtu() - 2*evsum.serial_size());
-    pc_  = new pc::Proto (pnet().conf(), uuid, gmcast_->segment(), uri_);
-
+                          uri_, gmcast_->mtu() - 2*evsum.serial_size(),
+                          restored ? &rst_view_ : NULL);
+    pc_  = new pc::Proto (pnet().conf(), uuid, gmcast_->segment(), uri_,
+                          restored ? &rst_view_ : NULL);
     conf_.set(Conf::PcLinger, gu::to_string(linger_));
 }
 

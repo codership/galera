@@ -13,7 +13,6 @@ libgcomm_sources = [
     'evs_proto.cpp',
     'gmcast.cpp',
     'gmcast_proto.cpp',
-    'histogram.cpp',
     'pc.cpp',
     'pc_proto.cpp',
     'protonet.cpp',
@@ -37,4 +36,3 @@ if '-DHAVE_ASIO_HPP' in libgcomm_env['CPPFLAGS']:
 libgcomm_env.StaticLibrary('gcomm', libgcomm_sources)
 
 env.Append(LIBGALERA_OBJS = libgcomm_env.SharedObject(libgcomm_sources))
-

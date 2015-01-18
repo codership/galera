@@ -64,7 +64,7 @@ check_size (RecordSet::CheckType const ct)
 #define MAX_CHECKSUM_SIZE                16
     }
 
-    log_fatal << "Non-existing RecordSet::CeckType value: " << ct;
+    log_fatal << "Non-existing RecordSet::CheckType value: " << ct;
     abort();
 }
 
@@ -395,6 +395,25 @@ RecordSetInBase::checksum() const
                 << "\nfound:    " << gu::Hexdump(stored_checksum, cs);
         }
     }
+}
+
+uint64_t
+RecordSetInBase::get_checksum() const
+{
+    unsigned int const checksum_size(check_size(check_type_));
+    const void* const stored_checksum(head_ + begin_ - checksum_size);
+    uint64_t ret(0);
+
+    if (checksum_size >= sizeof(uint64_t))
+        ret = *(static_cast<const uint64_t*>(stored_checksum));
+    else if (checksum_size >= sizeof(uint32_t))
+        ret = *(static_cast<const uint32_t*>(stored_checksum));
+    else if (checksum_size >= sizeof(uint16_t))
+        ret = *(static_cast<const uint16_t*>(stored_checksum));
+    else if (checksum_size >= sizeof(uint8_t))
+        ret = *(static_cast<const uint8_t*>(stored_checksum));
+
+    return gu::gtoh<uint64_t>(ret);
 }
 
 RecordSetInBase::RecordSetInBase (const byte_t* const ptr,

@@ -61,11 +61,6 @@ START_TEST (gu_hash_test)
     fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
              "gu::Hash::gather() failed in single mode.");
 
-// deprecated in favour of gather<>()
-//    hash_one.serialize_to(res128_one, sizeof(res128_one));
-//    fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
-//             "gu::Hash::serialize_to() failed in single mode.");
-
     gu::Hash::digest(test_msg, GU_HASH_TEST_LENGTH, res128_one);
     fail_if (check (gu_hash128_check, res128_one, sizeof(res128_one)),
              "gu::Hash::digest() failed.");
@@ -92,13 +87,10 @@ START_TEST (gu_hash_test)
     fail_if (check (gu_hash128_check, res128_multi, sizeof(res128_multi)),
              "gu::Hash::gather() failed in multi mode.");
 
-//    hash_multi.serialize_to(res128_multi, sizeof(res128_multi));
-//    fail_if (check (gu_hash128_check, res128_multi, sizeof(res128_multi)),
-//             "gu::Hash::serialize_to() failed in multi mode.");
-
     uint64_t res64;
     hash_multi.gather<sizeof(res64)>(&res64);
-    fail_if (gu_hash64(test_msg, GU_HASH_TEST_LENGTH) != res64);
+    uint64_t const res(gu_hash64(test_msg, GU_HASH_TEST_LENGTH));
+    fail_if (res != res64, "got 0x%0llx, expected 0x%llx", res64, res);
     res64 = gu_le64(res64);
     fail_if (check (gu_hash64_check, &res64, sizeof(res64)),
              "gu::Hash::gather<uint64_t>() failed.");

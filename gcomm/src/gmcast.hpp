@@ -36,19 +36,20 @@ namespace gcomm
     {
     public:
 
-        GMCast (Protonet&, const gu::URI&);
+        GMCast (Protonet&, const gu::URI&, const UUID* my_uuid = NULL);
         ~GMCast();
 
         // Protolay interface
         void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
         int  handle_down(Datagram&, const ProtoDownMeta&);
         void handle_stable_view(const View& view);
-        void handle_fencing(const UUID& uuid);
+        void handle_evict(const UUID& uuid);
         std::string handle_get_address(const UUID& uuid) const;
         bool set_param(const std::string& key, const std::string& val);
         // Transport interface
         const UUID& uuid() const { return my_uuid_; }
         SegmentId segment() const { return segment_; }
+        void connect_precheck(bool start_prim);
         void connect();
         void connect(const gu::URI&);
         void close(bool force = false);

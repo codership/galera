@@ -344,6 +344,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                    );
 
     wsrep_seqno_t rcode (0);
+    bool join_now = true;
 
     if (!skip_state_transfer)
     {
@@ -370,16 +371,14 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
-                    ist_sst_ = true; // gcs_.join() shall be called by IST
-                    gcs_.join(donor_seq);
-
                     wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
 
                     rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                            streq->sst_req(),
                                            streq->sst_len(),
                                            &state_id, 0, 0, true);
-// this must be reset only in sst_sent() call            ist_sst_ = false;
+                    // we will join in sst_sent.
+                    join_now = false;
                 }
 
                 if (rcode >= 0)
@@ -425,6 +424,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
                                    &state_id, 0, 0, false);
+            // we will join in sst_sent.
+            join_now = false;
         }
         else
         {
@@ -438,7 +439,7 @@ out:
 
     local_monitor_.leave(lo);
 
-    if (skip_state_transfer || rcode < 0)
+    if (join_now || rcode < 0)
     {
         gcs_.join(rcode < 0 ? rcode : donor_seq);
     }
@@ -497,6 +498,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
         case 0:
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
+        case 2:
         {
             void*   ist_req(0);
             ssize_t ist_req_len(0);
@@ -562,7 +564,8 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
         gcs_seqno_t seqno_l;
 
-        ret = gcs_.request_state_transfer(req->req(), req->len(), sst_donor_,
+        ret = gcs_.request_state_transfer(str_proto_ver_,
+                                          req->req(), req->len(), sst_donor_,
                                           ist_uuid, ist_seqno, &seqno_l);
         if (ret < 0)
         {
@@ -792,6 +795,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
+        st_.mark_corrupt();
         gcs_.close();
         gu_abort();
     }

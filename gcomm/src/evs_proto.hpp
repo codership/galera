@@ -15,12 +15,14 @@
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/map.hpp"
-#include "histogram.hpp"
+#include "gu_histogram.hpp"
+#include "gu_stats.hpp"
 #include "profile.hpp"
 
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
 #include "evs_consensus.hpp"
+#include "protocol_version.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -28,10 +30,6 @@
 #include <deque>
 #include <vector>
 #include <limits>
-
-#ifndef GCOMM_EVS_MAX_VERSION
-#define GCOMM_EVS_MAX_VERSION 0
-#endif // GCOMM_EVS_MAX_VERSION
 
 namespace gcomm
 {
@@ -50,6 +48,40 @@ namespace gcomm
         class InputMapMsg;
         class Proto;
         std::ostream& operator<<(std::ostream&, const Proto&);
+
+        //
+        // Helper class for getting the location where
+        // certain methods are called from.
+        //
+        // Example usage:
+        // Method prototype:
+        // void fun(EVS_CALLER_ARG, int a)
+        //
+        // Calling:
+        // fun(EVS_CALLER, a)
+        //
+        // Logging inside function:
+        // log_debug << EVS_LOG_METHOD << "log message"
+        //
+        class Caller
+        {
+        public:
+            Caller(const char* const file, const int line) :
+                file_(file),
+                line_(line)
+            { }
+            friend std::ostream& operator<<(std::ostream&, const Caller&);
+        private:
+            const char* const file_;
+            const int         line_;
+        };
+        inline std::ostream& operator<<(std::ostream& os, const Caller& caller)
+        {
+            return (os << caller.file_ << ": " << caller.line_ << ": ");
+        }
+#define EVS_CALLER_ARG const Caller& caller
+#define EVS_CALLER Caller(__FILE__, __LINE__)
+#define EVS_LOG_METHOD __FUNCTION__ << " called from " << caller
     }
 }
 
@@ -59,6 +91,7 @@ namespace gcomm
  */
 class gcomm::evs::Proto : public Protolay
 {
+
 public:
     enum State {
         S_CLOSED,
@@ -94,7 +127,8 @@ public:
           const UUID&    my_uuid,
           SegmentId      segment,
           const gu::URI& uri = gu::URI("evs://"),
-          const size_t   mtu = std::numeric_limits<size_t>::max());
+          const size_t   mtu = std::numeric_limits<size_t>::max(),
+          const View*    rst_view = NULL);
     ~Proto();
 
     const UUID& uuid() const { return my_uuid_; }
@@ -128,14 +162,16 @@ public:
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
     int send_delegate(Datagram&);
-    void send_gap(const UUID&, const ViewId&, const Range,
+    void send_gap(EVS_CALLER_ARG,
+                  const UUID&, const ViewId&, const Range,
                   bool commit = false, bool req_all = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
-    void send_install();
+    void send_install(EVS_CALLER_ARG);
+    void send_delayed_list();
 
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
@@ -149,7 +185,7 @@ public:
     // Clean up foreign nodes according to install message.
     void cleanup_foreign(const InstallMessage&);
     void cleanup_views();
-    void cleanup_fenced();
+    void cleanup_evicted();
     void cleanup_joins();
 
     size_t n_operational() const;
@@ -169,12 +205,13 @@ public:
     bool is_all_committed() const;
     void setall_installed(bool val);
     bool is_all_installed() const;
-
+    bool is_install_message() const { return install_message_ != 0; }
 
     bool is_representative(const UUID& pid) const;
 
     void shift_to(const State, const bool send_j = true);
-
+    bool is_all_suspected(const UUID& uuid) const;
+    const View& current_view() const { return current_view_; }
 
     // Message handlers
 private:
@@ -210,6 +247,7 @@ private:
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
+    void handle_delayed_list(const DelayedListMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
     void isolate(gu::datetime::Period period);
 public:
@@ -217,7 +255,8 @@ public:
                                       const Datagram&,
                                       Message*);
     void handle_msg(const Message& msg,
-                    const Datagram& dg = Datagram());
+                    const Datagram& dg = Datagram(),
+                    bool direct = true);
     // Protolay
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
     int handle_down(Datagram& wb, const ProtoDownMeta& dm);
@@ -267,6 +306,8 @@ public:
     }
 
     bool set_param(const std::string& key, const std::string& val);
+
+    void handle_get_status(gu::Status& status) const;
 
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time
@@ -329,14 +370,14 @@ public:
 private:
 
     int version_;
-    static const int max_version_ = GCOMM_EVS_MAX_VERSION;
     int debug_mask_;
     int info_mask_;
     gu::datetime::Date last_stats_report_;
     bool collect_stats_;
-    Histogram hs_agreed_;
-    Histogram hs_safe_;
-    Histogram hs_local_causal_;
+    gu::Histogram hs_agreed_;
+    gu::Histogram hs_safe_;
+    gu::Histogram hs_local_causal_;
+    gu::Stats     safe_deliv_latency_;
     long long int send_queue_s_;
     long long int n_send_queue_s_;
     std::vector<long long int> sent_msgs_;
@@ -359,6 +400,8 @@ private:
     SegmentId segment_;
     //
     // Known instances
+    friend class Node;
+    friend class InspectNode;
     NodeMap known_;
     NodeMap::iterator self_i_;
     //
@@ -371,6 +414,9 @@ private:
     gu::datetime::Period join_retrans_period_;
     gu::datetime::Period stats_report_period_;
     gu::datetime::Period causal_keepalive_period_;
+
+    gu::datetime::Period delay_margin_;
+    gu::datetime::Period delayed_keep_period_;
 
     gu::datetime::Date last_inactive_check_;
     gu::datetime::Date last_causal_keepalive_;
@@ -418,6 +464,8 @@ private:
     Consensus consensus_;
     // Last received install message
     InstallMessage* install_message_;
+    // Highest seen view id seqno
+    uint32_t max_view_id_seq_;
     // Install attempt counter
     uint32_t attempt_seq_;
     // Install timeout counting
@@ -442,6 +490,59 @@ private:
     int shift_to_rfcnt_;
     bool pending_leave_;
     gu::datetime::Date isolation_end_;
+
+    class DelayedEntry
+    {
+    public:
+        typedef enum
+        {
+            S_OK,
+            S_DELAYED
+        } State;
+        DelayedEntry(const std::string& addr)
+            :
+            addr_      (addr),
+            tstamp_(gu::datetime::Date::now()),
+            state_(S_DELAYED),
+            state_change_cnt_(1)
+        { }
+        const std::string& addr() const { return addr_; }
+
+        void set_tstamp(gu::datetime::Date tstamp) { tstamp_ = tstamp; }
+        gu::datetime::Date tstamp() const { return tstamp_; }
+
+        void set_state(State state,
+                       const gu::datetime::Period decay_period,
+                       const gu::datetime::Date now)
+        {
+            if (state == S_DELAYED && state_ != state)
+            {
+                // Limit to 0xff, see DelayedList format in DelayedListMessage
+                // restricts this value to uint8_t max.
+                if (state_change_cnt_ < 0xff)
+                    ++state_change_cnt_;
+            }
+            else if (state == S_OK &&
+                     tstamp_ + decay_period < now)
+            {
+                if (state_change_cnt_ > 0)
+                    --state_change_cnt_;
+            }
+            state_ = state;
+        }
+        State state() const {return state_; }
+        size_t state_change_cnt() const { return state_change_cnt_; }
+    private:
+        const std::string addr_;
+        gu::datetime::Date tstamp_;
+        State  state_;
+        size_t state_change_cnt_;
+    };
+
+    typedef std::map<UUID, DelayedEntry> DelayedList;
+    DelayedList delayed_list_;
+    size_t      auto_evict_;
+
     // non-copyable
     Proto(const Proto&);
     void operator=(const Proto&);

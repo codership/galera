@@ -34,6 +34,7 @@ Clean(gu_tests, '#/gu_tests.log')
 
 gu_testspp = env.Program(target = 'gu_tests++',
                          source = Split('''
+                              gu_atomic_test.cpp
                               gu_vector_test.cpp
                               gu_string_test.cpp
                               gu_vlq_test.cpp
@@ -46,6 +47,8 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_config_test.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
+                              gu_histogram_test.cpp
+                              gu_stats_test.cpp
                               gu_tests++.cpp
                            '''))
 

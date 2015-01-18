@@ -2,13 +2,17 @@
  * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
+#include "common/common.h"
+
 #include "gcomm/view.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/util.hpp"
 
 #include "gu_logger.hpp"
+#include "gu_exception.hpp"
 
 #include <sstream>
+#include <fstream>
 
 size_t gcomm::ViewId::unserialize(const gu::byte_t* buf,
                                   const size_t buflen,
@@ -172,4 +176,142 @@ std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::View& view)
     }
     os << ")";
     return os;
+}
+
+std::ostream& gcomm::View::write_stream(std::ostream& os) const
+{
+    os << "#vwbeg" << std::endl;
+    os << "view_id: ";
+    view_id_.write_stream(os) << std::endl;
+    os << "bootstrap: " << bootstrap_ << std::endl;
+    for(NodeList::const_iterator it = members_.begin();
+        it != members_.end(); ++it) {
+        const UUID& uuid(it -> first);
+        const Node& node(it -> second);
+        os << "member: ";
+        uuid.write_stream(os) << " ";
+        node.write_stream(os) << std::endl;
+    }
+    os << "#vwend" << std::endl;
+    return os;
+}
+
+std::istream& gcomm::View::read_stream(std::istream& is)
+{
+    std::string line;
+    while(is.good()) {
+        getline(is, line);
+        std::istringstream istr(line);
+        std::string param;
+        istr >> param;
+        if (param == "#vwbeg") continue;
+        else if (param == "#vwend") break;
+        if (param == "view_id:") {
+            view_id_.read_stream(istr);
+        } else if (param == "bootstrap:") {
+            istr >> bootstrap_;
+        } else if (param == "member:") {
+            UUID uuid;
+            Node node(0);
+            uuid.read_stream(istr);
+            node.read_stream(istr);
+            add_member(uuid, node.segment());
+        }
+    }
+    return is;
+}
+
+std::ostream& gcomm::ViewState::write_stream(std::ostream& os) const
+{
+    os << "my_uuid: ";
+    my_uuid_.write_stream(os) << std::endl;
+    view_.write_stream(os);
+    return os;
+}
+
+std::istream& gcomm::ViewState::read_stream(std::istream& is)
+{
+    std::string param;
+    std::string line;
+    while(is.good()) {
+        getline(is, line);
+        std::istringstream istr(line);
+        istr >> param;
+        if (param == "my_uuid:") {
+            my_uuid_.read_stream(istr);
+        } else if (param == "#vwbeg") {
+            // read from next line.
+            view_.read_stream(is);
+        }
+    }
+    return is;
+}
+
+void gcomm::ViewState::write_file(const char* fname) const
+{
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    // write to temporary file first.
+    std::string tmp(fname);
+    tmp += ".tmp";
+    FILE* fout = fopen(tmp.c_str(), "w");
+    if (fout == NULL) {
+        log_warn << "open file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        return ;
+    }
+    std::ostringstream os;
+    try {
+        write_stream(os);
+    } catch (const std::exception& e) {
+        log_warn << "write ostringstream failed("
+                 << e.what() << ")";
+        fclose(fout);
+        return ;
+    }
+    std::string content(os.str());
+    if (fwrite(content.c_str(), content.size(), 1, fout) == 0) {
+        log_warn << "write file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        fclose(fout);
+        return ;
+    }
+    // fflush is called inside.
+    if (fclose(fout) != 0){
+        log_warn << "close file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        return ;
+    }
+
+    // rename atomically.
+    if (rename(tmp.c_str(), fname) != 0) {
+        log_warn << "rename file(" << tmp << ") to file("
+                 << fname << ") failed("
+                 << strerror(errno) << ")";
+    }
+}
+
+bool gcomm::ViewState::read_file(const char* fname)
+{
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    if (access(fname, R_OK) != 0) {
+        log_warn << "access file(" << fname << ") failed("
+                 << strerror(errno) << ")";
+        return false;
+    }
+    try {
+        std::ifstream ifs(fname, std::ifstream::in);
+        read_stream(ifs);
+        ifs.close();
+        return true;
+    } catch (const std::exception& e) {
+        log_warn << "read file(" << fname << ") failed("
+                 << e.what() << ")";
+        return false;
+    }
+}
+
+void gcomm::ViewState::remove_file(const char* fname)
+{
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    (void) unlink(fname);
 }

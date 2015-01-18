@@ -7,16 +7,17 @@
 # chkconfig: - 99 01
 # config: /etc/sysconfig/garb | /etc/default/garb
 #
-#### BEGIN INIT INFO
-# Provides:          garbd
-# Required-Start:    $network
-# Should-Start:
-# Required-Stop:     $network
-# Should-Stop:
-# Default-Start:     3 4 5
-# Default-Stop:      0 1 2 6
+# Provides:          garb
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
-# Description:       Galera Arbitrator Daemon
+# Description:       Garbd is used as part of clusters that have only two
+#                    real Galera servers and need an extra
+#                    node to arbitrate split brain situations.
 ### END INIT INFO
 
 # Source function library.
@@ -26,7 +27,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garb
+	config=/etc/default/garbd
 fi
 
 log_failure() {
@@ -41,27 +42,55 @@ log_failure() {
 
 PIDFILE=/var/run/garbd
 
-prog=$(which garbd)
+prog="/usr/bin/garbd"
 
 program_start() {
 	local rcode
+	local gpid
 	if [ -f /etc/redhat-release ]; then
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    echo -n $"Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        echo -n $"Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        echo -n $"Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
 		echo -n $"Starting $prog: "
-		sudo -u nobody $prog $* >/dev/null
+		runuser nobody -c "$prog $*" >/dev/null
 		rcode=$?
+		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
 		&& echo_success || echo_failure
 		echo
 	else
+
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    log_daemon_msg "Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        log_daemon_msg "Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        log_daemon_msg "Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
+                if [ -r $PIDFILE ];then
+                    log_daemon_msg "Stale pid file with $(cat $PIDFILE)"
+                fi
 		log_daemon_msg "Starting $prog: "
-		start-stop-daemon --start --quiet --background \
+		start-stop-daemon --start --quiet -c nobody --background \
 		                  --exec $prog -- $*
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork
-		sleep 1
+		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE
 		log_end_msg $rcode
-	fi
+            fi
 	return $rcode
 }
 
@@ -95,8 +124,8 @@ start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
 
-	if grep -q -E '^# REMOVE' $config;then 
-	    log_daemon_msg "Garbd config $config is not configured yet"
+	if grep -q -E '^# REMOVE' $config; then
+	    log_failure "Garbd config $config is not configured yet"
 	    return 0
 	fi
 
@@ -122,9 +151,16 @@ start() {
 	# Find a working node
 	for ADDRESS in ${GALERA_NODES} 0; do
 		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
-		PORT=$(echo $ADDRESS | cut -d \: -f 2 )
+		PORT=$(echo $ADDRESS | cut -s -d \: -f 2 )
 		PORT=${PORT:-$GALERA_PORT}
-		nc -z $HOST $PORT >/dev/null && break
+		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
+                    nc -z $HOST $PORT >/dev/null && break
+                elif [[ -x `which nmap` ]];then
+                    nmap -Pn -p$PORT $HOST | awk "\$1 ~ /$PORT/ {print \$2}" | grep -q open && break
+                else
+                    log_failure "Neither netcat nor nmap are present for zero I/O scanning"
+                    return 1
+                fi
 	done
 	if [ ${ADDRESS} == "0" ]; then
 		log_failure "None of the nodes in $GALERA_NODES is accessible"
@@ -161,7 +197,7 @@ case "$1" in
   status)
 	program_status
 	;;
-  restart|reload)
+  restart|reload|force-reload)
 	restart
 	;;
   condrestart)
@@ -175,4 +211,4 @@ case "$1" in
 	exit 2
 esac
 
-exit $?
+exit 0

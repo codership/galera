@@ -1,54 +1,46 @@
-Source: percona-xtradb-cluster-galera-3.x
+Source: galera-3
+Maintainer: Codership Oy <info@codership.com>
+Uploaders: Otto Kekäläinen <otto@seravo.fi>
 Section: database
+Priority: optional
+Standards-Version: 3.9.5
+Build-Depends: check,
+               debhelper (>= 7.0.50~),
+               libboost-dev (>= 1.41),
+               libboost-program-options-dev (>= 1.41),
+               libssl-dev,
+               scons (>= 2)
+Homepage: http://www.galeracluster.com/
+Vcs-Git: git://github.com/codership/galera.git
+Vcs-Browser: http://github.com/codership/galera.git
+
+Package: galera-3
+Architecture: any
+Section: libs
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Conflicts: garbd-2,
+           garbd2,
+           percona-xtradb-cluster-galera,
+           percona-xtradb-cluster-galera-2.x,
+           percona-xtradb-cluster-galera-3.x,
+           percona-xtradb-cluster-garbd-2.x,
+           percona-xtradb-cluster-garbd-3.x
+Provides: galera-3, wsrep
+Homepage: http://galeracluster.com/
+Description: Replication framework for transactional applications
+ Galera is a fast synchronous multimaster wsrep provider (replication engine)
+ for transactional databases and similar applications. For more information
+ about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+ replication engine see http://galeracluster.com.
+
+Package: galera-3-dbg
+Architecture: any
+Section: debug
 Priority: extra
-Maintainer: Raghavendra Prabhu <raghavendra.prabhu@percona.com>
-Build-Depends: debhelper (>= 7.0.50~), scons, libboost-dev (>= 1.41),
-    libssl-dev, check, libboost-program-options-dev (>= 1.41)
-Standards-Version: 3.8.4
-
-Package: percona-xtradb-cluster-galera-3.x
-Architecture: any
-Provides: percona-xtradb-cluster-galera-25, galera3
-Conflicts: galera,  percona-xtradb-cluster-galera, percona-xtradb-cluster-galera-2.x
-Replaces: galera, percona-xtradb-cluster-galera-3, percona-xtradb-cluster-galera
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Galera components of Percona XtraDB Cluster
- This package contains the Galera components required by Percona XtraDB Cluster.
-
-Package: percona-xtradb-cluster-garbd-3.x
-Architecture: any
-Provides: garbd-3, garbd3
-Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2
-Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
-Description: Garbd components of Percona XtraDB Cluster
- This package contains the garbd of Percona XtraDB Cluster.
-
-Package: percona-xtradb-cluster-galera-3.x-dbg
-Architecture: any
-Section: debug
-Depends: percona-xtradb-cluster-galera-3.x (= ${binary:Version}), ${misc:Depends}
-Description: Debugging package for Percona XtraDB Cluster Galera 3.
-
-Package: percona-xtradb-cluster-garbd-3.x-dbg
-Architecture: any
-Section: debug
-Depends: percona-xtradb-cluster-garbd-3.x (= ${binary:Version}), ${misc:Depends}
-Description: Debugging package for Percona XtraDB Cluster Garbd 3.
-
-Package: percona-xtradb-cluster-galera-3
-Section: database
-Architecture: any
-Depends: percona-xtradb-cluster-galera-3.x (>= ${source:Version}), ${misc:Depends}
-Description: Metapackage for latest version of galera3.
-
-Package: percona-xtradb-cluster-garbd-3
-Section: database
-Architecture: any
-Depends: percona-xtradb-cluster-garbd-3.x (>= ${source:Version}), ${misc:Depends}
-Description: Metapackage for latest version of garbd3.
-
-Package: percona-xtradb-cluster-galera3-dbg
-Section: database
-Architecture: any
-Depends: percona-xtradb-cluster-galera-3.x-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-3.x-dbg (>= ${source:Version}), ${misc:Depends}
-Description: Metapackage for latest version of debug packages.
+Conflicts: percona-xtradb-cluster-galera-2.x-dbg,
+           percona-xtradb-cluster-galera-3-dbg,
+           percona-xtradb-cluster-galera-3.x-dbg
+Depends: galera-3 (= ${binary:Version}), ${misc:Depends}
+Description: Replication framework for transactional applications, debugging symbols
+ A special package that contains the Galera library and arbitator binaries
+ with debugging symbols.

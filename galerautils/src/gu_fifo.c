@@ -13,7 +13,7 @@
  * minimum space when there are few items in the queue.
  */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdio.h>
 #include <string.h>
@@ -45,6 +45,8 @@ struct gu_fifo
     long long  q_len_samples;
     uint  item_size;
     uint  used;
+    uint  used_max;
+    uint  used_min;
     int   get_err;
     bool  closed;
 
@@ -315,6 +317,9 @@ void gu_fifo_pop_head (gu_fifo_t* q)
 
     q->head = FIFO_INC(q, q->head);
     q->used--;
+    if (gu_unlikely(q->used < q->used_min)) {
+        q->used_min = q->used;
+    }
 
     if (fifo_unlock_get(q)) {
         gu_fatal ("Faled to unlock queue to get item.");
@@ -368,6 +373,9 @@ void gu_fifo_push_tail (gu_fifo_t* q)
     q->tail = FIFO_INC(q, q->tail);
     q->q_len += q->used;
     q->used++;
+    if (gu_unlikely(q->used > q->used_max)) {
+        q->used_max = q->used;
+    }
     q->q_len_samples++;
 
     if (fifo_unlock_put(q)) {
@@ -383,11 +391,14 @@ long gu_fifo_length (gu_fifo_t* q)
 }
 
 /*! returns how many items were in the queue per push_tail() */
-void gu_fifo_stats_get (gu_fifo_t* q, int* q_len, double* q_len_avg)
+void gu_fifo_stats_get (gu_fifo_t* q, int* q_len, int* q_len_max,
+                        int* q_len_min, double* q_len_avg)
 {
     fifo_lock (q);
 
     *q_len = q->used;
+    *q_len_max = q->used_max;
+    *q_len_min = q->used_min;
 
     long long len     = q->q_len;
     long long samples = q->q_len_samples;
@@ -414,6 +425,8 @@ void gu_fifo_stats_flush(gu_fifo_t* q)
 {
     fifo_lock (q);
 
+    q->used_max = q->used;
+    q->used_min = q->used;
     q->q_len = 0;
     q->q_len_samples = 0;
 

@@ -7,10 +7,8 @@
 #include "galera_exception.hpp"
 #include "uuid.hpp"
 
-extern "C"
-{
-#include "galera_info.h"
-}
+#include "galera_info.hpp"
+
 
 #include <sstream>
 #include <iostream>
@@ -132,6 +130,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     config_             (),
     init_config_        (config_, args->node_address),
     parse_options_      (config_, args->options),
+    init_ssl_           (config_),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
     proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),
@@ -165,7 +164,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
-    ist_sst_            (false),
     gcache_             (config_, data_dir_),
     gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -387,9 +385,22 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     {
         if (state_() != S_CLOSING)
         {
-            log_warn << "Broken shutdown sequence, provider state: "
-                     << state_() << ", retval: " << retval;
-            assert (0);
+            if (retval == WSREP_OK)
+            {
+                log_warn << "Broken shutdown sequence, provider state: "
+                         << state_() << ", retval: " << retval;
+                assert (0);
+            }
+            else
+            {
+                // Generate zero view before exit to notify application
+                wsrep_view_info_t* err_view(galera_view_info_create(0, false));
+                void* fake_sst_req(0);
+                size_t fake_sst_req_len(0);
+                view_cb_(app_ctx_, recv_ctx, err_view, 0, 0,
+                         &fake_sst_req, &fake_sst_req_len);
+                free(err_view);
+            }
             /* avoid abort in production */
             state_.shift_to(S_CLOSING);
         }
@@ -1181,9 +1192,7 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     }
 
     try {
-        // #557 - remove this if() when we return back to joining after SST
-        if (!ist_sst_ || rcode < 0) gcs_.join(seqno);
-        ist_sst_ = false;
+        gcs_.join(seqno);
         return WSREP_OK;
     }
     catch (gu::Exception& e)
@@ -1274,6 +1283,17 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
     case 5:
         trx_params_.version_ = 3;
         str_proto_ver_ = 1;
+        break;
+    case 6:
+        trx_params_.version_  = 3;
+        str_proto_ver_ = 2; // gcs intelligent donor selection.
+        // include handling dangling comma in donor string.
+        break;
+    case 7:
+        // Protocol upgrade to handle IST SSL backwards compatibility,
+        // no effect to TRX or STR protocols.
+        trx_params_.version_ = 3;
+        str_proto_ver_ = 2;
         break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "
@@ -1374,16 +1394,18 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     if (WSREP_CB_SUCCESS != rcode)
     {
         assert(app_req_len <= 0);
+        log_fatal << "View callback failed. This is unrecoverable, "
+                  << "restart required.";
         close();
-        gu_throw_fatal << "View callback failed. This is unrecoverable, "
-            "restart required.";
+        abort();
     }
     else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
     {
+        log_fatal << "Local state UUID " << state_uuid_
+                  << " is different from group state UUID " << group_uuid
+                  << ", and SST request is null: restart required.";
         close();
-        gu_throw_fatal << "Local state UUID " << state_uuid_
-                       << " is different from group state UUID " << group_uuid
-                       << ", and SST request is null: restart required.";
+        abort();
     }
 
     if (view_info.view >= 0) // Primary configuration
@@ -1480,6 +1502,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             log_fatal << "Internal error: unexpected next state for "
                       << "non-prim: " << next_state << ". Restart required.";
+            close();
             abort();
         }
 

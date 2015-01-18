@@ -10,6 +10,7 @@
 
 #include "check_trace.hpp"
 #include "gcomm/conf.hpp"
+#include "gu_asio.hpp" // gu::ssl_register_params()
 
 using namespace std;
 using namespace gu;
@@ -19,6 +20,7 @@ struct CheckTraceConfInit
 {
     explicit CheckTraceConfInit(gu::Config& conf)
     {
+        gu::ssl_register_params(conf);
         gcomm::Conf::register_params(conf);
     }
 };
@@ -213,7 +215,6 @@ void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj,
     ChannelMap::value(i)->set_loss(loss);
 }
 
-
 void gcomm::PropagationMatrix::split(const size_t ii, const size_t jj)
 {
     set_loss(ii, jj, 0.);
@@ -283,7 +284,7 @@ size_t gcomm::PropagationMatrix::count_channel_msgs() const
 
 bool gcomm::PropagationMatrix::all_in_cvi() const
 {
-    for (map<size_t, DummyNode*>::const_iterator i = tp_.begin();
+    for (std::map<size_t, DummyNode*>::const_iterator i = tp_.begin();
          i != tp_.end(); ++i)
     {
         if (i->second->in_cvi() == false)
@@ -294,41 +295,104 @@ bool gcomm::PropagationMatrix::all_in_cvi() const
     return true;
 }
 
-
-
 static void check_traces(const Trace& t1, const Trace& t2)
 {
-    for (Trace::ViewTraceMap::const_iterator
-             i = t1.view_traces().begin(); i != t1.view_traces().end();
-         ++i)
+    for (Trace::ViewTraceMap::const_iterator i = t1.view_traces().begin();
+         i != t1.view_traces().end();  ++i)
     {
-        Trace::ViewTraceMap::const_iterator i_next(i);
-        ++i_next;
-        if (i_next != t1.view_traces().end())
-        {
-            const Trace::ViewTraceMap::const_iterator
-                j(t2.view_traces().find(Trace::ViewTraceMap::key(i)));
-            Trace::ViewTraceMap::const_iterator j_next(j);
-            ++j_next;
-            // Note: Comparision is meaningful if also next view is the
-            //       same.
-            // @todo Proper checks for PRIM and NON_PRIM
-            if (j             != t2.view_traces().end() &&
-                j_next        != t2.view_traces().end() &&
-                i_next->first == j_next->first              &&
-                i_next->second.view().members() ==
-                j_next->second.view().members())
-            {
-                if (i->first.type() != V_NON_PRIM &&
-                    i->first.type() != V_PRIM)
-                {
-                    gcomm_assert(*i == *j)
-                        << "traces differ: \n\n" << *i << "\n\n" << *j << "\n\n"
-                        << "next views: \n\n" << *i_next << "\n\n" << *j_next;
+        Trace::ViewTraceMap::const_iterator j =
+                t2.view_traces().find(Trace::ViewTraceMap::key(i));
+        if (j == t2.view_traces().end()) continue;
+
+        ViewType type = i->first.type();
+        // @todo Proper checks for PRIM and NON_PRIM
+        if (type == V_TRANS || type == V_REG) {
+            Trace::ViewTraceMap::const_iterator i_next(i); ++i_next;
+            Trace::ViewTraceMap::const_iterator j_next(j); ++j_next;
+
+            if (type == V_TRANS) {
+                // if next reg view is same, then views and msgs are the same.
+                if (i_next != t1.view_traces().end() &&
+                    j_next != t2.view_traces().end() &&
+                    i_next->first == j_next->first) {
+                    gcomm_assert(*i == *j) <<
+                            "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                            "next views: \n\n" << *i_next << "\n\n" << *j_next;
                 }
-                else
-                {
-                    // todo
+            }
+
+            if (type == V_REG) {
+                // members are same all the times.
+                gcomm_assert(i->second.view().members() == j->second.view().members()) <<
+                        "trace differ: \n\n" << *i << "\n\n" << *j;
+
+                // if next trans view has same members, then msgs are the same.
+                if (i_next != t1.view_traces().end() &&
+                    j_next != t2.view_traces().end()) {
+                    if (i_next->second.view().members() ==
+                        j_next->second.view().members()) {
+                        gcomm_assert(i->second.msgs() == j->second.msgs()) <<
+                                "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                                "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                    } else {
+                        // if not, then members should be disjoint.
+                        std::map<gcomm::UUID, gcomm::Node> output;
+                        std::set_intersection(i_next->second.view().members().begin(),
+                                              i_next->second.view().members().end(),
+                                              j_next->second.view().members().begin(),
+                                              j_next->second.view().members().end(),
+                                              std::inserter(output,output.begin()));
+                        gcomm_assert(output.size() == 0) << 
+                                "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                                "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                    }
+                }
+                // if previous trans view id is the same.
+                // the reg view should be the same.
+
+                // if previous trans view id is not same.
+                // intersections of joined, left, partitioned sets are empty.
+
+                if (i == t1.view_traces().begin() ||
+                    j == t2.view_traces().begin()) continue;
+                Trace::ViewTraceMap::const_iterator i_prev(i); --i_prev;
+                Trace::ViewTraceMap::const_iterator j_prev(j); --j_prev;
+
+                if (i_prev->first == j_prev->first) {
+                    gcomm_assert(i->second.view() == j->second.view()) <<
+                            "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                            "previous views: \n\n" << *i_prev << "\n\n" << *j_prev;
+                } else {
+                    std::map<gcomm::UUID, gcomm::Node> output;
+                    int joined_size = 0, left_size = 0, part_size = 0;
+                    std::set_intersection(i->second.view().joined().begin(),
+                                          i->second.view().joined().end(),
+                                          j->second.view().joined().begin(),
+                                          j->second.view().joined().end(),
+                                          std::inserter(output, output.begin()));
+                    joined_size = output.size();
+                    output.clear();
+
+                    std::set_intersection(i->second.view().left().begin(),
+                                          i->second.view().left().end(),
+                                          j->second.view().left().begin(),
+                                          j->second.view().left().end(),
+                                          std::inserter(output, output.begin()));
+                    left_size = output.size();
+                    output.clear();
+
+                    std::set_intersection(i->second.view().partitioned().begin(),
+                                          i->second.view().partitioned().end(),
+                                          j->second.view().partitioned().begin(),
+                                          j->second.view().partitioned().end(),
+                                          std::inserter(output, output.begin()));
+                    part_size = output.size();
+                    output.clear();
+
+                    gcomm_assert(i->second.view().members() == j->second.view().members() &&
+                                 joined_size == 0 && left_size == 0 && part_size == 0) <<
+                            "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                            "previous views: \n\n" << *i_prev << "\n\n" << *j_prev;
                 }
             }
         }
@@ -361,4 +425,3 @@ void gcomm::check_trace(const vector<DummyNode*>& nvec)
 {
     for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
 }
-

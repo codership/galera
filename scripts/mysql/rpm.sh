@@ -116,10 +116,11 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 
 export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
+LIB_TYPE="bundled" # bundled or system
+
 [ "$MYSQL_VERSION_MAJOR$MYSQL_VERSION_MINOR" -ge "56" ] \
-&& MEMCACHED_OPT="-DWITH_LIBEVENT=system -DWITH_INNODB_MEMCACHED=ON" \
+&& MEMCACHED_OPT="-DWITH_LIBEVENT=$LIB_TYPE -DWITH_INNODB_MEMCACHED=ON" \
 || MEMCACHED_OPT=""
-export MEMCACHED_OPT # for RPM build
 
 if [ $MYSQL_VERSION_MINOR -eq 1 ]
 then
@@ -131,8 +132,8 @@ else
     -DBUILD_CONFIG=mysql_release \
     -DWITH_WSREP=1 \
     -DWITH_EXTRA_CHARSETS=all \
-    -DWITH_SSL=system \
-    -DWITH_ZLIB=system \
+    -DWITH_SSL=$LIB_TYPE \
+    -DWITH_ZLIB=$LIB_TYPE \
     $MEMCACHED_OPT
     $MYSQL_SRC \
     && make -S
@@ -164,6 +165,12 @@ mv $MYSQL_DIST/$MYSQL_DIST-linux-*.tar.gz ./
 #cleaning intermedieate sources:
 rm -rf $MYSQL_DIST
 
+if [ -n "$TAR_ONLY" ] || ! which rpmbuild >/dev/null 2>&1
+then
+    echo "Not building RPMs"
+    exit 0
+fi
+
 ######################################
 ##                                  ##
 ##            Build RPM             ##
@@ -187,6 +194,7 @@ RPMBUILD()
         WSREP_RPM_OPTIONS=(--with wsrep --with yassl \
                            --define "optflags $RPM_OPT_FLAGS")
     else
+        export MEMCACHED_OPT="-DWITH_LIBEVENT=system -DWITH_INNODB_MEMCACHED=ON" \
         WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
                            --define='distro_specific 1' \
                            --define='runselftest 0' \
@@ -219,6 +227,7 @@ mv $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./
 
 # remove the patch file if is was automatically generated
 if test ! -r "$2"; then rm -rf $WSREP_PATCH; fi
+rm -rf $RPM_BUILD_ROOT
 
 exit 0
 

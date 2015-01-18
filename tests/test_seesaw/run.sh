@@ -15,7 +15,7 @@ TRIES=${1:-"-1"} # -1 stands for indefinite loop
 KILL_RATE=${KILL_RATE:-"3"}
 SST_RATE=${SST_RATE:-"2"}
 
-#restart # cluster restart should be triggered by user
+restart # cluster restart should be triggered by user
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
@@ -39,7 +39,7 @@ terminate()
 
 trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
 
-trap "kill $sqlgen_pid" EXIT
+trap "kill $sqlgen_pid || :" EXIT
 
 pause 5 5
 consistency_check $sqlgen_pid
@@ -109,5 +109,8 @@ do
 
     node=$(( ( node + 1 ) % node_num ))
 done
+
+kill $sqlgen_pid
+check
 
 exit

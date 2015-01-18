@@ -124,7 +124,7 @@ WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno,
     uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
     uint64_t* const sq(reinterpret_cast<uint64_t*>(ptr_ + V3_SEQNO_OFF));
 
-    *pa = gu::htog<uint32_t>(pa_range);
+    *pa = gu::htog<uint16_t>(pa_range);
     *sq = gu::htog<uint64_t>(seqno);
 
     update_checksum (ptr_, size() - V3_CHECKSUM_SIZE);

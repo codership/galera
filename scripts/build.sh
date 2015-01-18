@@ -8,7 +8,7 @@ get_cores()
         "Linux")
             echo "$(grep -c ^processor /proc/cpuinfo)" ;;
         "SunOS")
-            echo "$(psrinfo | wc -l)" ;;
+            echo "$(psrinfo | wc -l | tr -d ' ')" ;;
         "Darwin" | "FreeBSD")
             echo "$(sysctl -n hw.ncpu)" ;;
         *)
@@ -56,7 +56,7 @@ DEBUG=${DEBUG:-"no"}
 DEBUG_LEVEL=${DEBUG_LEVEL:-"0"}
 SCONS=${SCONS:-"yes"}
 SCONS_OPTS=${SCONS_OPTS:-""}
-JOBS=${JOBS:-"$(get_cores)"}
+export JOBS=${JOBS:-"$(get_cores)"}
 SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
 NO_STRIP=${NO_STRIP:-"no"}
@@ -71,7 +71,9 @@ else
   true=/bin/true
   epm=/usr/bin/epm
 fi
+
 EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
+
 if [ "$OS" == "Darwin" ]; then
   if which -s port && test -x /opt/local/bin/port; then
     EXTRA_SYSROOT=/opt/local
@@ -94,6 +96,7 @@ else
     CC=${CC:-"gcc"}
     CXX=${CXX:-"g++"}
 fi
+
 if ccache -V > /dev/null 2>&1
 then
     echo "$CC"  | grep "ccache" > /dev/null || CC="ccache $CC"
@@ -229,10 +232,10 @@ if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 if [ "$CONFIGURE" == "yes" ] && [ "$SCONS" != "yes" ]; then SCRATCH="yes"; fi
 
 # Be quite verbose
-set -x
+#set -x
 
 # Build process base directory
-build_base=$(cd $(dirname $0)/..; pwd -P)
+build_base=${GALERA_SRC:-$(cd $(dirname $0)/..; pwd -P)}
 
 get_arch()
 {
@@ -286,9 +289,7 @@ build_packages()
 
     set +e
     if [ $DEBIAN -ne 0 ]; then # build DEB
-        $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH $STRIP_OPT galera # && \
-        $SUDO /bin/chown -R $WHOAMI.users $ARCH
+        ./deb.sh $GALERA_VER
     elif [ "$OS" == "FreeBSD" ]; then
         if test "$NO_STRIP" != "yes"; then
             strip $build_base/{garb/garbd,libgalera_smm.so}
@@ -354,10 +355,12 @@ pushd "$build_base"
 #GALERA_REV="$(svnversion | sed s/\:/,/g)"
 #if [ "$GALERA_REV" == "exported" ]
 #then
-    GALERA_REV=$(bzr revno --tree -q)     || \
+    GALERA_REV=$(git log --pretty=oneline | wc -l) || \
+    GALERA_REV=$(bzr revno --tree -q)              || \
     GALERA_REV=$(svn info >&/dev/null && svnversion | sed s/\:/,/g) || \
-    GALERA_REV=$(echo "XXXX")
-    export GALERA_REV
+    GALERA_REV="XXXX"
+    # trim spaces (sed is not working on Solaris, so using bash built-in)
+    GALERA_REV=${GALERA_REV//[[:space:]]/}
 #fi
 popd
 

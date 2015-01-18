@@ -147,7 +147,7 @@ public:
         :
         version_               (version),
         type_                  (type),
-        flags_                 (),
+        flags_                 (error.size() > 0 ? F_NODE_ADDRESS_OR_ERROR : 0),
         segment_id_            (segment_id),
         handshake_uuid_        (),
         source_uuid_           (source_uuid),
