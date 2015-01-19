@@ -23,13 +23,26 @@
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
-%dump
+# Define dist tag if not given by platform
+
+# For suse versions see:
+# https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+%if 0%{?suse_version} == 1310
+%define dist suse13.1
+%endif
+%if 0%{?suse_version} == 1315
+%define dist sle13.1
+%endif
+%if 0%{?suse_version} == 1320
+%define dist suse13.2
+%endif
+
 
 Name:          %{name}
 Summary:       Galera: a synchronous multi-master wsrep provider (replication engine)
 Group:         System Environment/Libraries
 Version:       %{version}
-Release:       %{release}
+Release:       %{release}%{dist}
 License:       GPL-2.0
 Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
