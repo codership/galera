@@ -9,6 +9,7 @@
 
 #include "galera_info.hpp"
 
+#include "gu_debug_sync.hpp"
 
 #include <sstream>
 #include <iostream>
@@ -129,7 +130,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     init_lib_           (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (),
     init_config_        (config_, args->node_address),
-    parse_options_      (config_, args->options),
+    parse_options_      (*this, config_, args->options),
     init_ssl_           (config_),
     str_proto_ver_      (-1),
     protocol_version_   (-1),
@@ -561,6 +562,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx,
             rcode = gcs_.repl(act, true);
         }
 
+        GU_DBUG_SYNC_WAIT("after_replicate_sync")
         trx->lock();
     }
     while (rcode == -EAGAIN && trx->state() != TrxHandle::S_MUST_ABORT &&
@@ -1288,6 +1290,12 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         trx_params_.version_  = 3;
         str_proto_ver_ = 2; // gcs intelligent donor selection.
         // include handling dangling comma in donor string.
+        break;
+    case 7:
+        // Protocol upgrade to handle IST SSL backwards compatibility,
+        // no effect to TRX or STR protocols.
+        trx_params_.version_ = 3;
+        str_proto_ver_ = 2;
         break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "

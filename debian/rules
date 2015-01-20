@@ -25,22 +25,13 @@ override_dh_auto_build:
 	@echo $(SCONS_ARGS)
 	scons $(SCONS_ARGS)
 
-override_dh_auto_clean:
-	scons -c
-	rm config.log
-
-override_dh_installdocs:
-	dh_installdocs
-	install -m 644 asio/LICENSE_1_0.txt debian/galera/usr/share/doc/galera/LICENSE.asio
-	install -m 644 chromium/LICENSE debian/galera/usr/share/doc/galera/LICENSE.chromium
-	install -m 644 www.evanjones.ca/LICENSE debian/galera/usr/share/doc/galera/LICENSE.crc32c
-
 # Start earlier than MySQL which has value 19
 override_dh_installinit-arch:
 	dh_installinit --name=garb -- defaults 18 22
 
 override_dh_strip:
-	dh_strip --dbg-package=galera-dbg
+	dh_strip -pgalera-3 --dbg-package=galera-3-dbg
+	dh_strip -pgalera-arbitrator-3 --dbg-package=galera-arbitrator-3-dbg
 
 %:
 	dh $@

@@ -7,6 +7,7 @@
 #include "gu_uri.hpp"
 #include "write_set_ng.hpp"
 #include "gu_throw.hpp"
+#include "wsrep_params.hpp"
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
@@ -24,7 +25,7 @@ const std::string galera::ReplicatorSMM::Param::key_format =
 const std::string galera::ReplicatorSMM::Param::max_write_set_size =
     common_prefix + "max_ws_size";
 
-int const galera::ReplicatorSMM::MAX_PROTO_VER(6);
+int const galera::ReplicatorSMM::MAX_PROTO_VER(7);
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
@@ -105,10 +106,14 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
 }
 
 
-galera::ReplicatorSMM::ParseOptions::ParseOptions(gu::Config&       conf,
+galera::ReplicatorSMM::ParseOptions::ParseOptions(Replicator&       repl,
+                                                  gu::Config&       conf,
                                                   const char* const opts)
 {
     conf.parse(opts);
+    // Set initial wsrep params here to enable debug logging etc
+    // for the rest of the initialization
+    wsrep_set_params(repl, opts);
 }
 
 
@@ -144,7 +149,7 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     }
     else
     {
-        log_warn << "parameter '" << "' not found";
+        log_warn << "parameter '" << key << "' not found";
         assert(0);
         throw gu::NotFound();
     }

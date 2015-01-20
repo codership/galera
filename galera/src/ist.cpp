@@ -7,6 +7,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
+#include "gu_debug_sync.hpp"
 
 #include "GCache.hpp"
 #include "galera_common.hpp"
@@ -220,7 +221,11 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
-            gu::ssl_prepare_context(conf_, ssl_ctx_);
+            // Protocol versions prior 7 had a bug on sender side
+            // which made sender to return null cert in handshake.
+            // Therefore peer cert verfification must be enabled
+            // only at protocol version 7 or higher.
+            gu::ssl_prepare_context(conf_, ssl_ctx_, version >= 7);
         }
 
         asio::ip::tcp::resolver resolver(io_service_);
@@ -626,6 +631,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
+            GU_DBUG_SYNC_WAIT("ist_sender_send_after_get_buffers")
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {

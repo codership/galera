@@ -117,6 +117,12 @@ strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 GALERA_VER = ARGUMENTS.get('version', '3.9')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
+
+# Attempt to read from file if not given
+if GALERA_REV == "XXXX" and os.path.isfile("GALERA_REVISION"):
+    with open("GALERA_REVISION", "r") as f:
+        GALERA_REV = f.readline().rstrip("\n")
+
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
 print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV

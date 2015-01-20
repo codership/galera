@@ -94,10 +94,12 @@ namespace
     };
 }
 
-void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx)
+void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
+                             bool verify_peer_cert)
 {
     ctx.set_verify_mode(asio::ssl::context::verify_peer |
-                        asio::ssl::context::verify_fail_if_no_peer_cert);
+                        (verify_peer_cert == true ?
+                         asio::ssl::context::verify_fail_if_no_peer_cert : 0));
     SSLPasswordCallback cb(conf);
     ctx.set_password_callback(
         boost::bind(&SSLPasswordCallback::get_password, &cb));
