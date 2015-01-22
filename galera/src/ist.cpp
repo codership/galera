@@ -705,10 +705,14 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 extern "C"
 void* run_async_sender(void* arg)
 {
-    galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
+    galera::ist::AsyncSender* as
+        (reinterpret_cast<galera::ist::AsyncSender*>(arg));
+
     log_info << "async IST sender starting to serve " << as->peer().c_str()
              << " sending " << as->first() << "-" << as->last();
+
     wsrep_seqno_t join_seqno;
+
     try
     {
         as->send(as->first(), as->last());

@@ -8,6 +8,8 @@
 #include "wsrep_api.h"
 #include "galera_exception.hpp"
 
+struct gcs_action;
+
 #include <galerautils.hpp>
 #include <string>
 
@@ -98,10 +100,7 @@ namespace galera
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l) = 0;
         virtual void process_conf_change(void*                    recv_ctx,
-                                         const wsrep_view_info_t& view_info,
-                                         int                      repl_proto,
-                                         State                    next_state,
-                                         wsrep_seqno_t            seqno_l) = 0;
+                                         const struct gcs_action& cc) = 0;
         virtual void process_state_req(void* recv_ctx, const void* req,
                                        size_t req_size,
                                        wsrep_seqno_t seqno_l,

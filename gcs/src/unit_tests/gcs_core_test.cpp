@@ -37,6 +37,9 @@
  */
 
 #include "gcs_core_test.hpp"
+#undef fail
+
+#include "gcs_test_utils.hpp"
 
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_core.hpp"
@@ -53,9 +56,10 @@ extern ssize_t gcs_tests_get_allocated();
 
 static const long UNKNOWN_SIZE = 1234567890; // some unrealistic number
 
-static gcs_core_t*    Core    = NULL;
-static gcs_backend_t* Backend = NULL;
-static gcs_seqno_t    Seqno   = 0;
+static gcache::GCache* Cache   = NULL;
+static gcs_core_t*     Core    = NULL;
+static gcs_backend_t*  Backend = NULL;
+static gcs_seqno_t     Seqno   = 0;
 
 typedef struct action {
     const struct gu_buf* in;
@@ -169,7 +173,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
 
     // action is ordered only if it is of type GCS_ACT_TORDERED and not an error
     if (act->seqno >= GCS_SEQNO_NIL) {
-        FAIL_IF (GCS_ACT_TORDERED != act->type,
+        FAIL_IF (GCS_ACT_TORDERED != act->type && GCS_ACT_CONF != act->type,
                  "GCS_ACT_TORDERED != act->type (%d), while act->seqno: %lld",
                  act->type, (long long)act->seqno);
         FAIL_IF ((*seqno + 1) != act->seqno,
@@ -333,11 +337,16 @@ core_test_init (bool bootstrap = true,
 
     mark_point();
 
-    gu_config_t* config = gu_config_create ();
+    gu::Config* const config(new gu::Config());
     fail_if (config == NULL);
 
-    Core = gcs_core_create (config, NULL, name,
-                            "aaa.bbb.ccc.ddd:xxxx", 0, 0);
+    gcs_test::InitConfig(*config, name);
+
+    Cache = new gcache::GCache(*config, ".");
+
+    Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config),
+                            reinterpret_cast<gcache_t*>(Cache),
+                            name, "aaa.bbb.ccc.ddd:xxxx", 0, 0);
 
     fail_if (NULL == Core);
 
@@ -367,7 +376,7 @@ core_test_init (bool bootstrap = true,
     // receive first configuration message
     fail_if (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act.out, act.size, bootstrap, 0, 1));
-    free (act.out);
+    Cache->free(act.out);
 
     // this will configure backend to have desired fragment size
     ret = core_test_set_payload_size (FRAG_SIZE);
@@ -415,7 +424,7 @@ core_test_cleanup ()
              ret, strerror (-ret));
     ret = CORE_RECV_END (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF);
     fail_if (ret, "ret: %ld (%s)", ret, strerror(-ret));
-    free (act.out);
+    Cache->free(act.out);
 
     // check that backend is closed too
     ret = Backend->send (Backend, tmp, sizeof(tmp), GCS_MSG_ACTION);
@@ -431,12 +440,15 @@ core_test_cleanup ()
         fail_if (0 != allocated,
                  "Expected 0 allocated bytes, found %zd", allocated);
     }
+
+    delete Cache;
 }
 
 // just a smoke test for core API
 START_TEST (gcs_core_test_api)
 {
     core_test_init ();
+    fail_if (NULL == Cache);
     fail_if (NULL == Core);
     fail_if (NULL == Backend);
 
@@ -476,7 +488,7 @@ START_TEST (gcs_core_test_api)
         fail_if (CORE_RECV_ACT (&act_r, NULL, sizeof(gcs_seqno_t),
                                 GCS_ACT_COMMIT_CUT));
         fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act_r.out));
-        free (act_r.out);
+        free(act_r.out); // commit cut is allocated by malloc()
     }
 
     // send fake flow control action, its contents is not important
@@ -529,7 +541,7 @@ DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
     FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF), "", NULL);
     FAIL_IF (core_test_check_conf(act.out, act.size, primary, my_idx, members),
              "", NULL);
-    free (act.out);
+    Cache->free(act.out);
     return false;
 }
 
@@ -584,7 +596,7 @@ START_TEST (gcs_core_test_own)
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
-    free (act_r.out);
+    Cache->free(act_r.out);
     fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_TORDERED));
     fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
              act_r.seqno, strerror (-act_r.seqno));
@@ -614,7 +626,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
-    free (act_r.out);
+    Cache->free(act_r.out);
 
     /*
      * TEST CASE 4: Action was sent successfully, but NON_PRIM component
@@ -630,7 +642,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_END (&act_s, act_size));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
-    free (act_r.out);
+    Cache->free(act_r.out);
     fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_TORDERED));
     fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
              act_r.seqno, strerror (-act_r.seqno));
@@ -678,7 +690,7 @@ START_TEST (gcs_core_test_own)
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
-    free (act_r.out);
+    Cache->free(act_r.out);
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
@@ -693,7 +705,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
-    free (act_r.out);
+    Cache->free(act_r.out);
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
     gu_free (prim);

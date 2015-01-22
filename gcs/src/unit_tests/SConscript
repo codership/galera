@@ -44,6 +44,7 @@ gcs_tests_sources = Split('''
                              ../gcs_params.cpp
                              gcs_fc_test.cpp
                              ../gcs_fc.cpp
+                             gcs_test_utils.cpp
                           ''')
 
 

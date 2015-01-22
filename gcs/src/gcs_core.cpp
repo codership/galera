@@ -703,12 +703,13 @@ core_handle_last_msg (gcs_core_t*          core,
  * @return action size, negative error code or 0 to continue.
  */
 static ssize_t
-core_handle_comp_msg (gcs_core_t*          core,
-                      struct gcs_recv_msg* msg,
-                      struct gcs_act*      act)
+core_handle_comp_msg (gcs_core_t*          const core,
+                      struct gcs_recv_msg* const msg,
+                      struct gcs_act_rcvd* const rcvd)
 {
-    ssize_t      ret = 0;
-    gcs_group_t* group = &core->group;
+    ssize_t ret(0);
+    gcs_group_t*    const group(&core->group);
+    struct gcs_act* const act(&rcvd->act);
 
     assert (GCS_MSG_COMPONENT == msg->type);
 
@@ -732,7 +733,7 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        ret = gcs_group_act_conf (group, act, &core->proto_ver);
+        ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
@@ -784,29 +785,29 @@ core_handle_comp_msg (gcs_core_t*          core,
         if (gu_mutex_lock (&core->send_lock)) abort();
         {
             if (core->state < CORE_CLOSED) {
-                ret = gcs_group_act_conf (group, act, &core->proto_ver);
-                if (ret < 0) {
-                    gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
-                              ret, strerror (-ret));
-                    assert (0);
-                    ret = -ENOTRECOVERABLE;
-                }
-
                 if (gcs_group_my_idx(group) == -1) { // self-leave
                     gcs_fifo_lite_close (core->fifo);
                     core->state = CORE_CLOSED;
-                    if (gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf)) {
-                        ret = -gcs_comp_msg_error(
-                            (const gcs_comp_msg_t*)msg->buf);
-                        free(const_cast<void*>(act->buf));
-                        act->buf = NULL;
-                        act->buf_len = 0;
+                    ret = -gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf);
+                    if (ret < 0) {
+                        assert(act->buf == NULL);
+                        assert(act->buf_len == 0);
                         act->type = GCS_ACT_ERROR;
                         gu_info("comp msg error in core %d", -ret);
                     }
                 }
                 else {                               // regular non-prim
                     core->state = CORE_NON_PRIMARY;
+                }
+
+                if (GCS_GROUP_NON_PRIMARY == ret) { // no error in comp msg
+                    ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
+                    if (ret < 0) {
+                        gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
+                                  ret, strerror (-ret));
+                        assert (0);
+                        ret = -ENOTRECOVERABLE;
+                    }
                 }
             }
             else { // ignore in production?
@@ -904,10 +905,11 @@ core_handle_uuid_msg (gcs_core_t*     core,
 static ssize_t
 core_handle_state_msg (gcs_core_t*          core,
                        struct gcs_recv_msg* msg,
-                       struct gcs_act*      act)
+                       struct gcs_act_rcvd* rcvd)
 {
-    ssize_t      ret = 0;
-    gcs_group_t* group = &core->group;
+    ssize_t      ret(0);
+    gcs_group_t* const group(&core->group);
+    struct gcs_act* const act(&rcvd->act);
 
     assert (GCS_MSG_STATE_MSG == msg->type);
 
@@ -938,7 +940,7 @@ core_handle_state_msg (gcs_core_t*          core,
             }
             gu_mutex_unlock (&core->send_lock);
 
-            ret = gcs_group_act_conf (group, act, &core->proto_ver);
+            ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
             if (ret < 0) {
                 gu_fatal ("Failed create CONF action: %d (%s)",
                           ret, strerror (-ret));
@@ -1090,7 +1092,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             assert (ret == recv_act->act.buf_len);
             break;
         case GCS_MSG_COMPONENT:
-            ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
+            ret = core_handle_comp_msg (conn, recv_msg, recv_act);
             // assert (ret >= 0); // hang on error in debug mode
             assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
@@ -1100,7 +1102,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             ret = 0;           // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:
-            ret = core_handle_state_msg (conn, recv_msg, &recv_act->act);
+            ret = core_handle_state_msg (conn, recv_msg, recv_act);
             assert (ret >= 0); // hang on error in debug mode
             assert (ret == recv_act->act.buf_len);
             break;
@@ -1132,6 +1134,7 @@ out:
     assert (ret == recv_act->act.buf_len || ret < 0);
     assert (recv_act->id       <= GCS_SEQNO_ILL ||
             recv_act->act.type == GCS_ACT_TORDERED ||
+            recv_act->act.type == GCS_ACT_CONF     ||
             recv_act->act.type == GCS_ACT_STATE_REQ); // <- dirty hack
     assert (recv_act->sender_idx >= 0 ||
             recv_act->act.type   != GCS_ACT_TORDERED);

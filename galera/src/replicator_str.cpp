@@ -249,12 +249,12 @@ public:
     IST_request(const std::string& peer,
                 const wsrep_uuid_t& uuid,
                 wsrep_seqno_t last_applied,
-                wsrep_seqno_t group_seqno)
+                wsrep_seqno_t last_missing_seqno)
         :
         peer_(peer),
         uuid_(uuid),
         last_applied_(last_applied),
-        group_seqno_(group_seqno)
+        group_seqno_(last_missing_seqno)
     { }
     const std::string&  peer()  const { return peer_ ; }
     const wsrep_uuid_t& uuid()  const { return uuid_ ; }
@@ -385,16 +385,16 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     try
                     {
-                        // Note: End of IST range must be cc_seqno_ instead
+                        // Note: End of IST range must be cc_seqno_-1 instead
                         // of istr.group_seqno() in case there are CCs between
                         // sending and delivering STR. If there are no
-                        // intermediate CCs, cc_seqno_ == istr.group_seqno().
+                        // intermediate CCs, cc_seqno_-1 == istr.group_seqno().
                         // Then duplicate message concern in #746 will be
                         // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
                                          istr.last_applied() + 1,
-                                         cc_seqno_,
+                                         cc_seqno_ - 1,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -449,7 +449,7 @@ out:
 void
 ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 const wsrep_uuid_t& group_uuid,
-                                wsrep_seqno_t const group_seqno)
+                                wsrep_seqno_t const last_missing_seqno)
 {
     if (state_uuid_ != group_uuid)
     {
@@ -465,14 +465,14 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
 
-    assert(local_seqno < group_seqno);
+    assert(local_seqno < last_missing_seqno);
 
     std::ostringstream os;
 
     std::string recv_addr = ist_receiver_.prepare(
-        local_seqno + 1, group_seqno, protocol_version_);
+        local_seqno + 1, last_missing_seqno, protocol_version_);
 
-    os << IST_request(recv_addr, state_uuid_, local_seqno, group_seqno);
+    os << IST_request(recv_addr, state_uuid_, local_seqno, last_missing_seqno);
 
     char* str = strdup (os.str().c_str());
 
@@ -489,7 +489,7 @@ ReplicatorSMM::StateRequest*
 ReplicatorSMM::prepare_state_request (const void* const   sst_req,
                                       ssize_t     const   sst_req_len,
                                       const wsrep_uuid_t& group_uuid,
-                                      wsrep_seqno_t const group_seqno)
+                                      wsrep_seqno_t const last_missing_seqno)
 {
     try
     {
@@ -506,7 +506,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             try
             {
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
-                                          group_uuid, group_seqno));
+                                          group_uuid, last_missing_seqno));
             }
             catch (gu::Exception& e)
             {
@@ -646,14 +646,17 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 void
 ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                        const wsrep_uuid_t& group_uuid,
-                                       wsrep_seqno_t const group_seqno,
+                                       wsrep_seqno_t const cc_seqno,
                                        const void*   const sst_req,
                                        ssize_t       const sst_req_len)
 {
     assert(sst_req_len >= 0);
 
+    wsrep_seqno_t const last_missing_seqno(cc_seqno - 1);//remove when IST supports CC events
+
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
-                                                  group_uuid, group_seqno));
+                                                  group_uuid,
+                                                  last_missing_seqno));
     gu::Lock lock(sst_mutex_);
 
     st_.mark_unsafe();
@@ -672,7 +675,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         if (sst_is_trivial(sst_req, sst_req_len))
         {
             sst_uuid_  = group_uuid;
-            sst_seqno_ = group_seqno;
+            sst_seqno_ = cc_seqno;
         }
         else
         {
@@ -705,7 +708,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_debug << "Installed new state: " << state_uuid_ << ":" << sst_seqno_;
+            log_debug << "Installed new state: " << state_uuid_ << ":"
+                      << sst_seqno_;
         }
     }
     else
@@ -717,12 +721,14 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     if (req->ist_len() > 0)
     {
+        assert(sst_uuid_ == group_uuid);
+
         // IST is prepared only with str proto ver 1 and above
-        if (STATE_SEQNO() < group_seqno)
+        if (STATE_SEQNO() < last_missing_seqno)
         {
-            log_info << "Receiving IST: " << (group_seqno - STATE_SEQNO())
-                     << " writesets, seqnos " << STATE_SEQNO()
-                     << "-" << group_seqno;
+            log_info << "Receiving IST: " << (last_missing_seqno-STATE_SEQNO())
+                     << " writesets, seqnos " << (STATE_SEQNO() + 1)
+                     << "-" << last_missing_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
             sst_seqno_ = ist_receiver_.finished();
@@ -731,12 +737,27 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             // IST appliers and GCS appliers, GCS action source may
             // provide actions that have already been applied.
             apply_monitor_.drain(sst_seqno_);
+
             log_info << "IST received: " << state_uuid_ << ":" << sst_seqno_;
+
+            if (sst_seqno_ < cc_seqno)
+            {
+                // common case: receiving IST up to the currently processing CC
+                // event (if sst_seqno_ is greater, then the current CC seqno
+                // was already processed)
+                assert(sst_seqno_ + 1 == cc_seqno);
+                cancel_seqno(cc_seqno);
+            }
         }
         else
         {
             (void)ist_receiver_.finished();
         }
+    }
+    else
+    {
+        // full SST can't be in the past
+        assert(sst_seqno_ >= cc_seqno);
     }
 
     delete req;

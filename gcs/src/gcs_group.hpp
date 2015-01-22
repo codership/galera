@@ -223,11 +223,11 @@ gcs_group_my_idx (const gcs_group_t* group)
 /*!
  * Creates new configuration action
  * @param group group handle
- * @param act   GCS action object
+ * @param rcvd  GCS action object
  * @param proto protocol version gcs should use for this configuration
  */
 extern ssize_t
-gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act, int* proto);
+gcs_group_act_conf (gcs_group_t* group, struct gcs_act_rcvd* rcvd, int* proto);
 
 /*! Returns state object for state message */
 extern gcs_state_msg_t*

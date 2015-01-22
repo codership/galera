@@ -818,9 +818,9 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
 }
 
 static int
-group_find_node_by_state (const gcs_group_t*     const group,
-                          int              const joiner_idx,
-                          gcs_node_state_t const status)
+group_find_node_by_state (const gcs_group_t* const group,
+                          int                const joiner_idx,
+                          gcs_node_state_t   const status)
 {
     gcs_segment_t const segment = group->nodes[joiner_idx].segment;
     int  idx;
@@ -834,12 +834,14 @@ group_find_node_by_state (const gcs_group_t*     const group,
         gcs_node_t* node = &group->nodes[idx];
 
         if (node->status >= status && group_node_is_stateful (group, node))
+        {
             donor = idx; /* potential donor */
+        }
 
         if (segment == node->segment) {
             if (donor == idx) return donor; /* found suitable donor in the
                                              * same segment */
-            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;;
+            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;
         }
     }
 
@@ -1160,8 +1162,8 @@ gcs_group_find_donor(const gcs_group_t* group,
     /* try to find ist donor first.
        if it fails, fallbacks to find sst donor*/
     int donor_idx = -1;
-    if (str_version >= 2 &&
-        gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
+
+    if (str_version >= 2 && gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
     {
         assert (ist_seqno != GCS_SEQNO_ILL);
         donor_idx = group_find_ist_donor(group,
@@ -1171,15 +1173,15 @@ gcs_group_find_donor(const gcs_group_t* group,
                                          ist_seqno,
                                          min_donor_state);
     }
+
     if (donor_idx < 0)
     {
-        /* if donor_string is empty,
-           it will fallback to find_node_by_state() */
-        donor_idx = group_for_each_donor_in_string
-                (group, str_version, joiner_idx,
-                 donor_string, donor_len,
-                 min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, str_version,
+                                                    joiner_idx, donor_string,
+                                                    donor_len, min_donor_state);
     }
+
     return donor_idx;
 }
 
@@ -1262,7 +1264,8 @@ group_select_donor (gcs_group_t* group,
 void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
-    if (act->act.type <= GCS_ACT_STATE_REQ) {
+//    if (act->act.type <= GCS_ACT_STATE_REQ) {
+    if (act->act.type <= GCS_ACT_CONF) {
         gcs_gcache_free (group->cache, act->act.buf);
     }
 
@@ -1389,9 +1392,9 @@ group_memb_record_size (gcs_group_t* group)
 
 /* Creates new configuration action */
 ssize_t
-gcs_group_act_conf (gcs_group_t*    group,
-                    struct gcs_act* act,
-                    int*            gcs_proto_ver)
+gcs_group_act_conf (gcs_group_t*         group,
+                    struct gcs_act_rcvd* rcvd,
+                    int*                 gcs_proto_ver)
 {
     // if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
     //     *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
@@ -1411,9 +1414,13 @@ gcs_group_act_conf (gcs_group_t*    group,
     conf.memb_size = group_memb_record_size(group);
     conf.memb = static_cast<char*>(::operator new(conf.memb_size));
 
-    long idx;
+    if (GCS_GROUP_PRIMARY == group->state) {
+        conf.seqno      = ++group->act_id_;
+    } else {
+        assert(GCS_GROUP_NON_PRIMARY == group->state);
+        conf.seqno      = GCS_SEQNO_ILL;
+    }
 
-    conf.seqno          = group->act_id_;
     conf.conf_id        = group->conf_id;
     conf.memb_num       = group->num;
     conf.my_idx         = group->my_idx;
@@ -1428,7 +1435,7 @@ gcs_group_act_conf (gcs_group_t*    group,
         conf.my_state = group->nodes[group->my_idx].status;
 
         char* ptr(conf.memb);
-        for (idx = 0; idx < group->num; idx++)
+        for (int idx = 0; idx < group->num; ++idx)
         {
             strcpy (ptr, group->nodes[idx].id);
             ptr += strlen(ptr) + 1;
@@ -1449,11 +1456,28 @@ gcs_group_act_conf (gcs_group_t*    group,
     }
 
     void* tmp;
-    act->buf_len = conf.write(&tmp);
-    act->buf     = tmp;
-    act->type    = GCS_ACT_CONF;
+    rcvd->act.buf_len = conf.write(&tmp); // throws when fails
+#ifndef GCS_FOR_GARB
+    /* copy CC event to gcache for IST */
+    rcvd->act.buf = gcache_malloc(group->cache, rcvd->act.buf_len);
+    if (rcvd->act.buf)
+    {
+        memcpy(const_cast<void*>(rcvd->act.buf), tmp, rcvd->act.buf_len);
+        rcvd->id = conf.seqno;
+    }
+    else
+    {
+        rcvd->act.buf_len = -ENOMEM;
+        rcvd->id          = -ENOMEM;
+    }
+    free(tmp);
+#else
+    rcvd->id = conf.seqno;
+#endif /* GCS_FOR_GARB */
 
-    return act->buf_len;
+    rcvd->act.type = GCS_ACT_CONF;
+
+    return rcvd->act.buf_len;
 }
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)

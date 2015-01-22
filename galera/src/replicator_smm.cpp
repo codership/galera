@@ -245,13 +245,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     log_debug << "End state: " << uuid << ':' << seqno << " #################";
 
-    update_state_uuid (uuid);
-
     cc_seqno_ = seqno; // is it needed here?
-    apply_monitor_.set_initial_position(seqno);
 
-    if (co_mode_ != CommitOrder::BYPASS)
-        commit_monitor_.set_initial_position(seqno);
+    set_initial_position(uuid, seqno);
 
     cert_.assign_initial_position(seqno, trx_proto_ver());
 
@@ -1370,6 +1366,36 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     log_debug << "Got commit cut from GCS: " << seq;
 }
 
+
+void galera::ReplicatorSMM::cancel_seqno(const wsrep_seqno_t& seqno)
+{
+    // To enter monitors we need to fake trx object
+    TrxHandleSlave* const dummy(TrxHandleSlave::New(slave_pool_));
+
+    dummy->set_received(NULL, WSREP_SEQNO_UNDEFINED, seqno);
+    dummy->set_depends_seqno(dummy->global_seqno() - 1);
+    dummy->lock();
+
+    ApplyOrder  ao(*dummy);
+    CommitOrder co(*dummy, co_mode_);
+
+    apply_monitor_.self_cancel(ao);
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+
+    dummy->unlock();
+    dummy->unref();
+}
+
+void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
+                                                 const wsrep_seqno_t& seqno)
+{
+    update_state_uuid(uuid);
+    apply_monitor_.set_initial_position(seqno);
+    if (co_mode_ != CommitOrder::BYPASS)
+        commit_monitor_.set_initial_position(seqno);
+    log_info << "####### Setting monitor position to " << seqno;
+}
+
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 {
     switch (proto_ver)
@@ -1420,8 +1446,8 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 static bool
 app_wants_state_transfer (const void* const req, ssize_t const req_len)
 {
-    return (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
-            memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
+    return req_len && (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
+                       memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
 }
 
 void
@@ -1457,34 +1483,61 @@ galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
     }
 }
 
+static galera::Replicator::State state2repl(const gcs_act_conf& conf)
+{
+    switch (conf.my_state)
+    {
+    case GCS_NODE_STATE_NON_PRIM:
+        if (conf.my_idx >= 0) return galera::Replicator::S_CONNECTED;
+        else                  return galera::Replicator::S_CLOSING;
+    case GCS_NODE_STATE_PRIM:
+        return galera::Replicator::S_CONNECTED;
+    case GCS_NODE_STATE_JOINER:
+        return galera::Replicator::S_JOINING;
+    case GCS_NODE_STATE_JOINED:
+        return galera::Replicator::S_JOINED;
+    case GCS_NODE_STATE_SYNCED:
+        return galera::Replicator::S_SYNCED;
+    case GCS_NODE_STATE_DONOR:
+        return galera::Replicator::S_DONOR;
+    case GCS_NODE_STATE_MAX:;
+    }
+
+    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    GU_DEBUG_NORETURN;
+}
+
 void
 galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
-                                           const wsrep_view_info_t& view_info,
-                                           int                      repl_proto,
-                                           State                    next_state,
-                                           wsrep_seqno_t            seqno_l)
+                                           const struct gcs_action& cc)
 {
-    assert(seqno_l > -1);
+    assert(cc.seqno_l > -1);
 
-    update_incoming_list(view_info);
+    gcs_act_conf const conf(cc.buf, cc.size);
 
-    LocalOrder lo(seqno_l);
+    wsrep_view_info_t* const view_info
+        (galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM));
+
+    update_incoming_list(*view_info);
+
+    LocalOrder lo(cc.seqno_l);
+
     gu_trace(local_monitor_.enter(lo));
 
     wsrep_seqno_t const upto(cert_.position());
 
     apply_monitor_.drain(upto);
-
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 
-    if (view_info.my_idx >= 0)
+    if (view_info->my_idx >= 0)
     {
-        uuid_ = view_info.members[view_info.my_idx].id;
+        uuid_ = view_info->members[view_info->my_idx].id;
     }
 
-    bool const          st_required(state_transfer_required(view_info));
-    wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
-    const wsrep_uuid_t& group_uuid (view_info.state_id.uuid);
+    bool const          st_required(state_transfer_required(*view_info));
+    wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
+    const wsrep_uuid_t& group_uuid (view_info->state_id.uuid);
+    assert(group_seqno == cc.seqno_g);
 
     if (st_required)
     {
@@ -1494,13 +1547,15 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
+//remove
+    else log_info << "##############  ST not required";
 
     void*  app_req(0);
     size_t app_req_len(0);
 
-    const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
+    const_cast<wsrep_view_info_t*>(view_info)->state_gap = st_required;
     wsrep_cb_status_t const rcode(
-        view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len));
+        view_cb_(app_ctx_, recv_ctx, view_info, 0, 0, &app_req, &app_req_len));
 
     if (WSREP_CB_SUCCESS != rcode)
     {
@@ -1519,9 +1574,13 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         abort();
     }
 
-    if (view_info.view >= 0) // Primary configuration
+    Replicator::State const next_state(state2repl(conf));
+
+    if (view_info->view >= 0) // Primary configuration
     {
-        establish_protocol_versions (repl_proto);
+        assert(cc.seqno_g > 0);
+
+        establish_protocol_versions (conf.repl_proto_ver);
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
@@ -1539,8 +1598,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
+        // This event can be processed 2 times:
+        // 1) out-of-order when state transfer is required
+        // 2) in-order (either when no state transfer or IST)
+        // When doing it out of order, the event buffer is simply discarded
         if (st_required && app_wants_st)
         {
+            gcache_.free(const_cast<void*>(cc.buf));
+
             // GCache::Seqno_reset() happens here
             request_state_transfer (recv_ctx,
                                     group_uuid, group_seqno, app_req,
@@ -1548,12 +1613,17 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else
         {
-            if (view_info.view == 1 || !app_wants_st)
+            gcache_.seqno_assign(cc.buf, cc.seqno_g, -1);
+
+            if (view_info->view == 1 || !app_wants_st)
             {
-                update_state_uuid (group_uuid);
-                apply_monitor_.set_initial_position(group_seqno);
-                if (co_mode_ != CommitOrder::BYPASS)
-                    commit_monitor_.set_initial_position(group_seqno);
+                set_initial_position(group_uuid, group_seqno);
+            }
+            else
+            {
+                log_info << "####### Not setting monitor position to "
+                         << group_seqno << ", view = " << view_info->view
+                         << ", app_wants_st = " << app_wants_st;
             }
 
             if (state_() == S_CONNECTED || state_() == S_DONOR)
@@ -1604,6 +1674,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     else
     {
         // Non-primary configuration
+        assert(cc.seqno_g == WSREP_SEQNO_UNDEFINED);
+
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
             st_.set (state_uuid_, STATE_SEQNO());
@@ -1618,11 +1690,23 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
 
         state_.shift_to(next_state);
+
+        gcache_.free(const_cast<void*>(cc.buf));
     }
 
     local_monitor_.leave(lo);
+
     gcs_.resume_recv();
+
     free(app_req);
+    free(view_info);
+
+    if (conf.conf_id < 0 && conf.memb_num == 0) {
+        assert(S_CLOSING == next_state);
+        log_debug << "Received SELF-LEAVE. Closing connection.";
+        // called after being shifted to S_CLOSING state.
+        gcs_.close();
+    }
 }
 
 

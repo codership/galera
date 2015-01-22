@@ -29,8 +29,9 @@ public:
         {
         case GCS_ACT_TORDERED:
             break;
+        case GCS_ACT_CONF:
+            break;
         case GCS_ACT_STATE_REQ:
-            gcache_.free(const_cast<void*>(act_.buf));
             break;
         default:
             ::free(const_cast<void*>(act_.buf));
@@ -42,31 +43,6 @@ private:
     struct gcs_action& act_;
     gcache::GCache&    gcache_;
 };
-
-
-static galera::Replicator::State state2repl(const gcs_act_conf& conf)
-{
-    switch (conf.my_state)
-    {
-    case GCS_NODE_STATE_NON_PRIM:
-        if (conf.my_idx >= 0) return galera::Replicator::S_CONNECTED;
-        else                  return galera::Replicator::S_CLOSING;
-    case GCS_NODE_STATE_PRIM:
-        return galera::Replicator::S_CONNECTED;
-    case GCS_NODE_STATE_JOINER:
-        return galera::Replicator::S_JOINING;
-    case GCS_NODE_STATE_JOINED:
-        return galera::Replicator::S_JOINED;
-    case GCS_NODE_STATE_SYNCED:
-        return galera::Replicator::S_SYNCED;
-    case GCS_NODE_STATE_DONOR:
-        return galera::Replicator::S_DONOR;
-    case GCS_NODE_STATE_MAX:;
-    }
-
-    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
-    GU_DEBUG_NORETURN;
-}
 
 
 galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
@@ -125,27 +101,8 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         break;
     }
     case GCS_ACT_CONF:
-    {
-        const gcs_act_conf conf(act.buf, act.size);
-
-        wsrep_view_info_t* view_info(
-            galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM)
-            );
-
-        gu_trace(replicator_.process_conf_change(recv_ctx, *view_info,
-                                                 conf.repl_proto_ver,
-                                                 state2repl(conf),
-                                                 act.seqno_l));
-        free(view_info);
-
-        if (conf.conf_id < 0 && conf.memb_num == 0) {
-            log_debug << "Received SELF-LEAVE. Closing connection.";
-            // called after being shifted to S_CLOSING state.
-            gcs_.close();
-        }
-
+        gu_trace(replicator_.process_conf_change(recv_ctx, act));
         break;
-    }
     case GCS_ACT_STATE_REQ:
         gu_trace(replicator_.process_state_req(recv_ctx, act.buf, act.size,
                                                act.seqno_l, act.seqno_g));

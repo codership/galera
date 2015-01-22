@@ -77,11 +77,12 @@ namespace galera
         void set_initial_position(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
-            if (last_entered_ == -1 || seqno == -1)
+//remove            if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset
                 last_entered_ = last_left_ = seqno;
             }
+#if 0 //remove after testing. This seems to be relic.
             else
             {
                 // drain monitor up to seqno but don't reset last_entered_
@@ -89,6 +90,7 @@ namespace galera
                 drain_common(seqno, lock);
                 drain_seqno_ = LLONG_MAX;
             }
+#endif
             if (seqno != -1)
             {
                 const size_t idx(indexof(seqno));

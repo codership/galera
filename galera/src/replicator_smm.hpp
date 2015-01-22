@@ -122,11 +122,7 @@ namespace galera
 
         void process_trx(void* recv_ctx, TrxHandleSlave* trx);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
-        void process_conf_change(void* recv_ctx,
-                                 const wsrep_view_info_t& view,
-                                 int repl_proto,
-                                 State next_state,
-                                 wsrep_seqno_t seqno_l);
+        void process_conf_change(void* recv_ctx, const struct gcs_action& cc);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
                                wsrep_seqno_t donor_seq);
@@ -383,6 +379,10 @@ namespace galera
 
 
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
+
+        void cancel_seqno(const wsrep_seqno_t& seqno);
+
+        void set_initial_position(const wsrep_uuid_t&, const wsrep_seqno_t&);
 
         void establish_protocol_versions (int version);
 
