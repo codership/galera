@@ -56,6 +56,7 @@ extern ssize_t gcs_tests_get_allocated();
 
 static const long UNKNOWN_SIZE = 1234567890; // some unrealistic number
 
+static std::string const CacheName("core_test.cache");
 static gcache::GCache* Cache   = NULL;
 static gcs_core_t*     Core    = NULL;
 static gcs_backend_t*  Backend = NULL;
@@ -329,8 +330,7 @@ core_test_set_payload_size (ssize_t s)
 
 // Initialises core and backend objects + some common tests
 static inline void
-core_test_init (bool bootstrap = true,
-                const char* name = "core_test")
+core_test_init (bool bootstrap = true)
 {
     long     ret;
     action_t act;
@@ -340,13 +340,13 @@ core_test_init (bool bootstrap = true,
     gu::Config* const config(new gu::Config());
     fail_if (config == NULL);
 
-    gcs_test::InitConfig(*config, name);
+    gcs_test::InitConfig(*config, CacheName);
 
     Cache = new gcache::GCache(*config, ".");
 
     Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config),
                             reinterpret_cast<gcache_t*>(Cache),
-                            name, "aaa.bbb.ccc.ddd:xxxx", 0, 0);
+                            "core_test", "aaa.bbb.ccc.ddd:xxxx", 0, 0);
 
     fail_if (NULL == Core);
 
@@ -442,6 +442,7 @@ core_test_cleanup ()
     }
 
     delete Cache;
+    ::unlink(CacheName.c_str());
 }
 
 // just a smoke test for core API

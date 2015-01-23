@@ -45,7 +45,7 @@ GcsGroup::common_ctor(const char*  node_name,
     assert(NULL  == gcache_);
     assert(false == initialized_);
 
-    conf_.set("gcache.name", node_name);
+    conf_.set("gcache.name", std::string(node_name) + ".cache");
     gcache_ = new gcache::GCache(conf_, ".");
 
     int const err(gcs_group_init(&group_, reinterpret_cast<gcache_t*>(gcache_),
@@ -79,6 +79,9 @@ GcsGroup::common_dtor()
         gcs_group_free(&group_);
 //remove        gcache_->seqno_release(LONG_LONG_MAX);
         delete gcache_;
+
+        std::string const gcache_name(conf_.get("gcache.name"));
+        ::unlink(gcache_name.c_str());
     }
     else
     {
