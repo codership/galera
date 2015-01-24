@@ -637,6 +637,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
 {
     assert(trx != 0);
     assert(trx->is_local() == true);
+    assert(trx->locked());
 
     log_debug << "aborting trx " << *trx << " " << trx;
 
