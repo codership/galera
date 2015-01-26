@@ -18,7 +18,7 @@
 #include "gcs_defrag_test.hpp"
 #include "gcs_node_test.hpp"
 #include "gcs_memb_test.hpp"
-#include "gcs_act_conf_test.hpp"
+#include "gcs_act_cchange_test.hpp"
 #include "gcs_group_test.hpp"
 #include "gcs_backend_test.hpp"
 #include "gcs_core_test.hpp"

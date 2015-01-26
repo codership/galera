@@ -7,7 +7,7 @@
 
 #undef fail
 
-#include "gcs_act_conf_test.hpp"
+#include "gcs_act_cchange_test.hpp"
 #include "../gcs.hpp"
 #include "gu_uuid.hpp"
 
