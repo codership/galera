@@ -447,7 +447,7 @@ START_TEST(gcs_memb_test_465)
              ret, strerror (-ret));
     fail_if (ret != act->buf_len);
     fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
-    const gcs_act_conf conf(act->buf, act->buf_len);
+    const gcs_act_cchange conf(act->buf, act->buf_len);
     fail_if (conf.my_idx != 1);
     /* according to #465 this was GCS_NODE_STATE_PRIM */
     fail_if (conf.my_state != GCS_NODE_STATE_SYNCED);

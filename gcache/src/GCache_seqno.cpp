@@ -41,7 +41,8 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-                          int64_t     const seqno_d)
+                          int64_t     const seqno_d,
+                          uint8_t     const type)
     {
         gu::Lock lock(mtx);
 
@@ -72,6 +73,7 @@ namespace gcache
 
         bh->seqno_g = seqno_g;
         bh->seqno_d = seqno_d;
+        bh->type    = type;
     }
 
     void

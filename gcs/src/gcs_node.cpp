@@ -29,7 +29,7 @@ gcs_node_init (gcs_node_t* const node,
     node->status    = GCS_NODE_STATE_NON_PRIM;
     node->name      = strdup (name     ? name     : NODE_NO_NAME);
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
-    gcs_defrag_init (&node->app, cache); // GCS_ACT_TORDERED goes only here
+    gcs_defrag_init (&node->app, cache); // GCS_ACT_WRITESET goes only here
     gcs_defrag_init (&node->oob, NULL);
 
     node->gcs_proto_ver  = gcs_proto_ver;

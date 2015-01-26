@@ -16,7 +16,7 @@
 
 START_TEST (zero_cc)
 {
-    gcs_act_conf const cc;
+    gcs_act_cchange const cc;
 
     fail_unless(cc.uuid  == GU_UUID_NIL);
     fail_if(cc.seqno != GCS_SEQNO_ILL);
@@ -33,7 +33,7 @@ END_TEST
 
 START_TEST (serialization)
 {
-    gcs_act_conf cc_src;
+    gcs_act_cchange cc_src;
 
     void* buf(NULL);
     int size(cc_src.write(&buf));
@@ -42,7 +42,7 @@ START_TEST (serialization)
     fail_if(size <= 0);
 
     {
-        gcs_act_conf const cc_dst(buf, size);
+        gcs_act_cchange const cc_dst(buf, size);
 
         fail_unless(cc_dst == cc_src);
     }
@@ -52,7 +52,7 @@ START_TEST (serialization)
     {
         static_cast<char*>(buf)[size/2] += 1;
 
-        gcs_act_conf const cc_dst(buf, size);
+        gcs_act_cchange const cc_dst(buf, size);
 
         fail_if(true, "exception must be thrown");
     }
@@ -77,7 +77,7 @@ START_TEST (serialization)
     fail_if(size <= 0);
 
     {
-        gcs_act_conf const cc_dst(buf, size);
+        gcs_act_cchange const cc_dst(buf, size);
 
         fail_unless(cc_dst == cc_src);
 
@@ -92,10 +92,10 @@ START_TEST (serialization)
 }
 END_TEST
 
-Suite *gcs_act_conf_suite(void)
+Suite *gcs_act_cchange_suite(void)
 {
   Suite *s  = suite_create("CC functions");
-  TCase *tc = tcase_create("gcs_act_conf");
+  TCase *tc = tcase_create("gcs_act_cchange");
 
   suite_add_tcase (s, tc);
   tcase_add_test  (tc, zero_cc);

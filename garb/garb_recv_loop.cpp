@@ -60,7 +60,7 @@ RecvLoop::loop()
 
         switch (act.type)
         {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
             if (gu_unlikely(!(act.seqno_g & 127)))
                 /* == report_interval_ of 128 */
             {
@@ -72,9 +72,9 @@ RecvLoop::loop()
         case GCS_ACT_STATE_REQ:
             gcs_.join (-ENOSYS); /* we can't donate state */
             break;
-        case GCS_ACT_CONF:
+        case GCS_ACT_CCHANGE:
         {
-            gcs_act_conf const cc(act.buf, act.size);
+            gcs_act_cchange const cc(act.buf, act.size);
 
             if (cc.conf_id > 0) /* PC */
             {

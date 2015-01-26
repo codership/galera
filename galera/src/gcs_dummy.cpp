@@ -72,7 +72,7 @@ namespace galera
     ssize_t
     DummyGcs::generate_cc (bool primary)
     {
-        gcs_act_conf cc;
+        gcs_act_cchange cc;
 
         if (primary)
         {
@@ -196,12 +196,12 @@ namespace galera
                 act.buf     = cc_;
                 act.size    = cc_size_;
                 act.seqno_l = local_seqno_;
-                act.type    = GCS_ACT_CONF;
+                act.type    = GCS_ACT_CCHANGE;
 
                 cc_      = 0;
                 cc_size_ = 0;
 
-                gcs_act_conf const cc(act.buf, act.size);
+                gcs_act_cchange const cc(act.buf, act.size);
 
                 if (cc.my_idx < 0)
                 {

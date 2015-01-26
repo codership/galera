@@ -328,7 +328,7 @@ static void test_ist_common(int const version)
             assert (wsi.pa_range()  == pa_range);
         }
 
-        gcache_sender->seqno_assign(ptr, i, i - pa_range);
+        gcache_sender->seqno_assign(ptr, i, i - pa_range, GCS_ACT_WRITESET);
         trx->unref();
     }
 

@@ -1265,7 +1265,7 @@ void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
 //    if (act->act.type <= GCS_ACT_STATE_REQ) {
-    if (act->act.type <= GCS_ACT_CONF) {
+    if (act->act.type <= GCS_ACT_CCHANGE) {
         gcs_gcache_free (group->cache, act->act.buf);
     }
 
@@ -1409,7 +1409,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     // gcs requires resending message with correct gcs protocol version.
     *gcs_proto_ver = group->quorum.gcs_proto_ver;
 
-    struct gcs_act_conf conf;
+    struct gcs_act_cchange conf;
 
     conf.memb_size = group_memb_record_size(group);
     conf.memb = static_cast<char*>(::operator new(conf.memb_size));
@@ -1475,7 +1475,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     rcvd->id = conf.seqno;
 #endif /* GCS_FOR_GARB */
 
-    rcvd->act.type = GCS_ACT_CONF;
+    rcvd->act.type = GCS_ACT_CCHANGE;
 
     return rcvd->act.buf_len;
 }

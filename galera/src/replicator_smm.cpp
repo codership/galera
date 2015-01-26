@@ -388,7 +388,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             else
             {
                 // Generate zero view before exit to notify application
-                gcs_act_conf const cc;
+                gcs_act_cchange const cc;
                 wsrep_view_info_t* err_view(galera_view_info_create(cc,false));
                 void* fake_sst_req(0);
                 size_t fake_sst_req_len(0);
@@ -493,7 +493,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
     WriteSetNG::GatherVector actv;
 
     gcs_action act;
-    act.type = GCS_ACT_TORDERED;
+    act.type = GCS_ACT_WRITESET;
 #ifndef NDEBUG
     act.seqno_g = GCS_SEQNO_ILL;
 #endif
@@ -1258,7 +1258,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
         int rcode;
         do
         {
-            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false);
+            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false);
         }
         while (rcode == -EAGAIN && (usleep(1000), true));
 
@@ -1441,7 +1441,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 
     protocol_version_ = proto_ver;
     log_info << "REPL Protocols: " << protocol_version_ << " ("
-              << trx_params_.version_ << ", " << str_proto_ver_ << ")";
+             << trx_params_.version_ << ", " << str_proto_ver_ << ")";
 }
 
 static bool
@@ -1484,7 +1484,7 @@ galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
     }
 }
 
-static galera::Replicator::State state2repl(const gcs_act_conf& conf)
+static galera::Replicator::State state2repl(const gcs_act_cchange& conf)
 {
     switch (conf.my_state)
     {
@@ -1514,7 +1514,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 {
     assert(cc.seqno_l > -1);
 
-    gcs_act_conf const conf(cc.buf, cc.size);
+    gcs_act_cchange const conf(cc.buf, cc.size);
 
     wsrep_view_info_t* const view_info
         (galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM));
@@ -1614,7 +1614,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else
         {
-            gcache_.seqno_assign(cc.buf, cc.seqno_g, -1);
+            gcache_.seqno_assign(cc.buf, cc.seqno_g, -1, GCS_ACT_CCHANGE);
 
             if (view_info->view == 1 || !app_wants_st)
             {
@@ -1945,7 +1945,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
         // it inside the monitor
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
-                              trx->depends_seqno());
+                              trx->depends_seqno(),
+                              GCS_ACT_WRITESET);
 
         local_monitor_.leave(lo);
     }
@@ -2020,7 +2021,8 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandleSlave* trx)
         // Mext step will be monitors release. Make sure that ws was not
         // corrupted and cert failure is real before proceeding with that.
         trx->verify_checksum();
-        gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
+        gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1,
+                              GCS_ACT_WRITESET);
         return WSREP_TRX_FAIL;
 
     default:

@@ -11,8 +11,8 @@ view_info_size (int members)
 }
 
 /* create view info out of configuration message */
-wsrep_view_info_t* galera_view_info_create (const gcs_act_conf& conf,
-                                            bool                st_required)
+wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
+                                            bool                   st_required)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
         ::malloc(view_info_size(conf.memb_num)));

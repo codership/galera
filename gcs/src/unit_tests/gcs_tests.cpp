@@ -36,7 +36,7 @@ static suite_creator_t suites[] =
 	gcs_defrag_suite,
 	gcs_node_suite,
 	gcs_memb_suite,
-	gcs_act_conf_suite,
+	gcs_act_cchange_suite,
 	gcs_group_suite,
 	gcs_backend_suite,
 	gcs_core_suite,

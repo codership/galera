@@ -818,7 +818,7 @@ _join (gcs_conn_t* conn, gcs_seqno_t seqno)
 static void
 gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
 {
-    gcs_act_conf const conf(act.buf, act.buf_len);
+    gcs_act_cchange const conf(act.buf, act.buf_len);
 
     long ret;
 
@@ -1003,7 +1003,7 @@ gcs_handle_actions (gcs_conn_t*          conn,
         assert (sizeof(struct gcs_fc_event) == rcvd->act.buf_len);
         gcs_handle_flow_control (conn, (const gcs_fc_event*)rcvd->act.buf);
         break;
-    case GCS_ACT_CONF:
+    case GCS_ACT_CCHANGE:
         gcs_handle_act_conf (conn, rcvd->act);
         ret = 1;
         break;
@@ -1231,7 +1231,7 @@ static void *gcs_recv_thread (void *arg)
 
         /* deliver to application (note matching assert in the bottom-half of
          * gcs_repl()) */
-        if (gu_likely (rcvd.act.type != GCS_ACT_TORDERED ||
+        if (gu_likely (rcvd.act.type != GCS_ACT_WRITESET ||
                        (rcvd.id > 0 && (conn->global_seqno = rcvd.id)))) {
             /* successful delivery - increment local order */
             this_act_id = gu_atomic_fetch_and_add(&conn->local_act_id, 1);
@@ -1569,7 +1569,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
             // ret will be -ENOTCONN
             if ((ret = -EAGAIN,
                  conn->upper_limit >= conn->queue_len ||
-                 act->type         != GCS_ACT_TORDERED)         &&
+                 act->type         != GCS_ACT_WRITESET)         &&
                 (ret = -ENOTCONN, GCS_CONN_OPEN >= conn->state) &&
                 (act_ptr = (struct gcs_repl_act**)gcs_fifo_lite_get_tail (conn->repl_q)))
             {
@@ -1618,7 +1618,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
 
                 if (act->seqno_g < 0) {
                     assert (GCS_SEQNO_ILL    == act->seqno_l ||
-                            GCS_ACT_TORDERED != act->type);
+                            GCS_ACT_WRITESET != act->type);
 
                     if (act->seqno_g == GCS_SEQNO_ILL) {
                         /* action was not replicated for some reason */
@@ -1796,7 +1796,7 @@ long gcs_recv (gcs_conn_t*        conn,
         action->seqno_g = recv_act->rcvd.id;
         action->seqno_l = recv_act->local_id;
 
-        if (gu_unlikely (GCS_ACT_CONF == action->type)) {
+        if (gu_unlikely (GCS_ACT_CCHANGE == action->type)) {
             err = gu_fifo_cancel_gets (conn->recv_q);
             if (err) {
                 gu_fatal ("Internal logic error: failed to cancel recv_q "

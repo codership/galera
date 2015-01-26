@@ -555,7 +555,7 @@ core_handle_act_msg (gcs_core_t*          core,
 
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
-                assert (GCS_ACT_TORDERED != act->act.type || act->id > 0);
+                assert (GCS_ACT_WRITESET != act->act.type || act->id > 0);
             }
             else {
                 /* local action, get from FIFO, should be there already */
@@ -1132,19 +1132,19 @@ out:
 
     assert (ret || GCS_ACT_ERROR == recv_act->act.type);
     assert (ret == recv_act->act.buf_len || ret < 0);
-    assert (recv_act->id       <= GCS_SEQNO_ILL ||
-            recv_act->act.type == GCS_ACT_TORDERED ||
-            recv_act->act.type == GCS_ACT_CONF     ||
+    assert (recv_act->id       <= GCS_SEQNO_ILL    ||
+            recv_act->act.type == GCS_ACT_WRITESET ||
+            recv_act->act.type == GCS_ACT_CCHANGE  ||
             recv_act->act.type == GCS_ACT_STATE_REQ); // <- dirty hack
     assert (recv_act->sender_idx >= 0 ||
-            recv_act->act.type   != GCS_ACT_TORDERED);
+            recv_act->act.type   != GCS_ACT_WRITESET);
 
 //    gu_debug ("Returning %d", ret);
 
     if (ret < 0) {
         assert (recv_act->id < 0);
 
-        if (GCS_ACT_TORDERED == recv_act->act.type && recv_act->act.buf) {
+        if (GCS_ACT_WRITESET == recv_act->act.type && recv_act->act.buf) {
             gcs_gcache_free (conn->cache, recv_act->act.buf);
             recv_act->act.buf = NULL;
         }

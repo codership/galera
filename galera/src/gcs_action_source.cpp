@@ -27,9 +27,9 @@ public:
     {
         switch (act_.type)
         {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
             break;
-        case GCS_ACT_CONF:
+        case GCS_ACT_CCHANGE:
             break;
         case GCS_ACT_STATE_REQ:
             break;
@@ -84,7 +84,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
 
     switch (act.type)
     {
-    case GCS_ACT_TORDERED:
+    case GCS_ACT_WRITESET:
     {
         assert(act.seqno_g > 0);
         GcsActionTrx trx(trx_pool_, act);
@@ -100,7 +100,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         gu_trace(replicator_.process_commit_cut(seq, act.seqno_l));
         break;
     }
-    case GCS_ACT_CONF:
+    case GCS_ACT_CCHANGE:
         gu_trace(replicator_.process_conf_change(recv_ctx, act));
         break;
     case GCS_ACT_STATE_REQ:

@@ -74,7 +74,7 @@ static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
     t->act.size     = MAX_MSG_LEN;
     t->act.seqno_g  = GCS_SEQNO_ILL;
     t->act.seqno_l  = GCS_SEQNO_ILL;
-    t->act.type     = GCS_ACT_TORDERED;
+    t->act.type     = GCS_ACT_WRITESET;
     t->n_tries      = n_tries;
 
     if (t->msg)
@@ -360,7 +360,7 @@ test_after_recv (gcs_test_thread_t* thread)
     ret = test_send_last_applied (gcs, thread->act.seqno_g);
 //    fprintf (stdout, "SEQNO applied %lld", thread->local_act_id);
 
-    if (thread->act.type == GCS_ACT_TORDERED)
+    if (thread->act.type == GCS_ACT_WRITESET)
         gcache_free (gcache, thread->act.buf);
 
     return ret;
@@ -416,7 +416,7 @@ void *gcs_test_send (void *arg)
 
     /* send message to group */
         ret = gcs_send (gcs, thread->act.buf, thread->act.size,
-                        GCS_ACT_TORDERED, false);
+                        GCS_ACT_WRITESET, false);
 
         if (ret < 0) break;
         //sleep (1);
@@ -433,11 +433,11 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 {
     long ret;
     static gcs_seqno_t conf_id = 0;
-    gcs_act_conf const conf(thread->act.buf, thread->act.size);
+    gcs_act_cchange const conf(thread->act.buf, thread->act.size);
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 
-    fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
+    fprintf (stdout, "Got GCS_ACT_CCHANGE: Conf: %lld, "
              "seqno: %lld, members: %d, my idx: %d, local seqno: %lld\n",
              (long long)conf.conf_id, (long long)conf.seqno,
              conf.memb_num, conf.my_idx, (long long)thread->act.seqno_l);
@@ -510,7 +510,7 @@ void *gcs_test_recv (void *arg)
         size_recvd += thread->act.size;
 
         switch (thread->act.type) {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
             test_after_recv (thread);
             //puts (thread->log_msg); fflush (stdout);
             break;
@@ -518,7 +518,7 @@ void *gcs_test_recv (void *arg)
             group_seqno = *(gcs_seqno_t*)thread->act.buf;
             gu_to_self_cancel (to, thread->act.seqno_l);
             break;
-        case GCS_ACT_CONF:
+        case GCS_ACT_CCHANGE:
             gcs_test_handle_configuration (gcs, thread);
             break;
         case GCS_ACT_STATE_REQ:

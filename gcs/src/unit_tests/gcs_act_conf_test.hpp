@@ -2,9 +2,9 @@
 
 // $Id$
 
-#ifndef __gcs_act_conf_test__
-#define __gcs_act_conf_test__
+#ifndef __gcs_act_cchange_test__
+#define __gcs_act_cchange_test__
 
-Suite *gcs_act_conf_suite(void);
+Suite *gcs_act_cchange_suite(void);
 
-#endif /* __gcs_act_conf_test__ */
+#endif /* __gcs_act_cchange_test__ */

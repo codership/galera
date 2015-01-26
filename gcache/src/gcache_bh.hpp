@@ -30,8 +30,9 @@ namespace gcache
         int64_t  seqno_d;
         int64_t  size;    /*! total buffer size, including header */
         MemOps*  ctx;
-        uint32_t flags;
-        int32_t  store;
+        uint16_t flags;
+        int8_t   store;
+        int8_t   type;    /*! arbitrary user defined type */
     }__attribute__((__packed__));
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
@@ -57,6 +58,7 @@ namespace gcache
         assert(0 == bh->ctx);
         assert(0 == bh->flags);
         assert(0 == bh->store);
+        assert(0 == bh->type);
     }
 
     static inline bool

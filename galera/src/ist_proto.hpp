@@ -227,12 +227,10 @@ namespace galera
         public:
 
             Proto(TrxHandleSlave::Pool& sp,
-//                  const std::string& data_dir,
                   gcache::GCache&       gc,
                   int version, bool keep_keys)
                 :
                 trx_pool_ (sp),
-//                data_dir_ (data_dir),
                 gcache_   (gc),
                 raw_sent_ (0),
                 real_sent_(0),
@@ -550,7 +548,8 @@ namespace galera
                     trx->set_depends_seqno(seqno_d);
                     trx->mark_certified();
 
-                    gcache_.seqno_assign(wbuf, seqno_g, seqno_d);
+                    gcache_.seqno_assign(wbuf, seqno_g, seqno_d,
+                                         GCS_ACT_WRITESET);
 
 //                    log_debug << "received trx body: " << *trx;
                     std::ostringstream os;

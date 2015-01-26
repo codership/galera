@@ -11,7 +11,7 @@
 #include <string>
 #include <limits>
 
-gcs_act_conf::gcs_act_conf()
+gcs_act_cchange::gcs_act_cchange()
     :
     uuid(GU_UUID_NIL),
     seqno(GCS_SEQNO_ILL),
@@ -57,7 +57,7 @@ inline std::istream& operator>>(std::istream& is, gcs_node_state_t& ns)
     return is;
 }
 
-gcs_act_conf::gcs_act_conf(const void* const cc_buf, int const cc_size)
+gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
     :
     uuid(),
     seqno(),
@@ -111,13 +111,13 @@ gcs_act_conf::gcs_act_conf(const void* const cc_buf, int const cc_size)
     std::copy(b, b + memb_size, memb);
 }
 
-gcs_act_conf::~gcs_act_conf()
+gcs_act_cchange::~gcs_act_cchange()
 {
     delete[] memb;
 }
 
 int
-gcs_act_conf::write(void** buf) const
+gcs_act_cchange::write(void** buf) const
 {
     int const cc_ver(0);
     std::ostringstream os;
@@ -163,7 +163,7 @@ gcs_act_conf::write(void** buf) const
 }
 
 bool
-gcs_act_conf::operator==(const gcs_act_conf& other) const
+gcs_act_cchange::operator==(const gcs_act_cchange& other) const
 {
     return (
         repl_proto_ver == other.repl_proto_ver &&

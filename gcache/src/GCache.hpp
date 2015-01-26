@@ -64,7 +64,8 @@ namespace gcache
          */
         void  seqno_assign (const void* ptr,
                             int64_t     seqno_g,
-                            int64_t     seqno_d);
+                            int64_t     seqno_d,
+                            uint8_t     type);
 
         /*!
          * Release (free) buffers up to seqno
