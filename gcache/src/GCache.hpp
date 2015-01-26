@@ -103,14 +103,15 @@ namespace gcache
         {
         public:
 
-            Buffer() : seqno_g_(), ptr_(), size_(), seqno_d_() { }
+            Buffer() : seqno_g_(), ptr_(), size_(), seqno_d_(), type_() { }
 
             Buffer (const Buffer& other)
                 :
                 seqno_g_(other.seqno_g_),
                 ptr_    (other.ptr_),
                 size_   (other.size_),
-                seqno_d_(other.seqno_d_)
+                seqno_d_(other.seqno_d_),
+                type_   (other.type_)
             { }
 
             Buffer& operator= (const Buffer& other)
@@ -119,6 +120,7 @@ namespace gcache
                 ptr_     = other.ptr_;
                 size_    = other.size_;
                 seqno_d_ = other.seqno_d_;
+                type_    = other.type_;
                 return *this;
             }
 
@@ -126,6 +128,7 @@ namespace gcache
             const gu::byte_t* ptr()     const { return ptr_;     }
             ssize_t           size()    const { return size_;    }
             int64_t           seqno_d() const { return seqno_d_; }
+            uint8_t           type()    const { return type_;    }
 
         protected:
 
@@ -134,8 +137,8 @@ namespace gcache
                 ptr_ = reinterpret_cast<const gu::byte_t*>(p);
             }
 
-            void set_other (ssize_t s, int64_t g, int64_t d)
-            { size_ = s; seqno_g_ = g; seqno_d_ = d; }
+            void set_other (ssize_t s, int64_t g, int64_t d, uint8_t t)
+            { size_ = s; seqno_g_ = g; seqno_d_ = d; type_ = t; }
 
         private:
 
@@ -143,6 +146,7 @@ namespace gcache
             const gu::byte_t* ptr_;
             ssize_t           size_;
             int64_t           seqno_d_;
+            uint8_t           type_;
 
             friend class GCache;
         };

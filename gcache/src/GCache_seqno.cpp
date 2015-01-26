@@ -267,7 +267,8 @@ namespace gcache
 
             v[i].set_other (bh->size - sizeof(BufferHeader),
                             bh->seqno_g,
-                            bh->seqno_d);
+                            bh->seqno_d,
+                            bh->type);
         }
 
         return found;
