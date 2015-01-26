@@ -81,7 +81,8 @@ libgalerautilsxx_sources = [
     'gu_resolver.cpp',
     'gu_histogram.cpp',
     'gu_stats.cpp',
-    'gu_asio.cpp'
+    'gu_asio.cpp',
+    'gu_debug_sync.cpp'
 ]
 
 #libgalerautilsxx_objs  = libgalerautilsxx_env.Object(

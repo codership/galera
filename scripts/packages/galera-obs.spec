@@ -16,26 +16,40 @@
 # MA  02110-1301  USA.
 
 %{!?name: %define name galera-3}
-%{!?version: %define version 3.x}
+%{!?version: %define version 25_3.x}
 %{!?release: %define release 1}
+%define revision XXXX
 %define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
-%dump
+# Define dist tag if not given by platform
+
+# For suse versions see:
+# https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+%if 0%{?suse_version} == 1310
+%define dist suse13.1
+%endif
+%if 0%{?suse_version} == 1315
+%define dist sle13.1
+%endif
+%if 0%{?suse_version} == 1320
+%define dist suse13.2
+%endif
+
 
 Name:          %{name}
 Summary:       Galera: a synchronous multi-master wsrep provider (replication engine)
 Group:         System Environment/Libraries
 Version:       %{version}
-Release:       %{release}
+Release:       %{release}%{dist}
 License:       GPL-2.0
 Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
 Packager:      Codership Oy
 Vendor:        Codership Oy
 
-BuildRoot:     %{_tmppath}/%{name}-%{version}-build
+BuildRoot:     %{_tmppath}/%{name}_%{version}-build
 
 BuildRequires: boost-devel
 BuildRequires: check-devel
@@ -75,8 +89,11 @@ BuildRequires: systemd
 %endif
 
 
-
 Requires:      openssl nmap
+
+%if 0%{?centos} == 6
+Requires: nc
+%endif
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 
@@ -92,7 +109,9 @@ This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
-%setup -q
+%setup -q -n %{name}-%{version}
+# When downloading from GitHub the contents is in a folder
+# that is named by the branch it was exported from.
 
 %build
 # Debug info:
@@ -111,11 +130,13 @@ export CC=gcc-4.7
 export CXX=g++-4.7
 %endif
 
-scons -j$(echo ${NUM_JOBS:-"1"})
+scons -j$(echo ${NUM_JOBS:-"1"}) revno=%{revision}
 
 %install
-RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3.x-17.1.x86_64
+RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
 RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
+# When downloading from GitHub the contents is in a folder
+# that is named by the branch it was exported from.
 
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
@@ -157,8 +178,8 @@ install -m 644 $RBD/chromium/LICENSE              $RBR%{docs}/LICENSE.chromium
 install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
-install -d $RBR%{_mandir}/man1
-install -m 644 $RBD/garb/files/garbd.troff        $RBR%{_mandir}/man1/garbd.1
+install -d $RBR%{_mandir}/man8
+install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
 
 %post
 %fillup_and_insserv
@@ -205,7 +226,7 @@ rm -f $(find %{libs} -type l)
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
 
-%doc %attr(644, root, man) %{_mandir}/man1/garbd.1*
+%doc %attr(644, root, man) %{_mandir}/man8/garbd.1*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;

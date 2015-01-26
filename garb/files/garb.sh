@@ -15,9 +15,9 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Galera Arbitrator Daemon
-# Description:       Garbd is used as part of clusters that have only two
-#                    real Galera servers and need an extra
-#                    node to arbitrate split brain situations.
+# Description:       The Galera Arbitrator is used as part of clusters
+#                    that have only two real Galera servers and need an
+#                    extra node to arbitrate split brain situations.
 ### END INIT INFO
 
 # Source function library.
