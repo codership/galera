@@ -267,7 +267,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     // directory. Unfortunately we cannot do it later, in gcomm 
     // initialization, because there we do not know the database
     // directory name.
-    if (config_.is_set(gcomm::Conf::ViewStateFile))
+    if (!config_.is_set(gcomm::Conf::ViewStateFile))
     {
        config_.set(gcomm::Conf::ViewStateFile,
                    data_dir_ + '/' + galera::VIEW_STATE_FILE);
