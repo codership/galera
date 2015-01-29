@@ -7,6 +7,8 @@
 #include "galera_exception.hpp"
 #include "uuid.hpp"
 
+#include "gcomm/conf.hpp"
+
 #include "galera_info.hpp"
 
 #include "gu_debug_sync.hpp"
@@ -259,6 +261,17 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     cert_.assign_initial_position(seqno, trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
+
+    // Now we have to find if view state file name is set in provider
+    // options. If it is not we are setting it here to put it to database
+    // directory. Unfortunately we cannot do it later, in gcomm 
+    // initialization, because there we do not know the database
+    // directory name.
+    if (config_.is_set(gcomm::Conf::ViewStateFile))
+    {
+       config_.set(gcomm::Conf::ViewStateFile,
+                   data_dir_ + '/' + galera::VIEW_STATE_FILE);
+    }
 }
 
 galera::ReplicatorSMM::~ReplicatorSMM()

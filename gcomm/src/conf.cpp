@@ -110,6 +110,10 @@ std::string const gcomm::Conf::PcWaitPrimTimeout =
 std::string const gcomm::Conf::PcWeight = PcPrefix + "weight";
 std::string const gcomm::Conf::PcRecovery = PcPrefix + "recovery";
 
+// Location of view state file.
+std::string const gcomm::Conf::ViewStateFile =
+    "gcomm" + Delim + "view_state_file";
+
 void
 gcomm::Conf::register_params(gu::Config& cnf)
 {
@@ -172,6 +176,8 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD_DEFAULT(PcWaitPrimTimeout);
     GCOMM_CONF_ADD_DEFAULT(PcWeight);
     GCOMM_CONF_ADD_DEFAULT(PcRecovery);
+
+    GCOMM_CONF_ADD        (ViewStateFile);
 
 #undef GCOMM_CONF_ADD
 #undef GCOMM_CONF_ADD_DEFAULT

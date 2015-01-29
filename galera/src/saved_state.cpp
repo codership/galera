@@ -10,6 +10,7 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <sys/file.h>
 
 namespace galera
 {
@@ -35,7 +36,6 @@ SavedState::SavedState  (const std::string& file) :
                     unlink(file.c_str()););
 
     std::ifstream ifs(file.c_str());
-    std::ofstream ofs;
 
     if (ifs.fail())
     {
@@ -49,6 +49,14 @@ SavedState::SavedState  (const std::string& file) :
         log_warn << "Could not open saved state file for writing: " << file;
         /* We are not reading anything from file we can't write to, since it
            may be terribly outdated. */
+        return;
+    }
+
+    // We take exclusive lock on state file in order to avoid possibility
+    // of two Galera replicators sharing the same state file.
+    if (flock(fileno(fs_), LOCK_EX|LOCK_NB))
+    {
+        log_warn << "Could not get exclusive lock on state file: " << file;
         return;
     }
 
@@ -125,7 +133,14 @@ SavedState::SavedState  (const std::string& file) :
 
 SavedState::~SavedState ()
 {
-    if (fs_) fclose(fs_);
+    if (fs_)
+    {
+        if (flock(fileno(fs_), LOCK_UN) != 0)
+        {
+            log_error << "Could not unlock saved state file.";
+        }
+        fclose(fs_);
+    }
 }
 
 void

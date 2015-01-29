@@ -25,7 +25,8 @@ void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
         um.view().id().type() == V_PRIM)
     {
         ViewState vst(const_cast<UUID&>(uuid()),
-                      const_cast<View&>(um.view()));
+                      const_cast<View&>(um.view()),
+                      conf_);
         log_info << "save pc into disk";
         vst.write_file();
     }
@@ -216,7 +217,7 @@ void gcomm::PC::close(bool force)
     pstack_.pop_proto(pc_);
     pstack_.pop_proto(evs_);
     pstack_.pop_proto(gmcast_);
-    ViewState::remove_file();
+    ViewState::remove_file(conf_);
 
     closed_ = true;
 }
@@ -250,7 +251,7 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
 
     conf_.set(Conf::PcRecovery, gu::to_string(pc_recovery_));
     bool restored = false;
-    ViewState vst(rst_uuid_, rst_view_);
+    ViewState vst(rst_uuid_, rst_view_, conf_);
     if (pc_recovery_) {
         if (vst.read_file()) {
             log_info << "restore pc from disk successfully";
@@ -260,7 +261,7 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
         }
     } else {
         log_info << "skip pc recovery and remove state file";
-        ViewState::remove_file();
+        ViewState::remove_file(conf_);
     }
 
     gmcast_ = new GMCast(pnet(), uri_, restored ? &rst_uuid_ : NULL);
