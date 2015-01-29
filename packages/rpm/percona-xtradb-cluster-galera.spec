@@ -171,8 +171,8 @@ install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README     \
     $RPM_BUILD_ROOT%{docs2}/README
 
 install -d $RPM_BUILD_ROOT%{_mandir}/man1
-install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garbd.troff  \
-    $RPM_BUILD_ROOT%{_mandir}/man1/garbd.1
+#install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garbd.troff  \
+    #$RPM_BUILD_ROOT%{_mandir}/man1/garbd.1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
