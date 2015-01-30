@@ -411,9 +411,9 @@ namespace gcomm
         static std::string const PcRecovery;
 
         /*!
-         * @brief Location of view state file.
+         * @brief Directory for view state file.
          */
-        static std::string const ViewStateFile;
+        static std::string const BaseDir;
 
         static void register_params(gu::Config&);
     };

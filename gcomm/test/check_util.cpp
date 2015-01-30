@@ -202,8 +202,6 @@ START_TEST(test_view_state)
     // Create configuration to set file name.
     gu::Config conf;
     gcomm::Conf::register_params(conf);
-    const char* fname = "/tmp/gvwstate.dat";
-    conf.set(Conf::ViewStateFile, fname);
 
     // compare view state.
     UUID my_uuid(NULL, 0);

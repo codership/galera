@@ -249,18 +249,9 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
 
 std::string gcomm::ViewState::get_viewstate_file_name(gu::Config& conf)
 {
-    // Check if file name was provided in provider options.
-    if (conf.is_set(Conf::ViewStateFile))
-    {
-        std::string file_name = conf.get(Conf::ViewStateFile);
-        // There is file name in the provider options,
-        // we should use it.
-        return file_name;
-    }
-
-    // If there is no view state file in the provider options we are
-    // using default file name.
-    return galera::VIEW_STATE_FILE;
+    // Get directory name from the configuration.
+    std::string dir_name = conf.get(Conf::BaseDir);
+    return dir_name + '/' +  galera::VIEW_STATE_FILE;
 }
 
 void gcomm::ViewState::write_file() const
