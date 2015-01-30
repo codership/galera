@@ -110,9 +110,6 @@ std::string const gcomm::Conf::PcWaitPrimTimeout =
 std::string const gcomm::Conf::PcWeight = PcPrefix + "weight";
 std::string const gcomm::Conf::PcRecovery = PcPrefix + "recovery";
 
-// Common directory name
-std::string const gcomm::Conf::BaseDir = COMMON_BASE_DIR_KEY;
-
 void
 gcomm::Conf::register_params(gu::Config& cnf)
 {
@@ -121,8 +118,6 @@ gcomm::Conf::register_params(gu::Config& cnf)
 
     GCOMM_CONF_ADD (COMMON_BASE_HOST_KEY);
     GCOMM_CONF_ADD (COMMON_BASE_PORT_KEY);
-
-    GCOMM_CONF_ADD_DEFAULT(BaseDir);
 
     GCOMM_CONF_ADD_DEFAULT(ProtonetBackend);
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);

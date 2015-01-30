@@ -170,6 +170,7 @@ namespace galera
         {
             static const std::string base_host;
             static const std::string base_port;
+            static const std::string base_dir;
             static const std::string proto_max;
             static const std::string key_format;
             static const std::string commit_order;

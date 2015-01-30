@@ -11,6 +11,7 @@
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
+const std::string galera::ReplicatorSMM::Param::base_dir  = "base_dir";
 
 static const std::string common_prefix = "repl.";
 
@@ -30,6 +31,7 @@ int const galera::ReplicatorSMM::MAX_PROTO_VER(7);
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
+    map_.insert(Default(Param::base_dir, BASE_DIR_DEFAULT));
     map_.insert(Default(Param::proto_max,  gu::to_string(MAX_PROTO_VER)));
     map_.insert(Default(Param::key_format, "FLAT8"));
     map_.insert(Default(Param::commit_order, "3"));
@@ -134,6 +136,7 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     }
     else if (key == Param::base_host ||
              key == Param::base_port ||
+             key == Param::base_dir ||
              key == Param::proto_max)
     {
         // nothing to do here, these params take effect only at

@@ -201,7 +201,6 @@ START_TEST(test_view_state)
 
     // Create configuration to set file name.
     gu::Config conf;
-    gcomm::Conf::register_params(conf);
 
     // compare view state.
     UUID my_uuid(NULL, 0);

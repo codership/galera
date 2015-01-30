@@ -410,11 +410,6 @@ namespace gcomm
          */
         static std::string const PcRecovery;
 
-        /*!
-         * @brief Directory for view state file.
-         */
-        static std::string const BaseDir;
-
         static void register_params(gu::Config&);
     };
 

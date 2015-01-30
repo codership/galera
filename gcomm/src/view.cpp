@@ -249,8 +249,16 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
 
 std::string gcomm::ViewState::get_viewstate_file_name(gu::Config& conf)
 {
-    // Get directory name from the configuration.
-    std::string dir_name = conf.get(Conf::BaseDir);
+    std::string dir_name = COMMON_BASE_DIR_DEFAULT;
+
+    try {
+        // If base_dir is set in the configuration we should use
+        // it instead of current directory default.
+        dir_name = conf.get(COMMON_BASE_DIR_KEY, dir_name);
+    } catch (const gu::NotFound &) {
+        // In case it is not known we do not have to do
+        // anything and use default.
+    }
     return dir_name + '/' +  galera::VIEW_STATE_FILE;
 }
 
