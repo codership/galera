@@ -2,7 +2,7 @@
  * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
-#include "common.hpp"
+#include "common/common.h"
 
 #include "gcomm/view.hpp"
 #include "gcomm/types.hpp"
