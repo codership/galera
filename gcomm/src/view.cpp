@@ -2,7 +2,7 @@
  * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
-#include "galera_common.hpp"
+#include "common.hpp"
 
 #include "gcomm/view.hpp"
 #include "gcomm/types.hpp"
@@ -259,7 +259,7 @@ std::string gcomm::ViewState::get_viewstate_file_name(gu::Config& conf)
         // In case it is not known we do not have to do
         // anything and use default.
     }
-    return dir_name + '/' +  galera::VIEW_STATE_FILE;
+    return dir_name + '/' +  COMMON_VIEW_STAT_FILE;
 }
 
 void gcomm::ViewState::write_file() const
