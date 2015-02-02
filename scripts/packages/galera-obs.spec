@@ -23,6 +23,10 @@
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
+# Avoid debuginfo RPMs, leaves binaries unstripped
+
+%global debug_package %{nil}
+
 # Define dist tag if not given by platform
 
 # For suse versions see:
