@@ -31,14 +31,17 @@
 
 # For suse versions see:
 # https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+%if 0%{?suse_version} == 1110
+%define dist .sle11
+%endif
 %if 0%{?suse_version} == 1310
-%define dist suse13.1
+%define dist .suse13.1
 %endif
 %if 0%{?suse_version} == 1315
-%define dist sle13.1
+%define dist .sle12
 %endif
 %if 0%{?suse_version} == 1320
-%define dist suse13.2
+%define dist .suse13.2
 %endif
 
 
