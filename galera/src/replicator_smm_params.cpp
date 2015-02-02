@@ -45,7 +45,8 @@ const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 
 
 galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
-                                              const char* const node_address)
+                                              const char* const node_address,
+                                              const char* const base_dir)
 {
     gu::ssl_register_params(conf);
     Replicator::register_params(conf);
@@ -95,6 +96,18 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
             conf.set(BASE_PORT_KEY, na.get_port());
         }
         catch (gu::NotSet& e) {}
+    }
+
+    // Now we store directory name to conf. This directory name
+    // could be used by other components, for example by gcomm
+    // to find appropriate location for view state file.
+    if (base_dir)
+    {
+       conf.set(BASE_DIR, base_dir);
+    }
+    else
+    {
+       conf.set(BASE_DIR, ".");
     }
 
     /* register variables and defaults from other modules */
