@@ -107,7 +107,7 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
     }
     else
     {
-       conf.set(BASE_DIR, ".");
+       conf.set(BASE_DIR, BASE_DIR_DEFAULT);
     }
 
     /* register variables and defaults from other modules */
