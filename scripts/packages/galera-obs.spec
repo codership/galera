@@ -25,7 +25,9 @@
 
 # Avoid debuginfo RPMs, leaves binaries unstripped
 
+%global _enable_debug_package 0
 %global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
 
 # Define dist tag if not given by platform
 
