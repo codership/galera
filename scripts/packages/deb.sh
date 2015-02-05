@@ -38,7 +38,7 @@ function build_deb
     cd "$galera_dir"
 
     dch -m -D "$debian_version" --force-distribution -v "$version-$debian_version" "Version upgrade"
-    DEB_BUILD_OPTIONS="parallel=$JOBS" dpkg-buildpackage -us -uc
+    DEB_BUILD_OPTIONS="parallel=$JOBS nostrip" dpkg-buildpackage -us -uc
 
     test -d "$galera_dir" && rm -rf "$galera_dir"
     test -f "$source_tar" && rm -r "$source_tar"
