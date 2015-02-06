@@ -158,7 +158,7 @@ namespace galera
 
         struct InitConfig
         {
-            InitConfig(gu::Config&, const char* node_address);
+            InitConfig(gu::Config&, const char* node_address, const char *base_dir);
         };
 
     private:
@@ -170,6 +170,7 @@ namespace galera
         {
             static const std::string base_host;
             static const std::string base_port;
+            static const std::string base_dir;
             static const std::string proto_max;
             static const std::string key_format;
             static const std::string commit_order;
@@ -499,7 +500,6 @@ namespace galera
         const CommitOrder::Mode co_mode_; // commit order mode
 
         // persistent data location
-        std::string           data_dir_;
         std::string           state_file_;
         SavedState            st_;
 

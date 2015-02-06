@@ -46,10 +46,26 @@ GCS/GCOMM option list. It is likely to be the same as on other nodes of the
 cluster.
 .TP
 \fB\-l\fR [ \fB\-\-log\fR ] arg
-Log file
+Path to log file
 .TP
 \fB\-c\fR [ \fB\-\-cfg\fR ] arg
-Configuration file
+Path to configuration file.
+Configuration file contains garbd options in the form \fB<option>=<value>\fR, one option per line.
+Hash symbol starts comments. Example:
+
+.RS
+# garbd config file
+.br
+daemon=1
+.br
+address="gcomm://192.168.90.3:4567"
+.br
+group="my_cluster"
+.br
+options="gmcast.segment=4;"
+.br
+log="/tmp/garb.log"
+.RE
 .SS "Other options:"
 .TP
 \fB\-v\fR [ \fB\-\-version\fR ]

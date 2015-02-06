@@ -23,18 +23,27 @@
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
+# Avoid debuginfo RPMs, leaves binaries unstripped
+
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
 # Define dist tag if not given by platform
 
 # For suse versions see:
 # https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+%if 0%{?suse_version} == 1110
+%define dist .sle11
+%endif
 %if 0%{?suse_version} == 1310
-%define dist suse13.1
+%define dist .suse13.1
 %endif
 %if 0%{?suse_version} == 1315
-%define dist sle13.1
+%define dist .sle12
 %endif
 %if 0%{?suse_version} == 1320
-%define dist suse13.2
+%define dist .suse13.2
 %endif
 
 
@@ -130,7 +139,9 @@ export CC=gcc-4.7
 export CXX=g++-4.7
 %endif
 
-scons -j$(echo ${NUM_JOBS:-"1"}) revno=%{revision}
+NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
+
+scons -j$(echo $NUM_JOBS) revno=%{revision}
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
