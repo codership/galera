@@ -97,7 +97,13 @@ BuildRequires: systemd
 %define systemd 0
 %endif
 
+%if 0%{?suse_version}
 PreReq:        %insserv_prereq %fillup_prereq
+%else
+Requires(post): chkconfig
+Requires(preun): chkconfig
+Requires(preun): initscripts
+%endif
 Requires:      openssl nmap
 
 %if 0%{?centos} == 6
@@ -192,11 +198,12 @@ install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 install -d $RBR%{_mandir}/man8
 install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
 
+%if 0%{?suse_version}
 # For the various macros and their parameters, see here:
 # https://en.opensuse.org/openSUSE:Packaging_Conventions_RPM_Macros
 
 %post
-%fillup_and_insserv %{name}
+%fillup_and_insserv garb
 
 %preun
 %stop_on_removal garb
@@ -205,6 +212,31 @@ rm -f $(find %{libs} -type l)
 %postun
 %restart_on_update garb
 %insserv_cleanup
+
+%else
+# Not SuSE - so it must be RedHat, CentOS, Fedora
+
+%post
+/sbin/chkconfig --add garb
+
+%preun
+if [ "$1" = "0" ]
+then
+    /sbin/service garb stop
+    /sbin/chkconfig --del garb
+fi
+
+%postun
+# >=1 packages after uninstall -> pkg was updated -> restart
+if [ "$1" -ge "1" ]
+then
+    /sbin/service garb restart
+fi
+
+
+%endif
+# SuSE versus Fedora/RedHat/CentOS
+
 
 %files
 %defattr(-,root,root,0755)
@@ -248,6 +280,7 @@ rm -f $(find %{libs} -type l)
 %changelog
 * Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Add missing "prereq" directive and arguments for the various service control macros.
+- Handle the difference between SuSE and Fedora/RedHat/CentOS.
 
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
 - Initial OBS packaging created
