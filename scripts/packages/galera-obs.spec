@@ -97,7 +97,7 @@ BuildRequires: systemd
 %define systemd 0
 %endif
 
-
+PreReq:        %insserv_prereq %fillup_prereq
 Requires:      openssl nmap
 
 %if 0%{?centos} == 6
@@ -192,15 +192,18 @@ install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 install -d $RBR%{_mandir}/man8
 install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
 
+# For the various macros and their parameters, see here:
+# https://en.opensuse.org/openSUSE:Packaging_Conventions_RPM_Macros
+
 %post
-%fillup_and_insserv
+%fillup_and_insserv %{name}
 
 %preun
-%stop_on_removal
+%stop_on_removal garb
 rm -f $(find %{libs} -type l)
 
 %postun
-%restart_on_update
+%restart_on_update garb
 %insserv_cleanup
 
 %files
@@ -243,6 +246,9 @@ rm -f $(find %{libs} -type l)
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
 
 %changelog
+* Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add missing "prereq" directive and arguments for the various service control macros.
+
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
 - Initial OBS packaging created
 
