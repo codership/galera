@@ -652,16 +652,18 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 {
     assert(sst_req_len >= 0);
 
-    wsrep_seqno_t const last_missing_seqno(cc_seqno - 1);//remove when IST supports CC events
+//    wsrep_seqno_t const last_missing_seqno(cc_seqno - 1);//remove when IST supports CC events
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
                                                   group_uuid,
-                                                  last_missing_seqno));
+//remove                                                  last_missing_seqno
+                                                  cc_seqno
+));
     gu::Lock lock(sst_mutex_);
 
     st_.mark_unsafe();
 
-    send_state_request (req);
+    send_state_request(req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
@@ -724,11 +726,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert(sst_uuid_ == group_uuid);
 
         // IST is prepared only with str proto ver 1 and above
-        if (STATE_SEQNO() < last_missing_seqno)
+        if (STATE_SEQNO() < cc_seqno)
         {
-            log_info << "Receiving IST: " << (last_missing_seqno-STATE_SEQNO())
+            log_info << "Receiving IST: " << (cc_seqno - STATE_SEQNO())
                      << " writesets, seqnos " << (STATE_SEQNO() + 1)
-                     << "-" << last_missing_seqno;
+                     << "-" << cc_seqno;
+
             ist_receiver_.ready();
             recv_IST(recv_ctx);
             sst_seqno_ = ist_receiver_.finished();
@@ -764,44 +767,94 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 }
 
 
+bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
+{
+    assert(GCS_ACT_WRITESET == act.type);
+
+    class IstTrx  // to ensure automatic trx cleanup on exception
+    {
+    public:
+        IstTrx(TrxHandleSlave::Pool& p)
+            : trx_(TrxHandleSlave::New(p)) { trx_->lock(); }
+        ~IstTrx() { trx_->unlock(); trx_->unref(); }
+        TrxHandleSlave* const trx_;
+    }
+    ist_trx(slave_pool_);
+
+    TrxHandleSlave* const trx(ist_trx.trx_);
+    bool exit_loop(false);
+
+    if (gu_likely(0 != act.size))
+    {
+        assert(act.buf != NULL);
+
+        gu_trace(trx->unserialize(
+                     static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+
+        trx->verify_checksum();
+        trx->set_state(TrxHandle::S_CERTIFYING);
+
+        assert(trx->global_seqno() == act.seqno_g);
+        assert(trx->depends_seqno() >= 0);
+
+        gu_trace(apply_trx(recv_ctx, trx));
+
+        exit_loop = trx->exit_loop();
+    }
+    else
+    {
+        trx->set_received(0, -1, act.seqno_g);
+        trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
+        trx->mark_certified();
+
+        ApplyOrder ao(*trx);
+        apply_monitor_.self_cancel(ao);
+        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+        {
+            CommitOrder co(*trx, co_mode_);
+            commit_monitor_.self_cancel(co);
+        }
+    }
+
+    if (gu_unlikely
+        (gu::Logger::no_log(gu::LOG_DEBUG) == false))
+    {
+        std::ostringstream os;
+        os << "IST received trx body: " << *trx;
+        log_debug << os;
+    }
+
+    return exit_loop;
+}
+
+
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
     try
     {
-        while (true)
+        bool exit_loop(false);
+
+        while (!exit_loop)
         {
-            TrxHandleSlave* trx(0);
+            gcs_action act;
             int err;
-            if ((err = ist_receiver_.recv(&trx)) == 0)
+
+            if (gu_likely((err = ist_receiver_.recv(act)) == 0))
             {
-                assert(trx != 0);
-                TrxHandleLock lock(*trx);
-                // Verify checksum before applying. This is also required
-                // to synchronize with possible background checksum thread.
-                trx->verify_checksum();
-                if (trx->depends_seqno() == -1)
+                if (gu_likely(GCS_ACT_WRITESET == act.type))
                 {
-                    ApplyOrder ao(*trx);
-                    apply_monitor_.self_cancel(ao);
-                    if (co_mode_ != CommitOrder::BYPASS)
-                    {
-                        CommitOrder co(*trx, co_mode_);
-                        commit_monitor_.self_cancel(co);
-                    }
+                    exit_loop = process_IST_writeset(recv_ctx, act);
                 }
                 else
                 {
-                    // replicating and certifying stages have been
-                    // processed on donor, just adjust states here
-                    trx->set_state(TrxHandle::S_CERTIFYING);
-                    apply_trx(recv_ctx, trx);
+                    assert(GCS_ACT_CCHANGE == act.type);
+                    process_conf_change(recv_ctx, act);
                 }
             }
             else
             {
                 return;
             }
-            trx->unref();
         }
     }
     catch (gu::Exception& e)

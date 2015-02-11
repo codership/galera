@@ -41,7 +41,7 @@ namespace galera
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
             void          ready();
-            int           recv(TrxHandleSlave** trx);
+            int           recv(gcs_action& act);
             wsrep_seqno_t finished();
             void          run();
 
@@ -60,17 +60,17 @@ namespace galera
             {
             public:
 
-                Consumer() : cond_(), trx_(0) { }
+                Consumer() : cond_(), act_() { }
                 ~Consumer() { }
 
-                gu::Cond&       cond()                   { return cond_; }
-                void            trx(TrxHandleSlave* trx) { trx_ = trx;   }
-                TrxHandleSlave* trx() const              { return trx_;  }
+                gu::Cond&         cond()                     { return cond_; }
+                void              act(const gcs_action& act) { act_ = act;   }
+                const gcs_action& act() const                { return act_;  }
 
             private:
 
                 gu::Cond        cond_;
-                TrxHandleSlave* trx_;
+                gcs_action      act_;
             };
 
             std::stack<Consumer*> consumers_;

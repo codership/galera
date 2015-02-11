@@ -593,16 +593,18 @@ namespace galera
             header_.finalize(ls, pa_range);
         }
 
-        /* Serializes wiriteset into a single buffer (for unit test purposes) */
-        void serialize(const wsrep_uuid_t&      source,
+        /* Serializes wiriteset into a single buffer (for unit test purposes)
+         * set last_seen to -1 if ws was explicitly finalized */
+        void serialize(std::vector<gu::byte_t>& ret,
+                       const wsrep_uuid_t&      source,
                        const wsrep_conn_id_t&   conn,
                        const wsrep_trx_id_t&    trx,
                        const wsrep_seqno_t&     last_seen,
-                       std::vector<gu::byte_t>& ret)
+                       const int                pa_range = -1)
         {
             WriteSetNG::GatherVector out;
             size_t const out_size(gather(source, conn, trx, out));
-            finalize(last_seen, -1);
+            finalize(last_seen, pa_range);
 
             ret.clear(); ret.reserve(out_size);
 
@@ -718,23 +720,34 @@ namespace galera
               check_ (false)
         {}
 
-        /* WriteSetIn(buf) == WriteSetIn() + read_buf(buf) */
-        void read_buf (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
+        void read_header (const gu::Buf& buf)
         {
             assert (0 == size_);
             assert (false == check_);
 
             header_.read_buf (buf);
             size_ = buf.size;
+        }
+
+        /*
+         * WriteSetIn(buf) == WriteSetIn() + read_buf(buf)
+         *
+         * @param st threshold at which launch dedicated thread for checksumming
+         *           0 - no checksumming
+         */
+        void read_buf (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
+        {
+            read_header (buf);
             init (st);
         }
 
-        void read_buf (const gu::byte_t* const ptr, ssize_t const len)
+        void read_buf (const gu::byte_t* const ptr, ssize_t const len,
+                       ssize_t const st = SIZE_THRESHOLD)
         {
             assert (ptr != NULL);
             assert (len >= 0);
             gu::Buf tmp = { ptr, len };
-            read_buf (tmp);
+            read_buf (tmp, st);
         }
 
         ~WriteSetIn ()

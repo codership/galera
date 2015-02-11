@@ -195,10 +195,10 @@ static inline long gcs_send (gcs_conn_t*    const conn,
 
 /*!*/
 struct gcs_action {
-    const void*    buf; /*! unlike input, output goes as a single buffer */
-    ssize_t        size;
     gcs_seqno_t    seqno_g;
     gcs_seqno_t    seqno_l;
+    const void*    buf; /*! unlike input, output goes as a single buffer */
+    int32_t        size;
     gcs_act_type_t type;
 };
 

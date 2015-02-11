@@ -41,15 +41,17 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-                          int64_t     const seqno_d,
-                          uint8_t     const type)
+//remove                          int64_t     const seqno_d,
+                          uint8_t     const type,
+                          bool        const skip)
     {
         gu::Lock lock(mtx);
 
         BufferHeader* bh = ptr2BH(ptr);
 
         assert (SEQNO_NONE == bh->seqno_g);
-        assert (SEQNO_ILL  == bh->seqno_d);
+        assert (seqno_g > 0);
+//remove        assert (SEQNO_ILL  == bh->seqno_d);
         assert (!BH_is_released(bh));
 
         if (gu_likely(seqno_g > seqno_max))
@@ -72,8 +74,10 @@ namespace gcache
         }
 
         bh->seqno_g = seqno_g;
-        bh->seqno_d = seqno_d;
+//remove        bh->seqno_d = seqno_d;
+        bh->flags  |= (BUFFER_SKIPPED * skip);
         bh->type    = type;
+
     }
 
     void
@@ -188,7 +192,7 @@ namespace gcache
      * @throws NotFound
      */
     const void* GCache::seqno_get_ptr (int64_t const seqno_g,
-                                       int64_t&      seqno_d,
+//remove                                       int64_t&      seqno_d,
                                        ssize_t&      size)
     {
         const void* ptr(0);
@@ -217,7 +221,7 @@ namespace gcache
         assert (ptr);
 
         const BufferHeader* const bh (ptr2BH(ptr)); // this can result in IO
-        seqno_d = bh->seqno_d;
+//remove        seqno_d = bh->seqno_d;
         size    = bh->size - sizeof(BufferHeader);
 
         return ptr;
@@ -267,7 +271,8 @@ namespace gcache
 
             v[i].set_other (bh->size - sizeof(BufferHeader),
                             bh->seqno_g,
-                            bh->seqno_d,
+//remove                            bh->seqno_d,
+                            BH_is_skipped(bh),
                             bh->type);
         }
 

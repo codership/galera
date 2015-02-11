@@ -393,6 +393,7 @@ namespace galera
                               wsrep_seqno_t       group_seqno);
 
         void recv_IST(void* recv_ctx);
+        bool process_IST_writeset(void* recv_ctx, const gcs_action& act);
 
         StateRequest* prepare_state_request (const void* sst_req,
                                              ssize_t     sst_req_len,
@@ -442,7 +443,7 @@ namespace galera
          * |                 1 |              1 |              0 |
          * |                 2 |              1 |              1 |
          * |                 3 |              2 |              1 |
-         * |                 4 |              2 |              1 |
+         * |                 4 |              2 |              1 | v2.1
          * |                 5 |              3 |              1 |
          * |                 6 |              3 |              2 |
          * |                 7 |              3 |              2 |

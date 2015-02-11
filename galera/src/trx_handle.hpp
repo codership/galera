@@ -644,7 +644,7 @@ namespace galera
             assert (last_seen_seqno >= 0);
             assert (last_seen_seqno >= this->last_seen_seqno());
 
-            int pa_range(version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
+            int pa_range(pa_range_default());
 
             if (gu_unlikely(false == trx_start_))
             {
@@ -663,8 +663,8 @@ namespace galera
         void serialize(const wsrep_seqno_t&     last_seen,
                        std::vector<gu::byte_t>& ret)
         {
-            write_set_out().serialize(source_id(), conn_id(), trx_id(),
-                                      last_seen, ret);
+            write_set_out().serialize(ret, source_id(), conn_id(), trx_id(),
+                                      last_seen, pa_range_default());
         }
 
         void clear()
@@ -736,6 +736,11 @@ namespace galera
         int  refcnt() const { return tr_.refcnt(); }
 
     private:
+
+        inline int pa_range_default()
+        {
+            return (version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
+        }
 
         void init_write_set_out()
         {

@@ -1614,7 +1614,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else
         {
-            gcache_.seqno_assign(cc.buf, cc.seqno_g, -1, GCS_ACT_CCHANGE);
+            gcache_.seqno_assign(cc.buf, cc.seqno_g,
+//remove -1,
+                                 GCS_ACT_CCHANGE, true);
 
             if (view_info->view == 1 || !app_wants_st)
             {
@@ -1868,11 +1870,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
     assert(trx->last_seen_seqno() >= 0);
     assert(trx->last_seen_seqno() < trx->global_seqno());
 
-    LocalOrder  lo(*trx);
-    ApplyOrder  ao(*trx);
-    CommitOrder co(*trx, co_mode_);
-
-    bool interrupted(false);
+    LocalOrder lo(*trx);
+    bool       interrupted(false);
 
     try
     {
@@ -1945,8 +1944,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
         // it inside the monitor
         gcache_.seqno_assign (trx->action(),
                               trx->global_seqno(),
-                              trx->depends_seqno(),
-                              GCS_ACT_WRITESET);
+//remove                              trx->depends_seqno(),
+                              GCS_ACT_WRITESET,
+                              trx->depends_seqno() <= 0);
 
         local_monitor_.leave(lo);
     }
@@ -1975,6 +1975,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
     if (gu_unlikely(WSREP_TRX_FAIL == retval && applicable))
     {
         // applicable but failed certification: self-cancel monitors
+        ApplyOrder  ao(*trx);
+        CommitOrder co(*trx, co_mode_);
+
         apply_monitor_.self_cancel(ao);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
     }

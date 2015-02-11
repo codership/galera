@@ -220,22 +220,25 @@ START_TEST(test_serialization)
     TrxHandleMaster::Pool lp(4096, 16, "serialization_lp");
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "serialization_sp");
 
-    int const version(3);
-    galera::TrxHandleMaster::Params const trx_params("", version,
-                                                     KeySet::MAX_VERSION);
-    wsrep_uuid_t uuid;
-    gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
-    TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
+    for (int version = 3; version <= 4; ++version)
+    {
+        galera::TrxHandleMaster::Params const trx_params("", version,
+                                                         KeySet::MAX_VERSION);
+        wsrep_uuid_t uuid;
+        gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
+        TrxHandleMaster* trx
+            (TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
 
-    std::vector<gu::byte_t> buf;
-    trx->serialize(0, buf);
-    fail_unless(buf.size() > 0);
+        std::vector<gu::byte_t> buf;
+        trx->serialize(0, buf);
+        fail_unless(buf.size() > 0);
 
-    TrxHandleSlave* txs1(TrxHandleSlave::New(sp));
-    fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
-    txs1->unref();
+        TrxHandleSlave* txs1(TrxHandleSlave::New(sp));
+        fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
+        txs1->unref();
 
-    trx->unref();
+        trx->unref();
+    }
 }
 END_TEST
 

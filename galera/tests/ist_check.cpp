@@ -22,9 +22,9 @@ START_TEST(test_ist_message)
 
     using namespace galera::ist;
 
+#if 0 /* This is a check for the old (broken) format */
     Message m3(3, Message::T_HANDSHAKE, 0x2, 3, 1001);
 
-#if 0 /* This is a check for the old (broken) format */
 #if GU_WORDSIZE == 32
     fail_unless(serial_size(m3) == 20, "serial size %zu != 20",
                 serial_size(m3));
@@ -32,7 +32,6 @@ START_TEST(test_ist_message)
     fail_unless(serial_size(m3) == 24, "serial size %zu != 24",
                 serial_size(m3));
 #endif
-#endif /* 0 */
 
     gu::Buffer buf(m3.serial_size());
     m3.serialize(&buf[0], buf.size(), 0);
@@ -44,12 +43,14 @@ START_TEST(test_ist_message)
     fail_unless(mu3.flags()   == 0x2);
     fail_unless(mu3.ctrl()    == 3);
     fail_unless(mu3.len()     == 1001);
+#endif /* 0 */
 
     Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
     fail_unless(m4.serial_size() == 12);
 
-    buf.clear();
-    buf.resize(m4.serial_size());
+    gu::Buffer buf(m4.serial_size());
+//    buf.clear();
+//    buf.resize(m4.serial_size());
     m4.serialize(&buf[0], buf.size(), 0);
 
     Message mu4(4);
@@ -131,10 +132,13 @@ struct receiver_args
 struct trx_thread_args
 {
     galera::ist::Receiver& receiver_;
+    galera::TrxHandleSlave::Pool& pool_;
     galera::Monitor<TestOrder> monitor_;
-    trx_thread_args(galera::ist::Receiver& receiver)
+    trx_thread_args(galera::ist::Receiver& receiver,
+                    galera::TrxHandleSlave::Pool& pool)
         :
         receiver_(receiver),
+        pool_(pool),
         monitor_()
     { }
 };
@@ -162,14 +166,52 @@ extern "C" void* trx_thread(void* arg)
     targs->receiver_.ready();
     while (true)
     {
-        galera::TrxHandleSlave* trx(0);
+        gcs_action act;
         int err;
-        if ((err = targs->receiver_.recv(&trx)) != 0)
+
+        if ((err = targs->receiver_.recv(act)) != 0 ||
+            GCS_ACT_UNKNOWN == act.type /* EOF */)
         {
-            assert(trx == 0);
+            assert(act.buf == NULL);
+            assert(act.size == 0);
             log_info << "terminated with " << err;
             return 0;
         }
+
+        galera::TrxHandleSlave* trx(TrxHandleSlave::New(targs->pool_));
+
+        if (GCS_ACT_WRITESET == act.type)
+        {
+            if (act.size > 0)
+            {
+                assert(act.buf != NULL);
+
+                gu_trace(trx->unserialize(
+                         static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+
+                trx->verify_checksum();
+                trx->set_state(TrxHandle::S_CERTIFYING);
+            }
+            else
+            {
+                assert(act.buf == NULL);
+
+                trx->set_received(NULL, -1, act.seqno_g);
+                trx->set_depends_seqno(0);
+            }
+        }
+        else
+        {
+            assert(act.type == GCS_ACT_CCHANGE);
+
+            gcs_act_cchange const cc(act.buf, act.size);
+
+            assert(act.seqno_g == cc.seqno);
+
+            trx->set_received(NULL, -1, cc.seqno);
+            trx->set_depends_seqno(cc.seqno - 1);
+        }
+
         TestOrder to(*trx);
         targs->monitor_.enter(to);
         targs->monitor_.leave(to);
@@ -197,7 +239,7 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
-    trx_thread_args trx_thd_args(receiver);
+    trx_thread_args trx_thd_args(receiver, rargs->trx_pool_);
     for (size_t i(0); i < threads.size(); ++i)
     {
         log_info << "starting trx thread " << i;
@@ -236,9 +278,12 @@ static int select_trx_version(int protocol_version)
     case 6:
         return 3;
     case 7:
+    case 8:
         return 4;
+    default:
+        fail("unsupported replicator protocol version: %n", protocol_version);
     }
-    fail("unknown protocol version %i", protocol_version);
+
     return -1;
 }
 
@@ -281,7 +326,8 @@ static void test_ist_common(int const version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i, 5678+i));
+        TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i,
+                                                  5678+i));
 
         const wsrep_buf_t key[2] = {
             {"key1", 4},
@@ -328,7 +374,10 @@ static void test_ist_common(int const version)
             assert (wsi.pa_range()  == pa_range);
         }
 
-        gcache_sender->seqno_assign(ptr, i, i - pa_range, GCS_ACT_WRITESET);
+        gcache_sender->seqno_assign(ptr, i,
+//remove                            i - pa_range,
+                                    GCS_ACT_WRITESET,
+                                    (i - pa_range) <= 0);
         trx->unref();
     }
 
@@ -372,6 +421,12 @@ START_TEST(test_ist_v7)
 }
 END_TEST
 
+START_TEST(test_ist_v8)
+{
+    test_ist_common(8);
+}
+END_TEST
+
 Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
@@ -387,6 +442,9 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_v7");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v7);
+    tc = tcase_create("test_ist_v8");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v8);
     suite_add_tcase(s, tc);
 
     return s;

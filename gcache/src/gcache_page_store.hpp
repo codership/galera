@@ -41,7 +41,7 @@ namespace gcache
         {
             assert(BH_is_released(bh));
             assert(SEQNO_ILL == bh->seqno_g);
-            free_page_ptr(static_cast<Page*>(bh->ctx), bh);
+            free_page_ptr(static_cast<Page*>(BH_ctx(bh)), bh);
         }
 
         void  reset();

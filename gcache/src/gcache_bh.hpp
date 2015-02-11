@@ -15,7 +15,8 @@
 
 namespace gcache
 {
-    static uint32_t const BUFFER_RELEASED  = 1 << 0;
+    static uint16_t const BUFFER_RELEASED  = 1 << 0;
+    static uint16_t const BUFFER_SKIPPED   = 1 << 1;
 
     enum StorageType
     {
@@ -24,15 +25,18 @@ namespace gcache
         BUFFER_IN_PAGE
     };
 
+    typedef uint64_t BH_ctx_t;
+    /*! must store pointer on both 32 and 64-bit systems */
+
     struct BufferHeader
     {
         int64_t  seqno_g;
-        int64_t  seqno_d;
-        int64_t  size;    /*! total buffer size, including header */
-        MemOps*  ctx;
+//remove        int64_t  seqno_d;
+        BH_ctx_t ctx;
+        uint32_t size;  /*! total buffer size, including header */
         uint16_t flags;
         int8_t   store;
-        int8_t   type;    /*! arbitrary user defined type */
+        int8_t   type;  /*! arbitrary user defined type */
     }__attribute__((__packed__));
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
@@ -53,7 +57,7 @@ namespace gcache
     BH_assert_clear (const BufferHeader* const bh)
     {
         assert(0 == bh->seqno_g);
-        assert(0 == bh->seqno_d);
+//remove        assert(0 == bh->seqno_d);
         assert(0 == bh->size);
         assert(0 == bh->ctx);
         assert(0 == bh->flags);
@@ -65,6 +69,18 @@ namespace gcache
     BH_is_released (const BufferHeader* const bh)
     {
         return (bh->flags & BUFFER_RELEASED);
+    }
+
+    static inline bool
+    BH_is_skipped (const BufferHeader* const bh)
+    {
+        return (bh->flags & BUFFER_SKIPPED);
+    }
+
+    static inline MemOps*
+    BH_ctx (const BufferHeader* const bh)
+    {
+        return reinterpret_cast<MemOps*>(bh->ctx);
     }
 
     static inline void
@@ -83,11 +99,12 @@ namespace gcache
     operator << (std::ostream& os, const BufferHeader* const bh)
     {
         os << "seqno_g: "   << bh->seqno_g
-           << ", seqno_d: " << bh->seqno_d
+//remove           << ", seqno_d: " << bh->seqno_d
            << ", size: "    << bh->size
-           << ", ctx: "     << bh->ctx
+           << ", ctx: "     << BH_ctx(bh)
            << ", flags: "   << bh->flags
-           << ". store: "   << bh->store;
+           << ". store: "   << bh->store
+           << ", type: "    << bh->type;
         return os;
     }
 

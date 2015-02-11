@@ -235,6 +235,10 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
             {
                 assert(!local_);
                 assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
+                global_seqno_  = write_set_.seqno();
+                depends_seqno_ = global_seqno_ - write_set_.pa_range();
+                assert(depends_seqno_ < global_seqno_);
+                assert(depends_seqno_ >= 0);
                 write_set_flags_ |= F_PREORDERED;
             }
             else

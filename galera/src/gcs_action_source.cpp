@@ -54,7 +54,7 @@ galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
     assert(act.seqno_l != GCS_SEQNO_ILL);
     assert(act.seqno_g != GCS_SEQNO_ILL);
 
-    const gu::byte_t* const buf = static_cast<const gu::byte_t*>(act.buf);
+    const gu::byte_t* const buf(static_cast<const gu::byte_t*>(act.buf));
 
 //    size_t offset(trx_->unserialize(buf, act.size, 0));
     gu_trace(trx_->unserialize(buf, act.size, 0));

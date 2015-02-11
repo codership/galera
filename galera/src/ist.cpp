@@ -322,36 +322,51 @@ void galera::ist::Receiver::run()
         }
         while (true)
         {
-            TrxHandleSlave* trx;
+//remove            TrxHandleSlave* trx;
+            gcs_action act;
+
             if (use_ssl_ == true)
             {
-                trx = p.recv_trx(ssl_stream);
+                p.recv_ordered(ssl_stream, act);
             }
             else
             {
-                trx = p.recv_trx(socket);
+                p.recv_ordered(socket, act);
             }
-            if (trx != 0)
+
+            if (gu_likely(act.type != GCS_ACT_UNKNOWN))
             {
-                if (trx->global_seqno() != current_seqno_)
+                assert(act.seqno_g > 0);
+
+                if (act.seqno_g != current_seqno_)
                 {
-                    log_error << "unexpected trx seqno: " << trx->global_seqno()
+                    log_error << "unexpected action seqno: " << act.seqno_g
                               << " expected: " << current_seqno_;
                     ec = EINVAL;
                     goto err;
                 }
+
                 ++current_seqno_;
             }
+            else
+            {
+                assert(0    == act.seqno_g);
+                assert(NULL == act.buf);
+                assert(0    == act.size);
+            }
+
             gu::Lock lock(mutex_);
             while (ready_ == false || consumers_.empty())
             {
                 lock.wait(cond_);
             }
+
             Consumer* cons(consumers_.top());
             consumers_.pop();
-            cons->trx(trx);
+            cons->act(act);
             cons->cond().signal();
-            if (trx == 0)
+
+            if (act.type == GCS_ACT_UNKNOWN)
             {
                 log_debug << "eof received, closing socket";
                 break;
@@ -410,10 +425,11 @@ void galera::ist::Receiver::ready()
     cond_.signal();
 }
 
-int galera::ist::Receiver::recv(TrxHandleSlave** trx)
+int galera::ist::Receiver::recv(gcs_action& act)
 {
     Consumer cons;
     gu::Lock lock(mutex_);
+
     if (running_ == false)
     {
         if (error_code_ != 0)
@@ -422,18 +438,22 @@ int galera::ist::Receiver::recv(TrxHandleSlave** trx)
         }
         return EINTR;
     }
+
     consumers_.push(&cons);
     cond_.signal();
     lock.wait(cons.cond());
-    if (cons.trx() == 0)
+
+    if (cons.act().buf == NULL)
     {
         if (error_code_ != 0)
         {
             gu_throw_error(error_code_) << "IST receiver reported error";
         }
-        return EINTR;
+
+        if (gu_unlikely(act.seqno_g < 0)) return EINTR; // else skip action
     }
-    *trx = cons.trx();
+
+    act = cons.act();
     return 0;
 }
 
@@ -639,11 +659,11 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 // log_info << "sending " << buf_vec[i].seqno_g();
                 if (use_ssl_ == true)
                 {
-                    p.send_trx(*ssl_stream_, buf_vec[i]);
+                    p.send_ordered(*ssl_stream_, buf_vec[i]);
                 }
                 else
                 {
-                    p.send_trx(socket_, buf_vec[i]);
+                    p.send_ordered(socket_, buf_vec[i]);
                 }
 
                 if (buf_vec[i].seqno_g() == last)
