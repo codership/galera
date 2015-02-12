@@ -596,7 +596,8 @@ namespace galera
                     }
                     else
                     {
-                        wbuf = gcache_.malloc(GU_WORDSIZE/8); // 4/8 bytes
+                        wsize = GU_WORDSIZE/8; // 4/8 bytes
+                        wbuf = gcache_.malloc(wsize);
                     }
 
                     gcache_.seqno_assign(wbuf, msg.seqno(),
