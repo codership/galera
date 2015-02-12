@@ -287,6 +287,97 @@ static int select_trx_version(int protocol_version)
     return -1;
 }
 
+static void store_trx(gcache::GCache* const gcache,
+                      TrxHandleMaster::Pool& lp,
+                      const TrxHandleMaster::Params& trx_params,
+                      const wsrep_uuid_t& uuid,
+                      int const i)
+{
+    TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i,
+                                              5678+i));
+
+    const wsrep_buf_t key[2] = {
+        {"key1", 4},
+        {"key2", 4}
+    };
+
+    trx->append_key(KeyData(trx_params.version_, key, 2, WSREP_KEY_EXCLUSIVE,
+                            true));
+    trx->append_data("bar", 3, WSREP_DATA_ORDERED, true);
+    assert (i > 0);
+    int last_seen(i - 1);
+    int pa_range(i);
+
+    gu::byte_t* ptr(0);
+
+    if (trx_params.version_ < 3)
+    {
+        fail("WS version %d not supported any more", trx_params.version_);
+    }
+    else
+    {
+        galera::WriteSetNG::GatherVector bufs;
+        ssize_t trx_size(trx->write_set_out().gather(trx->source_id(),
+                                                     trx->conn_id(),
+                                                     trx->trx_id(),
+                                                     bufs));
+        trx->finalize(last_seen);
+        ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
+
+        /* concatenate buffer vector */
+        gu::byte_t* p(ptr);
+        for (size_t k(0); k < bufs->size(); ++k)
+        {
+            ::memcpy(p, bufs[k].ptr, bufs[k].size); p += bufs[k].size;
+        }
+        assert ((p - ptr) == trx_size);
+
+        gu::Buf ws_buf = { ptr, trx_size };
+        galera::WriteSetIn wsi(ws_buf);
+        assert (wsi.last_seen() == last_seen);
+        assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER4 ?
+                                    0 : WriteSetNG::MAX_PA_RANGE));
+        wsi.set_seqno(i, pa_range);
+        assert (wsi.seqno()     == int64_t(i));
+        assert (wsi.pa_range()  == pa_range);
+    }
+
+    gcache->seqno_assign(ptr, i,
+//remove                            i - pa_range,
+                         GCS_ACT_WRITESET,
+                         (i - pa_range) <= 0);
+    trx->unref();
+}
+
+static void store_cc(gcache::GCache* const gcache,
+                      const wsrep_uuid_t& uuid,
+                     int const i)
+{
+    static int conf_id(0);
+
+    gcs_act_cchange cc;
+
+    ::memcpy(&cc.uuid, &uuid, sizeof(uuid));
+
+    cc.seqno = i;
+    cc.conf_id = conf_id++;
+    cc.memb = NULL;
+    cc.memb_size = 0;
+    cc.memb_num = 1;
+    cc.my_idx = 0;
+
+    void* tmp;
+    int   const cc_size(cc.write(&tmp));
+    void* const cc_ptr(gcache->malloc(cc_size));
+
+    fail_if(NULL == cc_ptr);
+    memcpy(cc_ptr, tmp, cc_size);
+
+    gcache->seqno_assign(cc_ptr, i,
+//remove                            i - pa_range,
+                         GCS_ACT_CCHANGE,
+                         i > 0);
+}
 
 static void test_ist_common(int const version)
 {
@@ -326,59 +417,14 @@ static void test_ist_common(int const version)
     // populate gcache
     for (size_t i(1); i <= 10; ++i)
     {
-        TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i,
-                                                  5678+i));
-
-        const wsrep_buf_t key[2] = {
-            {"key1", 4},
-            {"key2", 4}
-        };
-
-        trx->append_key(KeyData(trx_version, key, 2, WSREP_KEY_EXCLUSIVE,true));
-        trx->append_data("bar", 3, WSREP_DATA_ORDERED, true);
-        assert (i > 0);
-        int last_seen(i - 1);
-        int pa_range(i);
-
-        gu::byte_t* ptr(0);
-
-        if (trx_version < 3)
+        if (i % 3)
         {
-            fail("WS version %d not supported any more", trx_version);
+            store_trx(gcache_sender, lp, trx_params, uuid, i);
         }
         else
         {
-            galera::WriteSetNG::GatherVector bufs;
-            ssize_t trx_size(trx->write_set_out().gather(trx->source_id(),
-                                                         trx->conn_id(),
-                                                         trx->trx_id(),
-                                                         bufs));
-            trx->finalize(last_seen);
-            ptr = static_cast<gu::byte_t*>(gcache_sender->malloc(trx_size));
-
-            /* concatenate buffer vector */
-            gu::byte_t* p(ptr);
-            for (size_t k(0); k < bufs->size(); ++k)
-            {
-                ::memcpy(p, bufs[k].ptr, bufs[k].size); p += bufs[k].size;
-            }
-            assert ((p - ptr) == trx_size);
-
-            gu::Buf ws_buf = { ptr, trx_size };
-            galera::WriteSetIn wsi(ws_buf);
-            assert (wsi.last_seen() == last_seen);
-            assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER4 ?
-                                        0 : WriteSetNG::MAX_PA_RANGE));
-            wsi.set_seqno(i, pa_range);
-            assert (wsi.seqno()     == int64_t(i));
-            assert (wsi.pa_range()  == pa_range);
+            store_cc(gcache_sender, uuid, i);
         }
-
-        gcache_sender->seqno_assign(ptr, i,
-//remove                            i - pa_range,
-                                    GCS_ACT_WRITESET,
-                                    (i - pa_range) <= 0);
-        trx->unref();
     }
 
     mark_point();
