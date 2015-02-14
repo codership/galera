@@ -229,7 +229,7 @@ env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Replace(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+env.Replace(CXXFLAGS = ' -std=c++11 -Wno-long-long -Wno-deprecated -ansi')
 if sysname != 'sunos':
     env.Append(CXXFLAGS = ' -pipe')
 
