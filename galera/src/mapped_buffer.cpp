@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <limits>
 
@@ -96,10 +97,11 @@ void galera::MappedBuffer::reserve(size_t sz)
                                  fd_, 0)));
             if (tmp == MAP_FAILED)
             {
+                int dummy_errno = errno;
                 free(buf_);
                 buf_ = 0;
                 clear();
-                gu_throw_error(ENOMEM) << "mmap() failed";
+                gu_throw_error(dummy_errno) << "mmap() failed";
             }
             copy(buf_, buf_ + buf_size_, tmp);
             free(buf_);
@@ -119,9 +121,10 @@ void galera::MappedBuffer::reserve(size_t sz)
                             mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd_, 0)));
             if (tmp == MAP_FAILED)
             {
+                int dummy_errno = errno;
                 buf_ = 0;
                 clear();
-                gu_throw_error(ENOMEM) << "mmap() failed";
+                gu_throw_error(dummy_errno) << "mmap() failed";
             }
             buf_ = tmp;
         }
@@ -132,7 +135,7 @@ void galera::MappedBuffer::reserve(size_t sz)
         byte_t* tmp(reinterpret_cast<byte_t*>(realloc(buf_, sz)));
         if (tmp == 0)
         {
-            gu_throw_error(ENOMEM) << "realloc failed";
+            gu_throw_error(errno) << "realloc failed";
         }
         buf_ = tmp;
     }
