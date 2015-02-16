@@ -1,0 +1,94 @@
+.TH GARBD "8" "December 2014" "garbd  INFO: 2.8.r165" "System Administration Utilities"
+.SH NAME
+garbd \- arbitrator daemon for Galera cluster
+
+.SH SYNOPSIS
+.B garbd
+[\fI\,options\/\fR] [\fI\,group address\/\fR]
+
+.SH DESCRIPTION
+.B garbd
+joins Galera cluster as an additional node for the purpose of establishing
+quorum in case of network partitioning. It can do so by serving:
+.RS
+a) as an odd node to prevent split-brains;
+.RE
+.RS
+b) as a reference connection point outside a datacenter.
+.RE
+Arbitrator node must see all messages that the other nodes of the cluster
+see, however it does not process them any further and just discards them.
+As such it does not store any cluster state and can't be used to bootstrap
+the cluster, so it only can join existing cluster.
+
+.SH OPTIONS
+.SS "Configuration:"
+.TP
+\fB\-d\fR [ \fB\-\-daemon\fR ]
+Become daemon
+.TP
+\fB\-a\fR [ \fB\-\-address\fR ] arg
+Group address in Galera format
+.TP
+\fB\-g\fR [ \fB\-\-group\fR ] arg
+Group name
+.TP
+\fB\-\-sst\fR arg
+SST request string that contains SST request to trigger state snapshot dump
+(state backup) on one of the other nodes. For details refer to Galera
+documentation at http://www.galeracluster.com
+.TP
+\fB\-\-donor\fR arg
+SST donor name (for state dump)
+.TP
+\fB\-o\fR [ \fB\-\-options\fR ] arg
+GCS/GCOMM option list. It is likely to be the same as on other nodes of the
+cluster.
+.TP
+\fB\-l\fR [ \fB\-\-log\fR ] arg
+Path to log file
+.TP
+\fB\-c\fR [ \fB\-\-cfg\fR ] arg
+Path to configuration file.
+Configuration file contains garbd options in the form \fB<option>=<value>\fR, one option per line.
+Hash symbol starts comments. Example:
+
+.RS
+# garbd config file
+.br
+daemon=1
+.br
+address="gcomm://192.168.90.3:4567"
+.br
+group="my_cluster"
+.br
+options="gmcast.segment=4;"
+.br
+log="/tmp/garb.log"
+.RE
+.SS "Other options:"
+.TP
+\fB\-v\fR [ \fB\-\-version\fR ]
+Print version
+.TP
+\fB\-h\fR [ \fB\-\-help\fR ]
+Show help message
+.PP
+
+.SH FILES
+.I /etc/default/garb
+.RS
+The system wide configuration file for system service script
+on Debian-derived systems.
+.RE
+.I /etc/sysconfig/garb
+.RS
+The system wide configuration file for system service script
+on Red Hat \-derived systems.
+.RE
+
+.SH BUGS
+See Galera bug tracker at https://github.com/codership/galera
+
+.SH AUTHOR
+Codership Oy <info at codership dot com>

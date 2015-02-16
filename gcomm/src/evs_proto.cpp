@@ -1054,7 +1054,7 @@ void gcomm::evs::Proto::check_inactive()
             const DelayedListMessage* const elm(node.delayed_list_message());
             if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
             {
-                log_info << "discarding expired elm from " << elm->source();
+                log_debug << "discarding expired elm from " << elm->source();
                 node.set_delayed_list_message(0);
             }
         }

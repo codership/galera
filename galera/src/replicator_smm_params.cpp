@@ -7,9 +7,11 @@
 #include "gu_uri.hpp"
 #include "write_set_ng.hpp"
 #include "gu_throw.hpp"
+#include "wsrep_params.hpp"
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
+const std::string galera::ReplicatorSMM::Param::base_dir  = "base_dir";
 
 static const std::string common_prefix = "repl.";
 
@@ -29,6 +31,7 @@ int const galera::ReplicatorSMM::MAX_PROTO_VER(7);
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
     map_.insert(Default(Param::base_port, BASE_PORT_DEFAULT));
+    map_.insert(Default(Param::base_dir, BASE_DIR_DEFAULT));
     map_.insert(Default(Param::proto_max,  gu::to_string(MAX_PROTO_VER)));
     map_.insert(Default(Param::key_format, "FLAT8"));
     map_.insert(Default(Param::commit_order, "3"));
@@ -42,7 +45,8 @@ const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
 
 
 galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
-                                              const char* const node_address)
+                                              const char* const node_address,
+                                              const char* const base_dir)
 {
     gu::ssl_register_params(conf);
     Replicator::register_params(conf);
@@ -94,6 +98,18 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
         catch (gu::NotSet& e) {}
     }
 
+    // Now we store directory name to conf. This directory name
+    // could be used by other components, for example by gcomm
+    // to find appropriate location for view state file.
+    if (base_dir)
+    {
+       conf.set(BASE_DIR, base_dir);
+    }
+    else
+    {
+       conf.set(BASE_DIR, BASE_DIR_DEFAULT);
+    }
+
     /* register variables and defaults from other modules */
     gcache::GCache::register_params(conf);
     if (gcs_register_params(reinterpret_cast<gu_config_t*>(&conf)))
@@ -105,10 +121,14 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
 }
 
 
-galera::ReplicatorSMM::ParseOptions::ParseOptions(gu::Config&       conf,
+galera::ReplicatorSMM::ParseOptions::ParseOptions(Replicator&       repl,
+                                                  gu::Config&       conf,
                                                   const char* const opts)
 {
     conf.parse(opts);
+    // Set initial wsrep params here to enable debug logging etc
+    // for the rest of the initialization
+    wsrep_set_params(repl, opts);
 }
 
 
@@ -129,6 +149,7 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     }
     else if (key == Param::base_host ||
              key == Param::base_port ||
+             key == Param::base_dir ||
              key == Param::proto_max)
     {
         // nothing to do here, these params take effect only at
@@ -144,7 +165,7 @@ galera::ReplicatorSMM::set_param (const std::string& key,
     }
     else
     {
-        log_warn << "parameter '" << "' not found";
+        log_warn << "parameter '" << key << "' not found";
         assert(0);
         throw gu::NotFound();
     }
