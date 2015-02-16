@@ -423,23 +423,31 @@ namespace galera
                 size_t      payload_size; /* size of the 2nd cbs buffer */
                 size_t      sent;
 
-                galera::WriteSetIn ws;
-                gu::Buf tmp = { buffer.ptr(), buffer.size() };
-                int64_t seqno_d; // for proto ver < 8 compatibility
+                // for proto ver < 8 compatibility
+                int64_t seqno_d(WSREP_SEQNO_UNDEFINED);
 
                 if (gu_likely(Message::T_SKIP != type))
                 {
                     assert(Message::T_TRX == type || version_ >= 8);
 
-                    if (keep_keys_ || Message::T_CCHANGE == type ||
-                        version_ < WS_NG_VERSION)
+                    galera::WriteSetIn ws;
+                    gu::Buf tmp = { buffer.ptr(), buffer.size() };
+
+                    if (keep_keys_ || Message::T_CCHANGE == type)
                     {
-                        ws.read_header (tmp); // for seqno_d
+                        assert(version_ >= WS_NG_VERSION);
 
                         payload_size = buffer.size();
                         const void* const ptr(buffer.ptr());
                         cbs[1] = asio::const_buffer(ptr, payload_size);
                         cbs[2] = asio::const_buffer(ptr, 0);
+
+                        if (gu_likely(Message::T_TRX == type)) // compatibility
+                        {
+                            ws.read_header (tmp);
+                            seqno_d = buffer.seqno_g() - ws.pa_range();
+                            assert(buffer.seqno_g() == ws.seqno());
+                        }
                     }
                     else
                     {
@@ -450,11 +458,11 @@ namespace galera
                         assert (2 == out->size());
                         cbs[1] = asio::const_buffer(out[0].ptr, out[0].size);
                         cbs[2] = asio::const_buffer(out[1].ptr, out[1].size);
+
+                        seqno_d = buffer.seqno_g() - ws.pa_range();
+
+                        assert(buffer.seqno_g() == ws.seqno());
                     }
-
-                    assert(buffer.seqno_g() == ws.seqno());
-
-                    seqno_d = buffer.seqno_g() - ws.pa_range();
                 }
                 else
                 {

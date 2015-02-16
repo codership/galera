@@ -412,7 +412,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
-    assert(trx->is_certified() == true);
+    assert(trx->is_certified() /*Repl*/ || trx->preordered() /*IST*/);
     assert(trx->global_seqno() > STATE_SEQNO());
     assert(trx->is_local() == false);
 
@@ -1394,7 +1394,7 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
     apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
-    log_info << "####### Setting monitor position to " << seqno;
+    log_info << "####### Setting global monitor position to " << seqno;
 }
 
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
@@ -1579,7 +1579,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (view_info->view >= 0) // Primary configuration
     {
-        assert(cc.seqno_g > 0);
+        assert(group_seqno > 0);
 
         establish_protocol_versions (conf.repl_proto_ver);
 
@@ -1614,13 +1614,16 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else
         {
+            assert(!app_wants_st);
+
             gcache_.seqno_assign(cc.buf, cc.seqno_g,
 //remove -1,
-                                 GCS_ACT_CCHANGE, true);
+                                 GCS_ACT_CCHANGE, false);
 
-            if (view_info->view == 1 || !app_wants_st)
+            if (view_info->view == 1 || !app_wants_st) // seems to be always true
             {
-                set_initial_position(group_uuid, group_seqno);
+                set_initial_position(group_uuid, group_seqno + 1);
+//                cancel_seqno(group_seqno); // cancel CC seqno
             }
             else
             {

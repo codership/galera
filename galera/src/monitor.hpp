@@ -77,6 +77,7 @@ namespace galera
         void set_initial_position(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
+
 //remove            if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset

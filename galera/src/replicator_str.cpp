@@ -394,7 +394,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         ist_senders_.run(config_,
                                          istr.peer(),
                                          istr.last_applied() + 1,
-                                         cc_seqno_ - 1,
+                                         cc_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -853,6 +853,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             else
             {
+                assert(EINTR == err);
                 return;
             }
         }

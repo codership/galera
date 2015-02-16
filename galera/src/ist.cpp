@@ -44,21 +44,21 @@ namespace galera
             { }
 
             const gu::Config&  conf()   { return conf_;   }
-            const std::string& peer()   { return peer_;   }
-            wsrep_seqno_t      first()  { return first_;  }
-            wsrep_seqno_t      last()   { return last_;   }
+            const std::string& peer()  const { return peer_;   }
+            wsrep_seqno_t      first() const { return first_;  }
+            wsrep_seqno_t      last()  const { return last_;   }
             AsyncSenderMap&    asmap()  { return asmap_;  }
             pthread_t          thread() { return thread_; }
 
         private:
 
             friend class AsyncSenderMap;
-            const gu::Config&  conf_;
-            const std::string  peer_;
-            wsrep_seqno_t      first_;
-            wsrep_seqno_t      last_;
-            AsyncSenderMap&    asmap_;
-            pthread_t          thread_;
+            const gu::Config&   conf_;
+            std::string const   peer_;
+            wsrep_seqno_t const first_;
+            wsrep_seqno_t const last_;
+            AsyncSenderMap&     asmap_;
+            pthread_t           thread_;
         };
     }
 }
@@ -443,17 +443,18 @@ int galera::ist::Receiver::recv(gcs_action& act)
     cond_.signal();
     lock.wait(cons.cond());
 
-    if (cons.act().buf == NULL)
+    act = cons.act();
+
+    if (act.buf == NULL)
     {
         if (error_code_ != 0)
         {
             gu_throw_error(error_code_) << "IST receiver reported error";
         }
 
-        if (gu_unlikely(act.seqno_g < 0)) return EINTR; // else skip action
+        if (gu_unlikely(act.seqno_g <= 0)) return EINTR; // else skip seqno
     }
 
-    act = cons.act();
     return 0;
 }
 
@@ -618,6 +619,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 {
     if (first > last)
     {
+        assert(0);
         gu_throw_error(EINVAL) << "sender send first greater than last: "
                                << first << " > " << last ;
     }
@@ -641,10 +643,11 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             p.send_handshake_response(socket_);
             ctrl = p.recv_ctrl(socket_);
         }
+
         if (ctrl < 0)
         {
             gu_throw_error(EPROTO)
-                << "ist send failed, peer reported error: " << ctrl;
+                << "IST handshake failed, peer reported error: " << ctrl;
         }
 
         std::vector<gcache::GCache::Buffer> buf_vec(
@@ -766,11 +769,11 @@ void* run_async_sender(void* arg)
 }
 
 
-void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
-                                      const std::string& peer,
-                                      wsrep_seqno_t      first,
-                                      wsrep_seqno_t      last,
-                                      int                version)
+void galera::ist::AsyncSenderMap::run(const gu::Config&   conf,
+                                      const std::string&  peer,
+                                      wsrep_seqno_t const first,
+                                      wsrep_seqno_t const last,
+                                      int const           version)
 {
     gu::Critical crit(monitor_);
     AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
