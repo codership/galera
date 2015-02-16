@@ -200,6 +200,8 @@ galera::ReplicatorSMM::stats_get() const
     struct gcs_stats stats;
     gcs_.get_stats (&stats);
 
+    int64_t seqno_min = gcache_.seqno_min();
+
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
     sv[STATS_LOCAL_SEND_QUEUE_MAX].value._int64  = stats.send_q_len_max;
     sv[STATS_LOCAL_SEND_QUEUE_MIN].value._int64  = stats.send_q_len_min;
@@ -208,7 +210,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_RECV_QUEUE_MAX].value._int64  = stats.recv_q_len_max;
     sv[STATS_LOCAL_RECV_QUEUE_MIN].value._int64  = stats.recv_q_len_min;
     sv[STATS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
-    sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  = gcache_.seqno_min();
+    sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  =
+        seqno_min != GCS_SEQNO_ILL ? seqno_min : GCS_SEQNO_NIL;
     sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
