@@ -116,6 +116,9 @@ namespace galera
                 process_[idx].state_ = Process::S_WAITING;
                 process_[idx].obj_   = &obj;
 
+#ifdef GU_DBUG_ON
+                obj.debug_sync(mutex_);
+#endif // GU_DBUG_ON
                 while (may_enter(obj) == false &&
                        process_[idx].state_ == Process::S_WAITING)
                 {

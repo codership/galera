@@ -792,12 +792,16 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
                      static_cast<const gu::byte_t*>(act.buf), act.size, 0));
 
         trx->verify_checksum();
+
+        // replicating and certifying stages have been
+        // processed on donor, just adjust states here
         trx->set_state(TrxHandle::S_CERTIFYING);
 
         assert(trx->global_seqno() == act.seqno_g);
         assert(trx->depends_seqno() >= 0);
 
         gu_trace(apply_trx(recv_ctx, trx));
+        GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
 
         exit_loop = trx->exit_loop();
     }

@@ -32,6 +32,10 @@ namespace galera
         struct Param
         {
             static std::string const debug_log;
+#ifdef GU_DBUG_ON
+            static std::string const dbug;
+            static std::string const signal;
+#endif // GU_DBUG_ON
         };
 
         static const char* const TRIVIAL_SST;

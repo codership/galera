@@ -18,7 +18,7 @@ namespace
 
         TestEnv() :
             conf_   (),
-            init_   (conf_, NULL),
+            init_   (conf_, NULL, NULL),
             gcache_ (conf_, "."),
             gcs_    (conf_, gcache_)
         {}

@@ -247,12 +247,25 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
     return is;
 }
 
-void gcomm::ViewState::write_file(const char* fname) const
+std::string gcomm::ViewState::get_viewstate_file_name(gu::Config& conf)
 {
-    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    std::string dir_name = COMMON_BASE_DIR_DEFAULT;
+
+    try {
+        // If base_dir is set in the configuration we should use
+        // it instead of current directory default.
+        dir_name = conf.get(COMMON_BASE_DIR_KEY, dir_name);
+    } catch (const gu::NotFound &) {
+        // In case it is not known we do not have to do
+        // anything and use default.
+    }
+    return dir_name + '/' +  COMMON_VIEW_STAT_FILE;
+}
+
+void gcomm::ViewState::write_file() const
+{
     // write to temporary file first.
-    std::string tmp(fname);
-    tmp += ".tmp";
+    std::string tmp(file_name_ +  ".tmp");
     FILE* fout = fopen(tmp.c_str(), "w");
     if (fout == NULL) {
         log_warn << "open file(" << tmp << ") failed("
@@ -283,35 +296,38 @@ void gcomm::ViewState::write_file(const char* fname) const
     }
 
     // rename atomically.
-    if (rename(tmp.c_str(), fname) != 0) {
+    if (rename(tmp.c_str(), file_name_.c_str()) != 0) {
         log_warn << "rename file(" << tmp << ") to file("
-                 << fname << ") failed("
+                 << file_name_ << ") failed("
                  << strerror(errno) << ")";
     }
 }
 
-bool gcomm::ViewState::read_file(const char* fname)
+bool gcomm::ViewState::read_file()
 {
-    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
-    if (access(fname, R_OK) != 0) {
-        log_warn << "access file(" << fname << ") failed("
+    if (access(file_name_.c_str(), R_OK) != 0) {
+        log_warn << "access file(" << file_name_ << ") failed("
                  << strerror(errno) << ")";
         return false;
     }
     try {
-        std::ifstream ifs(fname, std::ifstream::in);
+        std::ifstream ifs(file_name_.c_str(), std::ifstream::in);
         read_stream(ifs);
         ifs.close();
         return true;
     } catch (const std::exception& e) {
-        log_warn << "read file(" << fname << ") failed("
+        log_warn << "read file(" << file_name_ << ") failed("
                  << e.what() << ")";
         return false;
     }
 }
 
-void gcomm::ViewState::remove_file(const char* fname)
+// remove_file is static function, it should remove the view
+// state file even if there is no ViewState object around.
+// View state file name is derived in the same way as for
+// ViewState object.
+void gcomm::ViewState::remove_file(gu::Config& conf)
 {
-    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
-    (void) unlink(fname);
+    std::string file_name = get_viewstate_file_name(conf);
+    (void) unlink(file_name.c_str());
 }

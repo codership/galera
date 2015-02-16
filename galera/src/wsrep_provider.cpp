@@ -31,8 +31,9 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     try
     {
         gh->ctx = new REPL_CLASS (args);
-        wsrep_set_params(*reinterpret_cast<REPL_CLASS*>(gh->ctx),
-                         args->options);
+        // Moved into galera::ReplicatorSMM::ParseOptions::ParseOptions()
+        // wsrep_set_params(*reinterpret_cast<REPL_CLASS*>(gh->ctx),
+        //                 args->options);
         return WSREP_OK;
     }
     catch (gu::Exception& e)

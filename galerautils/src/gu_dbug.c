@@ -790,6 +790,8 @@ _gu_db_pop_()
 	if (!(_gu_db_stack->flags & DEBUG_ON))
 	    _gu_db_on_ = 0;
     } else {
+        if (_gu_db_stack)
+            _gu_db_stack->flags &= ~DEBUG_ON;
 	_gu_db_on_ = 0;
     }
 }
