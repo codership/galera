@@ -25,8 +25,13 @@ Conflicts: garbd-2,
            percona-xtradb-cluster-galera-2.x,
            percona-xtradb-cluster-galera-3.x,
            percona-xtradb-cluster-garbd-2.x,
-           percona-xtradb-cluster-garbd-3.x
-Provides: galera-3, wsrep
+           percona-xtradb-cluster-garbd-3.x,
+           galera
+Provides: galera-3,
+          wsrep,
+          galera,
+          galera3,
+          percona-xtradb-cluster-galera-25
 Description: Replication framework for transactional applications
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information

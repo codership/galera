@@ -105,6 +105,7 @@ Requires: nc
 %endif
 
 Provides:      wsrep, %{name} = %{version}-%{release}
+Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
