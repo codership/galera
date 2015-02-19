@@ -125,7 +125,10 @@ galera::ReplicatorSMM::ParseOptions::ParseOptions(Replicator&       repl,
                                                   gu::Config&       conf,
                                                   const char* const opts)
 {
-    conf.parse(opts);
+    try {
+        conf.parse(opts);
+    }
+    catch (gu::NotFound) {}
     // Set initial wsrep params here to enable debug logging etc
     // for the rest of the initialization
     wsrep_set_params(repl, opts);
