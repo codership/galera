@@ -93,9 +93,21 @@ BuildRequires: python
 %if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7
 %define systemd 1
 BuildRequires: systemd
+BuildRequires: systemd-rpm-macros
 %else
 %define systemd 0
 %endif
+
+%if 0%{?systemd}
+%if 0%{?suse_version}
+%{?systemd_requires}
+%else
+Requires(post): systemd
+Requires(preun): systemd
+%endif
+
+%else
+# NOT systemd
 
 %if 0%{?suse_version}
 PreReq:        %insserv_prereq %fillup_prereq
@@ -104,8 +116,9 @@ Requires(post): chkconfig
 Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
-Requires:      openssl nmap
+%endif # systemd
 
+Requires:      openssl nmap
 %if 0%{?centos} == 6
 Requires: nc
 %endif
@@ -165,13 +178,18 @@ install -D -m 755 $RBD/garb/files/garb-systemd $RBR%{_bindir}/garb-systemd
 %else
 install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+%endif
 
-# Symlink required by SUSE policy
+# Symlink required by SUSE policy for SysV init, still supported with systemd
 %if 0%{?suse_version}
+%if 0%{?systemd}
+install -d %{buildroot}%{_sbindir}
+ln -sf /usr/sbin/service %{buildroot}%{_sbindir}/rcgarb
+%else
 install -d $RBR/usr/sbin
 ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
-%endif
-%endif
+%endif # systemd
+%endif # suse_version
 
 %if 0%{?suse_version}
 install -d $RBR/var/adm/fillup-templates/
@@ -179,7 +197,7 @@ install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.
 %else
 install -d $RBR%{_sysconfdir}/sysconfig
 install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
-%endif
+%endif # suse_version
 
 install -d $RBR%{_bindir}
 install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
@@ -197,6 +215,35 @@ install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
 install -d $RBR%{_mandir}/man8
 install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
+
+
+%if 0%{?systemd}
+
+%if 0%{?suse_version}
+
+%post
+%service_add_post garb
+
+%preun
+%service_del_preun garb
+
+%else
+# Not SuSE - so it must be RedHat, CentOS, Fedora
+
+%post
+%systemd_post garb.service
+
+%preun
+%systemd_preun garb.service
+
+%postun
+%systemd_postun_with_restart garb.service
+
+%endif
+# SuSE versus Fedora/RedHat/CentOS
+
+%else
+# NOT systemd
 
 %if 0%{?suse_version}
 # For the various macros and their parameters, see here:
@@ -233,9 +280,11 @@ then
     /sbin/service garb restart
 fi
 
-
 %endif
 # SuSE versus Fedora/RedHat/CentOS
+
+%endif
+# systemd ?
 
 
 %files
@@ -252,11 +301,11 @@ fi
 %attr(0755,root,root) %{_bindir}/garb-systemd
 %else
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+%endif
 
-# Symlink required by SUSE policy
+# Symlink required by SUSE policy for SysV init, still supported with systemd
 %if 0%{?suse_version}
 %attr(0755,root,root) /usr/sbin/rcgarb
-%endif
 %endif
 
 %attr(0755,root,root) %{_bindir}/garbd
@@ -281,6 +330,9 @@ fi
 * Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Add missing "prereq" directive and arguments for the various service control macros.
 - Handle the difference between SuSE and Fedora/RedHat/CentOS.
+- Fix systemd stuff, using info from these pages:
+  https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+  http://fedoraproject.org/wiki/Packaging:ScriptletSnippets#Systemd
 
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
 - Initial OBS packaging created
