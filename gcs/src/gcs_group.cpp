@@ -435,15 +435,19 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
         }
-        else if (bootstrap)
+        else if (bootstrap && gu_uuid_compare(&group->group_uuid,
+                                              &GU_UUID_NIL))
         {
             /* Is there need to initialize something else in this case? */
             group->nodes[group->my_idx].bootstrap = true;
         }
         else {
+            group->nodes[group->my_idx].bootstrap = bootstrap;
+
             const bool first_component =
 #ifndef GCS_CORE_TESTING
-            (1 == group->num) && !strcmp (NODE_NO_ID, group->nodes[0].id);
+            (1 == group->num) &&
+            (!strcmp (NODE_NO_ID, group->nodes[0].id) || bootstrap);
 #else
             (1 == group->num);
 #endif
