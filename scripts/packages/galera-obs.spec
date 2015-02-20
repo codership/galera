@@ -93,17 +93,15 @@ BuildRequires: python
 %if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7
 %define systemd 1
 BuildRequires: systemd
-BuildRequires: systemd-rpm-macros
 %else
 %define systemd 0
 %endif
 
 %if 0%{?systemd}
-%if 0%{?suse_version}
 %{?systemd_requires}
-%else
-Requires(post): systemd
-Requires(preun): systemd
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+# RedHat seems not to need this (or an equivalent).
 %endif
 
 %else
@@ -332,6 +330,7 @@ fi
 - Handle the difference between SuSE and Fedora/RedHat/CentOS.
 - Fix systemd stuff, using info from these pages:
   https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+  http://fedoraproject.org/wiki/Packaging:Systemd
   http://fedoraproject.org/wiki/Packaging:ScriptletSnippets#Systemd
 
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
