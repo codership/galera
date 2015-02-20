@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2014, Codership Oy <info@codership.com>.
+# Copyright (c) 2011-2015, Codership Oy <info@codership.com>.
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 %{!?version: %define version 25_3.x}
 %{!?release: %define release 1}
 %define revision XXXX
-%define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
+%define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
@@ -326,6 +326,9 @@ fi
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
 
 %changelog
+* Fri Feb 20 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Update copyright year.
+
 * Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Add missing "prereq" directive and arguments for the various service control macros.
 - Handle the difference between SuSE and Fedora/RedHat/CentOS.
