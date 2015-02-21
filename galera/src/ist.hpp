@@ -38,6 +38,8 @@ namespace galera
         public:
             virtual void preload_trx(TrxHandleSlave*) = 0;
             virtual void preload_view_change(const wsrep_view_info_t&) = 0;
+        protected:
+            ~PreloadHandler() {}
         };
 
         class Receiver

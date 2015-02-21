@@ -186,6 +186,7 @@ class PreIST : public galera::ist::PreloadHandler
 public:
     void preload_trx(TrxHandleSlave* trx) { }
     void preload_view_change(const wsrep_view_info_t& view) { }
+    virtual ~PreIST() {}
 };
 
 extern "C" void* receiver_thd(void* arg)
