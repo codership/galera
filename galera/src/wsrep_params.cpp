@@ -3,6 +3,8 @@
 //
 
 #include "wsrep_params.hpp"
+#include "gu_dbug.h"
+#include "gu_debug_sync.hpp"
 
 void
 wsrep_set_params (galera::Replicator& repl, const char* params)
@@ -31,6 +33,23 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
                     gu_conf_debug_off();
                 }
             }
+#ifdef GU_DBUG_ON
+            else if (key == galera::Replicator::Param::dbug)
+            {
+                if (value.empty())
+                {
+                    GU_DBUG_POP();
+                }
+                else
+                {
+                    GU_DBUG_PUSH(value.c_str());
+                }
+            }
+            else if (key == galera::Replicator::Param::signal)
+            {
+                gu_debug_sync_signal(value);
+            }
+#endif // GU_DBUG_ON
             else
             {
                 log_debug << "Setting param '"

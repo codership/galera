@@ -7,6 +7,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
+#include "gu_debug_sync.hpp"
 
 #include "galera_common.hpp"
 #include <boost/bind.hpp>
@@ -633,6 +634,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
+            GU_DBUG_SYNC_WAIT("ist_sender_send_after_get_buffers")
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {

@@ -199,12 +199,15 @@ START_TEST(test_view_state)
         fail_unless(view == view2);
     }
 
+    // Create configuration to set file name.
+    gu::Config conf;
+
     // compare view state.
     UUID my_uuid(NULL, 0);
-    ViewState vst(my_uuid, view);
+    ViewState vst(my_uuid, view, conf);
     UUID my_uuid_2;
     View view_2;
-    ViewState vst2(my_uuid_2, view_2);
+    ViewState vst2(my_uuid_2, view_2, conf);
 
     {
         std::ostringstream os;
@@ -216,15 +219,14 @@ START_TEST(test_view_state)
         fail_unless(vst == vst2);
     }
 
-    const char* fname = "/tmp/gvwstate.dat";
     // test write file and read file.
-    vst.write_file(fname);
+    vst.write_file();
     UUID my_uuid_3;
     View view_3;
-    ViewState vst3(my_uuid_3, view_3);
-    vst3.read_file(fname);
+    ViewState vst3(my_uuid_3, view_3, conf);
+    vst3.read_file();
     fail_unless(vst == vst3);
-    unlink(fname);
+    ViewState::remove_file(conf);
 }
 END_TEST
 

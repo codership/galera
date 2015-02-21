@@ -204,7 +204,7 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     {
         // otherwise node use the uuid in view state file.
         // which is probably still in other nodes evict list.
-        ViewState::remove_file();
+        gmcast_.remove_viewstate_file();
         gu_throw_fatal
             << "this node has been evicted out of the cluster, "
             << "gcomm backend restart is required";

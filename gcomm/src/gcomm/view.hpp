@@ -14,6 +14,7 @@
 #include "gcomm/uuid.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/map.hpp"
+#include "gcomm/conf.hpp"
 
 namespace gcomm
 {
@@ -226,15 +227,16 @@ namespace gcomm
     class ViewState
     {
     public:
-        ViewState(UUID& my_uuid, View& view):
+        ViewState(UUID& my_uuid, View& view, gu::Config& conf):
                 my_uuid_(my_uuid),
-                view_(view)
+                view_(view),
+                file_name_(get_viewstate_file_name(conf))
         { }
         std::ostream& write_stream(std::ostream& os) const;
         std::istream& read_stream(std::istream& is);
-        void write_file(const char* fname = NULL) const;
-        bool read_file(const char* fname = NULL);
-        static void remove_file(const char* fname = NULL);
+        void write_file() const;
+        bool read_file();
+        static void remove_file(gu::Config& conf);
         bool operator== (const ViewState& vst) const
         {
             return my_uuid_ == vst.my_uuid_ &&
@@ -243,6 +245,9 @@ namespace gcomm
     private:
         UUID& my_uuid_;
         View& view_;
+        std::string file_name_;
+
+        static std::string get_viewstate_file_name(gu::Config& conf);
     };
 } // namespace gcomm
 
