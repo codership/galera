@@ -499,6 +499,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
         case 2:
+        case 3:
         {
             void*   ist_req(0);
             ssize_t ist_req_len(0);
@@ -652,13 +653,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 {
     assert(sst_req_len >= 0);
 
-//    wsrep_seqno_t const last_missing_seqno(cc_seqno - 1);//remove when IST supports CC events
-
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
-                                                  group_uuid,
-//remove                                                  last_missing_seqno
-                                                  cc_seqno
-));
+                                                  group_uuid, cc_seqno));
     gu::Lock lock(sst_mutex_);
 
     st_.mark_unsafe();
@@ -701,6 +697,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         else
         {
             update_state_uuid (sst_uuid_);
+
+            //remove potentially
+            cert_.assign_initial_position(sst_seqno_, trx_params_.version_);
+
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
 
@@ -710,7 +710,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_debug << "Installed new state: " << state_uuid_ << ":"
+            log_info << "Installed new state from SST: " << state_uuid_ << ":"
                       << sst_seqno_;
         }
     }
@@ -738,8 +738,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
             // Note: apply_monitor_ must be drained to avoid race between
             // IST appliers and GCS appliers, GCS action source may
-            // provide actions that have already been applied.
-            apply_monitor_.drain(sst_seqno_);
+            // provide actions that have already been applied via IST.
+            // However with protocol version >= CC events received via IST should
+            // drain monitor in process_conf_change()
+            if (str_proto_ver_ < 3) apply_monitor_.drain(sst_seqno_);
 
             log_info << "IST received: " << state_uuid_ << ":" << sst_seqno_;
 

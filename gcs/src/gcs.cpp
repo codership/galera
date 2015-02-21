@@ -1862,6 +1862,7 @@ gcs_resume_recv (gcs_conn_t* conn)
         if (conn->state < GCS_CONN_CLOSED) {
             gu_fatal ("Internal logic error: failed to resume \"gets\" on "
                       "recv_q: %d (%s). Aborting.", ret, strerror (-ret));
+            assert(0);
             gcs_close (conn);
             gu_abort();
         }

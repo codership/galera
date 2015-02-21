@@ -5,7 +5,6 @@
 #ifndef GALERA_IST_PROTO_HPP
 #define GALERA_IST_PROTO_HPP
 
-//remove #include "ist_action.hpp"
 #include "gcs.hpp"
 #include "trx_handle.hpp"
 
@@ -212,15 +211,6 @@ namespace galera
         class Ordered : public Message
         {
         public:
-#if 0 //remove
-            Ordered(int version = -1,
-                    Type type = T_NONE,
-                    uint32_t len = 0,
-                    wsrep_seqno_t seqno = WSREP_SEQNO_UNDEFINED)
-                :
-                Message(version, type, 0, 0, len, seqno)
-            { }
-#endif
             Ordered(int version,
                     Type type,
                     uint32_t len,
@@ -609,7 +599,6 @@ namespace galera
                     }
 
                     gcache_.seqno_assign(wbuf, msg.seqno(),
-//remove                                         seqno_d,
                                          gcs_type(msg.type()),
                                          msg.type() == Message::T_SKIP);
 
@@ -626,54 +615,7 @@ namespace galera
                     default:
                         assert(0);
                     };
-#if 0 //remove
-                    switch(msg.type())
-                    {
-                    case T_TRX:
-                    case T_SKIP:
-                    {
-                        galera::TrxHandleSlave*
-                            trx(galera::TrxHandleSlave::New(trx_pool_));
 
-                        if (gu_likely(msg.type() == T_TRX))
-                        {
-                            // TODO: this should happen in parallel in applier
-                            // threads, like it happens during normal replicaiton
-                            trx->unserialize(static_cast<gu::byte_t*>(wbuf),
-                                             wsize, 0);
-                            assert(trx->global_seqno() == msg.seqno());
-                            assert(trx->depends_seqno() >= 0);
-                        }
-                        else
-                        {
-                            assert(msg.type() == Message::T_SKIP);
-                            trx->set_received(0, -1, msg.seqno());
-                            trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
-                            trx->mark_certified();
-                        }
-
-                        if (gu_unlikely
-                            (gu::Logger::no_log(gu::LOG_DEBUG) == false))
-                        {
-                            std::ostringstream os;
-                            os << "received trx body: ";
-                            os << *trx;
-                            log_debug << os;
-                        }
-
-                        return Action(trx, Action::T_TRX);
-                    }
-                    case T_CCHANGE:
-                    {
-                        gcs_act_cchange* const cc(new gcs_act_cchange(wbuf,
-                                                                      wsize));
-                        return Action(cc, Action::T_CC);
-                    }
-                    default:
-                        assert(0);
-                        throw std::runtime_error;
-                    }; /* switch(msg.type()) */
-#endif //remove
                     return;
                 }
                 case Message::T_CTRL:
@@ -698,7 +640,6 @@ namespace galera
                 }
 
                 gu_throw_fatal; throw;
-//remove                return Action(NULL, Action::T_EOF); // keep compiler happy
             }
 
         private:

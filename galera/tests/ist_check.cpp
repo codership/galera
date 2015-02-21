@@ -345,10 +345,7 @@ static void store_trx(gcache::GCache* const gcache,
         assert (wsi.pa_range()  == pa_range);
     }
 
-    gcache->seqno_assign(ptr, i,
-//remove                            i - pa_range,
-                         GCS_ACT_WRITESET,
-                         (i - pa_range) <= 0);
+    gcache->seqno_assign(ptr, i, GCS_ACT_WRITESET, (i - pa_range) <= 0);
     trx->unref();
 }
 
@@ -376,10 +373,7 @@ static void store_cc(gcache::GCache* const gcache,
     fail_if(NULL == cc_ptr);
     memcpy(cc_ptr, tmp, cc_size);
 
-    gcache->seqno_assign(cc_ptr, i,
-//remove                            i - pa_range,
-                         GCS_ACT_CCHANGE,
-                         i > 0);
+    gcache->seqno_assign(cc_ptr, i, GCS_ACT_CCHANGE, i > 0);
 }
 
 static void test_ist_common(int const version)

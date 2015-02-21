@@ -212,7 +212,6 @@ namespace gcache
         BufferHeader* const bh(BH_cast(ret));
         bh->size    = size;
         bh->seqno_g = SEQNO_NONE;
-//remove        bh->seqno_d = SEQNO_ILL;
         bh->flags   = 0;
         bh->store   = BUFFER_IN_RB;
         bh->ctx     = reinterpret_cast<BH_ctx_t>(this);
@@ -344,7 +343,6 @@ namespace gcache
                     log_fatal << "Buffer "
                               << reinterpret_cast<const void*>(r->second)
                               << ", seqno_g " << b->seqno_g
-//remove                              << ", seqno_d " << b->seqno_d
                               << " is not released.";
                     assert(0);
                 }

@@ -27,7 +27,27 @@ namespace galera
         return to_gu_uuid(a) == to_gu_uuid(b);
     }
 
+    inline bool operator==(const wsrep_uuid_t& a, const gu_uuid_t& b)
+    {
+        return to_gu_uuid(a) == b;
+    }
+
+    inline bool operator==(const gu_uuid_t& a, const wsrep_uuid_t& b)
+    {
+        return a == to_gu_uuid(b);
+    }
+
     inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+    {
+        return !(a == b);
+    }
+
+    inline bool operator!=(const wsrep_uuid_t& a, const gu_uuid_t& b)
+    {
+        return !(a == b);
+    }
+
+    inline bool operator!=(const gu_uuid_t& a, const wsrep_uuid_t& b)
     {
         return !(a == b);
     }

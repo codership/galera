@@ -188,11 +188,7 @@ IST_determine_recv_addr (gu::Config& conf)
 
         try
         {
-            port = gu::from_string<uint16_t>(
-//                 gu::URI(conf.get("gmcast.listen_addr")).get_port()
-                    conf.get(galera::BASE_PORT_KEY)
-                );
-
+            port = gu::from_string<uint16_t>(conf.get(galera::BASE_PORT_KEY));
         }
         catch (...)
         {
@@ -323,7 +319,6 @@ void galera::ist::Receiver::run()
         }
         while (true)
         {
-//remove            TrxHandleSlave* trx;
             gcs_action act;
 
             if (use_ssl_ == true)
@@ -356,16 +351,20 @@ void galera::ist::Receiver::run()
                 assert(0    == act.size);
             }
 
-            gu::Lock lock(mutex_);
-            while (ready_ == false || consumers_.empty())
+            if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
+            if (GCS_ACT_CCHANGE == act.type) { log_info << "####### Passing CC " << act.seqno_g; }
             {
-                lock.wait(cond_);
+                gu::Lock lock(mutex_);
+                while (ready_ == false || consumers_.empty())
+                {
+                    lock.wait(cond_);
+                }
+                Consumer* cons(consumers_.top());
+                consumers_.pop();
+                cons->act(act);
+                cons->cond().signal();
             }
-
-            Consumer* cons(consumers_.top());
-            consumers_.pop();
-            cons->act(act);
-            cons->cond().signal();
+            if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
 
             if (act.type == GCS_ACT_UNKNOWN)
             {

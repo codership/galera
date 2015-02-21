@@ -31,7 +31,6 @@ namespace gcache
     struct BufferHeader
     {
         int64_t  seqno_g;
-//remove        int64_t  seqno_d;
         BH_ctx_t ctx;
         uint32_t size;  /*! total buffer size, including header */
         uint16_t flags;
@@ -57,7 +56,6 @@ namespace gcache
     BH_assert_clear (const BufferHeader* const bh)
     {
         assert(0 == bh->seqno_g);
-//remove        assert(0 == bh->seqno_d);
         assert(0 == bh->size);
         assert(0 == bh->ctx);
         assert(0 == bh->flags);
@@ -99,7 +97,6 @@ namespace gcache
     operator << (std::ostream& os, const BufferHeader* const bh)
     {
         os << "seqno_g: "   << bh->seqno_g
-//remove           << ", seqno_d: " << bh->seqno_d
            << ", size: "    << bh->size
            << ", ctx: "     << BH_ctx(bh)
            << ", flags: "   << bh->flags

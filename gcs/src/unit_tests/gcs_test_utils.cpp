@@ -77,7 +77,6 @@ GcsGroup::common_dtor()
     {
         assert(NULL != gcache_);
         gcs_group_free(&group_);
-//remove        gcache_->seqno_release(LONG_LONG_MAX);
         delete gcache_;
 
         std::string const gcache_name(conf_.get("gcache.name"));

@@ -242,7 +242,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
         seqno = args->state_id->seqno;
     }
 
-    log_debug << "End state: " << uuid << ':' << seqno << " #################";
+    log_info << "End state: " << uuid << ':' << seqno << " #################";
 
     cc_seqno_ = seqno; // is it needed here?
 
@@ -1392,9 +1392,9 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
 {
     update_state_uuid(uuid);
     apply_monitor_.set_initial_position(seqno);
+
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
-    log_info << "####### Setting global monitor position to " << seqno;
 }
 
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
@@ -1431,7 +1431,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         break;
     case 8:
         trx_params_.version_ = 4;
-        str_proto_ver_ = 2;
+        str_proto_ver_ = 3;
         break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "
@@ -1516,6 +1516,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     gcs_act_cchange const conf(cc.buf, cc.size);
 
+    assert(cc.seqno_g == conf.seqno);
+
+    bool const from_IST(0 == cc.seqno_l);
+
+    log_info << "####### processing CC " << cc.seqno_g << (from_IST ? ", from IST" : ", local");
+
     wsrep_view_info_t* const view_info
         (galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM));
 
@@ -1523,7 +1529,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     LocalOrder lo(cc.seqno_l);
 
-    gu_trace(local_monitor_.enter(lo));
+    if (cc.seqno_l) { gu_trace(local_monitor_.enter(lo)); }
 
     wsrep_seqno_t const upto(cert_.position());
 
@@ -1549,7 +1555,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 //remove
-    else log_info << "##############  ST not required";
+    else log_info << "#######  ST not required";
 
     void*  app_req(0);
     size_t app_req_len(0);
@@ -1583,20 +1589,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         establish_protocol_versions (conf.repl_proto_ver);
 
-        // we have to reset cert initial position here, SST does not contain
-        // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_params_.version_);
-        // at this point there is no ongoing master or slave transactions
-        // and no new requests to service thread should be possible
-
-        service_thd_.flush();             // make sure service thd is idle
-
-        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-        // make sure all gcache buffers are released
-
-        // record state seqno, needed for IST on DONOR
-        cc_seqno_ = group_seqno;
-
         bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
         // This event can be processed 2 times:
@@ -1605,6 +1597,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // When doing it out of order, the event buffer is simply discarded
         if (st_required && app_wants_st)
         {
+            assert(!from_IST); // make sure we are never here from IST
             gcache_.free(const_cast<void*>(cc.buf));
 
             // GCache::Seqno_reset() happens here
@@ -1612,27 +1605,45 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                                     group_uuid, group_seqno, app_req,
                                     app_req_len);
         }
-        else
+        else if (conf.seqno > cert_.position())
         {
             assert(!app_wants_st);
+            assert(group_uuid == conf.uuid);
+            assert(group_seqno == cc.seqno_g);
+            assert(group_seqno == conf.seqno);
+            assert(group_seqno >= cc_seqno_); //remove
 
-            gcache_.seqno_assign(cc.buf, cc.seqno_g,
-//remove -1,
-                                 GCS_ACT_CCHANGE, false);
+            // we have to reset cert initial position here, SST does not contain
+            // cert index yet (see #197).
+            log_info << "######## Setting cert position to " << group_seqno;
+            cert_.assign_initial_position(group_seqno, trx_params_.version_);
+            // record state seqno, needed for IST on DONOR
+            cc_seqno_ = group_seqno;
+            // at this point there is no ongoing master or slave transactions
+            // and no new requests to service thread should be possible
+
+            if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
+            // make sure all gcache buffers are released
+
+            if (!from_IST) // CCs from IST already have seqno assigned.
+                gcache_.seqno_assign(cc.buf, cc.seqno_g, GCS_ACT_CCHANGE, false);
 
             if (view_info->view == 1 || !app_wants_st) // seems to be always true
             {
-                set_initial_position(group_uuid, group_seqno + 1);
+                log_info << "####### Setting monitor position to "
+                         << group_seqno;
+                set_initial_position(group_uuid, group_seqno);
 //                cancel_seqno(group_seqno); // cancel CC seqno
             }
             else
             {
                 log_info << "####### Not setting monitor position to "
-                         << group_seqno << ", view = " << view_info->view
+                         << group_seqno + 1 << ", view = " << view_info->view
                          << ", app_wants_st = " << app_wants_st;
+                assert(0);
             }
 
-            if (state_() == S_CONNECTED || state_() == S_DONOR)
+            if (!from_IST && (state_() == S_CONNECTED || state_() == S_DONOR))
             {
                 switch (next_state)
                 {
@@ -1660,8 +1671,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
             st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
         }
+        else
+        {
+            assert(!from_IST);
+        }
 
-        if (state_() == S_JOINING && sst_state_ != SST_NONE)
+        if (!from_IST && state_() == S_JOINING && sst_state_ != SST_NONE)
         {
             /* There are two reasons we can be here:
              * 1) we just got state transfer in request_state_transfer() above;
@@ -1700,14 +1715,17 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gcache_.free(const_cast<void*>(cc.buf));
     }
 
-    local_monitor_.leave(lo);
-
-    gcs_.resume_recv();
+    if (cc.seqno_l)
+    {
+        local_monitor_.leave(lo);
+        gcs_.resume_recv();
+    }
 
     free(app_req);
     free(view_info);
 
     if (conf.conf_id < 0 && conf.memb_num == 0) {
+        assert(cc.seqno_l);
         assert(S_CLOSING == next_state);
         log_debug << "Received SELF-LEAVE. Closing connection.";
         // called after being shifted to S_CLOSING state.
@@ -1945,11 +1963,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
 
         // we must do it 'in order' for std::map reasons, so keeping
         // it inside the monitor
-        gcache_.seqno_assign (trx->action(),
-                              trx->global_seqno(),
-//remove                              trx->depends_seqno(),
-                              GCS_ACT_WRITESET,
-                              trx->depends_seqno() <= 0);
+        gcache_.seqno_assign (trx->action(), trx->global_seqno(),
+                              GCS_ACT_WRITESET, trx->depends_seqno() < 0);
 
         local_monitor_.leave(lo);
     }
@@ -2027,8 +2042,8 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandleSlave* trx)
         // Mext step will be monitors release. Make sure that ws was not
         // corrupted and cert failure is real before proceeding with that.
         trx->verify_checksum();
-        gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1,
-                              GCS_ACT_WRITESET);
+        gcache_.seqno_assign (trx->action(), trx->global_seqno(),
+                              GCS_ACT_WRITESET, true);
         return WSREP_TRX_FAIL;
 
     default:

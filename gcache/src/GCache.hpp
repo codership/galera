@@ -57,16 +57,15 @@ namespace gcache
          * Reinitialize seqno sequence (after SST or such)
          * Clears seqno->ptr map // and sets seqno_min to seqno.
          */
-        void  seqno_reset (/*int64_t seqno*/);
+        void seqno_reset (/*int64_t seqno*/);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
          */
-        void  seqno_assign (const void* ptr,
-                            int64_t     seqno_g,
-//remove                            int64_t     seqno_d,
-                            uint8_t     type,
-                            bool        skip);
+        void seqno_assign (const void* ptr,
+                           int64_t     seqno_g,
+                           uint8_t     type,
+                           bool        skip);
 
         /*!
          * Release (free) buffers up to seqno
@@ -96,24 +95,19 @@ namespace gcache
          * Moves lock to the given seqno.
          * @throws NotFound
          */
-        const void* seqno_get_ptr (int64_t  seqno_g,
-//remove                                   int64_t& seqno_d,
-                                   ssize_t& size);
+        const void* seqno_get_ptr (int64_t  seqno_g, ssize_t& size);
 
         class Buffer
         {
         public:
 
-            Buffer() : seqno_g_(), ptr_(), size_(),
-//remove                       seqno_d_(),
-                       type_() { }
+            Buffer() : seqno_g_(), ptr_(), size_(), type_() { }
 
             Buffer (const Buffer& other)
                 :
                 seqno_g_(other.seqno_g_),
                 ptr_    (other.ptr_),
                 size_   (other.size_),
-//remove                seqno_d_(other.seqno_d_),
                 type_   (other.type_)
             { }
 
@@ -122,7 +116,6 @@ namespace gcache
                 seqno_g_ = other.seqno_g_;
                 ptr_     = other.ptr_;
                 size_    = other.size_;
-//remove                seqno_d_ = other.seqno_d_;
                 skip_    = other.skip_;
                 type_    = other.type_;
                 return *this;
@@ -131,7 +124,6 @@ namespace gcache
             int64_t           seqno_g() const { return seqno_g_; }
             const gu::byte_t* ptr()     const { return ptr_;     }
             ssize_t           size()    const { return size_;    }
-//remove            int64_t           seqno_d() const { return seqno_d_; }
             bool              skip()    const { return skip_;    }
             uint8_t           type()    const { return type_;    }
 
@@ -142,20 +134,16 @@ namespace gcache
                 ptr_ = reinterpret_cast<const gu::byte_t*>(p);
             }
 
-            void set_other (ssize_t s, int64_t g,
-//remove int64_t d,
-                            bool skp,
-                            uint8_t t)
-            { size_ = s; seqno_g_ = g;
-//remove seqno_d_ = d;
-                skip_ = skp, type_ = t; }
+            void set_other (ssize_t s, int64_t g, bool skp, uint8_t t)
+            {
+                size_ = s; seqno_g_ = g; skip_ = skp, type_ = t;
+            }
 
         private:
 
             int64_t           seqno_g_;
             const gu::byte_t* ptr_;
             ssize_t           size_;
-//remove            int64_t           seqno_d_;
             bool              skip_;
             uint8_t           type_;
 

@@ -41,7 +41,6 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-//remove                          int64_t     const seqno_d,
                           uint8_t     const type,
                           bool        const skip)
     {
@@ -51,7 +50,6 @@ namespace gcache
 
         assert (SEQNO_NONE == bh->seqno_g);
         assert (seqno_g > 0);
-//remove        assert (SEQNO_ILL  == bh->seqno_d);
         assert (!BH_is_released(bh));
 
         if (gu_likely(seqno_g > seqno_max))
@@ -74,7 +72,6 @@ namespace gcache
         }
 
         bh->seqno_g = seqno_g;
-//remove        bh->seqno_d = seqno_d;
         bh->flags  |= (BUFFER_SKIPPED * skip);
         bh->type    = type;
 
@@ -96,16 +93,11 @@ namespace gcache
         size_t old_gap(-1);
         int    batch_size(min_batch_size);
 
-        bool   loop(false);
+        bool   loop(seqno >= seqno_released);
 
-        do
+        while(loop)
         {
-            /* if we're doing this loop repeatedly, allow other threads to run*/
-            if (loop) sched_yield();
-
             gu::Lock lock(mtx);
-
-            assert(seqno >= seqno_released);
 
             seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
 
@@ -165,8 +157,10 @@ namespace gcache
             assert (loop || seqno == seqno_released);
 
             loop = (end < seqno) && loop;
+
+            /* if we're doing this loop repeatedly, allow other threads to run*/
+            if (loop) sched_yield();
         }
-        while(loop);
     }
 
     /*!
@@ -192,7 +186,6 @@ namespace gcache
      * @throws NotFound
      */
     const void* GCache::seqno_get_ptr (int64_t const seqno_g,
-//remove                                       int64_t&      seqno_d,
                                        ssize_t&      size)
     {
         const void* ptr(0);
@@ -221,8 +214,7 @@ namespace gcache
         assert (ptr);
 
         const BufferHeader* const bh (ptr2BH(ptr)); // this can result in IO
-//remove        seqno_d = bh->seqno_d;
-        size    = bh->size - sizeof(BufferHeader);
+        size = bh->size - sizeof(BufferHeader);
 
         return ptr;
     }
@@ -271,7 +263,6 @@ namespace gcache
 
             v[i].set_other (bh->size - sizeof(BufferHeader),
                             bh->seqno_g,
-//remove                            bh->seqno_d,
                             BH_is_skipped(bh),
                             bh->type);
         }
