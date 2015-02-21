@@ -388,7 +388,6 @@ static void test_ist_common(int const version)
     int const trx_version(select_trx_version(version));
     TrxHandleMaster::Params const trx_params("", trx_version,
                                        galera::KeySet::MAX_VERSION);
-
     std::string const dir(".");
 
     gu::Config conf_sender;
