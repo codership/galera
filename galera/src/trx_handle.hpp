@@ -566,7 +566,8 @@ namespace galera
 
         void lock()   const
         {
-            repl_->lock();
+            tr_.lock();
+            if (&tr_ != repl_) repl_->lock();
         }
 
 #ifndef NDEBUG
@@ -576,7 +577,8 @@ namespace galera
         void unlock() const
         {
             assert(locked());
-            repl_->unlock();
+            if (&tr_ != repl_) repl_->unlock();
+            tr_.unlock();
         }
 
         void set_state(TrxHandle::State const s)
@@ -694,10 +696,13 @@ namespace galera
             assert(ts->refcnt() == 1);
 
             TrxHandleSlave* const old(repl_);
-            repl_ = ts; // this might be dangerous
+            repl_ = ts;
 
-            old->unlock();
-            if (old != &tr_) { old->unref(); }
+            if (old != &tr_)
+            {
+                old->unlock();
+                old->unref();
+            }
 
             trx_start_ = false;
 

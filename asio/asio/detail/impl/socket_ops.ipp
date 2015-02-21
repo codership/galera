@@ -426,6 +426,39 @@ void sync_connect(socket_type s, const socket_addr_type* addr,
 
 bool non_blocking_connect(socket_type s, asio::error_code& ec)
 {
+  // Check if the connect operation has finished. This is required since we may
+  // get spurious readiness notifications from the reactor.
+
+#if defined(ASIO_WINDOWS) \
+  || defined(__CYGWIN__) \
+  || defined(__SYMBIAN32__)
+  fd_set write_fds;
+  FD_ZERO(&write_fds);
+  FD_SET(s, &write_fds);
+  fd_set except_fds;
+  FD_ZERO(&except_fds);
+  FD_SET(s, &except_fds);
+  timeval zero_timeout;
+  zero_timeout.tv_sec = 0;
+  zero_timeout.tv_usec = 0;
+  int ready = ::select(s + 1, 0, &write_fds, &except_fds, &zero_timeout);
+#else // defined(ASIO_WINDOWS)
+      // || defined(__CYGWIN__)
+      // || defined(__SYMBIAN32__)
+  pollfd fds;
+  fds.fd = s;
+  fds.events = POLLOUT;
+  fds.revents = 0;
+  int ready = ::poll(&fds, 1, 0);
+#endif // defined(ASIO_WINDOWS)
+       // || defined(__CYGWIN__)
+       // || defined(__SYMBIAN32__)
+  if (ready == 0)
+  { 
+    // The asynchronous connect operation is still in progress.
+    return false;
+  }
+
   // Get the error code from the connect operation.
   int connect_error = 0;
   size_t connect_error_len = sizeof(connect_error);

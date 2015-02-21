@@ -11,6 +11,9 @@
 #define COMMON_BASE_PORT_KEY     "base_port"
 #define COMMON_BASE_PORT_DEFAULT "4567"
 
+#define COMMON_BASE_DIR_KEY      "base_dir"
+#define COMMON_BASE_DIR_DEFAULT  "."
+
 #define COMMON_STATE_FILE "grastate.dat"
 #define COMMON_VIEW_STAT_FILE "gvwstate.dat"
 

@@ -78,6 +78,9 @@ public:
     {
         return (last_left >= trx_.depends_seqno());
     }
+#ifdef GU_DBUG_ON
+    void debug_sync(gu::Mutex&) { }
+#endif // GU_DBUG_ON
 private:
     galera::TrxHandleSlave& trx_;
 };
@@ -145,7 +148,7 @@ extern "C" void* sender_thd(void* arg)
 
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
     gu::Config conf;
-    galera::ReplicatorSMM::InitConfig(conf, NULL);
+    galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     pthread_barrier_wait(&start_barrier);
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
@@ -192,7 +195,7 @@ extern "C" void* receiver_thd(void* arg)
     receiver_args* rargs(reinterpret_cast<receiver_args*>(arg));
 
     gu::Config conf;
-    galera::ReplicatorSMM::InitConfig(conf, NULL);
+    galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
 
     mark_point();
 
@@ -265,18 +268,17 @@ static void test_ist_common(int const version)
     int const trx_version(select_trx_version(version));
     TrxHandleMaster::Params const trx_params("", trx_version,
                                        galera::KeySet::MAX_VERSION);
-
     std::string const dir(".");
 
     gu::Config conf_sender;
-    galera::ReplicatorSMM::InitConfig(conf_sender, NULL);
+    galera::ReplicatorSMM::InitConfig(conf_sender, NULL, NULL);
     std::string const gcache_sender_file("ist_sender.cache");
     conf_sender.set("gcache.name", gcache_sender_file);
     conf_sender.set("gcache.size", "16M");
     gcache::GCache* gcache_sender = new gcache::GCache(conf_sender, dir);
 
     gu::Config conf_receiver;
-    galera::ReplicatorSMM::InitConfig(conf_receiver, NULL);
+    galera::ReplicatorSMM::InitConfig(conf_receiver, NULL, NULL);
     std::string const gcache_receiver_file("ist_receiver.cache");
     conf_receiver.set("gcache.name", gcache_receiver_file);
     conf_receiver.set("gcache.size", "16M");

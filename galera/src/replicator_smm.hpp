@@ -26,6 +26,8 @@
 #include "ist.hpp"
 #include "gu_atomic.hpp"
 #include "saved_state.hpp"
+#include "gu_debug_sync.hpp"
+
 
 #include <map>
 
@@ -160,7 +162,7 @@ namespace galera
 
         struct InitConfig
         {
-            InitConfig(gu::Config&, const char* node_address);
+            InitConfig(gu::Config&, const char* node_address, const char *base_dir);
         };
 
     private:
@@ -172,6 +174,7 @@ namespace galera
         {
             static const std::string base_host;
             static const std::string base_port;
+            static const std::string base_dir;
             static const std::string proto_max;
             static const std::string key_format;
             static const std::string commit_order;
@@ -242,6 +245,19 @@ namespace galera
                 return (last_left + 1 == seqno_);
             }
 
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                if (trx_ != 0 && trx_->is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
+            }
+#endif // GU_DBUG_ON
         private:
 
             LocalOrder(const LocalOrder&);
@@ -267,6 +283,20 @@ namespace galera
                 return (trx_.is_local() == true ||
                         last_left >= trx_.depends_seqno());
             }
+
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                if (trx_.is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
+            }
+#endif // GU_DBUG_ON
 
         private:
 
@@ -331,6 +361,21 @@ namespace galera
                 }
                 gu_throw_fatal << "invalid commit mode value " << mode_;
             }
+
+#ifdef GU_DBUG_ON
+            void debug_sync(gu::Mutex& mutex)
+            {
+                if (trx_.is_local())
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
+            }
+#endif // GU_DBUG_ON
+
         private:
             CommitOrder(const CommitOrder&);
             const TrxHandleSlave& trx_;
@@ -427,7 +472,7 @@ namespace galera
 
         struct ParseOptions
         {
-            ParseOptions(gu::Config&, const char* opts);
+            ParseOptions(Replicator& repl, gu::Config&, const char* opts);
         }
             parse_options_; // parse option string supplied on initialization
 
@@ -464,7 +509,6 @@ namespace galera
         const CommitOrder::Mode co_mode_; // commit order mode
 
         // persistent data location
-        std::string           data_dir_;
         std::string           state_file_;
         SavedState            st_;
 

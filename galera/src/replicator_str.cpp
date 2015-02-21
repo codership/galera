@@ -855,6 +855,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     // processed on donor, just adjust states here
                     trx->set_state(TrxHandle::S_CERTIFYING);
                     apply_trx(recv_ctx, trx);
+                    GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx")
                 }
             }
             else
