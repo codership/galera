@@ -33,7 +33,7 @@
 
 namespace galera
 {
-    class ReplicatorSMM : public Replicator
+    class ReplicatorSMM : public Replicator, public ist::PreloadHandler
     {
     public:
 
@@ -152,6 +152,9 @@ namespace galera
 
         void          desync();
         void          resync();
+
+        void preload_index(const gcs_action&);
+        void preload_view_change(const wsrep_view_info_t&);
 
         struct InitConfig
         {
@@ -518,6 +521,7 @@ namespace galera
         wsrep_uuid_t const    state_uuid_;
         const char            state_uuid_str_[37];
         wsrep_seqno_t         cc_seqno_; // seqno of last CC
+        wsrep_seqno_t         cc_lowest_trx_seqno_;
         wsrep_seqno_t         pause_seqno_; // local seqno of last pause call
 
         // application callbacks
@@ -536,6 +540,7 @@ namespace galera
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
+        bool          sst_received_;
 
         // services
         gcache::GCache gcache_;

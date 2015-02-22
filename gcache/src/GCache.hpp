@@ -95,7 +95,7 @@ namespace gcache
          * Moves lock to the given seqno.
          * @throws NotFound
          */
-        const void* seqno_get_ptr (int64_t  seqno_g, ssize_t& size);
+        const void* seqno_get_ptr (int64_t seqno_g, ssize_t& size);
 
         class Buffer
         {

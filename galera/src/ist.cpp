@@ -32,6 +32,7 @@ namespace galera
                         const std::string& peer,
                         wsrep_seqno_t first,
                         wsrep_seqno_t last,
+                        wsrep_seqno_t preload_start,
                         AsyncSenderMap& asmap,
                         int version)
                 :
@@ -40,6 +41,7 @@ namespace galera
                 peer_  (peer),
                 first_ (first),
                 last_  (last),
+                preload_start_(preload_start),
                 asmap_ (asmap),
                 thread_()
             { }
@@ -48,6 +50,7 @@ namespace galera
             const std::string& peer()  const { return peer_;   }
             wsrep_seqno_t      first() const { return first_;  }
             wsrep_seqno_t      last()  const { return last_;   }
+            wsrep_seqno_t      preload_start() const { return preload_start_; }
             AsyncSenderMap&    asmap()  { return asmap_;  }
             pthread_t          thread() { return thread_; }
 
@@ -58,6 +61,7 @@ namespace galera
             std::string const   peer_;
             wsrep_seqno_t const first_;
             wsrep_seqno_t const last_;
+            wsrep_seqno_t const preload_start_;
             AsyncSenderMap&     asmap_;
             pthread_t           thread_;
         };
@@ -78,6 +82,7 @@ galera::ist::register_params(gu::Config& conf)
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandleSlave::Pool& sp,
                                 gcache::GCache&       gc,
+                                PreloadHandler&       preload,
                                 const char*           addr)
     :
     io_service_   (),
@@ -86,7 +91,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     mutex_        (),
     cond_         (),
     consumers_    (),
-    current_seqno_(-1),
+    first_seqno_  (-1),
     last_seqno_   (-1),
     conf_         (conf),
     trx_pool_     (sp),
@@ -96,7 +101,8 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     version_      (-1),
     use_ssl_      (false),
     running_      (false),
-    ready_        (false)
+    ready_        (false),
+    preload_      (preload)
 {
     std::string recv_addr;
 
@@ -252,7 +258,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
             << "', asio error '" << e.what() << "'";
     }
 
-    current_seqno_ = first_seqno;
+    first_seqno_   = first_seqno;
     last_seqno_    = last_seqno;
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
@@ -277,13 +283,15 @@ void galera::ist::Receiver::run()
 {
     asio::ip::tcp::socket socket(io_service_);
     asio::ssl::stream<asio::ip::tcp::socket> ssl_stream(io_service_, ssl_ctx_);
+
     try
     {
         if (use_ssl_ == true)
         {
             acceptor_.accept(ssl_stream.lowest_layer());
             gu::set_fd_options(ssl_stream.lowest_layer());
-            ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::server);
+            ssl_stream.handshake(
+                asio::ssl::stream<asio::ip::tcp::socket>::server);
         }
         else
         {
@@ -299,7 +307,10 @@ void galera::ist::Receiver::run()
                                          << gu::extra_error_info(e.code());
     }
     acceptor_.close();
+
     int ec(0);
+    wsrep_seqno_t current_seqno(WSREP_SEQNO_UNDEFINED);
+
     try
     {
         bool const keep_keys(conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
@@ -317,43 +328,71 @@ void galera::ist::Receiver::run()
             p.recv_handshake_response(socket);
             p.send_ctrl(socket, Ctrl::C_OK);
         }
+
+        bool preload_started(false);
         while (true)
         {
-            gcs_action act;
+            std::pair<gcs_action, bool> ret;
 
             if (use_ssl_ == true)
             {
-                p.recv_ordered(ssl_stream, act);
+                p.recv_ordered(ssl_stream, ret);
             }
             else
             {
-                p.recv_ordered(socket, act);
+                p.recv_ordered(socket, ret);
             }
+
+            gcs_action& act(ret.first);
 
             if (gu_likely(act.type != GCS_ACT_UNKNOWN))
             {
                 assert(act.seqno_g > 0);
 
-                if (act.seqno_g != current_seqno_)
+                if (WSREP_SEQNO_UNDEFINED == current_seqno)
+                {
+                    current_seqno = act.seqno_g;
+                }
+                else
+                {
+                    ++current_seqno;
+                }
+
+                if (act.seqno_g != current_seqno)
                 {
                     log_error << "unexpected action seqno: " << act.seqno_g
-                              << " expected: " << current_seqno_;
+                              << " expected: " << current_seqno;
                     ec = EINVAL;
                     goto err;
                 }
-
-                ++current_seqno_;
             }
             else
             {
                 assert(0    == act.seqno_g);
                 assert(NULL == act.buf);
                 assert(0    == act.size);
+                log_debug << "eof received, closing socket";
+                break;
             }
 
+            if (act.type == GCS_ACT_WRITESET && ret.second == true)
+            {
+                if (gu_unlikely(preload_started == false))
+                {
+                    log_info << "IST: cert index preload starting at "
+                             << act.seqno_g;
+                    preload_started = true;
+                }
+
+                // Trx was received with index preload flag on
+                preload_.preload_index(act);
+            }
+
+            if (first_seqno_ > 0 && current_seqno >= first_seqno_)
+            {
             if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
             if (GCS_ACT_CCHANGE == act.type) { log_info << "####### Passing CC " << act.seqno_g; }
-            {
+
                 gu::Lock lock(mutex_);
                 while (ready_ == false || consumers_.empty())
                 {
@@ -364,13 +403,84 @@ void galera::ist::Receiver::run()
                 cons->act(act);
                 cons->cond().signal();
             }
+            else
+            {
+                assert(GCS_ACT_WRITESET == act.type ||
+                       GCS_ACT_CCHANGE  == act.type);
+
+//remove                gcache_.seqno_assign(act.buf, act.seqno_g, act.type, false);
+            }
             if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
 
-            if (act.type == GCS_ACT_UNKNOWN)
+#if 0 //remove
+            gu::Lock lock(mutex_);
+            while (ready_ == false || consumers_.empty())
             {
+                lock.wait(cond_);
+            }
+
+            TrxHandleSlave* trx;
+            std::pair<TrxHandleSlave*, bool> ret;
+            if (use_ssl_ == true)
+            {
+                ret = p.recv_trx(ssl_stream);
+            }
+            else
+            {
+                ret = p.recv_trx(socket);
+            }
+            trx = ret.first;
+
+            // Verify that the sequence of trx is continuous
+            if (trx != 0)
+            {
+                if (current_seqno == -1)
+                {
+                    current_seqno = trx->global_seqno();
+                }
+                else if (trx->global_seqno() != current_seqno)
+                {
+                    log_error << "unexpected trx seqno: " << trx->global_seqno()
+                              << " expected: " << current_seqno;
+                    ec = EINVAL;
+                    goto err;
+                }
+            }
+
+            if (ret.second == true)
+            {
+                if (preload_started == false)
+                {
+                    log_info << "IST: cert index preload starting at "
+                             << trx->global_seqno();
+                    preload_started = true;
+                }
+                // Trx was received with index preload flag on
+                preload_.preload_trx(trx);
+            }
+            if (trx != 0 && first_seqno_ > 0 && current_seqno >= first_seqno_)
+            {
+                Consumer* cons(consumers_.top());
+                consumers_.pop();
+                cons->trx(trx);
+                cons->cond().signal();
+            }
+            else if (trx != 0)
+            {
+                trx->unref();
+            }
+
+            if (trx == 0)
+            {
+                // decrement counter to leave it to value of the last
+                // received transaction
+                --current_seqno;
                 log_debug << "eof received, closing socket";
                 break;
             }
+
+            ++current_seqno;
+#endif //remove
         }
     }
     catch (asio::system_error& e)
@@ -388,6 +498,7 @@ void galera::ist::Receiver::run()
     }
 
 err:
+    gcache_.seqno_unlock();
     gu::Lock lock(mutex_);
     if (use_ssl_ == true)
     {
@@ -400,10 +511,10 @@ err:
     }
 
     running_ = false;
-    if (ec != EINTR && current_seqno_ - 1 < last_seqno_)
+    if (last_seqno_ > 0 && ec != EINTR && current_seqno != last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
-                  << last_seqno_ << " last received: " << current_seqno_ - 1;
+                  << last_seqno_ << " last received: " << current_seqno;
         ec = EPROTO;
     }
     if (ec != EINTR)
@@ -490,7 +601,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         recv_addr_ = "";
     }
 
-    return (current_seqno_ - 1);
+    return last_seqno_;
 }
 
 
@@ -615,14 +726,41 @@ galera::ist::Sender::~Sender()
     gcache_.seqno_unlock();
 }
 
-void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
+template <class S>
+void send_eof(galera::ist::Proto& p, S& stream)
+{
+
+    p.send_ctrl(stream, galera::ist::Ctrl::C_EOF);
+
+    // wait until receiver closes the connection
+    try
+    {
+        gu::byte_t b;
+        size_t n;
+        n = asio::read(stream, asio::buffer(&b, 1));
+        if (n > 0)
+        {
+            log_warn << "received " << n
+                     << " bytes, expected none";
+        }
+    }
+    catch (asio::system_error& e)
+    { }
+}
+
+void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
+                               wsrep_seqno_t preload_start)
 {
     if (first > last)
     {
-        assert(0);
-        gu_throw_error(EINVAL) << "sender send first greater than last: "
-                               << first << " > " << last ;
+        if (version_ < 8)
+        {
+            assert(0);
+            gu_throw_error(EINVAL) << "sender send first greater than last: "
+                                   << first << " > " << last ;
+        }
     }
+
     try
     {
         TrxHandleSlave::Pool unused(1, 0, "");
@@ -650,6 +788,25 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
                 << "IST handshake failed, peer reported error: " << ctrl;
         }
 
+        // send eof even if the set or transactions sent would be empty
+        if (first > last || (first == 0 && last == 0))
+        {
+            log_info << "IST sender notifying joiner, not sending anything";
+            if (use_ssl_ == true)
+            {
+                send_eof(p, *ssl_stream_);
+            }
+            else
+            {
+                send_eof(p, socket_);
+            }
+            return;
+        }
+        else
+        {
+            log_info << "IST sender " << first << " -> " << last;
+        }
+
         std::vector<gcache::GCache::Buffer> buf_vec(
             std::min(static_cast<size_t>(last - first + 1),
                      static_cast<size_t>(1024)));
@@ -660,47 +817,31 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
-                // log_info << "sending " << buf_vec[i].seqno_g();
+                // Preload start is the seqno of the lowest trx in
+                // cert index at CC. If the cert index was completely
+                // reset, preload_start will be zero and no preload flag
+                // should be set.
+                bool preload_flag(preload_start > 0 &&
+                                  buf_vec[i].seqno_g() >= preload_start);
                 if (use_ssl_ == true)
                 {
-                    p.send_ordered(*ssl_stream_, buf_vec[i]);
+                    p.send_ordered(*ssl_stream_, buf_vec[i], preload_flag);
                 }
                 else
                 {
-                    p.send_ordered(socket_, buf_vec[i]);
+                    p.send_ordered(socket_, buf_vec[i], preload_flag);
                 }
 
                 if (buf_vec[i].seqno_g() == last)
                 {
                     if (use_ssl_ == true)
                     {
-                        p.send_ctrl(*ssl_stream_, Ctrl::C_EOF);
+                        send_eof(p, *ssl_stream_);
                     }
                     else
                     {
-                        p.send_ctrl(socket_, Ctrl::C_EOF);
+                        send_eof(p, socket_);
                     }
-                    // wait until receiver closes the connection
-                    try
-                    {
-                        gu::byte_t b;
-                        size_t n;
-                        if (use_ssl_ == true)
-                        {
-                            n = asio::read(*ssl_stream_, asio::buffer(&b, 1));
-                        }
-                        else
-                        {
-                            n = asio::read(socket_, asio::buffer(&b, 1));
-                        }
-                        if (n > 0)
-                        {
-                            log_warn << "received " << n
-                                     << " bytes, expected none";
-                        }
-                    }
-                    catch (asio::system_error& e)
-                    { }
                     return;
                 }
             }
@@ -739,7 +880,7 @@ void* run_async_sender(void* arg)
 
     try
     {
-        as->send(as->first(), as->last());
+        as->send(as->first(), as->last(), as->preload_start());
         join_seqno = as->last();
     }
     catch (gu::Exception& e)
@@ -774,10 +915,12 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&   conf,
                                       const std::string&  peer,
                                       wsrep_seqno_t const first,
                                       wsrep_seqno_t const last,
+                                      wsrep_seqno_t const preload_start,
                                       int const           version)
 {
     gu::Critical crit(monitor_);
-    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
+    AsyncSender* as(new AsyncSender(conf, peer, first, last, preload_start,
+                                    *this, version));
     int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {

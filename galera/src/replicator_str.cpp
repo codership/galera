@@ -70,6 +70,8 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
 
     sst_uuid_  = state_id.uuid;
     sst_seqno_ = rcode ? WSREP_SEQNO_UNDEFINED : state_id.seqno;
+    assert(false == sst_received_);
+    sst_received_ = true;
     sst_cond_.signal();
 
     return WSREP_OK;
@@ -353,7 +355,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             IST_request istr;
             get_ist_request(streq, &istr);
 
-            if (istr.uuid() == state_uuid_)
+            if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
             {
                 log_info << "IST request: " << istr;
 
@@ -393,8 +395,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
-                                         istr.last_applied() + 1,
+                                         (protocol_version_ < 8 ||
+                                          cc_lowest_trx_seqno_ == 0) ?
+                                         istr.last_applied() + 1 :
+                                         std::min(cc_lowest_trx_seqno_,
+                                                  istr.last_applied() + 1),
                                          cc_seqno_,
+                                         cc_lowest_trx_seqno_,
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -421,6 +428,41 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
+            if (protocol_version_ >= 8)
+            {
+                try
+                {
+                    if (cc_lowest_trx_seqno_ > 0)
+                    {
+                        gcache_.seqno_lock(cc_lowest_trx_seqno_);
+                    }
+                    else
+                    {
+                        assert(cc_seqno_ == 0);
+                    }
+                }
+                catch (gu::NotFound& nf)
+                {
+                    log_warn << "Cert index preload first seqno "
+                             << cc_lowest_trx_seqno_
+                             << " not found from gcache";
+                    rcode = -ENOMSG;
+                    goto out;
+                }
+
+                log_info << "Cert index preload: " << cc_lowest_trx_seqno_
+                         << " -> " << cc_seqno_;;
+                assert(streq->ist_len() > 0);
+                IST_request istr;
+                get_ist_request(streq, &istr);
+                // Send trxs to rebuild cert index.
+                ist_senders_.run(config_,
+                                 istr.peer(),
+                                 cc_lowest_trx_seqno_,
+                                 cc_seqno_,
+                                 cc_lowest_trx_seqno_,
+                                 protocol_version_);
+            }
             rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                    streq->sst_req(), streq->sst_len(),
                                    &state_id, 0, 0, false);
@@ -451,21 +493,33 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 const wsrep_uuid_t& group_uuid,
                                 wsrep_seqno_t const last_missing_seqno)
 {
+    // Up from protocol version 8 joiner is assumed to be able receive
+    // some transactions to rebuild cert index, so IST receiver must be
+    // prepared regardless of the group.
+    wsrep_seqno_t local_seqno(STATE_SEQNO());
+
     if (state_uuid_ != group_uuid)
     {
-        gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
-                               << ") does not match group state UUID ("
-                               << group_uuid << ')';
+        if (protocol_version_ < 8)
+        {
+            gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
+                                   << ") does not match group state UUID ("
+                                   << group_uuid << ')';
+
+        }
+        else
+        {
+            local_seqno = last_missing_seqno;
+        }
     }
 
-    wsrep_seqno_t const local_seqno(STATE_SEQNO());
-
-    if (local_seqno < 0)
+    if (local_seqno < 0 && protocol_version_ < 8)
     {
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
 
-    assert(local_seqno < last_missing_seqno);
+    assert((protocol_version_ >= 8 && local_seqno <= last_missing_seqno)
+           || local_seqno < last_missing_seqno);
 
     std::ostringstream os;
 
@@ -655,7 +709,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
                                                   group_uuid, cc_seqno));
-    gu::Lock lock(sst_mutex_);
+    gu::Lock sst_lock(sst_mutex_);
+    sst_received_ = false;
 
     st_.mark_unsafe();
 
@@ -663,9 +718,18 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
-    /* while waiting for state transfer to complete is a good point
-     * to reset gcache, since it may involve some IO too */
-    gcache_.seqno_reset();
+
+    /* There are two places where we may need to adjust GCache.
+     * This is the first one, which we can do while waiting for SST to complete.
+     * Here we reset seqno map completely if we have different histories.
+     * This MUST be done before IST starts. */
+    bool const first_reset
+        (state_uuid_ /* GCache has */ != group_uuid /* current PC has */);
+    if (first_reset)
+    {
+        log_info << "Resetting GCache seqno map due to different histories.";
+        gcache_.seqno_reset();
+    }
 
     if (sst_req_len != 0)
     {
@@ -674,10 +738,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         {
             sst_uuid_  = group_uuid;
             sst_seqno_ = cc_seqno;
+            sst_received_ = true;
         }
         else
         {
-            lock.wait(sst_cond_);
+            while (false == sst_received_) sst_lock.wait(sst_cond_);
         }
 
         if (sst_uuid_ != group_uuid)
@@ -696,10 +761,25 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
+            /* There are two places where we may need to adjust GCache.
+             * This is the second one.
+             * Here we reset seqno map completely if we have gap in seqnos
+             * between the received snapshot and current GCache contents.
+             * This MUST be done before IST starts. */
+            // there may be possible optimization to this when cert index
+            // transfer is implemented (it may close the gap), but not by much.
+            if (!first_reset && (STATE_SEQNO() /* GCache has */ !=
+                                 sst_seqno_    /* current state has */))
+            {
+                log_info << "Resetting GCache seqno map due to seqno gap: "
+                         << STATE_SEQNO() << ".." << sst_seqno_;
+                gcache_.seqno_reset();
+            }
+
             update_state_uuid (sst_uuid_);
 
             //remove potentially
-            cert_.assign_initial_position(sst_seqno_, trx_params_.version_);
+//            cert_.assign_initial_position(sst_seqno_, trx_params_.version_);
 
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
@@ -726,7 +806,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert(sst_uuid_ == group_uuid);
 
         // IST is prepared only with str proto ver 1 and above
-        if (STATE_SEQNO() < cc_seqno)
+        // IST is *always* prepared at protocol version 8 or higher
+        if (STATE_SEQNO() < cc_seqno || protocol_version_ >= 8)
         {
             log_info << "Receiving IST: " << (cc_seqno - STATE_SEQNO())
                      << " writesets, seqnos " << (STATE_SEQNO() + 1)
@@ -768,21 +849,20 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     delete req;
 }
 
+class IstTrx  // to ensure automatic trx cleanup on exception
+{
+public:
+    IstTrx(TrxHandleSlave::Pool& p)
+        : trx_(TrxHandleSlave::New(p)) { trx_->lock(); }
+    ~IstTrx() { trx_->unlock(); trx_->unref(); }
+    TrxHandleSlave* const trx_;
+};
 
 bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
 {
     assert(GCS_ACT_WRITESET == act.type);
 
-    class IstTrx  // to ensure automatic trx cleanup on exception
-    {
-    public:
-        IstTrx(TrxHandleSlave::Pool& p)
-            : trx_(TrxHandleSlave::New(p)) { trx_->lock(); }
-        ~IstTrx() { trx_->unlock(); trx_->unref(); }
-        TrxHandleSlave* const trx_;
-    }
-    ist_trx(slave_pool_);
-
+    IstTrx ist_trx(slave_pool_);
     TrxHandleSlave* const trx(ist_trx.trx_);
     bool exit_loop(false);
 
@@ -874,5 +954,48 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     }
 }
 
+void ReplicatorSMM::preload_index(const gcs_action& act)
+{
+    assert(GCS_ACT_WRITESET == act.type);
+
+    IstTrx ist_trx(slave_pool_);
+    TrxHandleSlave* const trx(ist_trx.trx_);
+
+    if (gu_likely(0 != act.size))
+    {
+        assert(act.buf != NULL);
+
+        gu_trace(trx->unserialize(
+                     static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+
+        assert(trx->global_seqno() == act.seqno_g);
+        assert(trx->depends_seqno() >= 0);
+
+        trx->verify_checksum();
+
+        if (gu_unlikely(cert_.position() == 0))
+        {
+            // This is the first pre IST trx for rebuilding cert index
+            cert_.assign_initial_position(trx->global_seqno() - 1,
+                                          trx->version());
+        }
+
+        Certification::TestResult result(cert_.append_trx(trx));
+
+        if (result != Certification::TEST_OK)
+        {
+            gu_throw_fatal << "Pre IST trx append returned unexpected "
+                           << "certification result " << result
+                           << ", expected " << Certification::TEST_OK
+                           << "must abort to maintain consistency";
+        }
+        cert_.set_trx_committed(trx);
+    }
+}
+
+void ReplicatorSMM::preload_view_change(const wsrep_view_info_t&)
+{
+
+}
 
 } /* namespace galera */

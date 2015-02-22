@@ -30,13 +30,25 @@ namespace galera
     {
         void register_params(gu::Config& conf);
 
+        // Interface to handle cert index preload events.
+        // These include trxs and configuration changes received
+        // from donor that have global seqno below IST start.
+        class PreloadHandler
+        {
+        public:
+            virtual void preload_index(const gcs_action&) = 0;
+            virtual void preload_view_change(const wsrep_view_info_t&) = 0;
+        protected:
+            ~PreloadHandler() {}
+        };
+
         class Receiver
         {
         public:
             static std::string const RECV_ADDR;
 
             Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
-                     const char* addr);
+                     PreloadHandler&, const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
@@ -74,7 +86,7 @@ namespace galera
             };
 
             std::stack<Consumer*> consumers_;
-            wsrep_seqno_t         current_seqno_;
+            wsrep_seqno_t         first_seqno_;
             wsrep_seqno_t         last_seqno_;
             gu::Config&           conf_;
             TrxHandleSlave::Pool& trx_pool_;
@@ -85,6 +97,8 @@ namespace galera
             bool                  use_ssl_;
             bool                  running_;
             bool                  ready_;
+            PreloadHandler&       preload_;
+
         };
 
         class Sender
@@ -97,7 +111,12 @@ namespace galera
                    int version);
             ~Sender();
 
-            void send(wsrep_seqno_t first, wsrep_seqno_t last);
+            // first - first trx seqno
+            // last  - last trx seqno
+            // preload_start - the seqno from which sent transactions
+            // are accompanied with index preload flag
+            void send(wsrep_seqno_t first, wsrep_seqno_t last,
+                      wsrep_seqno_t preload_start);
 
             void cancel()
             {
@@ -139,6 +158,7 @@ namespace galera
                 gcache_(gcache) { }
             void run(const gu::Config& conf,
                      const std::string& peer,
+                     wsrep_seqno_t,
                      wsrep_seqno_t,
                      wsrep_seqno_t,
                      int);

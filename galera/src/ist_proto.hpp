@@ -54,7 +54,13 @@ namespace galera
                 T_SKIP      = 6
             } Type;
 
-            Message(int       version = -1,
+            typedef enum
+            {
+                F_PRELOAD = 0x1
+            } Flag;
+
+            explicit
+            Message(int       version,
                     Type      type    = T_NONE,
                     uint8_t   flags   = 0,
                     int8_t    ctrl    = 0,
@@ -141,7 +147,6 @@ namespace galera
                                            << ", expected " << version_;
                 }
 
-//                version_ = u8;
                 offset = gu::unserialize1(buf, buflen, offset, u8);
                 type_  = static_cast<Message::Type>(u8);
                 offset = gu::unserialize1(buf, buflen, offset, flags_);
@@ -211,12 +216,13 @@ namespace galera
         class Ordered : public Message
         {
         public:
-            Ordered(int version,
-                    Type type,
+            Ordered(int      version,
+                    Type     type,
+                    uint8_t  flags,
                     uint32_t len,
                     const wsrep_seqno_t& seqno)
                 :
-                Message(version, type, 0, 0, len, seqno)
+                Message(version, type, flags, 0, len, seqno)
             { }
         };
 
@@ -404,8 +410,10 @@ namespace galera
 
 
             template <class ST>
+
             void send_ordered(ST&                           socket,
-                              const gcache::GCache::Buffer& buffer)
+                              const gcache::GCache::Buffer& buffer,
+                              bool const                    preload_flag)
             {
                 Message::Type type(ordered_type(buffer));
 
@@ -469,8 +477,11 @@ namespace galera
                 size_t const trx_meta_size (version_ >= 8 ? 0 :
                                             (8 /* seqno_g */ + 8 /* seqno_d */));
 
-                Ordered to_msg(version_, type, trx_meta_size + payload_size,
-                               buffer.seqno_g());
+                uint8_t const msg_flags
+                    ((version_ >= 8 && preload_flag) ? Message::F_PRELOAD : 0);
+
+                Ordered to_msg(version_, type, msg_flags,
+                               trx_meta_size + payload_size, buffer.seqno_g());
 
                 gu::Buffer buf(to_msg.serial_size() + trx_meta_size);
                 size_t  offset(to_msg.serialize(&buf[0], buf.size(), 0));
@@ -498,9 +509,26 @@ namespace galera
             }
 
             template <class ST>
-            void
-            recv_ordered(ST& socket, gcs_action& act)
+            void skip_bytes(ST& socket, size_t bytes)
             {
+                gu::Buffer buf(4092);
+                while (bytes > 0)
+                {
+                    bytes -= asio::read(
+                        socket,
+                        asio::buffer(&buf[0], std::min(buf.size(), bytes)));
+                }
+                assert(bytes == 0);
+            }
+
+
+            template <class ST>
+            void
+            recv_ordered(ST& socket,
+                         std::pair<gcs_action, bool>& ret)
+            {
+                gcs_action& act(ret.first);
+
                 act.seqno_g = 0;               // EOF
                 // act.seqno_l has no significance
                 act.buf     = NULL;            // skip
@@ -529,7 +557,8 @@ namespace galera
                 case Message::T_CCHANGE:
                 case Message::T_SKIP:
                 {
-                    if(gu_unlikely(version_ < 8)) // compatibility with 3.x
+                    int64_t seqno_g(msg.seqno());  // compatibility with 3.x
+                    if (gu_unlikely(version_ < 8)) // compatibility with 3.x
                     {
                         assert(msg.type() == Message::T_TRX);
 
@@ -545,7 +574,6 @@ namespace galera
                         }
 
                         offset = gu::unserialize8(&buf[0],buf.size(),0,seqno_g);
-
                         if (gu_unlikely(seqno_g <= 0))
                         {
                             assert(0);
@@ -571,36 +599,61 @@ namespace galera
                     }
                     else
                     {
-                        assert(msg.seqno() > 0);
+                        assert(seqno_g > 0);
                     } // end compatibility with 3.x
 
                     assert(msg.seqno() > 0);
 
-                    void* wbuf;
-                    size_t wsize;
+                    const void* wbuf;
+                    ssize_t     wsize;
+                    bool        already_cached(false);
 
                     if (gu_likely(msg.type() != Message::T_SKIP))
                     {
-                        wsize = msg.len() - offset;
-                        wbuf  = gcache_.malloc(wsize);
-
-                        n = asio::read(socket, asio::buffer(wbuf, wsize));
-
-                        if (gu_unlikely(n != wsize))
+                        // Check if cert index preload trx is already in gcache.
+                        if ((msg.flags() & Message::F_PRELOAD))
                         {
-                            gu_throw_error(EPROTO)
-                                << "error reading write set data";
+                            try
+                            {
+                                wbuf = gcache_.seqno_get_ptr(seqno_g, wsize);
+
+                                skip_bytes(socket, msg.len() - offset);
+
+                                already_cached = true;
+                            }
+                            catch (gu::NotFound& nf)
+                            {
+                                // not found from gcache, continue as normal
+                            }
+                        }
+
+                        if (!already_cached)
+                        {
+                            wsize = msg.len() - offset;
+
+                            void*   const ptr(gcache_.malloc(wsize));
+                            ssize_t const r
+                                (asio::read(socket, asio::buffer(ptr, wsize)));
+
+                            if (gu_unlikely(r != wsize))
+                            {
+                                gu_throw_error(EPROTO)
+                                    << "error reading write set data";
+                            }
+
+                            wbuf = ptr;
                         }
                     }
                     else
                     {
                         wsize = GU_WORDSIZE/8; // 4/8 bytes
-                        wbuf = gcache_.malloc(wsize);
+                        wbuf  = gcache_.malloc(wsize);
                     }
 
-                    gcache_.seqno_assign(wbuf, msg.seqno(),
-                                         gcs_type(msg.type()),
-                                         msg.type() == Message::T_SKIP);
+                    if (!already_cached)
+                        gcache_.seqno_assign(wbuf, msg.seqno(),
+                                             gcs_type(msg.type()),
+                                             msg.type() == Message::T_SKIP);
 
                     switch(msg.type())
                     {

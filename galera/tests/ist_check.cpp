@@ -157,7 +157,7 @@ extern "C" void* sender_thd(void* arg)
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
     mark_point();
-    sender.send(sargs->first_, sargs->last_);
+    sender.send(sargs->first_, sargs->last_, sargs->first_);
     mark_point();
     return 0;
 }
@@ -223,6 +223,14 @@ extern "C" void* trx_thread(void* arg)
     return 0;
 }
 
+class PreIST : public galera::ist::PreloadHandler
+{
+public:
+    void preload_index(const gcs_action& act) { }
+    void preload_view_change(const wsrep_view_info_t& view) { }
+    virtual ~PreIST() {}
+};
+
 extern "C" void* receiver_thd(void* arg)
 {
     mark_point();
@@ -235,7 +243,9 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_, 0);
+    PreIST pre_ist;
+    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_,
+                                   pre_ist, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
 
@@ -279,8 +289,8 @@ static int select_trx_version(int protocol_version)
         return 2;
     case 5:
     case 6:
-        return 3;
     case 7:
+        return 3;
     case 8:
         return 4;
     default:

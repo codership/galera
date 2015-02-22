@@ -51,9 +51,9 @@ namespace galera
         Certification(gu::Config& conf, ServiceThd& thd);
         ~Certification();
 
-        void assign_initial_position(wsrep_seqno_t seqno, int versiono);
+        void assign_initial_position(wsrep_seqno_t seqno, int version);
         TestResult append_trx(TrxHandleSlave*);
-        TestResult test(TrxHandleSlave*, bool = true);
+        TestResult test(TrxHandleSlave*, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
         wsrep_seqno_t
@@ -116,9 +116,14 @@ namespace galera
 
         void set_log_conflicts(const std::string& str);
 
+        wsrep_seqno_t lowest_trx_seqno() const
+        {
+            return (trx_map_.empty() ? position_ : trx_map_.begin()->second->global_seqno());
+        }
+
     private:
 
-        TestResult do_test(TrxHandleSlave*, bool);
+        TestResult do_test(TrxHandleSlave*, bool store_keys);
         TestResult do_test_v3(TrxHandleSlave*, bool);
         TestResult do_test_preordered(TrxHandleSlave*);
         void purge_for_trx(TrxHandleSlave*);

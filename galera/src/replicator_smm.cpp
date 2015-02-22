@@ -147,6 +147,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_uuid_         (WSREP_UUID_UNDEFINED),
     state_uuid_str_     (),
     cc_seqno_           (WSREP_SEQNO_UNDEFINED),
+    cc_lowest_trx_seqno_(WSREP_SEQNO_UNDEFINED),
     pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
@@ -161,6 +162,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
+    sst_received_       (false),
     gcache_             (config_, config_.get(BASE_DIR)),
     gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -168,7 +170,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     slave_pool_         (sizeof(TrxHandleSlave), 1024, "TrxHandleSlave"),
     as_                 (0),
     gcs_as_             (slave_pool_, gcs_, *this, gcache_),
-    ist_receiver_       (config_, slave_pool_, gcache_, args->node_address),
+    ist_receiver_       (config_, slave_pool_, gcache_, *this,
+                         args->node_address),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_, service_thd_),
@@ -248,7 +251,10 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     set_initial_position(uuid, seqno);
 
-    cert_.assign_initial_position(seqno, trx_proto_ver());
+    // Initialize cert index position to zero in the case recovery information
+    // was provided. This is required to avoid initializing cert position
+    // above index rebuild trx seqnos.
+    cert_.assign_initial_position(seqno < 0 ? seqno : 0, trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
 }
@@ -285,7 +291,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
-    wsrep_seqno_t const seqno(cert_.position());
+    wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
 
     log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
@@ -1587,9 +1593,39 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     {
         assert(group_seqno > 0);
 
+        int prev_protocol_version(protocol_version_);
         establish_protocol_versions (conf.repl_proto_ver);
 
         bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
+
+        //
+        // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
+        // from IST.
+        //
+        // The reasons to reset cert index:
+        // - Protocol version lower than 8    (ALL)
+        // - Protocol upgrade                 (ALL)
+        // - State transfer will take a place (JOINER)
+        //
+        bool index_reset(protocol_version_ < 8 ||
+                         prev_protocol_version != protocol_version_ ||
+                         (st_required && app_wants_st));
+
+        if (index_reset)
+        {
+            log_info << "Cert index reset " << protocol_version_
+                     << ", ST needed: " << (app_wants_st ? "yes" : "no");
+            cert_.assign_initial_position(
+                protocol_version_ < 8 ? STATE_SEQNO() : 0,
+                trx_params_.version_);
+
+            if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
+            // make sure all gcache buffers are released
+        }
+        else
+        {
+            log_info << "Skipping cert index reset";
+        }
 
         // This event can be processed 2 times:
         // 1) out-of-order when state transfer is required
@@ -1598,6 +1634,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (st_required && app_wants_st)
         {
             assert(!from_IST); // make sure we are never here from IST
+            assert(index_reset);
+
             gcache_.free(const_cast<void*>(cc.buf));
 
             // GCache::Seqno_reset() happens here
@@ -1613,17 +1651,24 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             assert(group_seqno == conf.seqno);
             assert(group_seqno >= cc_seqno_); //remove
 
-            // we have to reset cert initial position here, SST does not contain
-            // cert index yet (see #197).
-            log_info << "######## Setting cert position to " << group_seqno;
-            cert_.assign_initial_position(group_seqno, trx_params_.version_);
-            // record state seqno, needed for IST on DONOR
-            cc_seqno_ = group_seqno;
+            // since CC does not pass certification, need to adjust cert position
+            // explicitly (when processed in order)
+            log_info << "######## Setting cert position to " << conf.seqno;
+            if (!index_reset)
+                cert_.assign_initial_position(conf.seqno, trx_params_.version_);
             // at this point there is no ongoing master or slave transactions
             // and no new requests to service thread should be possible
 
             if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
             // make sure all gcache buffers are released
+
+            // record state seqno, needed for IST on DONOR
+            cc_seqno_ = group_seqno;
+            // Record lowest trx seqno in cert index to set cert index
+            // rebuild flag appropriately in IST. Notice that if cert index
+            // was completely reset above, the value returned is zero and
+            // no rebuild should happen.
+            cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
 
             if (!from_IST) // CCs from IST already have seqno assigned.
                 gcache_.seqno_assign(cc.buf, cc.seqno_g, GCS_ACT_CCHANGE, false);
@@ -1715,8 +1760,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gcache_.free(const_cast<void*>(cc.buf));
     }
 
-    if (cc.seqno_l)
+    if (!from_IST)
     {
+        double foo, bar;
+        size_t index_size;
+        cert_.stats_get(foo, bar, index_size);
         local_monitor_.leave(lo);
         gcs_.resume_recv();
     }
