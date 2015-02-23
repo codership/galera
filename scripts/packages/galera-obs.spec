@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2014, Codership Oy <info@codership.com>.
+# Copyright (c) 2011-2015, Codership Oy <info@codership.com>.
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 %{!?version: %define version 25_3.x}
 %{!?release: %define release 1}
 %define revision XXXX
-%define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
+%define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
@@ -213,7 +213,7 @@ install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
 install -d $RBR%{_mandir}/man8
-install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
+install -m 644 $RBD/man/garbd.8        $RBR%{_mandir}/man8/garbd.8
 
 
 %if 0%{?systemd}
@@ -320,12 +320,16 @@ fi
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
 
-%doc %attr(644, root, man) %{_mandir}/man8/garbd.1*
+%doc %attr(644, root, man) %{_mandir}/man8/garbd.8*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
 
 %changelog
+* Fri Feb 20 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Update copyright year.
+- Make the man page file name consistent with its section.
+
 * Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Add missing "prereq" directive and arguments for the various service control macros.
 - Handle the difference between SuSE and Fedora/RedHat/CentOS.
