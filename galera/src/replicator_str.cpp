@@ -624,7 +624,6 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         sst_state_ = SST_REQ_FAILED;
 
         st_.set(state_uuid_, STATE_SEQNO());
-        st_.mark_safe();
 
         if (state_() > S_CLOSING)
         {
@@ -637,6 +636,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         else
         {
             // connection is being closed, send failure is expected
+            st_.mark_safe();
         }
     }
 }
