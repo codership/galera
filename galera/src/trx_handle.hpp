@@ -381,6 +381,8 @@ namespace galera
 
         void mark_certified()
         {
+            assert(!certified_);
+
             if (write_set_.size() > 0)
             {
                 int dw(0);

@@ -82,7 +82,7 @@ galera::ist::register_params(gu::Config& conf)
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandleSlave::Pool& sp,
                                 gcache::GCache&       gc,
-                                PreloadHandler&       preload,
+                                ActionHandler&        ah,
                                 const char*           addr)
     :
     io_service_   (),
@@ -96,13 +96,13 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     conf_         (conf),
     trx_pool_     (sp),
     gcache_       (gc),
+    act_handler_  (ah),
     thread_       (),
     error_code_   (0),
     version_      (-1),
     use_ssl_      (false),
     running_      (false),
-    ready_        (false),
-    preload_      (preload)
+    ready_        (false)
 {
     std::string recv_addr;
 
@@ -260,6 +260,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 
     first_seqno_   = first_seqno;
     last_seqno_    = last_seqno;
+
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
@@ -329,7 +330,15 @@ void galera::ist::Receiver::run()
             p.send_ctrl(socket, Ctrl::C_OK);
         }
 
+        // wait for SST to complete
+        {
+            gu::Lock lock(mutex_);
+            while (ready_ == false) { lock.wait(cond_); }
+        }
+
+
         bool preload_started(false);
+
         while (true)
         {
             std::pair<gcs_action, bool> ret;
@@ -385,102 +394,35 @@ void galera::ist::Receiver::run()
                 }
 
                 // Trx was received with index preload flag on
-                preload_.preload_index(act);
+                act_handler_.preload_index(act);
             }
 
             if (first_seqno_ > 0 && current_seqno >= first_seqno_)
             {
-            if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
-            if (GCS_ACT_CCHANGE == act.type) { log_info << "####### Passing CC " << act.seqno_g; }
-
-                gu::Lock lock(mutex_);
-                while (ready_ == false || consumers_.empty())
+                if (GCS_ACT_CCHANGE == act.type)
                 {
-                    lock.wait(cond_);
+                    log_info << "####### Passing CC " << act.seqno_g;
+                    act_handler_.drain_monitors(act.seqno_g - 1);
                 }
-                Consumer* cons(consumers_.top());
-                consumers_.pop();
-                cons->act(act);
-                cons->cond().signal();
-            }
-            else
-            {
-                assert(GCS_ACT_WRITESET == act.type ||
-                       GCS_ACT_CCHANGE  == act.type);
 
-//remove                gcache_.seqno_assign(act.buf, act.seqno_g, act.type, false);
-            }
-            if ((GCS_ACT_CCHANGE == act.type) && usleep(1000000)) { log_info << "####### usleep returned " << errno; } //remove
-
-#if 0 //remove
-            gu::Lock lock(mutex_);
-            while (ready_ == false || consumers_.empty())
-            {
-                lock.wait(cond_);
-            }
-
-            TrxHandleSlave* trx;
-            std::pair<TrxHandleSlave*, bool> ret;
-            if (use_ssl_ == true)
-            {
-                ret = p.recv_trx(ssl_stream);
-            }
-            else
-            {
-                ret = p.recv_trx(socket);
-            }
-            trx = ret.first;
-
-            // Verify that the sequence of trx is continuous
-            if (trx != 0)
-            {
-                if (current_seqno == -1)
                 {
-                    current_seqno = trx->global_seqno();
+                    gu::Lock lock(mutex_);
+                    while (consumers_.empty()) { lock.wait(cond_); }
+
+                    assert(ready_);
+
+                    Consumer* cons(consumers_.top());
+                    consumers_.pop();
+                    cons->act(act);
+                    cons->cond().signal();
                 }
-                else if (trx->global_seqno() != current_seqno)
+
+                if (GCS_ACT_CCHANGE == act.type)
                 {
-                    log_error << "unexpected trx seqno: " << trx->global_seqno()
-                              << " expected: " << current_seqno;
-                    ec = EINVAL;
-                    goto err;
+                    log_info << "####### Waiting CC " << act.seqno_g;
+                    act_handler_.wait(act.seqno_g);
                 }
             }
-
-            if (ret.second == true)
-            {
-                if (preload_started == false)
-                {
-                    log_info << "IST: cert index preload starting at "
-                             << trx->global_seqno();
-                    preload_started = true;
-                }
-                // Trx was received with index preload flag on
-                preload_.preload_trx(trx);
-            }
-            if (trx != 0 && first_seqno_ > 0 && current_seqno >= first_seqno_)
-            {
-                Consumer* cons(consumers_.top());
-                consumers_.pop();
-                cons->trx(trx);
-                cons->cond().signal();
-            }
-            else if (trx != 0)
-            {
-                trx->unref();
-            }
-
-            if (trx == 0)
-            {
-                // decrement counter to leave it to value of the last
-                // received transaction
-                --current_seqno;
-                log_debug << "eof received, closing socket";
-                break;
-            }
-
-            ++current_seqno;
-#endif //remove
         }
     }
     catch (asio::system_error& e)
@@ -511,7 +453,7 @@ err:
     }
 
     running_ = false;
-    if (last_seqno_ > 0 && ec != EINTR && current_seqno != last_seqno_)
+    if (last_seqno_ > 0 && ec != EINTR && current_seqno < last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
                   << last_seqno_ << " last received: " << current_seqno;

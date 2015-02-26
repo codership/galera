@@ -33,7 +33,7 @@
 
 namespace galera
 {
-    class ReplicatorSMM : public Replicator, public ist::PreloadHandler
+    class ReplicatorSMM : public Replicator, public ist::ActionHandler
     {
     public:
 
@@ -154,7 +154,8 @@ namespace galera
         void          resync();
 
         void preload_index(const gcs_action&);
-        void preload_view_change(const wsrep_view_info_t&);
+        void wait(const wsrep_seqno_t&);
+        void drain_monitors(const wsrep_seqno_t&);
 
         struct InitConfig
         {

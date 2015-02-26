@@ -1535,12 +1535,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     LocalOrder lo(cc.seqno_l);
 
-    if (cc.seqno_l) { gu_trace(local_monitor_.enter(lo)); }
-
-    wsrep_seqno_t const upto(cert_.position());
-
-    apply_monitor_.drain(upto);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+    if (cc.seqno_l)
+    {
+        gu_trace(local_monitor_.enter(lo));
+        wsrep_seqno_t const upto(cert_.position());
+        gu_trace(drain_monitors(upto)); // IST recv thread drains monitors itself
+    }
 
     if (view_info->my_idx >= 0)
     {
@@ -1790,10 +1790,7 @@ void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_j,
     gu_trace(local_monitor_.enter(lo));
 
     wsrep_seqno_t const upto(cert_.position());
-
-    apply_monitor_.drain(upto);
-
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+    drain_monitors(upto);
 
     if (seqno_j < 0 && S_JOINING == state_())
     {
@@ -1818,10 +1815,7 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
     gu_trace(local_monitor_.enter(lo));
 
     wsrep_seqno_t const upto(cert_.position());
-
-    apply_monitor_.drain(upto);
-
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+    drain_monitors(upto);
 
     state_.shift_to(S_SYNCED);
     synced_cb_(app_ctx_);
@@ -1843,12 +1837,11 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 
     // Get drain seqno from cert index
     wsrep_seqno_t const upto(cert_.position());
-    apply_monitor_.drain(upto);
-    assert (apply_monitor_.last_left() >= upto);
+    drain_monitors(upto);
 
+    assert (apply_monitor_.last_left() >= upto);
     if (co_mode_ != CommitOrder::BYPASS)
     {
-        commit_monitor_.drain(upto);
         assert (commit_monitor_.last_left() >= upto);
         assert (commit_monitor_.last_left() == apply_monitor_.last_left());
     }

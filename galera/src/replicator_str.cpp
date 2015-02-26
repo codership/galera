@@ -373,7 +373,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
-                    wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
+                    wsrep_gtid_t state_id = { istr.uuid(), istr.last_applied() };
 
                     rcode = sst_donate_cb_(app_ctx_, recv_ctx,
                                            streq->sst_req(),
@@ -385,21 +385,15 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
                 if (rcode >= 0)
                 {
+                    wsrep_seqno_t const first
+                        ((protocol_version_ < 8 || cc_lowest_trx_seqno_ == 0) ?
+                         istr.last_applied() + 1 :
+                         std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
                     try
                     {
-                        // Note: End of IST range must be cc_seqno_-1 instead
-                        // of istr.group_seqno() in case there are CCs between
-                        // sending and delivering STR. If there are no
-                        // intermediate CCs, cc_seqno_-1 == istr.group_seqno().
-                        // Then duplicate message concern in #746 will be
-                        // releaved.
                         ist_senders_.run(config_,
                                          istr.peer(),
-                                         (protocol_version_ < 8 ||
-                                          cc_lowest_trx_seqno_ == 0) ?
-                                         istr.last_applied() + 1 :
-                                         std::min(cc_lowest_trx_seqno_,
-                                                  istr.last_applied() + 1),
+                                         first,
                                          cc_seqno_,
                                          cc_lowest_trx_seqno_,
                                          protocol_version_);
@@ -491,7 +485,7 @@ out:
 void
 ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 const wsrep_uuid_t& group_uuid,
-                                wsrep_seqno_t const last_missing_seqno)
+                                wsrep_seqno_t const last_needed_seqno)
 {
     // Up from protocol version 8 joiner is assumed to be able receive
     // some transactions to rebuild cert index, so IST receiver must be
@@ -509,7 +503,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         }
         else
         {
-            local_seqno = last_missing_seqno;
+            local_seqno = last_needed_seqno;
         }
     }
 
@@ -518,15 +512,15 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
 
-    assert((protocol_version_ >= 8 && local_seqno <= last_missing_seqno)
-           || local_seqno < last_missing_seqno);
+    assert((protocol_version_ >= 8 && local_seqno <= last_needed_seqno)
+           || local_seqno < last_needed_seqno);
 
     std::ostringstream os;
 
     std::string recv_addr = ist_receiver_.prepare(
-        local_seqno + 1, last_missing_seqno, protocol_version_);
+        local_seqno + 1, last_needed_seqno, protocol_version_);
 
-    os << IST_request(recv_addr, state_uuid_, local_seqno, last_missing_seqno);
+    os << IST_request(recv_addr, state_uuid_, local_seqno, last_needed_seqno);
 
     char* str = strdup (os.str().c_str());
 
@@ -543,7 +537,7 @@ ReplicatorSMM::StateRequest*
 ReplicatorSMM::prepare_state_request (const void* const   sst_req,
                                       ssize_t     const   sst_req_len,
                                       const wsrep_uuid_t& group_uuid,
-                                      wsrep_seqno_t const last_missing_seqno)
+                                      wsrep_seqno_t const last_needed_seqno)
 {
     try
     {
@@ -561,7 +555,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             try
             {
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
-                                          group_uuid, last_missing_seqno));
+                                          group_uuid, last_needed_seqno));
             }
             catch (gu::Exception& e)
             {
@@ -778,8 +772,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
             update_state_uuid (sst_uuid_);
 
-            //remove potentially
-//            cert_.assign_initial_position(sst_seqno_, trx_params_.version_);
+            if (str_proto_ver_ < 3)
+            {
+                cert_.assign_initial_position(sst_seqno_, trx_params_.version_);
+                // with higher versions this happens in cert index preload
+            }
 
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
@@ -809,9 +806,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         // IST is *always* prepared at protocol version 8 or higher
         if (STATE_SEQNO() < cc_seqno || protocol_version_ >= 8)
         {
-            log_info << "Receiving IST: " << (cc_seqno - STATE_SEQNO())
-                     << " writesets, seqnos " << (STATE_SEQNO() + 1)
-                     << "-" << cc_seqno;
+            wsrep_seqno_t const ist_from(STATE_SEQNO());
+            wsrep_seqno_t const ist_to(cc_seqno);
+            log_info << "Receiving IST: " << (ist_to - ist_from)
+                     << " writesets, seqnos " << (ist_from + 1)
+                     << "-" << ist_to;
 
             ist_receiver_.ready();
             recv_IST(recv_ctx);
@@ -993,9 +992,16 @@ void ReplicatorSMM::preload_index(const gcs_action& act)
     }
 }
 
-void ReplicatorSMM::preload_view_change(const wsrep_view_info_t&)
+void ReplicatorSMM::wait(const wsrep_seqno_t& upto)
 {
+    apply_monitor_.wait(upto);
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.wait(upto);
+}
 
+void ReplicatorSMM::drain_monitors(const wsrep_seqno_t& upto)
+{
+    apply_monitor_.drain(upto);
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 }
 
 } /* namespace galera */

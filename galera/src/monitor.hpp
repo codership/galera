@@ -78,6 +78,9 @@ namespace galera
         {
             gu::Lock lock(mutex_);
 
+            // Monitor must be properly drained before setting new position
+            assert(last_left_ == last_entered_);
+
 //remove            if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset
@@ -91,6 +94,9 @@ namespace galera
                 drain_common(seqno, lock);
                 drain_seqno_ = LLONG_MAX;
             }
+#else
+            // some drainers may wait for us here
+            cond_.broadcast();
 #endif
             if (seqno != -1)
             {

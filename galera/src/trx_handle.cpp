@@ -240,12 +240,7 @@ galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
                 depends_seqno_ = global_seqno_ - write_set_.pa_range();
                 assert(depends_seqno_ < global_seqno_);
                 assert(depends_seqno_ >= 0);
-                write_set_flags_ |= F_PREORDERED;
-#if 0 //remove
-                // Commented out to make difference between preordered
-                // and regular trxs in IST cert index preload.
-                // write_set_flags_ |= F_PREORDERED;
-#endif
+                certified_ = true;
             }
             else
             {

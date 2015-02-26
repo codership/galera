@@ -33,13 +33,14 @@ namespace galera
         // Interface to handle cert index preload events.
         // These include trxs and configuration changes received
         // from donor that have global seqno below IST start.
-        class PreloadHandler
+        class ActionHandler
         {
         public:
             virtual void preload_index(const gcs_action&) = 0;
-            virtual void preload_view_change(const wsrep_view_info_t&) = 0;
+            virtual void wait(const wsrep_seqno_t&) = 0;
+            virtual void drain_monitors(const wsrep_seqno_t&) = 0;
         protected:
-            ~PreloadHandler() {}
+            ~ActionHandler() {}
         };
 
         class Receiver
@@ -48,7 +49,7 @@ namespace galera
             static std::string const RECV_ADDR;
 
             Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
-                     PreloadHandler&, const char* addr);
+                     ActionHandler&, const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
@@ -91,14 +92,13 @@ namespace galera
             gu::Config&           conf_;
             TrxHandleSlave::Pool& trx_pool_;
             gcache::GCache&       gcache_;
+            ActionHandler&        act_handler_;
             pthread_t             thread_;
             int                   error_code_;
             int                   version_;
             bool                  use_ssl_;
             bool                  running_;
             bool                  ready_;
-            PreloadHandler&       preload_;
-
         };
 
         class Sender
@@ -155,13 +155,16 @@ namespace galera
                 senders_(),
                 monitor_(),
                 gcs_(gcs),
-                gcache_(gcache) { }
+                gcache_(gcache)
+            { }
+
             void run(const gu::Config& conf,
                      const std::string& peer,
-                     wsrep_seqno_t,
-                     wsrep_seqno_t,
-                     wsrep_seqno_t,
-                     int);
+                     wsrep_seqno_t first,
+                     wsrep_seqno_t last,
+                     wsrep_seqno_t preload_start,
+                     int           version);
+
             void remove(AsyncSender*, wsrep_seqno_t);
             void cancel();
             gcache::GCache& gcache() { return gcache_; }

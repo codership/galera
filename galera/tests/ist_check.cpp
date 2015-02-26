@@ -223,11 +223,12 @@ extern "C" void* trx_thread(void* arg)
     return 0;
 }
 
-class PreIST : public galera::ist::PreloadHandler
+class PreIST : public galera::ist::ActionHandler
 {
 public:
     void preload_index(const gcs_action& act) { }
-    void preload_view_change(const wsrep_view_info_t& view) { }
+    void wait(const wsrep_seqno_t& upto) { }
+    void drain_monitors(const wsrep_seqno_t& upto) { }
     virtual ~PreIST() {}
 };
 
