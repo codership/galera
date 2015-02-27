@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2014, Codership Oy <info@codership.com>.
+# Copyright (c) 2011-2015, Codership Oy <info@codership.com>.
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -18,17 +18,40 @@
 %{!?name: %define name galera-3}
 %{!?version: %define version 25.3.x}
 %{!?release: %define release 1}
-%define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
+%define revision XXXX
+%define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
-%dump
+# Avoid debuginfo RPMs, leaves binaries unstripped
+
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
+# Define dist tag if not given by platform
+
+# For suse versions see:
+# https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+%if 0%{?suse_version} == 1110
+%define dist .sle11
+%endif
+%if 0%{?suse_version} == 1310
+%define dist .suse13.1
+%endif
+%if 0%{?suse_version} == 1315
+%define dist .sle12
+%endif
+%if 0%{?suse_version} == 1320
+%define dist .suse13.2
+%endif
+
 
 Name:          %{name}
 Summary:       Galera: a synchronous multi-master wsrep provider (replication engine)
 Group:         System Environment/Libraries
 Version:       %{version}
-Release:       %{release}
+Release:       %{release}%{dist}
 License:       GPL-2.0
 Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
@@ -74,6 +97,25 @@ BuildRequires: systemd
 %define systemd 0
 %endif
 
+%if 0%{?systemd}
+%{?systemd_requires}
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
+# RedHat seems not to need this (or an equivalent).
+%endif
+
+%else
+# NOT systemd
+
+%if 0%{?suse_version}
+PreReq:        %insserv_prereq %fillup_prereq
+%else
+Requires(post): chkconfig
+Requires(preun): chkconfig
+Requires(preun): initscripts
+%endif
+%endif # systemd
+
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
 for transactional databases and similar applications. For more information
@@ -90,11 +132,13 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 %package -n galera-arbitrator-3
 Summary:       Galera arbitrator daemon
 Group:         Productivity/Databases/Servers
+
 Requires:      openssl nmap
 %if 0%{?centos} == 6
 Requires:      nc
 %endif
 Provides:      wsrep, %{name} = %{version}-%{release}
+Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
 
 %description -n galera-arbitrator-3
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
@@ -130,7 +174,9 @@ export CC=gcc-4.7
 export CXX=g++-4.7
 %endif
 
-scons -j$(echo ${NUM_JOBS:-"1"})
+NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
+
+scons -j$(echo $NUM_JOBS) revno=%{revision}
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
@@ -147,13 +193,19 @@ install -D -m 755 $RBD/garb/files/garb-systemd $RBR%{_bindir}/garb-systemd
 %else
 install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
+%endif
 
-# Symlink required by SUSE policy
+# Symlink required by SUSE policy for SysV init, still supported with systemd
 %if 0%{?suse_version}
+%if 0%{?systemd}
+install -d %{buildroot}%{_sbindir}
+ln -sf /usr/sbin/service %{buildroot}%{_sbindir}/rcgarb
+%else
 install -d $RBR/usr/sbin
+
 ln -sf /etc/init.d/garb $RBR%{_sbindir}/rcgarb
-%endif
-%endif
+%endif # systemd
+%endif # suse_version
 
 %if 0%{?suse_version}
 install -d $RBR/var/adm/fillup-templates/
@@ -161,7 +213,7 @@ install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.
 %else
 install -d $RBR%{_sysconfdir}/sysconfig
 install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
-%endif
+%endif # suse_version
 
 install -d $RBR%{_bindir}
 install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
@@ -178,17 +230,50 @@ install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
 install -d $RBR%{_mandir}/man8
-install -m 644 $RBD/man/garbd.1        $RBR%{_mandir}/man8/garbd.1
+install -m 644 $RBD/man/garbd.8        $RBR%{_mandir}/man8/garbd.8
+
+
+%if 0%{?systemd}
+
+%if 0%{?suse_version}
 
 %post
-%fillup_and_insserv
+%service_add_post garb
 
 %preun
-%stop_on_removal
+%service_del_preun garb
+
+%else
+# Not SuSE - so it must be RedHat, CentOS, Fedora
+
+%post
+%systemd_post garb.service
+
+%preun
+%systemd_preun garb.service
+
+%postun
+%systemd_postun_with_restart garb.service
+
+%endif
+# SuSE versus Fedora/RedHat/CentOS
+
+%else
+# NOT systemd
+
+%if 0%{?suse_version}
+# For the various macros and their parameters, see here:
+# https://en.opensuse.org/openSUSE:Packaging_Conventions_RPM_Macros
+
+%post
+%fillup_and_insserv garb
+
+%preun
+%stop_on_removal garb
 rm -f $(find %{libs} -type l)
 
 %postun
-%restart_on_update
+%restart_on_update garb
 %insserv_cleanup
 
 %pre -n galera-arbitrator-3
@@ -210,6 +295,32 @@ rm -f $(find %{libs} -type l)
 %if 0%{?suse_version} >= 1210
 %service_del_postun garb.service
 %endif
+
+%else
+# Not SuSE - so it must be RedHat, CentOS, Fedora
+
+%post
+/sbin/chkconfig --add garb
+
+%preun
+if [ "$1" = "0" ]
+then
+    /sbin/service garb stop
+    /sbin/chkconfig --del garb
+fi
+
+%postun
+# >=1 packages after uninstall -> pkg was updated -> restart
+if [ "$1" -ge "1" ]
+then
+    /sbin/service garb restart
+fi
+
+%endif
+# SuSE versus Fedora/RedHat/CentOS
+
+%endif
+# systemd ?
 
 
 %files
@@ -242,21 +353,43 @@ rm -f $(find %{libs} -type l)
 %attr(0755,root,root) %{_bindir}/garbd
 %else
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+%endif
 
-# Symlink required by SUSE policy
+# Symlink required by SUSE policy for SysV init, still supported with systemd
 %if 0%{?suse_version}
 %attr(0755,root,root) %{_sbindir}/rcgarb
-%endif
 %endif
 
 %attr(0755,root,root) %{_bindir}/garbd
 
-%doc %attr(644, root, man) %{_mandir}/man8/garbd.1*
+%attr(0755,root,root) %dir %{libs}
+%attr(0755,root,root) %{libs}/libgalera_smm.so
+
+%attr(0755,root,root) %dir %{docs}
+%doc %attr(0644,root,root) %{docs}/COPYING
+%doc %attr(0644,root,root) %{docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
+%doc %attr(0644,root,root) %{docs}/README
+%doc %attr(0644,root,root) %{docs}/README-MySQL
+
+%doc %attr(644, root, man) %{_mandir}/man8/garbd.8*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
 
 %changelog
+* Fri Feb 20 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Update copyright year.
+- Make the man page file name consistent with its section.
+
+* Wed Feb 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add missing "prereq" directive and arguments for the various service control macros.
+- Handle the difference between SuSE and Fedora/RedHat/CentOS.
+- Fix systemd stuff, using info from these pages:
+  https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+  http://fedoraproject.org/wiki/Packaging:Systemd
+  http://fedoraproject.org/wiki/Packaging:ScriptletSnippets#Systemd
+
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
 - Initial OBS packaging created
-

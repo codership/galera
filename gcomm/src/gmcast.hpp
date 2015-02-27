@@ -82,6 +82,11 @@ namespace gcomm
             return pnet_.mtu() - (4 + UUID::serial_size());
         }
 
+        void remove_viewstate_file() const
+        {
+            ViewState::remove_file(conf_);
+        }
+
     private:
 
         GMCast (const GMCast&);
