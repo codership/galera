@@ -17,7 +17,7 @@
 
 %{!?name: %define name galera-3}
 %{!?version: %define version 25_3.x}
-%{!?release: %define release 1}
+%{!?release: %define release 2}
 %define revision XXXX
 %define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
@@ -192,7 +192,7 @@ ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
 
 %if 0%{?suse_version}
 install -d $RBR/var/adm/fillup-templates/
-install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.%{name}
+install -m 644 $RBD/garb/files/garb.cnf $RBR/var/adm/fillup-templates/sysconfig.garb
 %else
 install -d $RBR%{_sysconfdir}/sysconfig
 install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
@@ -289,7 +289,7 @@ fi
 %files
 %defattr(-,root,root,0755)
 %if 0%{?suse_version}
-%config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.%{name}
+%config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.garb
 %else
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %endif
@@ -326,6 +326,9 @@ fi
 [ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT;
 
 %changelog
+* Fri Feb 27 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Service name is "garb", reflect that in the config file (SuSE only, galera#235, Release 2)
+
 * Fri Feb 20 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Update copyright year.
 - Make the man page file name consistent with its section.
