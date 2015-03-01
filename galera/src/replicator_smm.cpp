@@ -1368,7 +1368,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     if (seq >= cc_seqno_) /* Refs #782. workaround for
                            * assert(seqno >= seqno_released_) in gcache. */
         cert_.purge_trxs_upto(seq, true);
-
+    log_info << "####### commit cut: " << seq;
     local_monitor_.leave(lo);
     log_debug << "Got commit cut from GCS: " << seq;
 }
@@ -2041,6 +2041,13 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
     }
 
+//remove
+    uint16_t const sid(*reinterpret_cast<const uint16_t*>(&trx->source_id()));
+    log_info << "######## certified " << (trx->local() ? 'l' : 'r')
+             << ", g: " << trx->global_seqno()
+             << ", s: " << trx->last_seen_seqno()
+             << ", d: " << trx->depends_seqno()
+             << ", sid: " << sid;
     return retval;
 }
 

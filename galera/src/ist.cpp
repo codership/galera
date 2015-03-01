@@ -91,8 +91,9 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     mutex_        (),
     cond_         (),
     consumers_    (),
-    first_seqno_  (-1),
-    last_seqno_   (-1),
+    first_seqno_  (WSREP_SEQNO_UNDEFINED),
+    last_seqno_   (WSREP_SEQNO_UNDEFINED),
+    current_seqno_(WSREP_SEQNO_UNDEFINED),
     conf_         (conf),
     trx_pool_     (sp),
     gcache_       (gc),
@@ -210,9 +211,9 @@ IST_determine_recv_addr (gu::Config& conf)
 }
 
 std::string
-galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
-                               wsrep_seqno_t last_seqno,
-                               int           version)
+galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
+                               wsrep_seqno_t const last_seqno,
+                               int           const version)
 {
     ready_ = false;
     version_ = version;
@@ -310,7 +311,6 @@ void galera::ist::Receiver::run()
     acceptor_.close();
 
     int ec(0);
-    wsrep_seqno_t current_seqno(WSREP_SEQNO_UNDEFINED);
 
     try
     {
@@ -358,19 +358,19 @@ void galera::ist::Receiver::run()
             {
                 assert(act.seqno_g > 0);
 
-                if (WSREP_SEQNO_UNDEFINED == current_seqno)
+                if (WSREP_SEQNO_UNDEFINED == current_seqno_)
                 {
-                    current_seqno = act.seqno_g;
+                    current_seqno_ = act.seqno_g;
                 }
                 else
                 {
-                    ++current_seqno;
+                    ++current_seqno_;
                 }
 
-                if (act.seqno_g != current_seqno)
+                if (act.seqno_g != current_seqno_)
                 {
                     log_error << "unexpected action seqno: " << act.seqno_g
-                              << " expected: " << current_seqno;
+                              << " expected: " << current_seqno_;
                     ec = EINVAL;
                     goto err;
                 }
@@ -397,7 +397,7 @@ void galera::ist::Receiver::run()
                 act_handler_.preload_index(act);
             }
 
-            if (first_seqno_ > 0 && current_seqno >= first_seqno_)
+            if (first_seqno_ > 0 && current_seqno_ >= first_seqno_)
             {
                 if (GCS_ACT_CCHANGE == act.type)
                 {
@@ -453,10 +453,10 @@ err:
     }
 
     running_ = false;
-    if (last_seqno_ > 0 && ec != EINTR && current_seqno < last_seqno_)
+    if (last_seqno_ > 0 && ec != EINTR && current_seqno_ < last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
-                  << last_seqno_ << " last received: " << current_seqno;
+                  << last_seqno_ << " last received: " << current_seqno_;
         ec = EPROTO;
     }
     if (ec != EINTR)
@@ -543,7 +543,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         recv_addr_ = "";
     }
 
-    return last_seqno_;
+    return current_seqno_;
 }
 
 

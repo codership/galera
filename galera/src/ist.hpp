@@ -89,6 +89,7 @@ namespace galera
             std::stack<Consumer*> consumers_;
             wsrep_seqno_t         first_seqno_;
             wsrep_seqno_t         last_seqno_;
+            wsrep_seqno_t         current_seqno_;
             gu::Config&           conf_;
             TrxHandleSlave::Pool& trx_pool_;
             gcache::GCache&       gcache_;

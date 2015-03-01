@@ -819,8 +819,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             // Note: apply_monitor_ must be drained to avoid race between
             // IST appliers and GCS appliers, GCS action source may
             // provide actions that have already been applied via IST.
-            // However with protocol version >= CC events received via IST should
-            // drain monitor in process_conf_change()
+            // However with protocol version >= 3 CC events received via IST
+            // should drain monitor in process_conf_change()
             if (str_proto_ver_ < 3) apply_monitor_.drain(sst_seqno_);
 
             log_info << "IST received: " << state_uuid_ << ":" << sst_seqno_;
