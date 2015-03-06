@@ -1,8 +1,11 @@
-// Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2015 Codership Oy <info@codership.com>
 
 #include "galera_info.hpp"
+#include "uuid.hpp"
 #include <galerautils.h>
 #include <string.h>
+
+using namespace galera;
 
 static size_t
 view_info_size (int members)
@@ -12,6 +15,7 @@ view_info_size (int members)
 
 /* create view info out of configuration message */
 wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
+                                            wsrep_uuid_t&          my_uuid,
                                             bool                   st_required)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
@@ -33,7 +37,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
         ret->status    = conf.conf_id != -1 ?
             WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
         ret->state_gap = st_required;
-        ret->my_idx    = conf.my_idx;
+        ret->my_idx    = -1;
         ret->memb_num  = conf.memb_num;
         ret->proto_ver = conf.appl_proto_ver;
 
@@ -44,6 +48,11 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
             gu_uuid_scan (str, id_len,reinterpret_cast<gu_uuid_t*>(&member->id));
             str = str + id_len + 1;
 
+            if (member->id == my_uuid)
+            {
+                ret->my_idx = m;
+            }
+
             strncpy(member->name, str, sizeof(member->name) - 1);
             member->name[sizeof(member->name) - 1] = '\0';
             str = str + strlen(str) + 1;
@@ -53,6 +62,14 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
             str = str + strlen(str) + 1;
 
             str += sizeof(gcs_seqno_t); // skip cached seqno.
+        }
+
+        if (WSREP_UUID_UNDEFINED == my_uuid && conf.my_idx >= 0)
+        {
+            assert(-1 == ret->my_idx);
+            ret->my_idx = conf.my_idx;
+            assert(ret->my_idx < ret->memb_num);
+            my_uuid = ret->members[ret->my_idx].id;
         }
     }
 

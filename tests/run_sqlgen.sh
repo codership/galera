@@ -17,6 +17,9 @@ check()
 }
 
 #trap check SIGINT
+#node=1
+#DBMS_HOST=${NODE_INCOMING_HOST[$node]}
+#DBMS_PORT=${NODE_INCOMING_PORT[$node]}
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}

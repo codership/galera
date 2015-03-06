@@ -271,12 +271,14 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
 
     running_ = true;
 
-    log_info << "Prepared IST receiver, listening at: "
+    log_info << "Prepared IST receiver for " << first_seqno << '-'
+             << last_seqno << ", listening at: "
              << (uri.get_scheme()
                  + "://"
                  + gu::escape_addr(acceptor_.local_endpoint().address())
                  + ":"
                  + gu::to_string(acceptor_.local_endpoint().port()));
+
     return recv_addr_;
 }
 
@@ -338,6 +340,7 @@ void galera::ist::Receiver::run()
 
 
         bool preload_started(false);
+        current_seqno_ = WSREP_SEQNO_UNDEFINED;
 
         while (true)
         {
@@ -358,8 +361,17 @@ void galera::ist::Receiver::run()
             {
                 assert(act.seqno_g > 0);
 
-                if (WSREP_SEQNO_UNDEFINED == current_seqno_)
+                if (gu_unlikely(WSREP_SEQNO_UNDEFINED == current_seqno_))
                 {
+                    if (act.seqno_g > first_seqno_)
+                    {
+                        log_error
+                            << "IST started with wrong seqno: " << act.seqno_g
+                            << ", expected <= " << first_seqno_;
+                        ec = EINVAL;
+                        goto err;
+                    }
+                    log_info << "####### IST current seqno initialized to " << act.seqno_g;
                     current_seqno_ = act.seqno_g;
                 }
                 else
@@ -369,7 +381,7 @@ void galera::ist::Receiver::run()
 
                 if (act.seqno_g != current_seqno_)
                 {
-                    log_error << "unexpected action seqno: " << act.seqno_g
+                    log_error << "Unexpected action seqno: " << act.seqno_g
                               << " expected: " << current_seqno_;
                     ec = EINVAL;
                     goto err;
@@ -384,8 +396,15 @@ void galera::ist::Receiver::run()
                 break;
             }
 
-            if (act.type == GCS_ACT_WRITESET && ret.second == true)
+            assert(current_seqno_ > 0);
+            assert(current_seqno_ == act.seqno_g);
+            assert(act.type != GCS_ACT_UNKNOWN);
+
+            bool const must_apply(current_seqno_ >= first_seqno_);
+
+            if (ret.second == true)
             {
+                // Action was received with index preload flag on
                 if (gu_unlikely(preload_started == false))
                 {
                     log_info << "IST: cert index preload starting at "
@@ -393,11 +412,16 @@ void galera::ist::Receiver::run()
                     preload_started = true;
                 }
 
-                // Trx was received with index preload flag on
-                act_handler_.preload_index(act);
-            }
+                assert(GCS_ACT_WRITESET == act.type ||
+                       GCS_ACT_CCHANGE == act.type);
 
-            if (first_seqno_ > 0 && current_seqno_ >= first_seqno_)
+                // if must apply, then CC will be processed in isolation below
+                if (!(GCS_ACT_CCHANGE == act.type && must_apply))
+                    act_handler_.preload_index(act);
+            }
+            else assert(!preload_started);
+
+            if (must_apply)
             {
                 if (GCS_ACT_CCHANGE == act.type)
                 {
@@ -419,8 +443,8 @@ void galera::ist::Receiver::run()
 
                 if (GCS_ACT_CCHANGE == act.type)
                 {
-                    log_info << "####### Waiting CC " << act.seqno_g;
                     act_handler_.wait(act.seqno_g);
+                    log_info << "####### Waited CC " << act.seqno_g;
                 }
             }
         }
@@ -471,12 +495,17 @@ err:
 }
 
 
-void galera::ist::Receiver::ready()
+void galera::ist::Receiver::ready(wsrep_seqno_t const first)
 {
+    assert(first > 0);
+
     gu::Lock lock(mutex_);
-    ready_ = true;
+
+    first_seqno_ = first;
+    ready_       = true;
     cond_.signal();
 }
+
 
 int galera::ist::Receiver::recv(gcs_action& act)
 {

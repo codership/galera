@@ -65,6 +65,7 @@ namespace gcache
 
             if (false == res.second)
             {
+                assert(0);
                 gu_throw_fatal <<"Attempt to reuse the same seqno: " << seqno_g
                                <<". New ptr = " << ptr << ", previous ptr = "
                                << res.first->second;

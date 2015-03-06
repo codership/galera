@@ -457,6 +457,9 @@ namespace galera
                                      const void*         sst_req,
                                      ssize_t             sst_req_len);
 
+        void preload_index_trx(const gcs_action& act);
+        void preload_index_cc(const gcs_action& act);
+
         /* local state seqno for internal use (macro mock up) */
         wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }
 

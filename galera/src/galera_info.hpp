@@ -6,9 +6,13 @@
 #include "gcs.hpp"
 #include "wsrep_api.h"
 
-/* create view info out of configuration message */
+/* create view info out of configuration message
+ * if my_uuid is defined - use it to determine my_idx,
+ * otherwise set my_uuid according to conf.my_idx */
 extern wsrep_view_info_t*
-galera_view_info_create (const gcs_act_cchange& conf, bool st_required);
+galera_view_info_create (const gcs_act_cchange& conf,
+                         wsrep_uuid_t&          my_uuid,
+                         bool                   st_required);
 
 /* make a copy of view info object */
 extern wsrep_view_info_t*

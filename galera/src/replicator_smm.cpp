@@ -394,7 +394,9 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             {
                 // Generate zero view before exit to notify application
                 gcs_act_cchange const cc;
-                wsrep_view_info_t* err_view(galera_view_info_create(cc,false));
+                wsrep_uuid_t tmp(uuid_);
+                wsrep_view_info_t* const err_view
+                    (galera_view_info_create(cc, tmp, false));
                 void* fake_sst_req(0);
                 size_t fake_sst_req_len(0);
                 view_cb_(app_ctx_, recv_ctx, err_view, 0, 0,
@@ -1368,9 +1370,8 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     if (seq >= cc_seqno_) /* Refs #782. workaround for
                            * assert(seqno >= seqno_released_) in gcache. */
         cert_.purge_trxs_upto(seq, true);
-    log_info << "####### commit cut: " << seq;
-    local_monitor_.leave(lo);
     log_debug << "Got commit cut from GCS: " << seq;
+    local_monitor_.leave(lo);
 }
 
 
@@ -1526,32 +1527,69 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     bool const from_IST(0 == cc.seqno_l);
 
-    log_info << "####### processing CC " << cc.seqno_g << (from_IST ? ", from IST" : ", local");
-
-    wsrep_view_info_t* const view_info
-        (galera_view_info_create(conf, conf.my_state == GCS_NODE_STATE_PRIM));
-
-    update_incoming_list(*view_info);
-
     LocalOrder lo(cc.seqno_l);
 
-    if (cc.seqno_l)
+    if (!from_IST)
     {
         gu_trace(local_monitor_.enter(lo));
-        wsrep_seqno_t const upto(cert_.position());
-        gu_trace(drain_monitors(upto)); // IST recv thread drains monitors itself
     }
 
-    if (view_info->my_idx >= 0)
-    {
-        uuid_ = view_info->members[view_info->my_idx].id;
-    }
+    assert(!from_IST || WSREP_UUID_UNDEFINED != uuid_);
 
-    bool const          st_required(state_transfer_required(*view_info));
+    wsrep_uuid_t new_uuid(uuid_);
+    wsrep_view_info_t* const view_info
+        (galera_view_info_create(conf, new_uuid,
+                                 conf.my_state == GCS_NODE_STATE_PRIM));
+
     wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
     const wsrep_uuid_t& group_uuid (view_info->state_id.uuid);
     assert(group_seqno == cc.seqno_g);
 
+    if (!from_IST)
+    {
+        if (WSREP_UUID_UNDEFINED == uuid_)
+        {
+            uuid_ = new_uuid;
+        }
+        else
+        {
+            if (new_uuid != uuid_) // logical bug in galera_view_info_create()
+            {
+                log_fatal << "Node UUID change during operation: "
+                          << uuid_ << " -> " << new_uuid;
+                abort();
+            }
+        }
+
+        log_info << "####### My UUID: " << uuid_;
+
+        if (cc.seqno_g != WSREP_SEQNO_UNDEFINED &&
+            cc.seqno_g <= sst_seqno_)
+        {
+            log_info << "####### skipping CC " << cc.seqno_g
+                     << (from_IST ? ", from IST" : ", local");
+
+            // applied already in SST/IST, skip
+            gu_trace(local_monitor_.leave(lo));
+            gcs_.resume_recv();
+            ::free(view_info);
+            gcache_.free(const_cast<void*>(cc.buf));
+            return;
+        }
+        else
+        {
+            wsrep_seqno_t const upto(cert_.position());
+            gu_trace(drain_monitors(upto));
+            // IST recv thread drains monitors itself
+        }
+    }
+
+    update_incoming_list(*view_info);
+
+    log_info << "####### processing CC " << cc.seqno_g
+             << (from_IST ? ", from IST" : ", local");
+
+    bool const st_required(state_transfer_required(*view_info));
     if (st_required)
     {
         log_info << "State transfer required: "
@@ -1561,7 +1599,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 //remove
-    else log_info << "#######  ST not required";
+    else log_info << "####### ST not required";
 
     void*  app_req(0);
     size_t app_req_len(0);
@@ -1619,6 +1657,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 protocol_version_ < 8 ? STATE_SEQNO() : 0,
                 trx_params_.version_);
 
+            // at this point there is no ongoing master or slave transactions
+            // and no new requests to service thread should be possible
             if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
             // make sure all gcache buffers are released
         }
@@ -1631,10 +1671,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // 1) out-of-order when state transfer is required
         // 2) in-order (either when no state transfer or IST)
         // When doing it out of order, the event buffer is simply discarded
-        if (st_required && app_wants_st)
+        if (st_required)
         {
             assert(!from_IST); // make sure we are never here from IST
-            assert(index_reset);
 
             gcache_.free(const_cast<void*>(cc.buf));
 
@@ -1651,16 +1690,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             assert(group_seqno == conf.seqno);
             assert(group_seqno >= cc_seqno_); //remove
 
-            // since CC does not pass certification, need to adjust cert position
-            // explicitly (when processed in order)
-            log_info << "######## Setting cert position to " << conf.seqno;
-            if (!index_reset)
-                cert_.assign_initial_position(conf.seqno, trx_params_.version_);
-            // at this point there is no ongoing master or slave transactions
-            // and no new requests to service thread should be possible
-
-            if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-            // make sure all gcache buffers are released
+            /* since CC does not pass certification, need to adjust cert
+             * position explicitly (when processed in order) */
+            cert_.adjust_position(conf.seqno, trx_params_.version_);
 
             // record state seqno, needed for IST on DONOR
             cc_seqno_ = group_seqno;
@@ -1670,17 +1702,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             // no rebuild should happen.
             cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
 
-            if (!from_IST) // CCs from IST already have seqno assigned.
-                gcache_.seqno_assign(cc.buf, cc.seqno_g, GCS_ACT_CCHANGE, false);
-
             if (view_info->view == 1 || !app_wants_st) // seems to be always true
             {
                 log_info << "####### Setting monitor position to "
                          << group_seqno;
-                set_initial_position(group_uuid, group_seqno);
-//                cancel_seqno(group_seqno); // cancel CC seqno
+                set_initial_position(group_uuid, group_seqno - 1);
+                cancel_seqno(group_seqno); // cancel CC seqno
             }
-            else
+            else //remove
             {
                 log_info << "####### Not setting monitor position to "
                          << group_seqno + 1 << ", view = " << view_info->view
@@ -1688,29 +1717,37 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 assert(0);
             }
 
-            if (!from_IST && (state_() == S_CONNECTED || state_() == S_DONOR))
+            if (!from_IST)
             {
-                switch (next_state)
+                /* CCs from IST already have seqno assigned and cert. position
+                 * adjusted */
+                gu_trace(gcache_.seqno_assign(cc.buf, cc.seqno_g,
+                                              GCS_ACT_CCHANGE, false));
+
+                if (state_() == S_CONNECTED || state_() == S_DONOR)
                 {
-                case S_JOINING:
-                    state_.shift_to(S_JOINING);
-                    break;
-                case S_DONOR:
-                    if (state_() == S_CONNECTED)
+                    switch (next_state)
                     {
-                        state_.shift_to(S_DONOR);
+                    case S_JOINING:
+                        state_.shift_to(S_JOINING);
+                        break;
+                    case S_DONOR:
+                        if (state_() == S_CONNECTED)
+                        {
+                            state_.shift_to(S_DONOR);
+                        }
+                        break;
+                    case S_JOINED:
+                        state_.shift_to(S_JOINED);
+                        break;
+                    case S_SYNCED:
+                        state_.shift_to(S_SYNCED);
+                        synced_cb_(app_ctx_);
+                        break;
+                    default:
+                        log_debug << "next_state " << next_state;
+                        break;
                     }
-                    break;
-                case S_JOINED:
-                    state_.shift_to(S_JOINED);
-                    break;
-                case S_SYNCED:
-                    state_.shift_to(S_SYNCED);
-                    synced_cb_(app_ctx_);
-                    break;
-                default:
-                    log_debug << "next_state " << next_state;
-                    break;
                 }
             }
 
@@ -1742,6 +1779,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // Non-primary configuration
         assert(cc.seqno_g == WSREP_SEQNO_UNDEFINED);
 
+        // reset sst_seqno_ every time we disconnct from PC
+        sst_seqno_ = WSREP_SEQNO_UNDEFINED;
+
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
             st_.set (state_uuid_, STATE_SEQNO());
@@ -1760,6 +1800,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gcache_.free(const_cast<void*>(cc.buf));
     }
 
+    free(app_req);
+
     if (!from_IST)
     {
         double foo, bar;
@@ -1769,7 +1811,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gcs_.resume_recv();
     }
 
-    free(app_req);
     free(view_info);
 
     if (conf.conf_id < 0 && conf.memb_num == 0) {
@@ -2040,14 +2081,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
         apply_monitor_.self_cancel(ao);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
     }
+    else
+    {
+        assert(WSREP_TRX_FAIL == retval || trx->depends_seqno() >= 0);
+    }
 
-//remove
+#if 0
     uint16_t const sid(*reinterpret_cast<const uint16_t*>(&trx->source_id()));
-    log_info << "######## certified " << (trx->local() ? 'l' : 'r')
-             << ", g: " << trx->global_seqno()
+    log_info << "######## certified g: " << trx->global_seqno()
              << ", s: " << trx->last_seen_seqno()
              << ", d: " << trx->depends_seqno()
              << ", sid: " << sid;
+#endif
+
     return retval;
 }
 

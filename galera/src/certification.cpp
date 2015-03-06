@@ -306,7 +306,6 @@ cert_fail:
                 assert(kep->referenced() == false);
 
                 delete kep;
-
             }
             else
             {
@@ -338,7 +337,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     // must not fail, just populate index
     if (gu_unlikely(trx->is_certified() == false &&
                     (trx->last_seen_seqno() < initial_position_ ||
-                     trx->global_seqno() - trx->last_seen_seqno() > max_length_)))
+                     trx->global_seqno()-trx->last_seen_seqno() > max_length_)))
     {
         if (trx->last_seen_seqno() < initial_position_)
         {
@@ -535,6 +534,33 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     version_               = version;
 }
 
+
+void
+galera::Certification::adjust_position(wsrep_seqno_t const seqno,
+                                       int const version)
+{
+    gu::Lock lock(mutex_);
+
+// this assert is too strong: local ordered transactions may get canceled without
+// entering certification    assert(position_ + 1 == seqno || 0 == position_);
+
+    log_info << "####### Adjusting cert position to " << seqno;
+
+    if (version != version_)
+    {
+        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        trx_map_.clear();
+        assert(cert_index_.empty());
+        assert(cert_index_ng_.empty());
+
+        service_thd_.release_seqno(position_);
+        service_thd_.flush();
+    }
+
+    position_       = seqno;
+//            last_pa_unsafe_ = position_;
+    version_        = version;
+}
 
 galera::Certification::TestResult
 galera::Certification::test(TrxHandleSlave* trx, bool store_keys)

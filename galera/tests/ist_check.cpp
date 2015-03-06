@@ -166,7 +166,7 @@ extern "C" void* trx_thread(void* arg)
 {
     trx_thread_args* targs(reinterpret_cast<trx_thread_args*>(arg));
     pthread_barrier_wait(&start_barrier);
-    targs->receiver_.ready();
+    targs->receiver_.ready(targs->receiver_.first_seqno());
     while (true)
     {
         gcs_action act;

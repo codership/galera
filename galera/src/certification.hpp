@@ -56,6 +56,10 @@ namespace galera
         TestResult test(TrxHandleSlave*, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
+        /* this is for configuration change use */
+        void
+        adjust_position(wsrep_seqno_t seqno, int version);
+
         wsrep_seqno_t
         get_safe_to_discard_seqno() const
         {
@@ -118,7 +122,8 @@ namespace galera
 
         wsrep_seqno_t lowest_trx_seqno() const
         {
-            return (trx_map_.empty() ? position_ : trx_map_.begin()->second->global_seqno());
+            return (trx_map_.empty() ?
+                    position_ : trx_map_.begin()->second->global_seqno());
         }
 
     private:

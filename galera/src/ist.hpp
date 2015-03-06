@@ -53,10 +53,16 @@ namespace galera
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
-            void          ready();
+
+            // this must be called AFTER SST is processed and we know
+            // the starting point.
+            void          ready(wsrep_seqno_t first);
+
             int           recv(gcs_action& act);
             wsrep_seqno_t finished();
             void          run();
+
+            wsrep_seqno_t first_seqno() const { return first_seqno_; }
 
         private:
 

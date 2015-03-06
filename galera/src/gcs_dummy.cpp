@@ -76,6 +76,7 @@ namespace galera
 
         if (primary)
         {
+            ++global_seqno_;
             cc.seqno = global_seqno_;
             cc.conf_id = 1;
             memcpy (cc.uuid.data, &uuid_, sizeof(uuid_));

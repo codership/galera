@@ -473,7 +473,6 @@ namespace galera
 
     protected:
 
-        explicit
         TrxHandleSlave(gu::MemPool<true>& mp, void* buf) :
             TrxHandle          (),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
