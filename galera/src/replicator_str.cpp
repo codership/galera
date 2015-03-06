@@ -428,6 +428,14 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             if (protocol_version_ >= 8)
             {
+                if (streq->ist_len() <= 0)
+                {
+                    log_warn << "Joiner didn't provide IST connection info -"
+                        " cert. index preload impossible, bailing out.";
+                    rcode = -EHOSTUNREACH;
+                    goto out;
+                }
+
                 wsrep_seqno_t preload_start(cc_lowest_trx_seqno_);
 
                 try
@@ -450,7 +458,6 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 log_info << "Cert index preload: " << preload_start
                          << " -> " << cc_seqno_;
 
-                assert(streq->ist_len() > 0);
                 IST_request istr;
                 get_ist_request(streq, &istr);
                 // Send trxs to rebuild cert index.
