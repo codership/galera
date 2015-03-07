@@ -464,6 +464,8 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
 
     ret = backend->recv (backend, recv_msg, timeout);
 
+    assert(recv_msg->buf || 0 == recv_msg->buf_len);
+
     while (gu_unlikely(ret > recv_msg->buf_len)) {
         /* recv_buf too small, reallocate */
         /* sometimes - like in case of component message, we may need to
@@ -488,6 +490,8 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
             break;
         }
     }
+
+    assert(recv_msg->buf);
 
     if (gu_unlikely(ret < 0)) {
         gu_debug ("returning %d: %s\n", ret, strerror(-ret));
@@ -518,7 +522,8 @@ core_handle_act_msg (gcs_core_t*          core,
 
         if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
                         gcs_core_group_protocol_version(core))) {
-            gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
+            gu_info ("Message with protocol version %d != highest commonly "
+                     "supported: %d.",
                      gcs_act_proto_ver(msg->buf),
                      gcs_core_group_protocol_version(core));
             commonly_supported_version = false;
@@ -1052,8 +1057,8 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                        long long            timeout)
 {
 //    struct gcs_act_rcvd  recv_act;
-    struct gcs_recv_msg* recv_msg = &conn->recv_msg;
-    ssize_t              ret      = 0;
+    struct gcs_recv_msg* const recv_msg(&conn->recv_msg);
+    ssize_t ret(0);
 
     static struct gcs_act_rcvd zero_act(
         gcs_act(NULL,
@@ -1079,6 +1084,8 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         if (gu_unlikely (ret <= 0)) {
             goto out; /* backend error while receiving message */
         }
+
+        assert(recv_msg->buf);
 
         switch (recv_msg->type) {
         case GCS_MSG_ACTION:

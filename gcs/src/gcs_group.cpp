@@ -429,20 +429,24 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (!prim_comp);
     }
 
+    bool my_bootstrap(false);
+
     if (prim_comp) {
         /* Got PRIMARY COMPONENT - Hooray! */
         assert (new_my_idx >= 0);
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
+            assert(group->my_idx >= 0);
+            my_bootstrap = group->nodes[group->my_idx].bootstrap;
         }
         else if (bootstrap && gu_uuid_compare(&group->group_uuid,
                                               &GU_UUID_NIL))
         {
             /* Is there need to initialize something else in this case? */
-            group->nodes[group->my_idx].bootstrap = true;
+            my_bootstrap = true;
         }
         else {
-            group->nodes[group->my_idx].bootstrap = bootstrap;
+            my_bootstrap = bootstrap;
 
             const bool first_component =
 #ifndef GCS_CORE_TESTING
@@ -509,6 +513,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->my_idx = new_my_idx;
     group->num    = new_nodes_num;
     group->nodes  = new_nodes;
+
+    assert(group->num > 0 || group->my_idx < 0);
+    assert(group->my_idx >= 0 || group->num == 0);
+
+    if (group->my_idx >= 0) group->nodes[group->my_idx].bootstrap = my_bootstrap;
 
     if (gcs_comp_msg_primary(comp) || bootstrap) {
         /* TODO: for now pretend that we always have new nodes and perform
