@@ -60,7 +60,7 @@ program_start() {
                     fi
                 fi
 		echo -n $"Starting $prog: "
-		runuser nobody -c "$prog $*" >/dev/null
+		runuser nobody -s /bin/sh -c "$prog $*" >/dev/null
 		rcode=$?
 		sleep 2
 		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
