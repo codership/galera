@@ -167,7 +167,7 @@ start() {
 		return 1
 	fi
 
-        if ! grep -q ':' <<< $ADDRESS; then
+        if [[ $ADDRESS != *:* ]];then
             OPTIONS="-d -a gcomm://$ADDRESS:$GALERA_PORT"
         else
             OPTIONS="-d -a gcomm://$ADDRESS"
