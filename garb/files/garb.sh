@@ -170,7 +170,12 @@ start() {
 		return 1
 	fi
 
-	OPTIONS="-d -a gcomm://$ADDRESS"
+        if ! grep -q ':' <<< $ADDRESS; then
+            OPTIONS="-d -a gcomm://$ADDRESS:$GALERA_PORT"
+        else
+            OPTIONS="-d -a gcomm://$ADDRESS"
+        fi
+
 	[ -n "$GALERA_GROUP" ]   && OPTIONS="$OPTIONS -g $GALERA_GROUP"
 	[ -n "$GALERA_OPTIONS" ] && OPTIONS="$OPTIONS -o $GALERA_OPTIONS"
 	[ -n "$LOG_FILE" ]       && OPTIONS="$OPTIONS -l $LOG_FILE"
