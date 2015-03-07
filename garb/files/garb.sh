@@ -115,9 +115,12 @@ program_stop() {
 program_status() {
 	if [ -f /etc/redhat-release ]; then
 		status $prog
+                rcode=$?
 	else
 		status_of_proc -p $PIDFILE "$prog" garb
+                rcode=$?
 	fi
+	return $rcode
 }
 
 start() {
@@ -196,6 +199,7 @@ case "$1" in
 	;;
   status)
 	program_status
+	exit
 	;;
   restart|reload|force-reload)
 	restart
