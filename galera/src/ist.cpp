@@ -332,12 +332,13 @@ void galera::ist::Receiver::run()
             p.send_ctrl(socket, Ctrl::C_OK);
         }
 
-        // wait for SST to complete
+        // wait for SST to complete so that we know what is the first_seqno_
         {
             gu::Lock lock(mutex_);
             while (ready_ == false) { lock.wait(cond_); }
         }
-
+        log_info << "####### IST applying starts with " << first_seqno_; //remove
+        assert(first_seqno_ > 0);
 
         bool preload_started(false);
         current_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -407,7 +408,7 @@ void galera::ist::Receiver::run()
                 // Action was received with index preload flag on
                 if (gu_unlikely(preload_started == false))
                 {
-                    log_info << "IST: cert index preload starting at "
+                    log_info << "IST cert index preload starting at "
                              << act.seqno_g;
                     preload_started = true;
                 }
