@@ -608,26 +608,26 @@ namespace galera
                     ssize_t     wsize;
                     bool        already_cached(false);
 
-                    if (gu_likely(msg.type() != Message::T_SKIP))
+                    // Check if cert index preload trx is already in gcache.
+                    if ((msg.flags() & Message::F_PRELOAD))
                     {
-                        // Check if cert index preload trx is already in gcache.
-                        if ((msg.flags() & Message::F_PRELOAD))
+                        try
                         {
-                            try
-                            {
-                                wbuf = gcache_.seqno_get_ptr(seqno_g, wsize);
+                            wbuf = gcache_.seqno_get_ptr(seqno_g, wsize);
 
-                                skip_bytes(socket, msg.len() - offset);
+                            skip_bytes(socket, msg.len() - offset);
 
-                                already_cached = true;
-                            }
-                            catch (gu::NotFound& nf)
-                            {
-                                // not found from gcache, continue as normal
-                            }
+                            already_cached = true;
                         }
+                        catch (gu::NotFound& nf)
+                        {
+                            // not found from gcache, continue as normal
+                        }
+                    }
 
-                        if (!already_cached)
+                    if (!already_cached)
+                    {
+                        if (gu_likely(msg.type() != Message::T_SKIP))
                         {
                             wsize = msg.len() - offset;
 
@@ -643,17 +643,16 @@ namespace galera
 
                             wbuf = ptr;
                         }
-                    }
-                    else
-                    {
-                        wsize = GU_WORDSIZE/8; // 4/8 bytes
-                        wbuf  = gcache_.malloc(wsize);
-                    }
+                        else
+                        {
+                            wsize = GU_WORDSIZE/8; // 4/8 bytes
+                            wbuf  = gcache_.malloc(wsize);
+                        }
 
-                    if (!already_cached)
                         gcache_.seqno_assign(wbuf, msg.seqno(),
                                              gcs_type(msg.type()),
                                              msg.type() == Message::T_SKIP);
+                    }
 
                     switch(msg.type())
                     {
