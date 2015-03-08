@@ -1694,14 +1694,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
              * position explicitly (when processed in order) */
             cert_.adjust_position(conf.seqno, trx_params_.version_);
 
-            // record state seqno, needed for IST on DONOR
-            cc_seqno_ = group_seqno;
-            // Record lowest trx seqno in cert index to set cert index
-            // rebuild flag appropriately in IST. Notice that if cert index
-            // was completely reset above, the value returned is zero and
-            // no rebuild should happen.
-            cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
-
             if (view_info->view == 1 || !app_wants_st) // seems to be always true
             {
                 log_info << "####### Setting monitor position to "
@@ -1750,6 +1742,20 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                     }
                 }
             }
+
+            // record state seqno, needed for IST on DONOR
+            cc_seqno_ = group_seqno;
+            // Record lowest trx seqno in cert index to set cert index
+            // rebuild flag appropriately in IST. Notice that if cert index
+            // was completely reset above, the value returned is zero and
+            // no rebuild should happen.
+            cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
+            log_info << "####### Lowest cert index boundary: "
+                     << cc_lowest_trx_seqno_;
+            log_info << "####### Min available from gcache: "
+                     << gcache_.seqno_min();
+            assert(gcache_.seqno_min() > 0);
+            assert(cc_lowest_trx_seqno_ >= gcache_.seqno_min());
 
             st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
         }

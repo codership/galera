@@ -8,6 +8,8 @@
 #include "gcs_gcache.hpp"
 #include "gcs_priv.hpp"
 
+#include <gu_logger.hpp>
+
 #include <errno.h>
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
@@ -30,27 +32,19 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
-    group->num          = 1; // this must be removed (#474)
-    group->my_idx       = 0; // this must be -1 (#474)
+    group->num          = 0;
+    group->my_idx       = -1;
     group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
     group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
-    group->nodes        = GU_CALLOC(group->num, gcs_node_t); // this must be removed (#474)
-
-    if (!group->nodes) return -ENOMEM; // this should be removed (#474)
-
-    /// this should be removed (#474)
-    gcs_node_init (&group->nodes[group->my_idx], group->cache, NODE_NO_ID,
-                   group->my_name, group->my_address, gcs_proto_ver,
-                   repl_proto_ver, appl_proto_ver, 0);
-
-    group->prim_uuid  = GU_UUID_NIL;
-    group->prim_seqno = GCS_SEQNO_ILL;
-    group->prim_num   = 0;
-    group->prim_state = GCS_NODE_STATE_NON_PRIM;
+    group->nodes        = NULL;
+    group->prim_uuid    = GU_UUID_NIL;
+    group->prim_seqno   = GCS_SEQNO_ILL;
+    group->prim_num     = 0;
+    group->prim_state   = GCS_NODE_STATE_NON_PRIM;
 
     *(gcs_proto_t*)&group->gcs_proto_ver = gcs_proto_ver;
     *(int*)&group->repl_proto_ver = repl_proto_ver;
@@ -429,7 +423,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (!prim_comp);
     }
 
-    bool my_bootstrap(false);
+    bool my_bootstrap(bootstrap);
 
     if (prim_comp) {
         /* Got PRIMARY COMPONENT - Hooray! */
@@ -446,21 +440,17 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
             my_bootstrap = true;
         }
         else {
-            my_bootstrap = bootstrap;
-
             const bool first_component =
 #ifndef GCS_CORE_TESTING
-            (1 == group->num) &&
-            (!strcmp (NODE_NO_ID, group->nodes[0].id) || bootstrap);
+                (0 == group->num) || bootstrap; // is bootstrap needed?
 #else
-            (1 == group->num);
+                (0 == group->num);
 #endif
-
             if (1 == new_nodes_num && first_component) {
                 /* bootstrap new configuration */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
-                assert (1 == group->num);
-                assert (0 == group->my_idx);
+                assert (0 == group->num);
+                assert (-1 == group->my_idx);
 
                 // This bootstraps initial primary component for state exchange
                 gu_uuid_generate (&group->prim_uuid, NULL, 0);
@@ -475,14 +465,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                     gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
                 }
-// the following should be removed under #474
-                group->nodes[0].status = GCS_NODE_STATE_JOINED;
-                /* initialize node ID to the one given by the backend - this way
-                 * we'll be recognized as coming from prev. conf. in node array
-                 * remap below */
-                strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
-                         sizeof (new_nodes[0].id) - 1);
-                group->nodes[0].segment = new_nodes[0].segment;
+
+                new_nodes[0].status = GCS_NODE_STATE_JOINED;
             }
         }
     }
