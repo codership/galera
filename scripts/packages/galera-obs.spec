@@ -16,7 +16,7 @@
 # MA  02110-1301  USA.
 
 %{!?name: %define name galera-3}
-%{!?version: %define version 25_3.x}
+%{!?version: %define version 25.3.x}
 %{!?release: %define release 2}
 %define revision XXXX
 %define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
@@ -116,29 +116,46 @@ Requires(preun): initscripts
 %endif
 %endif # systemd
 
-Requires:      openssl nmap
-%if 0%{?centos} == 6
-Requires: nc
-%endif
-
-Provides:      wsrep, %{name} = %{version}-%{release}
-Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
-
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
 for transactional databases and similar applications. For more information
 about wsrep API see http://launchpad.net/wsrep. For a description of Galera
-replication engine see http://www.codership.com.
+replication engine see http://galeracluster.com.
+
+This package contains the Galera library/plugin.
 
 %{copyright}
 
 This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
+%package -n galera-arbitrator-3
+Summary:       Galera arbitrator daemon
+Group:         Productivity/Databases/Servers
+
+Requires:      openssl nmap
+%if 0%{?centos} == 6
+Requires:      nc
+%endif
+Provides:      wsrep, %{name} = %{version}-%{release}
+Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
+
+%description -n galera-arbitrator-3
+Galera is a fast synchronous multimaster wsrep provider (replication engine)
+for transactional databases and similar applications. For more information
+about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+replication engine see http://galeracluster.com.
+
+This package contains the Galera arbitrator daemon (garbd).
+
+%{copyright}
+
+This software comes with ABSOLUTELY NO WARRANTY. This is free software,
+and you are welcome to modify and redistribute it under the GPLv2 license.
+
+
 %prep
-%setup -q -n %{name}-%{version}
-# When downloading from GitHub the contents is in a folder
-# that is named by the branch it was exported from.
+%setup -q
 
 %build
 # Debug info:
@@ -164,8 +181,7 @@ scons -j$(echo $NUM_JOBS) revno=%{revision}
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
 RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
-# When downloading from GitHub the contents is in a folder
-# that is named by the branch it was exported from.
+
 
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
@@ -186,7 +202,8 @@ install -d %{buildroot}%{_sbindir}
 ln -sf /usr/sbin/service %{buildroot}%{_sbindir}/rcgarb
 %else
 install -d $RBR/usr/sbin
-ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
+
+ln -sf /etc/init.d/garb $RBR%{_sbindir}/rcgarb
 %endif # systemd
 %endif # suse_version
 
@@ -259,6 +276,26 @@ rm -f $(find %{libs} -type l)
 %restart_on_update garb
 %insserv_cleanup
 
+%pre -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_add_pre garb.service
+%endif
+
+%post -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_add_post garb.service
+%endif
+
+%preun -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_del_preun garb.service
+%endif
+
+%postun -n galera-arbitrator-3
+%if 0%{?suse_version} >= 1210
+%service_del_postun garb.service
+%endif
+
 %else
 # Not SuSE - so it must be RedHat, CentOS, Fedora
 
@@ -288,23 +325,39 @@ fi
 
 %files
 %defattr(-,root,root,0755)
+
+%attr(0755,root,root) %dir %{libs}
+%attr(0755,root,root) %{libs}/libgalera_smm.so
+
+%attr(0755,root,root) %dir %{docs}
+%doc %attr(0644,root,root) %{docs}/COPYING
+%doc %attr(0644,root,root) %{docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
+%doc %attr(0644,root,root) %{docs}/README
+%doc %attr(0644,root,root) %{docs}/README-MySQL
+
+
+%files -n galera-arbitrator-3
+%defattr(-,root,root,0755)
+
 %if 0%{?suse_version}
 %config(noreplace,missingok) /var/adm/fillup-templates/sysconfig.garb
 %else
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %endif
 
-
 %if 0%{?systemd}
 %attr(0644,root,root) %{_unitdir}/garb.service
 %attr(0755,root,root) %{_bindir}/garb-systemd
+%attr(0755,root,root) %{_bindir}/garbd
 %else
 %attr(0755,root,root) %{_sysconfdir}/init.d/garb
 %endif
 
 # Symlink required by SUSE policy for SysV init, still supported with systemd
 %if 0%{?suse_version}
-%attr(0755,root,root) /usr/sbin/rcgarb
+%attr(0755,root,root) %{_sbindir}/rcgarb
 %endif
 
 %attr(0755,root,root) %{_bindir}/garbd
@@ -343,4 +396,3 @@ fi
 
 * Tue Sep 30 2014 Otto Kekäläinen <otto@seravo.fi> - 3.x
 - Initial OBS packaging created
-
