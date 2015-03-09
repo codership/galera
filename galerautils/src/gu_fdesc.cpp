@@ -179,6 +179,7 @@ namespace gu
     void
     FileDescriptor::prealloc(off_t const start)
     {
+        int err= 0;
         off_t const diff (size_ - start);
 
         log_debug << "Preallocating " << diff << '/' << size_ << " bytes in '"
@@ -186,9 +187,14 @@ namespace gu
 
 #if defined(__APPLE__)
         if (0 != fcntl (fd_, F_SETSIZE, size_) && 0 != ftruncate (fd_, size_))
+        {
+          err= errno;
+        }
 #else
-        if (0 != posix_fallocate (fd_, start, diff))
+        // Note that posix_fallocate does not set errno.
+        err= posix_fallocate (fd_, start, diff);
 #endif
+        if (err != 0)
         {
             if (EINVAL == errno && start >= 0 && diff > 0)
             {
@@ -197,7 +203,7 @@ namespace gu
             }
             else
             {
-                gu_throw_error (errno) << "File preallocation failed";
+                gu_throw_error (err) << "File preallocation failed";
             }
         }
     }
