@@ -25,9 +25,8 @@ Conflicts: garbd-2,
            percona-xtradb-cluster-galera-2.x,
            percona-xtradb-cluster-galera-3.x,
            percona-xtradb-cluster-garbd-2.x,
-           percona-xtradb-cluster-garbd-3.x
-Breaks: galera
-Replaces: galera
+           percona-xtradb-cluster-garbd-3.x,
+           galera
 Provides: galera-3,
           wsrep,
           galera,
