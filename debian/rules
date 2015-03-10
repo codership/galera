@@ -1,9 +1,6 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE=1
-export DEB_BUILD_HARDENING=1
-DPKG_EXPORT_BUILDFLAGS = 1
-include /usr/share/dpkg/buildflags.mk
 
 # Parallel build support as adviced
 # at https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules-options

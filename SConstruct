@@ -156,11 +156,9 @@ link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
 
-# Initialize CPPFLAGS, LIBPATH and LDFLAGS from environment to get user
-# preferences
+# Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
 env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
-env.Append(LDFLAGS = os.getenv("LDFLAGS", ""))
 
 # Set -pthread flag explicitly to make sure that pthreads are
 # enabled on all platforms.
@@ -226,14 +224,12 @@ env.Replace(CCFLAGS = opt_flags + compile_arch +
                       ' -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
-env.Replace(CFLAGS = os.getenv('CFLAGS', ''))
-env.Append(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
+env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
 
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Replace(CXXFLAGS = os.getenv('CXXFLAGS', ''))
-env.Append(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+env.Replace(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
 if sysname != 'sunos':
     env.Append(CXXFLAGS = ' -pipe')
 
