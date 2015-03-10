@@ -1396,6 +1396,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         assert(app_req_len <= 0);
         log_fatal << "View callback failed. This is unrecoverable, "
                   << "restart required.";
+        local_monitor_.leave(lo);
         close();
         abort();
     }
@@ -1404,6 +1405,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         log_fatal << "Local state UUID " << state_uuid_
                   << " is different from group state UUID " << group_uuid
                   << ", and SST request is null: restart required.";
+        local_monitor_.leave(lo);
         close();
         abort();
     }
@@ -1502,6 +1504,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             log_fatal << "Internal error: unexpected next state for "
                       << "non-prim: " << next_state << ". Restart required.";
+            local_monitor_.leave(lo);
             close();
             abort();
         }
@@ -1844,6 +1847,9 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 void
 galera::ReplicatorSMM::abort()
 {
-    gcs_.close();
+    if (state_() != S_CLOSED)
+    {
+       gcs_.close();
+    }
     gu_abort();
 }
