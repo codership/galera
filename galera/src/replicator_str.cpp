@@ -911,7 +911,9 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     TrxHandleSlave* const trx(ist_trx.trx_);
     bool exit_loop(false);
 
-    if (gu_likely(0 != act.size))
+    bool const skip(0 == act.size);
+
+    if (gu_likely(!skip))
     {
         assert(act.buf != NULL);
 
@@ -919,6 +921,8 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
                      static_cast<const gu::byte_t*>(act.buf), act.size, 0));
 
         trx->verify_checksum();
+
+        assert(trx->is_certified());
 
         // replicating and certifying stages have been
         // processed on donor, just adjust states here
@@ -934,12 +938,13 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     }
     else
     {
-        trx->set_received(0, -1, act.seqno_g);
+        trx->set_received(0, WSREP_SEQNO_UNDEFINED, act.seqno_g);
         trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
         trx->mark_certified();
 
         ApplyOrder ao(*trx);
         apply_monitor_.self_cancel(ao);
+
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
             CommitOrder co(*trx, co_mode_);
@@ -951,7 +956,12 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
         (gu::Logger::no_log(gu::LOG_DEBUG) == false))
     {
         std::ostringstream os;
-        os << "IST received trx body: " << *trx;
+
+        if (gu_likely(!skip))
+            os << "IST received trx body: " << *trx;
+        else
+            os << "IST skipping trx " << act.seqno_g;
+
         log_debug << os;
     }
 

@@ -689,7 +689,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
         assert(deps_set_.size() <= trx_map_.size());
     }
 
-    trx->mark_certified();
+    if (!trx->is_certified()) trx->mark_certified();
 
     return retval;
 }

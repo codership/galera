@@ -1385,10 +1385,13 @@ void galera::ReplicatorSMM::cancel_seqno(const wsrep_seqno_t& seqno)
     dummy->lock();
 
     ApplyOrder  ao(*dummy);
-    CommitOrder co(*dummy, co_mode_);
-
     apply_monitor_.self_cancel(ao);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+
+    if (co_mode_ != CommitOrder::BYPASS)
+    {
+        CommitOrder co(*dummy, co_mode_);
+        commit_monitor_.self_cancel(co);
+    }
 
     dummy->unlock();
     dummy->unref();

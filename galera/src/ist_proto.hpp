@@ -611,6 +611,8 @@ namespace galera
                     // Check if cert index preload trx is already in gcache.
                     if ((msg.flags() & Message::F_PRELOAD))
                     {
+                        ret.second = true;
+
                         try
                         {
                             wbuf = gcache_.seqno_get_ptr(seqno_g, wsize);
