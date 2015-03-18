@@ -57,7 +57,6 @@ namespace gcache
 
                 bh->size    = size;
                 bh->seqno_g = SEQNO_NONE;
-//rmeove                bh->seqno_d = SEQNO_ILL;
                 bh->flags   = 0;
                 bh->store   = BUFFER_IN_MEM;
                 bh->ctx     = reinterpret_cast<BH_ctx_t>(this);
