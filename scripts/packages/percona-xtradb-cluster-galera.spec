@@ -35,7 +35,7 @@ Prefix: %{_prefix}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 2.11
+ %define galera_version 2.12
 %endif
 
 %if %{undefined galera_revision}
@@ -175,6 +175,9 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0644,root,root) %{docs}/COPYING
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
+%doc %attr(0644,root,root) %{docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 
 %files -n Percona-XtraDB-Cluster-garbd-2
 %defattr(-,root,root,-)

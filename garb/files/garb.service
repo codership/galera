@@ -13,6 +13,10 @@ User=nobody
 EnvironmentFile=/etc/sysconfig/garb
 ExecStart=/usr/bin/garb-systemd start
 
+# Use SIGINT because with the default SIGTERM
+# garbd fails to reliably transition to 'destroyed' state
+KillSignal=SIGINT
+
 TimeoutSec=2m
 PrivateTmp=false
 

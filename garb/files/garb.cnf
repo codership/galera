@@ -14,5 +14,6 @@
 # GALERA_OPTIONS=""
 
 # Log file for garbd. Optional, by default logs to syslog
+# Deprecated for CentOS7, use journalctl to query the log for garbd
 # LOG_FILE=""
 
