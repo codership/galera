@@ -28,10 +28,11 @@ public:
         switch (act_.type)
         {
         case GCS_ACT_WRITESET:
-            break;
         case GCS_ACT_CCHANGE:
+            // these are ordered and should be released when no longer needed
             break;
         case GCS_ACT_STATE_REQ:
+            gcache_.free(const_cast<void*>(act_.buf));
             break;
         default:
             ::free(const_cast<void*>(act_.buf));
