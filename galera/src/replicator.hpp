@@ -8,6 +8,8 @@
 #include "wsrep_api.h"
 #include "galera_exception.hpp"
 
+struct gcs_action;
+
 #include <galerautils.hpp>
 #include <string>
 
@@ -16,6 +18,8 @@ namespace galera
     class Statement;
     class RowId;
     class TrxHandle;
+    class TrxHandleMaster;
+    class TrxHandleSlave;
 
     //! @class Galera
     //
@@ -60,25 +64,25 @@ namespace galera
         virtual int trx_proto_ver() const = 0;
         virtual int repl_proto_ver() const = 0;
 
-        virtual TrxHandle* get_local_trx(wsrep_trx_id_t, bool) = 0;
-        virtual void unref_local_trx(TrxHandle* trx) = 0;
-        virtual void discard_local_trx(TrxHandle* trx_id) = 0;
+        virtual TrxHandleMaster* get_local_trx(wsrep_trx_id_t, bool) = 0;
+        virtual void unref_local_trx(TrxHandleMaster* trx) = 0;
+        virtual void discard_local_trx(TrxHandleMaster* trx_id) = 0;
 
-        virtual TrxHandle* local_conn_trx(wsrep_conn_id_t conn_id,
+        virtual TrxHandleMaster* local_conn_trx(wsrep_conn_id_t conn_id,
                                           bool create) = 0;
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 
-        virtual wsrep_status_t replicate(TrxHandle* trx, wsrep_trx_meta_t*) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandle* trx, wsrep_trx_meta_t*) =0;
-        virtual wsrep_status_t post_commit(TrxHandle* trx) = 0;
-        virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
-        virtual wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx) = 0;
-        virtual void abort_trx(TrxHandle* trx) = 0;
+        virtual wsrep_status_t replicate(TrxHandleMaster* trx, wsrep_trx_meta_t*) = 0;
+        virtual wsrep_status_t pre_commit(TrxHandleMaster* trx, wsrep_trx_meta_t*) =0;
+        virtual wsrep_status_t post_commit(TrxHandleMaster* trx) = 0;
+        virtual wsrep_status_t post_rollback(TrxHandleMaster* trx) = 0;
+        virtual wsrep_status_t replay_trx(TrxHandleMaster* trx, void* replay_ctx) = 0;
+        virtual void abort_trx(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t causal_read(wsrep_gtid_t*) = 0;
-        virtual wsrep_status_t to_isolation_begin(TrxHandle* trx,
+        virtual wsrep_status_t to_isolation_begin(TrxHandleMaster* trx,
                                                   wsrep_trx_meta_t*) = 0;
-        virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;
+        virtual wsrep_status_t to_isolation_end(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t preordered_collect(wsrep_po_handle_t& handle,
                                                   const struct wsrep_buf* data,
                                                   size_t                  count,
@@ -96,14 +100,11 @@ namespace galera
                                             int                 rcode) = 0;
 
         // action source interface
-        virtual void process_trx(void* recv_ctx, TrxHandle* trx) = 0;
+        virtual void process_trx(void* recv_ctx, TrxHandleSlave* trx) = 0;
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l) = 0;
         virtual void process_conf_change(void*                    recv_ctx,
-                                         const wsrep_view_info_t& view_info,
-                                         int                      repl_proto,
-                                         State                    next_state,
-                                         wsrep_seqno_t            seqno_l) = 0;
+                                         const struct gcs_action& cc) = 0;
         virtual void process_state_req(void* recv_ctx, const void* req,
                                        size_t req_size,
                                        wsrep_seqno_t seqno_l,

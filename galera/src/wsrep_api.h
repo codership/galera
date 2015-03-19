@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "25"
+#define WSREP_INTERFACE_VERSION "25sr"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -116,22 +116,28 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 /*!
  *  Writeset flags
  *
- * COMMIT       the writeset and all preceding writesets must be committed
+ * TRX_END      the writeset and all preceding writesets must be committed
  * ROLLBACK     all preceding writesets in a transaction must be rolled back
  * ISOLATION    the writeset must be applied AND committed in isolation
  * PA_UNSAFE    the writeset cannot be applied in parallel
  * COMMUTATIVE  the order in which the writeset is applied does not matter
  * NATIVE       the writeset contains another writeset in this provider format
  *
+ * TRX_START    shall be set on the first trx fragment by provider
+ *
  * Note that some of the flags are mutually exclusive (e.g. COMMIT and
  * ROLLBACK).
  */
-#define WSREP_FLAG_COMMIT               ( 1ULL << 0 )
+#define WSREP_FLAG_TRX_END              ( 1ULL << 0 )
 #define WSREP_FLAG_ROLLBACK             ( 1ULL << 1 )
 #define WSREP_FLAG_ISOLATION            ( 1ULL << 2 )
 #define WSREP_FLAG_PA_UNSAFE            ( 1ULL << 3 )
 #define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 4 )
 #define WSREP_FLAG_NATIVE               ( 1ULL << 5 )
+#define WSREP_FLAG_TRX_START            ( 1ULL << 6 )
+
+#define WSREP_FLAGS_LAST                WSREP_FLAG_TRX_START
+#define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
 
 
 typedef uint64_t wsrep_trx_id_t;  //!< application transaction ID
@@ -238,6 +244,13 @@ wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid);
 extern int
 wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
 
+/*!
+ * Source/server transaction ID (trx ID assigned at originating node)
+ */
+typedef struct wsrep_stid {
+    wsrep_uuid_t      node;    //!< source node ID
+    wsrep_trx_id_t    trx;     //!< local trx ID at source
+} wsrep_stid_t;
 
 /*!
  * Transaction meta data
@@ -245,8 +258,9 @@ wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len);
 typedef struct wsrep_trx_meta
 {
     wsrep_gtid_t  gtid;       /*!< Global transaction identifier */
-    wsrep_seqno_t depends_on; /*!< Sequence number part of the last transaction
-                                   this transaction depends on */
+    wsrep_stid_t  stid;       /*!< Source transaction identifier */
+    wsrep_seqno_t depends_on; /*!< Sequence number of the last transaction
+                                   this transaction may depend on */
 } wsrep_trx_meta_t;
 
 
@@ -289,7 +303,6 @@ typedef struct wsrep_view_info {
     wsrep_gtid_t        state_id;  //!< global state ID
     wsrep_seqno_t       view;      //!< global view number
     wsrep_view_status_t status;    //!< view status
-    wsrep_bool_t        state_gap; //!< gap between global and local states
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
     int                 proto_ver; //!< application protocol agreed on the view
@@ -297,9 +310,31 @@ typedef struct wsrep_view_info {
 } wsrep_view_info_t;
 
 /*!
+ * @brief group view handler
+ *
+ * This handler is called in *total order* corresponding to the group
+ * configuration change. It is to provide a vital information about
+ * new group view.
+ *
+ * @param app_ctx     application context
+ * @param recv_ctx    receiver context
+ * @param view        new view on the group
+ * @param state       current state
+ * @param state_len   length of current state
+ */
+typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
+    void*                     app_ctx,
+    void*                     recv_ctx,
+    const wsrep_view_info_t*  view,
+    const char*               state,
+    size_t                    state_len
+);
+
+
+/*!
  * Magic string to tell provider to engage into trivial (empty) state transfer.
  * No data will be passed, but the node shall be considered JOINED.
- * Should be passed in sst_req parameter of wsrep_view_cb_t.
+ * Should be passed in sst_req parameter of wsrep_sst_cb_t.
  */
 #define WSREP_STATE_TRANSFER_TRIVIAL "trivial"
 
@@ -307,40 +342,36 @@ typedef struct wsrep_view_info {
  * Magic string to tell provider not to engage in state transfer at all.
  * The member will stay in WSREP_MEMBER_UNDEFINED state but will keep on
  * receiving all writesets.
- * Should be passed in sst_req parameter of wsrep_view_cb_t.
+ * Should be passed in sst_req parameter of wsrep_sst_cb_t.
  */
 #define WSREP_STATE_TRANSFER_NONE "none"
 
 /*!
- * @brief group view handler
+ * @brief Creates and returns State Snapshot Transfer request for provider.
  *
- * This handler is called in total order corresponding to the group
- * configuration change. It is to provide a vital information about
- * new group view. If view info indicates existence of discontinuity
- * between group and member states, state transfer request message
- * should be filled in by the callback implementation.
+ * This handler is called whenvever the node is found to miss some of events
+ * from the cluster history (e.g. fresh node joining the cluster).
+ * SST will be used if it is impossible (or impractically long) to replay
+ * missing events, which may be not known in advance, so the node must always
+ * be ready to accept full SST or abort in case event replay is impossible.
+ *
+ * Normally SST request is an opaque buffer that is passed to the
+ * chosen SST donor node and must contain information sufficient for
+ * donor to deliver SST (typically SST method and delivery address).
+ * See above macros WSREP_STATE_TRANSFER_TRIVIAL and WSREP_STATE_TRANSFER_NONE
+ * to modify the standard provider benavior.
  *
  * @note Currently it is assumed that sst_req is allocated using
  *       malloc()/calloc()/realloc() and it will be freed by
  *       wsrep implementation.
  *
- * @param app_ctx     application context
- * @param recv_ctx    receiver context
- * @param view        new view on the group
- * @param state       current state
- * @param state_len   lenght of current state
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code,
  *                    value of 0 means no SST.
  */
-typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
-    void*                    app_ctx,
-    void*                    recv_ctx,
-    const wsrep_view_info_t* view,
-    const char*              state,
-    size_t                   state_len,
-    void**                   sst_req,
-    size_t*                  sst_req_len
+typedef enum wsrep_cb_status (*wsrep_sst_request_cb_t) (
+    void**                    sst_req,
+    size_t*                   sst_req_len
 );
 
 
@@ -362,11 +393,11 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
  * @retval WSREP_ERROR failed to apply the writeset
  */
 typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
-    void*                   recv_ctx,
-    const void*             data,
-    size_t                  size,
-    uint32_t                flags,
-    const wsrep_trx_meta_t* meta
+    void*                     recv_ctx,
+    const void*               data,
+    size_t                    size,
+    uint32_t                  flags,
+    const wsrep_trx_meta_t*   meta
 );
 
 
@@ -389,8 +420,7 @@ typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
     uint32_t                flags,
     const wsrep_trx_meta_t* meta,
-    wsrep_bool_t*           exit,
-    wsrep_bool_t            commit
+    wsrep_bool_t*           exit
 );
 
 
@@ -474,17 +504,18 @@ struct wsrep_init_args
     size_t              state_len;   //!< Length of state buffer
 
     /* Application callbacks */
-    wsrep_log_cb_t        logger_cb;       //!< logging handler
-    wsrep_view_cb_t       view_handler_cb; //!< group view change handler
+    wsrep_log_cb_t         logger_cb;       //!< logging handler
+    wsrep_view_cb_t        view_cb;         //!< group view change handler
+    wsrep_sst_request_cb_t sst_request_cb;          //!< SST request creator
 
     /* Applier callbacks */
-    wsrep_apply_cb_t      apply_cb;        //!< apply  callback
-    wsrep_commit_cb_t     commit_cb;       //!< commit callback
-    wsrep_unordered_cb_t  unordered_cb;    //!< callback for unordered actions
+    wsrep_apply_cb_t       apply_cb;        //!< apply  callback
+    wsrep_commit_cb_t      commit_cb;       //!< commit callback
+    wsrep_unordered_cb_t   unordered_cb;    //!< callback for unordered actions
 
     /* State Snapshot Transfer callbacks */
-    wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
-    wsrep_synced_cb_t     synced_cb;       //!< synced with group
+    wsrep_sst_donate_cb_t  sst_donate_cb;   //!< donate SST
+    wsrep_synced_cb_t      synced_cb;       //!< synced with group
 };
 
 
@@ -608,7 +639,7 @@ struct wsrep {
    *
    * @param wsrep provider handle
    */
-    uint64_t (*capabilities) (wsrep_t* wsrep);
+    uint64_t       (*capabilities) (wsrep_t* wsrep);
 
   /*!
    * @brief Passes provider-specific configuration string to provider.
@@ -824,8 +855,8 @@ struct wsrep {
    *
    * Whenever a new connection ID is passed to wsrep provider through
    * any of the API calls, a connection context is allocated for this
-   * connection. This call is to explicitly notify provider to close the
-   * connection.
+   * connection. This call is to explicitly notify provider of connection
+   * closing.
    *
    * @param wsrep       provider handle
    * @param conn_id     connection ID

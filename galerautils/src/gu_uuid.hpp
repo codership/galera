@@ -8,7 +8,8 @@
 
 #include "gu_uuid.h"
 #include "gu_assert.hpp"
-#include "gu_buffer.hpp"
+#include "gu_throw.hpp"
+#include "gu_types.hpp"
 #include <iostream>
 
 inline bool operator==(const gu_uuid_t& a, const gu_uuid_t& b)

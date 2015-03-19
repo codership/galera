@@ -169,7 +169,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
 
         rcvd->act.type = frg->act_type;
 
-        if (gu_likely(GCS_ACT_TORDERED  == rcvd->act.type &&
+        if (gu_likely(GCS_ACT_WRITESET  == rcvd->act.type &&
                       GCS_GROUP_PRIMARY == group->state   &&
                       group->nodes[sender_idx].status >= GCS_NODE_STATE_DONOR &&
                       !(group->frag_reset && local) &&
@@ -179,12 +179,12 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
              * and only in PRIM (skip messages while in state exchange) */
             rcvd->id = ++group->act_id_;
         }
-        else if (GCS_ACT_TORDERED  == rcvd->act.type) {
+        else if (GCS_ACT_WRITESET  == rcvd->act.type) {
             /* Rare situations */
             if (local) {
                 /* Let the sender know that it failed */
                 rcvd->id = -ERESTART;
-                gu_debug("Returning -ERESTART for TORDERED action: group->state"
+                gu_debug("Returning -ERESTART for WRITESET action: group->state"
                          " = %s, sender->status = %s, frag_reset = %s, "
                          "buf = %p",
                          gcs_group_state_str[group->state],
@@ -223,11 +223,11 @@ gcs_group_my_idx (const gcs_group_t* group)
 /*!
  * Creates new configuration action
  * @param group group handle
- * @param act   GCS action object
+ * @param rcvd  GCS action object
  * @param proto protocol version gcs should use for this configuration
  */
 extern ssize_t
-gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act, int* proto);
+gcs_group_act_conf (gcs_group_t* group, struct gcs_act_rcvd* rcvd, int* proto);
 
 /*! Returns state object for state message */
 extern gcs_state_msg_t*

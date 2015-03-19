@@ -27,7 +27,9 @@ public:
     {
         switch (act_.type)
         {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
+        case GCS_ACT_CCHANGE:
+            // these are ordered and should be released when no longer needed
             break;
         case GCS_ACT_STATE_REQ:
             gcache_.free(const_cast<void*>(act_.buf));
@@ -44,41 +46,16 @@ private:
 };
 
 
-static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
-{
-    switch (conf.my_state)
-    {
-    case GCS_NODE_STATE_NON_PRIM:
-        if (conf.my_idx >= 0) return galera::Replicator::S_CONNECTED;
-        else                  return galera::Replicator::S_CLOSING;
-    case GCS_NODE_STATE_PRIM:
-        return galera::Replicator::S_CONNECTED;
-    case GCS_NODE_STATE_JOINER:
-        return galera::Replicator::S_JOINING;
-    case GCS_NODE_STATE_JOINED:
-        return galera::Replicator::S_JOINED;
-    case GCS_NODE_STATE_SYNCED:
-        return galera::Replicator::S_SYNCED;
-    case GCS_NODE_STATE_DONOR:
-        return galera::Replicator::S_DONOR;
-    case GCS_NODE_STATE_MAX:;
-    }
-
-    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
-    GU_DEBUG_NORETURN;
-}
-
-
-galera::GcsActionTrx::GcsActionTrx(TrxHandle::SlavePool&    pool,
+galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
                                    const struct gcs_action& act)
     :
-    trx_(TrxHandle::New(pool))
+    trx_(TrxHandleSlave::New(pool))
     // TODO: this dynamic allocation should be unnecessary
 {
     assert(act.seqno_l != GCS_SEQNO_ILL);
     assert(act.seqno_g != GCS_SEQNO_ILL);
 
-    const gu::byte_t* const buf = static_cast<const gu::byte_t*>(act.buf);
+    const gu::byte_t* const buf(static_cast<const gu::byte_t*>(act.buf));
 
 //    size_t offset(trx_->unserialize(buf, act.size, 0));
     gu_trace(trx_->unserialize(buf, act.size, 0));
@@ -108,11 +85,10 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
 
     switch (act.type)
     {
-    case GCS_ACT_TORDERED:
+    case GCS_ACT_WRITESET:
     {
         assert(act.seqno_g > 0);
         GcsActionTrx trx(trx_pool_, act);
-        trx.trx()->set_state(TrxHandle::S_REPLICATING);
         gu_trace(replicator_.process_trx(recv_ctx, trx.trx()));
         exit_loop = trx.trx()->exit_loop(); // this is the end of trx lifespan
         break;
@@ -125,28 +101,9 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         gu_trace(replicator_.process_commit_cut(seq, act.seqno_l));
         break;
     }
-    case GCS_ACT_CONF:
-    {
-        const gcs_act_conf_t* conf(static_cast<const gcs_act_conf_t*>(act.buf));
-
-        wsrep_view_info_t* view_info(
-            galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
-            );
-
-        gu_trace(replicator_.process_conf_change(recv_ctx, *view_info,
-                                                 conf->repl_proto_ver,
-                                                 state2repl(*conf),
-                                                 act.seqno_l));
-        free(view_info);
-
-        if (conf->conf_id < 0 && conf->memb_num == 0) {
-            log_debug << "Received SELF-LEAVE. Closing connection.";
-            // called after being shifted to S_CLOSING state.
-            gcs_.close();
-        }
-
+    case GCS_ACT_CCHANGE:
+        gu_trace(replicator_.process_conf_change(recv_ctx, act));
         break;
-    }
     case GCS_ACT_STATE_REQ:
         gu_trace(replicator_.process_state_req(recv_ctx, act.buf, act.size,
                                                act.seqno_l, act.seqno_g));

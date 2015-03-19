@@ -19,6 +19,7 @@
 using galera::KeyOS;
 using galera::WriteSet;
 using galera::TrxHandle;
+using galera::TrxHandleMaster;
 using galera::TrxHandleLock;
 
 
@@ -266,17 +267,18 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
     return WSREP_FATAL;
 }
 
-static TrxHandle*
+static TrxHandleMaster*
 get_local_trx(REPL_CLASS* const        repl,
               wsrep_ws_handle_t* const handle,
               bool const               create)
 {
-    TrxHandle* trx;
+    TrxHandleMaster* trx(0);
+
     assert(handle != 0);
 
     if (handle->opaque != 0)
     {
-        trx = static_cast<TrxHandle*>(handle->opaque);
+        trx = static_cast<TrxHandleMaster*>(handle->opaque);
         assert(trx->trx_id() == handle->trx_id ||
                wsrep_trx_id_t(-1) == handle->trx_id);
         trx->ref();
@@ -299,7 +301,7 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, trx_handle, false));
+    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
     assert(trx != 0);
 
     wsrep_status_t retval;
@@ -335,9 +337,9 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-    REPL_CLASS *   repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    wsrep_status_t retval;
-    TrxHandle*     trx(repl->get_local_trx(victim_trx));
+    REPL_CLASS *     repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    wsrep_status_t   retval;
+    TrxHandleMaster* trx(repl->get_local_trx(victim_trx));
 
     if (!trx) return WSREP_OK;
 
@@ -345,6 +347,8 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     {
         TrxHandleLock lock(*trx);
         repl->abort_trx(trx);
+//too strict?        assert(trx->state() == TrxHandle::S_MUST_ABORT ||
+//               trx->state() == TrxHandle::S_ABORTING);
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -366,7 +370,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 static inline void
 discard_local_trx(REPL_CLASS*        repl,
                   wsrep_ws_handle_t* ws_handle,
-                  TrxHandle*         trx)
+                  TrxHandleMaster*   trx)
 {
     repl->unref_local_trx(trx);
     repl->discard_local_trx(trx);
@@ -381,7 +385,7 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, ws_handle, false));
+    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
 
     if (trx == 0)
     {
@@ -407,7 +411,16 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    discard_local_trx(repl, ws_handle, trx);
+    switch(trx->state())
+    {
+    case TrxHandle::S_COMMITTED:
+        discard_local_trx(repl, ws_handle, trx);
+    case TrxHandle::S_EXECUTING:
+        /* trx ready for new fragment */
+        break;
+    default:
+        assert(0);
+    }
 
     return retval;
 }
@@ -421,7 +434,7 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, ws_handle, false));
+    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
 
     if (trx == 0)
     {
@@ -454,7 +467,7 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
 
 
 static inline void
-append_data_array (TrxHandle*              const trx,
+append_data_array (TrxHandleMaster*        const trx,
                    const struct wsrep_buf* const data,
                    size_t                  const count,
                    wsrep_data_type_t       const type,
@@ -485,7 +498,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    TrxHandle* trx(get_local_trx(repl, trx_handle, /*rbr_data != 0*/ false));
+    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
 
     if (trx == 0)
     {
@@ -499,8 +512,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
     {
         TrxHandleLock lock(*trx);
         trx->set_conn_id(conn_id);
-//        /* rbr_data should clearly persist over pre_commit() call */
-//        append_data_array (trx, rbr_data, rbr_data_len, false, false);
+
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
 
         retval = repl->replicate(trx, meta);
@@ -537,6 +549,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         retval = WSREP_FATAL;
     }
 
+    trx->release_write_set_out();
     repl->unref_local_trx(trx);
 
     return retval;
@@ -555,7 +568,7 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, trx_handle, true));
+    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, true));
     assert(trx != 0);
 
     wsrep_status_t retval;
@@ -584,6 +597,7 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;
@@ -609,7 +623,7 @@ wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
     }
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
-    TrxHandle* trx(get_local_trx(repl, trx_handle, true));
+    TrxHandleMaster* trx(get_local_trx(repl, trx_handle, true));
     assert(trx != 0);
 
     wsrep_status_t retval;
@@ -706,7 +720,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    TrxHandle* trx(repl->local_conn_trx(conn_id, true));
+    TrxHandleMaster* trx(repl->local_conn_trx(conn_id, true));
     assert(trx != 0);
 
     wsrep_status_t retval;
@@ -725,7 +739,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(
-                           WSREP_FLAG_COMMIT |
+                           WSREP_FLAG_TRX_END |
                            WSREP_FLAG_ISOLATION));
 
         retval = repl->replicate(trx, meta);
@@ -751,12 +765,8 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
     if (retval != WSREP_OK) // galera_to_execute_end() won't be called
     {
+        assert(trx->refcnt() == 1);
         repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
-
-        if (trx->global_seqno() < 0) // no seqno -> no index -> no automatic purging
-        {
-            trx->unref(); // implicit destructor
-        }
     }
 
     return retval;
@@ -773,26 +783,27 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     wsrep_status_t retval;
-    TrxHandle* trx(repl->local_conn_trx(conn_id, false));
+    TrxHandleMaster* trx(repl->local_conn_trx(conn_id, false));
 
     try
     {
         TrxHandleLock lock(*trx);
-        repl->to_isolation_end(trx);
-        repl->discard_local_conn_trx(conn_id);
-        return WSREP_OK;
+        gu_trace(repl->to_isolation_end(trx));
+        retval =  WSREP_OK;
         // trx will be unreferenced (destructed) during purge
     }
     catch (std::exception& e)
     {
         log_warn << e.what();
-        return WSREP_CONN_FAIL;
+        retval = WSREP_CONN_FAIL;
     }
     catch (...)
     {
         log_fatal << "non-standard exception";
-        return WSREP_FATAL;
+        retval = WSREP_FATAL;
     }
+
+    gu_trace(repl->discard_local_conn_trx(conn_id));
 
     return retval;
 }
@@ -831,12 +842,12 @@ galera_preordered_collect (wsrep_t* const gh,
 
 
 extern "C" wsrep_status_t
-galera_preordered_commit (wsrep_t* const gh,
-                          wsrep_po_handle_t*      const handle,
-                          const wsrep_uuid_t*     const source_id,
-                          uint32_t                const flags,
-                          int                     const pa_range,
-                          wsrep_bool_t            const commit)
+galera_preordered_commit (wsrep_t*            const gh,
+                          wsrep_po_handle_t*  const handle,
+                          const wsrep_uuid_t* const source_id,
+                          uint32_t            const flags,
+                          int                 const pa_range,
+                          wsrep_bool_t        const commit)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);

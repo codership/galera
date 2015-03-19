@@ -36,6 +36,7 @@ libgcs_sources = Split('''
                           gcs_defrag.cpp
                           gcs_state_msg.cpp
                           gcs_node.cpp
+                          gcs_act_cchange.cpp
                           gcs_group.cpp
                           gcs_core.cpp
                           gcs_fc.cpp

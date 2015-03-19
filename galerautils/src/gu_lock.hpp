@@ -19,17 +19,17 @@ namespace gu
 {
     class Lock
     {
-        pthread_mutex_t* const value;
+        pthread_mutex_t* const value_;
 
         Lock (const Lock&);
         Lock& operator=(const Lock&);
 
     public:
 
-        Lock (const Mutex& mtx) : value(&mtx.value)
+        Lock (const Mutex& mtx) : value_(&mtx.value_)
         {
 
-            int err = pthread_mutex_lock (value);
+            int err = pthread_mutex_lock (value_);
             if (gu_unlikely(err))
             {
                 std::string msg = "Mutex lock failed: ";
@@ -40,7 +40,7 @@ namespace gu
 
         virtual ~Lock ()
         {
-            int err = pthread_mutex_unlock (value);
+            int err = pthread_mutex_unlock (value_);
             if (gu_unlikely(err))
             {
                 log_fatal << "Mutex unlock failed: " << err << " ("
@@ -53,7 +53,7 @@ namespace gu
         inline void wait (const Cond& cond)
         {
             cond.ref_count++;
-            pthread_cond_wait (&(cond.cond), value);
+            pthread_cond_wait (&(cond.cond), value_);
             cond.ref_count--;
         }
 
@@ -63,7 +63,7 @@ namespace gu
 
             date._timespec(ts);
             cond.ref_count++;
-            int ret = pthread_cond_timedwait (&(cond.cond), value, &ts);
+            int ret = pthread_cond_timedwait (&(cond.cond), value_, &ts);
             cond.ref_count--;
 
             if (gu_unlikely(ret)) gu_throw_error(ret);

@@ -65,7 +65,7 @@ START_TEST (gcs_defrag_test)
     frg1.frag      = frag1;
     frg1.frag_len  = frag1_len;
     frg1.frag_no   = 0;
-    frg1.act_type  = GCS_ACT_TORDERED;
+    frg1.act_type  = GCS_ACT_WRITESET;
     frg1.proto_ver = 0;
 
     // normal fragments

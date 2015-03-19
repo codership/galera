@@ -99,7 +99,7 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static int const GCS_PROTO_MAX = 0;
+static gcs_proto_t const GCS_PROTO_MAX = 0;
 
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
@@ -464,6 +464,8 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
 
     ret = backend->recv (backend, recv_msg, timeout);
 
+    assert(recv_msg->buf || 0 == recv_msg->buf_len);
+
     while (gu_unlikely(ret > recv_msg->buf_len)) {
         /* recv_buf too small, reallocate */
         /* sometimes - like in case of component message, we may need to
@@ -488,6 +490,8 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
             break;
         }
     }
+
+    assert(recv_msg->buf);
 
     if (gu_unlikely(ret < 0)) {
         gu_debug ("returning %d: %s\n", ret, strerror(-ret));
@@ -518,7 +522,8 @@ core_handle_act_msg (gcs_core_t*          core,
 
         if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
                         gcs_core_group_protocol_version(core))) {
-            gu_info ("Message with protocol version %d != highest commonly supported: %d. ",
+            gu_info ("Message with protocol version %d != highest commonly "
+                     "supported: %d.",
                      gcs_act_proto_ver(msg->buf),
                      gcs_core_group_protocol_version(core));
             commonly_supported_version = false;
@@ -555,7 +560,7 @@ core_handle_act_msg (gcs_core_t*          core,
 
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
-                assert (GCS_ACT_TORDERED != act->act.type || act->id > 0);
+                assert (GCS_ACT_WRITESET != act->act.type || act->id > 0);
             }
             else {
                 /* local action, get from FIFO, should be there already */
@@ -703,12 +708,13 @@ core_handle_last_msg (gcs_core_t*          core,
  * @return action size, negative error code or 0 to continue.
  */
 static ssize_t
-core_handle_comp_msg (gcs_core_t*          core,
-                      struct gcs_recv_msg* msg,
-                      struct gcs_act*      act)
+core_handle_comp_msg (gcs_core_t*          const core,
+                      struct gcs_recv_msg* const msg,
+                      struct gcs_act_rcvd* const rcvd)
 {
-    ssize_t      ret = 0;
-    gcs_group_t* group = &core->group;
+    ssize_t ret(0);
+    gcs_group_t*    const group(&core->group);
+    struct gcs_act* const act(&rcvd->act);
 
     assert (GCS_MSG_COMPONENT == msg->type);
 
@@ -732,7 +738,7 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        ret = gcs_group_act_conf (group, act, &core->proto_ver);
+        ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
@@ -784,29 +790,29 @@ core_handle_comp_msg (gcs_core_t*          core,
         if (gu_mutex_lock (&core->send_lock)) abort();
         {
             if (core->state < CORE_CLOSED) {
-                ret = gcs_group_act_conf (group, act, &core->proto_ver);
-                if (ret < 0) {
-                    gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
-                              ret, strerror (-ret));
-                    assert (0);
-                    ret = -ENOTRECOVERABLE;
-                }
-
                 if (gcs_group_my_idx(group) == -1) { // self-leave
                     gcs_fifo_lite_close (core->fifo);
                     core->state = CORE_CLOSED;
-                    if (gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf)) {
-                        ret = -gcs_comp_msg_error(
-                            (const gcs_comp_msg_t*)msg->buf);
-                        free(const_cast<void*>(act->buf));
-                        act->buf = NULL;
-                        act->buf_len = 0;
+                    ret = -gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf);
+                    if (ret < 0) {
+                        assert(act->buf == NULL);
+                        assert(act->buf_len == 0);
                         act->type = GCS_ACT_ERROR;
                         gu_info("comp msg error in core %d", -ret);
                     }
                 }
                 else {                               // regular non-prim
                     core->state = CORE_NON_PRIMARY;
+                }
+
+                if (GCS_GROUP_NON_PRIMARY == ret) { // no error in comp msg
+                    ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
+                    if (ret < 0) {
+                        gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
+                                  ret, strerror (-ret));
+                        assert (0);
+                        ret = -ENOTRECOVERABLE;
+                    }
                 }
             }
             else { // ignore in production?
@@ -904,10 +910,11 @@ core_handle_uuid_msg (gcs_core_t*     core,
 static ssize_t
 core_handle_state_msg (gcs_core_t*          core,
                        struct gcs_recv_msg* msg,
-                       struct gcs_act*      act)
+                       struct gcs_act_rcvd* rcvd)
 {
-    ssize_t      ret = 0;
-    gcs_group_t* group = &core->group;
+    ssize_t      ret(0);
+    gcs_group_t* const group(&core->group);
+    struct gcs_act* const act(&rcvd->act);
 
     assert (GCS_MSG_STATE_MSG == msg->type);
 
@@ -938,7 +945,7 @@ core_handle_state_msg (gcs_core_t*          core,
             }
             gu_mutex_unlock (&core->send_lock);
 
-            ret = gcs_group_act_conf (group, act, &core->proto_ver);
+            ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
             if (ret < 0) {
                 gu_fatal ("Failed create CONF action: %d (%s)",
                           ret, strerror (-ret));
@@ -1050,8 +1057,8 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                        long long            timeout)
 {
 //    struct gcs_act_rcvd  recv_act;
-    struct gcs_recv_msg* recv_msg = &conn->recv_msg;
-    ssize_t              ret      = 0;
+    struct gcs_recv_msg* const recv_msg(&conn->recv_msg);
+    ssize_t ret(0);
 
     static struct gcs_act_rcvd zero_act(
         gcs_act(NULL,
@@ -1078,6 +1085,8 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             goto out; /* backend error while receiving message */
         }
 
+        assert(recv_msg->buf);
+
         switch (recv_msg->type) {
         case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, recv_act);
@@ -1090,7 +1099,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             assert (ret == recv_act->act.buf_len);
             break;
         case GCS_MSG_COMPONENT:
-            ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
+            ret = core_handle_comp_msg (conn, recv_msg, recv_act);
             // assert (ret >= 0); // hang on error in debug mode
             assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
@@ -1100,7 +1109,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             ret = 0;           // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:
-            ret = core_handle_state_msg (conn, recv_msg, &recv_act->act);
+            ret = core_handle_state_msg (conn, recv_msg, recv_act);
             assert (ret >= 0); // hang on error in debug mode
             assert (ret == recv_act->act.buf_len);
             break;
@@ -1130,18 +1139,19 @@ out:
 
     assert (ret || GCS_ACT_ERROR == recv_act->act.type);
     assert (ret == recv_act->act.buf_len || ret < 0);
-    assert (recv_act->id       <= GCS_SEQNO_ILL ||
-            recv_act->act.type == GCS_ACT_TORDERED ||
+    assert (recv_act->id       <= GCS_SEQNO_ILL    ||
+            recv_act->act.type == GCS_ACT_WRITESET ||
+            recv_act->act.type == GCS_ACT_CCHANGE  ||
             recv_act->act.type == GCS_ACT_STATE_REQ); // <- dirty hack
     assert (recv_act->sender_idx >= 0 ||
-            recv_act->act.type   != GCS_ACT_TORDERED);
+            recv_act->act.type   != GCS_ACT_WRITESET);
 
 //    gu_debug ("Returning %d", ret);
 
     if (ret < 0) {
         assert (recv_act->id < 0);
 
-        if (GCS_ACT_TORDERED == recv_act->act.type && recv_act->act.buf) {
+        if (GCS_ACT_WRITESET == recv_act->act.type && recv_act->act.buf) {
             gcs_gcache_free (conn->cache, recv_act->act.buf);
             recv_act->act.buf = NULL;
         }

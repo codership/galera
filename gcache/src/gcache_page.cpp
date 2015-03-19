@@ -74,8 +74,7 @@ gcache::Page::malloc (ssize_t size)
 
         bh->size    = size;
         bh->seqno_g = SEQNO_NONE;
-        bh->seqno_d = SEQNO_ILL;
-        bh->ctx     = this;
+        bh->ctx     = reinterpret_cast<BH_ctx_t>(this);
         bh->flags   = 0;
         bh->store   = BUFFER_IN_PAGE;
 

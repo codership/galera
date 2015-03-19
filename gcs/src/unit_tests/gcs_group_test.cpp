@@ -109,7 +109,7 @@ START_TEST (gcs_group_configuration)
     frg1.frag      = NULL;
     frg1.frag_len  = 0;
     frg1.frag_no   = 0;
-    frg1.act_type  = GCS_ACT_TORDERED;
+    frg1.act_type  = GCS_ACT_WRITESET;
     frg1.proto_ver = 0;
 
     // normal fragments
@@ -237,7 +237,7 @@ START_TEST (gcs_group_configuration)
     fail_if (strncmp((const char*)act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
     fail_if (r_act.sender_idx != 0);
-    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (act->type != GCS_ACT_WRITESET);
     fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
@@ -282,7 +282,7 @@ START_TEST (gcs_group_configuration)
     fail_if (strncmp((const char*)act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
     fail_if (r_act.sender_idx != 0);
-    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (act->type != GCS_ACT_WRITESET);
     fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
@@ -348,7 +348,7 @@ return;
     fail_if (act->buf_len != act_len);
     fail_if (act->buf != NULL);
     fail_if (r_act.sender_idx != 0);
-    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (act->type != GCS_ACT_WRITESET);
     fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
 
@@ -361,7 +361,7 @@ return;
     fail_if (strncmp((const char*)act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
     fail_if (r_act.sender_idx != 1);
-    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (act->type != GCS_ACT_WRITESET);
     fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup

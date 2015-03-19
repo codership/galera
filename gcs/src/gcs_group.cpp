@@ -8,6 +8,8 @@
 #include "gcs_gcache.hpp"
 #include "gcs_priv.hpp"
 
+#include <gu_logger.hpp>
+
 #include <errno.h>
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
@@ -30,27 +32,19 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
-    group->num          = 1; // this must be removed (#474)
-    group->my_idx       = 0; // this must be -1 (#474)
+    group->num          = 0;
+    group->my_idx       = -1;
     group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
     group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
-    group->nodes        = GU_CALLOC(group->num, gcs_node_t); // this must be removed (#474)
-
-    if (!group->nodes) return -ENOMEM; // this should be removed (#474)
-
-    /// this should be removed (#474)
-    gcs_node_init (&group->nodes[group->my_idx], group->cache, NODE_NO_ID,
-                   group->my_name, group->my_address, gcs_proto_ver,
-                   repl_proto_ver, appl_proto_ver, 0);
-
-    group->prim_uuid  = GU_UUID_NIL;
-    group->prim_seqno = GCS_SEQNO_ILL;
-    group->prim_num   = 0;
-    group->prim_state = GCS_NODE_STATE_NON_PRIM;
+    group->nodes        = NULL;
+    group->prim_uuid    = GU_UUID_NIL;
+    group->prim_seqno   = GCS_SEQNO_ILL;
+    group->prim_num     = 0;
+    group->prim_state   = GCS_NODE_STATE_NON_PRIM;
 
     *(gcs_proto_t*)&group->gcs_proto_ver = gcs_proto_ver;
     *(int*)&group->repl_proto_ver = repl_proto_ver;
@@ -316,7 +310,10 @@ group_post_state_exchange (gcs_group_t* group)
             {
                 gu_fatal("Reversing history: %lld -> %lld, this member has "
                          "applied %lld more events than the primary component."
-                         "Data loss is possible. Aborting.");
+                         "Data loss is possible. Aborting.",
+                         group->act_id_, quorum->act_id,
+                         group->act_id_ - quorum->act_id);
+                assert(0);
                 gu_abort();
             }
             group->state      = GCS_GROUP_PRIMARY;
@@ -429,30 +426,35 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (!prim_comp);
     }
 
+    bool my_bootstrap(bootstrap);
+
     if (prim_comp) {
         /* Got PRIMARY COMPONENT - Hooray! */
         assert (new_my_idx >= 0);
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
+            assert(group->my_idx >= 0);
+            my_bootstrap = group->nodes[group->my_idx].bootstrap;
         }
-        else if (bootstrap)
+        else if (bootstrap && gu_uuid_compare(&group->group_uuid,
+                                              &GU_UUID_NIL))
         {
             /* Is there need to initialize something else in this case? */
-            group->nodes[group->my_idx].bootstrap = true;
+            my_bootstrap = true;
         }
         else {
             const bool first_component =
 #ifndef GCS_CORE_TESTING
-            (1 == group->num) && !strcmp (NODE_NO_ID, group->nodes[0].id);
+                (0 == group->num) || bootstrap;
 #else
-            (1 == group->num);
+                (0 == group->num);
 #endif
-
             if (1 == new_nodes_num && first_component) {
                 /* bootstrap new configuration */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
-                assert (1 == group->num);
-                assert (0 == group->my_idx);
+                assert ((0 == group->num && -1 == group->my_idx) ||
+                        /* if first comp was non prim due to group expulsion */
+                        (1 == group->num &&  0 == group->my_idx));
 
                 // This bootstraps initial primary component for state exchange
                 gu_uuid_generate (&group->prim_uuid, NULL, 0);
@@ -467,14 +469,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                     gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
                 }
-// the following should be removed under #474
-                group->nodes[0].status = GCS_NODE_STATE_JOINED;
-                /* initialize node ID to the one given by the backend - this way
-                 * we'll be recognized as coming from prev. conf. in node array
-                 * remap below */
-                strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
-                         sizeof (new_nodes[0].id) - 1);
-                group->nodes[0].segment = new_nodes[0].segment;
+
+                new_nodes[0].status = GCS_NODE_STATE_JOINED;
             }
         }
     }
@@ -505,6 +501,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->my_idx = new_my_idx;
     group->num    = new_nodes_num;
     group->nodes  = new_nodes;
+
+    assert(group->num > 0 || group->my_idx < 0);
+    assert(group->my_idx >= 0 || group->num == 0);
+
+    if (group->my_idx >= 0) group->nodes[group->my_idx].bootstrap = my_bootstrap;
 
     if (gcs_comp_msg_primary(comp) || bootstrap) {
         /* TODO: for now pretend that we always have new nodes and perform
@@ -818,9 +819,9 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
 }
 
 static int
-group_find_node_by_state (const gcs_group_t*     const group,
-                          int              const joiner_idx,
-                          gcs_node_state_t const status)
+group_find_node_by_state (const gcs_group_t* const group,
+                          int                const joiner_idx,
+                          gcs_node_state_t   const status)
 {
     gcs_segment_t const segment = group->nodes[joiner_idx].segment;
     int  idx;
@@ -834,12 +835,14 @@ group_find_node_by_state (const gcs_group_t*     const group,
         gcs_node_t* node = &group->nodes[idx];
 
         if (node->status >= status && group_node_is_stateful (group, node))
+        {
             donor = idx; /* potential donor */
+        }
 
         if (segment == node->segment) {
             if (donor == idx) return donor; /* found suitable donor in the
                                              * same segment */
-            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;;
+            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;
         }
     }
 
@@ -1160,10 +1163,15 @@ gcs_group_find_donor(const gcs_group_t* group,
     /* try to find ist donor first.
        if it fails, fallbacks to find sst donor*/
     int donor_idx = -1;
+
     if (str_version >= 2 &&
-        gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
+        gu_uuid_compare(&group->group_uuid, ist_uuid) == 0 &&
+        ist_seqno != GCS_SEQNO_ILL)
     {
-        assert (ist_seqno != GCS_SEQNO_ILL);
+        // FIXME: check if disabling the assertion and allowing ist_seqno to
+        // equal to GCS_SEQNO_ILL requires protocol upgrade
+        // assert(ist_seqno != GCS_SEQNO_ILL);
+
         donor_idx = group_find_ist_donor(group,
                                          str_version,
                                          joiner_idx,
@@ -1171,15 +1179,15 @@ gcs_group_find_donor(const gcs_group_t* group,
                                          ist_seqno,
                                          min_donor_state);
     }
+
     if (donor_idx < 0)
     {
-        /* if donor_string is empty,
-           it will fallback to find_node_by_state() */
-        donor_idx = group_for_each_donor_in_string
-                (group, str_version, joiner_idx,
-                 donor_string, donor_len,
-                 min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, str_version,
+                                                    joiner_idx, donor_string,
+                                                    donor_len, min_donor_state);
     }
+
     return donor_idx;
 }
 
@@ -1262,7 +1270,8 @@ group_select_donor (gcs_group_t* group,
 void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
-    if (act->act.type <= GCS_ACT_STATE_REQ) {
+//    if (act->act.type <= GCS_ACT_STATE_REQ) {
+    if (act->act.type <= GCS_ACT_CCHANGE) {
         gcs_gcache_free (group->cache, act->act.buf);
     }
 
@@ -1389,9 +1398,9 @@ group_memb_record_size (gcs_group_t* group)
 
 /* Creates new configuration action */
 ssize_t
-gcs_group_act_conf (gcs_group_t*    group,
-                    struct gcs_act* act,
-                    int*            gcs_proto_ver)
+gcs_group_act_conf (gcs_group_t*         group,
+                    struct gcs_act_rcvd* rcvd,
+                    int*                 gcs_proto_ver)
 {
     // if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
     //     *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
@@ -1406,56 +1415,75 @@ gcs_group_act_conf (gcs_group_t*    group,
     // gcs requires resending message with correct gcs protocol version.
     *gcs_proto_ver = group->quorum.gcs_proto_ver;
 
-    ssize_t conf_size = sizeof(gcs_act_conf_t) + group_memb_record_size(group);
-    gcs_act_conf_t* conf = static_cast<gcs_act_conf_t*>(malloc (conf_size));
+    struct gcs_act_cchange conf;
 
-    if (conf) {
-        long idx;
+    conf.memb_size = group_memb_record_size(group);
+    conf.memb = static_cast<char*>(::operator new(conf.memb_size));
 
-        conf->seqno          = group->act_id_;
-        conf->conf_id        = group->conf_id;
-        conf->memb_num       = group->num;
-        conf->my_idx         = group->my_idx;
-        conf->repl_proto_ver = group->quorum.repl_proto_ver;
-        conf->appl_proto_ver = group->quorum.appl_proto_ver;
+    if (GCS_GROUP_PRIMARY == group->state) {
+        conf.seqno      = ++group->act_id_;
+    } else {
+        assert(GCS_GROUP_NON_PRIMARY == group->state);
+        conf.seqno      = GCS_SEQNO_ILL;
+    }
 
-        memcpy (conf->uuid, &group->group_uuid, sizeof (gu_uuid_t));
+    conf.conf_id        = group->conf_id;
+    conf.memb_num       = group->num;
+    conf.my_idx         = group->my_idx;
+    conf.repl_proto_ver = group->quorum.repl_proto_ver;
+    conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
-        if (group->num) {
-            assert (conf->my_idx >= 0);
+    memcpy (conf.uuid.data, &group->group_uuid, sizeof (gu_uuid_t));
 
-            conf->my_state = group->nodes[group->my_idx].status;
+    if (group->num) {
+        assert (conf.my_idx >= 0);
 
-            char* ptr = &conf->data[0];
-            for (idx = 0; idx < group->num; idx++)
-            {
-                strcpy (ptr, group->nodes[idx].id);
-                ptr += strlen(ptr) + 1;
-                strcpy (ptr, group->nodes[idx].name);
-                ptr += strlen(ptr) + 1;
-                strcpy (ptr, group->nodes[idx].inc_addr);
-                ptr += strlen(ptr) + 1;
-                gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
-                memcpy(ptr, &cached, sizeof(cached));
-                ptr += sizeof(cached);
-            }
+        conf.my_state = group->nodes[group->my_idx].status;
+
+        char* ptr(conf.memb);
+        for (int idx = 0; idx < group->num; ++idx)
+        {
+            strcpy (ptr, group->nodes[idx].id);
+            ptr += strlen(ptr) + 1;
+            strcpy (ptr, group->nodes[idx].name);
+            ptr += strlen(ptr) + 1;
+            strcpy (ptr, group->nodes[idx].inc_addr);
+            ptr += strlen(ptr) + 1;
+            gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
+            memcpy(ptr, &cached, sizeof(cached));
+            ptr += sizeof(cached);
         }
-        else {
-            // self leave message
-            assert (conf->conf_id < 0);
-            assert (conf->my_idx  < 0);
-            conf->my_state = GCS_NODE_STATE_NON_PRIM;
-        }
-
-        act->buf     = conf;
-        act->buf_len = conf_size;
-        act->type    = GCS_ACT_CONF;
-
-        return conf_size;
     }
     else {
-        return -ENOMEM;
+        // self leave message
+        assert (conf.conf_id < 0);
+        assert (conf.my_idx  < 0);
+        conf.my_state = GCS_NODE_STATE_NON_PRIM;
     }
+
+    void* tmp;
+    rcvd->act.buf_len = conf.write(&tmp); // throws when fails
+#ifndef GCS_FOR_GARB
+    /* copy CC event to gcache for IST */
+    rcvd->act.buf = gcache_malloc(group->cache, rcvd->act.buf_len);
+    if (rcvd->act.buf)
+    {
+        memcpy(const_cast<void*>(rcvd->act.buf), tmp, rcvd->act.buf_len);
+        rcvd->id = conf.seqno;
+    }
+    else
+    {
+        rcvd->act.buf_len = -ENOMEM;
+        rcvd->id          = -ENOMEM;
+    }
+    free(tmp);
+#else
+    rcvd->id = conf.seqno;
+#endif /* GCS_FOR_GARB */
+
+    rcvd->act.type = GCS_ACT_CCHANGE;
+
+    return rcvd->act.buf_len;
 }
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)

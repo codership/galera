@@ -60,7 +60,7 @@ RecvLoop::loop()
 
         switch (act.type)
         {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
             if (gu_unlikely(!(act.seqno_g & 127)))
                 /* == report_interval_ of 128 */
             {
@@ -72,20 +72,19 @@ RecvLoop::loop()
         case GCS_ACT_STATE_REQ:
             gcs_.join (-ENOSYS); /* we can't donate state */
             break;
-        case GCS_ACT_CONF:
+        case GCS_ACT_CCHANGE:
         {
-            const gcs_act_conf_t* const cc
-                (reinterpret_cast<const gcs_act_conf_t*>(act.buf));
+            gcs_act_cchange const cc(act.buf, act.size);
 
-            if (cc->conf_id > 0) /* PC */
+            if (cc.conf_id > 0) /* PC */
             {
-                if (GCS_NODE_STATE_PRIM == cc->my_state)
+                if (GCS_NODE_STATE_PRIM == cc.my_state)
                 {
                     gcs_.request_state_transfer (config_.sst(),config_.donor());
-                    gcs_.join(cc->seqno);
+                    gcs_.join(cc.seqno);
                 }
             }
-            else if (cc->memb_num == 0) // SELF-LEAVE after closing connection
+            else if (cc.memb_num == 0) // SELF-LEAVE after closing connection
             {
                 log_info << "Exiting main loop";
                 return;

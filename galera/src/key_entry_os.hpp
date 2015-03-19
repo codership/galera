@@ -9,7 +9,7 @@
 
 namespace galera
 {
-    class TrxHandle;
+    class TrxHandleSlave;
 
     class KeyEntryOS
     {
@@ -53,7 +53,7 @@ namespace galera
         const KeyOS& get_key() const { return key_; }
         const KeyOS& get_key(int version) const { return key_; }
 
-        void ref(TrxHandle* trx, bool full_key)
+        void ref(TrxHandleSlave* trx, bool full_key)
         {
 #ifndef NDEBUG
             assert_ref(trx, full_key);
@@ -65,7 +65,7 @@ namespace galera
             }
         }
 
-        void unref(TrxHandle* trx, bool full_key)
+        void unref(TrxHandleSlave* trx, bool full_key)
         {
             assert(ref_trx_ != 0);
             if (ref_trx_ == trx) ref_trx_ = 0;
@@ -81,7 +81,7 @@ namespace galera
             }
         }
 
-        void ref_shared(TrxHandle* trx, bool full_key)
+        void ref_shared(TrxHandleSlave* trx, bool full_key)
         {
 #ifndef NDEBUG
             assert_ref_shared(trx, full_key);
@@ -93,7 +93,7 @@ namespace galera
             }
         }
 
-        void unref_shared(TrxHandle* trx, bool full_key)
+        void unref_shared(TrxHandleSlave* trx, bool full_key)
         {
             assert(ref_shared_trx_ != 0);
             if (ref_shared_trx_ == trx) ref_shared_trx_ = 0;
@@ -109,10 +109,10 @@ namespace galera
             }
         }
 
-        const TrxHandle* ref_trx() const { return ref_trx_; }
-        const TrxHandle* ref_full_trx() const { return ref_full_trx_; }
-        const TrxHandle* ref_shared_trx() const { return ref_shared_trx_; }
-        const TrxHandle* ref_full_shared_trx() const { return ref_full_shared_trx_; }
+        const TrxHandleSlave* ref_trx() const { return ref_trx_; }
+        const TrxHandleSlave* ref_full_trx() const { return ref_full_trx_; }
+        const TrxHandleSlave* ref_shared_trx() const { return ref_shared_trx_; }
+        const TrxHandleSlave* ref_full_shared_trx() const { return ref_full_shared_trx_; }
 
         size_t size() const
         {
@@ -122,16 +122,16 @@ namespace galera
     private:
         void operator=(const KeyEntryOS&);
         KeyOS      key_;
-        TrxHandle* ref_trx_;
-        TrxHandle* ref_full_trx_;
-        TrxHandle* ref_shared_trx_;
-        TrxHandle* ref_full_shared_trx_;
+        TrxHandleSlave* ref_trx_;
+        TrxHandleSlave* ref_full_trx_;
+        TrxHandleSlave* ref_shared_trx_;
+        TrxHandleSlave* ref_full_shared_trx_;
 
 #ifndef NDEBUG
-        void assert_ref(TrxHandle*, bool) const;
-        void assert_unref(TrxHandle*) const;
-        void assert_ref_shared(TrxHandle*, bool) const;
-        void assert_unref_shared(TrxHandle*) const;
+        void assert_ref(TrxHandleSlave*, bool) const;
+        void assert_unref(TrxHandleSlave*) const;
+        void assert_ref_shared(TrxHandleSlave*, bool) const;
+        void assert_unref_shared(TrxHandleSlave*) const;
 #endif /* NDEBUG */
     };
 

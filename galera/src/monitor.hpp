@@ -74,21 +74,38 @@ namespace galera
             }
         }
 
-        void set_initial_position(wsrep_seqno_t seqno)
+        /*
+         * For ordered CC events this had to be changed:
+         * - it either resets position to -1 or
+         * - merely advances it to seqno if current position is behind.
+         * Assumes that monitor has been drained.
+         */
+        void set_initial_position(wsrep_seqno_t const seqno)
         {
             gu::Lock lock(mutex_);
+
             if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset
                 last_entered_ = last_left_ = seqno;
             }
             else
+#if 1 // now
+            {
+                if (last_left_    < seqno)      last_left_    = seqno;
+                if (last_entered_ < last_left_) last_entered_ = last_left_;
+            }
+
+            // some drainers may wait for us here
+            cond_.broadcast();
+#else // before
             {
                 // drain monitor up to seqno but don't reset last_entered_
                 // or last_left_
                 drain_common(seqno, lock);
                 drain_seqno_ = LLONG_MAX;
             }
+#endif
             if (seqno != -1)
             {
                 const size_t idx(indexof(seqno));
@@ -156,7 +173,7 @@ namespace galera
 
             assert(process_[indexof(last_left_)].state_ == Process::S_IDLE);
 
-            post_leave(obj, lock);
+            post_leave(obj.seqno(), lock);
         }
 
         void self_cancel(C& obj)
@@ -188,7 +205,7 @@ namespace galera
 
             if (obj_seqno <= drain_seqno_)
             {
-                post_leave(obj, lock);
+                post_leave(obj.seqno(), lock);
             }
             else
             {
@@ -369,9 +386,8 @@ namespace galera
             }
         }
 
-        void post_leave(const C& obj, gu::Lock& lock)
+        void post_leave(wsrep_seqno_t const obj_seqno, gu::Lock& lock)
         {
-            const wsrep_seqno_t obj_seqno(obj.seqno());
             const size_t idx(indexof(obj_seqno));
 
             if (last_left_ + 1 == obj_seqno) // we're shrinking window

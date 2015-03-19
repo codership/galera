@@ -74,7 +74,7 @@ static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
     t->act.size     = MAX_MSG_LEN;
     t->act.seqno_g  = GCS_SEQNO_ILL;
     t->act.seqno_l  = GCS_SEQNO_ILL;
-    t->act.type     = GCS_ACT_TORDERED;
+    t->act.type     = GCS_ACT_WRITESET;
     t->n_tries      = n_tries;
 
     if (t->msg)
@@ -360,7 +360,7 @@ test_after_recv (gcs_test_thread_t* thread)
     ret = test_send_last_applied (gcs, thread->act.seqno_g);
 //    fprintf (stdout, "SEQNO applied %lld", thread->local_act_id);
 
-    if (thread->act.type == GCS_ACT_TORDERED)
+    if (thread->act.type == GCS_ACT_WRITESET)
         gcache_free (gcache, thread->act.buf);
 
     return ret;
@@ -416,7 +416,7 @@ void *gcs_test_send (void *arg)
 
     /* send message to group */
         ret = gcs_send (gcs, thread->act.buf, thread->act.size,
-                        GCS_ACT_TORDERED, false);
+                        GCS_ACT_WRITESET, false);
 
         if (ret < 0) break;
         //sleep (1);
@@ -433,14 +433,14 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 {
     long ret;
     static gcs_seqno_t conf_id = 0;
-    gcs_act_conf_t* conf = (gcs_act_conf_t*)thread->msg;
+    gcs_act_cchange const conf(thread->act.buf, thread->act.size);
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 
-    fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
-             "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
-             (long long)conf->conf_id, (long long)conf->seqno,
-             conf->memb_num, conf->my_idx, (long long)thread->act.seqno_l);
+    fprintf (stdout, "Got GCS_ACT_CCHANGE: Conf: %lld, "
+             "seqno: %lld, members: %d, my idx: %d, local seqno: %lld\n",
+             (long long)conf.conf_id, (long long)conf.seqno,
+             conf.memb_num, conf.my_idx, (long long)thread->act.seqno_l);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
@@ -448,18 +448,18 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     //       so for simplicity, just check conf_id.
     while (-EAGAIN == (ret = gu_to_grab (to, thread->act.seqno_l)));
     if (0 == ret) {
-        if (conf->my_state == GCS_NODE_STATE_PRIM) {
+        if (conf.my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
             fprintf (stdout,"Gap in configurations: ours: %lld, group: %lld.\n",
-                     (long long)conf_id, (long long)conf->conf_id);
+                     (long long)conf_id, (long long)conf.conf_id);
             fflush (stdout);
 
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
-                     (long long)conf->seqno, // this is global seqno
-                     strerror (-gcs_request_state_transfer (gcs, 0, &conf->seqno,
-                                                            sizeof(conf->seqno),
-                                                            "", &ist_uuid, ist_seqno,
-                                                            &seqno)));
+                     (long long)conf.seqno, // this is global seqno
+                     strerror (-gcs_request_state_transfer(gcs, 0, &conf.seqno,
+                                                           sizeof(conf.seqno),"",
+                                                           &ist_uuid, ist_seqno,
+                                                           &seqno)));
 
             // pretend that state transfer is complete, cancel every action up
             // to seqno
@@ -477,7 +477,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     else {
         fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
     }
-    conf_id = conf->conf_id;
+    conf_id = conf.conf_id;
 }
 
 void *gcs_test_recv (void *arg)
@@ -510,7 +510,7 @@ void *gcs_test_recv (void *arg)
         size_recvd += thread->act.size;
 
         switch (thread->act.type) {
-        case GCS_ACT_TORDERED:
+        case GCS_ACT_WRITESET:
             test_after_recv (thread);
             //puts (thread->log_msg); fflush (stdout);
             break;
@@ -518,7 +518,7 @@ void *gcs_test_recv (void *arg)
             group_seqno = *(gcs_seqno_t*)thread->act.buf;
             gu_to_self_cancel (to, thread->act.seqno_l);
             break;
-        case GCS_ACT_CONF:
+        case GCS_ACT_CCHANGE:
             gcs_test_handle_configuration (gcs, thread);
             break;
         case GCS_ACT_STATE_REQ:

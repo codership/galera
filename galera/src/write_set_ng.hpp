@@ -104,12 +104,24 @@ namespace galera
             F_TOI         = 1 << 2,
             F_PA_UNSAFE   = 1 << 3,
             F_COMMUTATIVE = 1 << 4,
-            F_NATIVE      = 1 << 5
+            F_NATIVE      = 1 << 5,
+            F_BEGIN       = 1 << 6,
+            /*
+             * reserved for extension
+             */
+            F_CERTIFIED   = 1 << 15  // should be used only for VER4 and up.
         };
 
-        /* this takes care of converting wsrep API flags to on-the-wire flags */
-        static uint32_t
-        wsrep_flags_to_ws_flags (uint32_t const flags);
+        static bool const FLAGS_MATCH_API_FLAGS =
+                           (WSREP_FLAG_TRX_END     == F_COMMIT       &&
+                            WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
+                            WSREP_FLAG_ISOLATION   == F_TOI          &&
+                            WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
+                            WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
+                            WSREP_FLAG_NATIVE      == F_NATIVE       &&
+                            WSREP_FLAG_TRX_START   == F_BEGIN);
+
+        static uint32_t wsrep_flags_to_ws_flags (uint32_t flags);
 
         typedef gu::RecordSet::GatherVector GatherVector;
 
@@ -161,17 +173,13 @@ namespace galera
                            GatherVector&          out);
 
             /* records last_seen, timestamp and CRC before replication */
-            void set_last_seen (const wsrep_seqno_t& ls);
+            void finalize(const wsrep_seqno_t& ls, int pa_range);
 
             /* records partial seqno, pa_range, timestamp and CRC before
              * replication (for preordered events)*/
-            void set_preordered (uint16_t pa_range)
+            void finalize_preordered(uint16_t pa_range)
             {
-                uint16_t* const pa(reinterpret_cast<uint16_t*>
-                                   (ptr_ + V3_PA_RANGE_OFF));
-
-                *pa = gu::htog<uint16_t>(pa_range);
-                set_last_seen (0);
+                finalize(0, pa_range);
             }
 
             /* This is for WriteSetIn */
@@ -254,7 +262,7 @@ namespace galera
 
             wsrep_seqno_t    last_seen() const
             {
-                assert (pa_range() == 0);
+                assert (pa_range() == 0 || version() >= VER4);
                 return seqno_priv();
             }
 
@@ -441,47 +449,37 @@ namespace galera
 
     private:
 
-        static bool const WRITESET_FLAGS_MATCH_API_FLAGS =
-                           (WSREP_FLAG_COMMIT      == F_COMMIT       &&
-                            WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
-                            WSREP_FLAG_ISOLATION   == F_TOI          &&
-                            WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
-                            WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
-                            WSREP_FLAG_NATIVE      == F_NATIVE);
-
         /* this assert should be removed when wsrep API flags become
          * explicitly incompatible with wirteset flags */
-        GU_COMPILE_ASSERT(WRITESET_FLAGS_MATCH_API_FLAGS, flags_incompatible);
+        GU_COMPILE_ASSERT(FLAGS_MATCH_API_FLAGS, flags_incompatible);
 
-        template<bool>
+        template <bool>
         static inline uint32_t
         wsrep_flags_to_ws_flags_tmpl (uint32_t const flags)
         {
+            assert(0); // remove when needed
             uint32_t ret(0);
 
-            if (flags & WSREP_FLAG_COMMIT)      ret |= F_COMMIT;
+            if (flags & WSREP_FLAG_TRX_END)     ret |= F_COMMIT;
             if (flags & WSREP_FLAG_ROLLBACK)    ret |= F_ROLLBACK;
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_TOI;
             if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
+            if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
 
             return ret;
         }
 
     }; /* class WriteSetNG */
 
-    /* specialization for the case when WS flags fully match API flags */
     template <> inline uint32_t
     WriteSetNG::wsrep_flags_to_ws_flags_tmpl<true>(uint32_t const flags)
     { return flags; }
 
     inline uint32_t
     WriteSetNG::wsrep_flags_to_ws_flags (uint32_t const flags)
-    {
-        return wsrep_flags_to_ws_flags_tmpl<WRITESET_FLAGS_MATCH_API_FLAGS>
-            (flags);
-    }
+    { return wsrep_flags_to_ws_flags_tmpl<FLAGS_MATCH_API_FLAGS>(flags); }
 
     class WriteSetOut
     {
@@ -590,12 +588,36 @@ namespace galera
             return out_size;
         }
 
-        void set_last_seen (const wsrep_seqno_t& ls)
+        void finalize(const wsrep_seqno_t& ls, int pa_range)
         {
-            header_.set_last_seen(ls);
+            header_.finalize(ls, pa_range);
         }
 
-        void set_preordered (ssize_t pa_range)
+        /* Serializes wiriteset into a single buffer (for unit test purposes)
+         * set last_seen to -1 if ws was explicitly finalized */
+        void serialize(std::vector<gu::byte_t>& ret,
+                       const wsrep_uuid_t&      source,
+                       const wsrep_conn_id_t&   conn,
+                       const wsrep_trx_id_t&    trx,
+                       const wsrep_seqno_t&     last_seen,
+                       const int                pa_range = -1)
+        {
+            WriteSetNG::GatherVector out;
+            size_t const out_size(gather(source, conn, trx, out));
+            finalize(last_seen, pa_range);
+
+            ret.clear(); ret.reserve(out_size);
+
+            /* concatenate all out buffers into ret */
+            for (size_t i(0); i < out->size(); ++i)
+            {
+                const gu::byte_t* ptr
+                    (static_cast<const gu::byte_t*>(out[i].ptr));
+                ret.insert (ret.end(), ptr, ptr + out[i].size);
+            }
+        }
+
+        void finalize_preordered (ssize_t pa_range)
         {
             assert (pa_range >= 0);
 
@@ -603,11 +625,7 @@ namespace galera
              * 0 meaning failed certification. */
             pa_range++;
 
-            /* cap PA range by maximum we can represent */
-            if (gu_unlikely(pa_range > WriteSetNG::MAX_PA_RANGE))
-                pa_range = WriteSetNG::MAX_PA_RANGE;
-
-            header_.set_preordered(pa_range + 1);
+            header_.finalize_preordered(pa_range);
         }
 
     private:
@@ -702,23 +720,34 @@ namespace galera
               check_ (false)
         {}
 
-        /* WriteSetIn(buf) == WriteSetIn() + read_buf(buf) */
-        void read_buf (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
+        void read_header (const gu::Buf& buf)
         {
             assert (0 == size_);
             assert (false == check_);
 
             header_.read_buf (buf);
             size_ = buf.size;
+        }
+
+        /*
+         * WriteSetIn(buf) == WriteSetIn() + read_buf(buf)
+         *
+         * @param st threshold at which launch dedicated thread for checksumming
+         *           0 - no checksumming
+         */
+        void read_buf (const gu::Buf& buf, ssize_t const st = SIZE_THRESHOLD)
+        {
+            read_header (buf);
             init (st);
         }
 
-        void read_buf (const gu::byte_t* const ptr, ssize_t const len)
+        void read_buf (const gu::byte_t* const ptr, ssize_t const len,
+                       ssize_t const st = SIZE_THRESHOLD)
         {
             assert (ptr != NULL);
             assert (len >= 0);
             gu::Buf tmp = { ptr, len };
-            read_buf (tmp);
+            read_buf (tmp, st);
         }
 
         ~WriteSetIn ()
@@ -732,14 +761,21 @@ namespace galera
             delete annt_;
         }
 
-        size_t        size()      const { return size_;               }
+        WriteSetNG::Version version()   const { return header_.version(); }
+
+        ssize_t       size()      const { return size_;               }
         uint16_t      flags()     const { return header_.flags();     }
-        bool          is_toi()    const
-        { return flags() & WriteSetNG::F_TOI; }
+        bool          is_toi()    const { return flags() & WriteSetNG::F_TOI; }
         bool          pa_unsafe() const
         { return flags() & WriteSetNG::F_PA_UNSAFE; }
         int           pa_range()  const { return header_.pa_range();  }
-        bool          certified() const { return header_.pa_range();  }
+        bool          certified() const
+        {
+            if (gu_likely(version() >= WriteSetNG::VER4))
+                return (flags() & WriteSetNG::F_CERTIFIED);
+            else
+                return (pa_range()); // VER3
+        }
         wsrep_seqno_t last_seen() const { return header_.last_seen(); }
         wsrep_seqno_t seqno()     const { return header_.seqno();     }
         long long     timestamp() const { return header_.timestamp(); }
