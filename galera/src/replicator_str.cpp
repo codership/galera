@@ -9,9 +9,10 @@
 namespace galera {
 
 bool
-ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
+ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
+                                       bool const rejoined)
 {
-    if (view_info.state_gap)
+    if (rejoined)
     {
         assert(view_info.view >= 0);
 

@@ -435,7 +435,8 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
-        bool state_transfer_required(const wsrep_view_info_t& view_info);
+        bool state_transfer_required(const wsrep_view_info_t& view_info,
+                                     bool rejoined);
 
         void prepare_for_IST (void*& req, ssize_t& req_len,
                               const wsrep_uuid_t& group_uuid,
@@ -529,13 +530,14 @@ namespace galera
         wsrep_seqno_t         pause_seqno_; // local seqno of last pause call
 
         // application callbacks
-        void*                 app_ctx_;
-        wsrep_view_cb_t       view_cb_;
-        wsrep_apply_cb_t      apply_cb_;
-        wsrep_commit_cb_t     commit_cb_;
-        wsrep_unordered_cb_t  unordered_cb_;
-        wsrep_sst_donate_cb_t sst_donate_cb_;
-        wsrep_synced_cb_t     synced_cb_;
+        void*                  app_ctx_;
+        wsrep_view_cb_t        view_cb_;
+        wsrep_sst_request_cb_t sst_request_cb_;
+        wsrep_apply_cb_t       apply_cb_;
+        wsrep_commit_cb_t      commit_cb_;
+        wsrep_unordered_cb_t   unordered_cb_;
+        wsrep_sst_donate_cb_t  sst_donate_cb_;
+        wsrep_synced_cb_t      synced_cb_;
 
         // SST
         std::string   sst_donor_;

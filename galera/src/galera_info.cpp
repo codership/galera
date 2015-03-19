@@ -15,8 +15,7 @@ view_info_size (int members)
 
 /* create view info out of configuration message */
 wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
-                                            wsrep_uuid_t&          my_uuid,
-                                            bool                   st_required)
+                                            wsrep_uuid_t&          my_uuid)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
         ::malloc(view_info_size(conf.memb_num)));
@@ -36,7 +35,6 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
         ret->view      = conf.conf_id;
         ret->status    = conf.conf_id != -1 ?
             WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
-        ret->state_gap = st_required;
         ret->my_idx    = -1;
         ret->memb_num  = conf.memb_num;
         ret->proto_ver = conf.appl_proto_ver;

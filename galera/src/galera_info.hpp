@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2015 Codership Oy <info@codership.com>
 
 #ifndef __GALERA_INFO_H__
 #define __GALERA_INFO_H__
@@ -11,8 +11,7 @@
  * otherwise set my_uuid according to conf.my_idx */
 extern wsrep_view_info_t*
 galera_view_info_create (const gcs_act_cchange& conf,
-                         wsrep_uuid_t&          my_uuid,
-                         bool                   st_required);
+                         wsrep_uuid_t&          my_uuid);
 
 /* make a copy of view info object */
 extern wsrep_view_info_t*

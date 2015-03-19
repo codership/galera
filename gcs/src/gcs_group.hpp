@@ -184,7 +184,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
             if (local) {
                 /* Let the sender know that it failed */
                 rcvd->id = -ERESTART;
-                gu_debug("Returning -ERESTART for TORDERED action: group->state"
+                gu_debug("Returning -ERESTART for WRITESET action: group->state"
                          " = %s, sender->status = %s, frag_reset = %s, "
                          "buf = %p",
                          gcs_group_state_str[group->state],

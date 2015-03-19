@@ -445,15 +445,16 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         else {
             const bool first_component =
 #ifndef GCS_CORE_TESTING
-                (0 == group->num) || bootstrap; // is bootstrap needed?
+                (0 == group->num) || bootstrap;
 #else
                 (0 == group->num);
 #endif
             if (1 == new_nodes_num && first_component) {
                 /* bootstrap new configuration */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
-                assert (0 == group->num);
-                assert (-1 == group->my_idx);
+                assert ((0 == group->num && -1 == group->my_idx) ||
+                        /* if first comp was non prim due to group expulsion */
+                        (1 == group->num &&  0 == group->my_idx));
 
                 // This bootstraps initial primary component for state exchange
                 gu_uuid_generate (&group->prim_uuid, NULL, 0);

@@ -215,7 +215,6 @@ namespace gcache
         bh->flags   = 0;
         bh->store   = BUFFER_IN_RB;
         bh->ctx     = reinterpret_cast<BH_ctx_t>(this);
-
         next_ = ret + size;
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));

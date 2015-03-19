@@ -150,7 +150,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     cc_lowest_trx_seqno_(WSREP_SEQNO_UNDEFINED),
     pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
-    view_cb_            (args->view_handler_cb),
+    view_cb_            (args->view_cb),
+    sst_request_cb_     (args->sst_request_cb),
     apply_cb_           (args->apply_cb),
     commit_cb_          (args->commit_cb),
     unordered_cb_       (args->unordered_cb),
@@ -396,11 +397,8 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
                 gcs_act_cchange const cc;
                 wsrep_uuid_t tmp(uuid_);
                 wsrep_view_info_t* const err_view
-                    (galera_view_info_create(cc, tmp, false));
-                void* fake_sst_req(0);
-                size_t fake_sst_req_len(0);
-                view_cb_(app_ctx_, recv_ctx, err_view, 0, 0,
-                         &fake_sst_req, &fake_sst_req_len);
+                    (galera_view_info_create(cc, tmp));
+                view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
                 free(err_view);
             }
             /* avoid abort in production */
@@ -1455,7 +1453,7 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 }
 
 static bool
-app_wants_state_transfer (const void* const req, ssize_t const req_len)
+app_waits_snapshot_transfer (const void* const req, ssize_t const req_len)
 {
     return req_len && (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
                        memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
@@ -1539,10 +1537,16 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     assert(!from_IST || WSREP_UUID_UNDEFINED != uuid_);
 
+    int const prev_protocol_version(protocol_version_);
+
+    if (conf.conf_id >= 0) // Primary configuration
+    {
+        establish_protocol_versions (conf.repl_proto_ver);
+        assert(!from_IST || conf.repl_proto_ver >= 8);
+    }
+
     wsrep_uuid_t new_uuid(uuid_);
-    wsrep_view_info_t* const view_info
-        (galera_view_info_create(conf, new_uuid,
-                                 conf.my_state == GCS_NODE_STATE_PRIM));
+    wsrep_view_info_t* const view_info(galera_view_info_create(conf, new_uuid));
 
     wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
     const wsrep_uuid_t& group_uuid (view_info->state_id.uuid);
@@ -1592,52 +1596,66 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     log_info << "####### processing CC " << cc.seqno_g
              << (from_IST ? ", from IST" : ", local");
 
-    bool const st_required(state_transfer_required(*view_info));
+    bool const st_required
+        (state_transfer_required(*view_info,
+                                 conf.my_state == GCS_NODE_STATE_PRIM));
+
+    void*  app_req(0);
+    size_t app_req_len(0);
+    bool   app_waits_sst(false); // this is probably unused.
+
     if (st_required)
     {
+        assert(!from_IST);
+
         log_info << "State transfer required: "
                  << "\n\tGroup state: " << group_uuid << ":" << group_seqno
                  << "\n\tLocal state: " << state_uuid_<< ":" << STATE_SEQNO();
 
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
+
+        wsrep_cb_status_t const rcode(sst_request_cb_(&app_req, &app_req_len));
+
+        if (WSREP_CB_SUCCESS != rcode)
+        {
+            assert(app_req_len <= 0);
+            log_fatal << "SST request callback failed. This is unrecoverable, "
+                      << "restart required.";
+            close();
+            abort();
+        }
+        else if (0 == app_req_len && state_uuid_ != group_uuid)
+        {
+            log_fatal << "Local state UUID " << state_uuid_
+                      << " is different from group state UUID " << group_uuid
+                      << ", and SST request is null: restart required.";
+            close();
+            abort();
+        }
+
+        app_waits_sst = app_waits_snapshot_transfer(app_req, app_req_len);
     }
-//remove
-    else log_info << "####### ST not required";
-
-    void*  app_req(0);
-    size_t app_req_len(0);
-
-    const_cast<wsrep_view_info_t*>(view_info)->state_gap = st_required;
-    wsrep_cb_status_t const rcode(
-        view_cb_(app_ctx_, recv_ctx, view_info, 0, 0, &app_req, &app_req_len));
-
-    if (WSREP_CB_SUCCESS != rcode)
+    else
     {
-        assert(app_req_len <= 0);
-        log_fatal << "View callback failed. This is unrecoverable, "
-                  << "restart required.";
-        close();
-        abort();
-    }
-    else if (st_required && 0 == app_req_len && state_uuid_ != group_uuid)
-    {
-        log_fatal << "Local state UUID " << state_uuid_
-                  << " is different from group state UUID " << group_uuid
-                  << ", and SST request is null: restart required.";
-        close();
-        abort();
+        log_info << "####### ST not required";
+
+        wsrep_cb_status_t const rcode
+            (view_cb_(app_ctx_, recv_ctx, view_info, 0, 0));
+
+        if (WSREP_CB_SUCCESS != rcode) // is this really fatal now?
+        {
+            log_fatal << "View callback failed. This is unrecoverable, "
+                      << "restart required.";
+            close();
+            abort();
+        }
     }
 
     Replicator::State const next_state(state2repl(conf));
 
-    if (view_info->view >= 0) // Primary configuration
+    if (conf.conf_id >= 0) // Primary configuration
     {
         assert(group_seqno > 0);
-
-        int prev_protocol_version(protocol_version_);
-        establish_protocol_versions (conf.repl_proto_ver);
-
-        bool const app_wants_st(app_wants_state_transfer(app_req, app_req_len));
 
         //
         // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
@@ -1650,12 +1668,18 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         //
         bool index_reset(protocol_version_ < 8 ||
                          prev_protocol_version != protocol_version_ ||
-                         (st_required && app_wants_st));
+                         // this last condition is a bit too strict. In fact
+                         // checking for app_waits_sst would be enough, but in
+                         // that case we'd have to skip cert index rebuilding
+                         // when there is none.
+                         // This would complicate the logic with little to no
+                         // benefits...
+                         st_required);
 
         if (index_reset)
         {
-            log_info << "Cert index reset " << protocol_version_
-                     << ", ST needed: " << (app_wants_st ? "yes" : "no");
+            log_info << "Cert index reset " << protocol_version_ <<
+                ", state transfer needed: " << (st_required ? "yes" : "no");
             cert_.assign_initial_position(
                 protocol_version_ < 8 ? STATE_SEQNO() : 0,
                 trx_params_.version_);
@@ -1687,36 +1711,25 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else if (conf.seqno > cert_.position())
         {
-            assert(!app_wants_st);
+            assert(!app_waits_sst);
             assert(group_uuid == conf.uuid);
             assert(group_seqno == cc.seqno_g);
             assert(group_seqno == conf.seqno);
-            assert(group_seqno >= cc_seqno_); //remove
 
             /* since CC does not pass certification, need to adjust cert
              * position explicitly (when processed in order) */
             cert_.adjust_position(conf.seqno, trx_params_.version_);
 
-            if (view_info->view == 1 || !app_wants_st) // seems to be always true
-            {
-                log_info << "####### Setting monitor position to "
-                         << group_seqno;
-                set_initial_position(group_uuid, group_seqno - 1);
-                cancel_seqno(group_seqno); // cancel CC seqno
-            }
-            else //remove
-            {
-                log_info << "####### Not setting monitor position to "
-                         << group_seqno + 1 << ", view = " << view_info->view
-                         << ", app_wants_st = " << app_wants_st;
-                assert(0);
-            }
+            log_info << "####### Setting monitor position to "
+                     << group_seqno;
+            set_initial_position(group_uuid, group_seqno - 1);
+            cancel_seqno(group_seqno); // cancel CC seqno
 
             if (!from_IST)
             {
                 /* CCs from IST already have seqno assigned and cert. position
                  * adjusted */
-                gu_trace(gcache_.seqno_assign(cc.buf, cc.seqno_g,
+                gu_trace(gcache_.seqno_assign(cc.buf, conf.seqno,
                                               GCS_ACT_CCHANGE, false));
 
                 if (state_() == S_CONNECTED || state_() == S_DONOR)
@@ -1786,7 +1799,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     else
     {
         // Non-primary configuration
-        assert(cc.seqno_g == WSREP_SEQNO_UNDEFINED);
+        assert(conf.seqno == WSREP_SEQNO_UNDEFINED);
 
         // reset sst_seqno_ every time we disconnct from PC
         sst_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -1823,7 +1836,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     free(view_info);
 
     if (conf.conf_id < 0 && conf.memb_num == 0) {
-        assert(cc.seqno_l);
+        assert(cc.seqno_l > 0);
         assert(S_CLOSING == next_state);
         log_debug << "Received SELF-LEAVE. Closing connection.";
         // called after being shifted to S_CLOSING state.
