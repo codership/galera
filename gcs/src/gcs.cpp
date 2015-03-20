@@ -26,6 +26,8 @@
 #include "gcs_sm.hpp"
 #include "gcs_gcache.hpp"
 
+#define min(a,b) (a <= b ? a : b)
+
 const char* gcs_node_state_to_str (gcs_node_state_t state)
 {
     static const char* str[GCS_NODE_STATE_MAX + 1] =

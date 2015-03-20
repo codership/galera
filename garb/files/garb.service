@@ -1,0 +1,23 @@
+# Systemd service file for garbd
+
+[Unit]
+Description=Galera Arbitrator Daemon
+After=network.target syslog.target
+
+[Install]
+WantedBy=multi-user.target
+Alias=garbd.service
+
+[Service]
+User=nobody
+EnvironmentFile=/etc/sysconfig/garb
+ExecStart=/usr/bin/garb-systemd start
+
+# Use SIGINT because with the default SIGTERM
+# garbd fails to reliably transition to 'destroyed' state
+KillSignal=SIGINT
+
+TimeoutSec=2m
+PrivateTmp=false
+
+

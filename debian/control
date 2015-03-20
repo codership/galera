@@ -1,0 +1,54 @@
+Source: percona-xtradb-cluster-galera-2.x
+Section: database
+Priority: extra
+Maintainer: Percona Server Development Team <mysql-dev@percona.com>
+Uploaders: Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+Build-Depends: debhelper (>= 7.0.50~), scons, libboost-dev (>= 1.41),
+    libssl-dev, check, libboost-program-options-dev (>= 1.41)
+Standards-Version: 7.0.0
+
+Package: percona-xtradb-cluster-galera-2.x
+Architecture: any
+Provides: percona-xtradb-cluster-galera-25, galera2
+Conflicts: galera, percona-xtradb-cluster-galera
+Replaces: galera, percona-xtradb-cluster-galera
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Galera components of Percona XtraDB Cluster
+ This package contains the Galera components required by Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-garbd-2.x
+Architecture: any
+Provides: garbd2
+Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
+Description: Garbd components of Percona XtraDB Cluster
+ This package contains the garbd of Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-galera-2.x-dbg
+Architecture: any
+Section: debug
+Depends: percona-xtradb-cluster-galera-2.x (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Galera 2.
+
+Package: percona-xtradb-cluster-garbd-2.x-dbg
+Architecture: any
+Section: debug
+Depends: percona-xtradb-cluster-garbd-2.x (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Garbd 2.
+
+Package: percona-xtradb-cluster-galera-2
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-galera-2.x (= ${binary:Version}), ${misc:Depends}
+Description: Metapackage for latest version of galera2.
+
+Package: percona-xtradb-cluster-garbd-2
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-garbd-2.x (= ${binary:Version}), ${misc:Depends}
+Description: Metapackage for latest version of garbd2.
+
+Package: percona-xtradb-cluster-galera2-dbg
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-galera-2.x-dbg (= ${binary:Version}), percona-xtradb-cluster-garbd-2.x-dbg (= ${binary:Version}), ${misc:Depends}
+Description: Metapackage for latest version of debug packages.

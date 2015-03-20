@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+export DH_VERBOSE=1
+
+%:
+	dh $@
+
+build:
+	scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd libgalera_smm.so $(SCONS_ARGS)
+
+override_dh_strip:
+	dh_strip -ppercona-xtradb-cluster-galera-2.x --dbg-package=percona-xtradb-cluster-galera-2.x-dbg
+	dh_strip -ppercona-xtradb-cluster-garbd-2.x --dbg-package=percona-xtradb-cluster-garbd-2.x-dbg
+
+override_dh_installinit:
+	dh_installinit -ppercona-xtradb-cluster-garbd-2.x  --name=garbd
+
+.PHONY: override_dh_strip override_dh_installinit

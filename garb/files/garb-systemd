@@ -1,0 +1,83 @@
+#!/bin/bash -ue
+#
+
+
+config=/etc/sysconfig/garb
+
+log_failure() {
+    echo " ERROR! $@"
+}
+
+
+
+program_start() {
+	echo "Starting garbd"
+        /usr/bin/garbd $* 
+}
+
+
+start() {
+
+	if grep -q -E '^# REMOVE' $config;then 
+	    log_failure "Garbd config $config is not configured yet"
+	    return 0
+	fi
+
+	# Check that node addresses are configured
+	if [[ -z "${GALERA_NODES:-}" ]]; then
+		log_failure "List of GALERA_NODES is not configured"
+		return 6
+	fi
+	if [[ -z "${GALERA_GROUP:-}" ]]; then
+		log_failure "GALERA_GROUP name is not configured"
+		return 6
+	fi
+
+	GALERA_PORT=${GALERA_PORT:-4567}
+
+	# Find a working node
+	for ADDRESS in ${GALERA_NODES} 0; do
+		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
+		PORT=$(echo $ADDRESS | cut -s -d \: -f 2 )
+		PORT=${PORT:-$GALERA_PORT}
+		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
+                    nc -z $HOST $PORT >/dev/null && break
+                elif [[ -x `which nmap` ]];then
+                    nmap -Pn -p$PORT $HOST | awk "\$1 ~ /$PORT/ {print \$2}" | grep -q open && break
+                else
+                    log_failure "Neither netcat nor nmap are present for zero I/O scanning"
+                    return 1
+                fi
+	done
+	if [ ${ADDRESS} == "0" ]; then
+		log_failure "None of the nodes in $GALERA_NODES is accessible"
+		return 1
+	fi
+
+        if [[ $ADDRESS != *:* ]];then
+            OPTIONS="-d -a gcomm://$ADDRESS:$GALERA_PORT"
+        else
+            OPTIONS="-d -a gcomm://$ADDRESS"
+        fi
+
+	OPTIONS=" -a gcomm://$ADDRESS "
+	[ -n "${GALERA_GROUP:-}" ]   && OPTIONS="$OPTIONS -g $GALERA_GROUP"
+	[ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o $GALERA_OPTIONS"
+	[ -n "${LOG_FILE:-}" ]       && OPTIONS="$OPTIONS -l $LOG_FILE"
+
+	program_start $OPTIONS
+}
+
+
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  *)
+	echo $"Usage: $0 {start}"
+	exit 2
+esac
+
+exit $?

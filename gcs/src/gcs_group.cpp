@@ -849,6 +849,10 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
     const char* begin = str;
     const char* end;
     int err = -EHOSTDOWN; /* worst error */
+    bool dcomma = false; /* dangling comma */
+
+    if (!strcmp(str+strlen(str)-1,","))
+        dcomma = true;
 
     do {
         end = strchr(begin, ',');
@@ -867,8 +871,10 @@ group_for_each_donor_in_string (gcs_group_t* const group, int const joiner_idx,
         int const idx = len > 0 ? /* consider empty name as "any" */
             group_find_node_by_name (group, joiner_idx, begin, len, status) :
             /* err == -EAGAIN here means that at least one of the nodes in the
-             * list will be available later, so don't try others. */
-            (err == -EAGAIN ?
+             * list will be available later, so don't try others.
+             * Also, dangling comma is checked to see if fallback is attempted 
+             * or not */
+            ((err == -EAGAIN && !dcomma) ?
              err : group_find_node_by_state(group, status));
 
         if (idx >= 0) return idx;

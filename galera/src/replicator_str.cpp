@@ -754,7 +754,15 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     // processed on donor, just adjust states here
                     trx->set_state(TrxHandle::S_REPLICATING);
                     trx->set_state(TrxHandle::S_CERTIFYING);
-                    apply_trx(recv_ctx, trx);
+                    try 
+                    {
+                        apply_trx(recv_ctx, trx);
+                    }
+                    catch (gu::Exception& e)
+                    {
+                        st_.mark_corrupt();
+                        throw;
+                    }
                 }
             }
             else
