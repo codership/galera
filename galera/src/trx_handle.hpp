@@ -72,7 +72,7 @@ namespace galera
                 WSREP_FLAG_ROLLBACK == int(F_ROLLBACK) && F_ROLLBACK == 2,
                 flags_dont_match1);
 
-            uint32_t ret(flags & 0x03); // setting F_COMMIT|F_ROLLBACK in one go
+            uint32_t ret(flags & COMMON_FLAGS_MASK);
 
             if (flags & WSREP_FLAG_ISOLATION)   ret |= F_ISOLATION;
             if (flags & WSREP_FLAG_PA_UNSAFE)   ret |= F_PA_UNSAFE;
@@ -328,7 +328,7 @@ namespace galera
 
             if (new_version())
             {
-                uint16_t ws_flags(flags & 0x07);
+                uint16_t ws_flags(flags & COMMON_FLAGS_MASK);
                 if (flags & F_ISOLATION) ws_flags |= WriteSetNG::F_TOI;
                 if (flags & F_PA_UNSAFE) ws_flags |= WriteSetNG::F_PA_UNSAFE;
                 write_set_out().set_flags(ws_flags);
@@ -610,6 +610,8 @@ namespace galera
         }
 
     private:
+
+        static uint32_t const COMMON_FLAGS_MASK = 0x03;
 
         /* slave trx ctor */
         explicit
