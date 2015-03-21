@@ -549,15 +549,15 @@ namespace galera
                 log_debug << "received header: " << n << " bytes, type "
                           << msg.type() << " len " << msg.len();
 
-                size_t offset(0);
-
                 switch (msg.type())
                 {
                 case Message::T_TRX:
                 case Message::T_CCHANGE:
                 case Message::T_SKIP:
                 {
+                    size_t offset(0);
                     int64_t seqno_g(msg.seqno());  // compatibility with 3.x
+
                     if (gu_unlikely(version_ < 8)) // compatibility with 3.x
                     {
                         assert(msg.type() == Message::T_TRX);
@@ -627,9 +627,17 @@ namespace galera
                         }
                     }
 
+                    /* Backward compatibility code above could change msg type.
+                     * but it should not change below. Saving const for later
+                     * assert(). */
+                    Message::Type const msg_type(msg.type());
+                    gcs_act_type const  gcs_type
+                        (msg_type == Message::T_CCHANGE ?
+                         GCS_ACT_CCHANGE : GCS_ACT_WRITESET);
+
                     if (!already_cached)
                     {
-                        if (gu_likely(msg.type() != Message::T_SKIP))
+                        if (gu_likely(msg_type != Message::T_SKIP))
                         {
                             wsize = msg.len() - offset;
 
@@ -651,12 +659,13 @@ namespace galera
                             wbuf  = gcache_.malloc(wsize);
                         }
 
-                        gcache_.seqno_assign(wbuf, msg.seqno(),
-                                             gcs_type(msg.type()),
-                                             msg.type() == Message::T_SKIP);
+                        gcache_.seqno_assign(wbuf, msg.seqno(), gcs_type,
+                                             msg_type == Message::T_SKIP);
                     }
 
-                    switch(msg.type())
+                    assert(msg.type() == msg_type);
+
+                    switch(msg_type)
                     {
                     case Message::T_TRX:
                     case Message::T_CCHANGE:
@@ -664,7 +673,7 @@ namespace galera
                         act.size = wsize;
                     case Message::T_SKIP:
                         act.seqno_g = msg.seqno(); // not EOF
-                        act.type    = gcs_type(msg.type());
+                        act.type    = gcs_type;
                         break;
                     default:
                         assert(0);
@@ -722,8 +731,9 @@ namespace galera
                         return (version_ >= 8 ?
                                 Message::T_CCHANGE : Message::T_SKIP);
                     default:
-                        log_error << "Unsupported message type from cache. "
-                                  << "Skipping seqno " << buf.seqno_g();
+                        log_error << "Unsupported message type from cache: "
+                                  << buf.type()
+                                  << ". Skipping seqno " << buf.seqno_g();
                         assert(0);
                         return  Message::T_SKIP;
                     }
@@ -732,19 +742,6 @@ namespace galera
                 {
                     return Message::T_SKIP;
                 }
-            }
-
-            gcs_act_type
-            gcs_type(Message::Type t) const
-            {
-                switch(t)
-                {
-                case Message::T_TRX:
-                case Message::T_SKIP:
-                    return GCS_ACT_WRITESET;
-                case Message::T_CCHANGE:
-                    return GCS_ACT_CCHANGE;
-                };
             }
         };
     }
