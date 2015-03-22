@@ -19,6 +19,7 @@ libgaleraxx_srcs = [
     'gcs_action_source.cpp',
     'galera_info.cpp',
     'replicator.cpp',
+    'ist_proto.cpp',
     'ist.cpp',
     'gcs_dummy.cpp',
     'saved_state.cpp' ]

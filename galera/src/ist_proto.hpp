@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2015 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
@@ -75,12 +75,12 @@ namespace galera
                 ctrl_   (ctrl   )
             {}
 
-            int      version() const { return version_; }
-            Type     type()    const { return type_   ; }
-            uint8_t  flags()   const { return flags_  ; }
-            int8_t   ctrl()    const { return ctrl_   ; }
-            uint32_t len()     const { return len_    ; }
-            wsrep_seqno_t seqno() const { return seqno_; }
+            int           version() const { return version_; }
+            Type          type()    const { return type_   ; }
+            uint8_t       flags()   const { return flags_  ; }
+            int8_t        ctrl()    const { return ctrl_   ; }
+            uint32_t      len()     const { return len_    ; }
+            wsrep_seqno_t seqno()   const { return seqno_  ; }
 
             void set_type_seqno(Type t, wsrep_seqno_t s)
             {
@@ -93,7 +93,7 @@ namespace galera
                 {
                     // header: version 1 byte, type 1 byte, flags 1 byte,
                     //         ctrl field 1 byte, length 4 bytes, seqno 8 bytes
-                    return 4 + 4 + 8;
+                    return 4 + 4 + 8 + sizeof(checksum_t);
                 }
                 else
                 {
@@ -106,9 +106,9 @@ namespace galera
             size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
             {
                 assert(version_ >= 4);
-#ifndef NDEBUG
-                size_t orig_offset(offset);
-#endif // NDEBUG
+
+                size_t const orig_offset(offset);
+
                 offset = gu::serialize1(uint8_t(version_), buf, buflen, offset);
                 offset = gu::serialize1(uint8_t(type_), buf, buflen, offset);
                 offset = gu::serialize1(flags_, buf, buflen, offset);
@@ -118,6 +118,11 @@ namespace galera
                 {
                     offset = gu::serialize4(len_,   buf, buflen, offset);
                     offset = gu::serialize8(seqno_, buf, buflen, offset);
+
+                    *reinterpret_cast<checksum_t*>(buf + offset) =
+                        htog_checksum(buf + orig_offset, offset - orig_offset);
+
+                    offset += sizeof(checksum_t);
                 }
                 else /**/
                 {
@@ -134,18 +139,13 @@ namespace galera
                                size_t offset)
             {
                 assert(version_ >= 4);
-#ifndef NDEBUG
+
                 size_t orig_offset(offset);
-#endif // NDEBUG
+
                 uint8_t u8;
                 offset = gu::unserialize1(buf, buflen, offset, u8);
 
-                if (u8 != version_)
-                {
-                    gu_throw_error(EPROTO) << "invalid protocol version "
-                                           << int(u8)
-                                           << ", expected " << version_;
-                }
+                if (gu_unlikely(u8 != version_)) throw_invalid_version(u8);
 
                 offset = gu::unserialize1(buf, buflen, offset, u8);
                 type_  = static_cast<Message::Type>(u8);
@@ -156,6 +156,16 @@ namespace galera
                 {
                     offset = gu::unserialize4(buf, buflen, offset, len_);
                     offset = gu::unserialize8(buf, buflen, offset, seqno_);
+
+                    checksum_t const computed(htog_checksum(buf + orig_offset,
+                                                            offset-orig_offset));
+                    const checksum_t* expected
+                        (reinterpret_cast<const checksum_t*>(buf + offset));
+
+                    if (gu_unlikely(computed != *expected))
+                        throw_corrupted_header();
+
+                    offset += sizeof(checksum_t);
                 }
                 else
                 {
@@ -178,7 +188,23 @@ namespace galera
             uint8_t  version_;
             uint8_t  flags_;
             int8_t   ctrl_;
+
+            typedef uint64_t checksum_t;
+
+            // returns endian-adjusted checksum of buf
+            static checksum_t
+            htog_checksum(const void* const buf, size_t const size)
+            {
+                return
+                    gu::htog<checksum_t>(gu::FastHash::digest<checksum_t>(buf,
+                                                                          size));
+            }
+
+            void throw_invalid_version(uint8_t v);
+            void throw_corrupted_header();
         };
+
+        std::ostream& operator<< (std::ostream& os, const Message& m);
 
         class Handshake : public Message
         {

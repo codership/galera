@@ -28,7 +28,7 @@ public:
     ~MMH3 () {}
 
     template <typename T> static int
-    digest (const void* const in, size_t size, T& out)
+    digest (const void* const in, size_t const size, T& out)
     {
         byte_t tmp[16];
         gu_mmh128(in, size, tmp);
@@ -39,7 +39,7 @@ public:
 
     /* experimental */
     template <typename T> static T
-    digest (const void* const in, size_t size)
+    digest (const void* const in, size_t const size)
     {
         switch (sizeof(T))
         {
@@ -56,7 +56,7 @@ public:
         gu_mmh128_append (&ctx_, buf, size);
     }
 
-    template <size_t size>
+    template <size_t const size>
     int  gather (void* const buf) const
     {
         GU_COMPILE_ASSERT(size >= 16, wrong_buf_size);
@@ -90,25 +90,25 @@ private:
 }; /* class MMH3 */
 
 template <> inline int
-MMH3::digest (const void* const in, size_t size, uint8_t& out)
+MMH3::digest (const void* const in, size_t const size, uint8_t& out)
 {
     out = gu_mmh128_32(in, size); return sizeof(out);
 }
 
 template <> inline int
-MMH3::digest (const void* const in, size_t size, uint16_t& out)
+MMH3::digest (const void* const in, size_t const size, uint16_t& out)
 {
     out = gu_mmh128_32(in, size); return sizeof(out);
 }
 
 template <> inline int
-MMH3::digest (const void* const in, size_t size, uint32_t& out)
+MMH3::digest (const void* const in, size_t const size, uint32_t& out)
 {
     out = gu_mmh128_32(in, size); return sizeof(out);
 }
 
 template <> inline int
-MMH3::digest (const void* const in, size_t size, uint64_t& out)
+MMH3::digest (const void* const in, size_t const size, uint64_t& out)
 {
     out = gu_mmh128_64(in, size); return sizeof(out);
 }
@@ -133,7 +133,7 @@ class FastHash
 public:
 
     template <typename T> static int
-    digest (const void* const in, size_t size, T& out)
+    digest (const void* const in, size_t const size, T& out)
     {
         byte_t tmp[16];
         gu_fast_hash128(in, size, tmp);
@@ -144,41 +144,86 @@ public:
 
     /* experimental */
     template <typename T> static T
-    digest (const void* const in, size_t size)
-    {
-        switch (sizeof(T))
-        {
-        case 1:  return gu_fast_hash32(in, size);
-        case 2:  return gu_fast_hash32(in, size);
-        case 4:  return gu_fast_hash32(in, size);
-        case 8:  return gu_fast_hash64(in, size);
-        }
-        throw;
-    }
+    digest (const void* const in, size_t const size);
+    /* The above is undefined and should cause linking error in case that
+     * template gets instantiated instead of specialized ones below.
+     * Unfortunately GU_COMPILE_ASSERT() is unusable here - causes compilation
+     * errors in every unit that only includes this header (probably because
+     * method is static).
+     * Perhaps templating the class would have done the trick */
+
 }; /* FastHash */
 
 template <> inline int
-FastHash::digest (const void* const in, size_t size, uint8_t& out)
+FastHash::digest (const void* const in, size_t const size, uint8_t& out)
 {
     out = gu_fast_hash32(in, size);  return sizeof(out);
 }
 
 template <> inline int
-FastHash::digest (const void* const in, size_t size, uint16_t& out)
+FastHash::digest (const void* const in, size_t const size, uint16_t& out)
 {
     out = gu_fast_hash32(in, size);  return sizeof(out);
 }
 
 template <> inline int
-FastHash::digest (const void* const in, size_t size, uint32_t& out)
+FastHash::digest (const void* const in, size_t const size, uint32_t& out)
 {
     out = gu_fast_hash32(in, size);  return sizeof(out);
 }
 
 template <> inline int
-FastHash::digest (const void* const in, size_t size, uint64_t& out)
+FastHash::digest (const void* const in, size_t const size, uint64_t& out)
 {
     out = gu_fast_hash64(in, size);  return sizeof(out);
+}
+
+template <> inline uint8_t
+FastHash::digest<uint8_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline uint16_t
+FastHash::digest<uint16_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline uint32_t
+FastHash::digest<uint32_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline uint64_t
+FastHash::digest<uint64_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash64(in, size);
+}
+
+template <> inline int8_t
+FastHash::digest<int8_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline int16_t
+FastHash::digest<int16_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline int32_t
+FastHash::digest<int32_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash32(in, size);
+}
+
+template <> inline int64_t
+FastHash::digest<int64_t>(const void* const in, size_t const size)
+{
+    return gu_fast_hash64(in, size);
 }
 
 } /* namespace gu */
