@@ -816,13 +816,16 @@ _join (gcs_conn_t* conn, gcs_seqno_t seqno)
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
 static void
-gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
+gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd* rcvd)
 {
+    const gcs_act& act(rcvd->act);
     gcs_act_cchange const conf(act.buf, act.buf_len);
 
-    long ret;
+    assert(rcvd->id >= 0 || 0 == conf.memb.size());
 
-    conn->my_idx = conf.my_idx;
+    conn->my_idx = rcvd->id;
+
+    long ret;
 
     gu_fifo_lock(conn->recv_q);
     {
@@ -831,7 +834,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
             conn->stop_sent   = 0;
             conn->stop_count  = 0;
             conn->conf_id     = conf.conf_id;
-            conn->memb_num    = conf.memb_num;
+            conn->memb_num    = conf.memb.size();
 
             _set_fc_limits (conn);
 
@@ -850,14 +853,14 @@ gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
     gu_fifo_release (conn->recv_q);
 
     if (conf.conf_id < 0) {
-        if (0 == conf.memb_num) {
-            assert (conf.my_idx < 0);
+        if (0 == conn->memb_num) {
+            assert (conn->my_idx < 0);
             gu_info ("Received SELF-LEAVE. Closing connection.");
             gcs_shift_state (conn, GCS_CONN_CLOSED);
         }
         else {
             gu_info ("Received NON-PRIMARY.");
-            assert (GCS_NODE_STATE_NON_PRIM == conf.my_state);
+            assert (GCS_NODE_STATE_NON_PRIM == conf.memb[conn->my_idx].state_);
             gcs_become_open (conn);
             conn->global_seqno = conf.seqno;
         }
@@ -868,19 +871,21 @@ gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
     assert (conf.conf_id  >= 0);
 
     /* <sanity_checks> */
-    if (conf.memb_num < 1) {
+    if (conn->memb_num < 1) {
+        assert(0);
         gu_fatal ("Internal error: PRIMARY configuration with %d nodes",
-                  conf.memb_num);
+                  conn->memb_num);
         abort();
     }
 
-    if (conf.my_idx < 0 || conf.my_idx >= conf.memb_num) {
+    if (conn->my_idx < 0 || conn->my_idx >= conn->memb_num) {
+        assert(0);
         gu_fatal ("Internal error: index of this node (%d) is out of bounds: "
-                  "[%d, %d]", conf.my_idx, 0, conf.memb_num - 1);
+                  "[%d, %d]", conn->my_idx, 0, conn->memb_num - 1);
         abort();
     }
 
-    if (conf.my_state < GCS_NODE_STATE_PRIM) {
+    if (conf.memb[conn->my_idx].state_ < GCS_NODE_STATE_PRIM) {
         gu_fatal ("Internal error: NON-PRIM node state in PRIM configuraiton");
         abort();
     }
@@ -893,7 +898,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
 // Ticket #600: commented out as unsafe under load    _reset_pkt_size(conn);
 
     const gcs_conn_state_t old_state = conn->state;
-    switch (conf.my_state) {
+
+    switch (conf.memb[conn->my_idx].state_)
+    {
     case GCS_NODE_STATE_PRIM:   gcs_become_primary(conn);      return;
         /* Below are not real state transitions, rather state recovery,
          * so bypassing state transition matrix */
@@ -903,7 +910,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const gcs_act& act)
     case GCS_NODE_STATE_SYNCED: conn->state = GCS_CONN_SYNCED; break;
     default:
         gu_fatal ("Internal error: unrecognized node state: %d",
-                  conf.my_state);
+                  conf.memb[conn->my_idx].state_);
         abort();
     }
 
@@ -1004,7 +1011,7 @@ gcs_handle_actions (gcs_conn_t*          conn,
         gcs_handle_flow_control (conn, (const gcs_fc_event*)rcvd->act.buf);
         break;
     case GCS_ACT_CCHANGE:
-        gcs_handle_act_conf (conn, rcvd->act);
+        gcs_handle_act_conf (conn, rcvd);
         ret = 1;
         break;
     case GCS_ACT_STATE_REQ:

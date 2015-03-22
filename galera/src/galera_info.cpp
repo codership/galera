@@ -5,6 +5,8 @@
 #include <galerautils.h>
 #include <string.h>
 
+#include <vector>
+
 using namespace galera;
 
 static size_t
@@ -15,57 +17,51 @@ view_info_size (int members)
 
 /* create view info out of configuration message */
 wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
+                                            int const              my_idx,
                                             wsrep_uuid_t&          my_uuid)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
-        ::malloc(view_info_size(conf.memb_num)));
+        ::malloc(view_info_size(conf.memb.size())));
 
     if (ret)
     {
-        const char* str = conf.memb;
-        int m;
-
-        wsrep_uuid_t  uuid;
-        memcpy(uuid.data, conf.uuid.data, sizeof(uuid.data));
-        wsrep_seqno_t seqno = conf.seqno != GCS_SEQNO_ILL ?
-            conf.seqno : WSREP_SEQNO_UNDEFINED;
-        wsrep_gtid_t  gtid  = { uuid, seqno };
+        wsrep_uuid_t  const uuid(to_wsrep_uuid(conf.uuid));
+        wsrep_seqno_t const seqno
+            (conf.seqno != GCS_SEQNO_ILL ? conf.seqno : WSREP_SEQNO_UNDEFINED);
+        wsrep_gtid_t const gtid = { uuid, seqno };
 
         ret->state_id  = gtid;
         ret->view      = conf.conf_id;
         ret->status    = conf.conf_id != -1 ?
             WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
         ret->my_idx    = -1;
-        ret->memb_num  = conf.memb_num;
+        ret->memb_num  = conf.memb.size();
         ret->proto_ver = conf.appl_proto_ver;
 
-        for (m = 0; m < ret->memb_num; m++) {
-            wsrep_member_info_t* member = &ret->members[m];
+        for (int m = 0; m < ret->memb_num; ++m)
+        {
+            const gcs_act_cchange::member& cm(conf.memb[m]);    // from
+            wsrep_member_info_t&           wm(ret->members[m]); // to
 
-            size_t id_len = strlen(str);
-            gu_uuid_scan (str, id_len,reinterpret_cast<gu_uuid_t*>(&member->id));
-            str = str + id_len + 1;
+            wm.id = to_wsrep_uuid(cm.uuid_);
 
-            if (member->id == my_uuid)
+            if (wm.id == my_uuid)
             {
                 ret->my_idx = m;
             }
 
-            strncpy(member->name, str, sizeof(member->name) - 1);
-            member->name[sizeof(member->name) - 1] = '\0';
-            str = str + strlen(str) + 1;
+            strncpy(wm.name, cm.name_.c_str(), sizeof(wm.name) - 1);
+            wm.name[sizeof(wm.name) - 1] = '\0';
 
-            strncpy(member->incoming, str, sizeof(member->incoming) - 1);
-            member->incoming[sizeof(member->incoming) - 1] = '\0';
-            str = str + strlen(str) + 1;
+            strncpy(wm.incoming, cm.incoming_.c_str(), sizeof(wm.incoming) - 1);
+            wm.incoming[sizeof(wm.incoming) - 1] = '\0';
 
-            str += sizeof(gcs_seqno_t); // skip cached seqno.
         }
 
-        if (WSREP_UUID_UNDEFINED == my_uuid && conf.my_idx >= 0)
+        if (WSREP_UUID_UNDEFINED == my_uuid && my_idx >= 0)
         {
             assert(-1 == ret->my_idx);
-            ret->my_idx = conf.my_idx;
+            ret->my_idx = my_idx;
             assert(ret->my_idx < ret->memb_num);
             my_uuid = ret->members[ret->my_idx].id;
         }

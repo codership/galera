@@ -113,7 +113,12 @@ public:
         return sizeof(gu_uuid_t);
     }
 
-    const gu_uuid_t* uuid_ptr() const
+    const gu_uuid_t* ptr() const
+    {
+        return &uuid_;
+    }
+
+    gu_uuid_t* ptr()
     {
         return &uuid_;
     }
@@ -155,6 +160,12 @@ public:
             gu_throw_error(EINVAL) << "could not parse UUID from '" << str
                                    << '\'' ;
         return is;
+    }
+
+    UUID& operator=(const gu_uuid_t& other)
+    {
+        uuid_ = other;
+        return *this;
     }
 
 protected:

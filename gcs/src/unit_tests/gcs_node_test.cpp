@@ -5,6 +5,7 @@
  */
 
 #include <check.h>
+#undef fail // needed by STL
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>

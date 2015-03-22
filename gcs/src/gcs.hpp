@@ -20,9 +20,12 @@
 #include "gu_buf.h"
 #include "gcache.h"
 #include "gu_errno.h"
-#include "gu_uuid.h"
+#include "gu_uuid.hpp"
 
 #include "gu_status.hpp"
+
+#include <vector>
+#include <string>
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -404,31 +407,32 @@ gcs_node_state_t;
 extern const char*
 gcs_node_state_to_str (gcs_node_state_t state);
 
-/*! New configuration action */
+/*! New configuration action deserialized */
 struct gcs_act_cchange
 {
     gcs_act_cchange();
     gcs_act_cchange(const void* buf, int size);
-    ~gcs_act_cchange();
-    int write(void** buf) const; // buf allocated by malloc().
 
+    int write(void** buf) const;
     bool operator==(const gcs_act_cchange& other) const;
 
+    struct member
+    {
+        member() : uuid_(), name_(), incoming_(), cached_(), state_() {}
+        bool operator==(const member& other) const;
+        gu_uuid_t      uuid_;
+        std::string    name_;
+        std::string    incoming_;
+        gcs_seqno_t    cached_;
+        gcs_node_state state_;
+    };
+
+    std::vector<member> memb;
     gu_uuid_t        uuid;     //! group UUID
     gcs_seqno_t      seqno;    //! last global seqno applied by this group
     gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
-    char*            memb;     /*! member array (null-terminated ID, name,
-                                *  incoming address, 8-byte cached seqno) */
-    int              memb_size;//! size of member array (bytes)
-    int              memb_num; //! number of members in configuration
-    int              my_idx;   //! index of this node in the configuration
     int              repl_proto_ver; //! replicator  protocol version to use
     int              appl_proto_ver; //! application protocol version to use
-    gcs_node_state_t my_state; //! current node state
-
-private:
-    gcs_act_cchange(const gcs_act_cchange&);
-    gcs_act_cchange& operator=(const gcs_act_cchange&);
 };
 
 std::ostream&

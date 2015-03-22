@@ -1,8 +1,9 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2015 Codership Oy <info@codership.com>
 //
 
 #include "galera_gcs.hpp"
+#include "uuid.hpp"
 
 namespace galera
 {
@@ -74,31 +75,33 @@ namespace galera
     {
         gcs_act_cchange cc;
 
+        gcs_node_state_t const my_state
+            (primary ? GCS_NODE_STATE_JOINED : GCS_NODE_STATE_NON_PRIM);
+
         if (primary)
         {
             ++global_seqno_;
-            cc.seqno = global_seqno_;
+
+            cc.seqno   = global_seqno_;
             cc.conf_id = 1;
-            memcpy (cc.uuid.data, &uuid_, sizeof(uuid_));
-            cc.memb_num = 1;
-            cc.my_idx = 0;
-            cc.my_state = GCS_NODE_STATE_JOINED;
+            cc.uuid    = uuid_;
             cc.repl_proto_ver = repl_proto_ver_;
             cc.appl_proto_ver = appl_proto_ver_;
 
-            char* const str(cc.memb);
-            ssize_t offt(0);
-            offt += gu_uuid_print (&uuid_, str, GU_UUID_STR_LEN+1) + 1;
-            offt += sprintf (str + offt, "%s", my_name_.c_str()) + 1;
-            sprintf (str + offt, "%s", incoming_.c_str());
+            /* we have single member here */
+            gcs_act_cchange::member m;
+
+            m.uuid_     = uuid_;
+            m.name_     = my_name_;
+            m.incoming_ = incoming_;
+            m.state_    = my_state;
+
+            cc.memb.push_back(m);
         }
         else
         {
             cc.seqno    = GCS_SEQNO_ILL;
             cc.conf_id  = -1;
-            cc.memb_num = 0;
-            cc.my_idx   = -1;
-            cc.my_state = GCS_NODE_STATE_NON_PRIM;
         }
 
         cc_size_ = cc.write(&cc_);
@@ -108,7 +111,6 @@ namespace galera
             cc_size_ = 0;
             return -ENOMEM;
         }
-
 
         return cc_size_;
     }
@@ -124,7 +126,6 @@ namespace galera
 
         if (ret > 0)
         {
-            //          state_ = S_CONNECTED;
             cond_.signal();
             ret = 0;
         }
@@ -204,14 +205,18 @@ namespace galera
 
                 gcs_act_cchange const cc(act.buf, act.size);
 
-                if (cc.my_idx < 0)
+                act.seqno_g = (cc.conf_id >= 0 ? 0 : -1);
+
+                int const my_idx(act.seqno_g);
+
+                if (my_idx < 0)
                 {
-                    assert (0 == cc.memb_num);
+                    assert (0 == cc.memb.size());
                     state_ = S_CLOSED;
                 }
                 else
                 {
-                    assert (1 == cc.memb_num);
+                    assert (1 == cc.memb.size());
                     state_ = S_CONNECTED;
                 }
 

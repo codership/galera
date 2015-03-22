@@ -434,13 +434,15 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     long ret;
     static gcs_seqno_t conf_id = 0;
     gcs_act_cchange const conf(thread->act.buf, thread->act.size);
+    int const my_idx(thread->act.seqno_g);
+    gcs_node_state my_state(conf.memb[my_idx].state_);
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
 
     fprintf (stdout, "Got GCS_ACT_CCHANGE: Conf: %lld, "
-             "seqno: %lld, members: %d, my idx: %d, local seqno: %lld\n",
+             "seqno: %lld, members: %zd, my idx: %d, local seqno: %lld\n",
              (long long)conf.conf_id, (long long)conf.seqno,
-             conf.memb_num, conf.my_idx, (long long)thread->act.seqno_l);
+             conf.memb.size(), my_idx, (long long)thread->act.seqno_l);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
@@ -448,7 +450,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     //       so for simplicity, just check conf_id.
     while (-EAGAIN == (ret = gu_to_grab (to, thread->act.seqno_l)));
     if (0 == ret) {
-        if (conf.my_state == GCS_NODE_STATE_PRIM) {
+        if (my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
             fprintf (stdout,"Gap in configurations: ours: %lld, group: %lld.\n",
                      (long long)conf_id, (long long)conf.conf_id);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -177,9 +177,18 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
         FAIL_IF (GCS_ACT_WRITESET != act->type && GCS_ACT_CCHANGE != act->type,
                  "GCS_ACT_WRITESET != act->type (%d), while act->seqno: %lld",
                  act->type, (long long)act->seqno);
-        FAIL_IF ((*seqno + 1) != act->seqno,
-                 "expected seqno %lld, got %lld",
-                 (long long)(*seqno + 1), (long long)act->seqno);
+        if (GCS_ACT_CCHANGE != act->type)
+        {
+            FAIL_IF ((*seqno + 1) != act->seqno,
+                     "expected seqno %lld, got %lld",
+                     (long long)(*seqno + 1), (long long)act->seqno);
+        }
+        else
+        {
+            FAIL_IF (act->seqno < 0, "Negative seqno: %lld",
+                     (long long)act->seqno);
+        }
+
         *seqno = *seqno + 1;
     }
 
@@ -280,7 +289,7 @@ static bool CORE_SEND_END(action_t* act, long ret)
 // check if configuration is the one that we expected
 static long
 core_test_check_conf (const void* const conf_msg, int const conf_size,
-                      bool prim, long my_idx, long memb_num)
+                      bool const prim, long const my_idx, size_t const memb_num)
 {
     long ret = 0;
 
@@ -293,13 +302,8 @@ core_test_check_conf (const void* const conf_msg, int const conf_size,
         ret = -1;
     }
 
-    if (conf.my_idx != my_idx) {
-        gu_error ("Expected my_idx = %ld, got %ld", my_idx, conf.my_idx);
-        ret = -1;
-    }
-
-    if (conf.my_idx != my_idx) {
-        gu_error ("Expected my_idx = %ld, got %ld", my_idx, conf.my_idx);
+    if (conf.memb.size() != memb_num) {
+        gu_error ("Expected memb_num = %zd, got %zd", memb_num,conf.memb.size());
         ret = -1;
     }
 

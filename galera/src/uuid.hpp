@@ -22,6 +22,16 @@ namespace galera
         return *reinterpret_cast<gu_uuid_t*>(&uuid);
     }
 
+    inline const wsrep_uuid_t& to_wsrep_uuid(const gu_uuid_t& uuid)
+    {
+        return *reinterpret_cast<const wsrep_uuid_t*>(&uuid);
+    }
+
+    inline wsrep_uuid_t& to_wsrep_uuid(gu_uuid_t& uuid)
+    {
+        return *reinterpret_cast<wsrep_uuid_t*>(&uuid);
+    }
+
     inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
     {
         return to_gu_uuid(a) == to_gu_uuid(b);
