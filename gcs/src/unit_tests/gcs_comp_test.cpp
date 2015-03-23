@@ -1,19 +1,15 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <check.h>
-#include <errno.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <galerautils.h>
 
 #define  GCS_COMP_MSG_ACCESS
 #include "../gcs_comp_msg.hpp"
-#include "gcs_comp_test.hpp"
+
+#include "gcs_comp_test.hpp" // must be included last
 
 
 static gcs_comp_memb_t const members[] =

@@ -1,16 +1,11 @@
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 
 // $Id$
 
 
 #include "../gcs_sm.hpp"
 
-#include <check.h>
-#include <string.h>
-
-#include "gcs_sm_test.hpp"
-
-
+#include "gcs_sm_test.hpp" // must be included last
 
 #define TEST_USLEEP 10000
 

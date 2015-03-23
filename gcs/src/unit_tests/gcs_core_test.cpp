@@ -36,9 +36,6 @@
  *
  */
 
-#include "gcs_core_test.hpp"
-#undef fail
-
 #include "gcs_test_utils.hpp"
 
 #define GCS_STATE_MSG_ACCESS
@@ -49,8 +46,7 @@
 
 #include <galerautils.h>
 
-#include <errno.h>
-#include <stdlib.h>
+#include "gcs_core_test.hpp" // must be included last
 
 extern ssize_t gcs_tests_get_allocated();
 

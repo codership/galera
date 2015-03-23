@@ -4,11 +4,6 @@
  * $Id$
  */
 
-#include <check.h>
-#undef fail // needed by STL
-
-#include "gcs_memb_test.hpp"
-
 #include "../gcs_group.hpp"
 #include "../gcs_comp_msg.hpp"
 
@@ -16,7 +11,7 @@
 
 #include "gu_uuid.h"
 
-#include <stdbool.h>
+#include "gcs_memb_test.hpp" // must be included last
 
 using namespace gcs_test;
 

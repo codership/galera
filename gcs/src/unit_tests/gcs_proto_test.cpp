@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <unistd.h>
-#include <string.h>
-#include <check.h>
-#undef fail // needed by STL
-
 #include "../gcs_act_proto.hpp"
 
-#include "gcs_proto_test.hpp"
+#include "gcs_proto_test.hpp" // must be included last
 
 static long
 frgcmp (gcs_act_frag_t* f1, gcs_act_frag_t* f2)

@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <check.h>
-#undef fail // needed by STL
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-
-#include "gcs_defrag_test.hpp"
 #include "../gcs_defrag.hpp"
+
+#include "gcs_defrag_test.hpp" // must be included last
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)

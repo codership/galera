@@ -1,13 +1,11 @@
-// Copyright (C) 2007-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2015 Codership Oy <info@codership.com>
 
 // $Id$
 
-#include <check.h>
-#undef fail // needed by STL
-#include <string.h>
-#include "gcs_state_msg_test.hpp"
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_state_msg.hpp"
+
+#include "gcs_state_msg_test.hpp" // must be included last
 
 static int const QUORUM_VERSION = 3;
 

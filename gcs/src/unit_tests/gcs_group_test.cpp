@@ -1,20 +1,14 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <check.h>
-#undef fail // needed by STL
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <stdlib.h>
-
-#include "gcs_group_test.hpp"
 #include "../gcs_group.hpp"
 #include "../gcs_act_proto.hpp"
 #include "../gcs_comp_msg.hpp"
+
+#include "gcs_group_test.hpp" // must be included last
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)

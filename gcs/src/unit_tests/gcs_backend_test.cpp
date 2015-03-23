@@ -1,19 +1,14 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <check.h>
-#undef fail // STL needs that
-#include <errno.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <galerautils.h>
 
 #include "../gcs_backend.hpp"
-#include "gcs_backend_test.hpp"
+
+#include "gcs_backend_test.hpp" // must be included last
 
 // Fake backend definitons. Must be global for gcs_backend.c to see
 

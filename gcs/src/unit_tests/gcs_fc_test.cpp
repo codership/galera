@@ -1,12 +1,10 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 
 // $Id$
 
-#include "gcs_fc_test.hpp"
 #include "../gcs_fc.hpp"
 
-#include <stdbool.h>
-#include <string.h>
+#include "gcs_fc_test.hpp" // must be included last
 
 START_TEST(gcs_fc_test_limits)
 {

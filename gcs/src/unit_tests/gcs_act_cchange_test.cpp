@@ -1,19 +1,15 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2015 Codership Oy <info@codership.com>
 
 // $Id$
 
 
-#include <check.h>
-
-#undef fail
-
-#include "gcs_act_cchange_test.hpp"
 #include "../gcs.hpp"
 #include "gu_uuid.hpp"
 #include "gu_utils.hpp"
 
+#include <cstdlib> // for ::free()
 
-#include <cstdlib>
+#include "gcs_act_cchange_test.hpp" // must be included last
 
 START_TEST (zero_cc)
 {

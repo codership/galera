@@ -1,11 +1,10 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2015 Codership Oy <info@codership.com>
 
 // $Id$
 
-#include <check.h>
-#undef fail // needed by STL
-#include "gcs_fifo_test.hpp"
 #include "../gcs_fifo_lite.hpp"
+
+#include "gcs_fifo_test.hpp" // must be included last
 
 #define FIFO_LENGTH 10
 
