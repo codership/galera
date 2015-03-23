@@ -914,7 +914,6 @@ core_handle_state_msg (gcs_core_t*          core,
 {
     ssize_t      ret(0);
     gcs_group_t* const group(&core->group);
-    struct gcs_act* const act(&rcvd->act);
 
     assert (GCS_MSG_STATE_MSG == msg->type);
 
@@ -952,7 +951,7 @@ core_handle_state_msg (gcs_core_t*          core,
                 assert (0);
                 ret = -ENOTRECOVERABLE;
             }
-            assert (ret == act->buf_len);
+            assert (ret == rcvd->act.buf_len);
             break;
         case GCS_GROUP_WAIT_STATE_MSG:
             // waiting for more state messages

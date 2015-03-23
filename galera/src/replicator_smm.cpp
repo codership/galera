@@ -1452,13 +1452,6 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
              << trx_params_.version_ << ", " << str_proto_ver_ << ")";
 }
 
-static bool
-app_waits_snapshot_transfer (const void* const req, ssize_t const req_len)
-{
-    return req_len && (req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
-                       memcmp(req, WSREP_STATE_TRANSFER_NONE, req_len));
-}
-
 void
 galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
 {
@@ -1611,7 +1604,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     void*  app_req(0);
     size_t app_req_len(0);
-    bool   app_waits_sst(false); // this is probably unused.
+#ifndef NDEBUG
+    bool   app_waits_sst(false);
+#endif
 
     if (st_required)
     {
@@ -1641,8 +1636,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             close();
             abort();
         }
-
-        app_waits_sst = app_waits_snapshot_transfer(app_req, app_req_len);
+#ifndef NDEBUG
+        app_waits_sst = (app_req_len > 0) &&
+            (app_req_len != (strlen(WSREP_STATE_TRANSFER_NONE) + 1) ||
+             memcmp(app_req, WSREP_STATE_TRANSFER_NONE, app_req_len));
+#endif
     }
     else
     {
