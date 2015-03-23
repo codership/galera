@@ -190,7 +190,7 @@ namespace gu
         if (0 != posix_fallocate (fd_, start, diff))
 #endif
         {
-            if (EINVAL == errno && start >= 0 && diff > 0)
+            if ((EINVAL == errno || ENOSYS == errno) && start >= 0 && diff > 0)
             {
                 // FS does not support the operation, try physical write
                 write_file (start);
