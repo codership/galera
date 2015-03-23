@@ -397,7 +397,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
                 gcs_act_cchange const cc;
                 wsrep_uuid_t tmp(uuid_);
                 wsrep_view_info_t* const err_view
-                    (galera_view_info_create(cc, tmp));
+                    (galera_view_info_create(cc, -1, tmp));
                 view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
                 free(err_view);
             }
@@ -1492,13 +1492,14 @@ galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
     }
 }
 
-static galera::Replicator::State state2repl(const gcs_act_cchange& conf)
+static galera::Replicator::State state2repl(gcs_node_state const my_state,
+                                            int const            my_idx)
 {
-    switch (conf.my_state)
+    switch (my_state)
     {
     case GCS_NODE_STATE_NON_PRIM:
-        if (conf.my_idx >= 0) return galera::Replicator::S_CONNECTED;
-        else                  return galera::Replicator::S_CLOSING;
+        if (my_idx >= 0) return galera::Replicator::S_CONNECTED;
+        else             return galera::Replicator::S_CLOSING;
     case GCS_NODE_STATE_PRIM:
         return galera::Replicator::S_CONNECTED;
     case GCS_NODE_STATE_JOINER:
@@ -1509,10 +1510,11 @@ static galera::Replicator::State state2repl(const gcs_act_cchange& conf)
         return galera::Replicator::S_SYNCED;
     case GCS_NODE_STATE_DONOR:
         return galera::Replicator::S_DONOR;
-    case GCS_NODE_STATE_MAX:;
+    case GCS_NODE_STATE_MAX:
+        assert(0);
     }
 
-    gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
+    gu_throw_fatal << "unhandled gcs state: " << my_state;
     GU_DEBUG_NORETURN;
 }
 
@@ -1523,8 +1525,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     assert(cc.seqno_l > -1);
 
     gcs_act_cchange const conf(cc.buf, cc.size);
-
-    assert(cc.seqno_g == conf.seqno);
 
     bool const from_IST(0 == cc.seqno_l);
 
@@ -1545,12 +1545,22 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         assert(!from_IST || conf.repl_proto_ver >= 8);
     }
 
+    // we must have either my_idx or uuid_ defined
+    assert(cc.seqno_g >= 0 || uuid_ != WSREP_UUID_UNDEFINED);
+
     wsrep_uuid_t new_uuid(uuid_);
-    wsrep_view_info_t* const view_info(galera_view_info_create(conf, new_uuid));
+    wsrep_view_info_t* const view_info
+        (galera_view_info_create(conf, (!from_IST ? cc.seqno_g : -1), new_uuid));
+    int const my_idx(view_info->my_idx);
+    gcs_node_state_t const my_state
+        (my_idx >= 0 ? conf.memb[my_idx].state_ : GCS_NODE_STATE_NON_PRIM);
+
+    assert(my_state >= GCS_NODE_STATE_NON_PRIM);
+    assert(my_state < GCS_NODE_STATE_MAX);
 
     wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
     const wsrep_uuid_t& group_uuid (view_info->state_id.uuid);
-    assert(group_seqno == cc.seqno_g);
+    assert(group_seqno == conf.seqno);
 
     if (!from_IST)
     {
@@ -1570,10 +1580,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         log_info << "####### My UUID: " << uuid_;
 
-        if (cc.seqno_g != WSREP_SEQNO_UNDEFINED &&
-            cc.seqno_g <= sst_seqno_)
+        if (conf.seqno != WSREP_SEQNO_UNDEFINED &&
+            conf.seqno <= sst_seqno_)
         {
-            log_info << "####### skipping CC " << cc.seqno_g
+            log_info << "####### skipping CC " << conf.seqno
                      << (from_IST ? ", from IST" : ", local");
 
             // applied already in SST/IST, skip
@@ -1593,12 +1603,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     update_incoming_list(*view_info);
 
-    log_info << "####### processing CC " << cc.seqno_g
+    log_info << "####### processing CC " << conf.seqno
              << (from_IST ? ", from IST" : ", local");
 
     bool const st_required
-        (state_transfer_required(*view_info,
-                                 conf.my_state == GCS_NODE_STATE_PRIM));
+        (state_transfer_required(*view_info, my_state == GCS_NODE_STATE_PRIM));
 
     void*  app_req(0);
     size_t app_req_len(0);
@@ -1651,7 +1660,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
     }
 
-    Replicator::State const next_state(state2repl(conf));
+    Replicator::State const next_state(state2repl(my_state, my_idx));
 
     if (conf.conf_id >= 0) // Primary configuration
     {
@@ -1712,8 +1721,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         else if (conf.seqno > cert_.position())
         {
             assert(!app_waits_sst);
-            assert(group_uuid == conf.uuid);
-            assert(group_seqno == cc.seqno_g);
+            assert(group_uuid  == conf.uuid);
             assert(group_seqno == conf.seqno);
 
             /* since CC does not pass certification, need to adjust cert
@@ -1835,7 +1843,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     free(view_info);
 
-    if (conf.conf_id < 0 && conf.memb_num == 0) {
+    if (conf.conf_id < 0 && conf.memb.size() == 0) {
         assert(cc.seqno_l > 0);
         assert(S_CLOSING == next_state);
         log_debug << "Received SELF-LEAVE. Closing connection.";

@@ -9,6 +9,7 @@
 #include "gcs_priv.hpp"
 
 #include <gu_logger.hpp>
+#include <gu_macros.hpp>
 
 #include <errno.h>
 
@@ -1380,22 +1381,6 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     return act->act.buf_len;
 }
 
-static ssize_t
-group_memb_record_size (gcs_group_t* group)
-{
-    ssize_t ret = 0;
-    long idx;
-
-    for (idx = 0; idx < group->num; idx++) {
-        ret += strlen(group->nodes[idx].id) + 1;
-        ret += strlen(group->nodes[idx].name) + 1;
-        ret += strlen(group->nodes[idx].inc_addr) + 1;
-        ret += sizeof(gcs_seqno_t); // cached seqno
-    }
-
-    return ret;
-}
-
 /* Creates new configuration action */
 ssize_t
 gcs_group_act_conf (gcs_group_t*         group,
@@ -1417,9 +1402,6 @@ gcs_group_act_conf (gcs_group_t*         group,
 
     struct gcs_act_cchange conf;
 
-    conf.memb_size = group_memb_record_size(group);
-    conf.memb = static_cast<char*>(::operator new(conf.memb_size));
-
     if (GCS_GROUP_PRIMARY == group->state) {
         conf.seqno      = ++group->act_id_;
     } else {
@@ -1428,37 +1410,32 @@ gcs_group_act_conf (gcs_group_t*         group,
     }
 
     conf.conf_id        = group->conf_id;
-    conf.memb_num       = group->num;
-    conf.my_idx         = group->my_idx;
     conf.repl_proto_ver = group->quorum.repl_proto_ver;
     conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
     memcpy (conf.uuid.data, &group->group_uuid, sizeof (gu_uuid_t));
 
     if (group->num) {
-        assert (conf.my_idx >= 0);
+        assert (group->my_idx >= 0);
 
-        conf.my_state = group->nodes[group->my_idx].status;
-
-        char* ptr(conf.memb);
         for (int idx = 0; idx < group->num; ++idx)
         {
-            strcpy (ptr, group->nodes[idx].id);
-            ptr += strlen(ptr) + 1;
-            strcpy (ptr, group->nodes[idx].name);
-            ptr += strlen(ptr) + 1;
-            strcpy (ptr, group->nodes[idx].inc_addr);
-            ptr += strlen(ptr) + 1;
-            gcs_seqno_t cached = gcs_node_cached(&group->nodes[idx]);
-            memcpy(ptr, &cached, sizeof(cached));
-            ptr += sizeof(cached);
+            gcs_act_cchange::member m;
+
+            gu_uuid_scan(group->nodes[idx].id, strlen(group->nodes[idx].id),
+                         &m.uuid_);
+            m.name_     = group->nodes[idx].name;
+            m.incoming_ = group->nodes[idx].inc_addr;
+            m.cached_   = gcs_node_cached(&group->nodes[idx]);
+            m.state_    = group->nodes[idx].status;
+
+            conf.memb.push_back(m);
         }
     }
     else {
         // self leave message
         assert (conf.conf_id < 0);
-        assert (conf.my_idx  < 0);
-        conf.my_state = GCS_NODE_STATE_NON_PRIM;
+        assert (-1 == group->my_idx);
     }
 
     void* tmp;
@@ -1469,7 +1446,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     if (rcvd->act.buf)
     {
         memcpy(const_cast<void*>(rcvd->act.buf), tmp, rcvd->act.buf_len);
-        rcvd->id = conf.seqno;
+        rcvd->id = group->my_idx; // passing own index in seqno_g
     }
     else
     {
@@ -1478,7 +1455,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     }
     free(tmp);
 #else
-    rcvd->id = conf.seqno;
+    rcvd->id = group->my_idx;
 #endif /* GCS_FOR_GARB */
 
     rcvd->act.type = GCS_ACT_CCHANGE;

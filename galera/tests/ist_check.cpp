@@ -372,10 +372,6 @@ static void store_cc(gcache::GCache* const gcache,
 
     cc.seqno = i;
     cc.conf_id = conf_id++;
-    cc.memb = NULL;
-    cc.memb_size = 0;
-    cc.memb_num = 1;
-    cc.my_idx = 0;
 
     void* tmp;
     int   const cc_size(cc.write(&tmp));

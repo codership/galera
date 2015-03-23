@@ -78,13 +78,18 @@ RecvLoop::loop()
 
             if (cc.conf_id > 0) /* PC */
             {
-                if (GCS_NODE_STATE_PRIM == cc.my_state)
+                int const my_idx(act.seqno_g);
+                assert(my_idx >= 0);
+
+                gcs_node_state const my_state(cc.memb[my_idx].state_);
+
+                if (GCS_NODE_STATE_PRIM == my_state)
                 {
                     gcs_.request_state_transfer (config_.sst(),config_.donor());
                     gcs_.join(cc.seqno);
                 }
             }
-            else if (cc.memb_num == 0) // SELF-LEAVE after closing connection
+            else if (cc.memb.size() == 0) // SELF-LEAVE after closing connection
             {
                 log_info << "Exiting main loop";
                 return;

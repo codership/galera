@@ -18,16 +18,12 @@ START_TEST (zero_cc)
 {
     gcs_act_cchange const cc;
 
-    fail_unless(cc.uuid  == GU_UUID_NIL);
+    fail_unless(cc.uuid == GU_UUID_NIL);
     fail_if(cc.seqno != GCS_SEQNO_ILL);
     fail_if(cc.conf_id != -1);
-    fail_if(cc.memb != NULL);
-    fail_if(cc.memb_size != 0);
-    fail_if(cc.memb_num != 0);
-    fail_if(cc.my_idx != -1);
+    fail_if(cc.memb.size() != 0);
     fail_if(cc.repl_proto_ver != -1);
     fail_if(cc.appl_proto_ver != -1);
-    fail_if(cc.my_state != GCS_NODE_STATE_NON_PRIM);
 }
 END_TEST
 
@@ -63,11 +59,8 @@ START_TEST (serialization)
 
     cc_src.seqno = 1234567890;
     cc_src.conf_id = 234;
-    cc_src.memb_num = 3;
-    cc_src.my_idx = 1;
     cc_src.repl_proto_ver = 4;
     cc_src.appl_proto_ver = 5;
-    cc_src.my_state = GCS_NODE_STATE_JOINER;
 
     // TODO - add memb array
 
@@ -83,11 +76,9 @@ START_TEST (serialization)
 
         fail_if(cc_dst.seqno          != cc_src.seqno);
         fail_if(cc_dst.conf_id        != cc_src.conf_id);
-        fail_if(cc_dst.memb_num       != cc_src.memb_num);
-        fail_if(cc_dst.my_idx         != cc_src.my_idx);
+        fail_if(cc_dst.memb.size()    != cc_src.memb.size());
         fail_if(cc_dst.repl_proto_ver != cc_src.repl_proto_ver);
         fail_if(cc_dst.appl_proto_ver != cc_src.appl_proto_ver);
-        fail_if(cc_dst.my_state       != cc_src.my_state);
     }
 }
 END_TEST

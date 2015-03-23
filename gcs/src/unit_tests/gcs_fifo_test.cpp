@@ -3,6 +3,7 @@
 // $Id$
 
 #include <check.h>
+#undef fail // needed by STL
 #include "gcs_fifo_test.hpp"
 #include "../gcs_fifo_lite.hpp"
 
@@ -39,7 +40,7 @@ START_TEST (gcs_fifo_lite_test)
         *item = i;
         gcs_fifo_lite_push_tail (fifo);
     }
-    fail_if (fifo->used != FIFO_LENGTH, "fifo->used is %zu, expected %zu", 
+    fail_if (fifo->used != FIFO_LENGTH, "fifo->used is %zu, expected %zu",
              fifo->used, FIFO_LENGTH);
 
     // test remove

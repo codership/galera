@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <check.h>
+#undef fail // needed by STL
 
 #include "../gcs_act_proto.hpp"
 

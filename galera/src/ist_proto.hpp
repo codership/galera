@@ -555,22 +555,23 @@ namespace galera
                 case Message::T_CCHANGE:
                 case Message::T_SKIP:
                 {
-                    size_t offset(0);
+                    size_t  offset(0);
                     int64_t seqno_g(msg.seqno());  // compatibility with 3.x
 
                     if (gu_unlikely(version_ < 8)) // compatibility with 3.x
                     {
                         assert(msg.type() == Message::T_TRX);
 
-                        int64_t seqno_g, seqno_d;
+                        int64_t seqno_d;
 
                         buf.resize(sizeof(seqno_g) + sizeof(seqno_d));
 
                         n = asio::read(socket, asio::buffer(&buf[0],buf.size()));
                         if (n != buf.size())
                         {
-                            gu_throw_error(EPROTO) <<
-                                "error reading trx meta data";
+                            assert(0);
+                            gu_throw_error(EPROTO)
+                                << "error reading trx meta data";
                         }
 
                         offset = gu::unserialize8(&buf[0],buf.size(),0,seqno_g);
@@ -597,10 +598,10 @@ namespace galera
 
                         msg.set_type_seqno(type, seqno_g);
                     }
-                    else
+                    else  // end compatibility with 3.x
                     {
                         assert(seqno_g > 0);
-                    } // end compatibility with 3.x
+                    }
 
                     assert(msg.seqno() > 0);
 
@@ -631,7 +632,7 @@ namespace galera
                      * but it should not change below. Saving const for later
                      * assert(). */
                     Message::Type const msg_type(msg.type());
-                    gcs_act_type const  gcs_type
+                    gcs_act_type  const gcs_type
                         (msg_type == Message::T_CCHANGE ?
                          GCS_ACT_CCHANGE : GCS_ACT_WRITESET);
 

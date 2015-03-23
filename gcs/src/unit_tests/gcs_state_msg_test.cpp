@@ -3,6 +3,7 @@
 // $Id$
 
 #include <check.h>
+#undef fail // needed by STL
 #include <string.h>
 #include "gcs_state_msg_test.hpp"
 #define GCS_STATE_MSG_ACCESS
