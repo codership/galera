@@ -6,6 +6,7 @@
 #include "gu_digest.hpp"
 #include "gu_hexdump.hpp"
 #include "gu_uuid.hpp"
+#include "gu_macros.hpp"
 
 #include <sstream>
 #include <string>
@@ -21,36 +22,63 @@ gcs_act_cchange::gcs_act_cchange()
     appl_proto_ver(-1)
 {}
 
-static int
-_checksum_len(int ver)
+enum Version
+{
+    VER0 = 0
+};
+
+static Version
+_version(int ver)
 {
     switch(ver)
     {
-    case 0: return sizeof(uint64_t);
+    case VER0: return VER0;
     default:
         gu_throw_error(EPROTO) << "Unsupported CC action version";
         throw;
     }
 }
 
+// sufficiently big array to cover all potential checksum sizes
+typedef char checksum_t[16];
+
+static inline int
+_checksum_len(Version const ver)
+{
+    int ret(0);
+
+    switch(ver)
+    {
+    case VER0: ret = 8; break;
+    default: assert(0);
+    }
+
+    assert(ret < int(sizeof(checksum_t)));
+
+    return ret;
+}
+
+static void
+_checksum(Version const ver, const void* const buf, size_t const size,
+          checksum_t& res)
+{
+    switch(ver)
+    {
+    case VER0: gu::FastHash::digest(buf, size, res); return;
+    default: assert(0);
+    }
+}
+
 static inline gcs_node_state_t
 _int_to_node_state(int const s)
 {
-    if (s < 0 || s >= GCS_NODE_STATE_MAX)
+    if (gu_unlikely(s < 0 || s >= GCS_NODE_STATE_MAX))
     {
+        assert(0);
         gu_throw_error(EINVAL) << "No such node state: " << s;
     }
 
     return gcs_node_state_t(s);
-}
-
-/* >> wrapper for gcs_node_state enum */
-inline std::istream& operator>>(std::istream& is, gcs_node_state_t& ns)
-{
-    int s;
-    is >> s;
-    ns = _int_to_node_state(s);
-    return is;
 }
 
 gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
@@ -63,18 +91,19 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
     appl_proto_ver()
 {
     const char* b(static_cast<const char*>(cc_buf));
-    int const cc_ver(b[0]);
-    int const check_len(cc_size - _checksum_len(cc_ver));
+    Version const cc_ver(_version(b[0]));
+    int const check_len(_checksum_len(cc_ver));
+    int const check_offset(cc_size - check_len);
 
-    char check[16];
-    gu::FastHash::digest(cc_buf, check_len, check);
+    checksum_t check;
+    _checksum(cc_ver, cc_buf, check_offset, check);
 
-    if (!std::equal(b + check_len, b + cc_size, check))
+    if (gu_unlikely(!std::equal(b + check_offset, b + cc_size, check)))
     {
         gu_throw_error(EINVAL) << "CC action checksum mismatch. Expected "
-                               << gu::Hexdump(b + check_len, cc_size - check_len)
-                               << ", found "
-                               << gu::Hexdump(check, cc_size - check_len);
+                               << gu::Hexdump(b + check_offset, check_len)
+                               << ", computed "
+                               << gu::Hexdump(check, check_len);
     }
 
     b += 1; // skip version byte
@@ -117,21 +146,13 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
         m.cached_ = gu::gtoh<uint64_t>(*cached);
         b += sizeof(gcs_seqno_t);
 
-        if (b[0] >= GCS_NODE_STATE_NON_PRIM && b[0] < GCS_NODE_STATE_MAX)
-        {
-            m.state_ = gcs_node_state(b[0]);
-            ++b;
-        }
-        else
-        {
-            assert(0);
-            gu_throw_error(EINVAL) << "Unrecognized node state in CC: " << b[0];
-        }
+        m.state_ = _int_to_node_state(b[0]);
+        ++b;
 
         memb.push_back(m);
     }
 
-    assert(b - static_cast<const char*>(cc_buf) == check_len);
+    assert(b - static_cast<const char*>(cc_buf) == check_offset);
 }
 
 static size_t
@@ -161,7 +182,7 @@ _strcopy(const std::string& str, char* ptr)
 int
 gcs_act_cchange::write(void** buf) const
 {
-    int const cc_ver(0);
+    Version const cc_ver(VER0);
     std::ostringstream os;
 
     os << cc_ver << ','
@@ -175,7 +196,7 @@ gcs_act_cchange::write(void** buf) const
 
     int const payload_len(str.length() + 1 + _memb_size(memb));
     int const check_offset(1 + payload_len);    // version byte + payload
-    int const check_len(_checksum_len(cc_ver)); // checksum hash
+    int const check_len(_checksum_len(cc_ver)); // checksum length
     int const ret(check_offset + check_len);    // total message length
 
     /* using malloc() for C compatibility */
@@ -215,8 +236,8 @@ gcs_act_cchange::write(void** buf) const
 
     assert(static_cast<char*>(*buf) + check_offset == b);
 
-    gu::byte_t check[16];
-    gu::FastHash::digest(*buf, check_offset, check);
+    checksum_t check;
+    _checksum(cc_ver, *buf, check_offset, check);
 
     std::copy(check, check + check_len, b); b += check_len;
 

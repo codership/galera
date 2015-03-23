@@ -204,7 +204,7 @@ galera::TrxHandleSlave::sanity_checks() const
                     (F_ROLLBACK | F_BEGIN)))
     {
         log_warn << "Both F_BEGIN and F_ROLLBACK are set on trx. "
-                 << "This trx should not have been replicated at all: " << this;
+                 << "This trx should not have been replicated at all: " << *this;
     }
 }
 
