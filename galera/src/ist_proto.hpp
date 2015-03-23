@@ -631,6 +631,15 @@ namespace galera
 
                     assert(msg.seqno() > 0);
 
+
+                    /* Backward compatibility code above could change msg type.
+                     * but it should not change below. Saving const for later
+                     * assert(). */
+                    Message::Type const msg_type(msg.type());
+                    gcs_act_type  const gcs_type
+                        (msg_type == Message::T_CCHANGE ?
+                         GCS_ACT_CCHANGE : GCS_ACT_WRITESET);
+
                     const void* wbuf;
                     ssize_t     wsize;
                     bool        already_cached(false);
@@ -653,14 +662,6 @@ namespace galera
                             // not found from gcache, continue as normal
                         }
                     }
-
-                    /* Backward compatibility code above could change msg type.
-                     * but it should not change below. Saving const for later
-                     * assert(). */
-                    Message::Type const msg_type(msg.type());
-                    gcs_act_type  const gcs_type
-                        (msg_type == Message::T_CCHANGE ?
-                         GCS_ACT_CCHANGE : GCS_ACT_WRITESET);
 
                     if (!already_cached)
                     {
@@ -703,8 +704,9 @@ namespace galera
                         act.type    = gcs_type;
                         break;
                     default:
-                        assert(0);
-                    };
+                        gu_throw_error(EPROTO) << "Unrecognized message type"
+                                               << msg_type;
+                    }
 
                     return;
                 }
