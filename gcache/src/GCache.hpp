@@ -101,13 +101,14 @@ namespace gcache
         {
         public:
 
-            Buffer() : seqno_g_(), ptr_(), size_(), type_() { }
+            Buffer() : seqno_g_(), ptr_(), size_(), skip_(), type_() { }
 
             Buffer (const Buffer& other)
                 :
                 seqno_g_(other.seqno_g_),
                 ptr_    (other.ptr_),
                 size_   (other.size_),
+                skip_   (other.skip_),
                 type_   (other.type_)
             { }
 
