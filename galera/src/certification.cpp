@@ -220,7 +220,7 @@ galera::Certification::do_test_v3(TrxHandleSlave* const trx, bool store_keys)
 #ifndef NDEBUG
     // to check that cleanup after cert failure returns cert_index_
     // to original size
-    size_t prev_cert_index_size(cert_index_.size());
+    size_t prev_cert_index_size(cert_index_ng_.size());
 #endif // NDEBUG
 
     const KeySetIn& key_set(trx->write_set().keyset());
@@ -315,7 +315,7 @@ cert_fail:
                           << ke.key() << "' from cert index";
             }
         }
-        assert(cert_index_.size() == prev_cert_index_size);
+        assert(cert_index_ng_.size() == prev_cert_index_size);
     }
 
     return TEST_FAILED;
