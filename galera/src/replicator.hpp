@@ -132,6 +132,8 @@ namespace galera
         virtual void          desync() = 0;
         virtual void          resync() = 0;
 
+        virtual const wsrep_uuid_t& source_id() const = 0;
+
     protected:
 
         static void register_params(gu::Config&);

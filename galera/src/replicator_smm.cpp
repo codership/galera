@@ -943,13 +943,13 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
 
             tr->set_state(TrxHandle::S_REPLAYING);
 
-            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr,meta));
+            gu_trace(apply_trx_ws(trx_ctx, apply_cb_, commit_cb_, *tr, meta));
 
             uint32_t const flags
                 (TrxHandle::trx_flags_to_wsrep_flags(tr->flags()));
             wsrep_bool_t unused(false);
 
-            wsrep_cb_status_t rcode(commit_cb_(trx_ctx,flags,&meta,&unused));
+            wsrep_cb_status_t rcode(commit_cb_(trx_ctx, flags, &meta, &unused));
 
             if (gu_unlikely(rcode != WSREP_CB_SUCCESS))
                 gu_throw_fatal << "Commit failed. Trx: " << *tr;

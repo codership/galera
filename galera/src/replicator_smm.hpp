@@ -153,6 +153,11 @@ namespace galera
         void          desync();
         void          resync();
 
+        const wsrep_uuid_t& source_id() const
+        {
+            return uuid_;
+        }
+
         void preload_index(const gcs_action&);
         void wait(const wsrep_seqno_t&);
         void drain_monitors(const wsrep_seqno_t&);

@@ -490,20 +490,29 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-    if (meta != 0)
-    {
-        meta->gtid = WSREP_GTID_UNDEFINED;
-        meta->depends_on = WSREP_SEQNO_UNDEFINED;
-    }
-
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
 
-    if (trx == 0)
+    if (gu_unlikely(trx == 0))
     {
+        if (meta != 0)
+        {
+            meta->gtid       = WSREP_GTID_UNDEFINED;
+            meta->depends_on = WSREP_SEQNO_UNDEFINED;
+            meta->stid.node  = repl->source_id();
+            meta->stid.trx   = -1;
+        }
         // no data to replicate
         return WSREP_OK;
+    }
+
+    if (meta != 0)
+    {
+        meta->gtid       = WSREP_GTID_UNDEFINED;
+        meta->depends_on = WSREP_SEQNO_UNDEFINED;
+        meta->stid.node  = trx->source_id();
+        meta->stid.trx   = trx->trx_id();
     }
 
     wsrep_status_t retval;
@@ -722,6 +731,14 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
     TrxHandleMaster* trx(repl->local_conn_trx(conn_id, true));
     assert(trx != 0);
+
+    if (meta != 0)
+    {
+        meta->gtid       = WSREP_GTID_UNDEFINED;
+        meta->depends_on = WSREP_SEQNO_UNDEFINED;
+        meta->stid.node  = trx->source_id();
+        meta->stid.trx   = trx->trx_id();
+    }
 
     wsrep_status_t retval;
 
