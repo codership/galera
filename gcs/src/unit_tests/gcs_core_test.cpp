@@ -173,19 +173,24 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
         FAIL_IF (GCS_ACT_WRITESET != act->type && GCS_ACT_CCHANGE != act->type,
                  "GCS_ACT_WRITESET != act->type (%d), while act->seqno: %lld",
                  act->type, (long long)act->seqno);
+
         if (GCS_ACT_CCHANGE != act->type)
         {
             FAIL_IF ((*seqno + 1) != act->seqno,
                      "expected seqno %lld, got %lld",
                      (long long)(*seqno + 1), (long long)act->seqno);
+
+            *seqno = *seqno + 1;
         }
         else
         {
+            assert(GCS_ACT_CCHANGE == act->type);
+
             FAIL_IF (act->seqno < 0, "Negative seqno: %lld",
                      (long long)act->seqno);
-        }
 
-        *seqno = *seqno + 1;
+            if (gcs_core_proto_ver(Core) >= 1) *seqno = *seqno + 1;
+        }
     }
 
     if (NULL != buf) {
@@ -330,7 +335,7 @@ core_test_set_payload_size (ssize_t s)
 
 // Initialises core and backend objects + some common tests
 static inline void
-core_test_init (bool bootstrap = true)
+core_test_init (bool bootstrap = true, int gcs_proto_ver = 1)
 {
     long     ret;
     action_t act;
@@ -346,7 +351,8 @@ core_test_init (bool bootstrap = true)
 
     Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config),
                             reinterpret_cast<gcache_t*>(Cache),
-                            "core_test", "aaa.bbb.ccc.ddd:xxxx", 0, 0);
+                            "core_test", "aaa.bbb.ccc.ddd:xxxx", 0, 0,
+                            gcs_proto_ver);
 
     fail_if (NULL == Core);
 
@@ -378,6 +384,10 @@ core_test_init (bool bootstrap = true)
     fail_if (core_test_check_conf(act.out, act.size, bootstrap, 0, 1));
     Cache->free(act.out);
 
+    int const ver(gcs_core_proto_ver(Core));
+    fail_if(ver != gcs_proto_ver, "Expected protocol version: %d, got: %d",
+            gcs_proto_ver, ver);
+
     // this will configure backend to have desired fragment size
     ret = core_test_set_payload_size (FRAG_SIZE);
     fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
@@ -389,7 +399,7 @@ core_test_init (bool bootstrap = true)
              sizeof(act1_str), ret, strerror (-ret));
     gu_warn ("Next CORE_RECV_ACT fails under valgrind");
     act.in = act1;
-    fail_if (CORE_RECV_ACT (&act, act1_str, sizeof(act1_str),GCS_ACT_WRITESET));
+    fail_if (CORE_RECV_ACT (&act, act1_str, sizeof(act1_str), GCS_ACT_WRITESET));
 
     ret = gcs_core_send_join (Core, Seqno);
     fail_if (ret != 0, "gcs_core_send_join(): %ld (%s)",
@@ -399,7 +409,7 @@ core_test_init (bool bootstrap = true)
     ret = gcs_core_send_sync (Core, Seqno);
     fail_if (ret != 0, "gcs_core_send_sync(): %ld (%s)",
              ret, strerror(-ret));
-    fail_if (CORE_RECV_ACT(&act,NULL,sizeof(gcs_seqno_t),GCS_ACT_SYNC));
+    fail_if (CORE_RECV_ACT(&act, NULL, sizeof(gcs_seqno_t), GCS_ACT_SYNC));
     fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act.out));
 
     gcs_core_send_lock_step (Core, true);
@@ -546,7 +556,8 @@ DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
     return false;
 }
 
-START_TEST (gcs_core_test_own)
+static void
+CORE_TEST_OWN (int gcs_proto_ver)
 {
     long const tout = 1000; // 100 ms timeout
 
@@ -565,7 +576,7 @@ START_TEST (gcs_core_test_own)
     gcs_comp_msg_add (prim,     "node1", 0);
     gcs_comp_msg_add (non_prim, "node1", 1);
 
-    core_test_init ();
+    core_test_init (true, gcs_proto_ver);
 
     /////////////////////////////////////////////
     /// check behaviour in transitional state ///
@@ -713,6 +724,17 @@ START_TEST (gcs_core_test_own)
     gu_free (non_prim);
 
     core_test_cleanup ();
+}
+
+START_TEST (gcs_core_test_own_v0)
+{
+    CORE_TEST_OWN(0);
+}
+END_TEST
+
+START_TEST (gcs_core_test_own_v1)
+{
+    CORE_TEST_OWN(1);
 }
 END_TEST
 
@@ -962,7 +984,8 @@ Suite *gcs_core_suite(void)
   bool skip = false;
   if (skip == false) {
       tcase_add_test  (tcase, gcs_core_test_api);
-      tcase_add_test  (tcase, gcs_core_test_own);
+      tcase_add_test  (tcase, gcs_core_test_own_v0);
+      tcase_add_test  (tcase, gcs_core_test_own_v1);
       //  tcase_add_test  (tcase, gcs_core_test_foreign);
       // tcase_add_test (tcase, gcs_core_test_gh74);
   }

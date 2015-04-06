@@ -99,15 +99,14 @@ typedef struct causal_act
     gu_cond_t*   cond;
 } causal_act_t;
 
-static gcs_proto_t const GCS_PROTO_MAX = 0;
-
 gcs_core_t*
 gcs_core_create (gu_config_t* const conf,
                  gcache_t*    const cache,
                  const char*  const node_name,
                  const char*  const inc_addr,
                  int          const repl_proto_ver,
-                 int          const appl_proto_ver)
+                 int          const appl_proto_ver,
+                 int          const gcs_proto_ver)
 {
     assert (conf);
 
@@ -135,7 +134,7 @@ gcs_core_create (gu_config_t* const conf,
                     gu_mutex_init  (&core->send_lock, NULL);
                     core->proto_ver = -1; // shall be bumped in gcs_group_act_conf()
                     gcs_group_init (&core->group, cache, node_name, inc_addr,
-                                    GCS_PROTO_MAX, repl_proto_ver,
+                                    gcs_proto_ver, repl_proto_ver,
                                     appl_proto_ver);
                     core->state = CORE_CLOSED;
                     core->send_act_no = 1; // 0 == no actions sent
@@ -521,11 +520,10 @@ core_handle_act_msg (gcs_core_t*          core,
     if ((CORE_PRIMARY == core->state) || my_msg){//should always handle own msgs
 
         if (gu_unlikely(gcs_act_proto_ver(msg->buf) !=
-                        gcs_core_group_protocol_version(core))) {
+                        gcs_core_proto_ver(core))) {
             gu_info ("Message with protocol version %d != highest commonly "
                      "supported: %d.",
-                     gcs_act_proto_ver(msg->buf),
-                     gcs_core_group_protocol_version(core));
+                     gcs_act_proto_ver(msg->buf), gcs_core_proto_ver(core));
             commonly_supported_version = false;
             if (!my_msg) {
                 gu_info ("Discard message from member %d because of "
@@ -1147,8 +1145,9 @@ out:
 
 //    gu_debug ("Returning %d", ret);
 
-    if (ret < 0) {
+    if (gu_unlikely(ret < 0)) {
         assert (recv_act->id < 0);
+        assert (GCS_ACT_CCHANGE != recv_act->act.type);
 
         if (GCS_ACT_WRITESET == recv_act->act.type && recv_act->act.buf) {
             gcs_gcache_free (conn->cache, recv_act->act.buf);
@@ -1231,8 +1230,8 @@ long gcs_core_destroy (gcs_core_t* core)
     return 0;
 }
 
-gcs_proto_t
-gcs_core_group_protocol_version (const gcs_core_t* conn)
+int
+gcs_core_proto_ver (const gcs_core_t* conn)
 {
     return conn->proto_ver;
 }

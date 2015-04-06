@@ -42,6 +42,7 @@ typedef struct gcs_core gcs_core_t;
 /*
  * Allocates context resources  private to
  * generic communicaton layer - send/recieve buffers and the like.
+ * @param gcs_proto_ver only for unit tests
  */
 extern gcs_core_t*
 gcs_core_create (gu_config_t* conf,
@@ -49,7 +50,8 @@ gcs_core_create (gu_config_t* conf,
                  const char*  node_name,
                  const char*  inc_addr,
                  int          repl_proto_ver,
-                 int          appl_proto_ver);
+                 int          appl_proto_ver,
+                 int          gcs_proto_ver = GCS_PROTO_MAX);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */
 extern long
@@ -130,8 +132,8 @@ gcs_core_recv (gcs_core_t*          conn,
                long long            timeout);
 
 /* group protocol version */
-extern gcs_proto_t
-gcs_core_group_protocol_version (const gcs_core_t* conn);
+extern int
+gcs_core_proto_ver (const gcs_core_t* conn);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size.

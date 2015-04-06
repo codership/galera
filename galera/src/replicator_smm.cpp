@@ -1709,7 +1709,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             assert(!from_IST); // make sure we are never here from IST
 
-            gcache_.free(const_cast<void*>(cc.buf));
+            gu_trace(gcache_.free(const_cast<void*>(cc.buf)));
 
             // GCache::Seqno_reset() happens here
             request_state_transfer (recv_ctx,
@@ -1735,8 +1735,15 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 /* CCs from IST already have seqno assigned and cert. position
                  * adjusted */
-                gu_trace(gcache_.seqno_assign(cc.buf, conf.seqno,
-                                              GCS_ACT_CCHANGE, false));
+                if (protocol_version_ >= 8)
+                {
+                    gu_trace(gcache_.seqno_assign(cc.buf, conf.seqno,
+                                                  GCS_ACT_CCHANGE, false));
+                }
+                else /* before protocol ver 8 conf changes are not ordered */
+                {
+                    gu_trace(gcache_.free(const_cast<void*>(cc.buf)));
+                }
 
                 if (state_() == S_CONNECTED || state_() == S_DONOR)
                 {

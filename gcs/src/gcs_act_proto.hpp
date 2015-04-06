@@ -18,7 +18,7 @@
 typedef uint8_t gcs_proto_t;
 
 /*! Supported protocol range (for now only version 0 is supported) */
-#define GCS_ACT_PROTO_MAX 0
+#define GCS_PROTO_MAX 1
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag

@@ -1403,7 +1403,8 @@ gcs_group_act_conf (gcs_group_t*         group,
     struct gcs_act_cchange conf;
 
     if (GCS_GROUP_PRIMARY == group->state) {
-        conf.seqno      = ++group->act_id_;
+        if (group->quorum.gcs_proto_ver >= 1) { ++group->act_id_; }
+        conf.seqno      = group->act_id_;
     } else {
         assert(GCS_GROUP_NON_PRIMARY == group->state);
         conf.seqno      = GCS_SEQNO_ILL;
