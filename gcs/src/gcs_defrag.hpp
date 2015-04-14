@@ -11,16 +11,13 @@
 #ifndef _gcs_defrag_h_
 #define _gcs_defrag_h_
 
-#include <string.h>   // for memset()
-#include <stdbool.h>
-#include <galerautils.h>
-
 #include "gcs.hpp"     // for gcs_seqno_t et al.
 #include "gcs_act_proto.hpp"
 #include "gcs_act.hpp"
 #include "gcs_gcache.hpp"
 
-#include <gcache.h>
+#include <string.h>   // for memset()
+#include <stdbool.h>
 
 typedef struct gcs_defrag
 {

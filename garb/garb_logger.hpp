@@ -3,8 +3,6 @@
 #ifndef _GARB_LOGGER_HPP_
 #define _GARB_LOGGER_HPP_
 
-#include <galerautils.hpp>
-
 #include <string>
 
 namespace garb

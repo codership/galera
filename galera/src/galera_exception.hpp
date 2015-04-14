@@ -5,7 +5,8 @@
 #ifndef GALERA_EXCEPTION_HPP
 #define GALERA_EXCEPTION_HPP
 
-#include "galerautils.hpp"
+#include <gu_exception.hpp>
+#include <gu_logger.hpp>
 #include "wsrep_api.h"
 
 namespace galera

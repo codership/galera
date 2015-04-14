@@ -21,16 +21,14 @@
 #ifndef _gcs_core_h_
 #define _gcs_core_h_
 
-#include <stdint.h>
-#include <stdlib.h>
-
-#include <galerautils.h>
-
 #include "gcs.hpp"
 #include "gcs_act.hpp"
 #include "gcs_act_proto.hpp"
 
-#include <gcache.h>
+#include <galerautils.h>
+
+#include <stdint.h>
+#include <stdlib.h>
 
 /* 'static' method to register configuration variables */
 extern bool

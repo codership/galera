@@ -3,6 +3,16 @@ Import('env')
 
 libgaleraxx_env = env.Clone()
 
+# Include paths
+libgaleraxx_env.Append(CPPPATH = Split('''
+                                          #
+                                          #/asio
+                                          #/common
+                                          #/galerautils/src
+                                          #/gcache/src
+                                          #/gcs/src
+                                       '''))
+
 libgaleraxx_srcs = [
     'mapped_buffer.cpp',
     'write_set.cpp',

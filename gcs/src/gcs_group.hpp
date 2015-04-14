@@ -13,14 +13,11 @@
 
 #include <stdbool.h>
 
-#include <galerautils.h>
-
+#include "gcs_gcache.hpp"
 #include "gcs_node.hpp"
 #include "gcs_recv_msg.hpp"
 #include "gcs_seqno.hpp"
 #include "gcs_state_msg.hpp"
-
-#include <gcache.h>
 
 typedef enum gcs_group_state
 {

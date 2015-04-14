@@ -8,11 +8,12 @@
 #include "write_set_ng.hpp"
 #include "wsrep_api.h"
 #include "gcs.hpp"
-#include "gu_atomic.hpp"
-#include "gu_throw.hpp"
-#include "gu_config.hpp"
-#include "gu_buf.hpp"
-#include "gu_status.hpp"
+#include <gu_atomic.hpp>
+#include <gu_throw.hpp>
+#include <gu_config.hpp>
+#include <gu_buf.hpp>
+#include <gu_status.hpp>
+#include <gu_lock.hpp> // for gu::Mutex and gu::Cond
 
 #include <GCache.hpp>
 #include <cerrno>

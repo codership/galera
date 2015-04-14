@@ -144,6 +144,7 @@ extern "C" void* sender_thd(void* arg)
     mark_point();
 
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
+
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     pthread_barrier_wait(&start_barrier);
@@ -159,6 +160,7 @@ extern "C" void* trx_thread(void* arg)
     trx_thread_args* targs(reinterpret_cast<trx_thread_args*>(arg));
     pthread_barrier_wait(&start_barrier);
     targs->receiver_.ready();
+
     while (true)
     {
         galera::TrxHandle* trx(0);

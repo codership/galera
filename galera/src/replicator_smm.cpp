@@ -9,7 +9,8 @@
 
 #include "galera_info.hpp"
 
-#include "gu_debug_sync.hpp"
+#include <gu_debug_sync.hpp>
+#include <gu_abort.h>
 
 #include <sstream>
 #include <iostream>
