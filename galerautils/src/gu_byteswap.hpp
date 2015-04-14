@@ -25,9 +25,19 @@ template <typename T> T gtoh (const T& val)
 
 /* Specialized templates */
 
+template <> GU_FORCE_INLINE int8_t  gtoh (const int8_t& val)
+{
+    return  val;
+}
+
 template <> GU_FORCE_INLINE uint8_t  gtoh (const uint8_t& val)
 {
     return  val;
+}
+
+template <> GU_FORCE_INLINE int16_t gtoh (const int16_t& val)
+{
+    return  gtoh16(val);
 }
 
 template <> GU_FORCE_INLINE uint16_t gtoh (const uint16_t& val)
@@ -35,11 +45,17 @@ template <> GU_FORCE_INLINE uint16_t gtoh (const uint16_t& val)
     return  gtoh16(val);
 }
 
-template <> GU_FORCE_INLINE unsigned int gtoh (const unsigned int& val)
+template <> GU_FORCE_INLINE int32_t gtoh (const int32_t& val)
 {
     return  gtoh32(val);
 }
 
+template <> GU_FORCE_INLINE uint32_t gtoh (const uint32_t& val)
+{
+    return  gtoh32(val);
+}
+
+#if 0 //remove (why do we need this?)
 #if __LONG_MAX__ == __INT_MAX__
 template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
 {
@@ -53,8 +69,14 @@ template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
 #else
 # error can not determine size of long
 #endif
+#endif
 
-template <> GU_FORCE_INLINE unsigned long long gtoh (const unsigned long long& val)
+template <> GU_FORCE_INLINE int64_t gtoh (const int64_t& val)
+{
+    return  gtoh64(val);
+}
+
+template <> GU_FORCE_INLINE uint64_t gtoh (const uint64_t& val)
 {
     return  gtoh64(val);
 }

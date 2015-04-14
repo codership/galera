@@ -86,6 +86,7 @@ libgalerautilsxx_sources = [
     'gu_uri.cpp',
     'gu_buffer.cpp',
     'gu_utils++.cpp',
+    'gu_gtid.cpp',
     'gu_config.cpp',
     'gu_fdesc.cpp',
     'gu_mmap.cpp',

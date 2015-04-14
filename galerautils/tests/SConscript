@@ -50,6 +50,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_rset_test.cpp
                               gu_string_utils_test.cpp
                               gu_uri_test.cpp
+                              gu_gtid_test.cpp
                               gu_config_test.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
