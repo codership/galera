@@ -49,14 +49,13 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
             {
                 gu_debug_sync_signal(value);
             }
-#endif // GU_DBUG_ON
+#endif /* GU_DBUG_ON */
             else
             {
                 log_debug << "Setting param '"
                           << key << "' = '" << value << '\'';
                 repl.param_set(key, value);
             }
-
         }
         catch (gu::NotFound&)
         {

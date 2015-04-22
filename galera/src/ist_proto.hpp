@@ -10,6 +10,7 @@
 
 #include "GCache.hpp"
 
+#include "gu_asio.hpp"
 #include "gu_logger.hpp"
 #include "gu_serialize.hpp"
 #include "gu_vector.hpp"
@@ -257,11 +258,9 @@ namespace galera
         {
         public:
 
-            Proto(TrxHandleSlave::Pool& sp,
-                  gcache::GCache&       gc,
+            Proto(gcache::GCache&       gc,
                   int version, bool keep_keys)
                 :
-                trx_pool_ (sp),
                 gcache_   (gc),
                 raw_sent_ (0),
                 real_sent_(0),
@@ -735,8 +734,6 @@ namespace galera
             }
 
         private:
-
-            TrxHandleSlave::Pool& trx_pool_;
 
             gcache::GCache& gcache_;
 

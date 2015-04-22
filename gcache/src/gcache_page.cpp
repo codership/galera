@@ -112,7 +112,7 @@ gcache::Page::realloc (void* ptr, int size)
 
     if (bh == BH_cast(next_ - bh->size)) // last buffer, can shrink and expand
     {
-        ssize_t const diff_size (size - bh->size);
+        int const diff_size (size - bh->size);
 
         if (gu_likely (diff_size < space_))
         {
@@ -127,7 +127,7 @@ gcache::Page::realloc (void* ptr, int size)
     }
     else
     {
-        if (gu_likely(size > bh->size))
+        if (gu_likely(size > 0 && uint32_t(size) > bh->size))
         {
             void* const ret (malloc (size));
 

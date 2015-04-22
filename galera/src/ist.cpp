@@ -80,7 +80,6 @@ galera::ist::register_params(gu::Config& conf)
 }
 
 galera::ist::Receiver::Receiver(gu::Config&           conf,
-                                TrxHandleSlave::Pool& sp,
                                 gcache::GCache&       gc,
                                 ActionHandler&        ah,
                                 const char*           addr)
@@ -95,7 +94,6 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     last_seqno_   (WSREP_SEQNO_UNDEFINED),
     current_seqno_(WSREP_SEQNO_UNDEFINED),
     conf_         (conf),
-    trx_pool_     (sp),
     gcache_       (gc),
     act_handler_  (ah),
     thread_       (),
@@ -317,7 +315,7 @@ void galera::ist::Receiver::run()
     try
     {
         bool const keep_keys(conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
-        Proto p(trx_pool_, gcache_, version_, keep_keys);
+        Proto p(gcache_, version_, keep_keys);
 
         if (use_ssl_ == true)
         {
@@ -606,8 +604,7 @@ void galera::ist::Receiver::interrupt()
             ssl_stream.lowest_layer().connect(*i);
             gu::set_fd_options(ssl_stream.lowest_layer());
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p(trx_pool_,
-                    gcache_,
+            Proto p(gcache_,
                     version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(ssl_stream);
             p.send_ctrl(ssl_stream, Ctrl::C_EOF);
@@ -618,7 +615,7 @@ void galera::ist::Receiver::interrupt()
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
             gu::set_fd_options(socket);
-            Proto p(trx_pool_, gcache_, version_,
+            Proto p(gcache_, version_,
                     conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
             p.recv_handshake(socket);
             p.send_ctrl(socket, Ctrl::C_EOF);
@@ -735,9 +732,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
 
     try
     {
-        TrxHandleSlave::Pool unused(1, 0, "");
-        Proto p(unused,
-                gcache_,
+        Proto p(gcache_,
                 version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
 
