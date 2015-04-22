@@ -3,6 +3,11 @@ Import('env')
 
 gcache_env = env.Clone()
 
+# Include paths
+gcache_env.Append(CPPPATH = Split('''
+                                     #/galerautils/src
+                                  '''))
+
 gcache_sources = Split ('''
         GCache_seqno.cpp
         gcache_params.cpp

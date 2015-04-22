@@ -107,11 +107,8 @@ namespace gu
 #endif
     };
 
-
 #define GU_LOG_CPP(level)                                               \
-    if (gu::Logger::no_log(level) ||                                    \
-        (level == gu::LOG_DEBUG &&                                      \
-         gu::Logger::no_debug(__FILE__, __FUNCTION__, __LINE__))) {}    \
+    if (gu::Logger::no_log(level)) {}                                   \
     else gu::Logger(level).get(__FILE__, __FUNCTION__, __LINE__)
 
 // USAGE: LOG(level) << item_1 << item_2 << ... << item_n;
@@ -120,8 +117,9 @@ namespace gu
 #define log_error GU_LOG_CPP(gu::LOG_ERROR)
 #define log_warn  GU_LOG_CPP(gu::LOG_WARN)
 #define log_info  GU_LOG_CPP(gu::LOG_INFO)
-#define log_debug GU_LOG_CPP(gu::LOG_DEBUG)
-
+#define log_debug                                                       \
+    if (gu::Logger::no_debug(__FILE__, __FUNCTION__, __LINE__)) {} else \
+        GU_LOG_CPP(gu::LOG_DEBUG)
 }
 
 #endif // __GU_LOGGER__

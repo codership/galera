@@ -10,7 +10,7 @@
 
 struct gcs_action;
 
-#include <galerautils.hpp>
+#include <gu_config.hpp>
 #include <string>
 
 namespace galera

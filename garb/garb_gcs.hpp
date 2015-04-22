@@ -4,7 +4,7 @@
 #define _GARB_GCS_HPP_
 
 #include <gcs.hpp>
-#include <galerautils.hpp>
+#include <gu_config.hpp>
 
 namespace garb
 {

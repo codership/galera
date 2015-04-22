@@ -3,6 +3,13 @@ Import('check_env')
 
 env = check_env.Clone()
 
+# Include paths
+env.Append(CPPPATH = Split('''
+                              #
+                              #/asio
+                              #/galerautils/src
+                           '''))
+
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 
@@ -30,7 +37,6 @@ env.Test("gu_tests.passed", gu_tests)
 env.Alias("test", "gu_tests.passed")
 
 Clean(gu_tests, '#/gu_tests.log')
-
 
 gu_testspp = env.Program(target = 'gu_tests++',
                          source = Split('''

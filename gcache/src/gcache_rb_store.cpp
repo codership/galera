@@ -6,7 +6,9 @@
 #include "gcache_page_store.hpp"
 #include "gcache_mem_store.hpp"
 
-#include <galerautils.hpp>
+#include <gu_logger.hpp>
+#include <gu_throw.hpp>
+
 #include <cassert>
 
 namespace gcache
@@ -224,7 +226,7 @@ namespace gcache
     }
 
     void*
-    RingBuffer::malloc (ssize_t size)
+    RingBuffer::malloc (int size)
     {
         void* ret(0);
 
@@ -261,7 +263,7 @@ namespace gcache
     }
 
     void*
-    RingBuffer::realloc (void* ptr, ssize_t const size)
+    RingBuffer::realloc (void* ptr, int const size)
     {
         assert_sizes();
         assert (NULL != ptr);
@@ -277,13 +279,13 @@ namespace gcache
         // first check if we can grow this buffer by allocating
         // adjacent buffer
         {
-            ssize_t  const adj_size(size - bh->size);
+            int const adj_size(size - bh->size);
             if (adj_size <= 0) return ptr;
 
             uint8_t* const adj_ptr(reinterpret_cast<uint8_t*>(BH_next(bh)));
             if (adj_ptr == next_)
             {
-                ssize_t const size_trail_saved(size_trail_);
+                int const size_trail_saved(size_trail_);
                 void* const adj_buf (get_new_buffer (adj_size));
 
                 BH_assert_clear(BH_cast(next_));

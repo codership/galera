@@ -31,11 +31,11 @@ namespace gcache
             return static_cast<PageStore*>(p->parent());
         }
 
-        void* malloc  (ssize_t size);
+        void* malloc  (int size);
 
         void  free    (BufferHeader* bh) { assert(0); }
 
-        void* realloc (void* ptr, ssize_t size);
+        void* realloc (void* ptr, int size);
 
         void  discard (BufferHeader* bh)
         {
@@ -75,7 +75,7 @@ namespace gcache
         // cleans up extra pages.
         void cleanup     ();
 
-        void* malloc_new (ssize_t size) ;
+        void* malloc_new (unsigned int size);
 
         void
         free_page_ptr (Page* page, BufferHeader* bh)

@@ -124,7 +124,7 @@ namespace gu
     LogLevel    Logger::max_level    = LOG_INFO;
     LogCallback Logger::logger       = default_logger;
 #else
-#define do_timestamp       (gu_log_self_tstamp == true)
+#define do_timestamp       gu_log_self_tstamp == true
 #define level_str          gu_log_level_str
 #endif // _gu_log_h_
 

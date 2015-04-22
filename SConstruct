@@ -29,7 +29,6 @@ if bits == '32bit':
 elif bits == '64bit':
     x86 = 64
 
-
 #
 # Print Help
 #
@@ -186,30 +185,6 @@ if extra_sysroot != '':
     env.Append(CPPFLAGS = ' -I' + extra_sysroot + '/include')
 
 # print env.Dump()
-#
-# Set up build and link paths
-#
-
-# Include paths
-env.Append(CPPPATH = Split('''#
-                              #/asio
-                              #/common
-                              #/galerautils/src
-                              #/gcomm/src
-                              #/gcomm/src/gcomm
-                              #/gcache/src
-                              #/gcs/src
-                              #/wsdb/src
-                              #/galera/src
-                           '''))
-
-# Library paths
-#env.Append(LIBPATH = Split('''#/galerautils/src
-#                              #/gcomm/src
-#                              #/gcs/src
-#                              #/wsdb/src
-#                              #/galera/src
-#                           '''))
 
 # Preprocessor flags
 if sysname != 'sunos' and sysname != 'darwin' and sysname != 'freebsd':
@@ -382,6 +357,12 @@ else:
     print 'Not using boost'
 
 # asio
+if 'CPPPATH' in conf.env:
+    cpppath_saved = conf.env['CPPPATH']
+else:
+    cpppath_saved = None
+
+conf.env.Append(CPPPATH = [ '#/asio' ])
 if conf.CheckCXXHeader('asio.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
@@ -402,14 +383,21 @@ if ssl == 1:
         print 'ssl support required but openssl library not found'
         print 'compile with ssl=0 or check that openssl library is usable'
         Exit(1)
+conf.env['CPPPATH'] = cpppath_saved
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
     conf.env.Append(CPPFLAGS = ' -Werror')
     conf.env.Append(CCFLAGS  = ' -pedantic')
-    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+    if 'clang' not in conf.env['CXX']:
+        conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+    else:
+        conf.env.Append(CPPFLAGS = ' -Wno-self-assign')
+        if 'ccache' in conf.env['CXX']:
+            conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
 
 env = conf.Finish()
+
 Export('x86', 'env', 'sysname', 'libboost_program_options')
 
 #
