@@ -55,22 +55,6 @@ template <> GU_FORCE_INLINE uint32_t gtoh (const uint32_t& val)
     return  gtoh32(val);
 }
 
-#if 0 //remove (why do we need this?)
-#if __LONG_MAX__ == __INT_MAX__
-template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
-{
-    return  gtoh32(val);
-}
-#elif __LONG_MAX__ == __LONG_LONG_MAX__
-template <> GU_FORCE_INLINE unsigned long gtoh (const unsigned long& val)
-{
-    return  gtoh64(val);
-}
-#else
-# error can not determine size of long
-#endif
-#endif
-
 template <> GU_FORCE_INLINE int64_t gtoh (const int64_t& val)
 {
     return  gtoh64(val);
