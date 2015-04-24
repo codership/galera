@@ -15,7 +15,6 @@
 #include <limits>
 
 #include "gu_exception.hpp"
-//#include "gu_string.hpp"
 
 namespace gu {
 

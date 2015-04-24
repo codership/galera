@@ -46,7 +46,7 @@ namespace gcache
     }
 
     void*
-    GCache::malloc (ssize_t size)
+    GCache::malloc (int size)
     {
         size += sizeof(BufferHeader);
 
@@ -136,7 +136,7 @@ namespace gcache
 
     // this will crash if ptr == 0
     void*
-    GCache::realloc (void* ptr, ssize_t size)
+    GCache::realloc (void* ptr, int size)
     {
         size += sizeof(BufferHeader);
 

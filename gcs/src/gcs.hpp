@@ -11,18 +11,18 @@
 #ifndef _gcs_h_
 #define _gcs_h_
 
+#include "gcs_gcache.hpp"
+
+#include <gu_config.h>
+#include <gu_buf.h>
+#include <gu_errno.h>
+#include <gu_uuid.h>
+#include <gu_status.hpp>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdio.h>
-
-#include "gu_config.h"
-#include "gu_buf.h"
-#include "gcache.h"
-#include "gu_errno.h"
-#include "gu_uuid.h"
-
-#include "gu_status.hpp"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;

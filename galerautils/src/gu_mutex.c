@@ -10,7 +10,7 @@
 #include <string.h>
 #include "galerautils.h"
 
-/* Is it usable? */
+#if 0 /* Is it usable? */
 static const struct gu_mutex
 gu_mutex_init = { .target_mutex      = PTHREAD_MUTEX_INITIALIZER,
                   .control_mutex     = PTHREAD_MUTEX_INITIALIZER,
@@ -21,6 +21,7 @@ gu_mutex_init = { .target_mutex      = PTHREAD_MUTEX_INITIALIZER,
                   .file              = __FILE__,
                   .line              = __LINE__
 };
+#endif
 
 int gu_mutex_init_dbg (struct gu_mutex *m,
                        const pthread_mutexattr_t* attr,

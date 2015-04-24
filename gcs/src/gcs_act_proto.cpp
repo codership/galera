@@ -25,15 +25,15 @@ AT - action type
 */
 
 static const size_t PROTO_PV_OFFSET       = 0;
-static const size_t PROTO_ACT_ID_OFFSET   = 0;
-static const size_t PROTO_ACT_SIZE_OFFSET = 8;
-static const size_t PROTO_FRAG_NO_OFFSET  = 12;
 static const size_t PROTO_AT_OFFSET       = 16;
 static const size_t PROTO_DATA_OFFSET     = 20;
+// static const size_t PROTO_ACT_ID_OFFSET   = 0;
+// static const size_t PROTO_ACT_SIZE_OFFSET = 8;
+// static const size_t PROTO_FRAG_NO_OFFSET  = 12;
 
-static const gcs_seqno_t   PROTO_ACT_ID_MAX   = 0x00FFFFFFFFFFFFLL;
-static const unsigned int  PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
-static const unsigned char PROTO_AT_MAX       = 0xFF;
+// static const gcs_seqno_t   PROTO_ACT_ID_MAX   = 0x00FFFFFFFFFFFFLL;
+// static const unsigned int  PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
+// static const unsigned char PROTO_AT_MAX       = 0xFF;
 
 static const int PROTO_VERSION = GCS_ACT_PROTO_MAX;
 

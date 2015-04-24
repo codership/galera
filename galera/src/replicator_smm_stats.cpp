@@ -2,7 +2,8 @@
 
 #include "replicator_smm.hpp"
 #include "uuid.hpp"
-#include "gu_debug_sync.hpp"
+#include <gu_debug_sync.hpp>
+#include <gu_mem.h>
 
 // @todo: should be protected static member of the parent class
 static const size_t GALERA_STAGE_MAX(11);
@@ -272,9 +273,8 @@ galera::ReplicatorSMM::stats_get() const
     // * Trailing space for string store
     size_t const vec_size(
         (sv.size() + status.size())*sizeof(struct wsrep_stats_var));
-    struct wsrep_stats_var* const buf(
-        reinterpret_cast<struct wsrep_stats_var*>(
-            gu_malloc(vec_size + tail_size)));
+    struct wsrep_stats_var* const buf(static_cast<struct wsrep_stats_var*>(
+                                      gu_malloc(vec_size + tail_size)));
 
     if (buf)
     {

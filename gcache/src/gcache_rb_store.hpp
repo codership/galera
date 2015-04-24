@@ -10,8 +10,8 @@
 #include "gcache_memops.hpp"
 #include "gcache_bh.hpp"
 
-#include "gu_fdesc.hpp"
-#include "gu_mmap.hpp"
+#include <gu_fdesc.hpp>
+#include <gu_mmap.hpp>
 
 #include <string>
 #include <map>
@@ -28,11 +28,11 @@ namespace gcache
 
         ~RingBuffer ();
 
-        void* malloc  (ssize_t size);
+        void* malloc  (int size);
 
         void  free    (BufferHeader* bh);
 
-        void* realloc (void* ptr, ssize_t size);
+        void* realloc (void* ptr, int size);
 
         void  discard (BufferHeader* const bh)
         {

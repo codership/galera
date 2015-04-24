@@ -8,7 +8,7 @@
 #include "wsrep_api.h"
 #include "galera_exception.hpp"
 
-#include <galerautils.hpp>
+#include <gu_config.hpp>
 #include <string>
 
 namespace galera

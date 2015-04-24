@@ -1532,7 +1532,7 @@ GU_DBUGOpenFile(const char *name, int append)
 
     if (name != NULL) {
 	strcpy(_gu_db_stack->name, name);
-	if (strcmp(name, "-") == 0) {
+	if (strlen(name) == 1 && name[0] == '-') {
 	    _gu_db_fp_ = stdout;
 	    _gu_db_stack->out_file = _gu_db_fp_;
 	    _gu_db_stack->flags |= FLUSH_ON_WRITE;
