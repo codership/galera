@@ -357,10 +357,7 @@ else:
     print 'Not using boost'
 
 # asio
-if 'CPPPATH' in conf.env:
-    cpppath_saved = conf.env['CPPPATH']
-else:
-    cpppath_saved = None
+cpppath_saved = conf.env.get('CPPPATH')
 
 conf.env.Append(CPPPATH = [ '#/asio' ])
 if conf.CheckCXXHeader('asio.hpp'):
