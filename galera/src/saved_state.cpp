@@ -39,17 +39,16 @@ SavedState::SavedState  (const std::string& file) :
 
     if (ifs.fail())
     {
-        log_warn << "Could not open saved state file for reading: " << file;
+        log_warn << "Could not open state file for reading: '" << file << '\'';
     }
 
     fs_ = fopen(file.c_str(), "a");
 
     if (!fs_)
     {
-        log_warn << "Could not open saved state file for writing: " << file;
-        /* We are not reading anything from file we can't write to, since it
-           may be terribly outdated. */
-        return;
+        gu_throw_error(errno)
+            << "Could not open state file for writing: '" << file
+            << "'. Check permissions and/or disk space.";
     }
 
     // We take exclusive lock on state file in order to avoid possibility
