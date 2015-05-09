@@ -50,7 +50,7 @@ Architecture: any
 Conflicts: garbd-2, garbd2, percona-xtradb-cluster-garbd-2.x
 Breaks: percona-xtradb-cluster-galera-2.x
 Replaces: percona-xtradb-cluster-galera-2.x
-Depends: netcat-openbsd, ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Galera arbitrator daemon
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
