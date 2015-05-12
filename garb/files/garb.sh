@@ -21,6 +21,10 @@
 #                    extra node to arbitrate split brain situations.
 ### END INIT INFO
 
+# On Debian Jessie, avoid redirecting calls to this script to 'systemctl start'
+
+_SYSTEMCTL_SKIP_REDIRECT=true
+
 # Source function library.
 if [ -f /etc/redhat-release ]; then
 	. /etc/init.d/functions
