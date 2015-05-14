@@ -28,7 +28,7 @@ static void parse_authority (const string&     auth,
                              gu::RegEx::Match& host,
                              gu::RegEx::Match& port)
 {
-    size_t pos1, pos2;
+    size_t pos1, pos2, pos3;
 
     pos1 = auth.find_first_of ('@');
 
@@ -44,17 +44,20 @@ static void parse_authority (const string&     auth,
         pos1 = 0;
     }
 
-    pos2 = auth.find_last_of (':');
+    pos2 = auth.find_last_of (']');
+    pos3 = auth.find_last_of (':');
 
-    if (pos2 != string::npos && pos2 >= pos1)
+    if ((pos2 != string::npos && pos3 != string::npos
+        && pos2 < pos3 && pos3 >= pos1)
+        || (pos3 != string::npos && pos2 == string::npos && pos3 >= pos1))
     {
-        host = gu::RegEx::Match (auth.substr (pos1, pos2 - pos1));
+        host = gu::RegEx::Match (auth.substr (pos1, pos3 - pos1));
 
         // according to RFC 3986 empty port (nothing after :) should be treated
         // as unspecified, so make sure that it is not 0-length.
-        if ((pos2 + 1) < auth.length())
+        if ((pos3 + 1) < auth.length())
         {
-            port = gu::RegEx::Match (auth.substr (pos2 + 1));
+            port = gu::RegEx::Match (auth.substr (pos3 + 1));
 
             if ((port.str().find_first_not_of ("0123456789") != string::npos)
                 ||
@@ -64,7 +67,7 @@ static void parse_authority (const string&     auth,
                 log_debug << "\n\tauth: '" << auth << "'"
                           << "\n\thost: '" << host.str() << "'"
                           << "\n\tport: '" << port.str() << "'"
-                          << "\n\tpos1: " << pos1 << ", pos2: " << pos2;
+                          << "\n\tpos1: " << pos1 << ", pos3: " << pos3;
 
                 gu_throw_error (EINVAL) << "Can't parse port number from '"
                                         << port.str() << "'";
