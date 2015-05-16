@@ -151,6 +151,7 @@ extern "C" void* sender_thd(void* arg)
     mark_point();
 
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
+
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     pthread_barrier_wait(&start_barrier);
@@ -167,6 +168,7 @@ extern "C" void* trx_thread(void* arg)
     trx_thread_args* targs(reinterpret_cast<trx_thread_args*>(arg));
     pthread_barrier_wait(&start_barrier);
     targs->receiver_.ready(targs->receiver_.first_seqno());
+
     while (true)
     {
         gcs_action act;
@@ -245,8 +247,7 @@ extern "C" void* receiver_thd(void* arg)
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     PreIST pre_ist;
-    galera::ist::Receiver receiver(conf, rargs->trx_pool_, rargs->gcache_,
-                                   pre_ist, 0);
+    galera::ist::Receiver receiver(conf, rargs->gcache_, pre_ist, 0);
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
                                            rargs->version_);
 

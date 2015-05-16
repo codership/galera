@@ -7,7 +7,6 @@
 
 #include "wsrep_api.h"
 
-#include "galerautils.hpp"
 #include "replicator.hpp"
 
 void

@@ -48,7 +48,7 @@ namespace galera
         public:
             static std::string const RECV_ADDR;
 
-            Receiver(gu::Config& conf, TrxHandleSlave::Pool&, gcache::GCache&,
+            Receiver(gu::Config& conf, gcache::GCache&,
                      ActionHandler&, const char* addr);
             ~Receiver();
 
@@ -97,7 +97,6 @@ namespace galera
             wsrep_seqno_t         last_seqno_;
             wsrep_seqno_t         current_seqno_;
             gu::Config&           conf_;
-            TrxHandleSlave::Pool& trx_pool_;
             gcache::GCache&       gcache_;
             ActionHandler&        act_handler_;
             pthread_t             thread_;
@@ -157,11 +156,10 @@ namespace galera
         class AsyncSenderMap
         {
         public:
-            AsyncSenderMap(GCS_IMPL& gcs, gcache::GCache& gcache)
+            AsyncSenderMap(gcache::GCache& gcache)
                 :
                 senders_(),
                 monitor_(),
-                gcs_(gcs),
                 gcache_(gcache)
             { }
 
@@ -179,7 +177,6 @@ namespace galera
             std::set<AsyncSender*> senders_;
             // use monitor instead of mutex, it provides cancellation point
             gu::Monitor            monitor_;
-            GCS_IMPL&              gcs_;
             gcache::GCache&        gcache_;
         };
 

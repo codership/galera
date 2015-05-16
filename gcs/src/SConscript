@@ -5,6 +5,13 @@ Import('env')
 # Clone environment as we need to tune compilation flags
 libgcs_env = env.Clone()
 
+# Include paths
+libgcs_env.Append(CPPPATH = Split('''
+                                     #/galerautils/src
+                                     #/gcomm/src
+                                     #/gcache/src
+                                  '''))
+
 # Backends (TODO: Get from global options)
 libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
 # For C-style logging

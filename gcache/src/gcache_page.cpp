@@ -6,6 +6,9 @@
 
 #include "gcache_page.hpp"
 
+#include <gu_throw.hpp>
+#include <gu_logger.hpp>
+
 // for posix_fadvise()
 #if !defined(_XOPEN_SOURCE)
 #define _XOPEN_SOURCE 600
@@ -66,7 +69,7 @@ gcache::Page::Page (void* ps, const std::string& name, ssize_t size)
 }
 
 void*
-gcache::Page::malloc (ssize_t size)
+gcache::Page::malloc (int size)
 {
     if (size <= space_)
     {
@@ -103,13 +106,13 @@ gcache::Page::malloc (ssize_t size)
 }
 
 void*
-gcache::Page::realloc (void* ptr, ssize_t size)
+gcache::Page::realloc (void* ptr, int size)
 {
     BufferHeader* bh(ptr2BH(ptr));
 
     if (bh == BH_cast(next_ - bh->size)) // last buffer, can shrink and expand
     {
-        ssize_t const diff_size (size - bh->size);
+        int const diff_size (size - bh->size);
 
         if (gu_likely (diff_size < space_))
         {
@@ -124,7 +127,7 @@ gcache::Page::realloc (void* ptr, ssize_t size)
     }
     else
     {
-        if (gu_likely(size > bh->size))
+        if (gu_likely(size > 0 && uint32_t(size) > bh->size))
         {
             void* const ret (malloc (size));
 

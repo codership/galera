@@ -13,8 +13,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <galerautils.hpp>
-
 using std::pair;
 using std::make_pair;
 using std::string;

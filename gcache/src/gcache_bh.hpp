@@ -6,12 +6,13 @@
 #ifndef __GCACHE_BUFHEAD__
 #define __GCACHE_BUFHEAD__
 
+#include "SeqnoNone.hpp"
+#include "gcache_memops.hpp"
+#include <gu_assert.h>
+
 #include <cstring>
 #include <stdint.h>
 #include <ostream>
-
-#include "SeqnoNone.hpp"
-#include "gcache_memops.hpp"
 
 namespace gcache
 {

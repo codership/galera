@@ -1,10 +1,12 @@
 /* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
-#include "gu_crc32c.h"
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
-#include "gcs.hpp"
+#include <gcs.hpp>
 
+#include <gu_crc32c.h>
+#include <gu_logger.hpp>
+#include <gu_throw.hpp>
 #include <wsrep_api.h>
 
 #include <boost/program_options.hpp>

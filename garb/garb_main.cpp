@@ -3,7 +3,7 @@
 #include "garb_config.hpp"
 #include "garb_recv_loop.hpp"
 
-#include <galerautils.hpp>
+#include <gu_throw.hpp>
 
 #include <iostream>
 

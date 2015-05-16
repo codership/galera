@@ -11,7 +11,7 @@ std::string const Replicator::Param::debug_log = "debug";
 #ifdef GU_DBUG_ON
 std::string const Replicator::Param::dbug = "dbug";
 std::string const Replicator::Param::signal = "signal";
-#endif // GU_DBUG_ON
+#endif /* GU_DBUG_ON */
 
 void Replicator::register_params(gu::Config& conf)
 {
@@ -19,7 +19,7 @@ void Replicator::register_params(gu::Config& conf)
 #ifdef GU_DBUG_ON
     conf.add(Param::dbug, "");
     conf.add(Param::signal, "");
-#endif // GU_DBUG_ON
+#endif /* GU_DBUG_ON */
 }
 
 const char* const

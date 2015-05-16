@@ -6,7 +6,7 @@
 #define GALERA_MONITOR_HPP
 
 #include "trx_handle.hpp"
-#include <galerautils.hpp>
+#include <gu_lock.hpp> // for gu::Mutex and gu::Cond
 
 #include <vector>
 

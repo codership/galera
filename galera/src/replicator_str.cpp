@@ -4,7 +4,7 @@
 
 #include "replicator_smm.hpp"
 #include "uuid.hpp"
-#include <galerautils.hpp>
+#include <gu_abort.h>
 
 namespace galera {
 

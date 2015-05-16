@@ -3,8 +3,6 @@
 #ifndef _GARB_CONFIG_HPP_
 #define _GARB_CONFIG_HPP_
 
-#include <galerautils.hpp>
-
 #include <string>
 #include <iostream>
 

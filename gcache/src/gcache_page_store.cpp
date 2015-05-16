@@ -7,9 +7,14 @@
 #include "gcache_page_store.hpp"
 #include "gcache_bh.hpp"
 
+#include <gu_logger.hpp>
+#include <gu_throw.hpp>
+
 #include <cstdio>
 #include <cstring>
 #include <pthread.h>
+
+#include <iomanip>
 
 static const std::string base_name ("gcache.page.");
 
@@ -53,7 +58,7 @@ remove_file (void* __restrict__ arg)
             int err = errno;
 
             log_error << "Failed to remove page file '" << file_name << "': "
-                      << gu::to_string(err) << " (" << strerror(err) << ")";
+                      << err << " (" << strerror(err) << ")";
         }
         else
         {
@@ -195,7 +200,7 @@ gcache::PageStore::~PageStore ()
 }
 
 inline void*
-gcache::PageStore::malloc_new (ssize_t size)
+gcache::PageStore::malloc_new (unsigned int size)
 {
     void* ret = 0;
 
@@ -216,7 +221,7 @@ gcache::PageStore::malloc_new (ssize_t size)
 }
 
 void*
-gcache::PageStore::malloc (ssize_t size)
+gcache::PageStore::malloc (int size)
 {
     if (gu_likely (0 != current_))
     {
@@ -231,7 +236,7 @@ gcache::PageStore::malloc (ssize_t size)
 }
 
 void*
-gcache::PageStore::realloc (void* ptr, ssize_t size)
+gcache::PageStore::realloc (void* ptr, int size)
 {
     assert(ptr != 0);
 

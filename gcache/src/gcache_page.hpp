@@ -24,7 +24,7 @@ namespace gcache
         Page (void* ps, const std::string& name, ssize_t size);
         ~Page () {}
 
-        void* malloc  (ssize_t size);
+        void* malloc  (int size);
 
         void  free    (BufferHeader* bh)
         {
@@ -36,7 +36,7 @@ namespace gcache
             used_--;
         }
 
-        void* realloc (void* ptr, ssize_t size);
+        void* realloc (void* ptr, int size);
 
         void discard (BufferHeader* ptr) {}
 

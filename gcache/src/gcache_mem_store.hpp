@@ -12,6 +12,7 @@
 
 #include <string>
 #include <set>
+#include <map>
 
 namespace gcache
 {
@@ -43,7 +44,7 @@ namespace gcache
 
         ~MemStore () { reset(); }
 
-        void* malloc  (ssize_t size)
+        void* malloc  (int size)
         {
             if (size > max_size_ || have_free_space(size) == false) return 0;
 
@@ -79,7 +80,7 @@ namespace gcache
             if (SEQNO_NONE == bh->seqno_g) discard (bh);
         }
 
-        void* realloc (void* ptr, ssize_t size)
+        void* realloc (void* ptr, int size)
         {
             BufferHeader* bh(0);
             ssize_t old_size(0);

@@ -2,6 +2,11 @@ Import('env', 'x86', 'sysname')
 
 libgalerautils_env = env.Clone()
 
+# Include paths
+libgalerautils_env.Append(CPPPATH = Split('''
+                                             #
+                                          '''))
+
 # C part
 libgalerautils_sources = [
     'gu_abort.c',
@@ -29,6 +34,7 @@ libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_env = env.Clone()
+crc32c_env.Append(CPPPATH = [ '#' ])
 crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
@@ -57,6 +63,13 @@ env.Append(LIBGALERA_OBJS = libgalerautils_objs + crc32c_objs)
 #env.Append(LIBGALERA_OBJS = crc32c_objs)
 
 libgalerautilsxx_env = env.Clone()
+
+# Include paths
+libgalerautilsxx_env.Append(CPPPATH = Split('''
+                                               #
+                                               #/asio
+                                               #/common
+                                            '''))
 
 # disable old style cast warnings
 libgalerautilsxx_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
