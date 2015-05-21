@@ -254,3 +254,16 @@ gcache::PageStore::realloc (void* ptr, ssize_t size)
 
     return ret;
 }
+
+size_t gcache::PageStore::actual_pool_size ()
+{
+  size_t size = 0;
+  std::deque<Page*>::iterator ptr = pages_.begin();
+  while (ptr != pages_.end())
+  {
+    Page* page = static_cast<Page*>(*ptr);
+    size += page->actual_pool_size();
+    ptr++;
+  }
+  return size;
+}

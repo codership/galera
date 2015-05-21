@@ -39,4 +39,7 @@ private:
 
 } /* namespace gu */
 
+/** Returns actual memory usage by allocated page range: **/
+size_t gu_actual_memory_usage (const void * const ptr, const size_t length);
+
 #endif /* __GCACHE_MMAP__ */

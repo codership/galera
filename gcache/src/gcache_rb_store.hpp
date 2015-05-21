@@ -101,6 +101,8 @@ namespace gcache
             assert_size_free();
         }
 
+        size_t actual_pool_size ();
+
     private:
 
         static ssize_t const PREAMBLE_LEN = 1024;
