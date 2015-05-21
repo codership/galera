@@ -144,3 +144,8 @@ gcache::Page::realloc (void* ptr, ssize_t size)
         }
     }
 }
+
+size_t gcache::Page::actual_pool_size ()
+{
+    return gu_actual_memory_usage((void *) mmap_.ptr, mmap_.size);
+}

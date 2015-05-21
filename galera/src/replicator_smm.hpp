@@ -134,7 +134,7 @@ namespace galera
         void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l);
         void process_sync(wsrep_seqno_t seqno_l);
 
-        const struct wsrep_stats_var* stats_get()  const;
+        const struct wsrep_stats_var* stats_get();
         void                          stats_reset();
         void                   stats_free(struct wsrep_stats_var*);
 

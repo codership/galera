@@ -54,6 +54,8 @@ namespace gcache
 
         void* parent() const { return ps_; }
 
+        size_t actual_pool_size ();
+
     private:
 
         gu::FileDescriptor fd_;

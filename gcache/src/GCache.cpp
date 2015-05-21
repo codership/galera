@@ -70,6 +70,14 @@ namespace gcache
                   << "\n" << "GCache frees   : " << frees;
     }
 
+    size_t GCache::actual_pool_size ()
+    {
+        gu::Lock lock(mtx);
+        return mem.actual_pool_size() +
+               rb.actual_pool_size() +
+               ps.actual_pool_size();
+    }
+
     /*! prints object properties */
     void print (std::ostream& os) {}
 }
