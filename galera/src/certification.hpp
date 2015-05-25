@@ -105,6 +105,12 @@ namespace galera
             index_size_ = 0;
         }
 
+        size_t bucket_count ()
+        {
+            return cert_index_.bucket_count() +
+                cert_index_ng_.bucket_count();
+        }
+
         bool index_purge_required()
         {
             register long const count(key_count_.fetch_and_zero());

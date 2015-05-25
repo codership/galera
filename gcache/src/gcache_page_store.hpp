@@ -52,6 +52,8 @@ namespace gcache
 
         void  set_keep_size (ssize_t size) { keep_size_ = size; }
 
+        size_t actual_pool_size ();
+
     private:
 
         std::string const base_name_; /* /.../.../gcache.page. */

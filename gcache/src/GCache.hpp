@@ -98,6 +98,11 @@ namespace gcache
                                    int64_t& seqno_d,
                                    ssize_t& size);
 
+        /*!
+         * Returns actual gcache memory pool size (in bytes).
+         */
+        size_t actual_pool_size ();
+
         class Buffer
         {
         public:

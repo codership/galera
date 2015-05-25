@@ -135,6 +135,8 @@ namespace gcache
         // for unit tests only
         ssize_t _allocd () const { return size_; }
 
+        size_t actual_pool_size ();
+
     private:
 
         bool have_free_space (ssize_t size);

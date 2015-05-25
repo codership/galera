@@ -67,6 +67,11 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
         log_error << "Negative page buffer size";
     }
 
+    if (rb_size_ < 0)
+    {
+        log_error << "Negative ring buffer size";
+    }
+
     if (mem_size_ < 0)
     {
         log_error << "Negative memory buffer size";

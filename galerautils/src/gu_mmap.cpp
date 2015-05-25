@@ -11,6 +11,11 @@
 
 #include <cerrno>
 #include <sys/mman.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include "gu_limits.h"
 
 // to avoid -Wold-style-cast
 extern "C" { static const void* const GU_MAP_FAILED = MAP_FAILED; }
@@ -91,4 +96,44 @@ namespace gu
     {
         if (mapped) unmap();
     }
+}
+
+/** Returns actual memory usage by allocated page range: **/
+
+size_t gu_actual_memory_usage (const void * const ptr, const size_t length)
+{
+    size_t size= 0;
+    if (length)
+    {       
+      const uintptr_t first= (uintptr_t) ptr                & -GU_PAGE_SIZE;
+      const uintptr_t last=  ((uintptr_t) ptr + length - 1) & -GU_PAGE_SIZE;
+      const ptrdiff_t total= last - first + GU_PAGE_SIZE;
+      const size_t    pages= total / GU_PAGE_SIZE;
+      unsigned char * const map= (unsigned char *) malloc(pages);
+      if (map)
+      {
+        if (mincore((void *) first, total, map) == 0)
+        {
+          for (size_t i = 0; i < pages; i++)
+          {
+            if (map[i])
+              size += GU_PAGE_SIZE;
+          }
+        }
+        else
+        {
+           log_fatal << "Unable to get in-core state vector for page range. "
+                     << "Aborting.";
+           abort();
+        }
+        free(map);
+      }
+      else
+      {
+        log_fatal << "Unable to allocate memory for in-core state vector. "
+                  << "Aborting.";
+        abort();
+      }
+    }
+    return size;
 }

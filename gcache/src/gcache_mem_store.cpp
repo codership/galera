@@ -4,6 +4,7 @@
 
 #include "gcache_mem_store.hpp"
 #include "gcache_page_store.hpp"
+#include "gcache_rb_store.hpp"
 
 #include <gu_logger.hpp>
 
@@ -60,7 +61,7 @@ MemStore::seqno_reset()
     {
         std::set<void*>::iterator tmp(buf); ++buf;
 
-        BufferHeader* const bh(ptr2BH(*tmp));
+        BufferHeader* const bh(BH_cast(*tmp));
 
         if (bh->seqno_g != SEQNO_NONE)
         {
@@ -72,6 +73,38 @@ MemStore::seqno_reset()
             ::free (bh);
         }
     }
+}
+
+size_t MemStore::actual_pool_size ()
+{
+  size_t size= 0;
+  for (std::set<void*>::iterator buf(allocd_.begin());
+                                 buf != allocd_.end(); ++buf)
+  {
+    BufferHeader* const bh(static_cast<BufferHeader*>(*buf));
+    switch (bh->store)
+    {
+      case BUFFER_IN_MEM:
+        size += bh->size;
+        break;
+      case BUFFER_IN_RB:
+        {
+          RingBuffer* const rb (static_cast<RingBuffer*>(bh->ctx));
+          size += rb->actual_pool_size();
+          break;
+        }
+      case BUFFER_IN_PAGE:
+        {
+          Page* const page (static_cast<Page*>(bh->ctx));
+          size += page->actual_pool_size();
+          break;
+        }
+      default:
+        log_fatal << "Corrupt buffer header: " << bh;
+        abort();
+    }
+  }
+  return size;
 }
 
 } /* namespace gcache */
