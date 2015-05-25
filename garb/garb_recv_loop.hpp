@@ -6,7 +6,8 @@
 #include "garb_gcs.hpp"
 #include "garb_config.hpp"
 
-#include <galerautils.hpp>
+#include <gu_throw.hpp>
+#include <gu_asio.hpp>
 
 #include <pthread.h>
 

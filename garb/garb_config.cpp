@@ -1,10 +1,12 @@
 /* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
 
-#include "gu_crc32c.h"
 #include "garb_config.hpp"
 #include "garb_logger.hpp"
-#include "gcs.hpp"
+#include <gcs.hpp>
 
+#include <gu_crc32c.h>
+#include <gu_logger.hpp>
+#include <gu_throw.hpp>
 #include <wsrep_api.h>
 
 #include <boost/program_options.hpp>
@@ -16,6 +18,17 @@ namespace po = boost::program_options;
 
 namespace garb
 {
+
+    static void
+    strip_quotes(std::string& s)
+    {
+        /* stripping no more than one pair of quotes */
+        if ('"' == *s.begin() && '"' == *s.rbegin())
+        {
+            std::string stripped(s.substr(1, s.length() - 2));
+            s = stripped;
+        }
+    }
 
     std::string const Config::DEFAULT_SST(WSREP_STATE_TRANSFER_TRIVIAL);
 
@@ -51,7 +64,7 @@ Config::Config (int argc, char* argv[])
         ;
 
     po::options_description cfg_opt;
-    config.add_options()
+    cfg_opt.add_options()
         ("cfg,c",    po::value<std::string>(&cfg_),     "Configuration file")
         ;
 
@@ -112,6 +125,19 @@ Config::Config (int argc, char* argv[])
     {
         daemon_ = true;
     }
+
+    /* Seeing how https://svn.boost.org/trac/boost/ticket/850 is fixed long and
+     * hard, it becomes clear what an undercooked piece of... cake(?) boost is.
+     * - need to strip quotes manually if used in config file.
+     * (which is done in a very simplistic manner, but should work for most) */
+    strip_quotes(name_);
+    strip_quotes(address_);
+    strip_quotes(group_);
+    strip_quotes(sst_);
+    strip_quotes(donor_);
+    strip_quotes(options_);
+    strip_quotes(log_);
+    strip_quotes(cfg_);
 
     if (options_.length() > 0) options_ += "; ";
     options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_master_slave=yes";

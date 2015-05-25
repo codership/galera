@@ -2,6 +2,9 @@
 
 #include "garb_logger.hpp"
 
+#include <gu_throw.hpp>
+#include <gu_conf.h>
+
 #include <cstdio>
 #include <errno.h>
 #include <syslog.h>

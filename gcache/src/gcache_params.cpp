@@ -46,7 +46,7 @@ name_value (gu::Config& cfg, const std::string& data_dir)
      * the latter is not an absolute path */
     if ('/' != rb_name[0] && !dir.empty())
     {
-        rb_name = dir + '/' + GCACHE_DEFAULT_RB_NAME;
+        rb_name = dir + '/' + rb_name;
         cfg.set (GCACHE_PARAMS_RB_NAME, rb_name);
     }
 

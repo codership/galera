@@ -6,8 +6,6 @@
 #include "gcache_bh.hpp"
 #include "GCache.hpp"
 
-#include <galerautils.hpp>
-
 #include <cerrno>
 #include <cassert>
 

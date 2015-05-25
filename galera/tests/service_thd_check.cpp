@@ -14,11 +14,30 @@ namespace
 {
     class TestEnv
     {
+        class GCache_setup
+        {
+        public:
+            GCache_setup(gu::Config& conf) : name_("service_thd_check.gcache")
+            {
+                conf.set("gcache.name", name_);
+                conf.set("gcache.size", "4M");
+                log_info << "conf for gcache: " << conf;
+            }
+
+            ~GCache_setup()
+            {
+                unlink(name_.c_str());
+            }
+        private:
+            std::string const name_;
+        };
+
     public:
 
         TestEnv() :
             conf_   (),
             init_   (conf_, NULL, NULL),
+            gcache_setup_(conf_),
             gcache_ (conf_, "."),
             gcs_    (conf_, gcache_)
         {}
@@ -30,6 +49,7 @@ namespace
 
         gu::Config       conf_;
         galera::ReplicatorSMM::InitConfig init_;
+        GCache_setup     gcache_setup_;
         gcache::GCache   gcache_;
         galera::DummyGcs gcs_;
     };

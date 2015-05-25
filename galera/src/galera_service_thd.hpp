@@ -8,8 +8,7 @@
 #include "galera_gcs.hpp"
 #include <GCache.hpp>
 
-#include <galerautils.h>
-#include <galerautils.hpp>
+#include <gu_lock.hpp> // gu::Mutex and gu::Cond
 
 namespace galera
 {

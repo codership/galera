@@ -79,6 +79,7 @@ Suite* gu_net_suite()
 
     tc = tcase_create("test_resolver");
     tcase_add_test(tc, test_resolver);
+    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("trac_288");

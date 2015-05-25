@@ -4,7 +4,6 @@
  * $Id$
  */
 
-#include "gcs_act_proto.hpp"
 #include "gcs_defrag.hpp"
 
 #include <errno.h>

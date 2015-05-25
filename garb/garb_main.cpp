@@ -3,7 +3,7 @@
 #include "garb_config.hpp"
 #include "garb_recv_loop.hpp"
 
-#include <galerautils.hpp>
+#include <gu_throw.hpp>
 
 #include <iostream>
 
@@ -86,9 +86,21 @@ main (int argc, char* argv[])
 
     if (config.daemon()) become_daemon();
 
-    RecvLoop loop (config);
+    try
+    {
+        RecvLoop loop (config);
+        return 0;
+    }
+    catch (std::exception& e)
+    {
+        log_fatal << "Exception in creating receive loop: " << e.what();
+    }
+    catch (...)
+    {
+        log_fatal << "Exception in creating receive loop.";
+    }
 
-    return 0;
+    return EXIT_FAILURE;
 }
 
 } /* namespace garb */

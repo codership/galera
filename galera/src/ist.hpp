@@ -135,7 +135,6 @@ namespace galera
                 :
                 senders_(),
                 monitor_(),
-                gcs_(gcs),
                 gcache_(gcache) { }
             void run(const gu::Config& conf,
                      const std::string& peer,
@@ -149,7 +148,6 @@ namespace galera
             std::set<AsyncSender*> senders_;
             // use monitor instead of mutex, it provides cancellation point
             gu::Monitor            monitor_;
-            GCS_IMPL&              gcs_;
             gcache::GCache&        gcache_;
         };
 

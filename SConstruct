@@ -29,7 +29,6 @@ if bits == '32bit':
 elif bits == '64bit':
     x86 = 64
 
-
 #
 # Print Help
 #
@@ -121,7 +120,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.9')
+GALERA_VER = ARGUMENTS.get('version', '3.10')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -186,30 +185,6 @@ if extra_sysroot != '':
     env.Append(CPPFLAGS = ' -I' + extra_sysroot + '/include')
 
 # print env.Dump()
-#
-# Set up build and link paths
-#
-
-# Include paths
-env.Append(CPPPATH = Split('''#
-                              #/asio
-                              #/common
-                              #/galerautils/src
-                              #/gcomm/src
-                              #/gcomm/src/gcomm
-                              #/gcache/src
-                              #/gcs/src
-                              #/wsdb/src
-                              #/galera/src
-                           '''))
-
-# Library paths
-#env.Append(LIBPATH = Split('''#/galerautils/src
-#                              #/gcomm/src
-#                              #/gcs/src
-#                              #/wsdb/src
-#                              #/galera/src
-#                           '''))
 
 # Preprocessor flags
 if sysname != 'sunos' and sysname != 'darwin' and sysname != 'freebsd':
@@ -382,6 +357,9 @@ else:
     print 'Not using boost'
 
 # asio
+cpppath_saved = conf.env.get('CPPPATH')
+
+conf.env.Append(CPPPATH = [ '#/asio' ])
 if conf.CheckCXXHeader('asio.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
@@ -414,13 +392,19 @@ if ssl == 1:
             print 'compile with ssl=0 or check that' 
             print 'openssl static librares - libssl.a, libcrypto.a, libz.a are available'
             Exit(1)
+conf.env['CPPPATH'] = cpppath_saved
 
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
     conf.env.Append(CPPFLAGS = ' -Werror')
     conf.env.Append(CCFLAGS  = ' -pedantic')
-    conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+    if 'clang' not in conf.env['CXX']:
+        conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+    else:
+        conf.env.Append(CPPFLAGS = ' -Wno-self-assign')
+        if 'ccache' in conf.env['CXX']:
+            conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
 
 env = conf.Finish()
 Export('x86', 'env', 'sysname', 'libboost_program_options', 'static_ssl', 'with_ssl')

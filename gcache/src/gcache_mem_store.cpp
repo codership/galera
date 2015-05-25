@@ -5,6 +5,8 @@
 #include "gcache_mem_store.hpp"
 #include "gcache_page_store.hpp"
 
+#include <gu_logger.hpp>
+
 namespace gcache
 {
 

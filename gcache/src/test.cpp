@@ -3,8 +3,10 @@
  *
  */
 
-#include <galerautils.hpp>
 #include "GCache.hpp"
+
+#include <gu_logger.hpp>
+#include <gu_exception.hpp>
 
 using namespace gcache;
 

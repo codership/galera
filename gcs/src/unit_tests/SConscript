@@ -3,6 +3,13 @@ Import('check_env')
 
 env = check_env.Clone()
 
+# Include paths
+env.Append(CPPPATH = Split('''
+                              #/galerautils/src
+                              #/gcache/src
+                              #/gcs/src
+                           '''))
+
 # For C-style logging
 env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
 # Disable old style cast warns until code is fixed

@@ -4,6 +4,17 @@ Import('env', 'libboost_program_options', 'static_ssl', 'with_ssl')
 
 garb_env = env.Clone()
 
+# Include paths
+garb_env.Append(CPPPATH = Split('''
+                                   #
+                                   #/asio
+                                   #/common
+                                   #/galerautils/src
+                                   #/gcs/src
+                                '''))
+
+garb_env.Append(CPPFLAGS = ' -DGCS_FOR_GARB')
+
 garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 garb_env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))

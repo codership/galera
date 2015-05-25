@@ -2,12 +2,13 @@
  * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
+#include "GCache.hpp"
+#include "gcache_bh.hpp"
+
+#include <gu_logger.hpp>
+
 #include <cerrno>
 #include <unistd.h>
-#include <galerautils.hpp>
-
-#include "gcache_bh.hpp"
-#include "GCache.hpp"
 
 namespace gcache
 {
@@ -89,7 +90,7 @@ void gcache_destroy (gcache_t* gc)
     delete gcache;
 }
 
-void* gcache_malloc  (gcache_t* gc, size_t size)
+void* gcache_malloc  (gcache_t* gc, int size)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     return gcache->malloc (size);
@@ -101,7 +102,7 @@ void  gcache_free    (gcache_t* gc, const void* ptr)
     gcache->free (const_cast<void*>(ptr));
 }
 
-void* gcache_realloc (gcache_t* gc, void* ptr, size_t size)
+void* gcache_realloc (gcache_t* gc, void* ptr, int size)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     return gcache->realloc (ptr, size);

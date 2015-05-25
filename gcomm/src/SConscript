@@ -2,6 +2,19 @@
 
 Import('env')
 
+libgcomm_env = env.Clone()
+
+# Include paths
+libgcomm_env.Append(CPPPATH = Split('''
+                                       #
+                                       #/asio
+                                       #/common
+                                       #/galerautils/src
+                                       #/gcomm/src
+                                    '''))
+
+libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing')
+
 libgcomm_sources = [
     'conf.cpp',
     'defaults.cpp',
@@ -21,9 +34,6 @@ libgcomm_sources = [
     'uuid.cpp',
     'view.cpp',
     'socket.cpp']
-
-libgcomm_env = env.Clone()
-libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing')
 
 if '-DHAVE_ASIO_HPP' in libgcomm_env['CPPFLAGS']:
     # ASIO sources need to be built with relaxed C++ flags

@@ -9,7 +9,9 @@
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
 
-#include "gu_types.hpp"
+#include <gu_types.hpp>
+#include <gu_lock.hpp> // for gu::Mutex and gu::Cond
+#include <gu_config.hpp>
 
 #include <string>
 #include <iostream>
@@ -45,9 +47,9 @@ namespace gcache
         void  reset();
 
         /* Memory allocation functions */
-        void* malloc  (ssize_t size);
+        void* malloc  (int size);
         void  free    (void* ptr);
-        void* realloc (void* ptr, ssize_t size);
+        void* realloc (void* ptr, int size);
 
         /* Seqno related functions */
 

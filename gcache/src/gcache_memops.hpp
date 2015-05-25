@@ -7,8 +7,6 @@
 #ifndef _gcache_memops_hpp_
 #define _gcache_memops_hpp_
 
-#include <galerautils.hpp>
-
 namespace gcache
 {
     struct BufferHeader;
@@ -20,13 +18,13 @@ namespace gcache
         virtual ~MemOps() {}
 
         virtual void*
-        malloc  (ssize_t size)            = 0;
+        malloc  (int size)                = 0;
 
         virtual void
         free    (BufferHeader* bh)        = 0;
 
         virtual void*
-        realloc (void* ptr, ssize_t size) = 0;
+        realloc (void* ptr, int size)     = 0;
 
         virtual void
         discard (BufferHeader* bh)        = 0;

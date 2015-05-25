@@ -18,8 +18,6 @@
 #include "gcs_comp_msg.hpp"
 #include "gcs_state_msg.hpp"
 
-#include <gcache.h>
-
 #define NODE_NO_ID   "undefined"
 #define NODE_NO_NAME "unspecified"
 #define NODE_NO_ADDR "unspecified"

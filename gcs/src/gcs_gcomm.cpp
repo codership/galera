@@ -17,19 +17,21 @@
 #define GCS_COMP_MSG_ACCESS 1
 #include "gcs_comp_msg.hpp"
 
-
-#include <galerautils.hpp>
-#include "gu_backtrace.hpp"
-#include "gcomm/transport.hpp"
-#include "gcomm/util.hpp"
-#include "gcomm/conf.hpp"
+#include <gcomm/transport.hpp>
+#include <gcomm/util.hpp>
+#include <gcomm/conf.hpp>
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
 #else
 #undef GCOMM_PROFILE
 #endif // PROFILE_GCS_GCOMM
-#include "profile.hpp"
+#include <profile.hpp>
+
+#include <gu_backtrace.hpp>
+#include <gu_throw.hpp>
+#include <gu_logger.hpp>
+#include <gu_prodcons.hpp>
 
 #include <deque>
 
