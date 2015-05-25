@@ -196,7 +196,7 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
 env.Replace(CCFLAGS = opt_flags + compile_arch +
-                      ' -Wall -Wextra -Wno-unused-parameter')
+                      ' -Wall -Wextra -Wno-unused-parameter -Wno-error=pedantic')
 
 # C-specific flags
 env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
