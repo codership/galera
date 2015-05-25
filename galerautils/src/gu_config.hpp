@@ -86,7 +86,7 @@ public:
         else
         {
 #ifndef NDEBUG
-            log_error << "key '" << key << "' not recognized.";
+            log_debug << "Key '" << key << "' not recognized.";
 #endif
             throw NotFound();
         }
