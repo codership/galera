@@ -102,7 +102,7 @@ namespace gu
         }
 */
 #endif
-        log_debug << "Opened file '" << name_ << "'";
+        log_debug << "Opened file '" << name_ << "', size: " << size_;
         log_debug << "File descriptor: " << fd_;
     }
 

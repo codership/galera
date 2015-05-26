@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -47,9 +47,10 @@ namespace gcache
         void  reset();
 
         /* Memory allocation functions */
-        void* malloc  (int size);
+        typedef MemOps::ssize_type ssize_type;
+        void* malloc  (ssize_type size);
         void  free    (void* ptr);
-        void* realloc (void* ptr, int size);
+        void* realloc (void* ptr, ssize_type size);
 
         /* Seqno related functions */
 
@@ -167,6 +168,8 @@ namespace gcache
         static size_t const PREAMBLE_LEN;
 
     private:
+
+        typedef MemOps::size_type size_type;
 
         void free_common (BufferHeader*);
 

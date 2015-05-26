@@ -1,10 +1,11 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
 #include "gcache_mem_store.hpp"
+#include "gcache_limits.hpp"
 
 #include <gu_logger.hpp>
 #include <gu_throw.hpp>
@@ -13,10 +14,8 @@
 
 namespace gcache
 {
-    static size_t check_size (ssize_t s)
+    static inline size_t check_size (size_t s)
     {
-        if (s < 0) gu_throw_error(EINVAL) << "Negative cache file size: " << s;
-
         return s + RingBuffer::pad_size() + sizeof(BufferHeader);
     }
 
@@ -39,7 +38,7 @@ namespace gcache
     void
     RingBuffer::constructor_common() {}
 
-    RingBuffer::RingBuffer (const std::string& name, ssize_t size,
+    RingBuffer::RingBuffer (const std::string& name, size_t size,
                             std::map<int64_t, const void*> & seqno2ptr)
     :
         fd_        (name, check_size(size)),
@@ -117,21 +116,22 @@ namespace gcache
 
     // returns pointer to buffer data area or 0 if no space found
     BufferHeader*
-    RingBuffer::get_new_buffer (ssize_t const size)
+    RingBuffer::get_new_buffer (size_type const size)
     {
         assert_size_free();
-        assert (size > 0);
 
         BH_assert_clear(BH_cast(next_));
 
         uint8_t* ret(next_);
 
-        ssize_t const size_next (size + sizeof(BufferHeader));
+        size_type const size_next(size + sizeof(BufferHeader));
+
+        Limits::assert_size(size_next);
 
         if (ret >= first_) {
             assert (0 == size_trail_);
             // try to find space at the end
-            ssize_t const end_size(end_ - ret);
+            size_t const end_size(end_ - ret);
 
             if (end_size >= size_next) {
                 assert(size_free_ >= size);
@@ -208,8 +208,8 @@ namespace gcache
     found_space:
         size_used_ += size;
         assert (size_used_ <= size_cache_);
+        assert (size_free_ >= size);
         size_free_ -= size;
-        assert (size_free_ >= 0);
 
         BufferHeader* const bh(BH_cast(ret));
         bh->size    = size;
@@ -228,9 +228,11 @@ namespace gcache
     }
 
     void*
-    RingBuffer::malloc (int size)
+    RingBuffer::malloc (size_type const size)
     {
-        void* ret(0);
+        Limits::assert_size(size);
+
+        void* ret(NULL);
 
         // We can reliably allocate continuous buffer which is 1/2
         // of a total cache space. So compare to half the space
@@ -254,8 +256,8 @@ namespace gcache
     {
         assert(BH_is_released(bh));
 
+        assert(size_used_ >= bh->size);
         size_used_ -= bh->size;
-        assert(size_used_ >= 0);
 
         if (SEQNO_NONE == bh->seqno_g)
         {
@@ -265,8 +267,10 @@ namespace gcache
     }
 
     void*
-    RingBuffer::realloc (void* ptr, int const size)
+    RingBuffer::realloc (void* ptr, size_type const size)
     {
+        Limits::assert_size(size);
+
         assert_sizes();
         assert (NULL != ptr);
         assert (size > 0);
@@ -281,13 +285,14 @@ namespace gcache
         // first check if we can grow this buffer by allocating
         // adjacent buffer
         {
-            int const adj_size(size - bh->size);
+            Limits::assert_size(bh->size);
+            diff_type const adj_size(size - bh->size);
             if (adj_size <= 0) return ptr;
 
             uint8_t* const adj_ptr(reinterpret_cast<uint8_t*>(BH_next(bh)));
             if (adj_ptr == next_)
             {
-                int const size_trail_saved(size_trail_);
+                ssize_type const size_trail_saved(size_trail_);
                 void* const adj_buf (get_new_buffer (adj_size));
 
                 BH_assert_clear(BH_cast(next_));
@@ -365,7 +370,7 @@ namespace gcache
          * freed, and the only unreleased buffers should come only from new
          * configuration. There should be no seqno'd buffers after it. */
 
-        ssize_t const old(size_free_);
+        size_t const old(size_free_);
 
         assert (0 == size_trail_ || first_ > next_);
         first_ = reinterpret_cast<uint8_t*>(bh);
