@@ -1,10 +1,11 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class implementation */
 
 #include "gcache_page.hpp"
+#include "gcache_limits.hpp"
 
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
@@ -14,15 +15,6 @@
 #define _XOPEN_SOURCE 600
 #endif
 #include <fcntl.h>
-
-static ssize_t
-check_size (ssize_t size)
-{
-    if (size < 0)
-        gu_throw_error(EINVAL) << "Negative page size: " << size;
-
-    return size;
-}
 
 void
 gcache::Page::reset ()
@@ -54,9 +46,9 @@ gcache::Page::drop_fs_cache() const
 #endif
 }
 
-gcache::Page::Page (void* ps, const std::string& name, ssize_t size)
+gcache::Page::Page (void* ps, const std::string& name, size_t size)
     :
-    fd_   (name, check_size(size), false, false),
+    fd_   (name, size, false, false),
     mmap_ (fd_),
     ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
@@ -69,8 +61,10 @@ gcache::Page::Page (void* ps, const std::string& name, ssize_t size)
 }
 
 void*
-gcache::Page::malloc (int size)
+gcache::Page::malloc (size_type size)
 {
+    Limits::assert_size(size);
+
     if (size <= space_)
     {
         BufferHeader* bh(BH_cast(next_));
@@ -107,13 +101,15 @@ gcache::Page::malloc (int size)
 }
 
 void*
-gcache::Page::realloc (void* ptr, int size)
+gcache::Page::realloc (void* ptr, size_type size)
 {
+    Limits::assert_size(size);
+
     BufferHeader* bh(ptr2BH(ptr));
 
     if (bh == BH_cast(next_ - bh->size)) // last buffer, can shrink and expand
     {
-        ssize_t const diff_size (size - bh->size);
+        diff_type const diff_size (size - bh->size);
 
         if (gu_likely (diff_size < space_))
         {
