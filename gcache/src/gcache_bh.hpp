@@ -36,7 +36,7 @@ namespace gcache
         int32_t  store;
     }__attribute__((__packed__));
 
-    GU_COMPILE_ASSERT(sizeof(BufferHeader::size) >= sizeof(MemOps::size_type),
+    GU_COMPILE_ASSERT(sizeof(BufferHeader().size) >= sizeof(MemOps::size_type),
                       buffer_header_size_check);
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)

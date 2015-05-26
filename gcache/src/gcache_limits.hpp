@@ -40,12 +40,15 @@ namespace gcache
         /* the difference between MAX_SIZE and MIN_SIZE should never exceed
          * diff_type capacity */
 
+        GU_COMPILE_ASSERT(MAX_SIZE > MIN_SIZE, max_min);
+
         typedef MemOps::diff_type diff_type;
 
         static diff_type const DIFF_MAX =
             (1ULL << (sizeof(diff_type)*8 - 1)) - 1;
 
-        GU_COMPILE_ASSERT(DIFF_MAX >= MAX_SIZE - MIN_SIZE, max_diff);
+        GU_COMPILE_ASSERT(DIFF_MAX >= 0, diff_max);
+        GU_COMPILE_ASSERT(size_type(DIFF_MAX) >= MAX_SIZE - MIN_SIZE, max_diff);
 
         static diff_type const DIFF_MIN = -DIFF_MAX - 1;
 
