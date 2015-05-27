@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  *
  */
 
@@ -9,6 +9,7 @@
 #include "SeqnoNone.hpp"
 #include "gcache_memops.hpp"
 #include <gu_assert.h>
+#include <gu_macros.hpp>
 
 #include <cstring>
 #include <stdint.h>
@@ -27,7 +28,6 @@ namespace gcache
     };
 
     typedef uint64_t BH_ctx_t;
-    /*! must store pointer on both 32 and 64-bit systems */
 
     struct BufferHeader
     {
@@ -38,6 +38,13 @@ namespace gcache
         int8_t   store;
         int8_t   type;  /*! arbitrary user defined type */
     }__attribute__((__packed__));
+
+    GU_COMPILE_ASSERT(sizeof(BufferHeader().size) >= sizeof(MemOps::size_type),
+                      buffer_header_size_check);
+
+    /*! must store pointer on both 32 and 64-bit systems */
+    GU_COMPILE_ASSERT(sizeof(BufferHeader().ctx) >= sizeof(void*),
+                      buffer_header_ctx_check);
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
 
@@ -105,7 +112,6 @@ namespace gcache
            << ", type: "    << bh->type;
         return os;
     }
-
 }
 
 #endif /* __GCACHE_BUFHEAD__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -46,24 +46,31 @@ namespace gcache
     }
 
     void*
-    GCache::malloc (int size)
+    GCache::malloc (ssize_type const s)
     {
-        size += sizeof(BufferHeader);
+        assert(s >= 0);
 
-        gu::Lock lock(mtx);
-        void*    ptr;
+        void* ptr(NULL);
 
-        mallocs++;
+        if (gu_likely(s > 0))
+        {
+            size_type const size(s + sizeof(BufferHeader));
 
-        ptr = mem.malloc(size);
+            gu::Lock lock(mtx);
 
-        if (0 == ptr) ptr = rb.malloc(size);
+            mallocs++;
 
-        if (0 == ptr) ptr = ps.malloc(size);
+            ptr = mem.malloc(size);
+
+            if (0 == ptr) ptr = rb.malloc(size);
+
+            if (0 == ptr) ptr = ps.malloc(size);
 
 #ifndef NDEBUG
-        if (0 != ptr) buf_tracker.insert (ptr);
+            if (0 != ptr) buf_tracker.insert (ptr);
 #endif
+        }
+
         return ptr;
     }
 
@@ -72,6 +79,7 @@ namespace gcache
     {
         assert(bh->seqno_g != SEQNO_ILL);
         BH_release(bh);
+
         if (gu_likely(SEQNO_NONE != bh->seqno_g))
         {
 #ifndef NDEBUG
@@ -134,13 +142,24 @@ namespace gcache
         }
     }
 
-    // this will crash if ptr == 0
     void*
-    GCache::realloc (void* ptr, int size)
+    GCache::realloc (void* const ptr, ssize_type const s)
     {
-        size += sizeof(BufferHeader);
+        assert(s >= 0);
 
-        void*               new_ptr(0);
+        if (NULL == ptr)
+        {
+            return malloc(s);
+        }
+        else if (s == 0)
+        {
+            free (ptr);
+            return NULL;
+        }
+
+        size_type const size(s + sizeof(BufferHeader));
+
+        void*               new_ptr(NULL);
         BufferHeader* const bh(ptr2BH(ptr));
 
         if (gu_unlikely(bh->seqno_g > 0)) // sanity check
