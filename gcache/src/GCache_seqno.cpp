@@ -219,15 +219,15 @@ namespace gcache
         return ptr;
     }
 
-    ssize_t
+    size_t
     GCache::seqno_get_buffers (std::vector<Buffer>& v,
                                int64_t const start)
     {
-        ssize_t const max(v.size());
+        size_t const max(v.size());
 
         assert (max > 0);
 
-        ssize_t found(0);
+        size_t found(0);
 
         {
             gu::Lock lock(mtx);
@@ -249,21 +249,22 @@ namespace gcache
                     v[found].set_ptr(p->second);
                 }
                 while (++found < max && ++p != seqno2ptr.end() &&
-                       p->first == (start + found));
+                       p->first == int64_t(start + found));
                 /* the latter condition ensures seqno continuty, #643 */
             }
         }
 
         // the following may cause IO
-        for (ssize_t i(0); i < found; ++i)
+        for (size_t i(0); i < found; ++i)
         {
             const BufferHeader* const bh (ptr2BH(v[i].ptr()));
 
             assert (bh->seqno_g == (start + i));
+            Limits::assert_size(bh->size);
 
-            v[i].set_other (bh->size - sizeof(BufferHeader),
-                            bh->seqno_g,
-                            bh->seqno_d);
+            v[i].set_other (bh->seqno_g,
+                            bh->seqno_d,
+                            bh->size - sizeof(BufferHeader));
         }
 
         return found;
