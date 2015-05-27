@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,8 +13,8 @@ using namespace gcache;
 START_TEST(test1)
 {
     std::string const rb_name = "rb_test";
-    ssize_t const bh_size = sizeof(gcache::BufferHeader);
-    ssize_t const rb_size (4 + 2*bh_size);
+    size_t const bh_size = sizeof(gcache::BufferHeader);
+    size_t const rb_size (4 + 2*bh_size);
 
     std::map<int64_t, const void*> s2p;
     RingBuffer rb(rb_name, rb_size, s2p);
