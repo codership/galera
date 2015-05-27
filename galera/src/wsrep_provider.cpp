@@ -91,7 +91,6 @@ extern "C"
 void galera_tear_down(wsrep_t* gh)
 {
     assert(gh != 0);
-    assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
