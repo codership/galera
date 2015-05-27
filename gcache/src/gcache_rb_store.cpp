@@ -145,9 +145,10 @@ namespace gcache
         }
 
         assert (ret <= first_);
-        if ((first_ - ret) >= size_next) { assert(size_free_ >= size); }
 
-        while ((first_ - ret) < size_next) {
+        if (first_ >= ret + size_next) { assert(size_free_ >= size); }
+
+        while (first_ < ret + size_next) {
             // try to discard first buffer to get more space
             BufferHeader* bh = BH_cast(first_);
 
@@ -175,10 +176,9 @@ namespace gcache
                 assert(first_ >= ret);
 
                 first_ = start_;
-// WRONG               if (first_ != ret) size_trail_ = 0; // we're now contiguous: first_ < next_
                 assert_size_free();
 
-                if ((end_ - ret) >= size_next)
+                if (end_ >= ret + size_next)
                 {
                     assert(size_free_ >= size);
                     size_trail_ = 0;
@@ -190,10 +190,12 @@ namespace gcache
                     ret = start_;
                 }
             }
+
+            assert(ret <= first_);
         }
 
 #ifndef NDEBUG
-        if ((first_ - ret) < size_next) {
+        if (first_ < ret + size_next) {
             log_fatal << "Assertion ((first - ret) >= size_next) failed: "
                       << std::endl
                       << "first offt = " << (first_ - start_) << std::endl

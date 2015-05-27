@@ -27,7 +27,7 @@ namespace gcache
 
         static size_type const MIN_SIZE = sizeof(BufferHeader) + 1;
 
-        static inline void assert_size(size_type s)
+        static inline void assert_size(unsigned long long s)
         {
 #ifndef NDEBUG
             assert(s <= MAX_SIZE);

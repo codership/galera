@@ -24,7 +24,7 @@ namespace gcache
 
     public:
 
-        MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr)
+        MemStore (size_t max_size, seqno2ptr_t& seqno2ptr)
             : max_size_ (max_size),
               size_     (0),
               allocd_   (),
@@ -136,7 +136,7 @@ namespace gcache
         void seqno_reset();
 
         // for unit tests only
-        ssize_t _allocd () const { return size_; }
+        size_t _allocd () const { return size_; }
 
     private:
 

@@ -46,11 +46,11 @@ namespace gcache
 
         void  reset();
 
-        ssize_t count() const { return count_; } // for unit tests
+        size_t count() const { return count_; } // for unit tests
 
-        void  set_page_size (ssize_t size) { page_size_ = size; }
+        void  set_page_size (size_t size) { page_size_ = size; }
 
-        void  set_keep_size (ssize_t size) { keep_size_ = size; }
+        void  set_keep_size (size_t size) { keep_size_ = size; }
 
     private:
 
@@ -58,7 +58,7 @@ namespace gcache
         size_t            keep_size_; /* how much pages to keep after freeing*/
         size_t            page_size_; /* min size of the individual page */
         bool        const keep_page_; /* whether to keep the last page */
-        int               count_;
+        size_t            count_;
         std::deque<Page*> pages_;
         Page*             current_;
         size_t            total_size_;

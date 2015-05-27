@@ -40,9 +40,9 @@ namespace gcache
 
         void discard (BufferHeader* ptr) {}
 
-        ssize_t used () const { return used_; }
+        size_t used () const { return used_; }
 
-        ssize_t size () const /* total page size */
+        size_t size () const /* total page size */
         { return mmap_.size - sizeof(BufferHeader); }
 
         const std::string& name() const { return fd_.name(); }
@@ -60,8 +60,8 @@ namespace gcache
         gu::MMap           mmap_;
         void* const        ps_;
         uint8_t*           next_;
-        ssize_t            space_;
-        ssize_t            used_;
+        size_t             space_;
+        size_t             used_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);
