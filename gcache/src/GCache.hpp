@@ -103,29 +103,29 @@ namespace gcache
         {
         public:
 
-            Buffer() : seqno_g_(), ptr_(), size_(), seqno_d_() { }
+            Buffer() : seqno_g_(), seqno_d_(), ptr_(), size_() { }
 
             Buffer (const Buffer& other)
                 :
                 seqno_g_(other.seqno_g_),
+                seqno_d_(other.seqno_d_),
                 ptr_    (other.ptr_),
-                size_   (other.size_),
-                seqno_d_(other.seqno_d_)
+                size_   (other.size_)
             { }
 
             Buffer& operator= (const Buffer& other)
             {
                 seqno_g_ = other.seqno_g_;
+                seqno_d_ = other.seqno_d_;
                 ptr_     = other.ptr_;
                 size_    = other.size_;
-                seqno_d_ = other.seqno_d_;
                 return *this;
             }
 
             int64_t           seqno_g() const { return seqno_g_; }
-            const gu::byte_t* ptr()     const { return ptr_;     }
-            ssize_t           size()    const { return size_;    }
             int64_t           seqno_d() const { return seqno_d_; }
+            const gu::byte_t* ptr()     const { return ptr_;     }
+            ssize_type        size()    const { return size_;    }
 
         protected:
 
@@ -134,15 +134,18 @@ namespace gcache
                 ptr_ = reinterpret_cast<const gu::byte_t*>(p);
             }
 
-            void set_other (ssize_t s, int64_t g, int64_t d)
-            { size_ = s; seqno_g_ = g; seqno_d_ = d; }
+            void set_other (int64_t g, int64_t d, ssize_type s)
+            {
+                assert(s > 0);
+                seqno_g_ = g; seqno_d_ = d; size_ = s;
+            }
 
         private:
 
             int64_t           seqno_g_;
-            const gu::byte_t* ptr_;
-            ssize_t           size_;
             int64_t           seqno_d_;
+            const gu::byte_t* ptr_;
+            ssize_type        size_; /* same type as passed to malloc() */
 
             friend class GCache;
         };
@@ -154,8 +157,7 @@ namespace gcache
          *
          * @retval number of buffers filled (<= v.size())
          */
-        ssize_t seqno_get_buffers (std::vector<Buffer>& v,
-                                   int64_t start);
+        size_t seqno_get_buffers (std::vector<Buffer>& v, int64_t start);
 
         /*!
          * Releases any seqno locks present.
@@ -186,23 +188,23 @@ namespace gcache
             const std::string& rb_name()  const { return rb_name_;  }
             const std::string& dir_name() const { return dir_name_; }
 
-            ssize_t mem_size()            const { return mem_size_;        }
-            ssize_t rb_size()             const { return rb_size_;         }
-            ssize_t page_size()           const { return page_size_;       }
-            ssize_t keep_pages_size()     const { return keep_pages_size_; }
+            size_t mem_size()            const { return mem_size_;        }
+            size_t rb_size()             const { return rb_size_;         }
+            size_t page_size()           const { return page_size_;       }
+            size_t keep_pages_size()     const { return keep_pages_size_; }
 
-            void mem_size        (ssize_t s) { mem_size_        = s; }
-            void page_size       (ssize_t s) { page_size_       = s; }
-            void keep_pages_size (ssize_t s) { keep_pages_size_ = s; }
+            void mem_size        (size_t s) { mem_size_        = s; }
+            void page_size       (size_t s) { page_size_       = s; }
+            void keep_pages_size (size_t s) { keep_pages_size_ = s; }
 
         private:
 
             std::string const rb_name_;
             std::string const dir_name_;
-            ssize_t           mem_size_;
-            ssize_t     const rb_size_;
-            ssize_t           page_size_;
-            ssize_t           keep_pages_size_;
+            size_t            mem_size_;
+            size_t      const rb_size_;
+            size_t            page_size_;
+            size_t            keep_pages_size_;
         }
             params;
 

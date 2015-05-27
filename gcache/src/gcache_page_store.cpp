@@ -40,7 +40,7 @@ make_base_name (const std::string& dir_name)
 }
 
 static std::string
-make_page_name (const std::string& base_name, ssize_t count)
+make_page_name (const std::string& base_name, size_t count)
 {
     std::ostringstream os;
     os << base_name << std::setfill ('0') << std::setw (6) << count;

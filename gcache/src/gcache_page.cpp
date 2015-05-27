@@ -76,12 +76,13 @@ gcache::Page::malloc (size_type size)
         bh->flags   = 0;
         bh->store   = BUFFER_IN_PAGE;
 
+        assert(space_ >= size);
         space_ -= size;
         next_  += size;
         used_++;
 
 #ifndef NDEBUG
-        if (space_ >= static_cast<ssize_t>(sizeof(BufferHeader)))
+        if (space_ >= sizeof(BufferHeader))
         {
             BH_clear (BH_cast(next_));
             assert (reinterpret_cast<uint8_t*>(bh + 1) < next_);
@@ -111,7 +112,7 @@ gcache::Page::realloc (void* ptr, size_type size)
     {
         diff_type const diff_size (size - bh->size);
 
-        if (gu_likely (diff_size < space_))
+        if (gu_likely (diff_size < 0 || size_t(diff_size) < space_))
         {
             bh->size += diff_size;
             space_   -= diff_size;
@@ -131,6 +132,7 @@ gcache::Page::realloc (void* ptr, size_type size)
             if (ret)
             {
                 memcpy (ret, ptr, bh->size - sizeof(BufferHeader));
+                assert(used_ > 0);
                 used_--;
             }
 

@@ -91,7 +91,7 @@ namespace gcache
             if (next_ >= first_)
                 assert(0 == size_trail_);
             else
-                assert(size_trail_ >= ssize_t(sizeof(BufferHeader)));
+                assert(size_trail_ >= sizeof(BufferHeader));
 #endif
         }
 
