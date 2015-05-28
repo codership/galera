@@ -105,14 +105,14 @@ size_t gu_actual_memory_usage (const void * const ptr, const size_t length)
     size_t size= 0;
     if (length)
     {       
-      const uintptr_t first= (uintptr_t) ptr                & -GU_PAGE_SIZE;
-      const uintptr_t last=  ((uintptr_t) ptr + length - 1) & -GU_PAGE_SIZE;
+      const uintptr_t first=  reinterpret_cast<uintptr_t> (ptr)               & -GU_PAGE_SIZE;
+      const uintptr_t last=  (reinterpret_cast<uintptr_t> (ptr) + length - 1) & -GU_PAGE_SIZE;
       const ptrdiff_t total= last - first + GU_PAGE_SIZE;
       const size_t    pages= total / GU_PAGE_SIZE;
-      unsigned char * const map= (unsigned char *) malloc(pages);
+      unsigned char * const map= static_cast<unsigned char *> (malloc(pages));
       if (map)
       {
-        if (mincore((void *) first, total, map) == 0)
+        if (mincore(reinterpret_cast<void *> (first), total, map) == 0)
         {
           for (size_t i = 0; i < pages; i++)
           {

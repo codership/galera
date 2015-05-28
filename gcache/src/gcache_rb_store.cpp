@@ -473,7 +473,7 @@ namespace gcache
 
     size_t RingBuffer::actual_pool_size ()
     {
-       return gu_actual_memory_usage((void *) mmap_.ptr, mmap_.size);
+       return gu_actual_memory_usage(static_cast<void *> (mmap_.ptr), mmap_.size);
     }
 
     void RingBuffer::print (std::ostream& os) const
