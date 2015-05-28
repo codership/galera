@@ -77,7 +77,7 @@ Prefix: %{_prefix}
 
 Name:		Percona-XtraDB-Cluster-galera-3
 Version:	%{galera_version}
-Release:	1.%{pxcg_revision}.%{?distribution}
+Release:	%{pxcg_revision}.%{?distribution}
 Summary:	Galera libraries of Percona XtraDB Cluster
 Group:		Applications/Databases
 License:	GPLv3
