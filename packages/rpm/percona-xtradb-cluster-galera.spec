@@ -171,8 +171,8 @@ install -m 644 $RPM_BUILD_DIR/%{src_dir}/packages/rpm/README     \
     $RPM_BUILD_ROOT%{docs2}/README
 
 install -d $RPM_BUILD_ROOT%{_mandir}/man1
-install -m 644 $RPM_BUILD_DIR/%{src_dir}/man/garbd.1  \
-    $RPM_BUILD_ROOT%{_mandir}/man1/garbd.1
+install -m 644 $RPM_BUILD_DIR/%{src_dir}/man/garbd.8  \
+    $RPM_BUILD_ROOT%{_mandir}/man1/garbd.8
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -203,7 +203,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755,root,root) %{_bindir}/garbd
 %doc %attr(0644,root,root) %{docs2}/COPYING
 %doc %attr(0644,root,root) %{docs2}/README
-%doc %attr(644, root, man) %{_mandir}/man1/garbd.1*
+%doc %attr(644, root, man) %{_mandir}/man1/garbd.8
 
 %post -n Percona-XtraDB-Cluster-garbd-3
 %if 0%{?systemd}
