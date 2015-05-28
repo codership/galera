@@ -1,11 +1,13 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file memory operations interface */
 
 #ifndef _gcache_memops_hpp_
 #define _gcache_memops_hpp_
+
+#include <limits>
 
 namespace gcache
 {
@@ -14,17 +16,27 @@ namespace gcache
     class MemOps
     {
     public:
+
+        /* although size value passed to GCache should be representable by
+         * a signed integer type, internally the buffer allocated will also
+         * incur header overhead, so it has to be represented by unsigned int.
+         * However the difference between to internal sizes should never exceed
+         * signed representation. */
+        typedef          int ssize_type; // size passed to GCache
+        typedef unsigned int size_type;  // internal size representation
+        typedef ssize_type   diff_type;  // difference between two size_types
+
         MemOps() {}
         virtual ~MemOps() {}
 
         virtual void*
-        malloc  (int size)                = 0;
+        malloc  (size_type size)          = 0;
 
         virtual void
         free    (BufferHeader* bh)        = 0;
 
         virtual void*
-        realloc (void* ptr, int size)     = 0;
+        realloc (void* ptr, size_type size) = 0;
 
         virtual void
         discard (BufferHeader* bh)        = 0;

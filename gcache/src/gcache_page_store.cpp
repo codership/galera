@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file page store implementation */
 
 #include "gcache_page_store.hpp"
 #include "gcache_bh.hpp"
+#include "gcache_limits.hpp"
 
 #include <gu_logger.hpp>
 #include <gu_throw.hpp>
@@ -39,7 +40,7 @@ make_base_name (const std::string& dir_name)
 }
 
 static std::string
-make_page_name (const std::string& base_name, ssize_t count)
+make_page_name (const std::string& base_name, size_t count)
 {
     std::ostringstream os;
     os << base_name << std::setfill ('0') << std::setw (6) << count;
@@ -128,7 +129,7 @@ gcache::PageStore::reset ()
 }
 
 inline void
-gcache::PageStore::new_page (ssize_t size)
+gcache::PageStore::new_page (size_type size)
 {
     Page* const page(new Page(this, make_page_name (base_name_, count_), size));
 
@@ -139,8 +140,8 @@ gcache::PageStore::new_page (ssize_t size)
 }
 
 gcache::PageStore::PageStore (const std::string& dir_name,
-                              ssize_t            keep_size,
-                              ssize_t            page_size,
+                              size_t             keep_size,
+                              size_t             page_size,
                               bool               keep_page)
     :
     base_name_ (make_base_name(dir_name)),
@@ -200,9 +201,11 @@ gcache::PageStore::~PageStore ()
 }
 
 inline void*
-gcache::PageStore::malloc_new (unsigned int size)
+gcache::PageStore::malloc_new (size_type size)
 {
-    void* ret = 0;
+    Limits::assert_size(size);
+
+    void* ret(NULL);
 
     try
     {
@@ -221,11 +224,13 @@ gcache::PageStore::malloc_new (unsigned int size)
 }
 
 void*
-gcache::PageStore::malloc (int size)
+gcache::PageStore::malloc (size_type const size)
 {
+    Limits::assert_size(size);
+
     if (gu_likely (0 != current_))
     {
-        register void* ret = current_->malloc (size);
+        void* ret = current_->malloc (size);
 
         if (gu_likely(0 != ret)) return ret;
 
@@ -236,9 +241,11 @@ gcache::PageStore::malloc (int size)
 }
 
 void*
-gcache::PageStore::realloc (void* ptr, int size)
+gcache::PageStore::realloc (void* ptr, size_type const size)
 {
-    assert(ptr != 0);
+    Limits::assert_size(size);
+
+    assert(ptr != NULL);
 
     BufferHeader* const bh(ptr2BH(ptr));
     Page* const page(static_cast<Page*>(BH_ctx(bh)));
@@ -251,7 +258,8 @@ gcache::PageStore::realloc (void* ptr, int size)
 
     if (gu_likely(0 != ret))
     {
-        ssize_t const ptr_size(bh->size - sizeof(BufferHeader));
+        assert(bh->size > sizeof(BufferHeader));
+        size_type const ptr_size(bh->size - sizeof(BufferHeader));
 
         memcpy (ret, ptr, size > ptr_size ? ptr_size : size);
         free_page_ptr (page, bh);
