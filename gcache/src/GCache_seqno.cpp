@@ -243,7 +243,7 @@ namespace gcache
                 seqno_locked = start;
 
                 do {
-                    assert (p->first == (start + found));
+                    assert (p->first == int64_t(start + found));
                     assert (p->second);
                     v[found].set_ptr(p->second);
                 }
@@ -258,7 +258,7 @@ namespace gcache
         {
             const BufferHeader* const bh (ptr2BH(v[i].ptr()));
 
-            assert (bh->seqno_g == (start + i));
+            assert (bh->seqno_g == int64_t(start + i));
             Limits::assert_size(bh->size);
 
             v[i].set_other (bh->seqno_g,
