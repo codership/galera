@@ -9,6 +9,8 @@ addons:
   apt:
 #    sources:
 #      - ubuntu-toolchain-r-test
+#     https://github.com/travis-ci/travis-ci/issues/3668
+#     for alternatives in container builds
     packages:
       - libboost-program-options-dev
       - libssl-dev
