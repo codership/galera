@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -23,16 +23,16 @@ namespace gcache
     {
     public:
 
-        RingBuffer (const std::string& name, ssize_t size,
+        RingBuffer (const std::string& name, size_t size,
                     std::map<int64_t, const void*>& seqno2ptr);
 
         ~RingBuffer ();
 
-        void* malloc  (int size);
+        void* malloc  (size_type size);
 
         void  free    (BufferHeader* bh);
 
-        void* realloc (void* ptr, int size);
+        void* realloc (void* ptr, size_type size);
 
         void  discard (BufferHeader* const bh)
         {
@@ -42,9 +42,9 @@ namespace gcache
             assert (size_free_ <= size_cache_);
         }
 
-        ssize_t size      () const { return size_cache_; }
+        size_t size      () const { return size_cache_; }
 
-        ssize_t rb_size   () const { return fd_.size(); }
+        size_t rb_size   () const { return fd_.size(); }
 
         const std::string& rb_name() const { return fd_.name(); }
 
@@ -57,7 +57,7 @@ namespace gcache
 
         void print (std::ostream& os) const;
 
-        static ssize_t pad_size()
+        static size_t pad_size()
         {
             RingBuffer* rb(0);
             // cppcheck-suppress nullPointer
@@ -79,7 +79,7 @@ namespace gcache
             {
                 /* start_  next_       first_   end_
                  *   |#######|           |#####| |      */
-                assert(size_free_ >= (first_ - next_));
+                assert(size_free_ >= size_t(first_ - next_));
             }
             assert (size_free_ <= size_cache_);
 #endif
@@ -91,7 +91,7 @@ namespace gcache
             if (next_ >= first_)
                 assert(0 == size_trail_);
             else
-                assert(size_trail_ >= ssize_t(sizeof(BufferHeader)));
+                assert(size_trail_ >= sizeof(BufferHeader));
 #endif
         }
 
@@ -103,8 +103,8 @@ namespace gcache
 
     private:
 
-        static ssize_t const PREAMBLE_LEN = 1024;
-        static ssize_t const HEADER_LEN = 32;
+        static size_t const PREAMBLE_LEN = 1024;
+        static size_t const HEADER_LEN = 32;
 
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
@@ -116,16 +116,16 @@ namespace gcache
         uint8_t*           first_;    // pointer to the first (oldest) buffer
         uint8_t*           next_;     // pointer to the next free space
 
-        ssize_t      const size_cache_;
-        ssize_t            size_free_;
-        ssize_t            size_used_;
-        ssize_t            size_trail_;
+        size_t       const size_cache_;
+        size_t             size_free_;
+        size_t             size_used_;
+        size_t             size_trail_;
 
         typedef std::map<int64_t, const void*> seqno2ptr_t;
 
         seqno2ptr_t&    seqno2ptr_;
 
-        BufferHeader*   get_new_buffer (ssize_t size);
+        BufferHeader*   get_new_buffer (size_type size);
 
         void            constructor_common();
 
