@@ -2,13 +2,16 @@ language: cpp
 
 sudo: false
 
+cache:
+  - apt
+  - ccache
 compiler:
   - gcc
   - clang
 addons:
   apt:
-#    sources:
-#      - ubuntu-toolchain-r-test
+    sources:
+      - ubuntu-toolchain-r-test
 #     https://github.com/travis-ci/travis-ci/issues/3668
 #     for alternatives in container builds
     packages:
@@ -16,5 +19,15 @@ addons:
       - libssl-dev
       - check
       - scons
+      - gcc-4.9
+      - g++-4.9
 
-script: MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / }); MAX_JOBS=$(( ${RAM[1]} / 262144 )); echo Jobs\:\ $MAX_JOBS; ./scripts/build.sh -j $MAX_JOBS
+before_install:
+  - if [ ${CC} == "gcc" ]; then
+      export CC=`which gcc-4.9`;
+      export CXX=`which g++-4.9`;
+    fi
+
+script:
+  - ${CC} --version ; ${CXX} --version
+  - MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / }); MAX_JOBS=$(( ${RAM[1]} / 262144 )); echo Jobs\:\ $MAX_JOBS; ./scripts/build.sh -j $MAX_JOBS
