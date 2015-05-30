@@ -1,16 +1,33 @@
 language: cpp
 
+sudo: false
+
+cache:
+  - apt
+  - ccache
 compiler:
   - gcc
   - clang
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+#     https://github.com/travis-ci/travis-ci/issues/3668
+#     for alternatives in container builds
+    packages:
+      - libboost-program-options-dev
+      - libssl-dev
+      - check
+      - scons
+      - gcc-5
+      - g++-5
 
 before_install:
-  # - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo apt-get update -qq || echo > /dev/null
+  - if [ ${CC} == "gcc" ]; then
+      export CC=`which gcc-5`;
+      export CXX=`which g++-5`;
+    fi
 
-install:
-  - sudo apt-get install -y gcc g++ clang libboost-program-options-dev libssl-dev check scons
-  # - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-  # - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.6 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.6
-
-script: MEM=$(head -1 /proc/meminfo); RAM=(${MEM// / }); MAX_JOBS=$(( ${RAM[1]} / 262144 )); echo Jobs\:\ $MAX_JOBS; ./scripts/build.sh -j $MAX_JOBS
+script:
+  - ${CC} --version ; ${CXX} --version
+  - MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / }); MAX_JOBS=$(( ${RAM[1]} / 262144 )); echo Jobs\:\ $MAX_JOBS; ./scripts/build.sh -j $MAX_JOBS
