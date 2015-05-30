@@ -19,13 +19,13 @@ addons:
       - libssl-dev
       - check
       - scons
-      - gcc-4.9
-      - g++-4.9
+      - gcc-5
+      - g++-5
 
 before_install:
   - if [ ${CC} == "gcc" ]; then
-      export CC=`which gcc-4.9`;
-      export CXX=`which g++-4.9`;
+      export CC=`which gcc-5`;
+      export CXX=`which g++-5`;
     fi
 
 script:
