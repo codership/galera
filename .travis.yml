@@ -1,6 +1,6 @@
 language: cpp
 
-sudo: false
+sudo: true
 
 cache:
   - apt
@@ -27,9 +27,9 @@ addons:
 script:
   - if [ ${CC} != "clang" ]; then
       MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / });
-      MAX_JOBS=$(( ${RAM[1]} / 393216 )); echo Jobs\:\ $MAX_JOBS;
+      MAX_JOBS=$(( ${RAM[1]} / 393216 )); echo Max jobs\:\ $MAX_JOBS;
       CORES=$(grep -c ^processor /proc/cpuinfo);
-      [ $CORES -lt $MAX_JOBS ] && MAX_JOBS=$CORES;
+      [ $CORES -lt $MAX_JOBS ] && MAX_JOBS=$CORES; echo Real jobs\:\ $MAX_JOBS;
       ${CC} --version; ${CXX} --version;
       ./scripts/build.sh -j $MAX_JOBS;
       export CC=`which gcc-5`;
