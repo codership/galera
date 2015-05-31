@@ -5,9 +5,11 @@ sudo: false
 cache:
   - apt
   - ccache
+
 compiler:
   - gcc
   - clang
+
 addons:
   apt:
     sources:
@@ -22,12 +24,19 @@ addons:
       - gcc-5
       - g++-5
 
-before_install:
-  - if [ ${CC} == "gcc" ]; then
+script:
+  - if [ ${CC} != "clang" ]; then
+      MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / });
+      MAX_JOBS=$(( ${RAM[1]} / 393216 )); echo Jobs\:\ $MAX_JOBS;
+      CORES=$(grep -c ^processor /proc/cpuinfo);
+      [ $CORES -lt $MAX_JOBS ] && MAX_JOBS=$CORES;
+      ${CC} --version; ${CXX} --version;
+      ./scripts/build.sh -j $MAX_JOBS;
       export CC=`which gcc-5`;
       export CXX=`which g++-5`;
+      ${CC} --version; ${CXX} --version;
+      ./scripts/build.sh -j $MAX_JOBS;
+    else
+      ${CC} --version ; ${CXX} --version;
+      ./scripts/build.sh;
     fi
-
-script:
-  - ${CC} --version ; ${CXX} --version
-  - MEM=$(head -n 1 /proc/meminfo); RAM=(${MEM// / }); MAX_JOBS=$(( ${RAM[1]} / 262144 )); echo Jobs\:\ $MAX_JOBS; ./scripts/build.sh -j $MAX_JOBS
