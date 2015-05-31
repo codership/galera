@@ -548,14 +548,14 @@ gcs_shift_state (gcs_conn_t*      conn,
 
     if (!allowed[new_state][old_state]) {
         if (old_state != new_state) {
-            gu_warn ("Shifting %s -> %s is not allowed (TO: %lld)",
+            gu_warn ("GCS: Shifting %s -> %s is not allowed (TO: %lld)",
                      gcs_conn_state_str[old_state],
                      gcs_conn_state_str[new_state], conn->global_seqno);
         }
         return false;
     }
 
-    gu_info ("Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
+    gu_info ("GCS: Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
              gcs_conn_state_str[new_state], conn->global_seqno);
 
     conn->state = new_state;
