@@ -696,7 +696,9 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         st_.set(state_uuid_, STATE_SEQNO());
         st_.mark_safe();
 
-        if (state_() > S_CLOSING)
+        gu::Lock lock(closing_mutex_);
+
+        if (!closing_ && state_() > S_CLOSED)
         {
             log_fatal << "State transfer request failed unrecoverably: "
                       << -ret << " (" << strerror(-ret) << "). Most likely "

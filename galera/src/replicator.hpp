@@ -44,7 +44,6 @@ namespace galera
         {
             S_DESTROYED,
             S_CLOSED,
-            S_CLOSING,
             S_CONNECTED,
             S_JOINING,
             S_JOINED,

@@ -466,6 +466,12 @@ namespace galera
         void preload_index_trx(const gcs_action& act);
         void preload_index_cc(const gcs_action& act);
 
+        /* These methods facilitate closing procedure.
+         * They must be called under closing_mutex_ lock */
+        void start_closing();
+        void shift_to_CLOSED();
+        void wait_for_CLOSED(gu::Lock&);
+
         /* local state seqno for internal use (macro mock up) */
         wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }
 
@@ -514,6 +520,10 @@ namespace galera
         int                    proto_max_;    // maximum allowed proto version
 
         FSM<State, Transition> state_;
+        gu::Mutex              closing_mutex_; // to sync close() call
+        gu::Cond               closing_cond_;
+        bool                   closing_; // to indicate that the closing process
+                                         // started
         SstState               sst_state_;
 
         // configurable params

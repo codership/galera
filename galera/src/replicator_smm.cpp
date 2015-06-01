@@ -107,7 +107,6 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
     {
     case ReplicatorSMM::S_DESTROYED: return (os << "DESTROYED");
     case ReplicatorSMM::S_CLOSED:    return (os << "CLOSED");
-    case ReplicatorSMM::S_CLOSING:   return (os << "CLOSING");
     case ReplicatorSMM::S_CONNECTED: return (os << "CONNECTED");
     case ReplicatorSMM::S_JOINING:   return (os << "JOINING");
     case ReplicatorSMM::S_JOINED:    return (os << "JOINED");
@@ -135,6 +134,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     protocol_version_   (-1),
     proto_max_          (gu::from_string<int>(config_.get(Param::proto_max))),
     state_              (S_CLOSED),
+    closing_mutex_      (),
+    closing_cond_       (),
+    closing_            (false),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
                              config_.get(Param::commit_order))),
@@ -200,9 +202,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     // @todo add guards (and perhaps actions)
     state_.add_transition(Transition(S_CLOSED,  S_DESTROYED));
     state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
-    state_.add_transition(Transition(S_CLOSING, S_CLOSED));
 
-    state_.add_transition(Transition(S_CONNECTED, S_CLOSING));
+    state_.add_transition(Transition(S_CONNECTED, S_CLOSED));
     state_.add_transition(Transition(S_CONNECTED, S_CONNECTED));
     state_.add_transition(Transition(S_CONNECTED, S_JOINING));
     // the following is possible only when bootstrapping new cluster
@@ -212,20 +213,20 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_CONNECTED, S_DONOR));
     state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
 
-    state_.add_transition(Transition(S_JOINING, S_CLOSING));
+    state_.add_transition(Transition(S_JOINING, S_CLOSED));
     // the following is possible if one non-prim conf follows another
     state_.add_transition(Transition(S_JOINING, S_CONNECTED));
     state_.add_transition(Transition(S_JOINING, S_JOINED));
 
-    state_.add_transition(Transition(S_JOINED, S_CLOSING));
+    state_.add_transition(Transition(S_JOINED, S_CLOSED));
     state_.add_transition(Transition(S_JOINED, S_CONNECTED));
     state_.add_transition(Transition(S_JOINED, S_SYNCED));
 
-    state_.add_transition(Transition(S_SYNCED, S_CLOSING));
+    state_.add_transition(Transition(S_SYNCED, S_CLOSED));
     state_.add_transition(Transition(S_SYNCED, S_CONNECTED));
     state_.add_transition(Transition(S_SYNCED, S_DONOR));
 
-    state_.add_transition(Transition(S_DONOR, S_CLOSING));
+    state_.add_transition(Transition(S_DONOR, S_CLOSED));
     state_.add_transition(Transition(S_DONOR, S_CONNECTED));
     state_.add_transition(Transition(S_DONOR, S_JOINED));
 
@@ -260,9 +261,46 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     build_stats_vars(wsrep_stats_);
 }
 
+void galera::ReplicatorSMM::start_closing()
+{
+    assert(closing_mutex_.locked());
+    assert(state_() >= S_CONNECTED);
+    if (!closing_)
+    {
+        closing_ = true;
+        gcs_.close();
+    }
+}
+
+void galera::ReplicatorSMM::shift_to_CLOSED()
+{
+    assert(closing_mutex_.locked());
+    assert(closing_);
+
+    state_.shift_to(S_CLOSED);
+
+    /* Cleanup for re-opening. */
+    uuid_ = WSREP_UUID_UNDEFINED;
+    closing_ = false;
+
+    closing_cond_.broadcast();
+}
+
+void galera::ReplicatorSMM::wait_for_CLOSED(gu::Lock& lock)
+{
+    assert(closing_mutex_.locked());
+    assert(closing_);
+    while (state_() > S_CLOSED) lock.wait(closing_cond_);
+    assert(!closing_);
+    assert(WSREP_UUID_UNDEFINED == uuid_);
+}
+
 galera::ReplicatorSMM::~ReplicatorSMM()
 {
     log_info << "dtor state: " << state_();
+
+    gu::Lock lock(closing_mutex_);
+
     switch (state_())
     {
     case S_CONNECTED:
@@ -270,9 +308,8 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_JOINED:
     case S_SYNCED:
     case S_DONOR:
-        close();
-    case S_CLOSING:
-        // @todo wait that all users have left the building
+        start_closing();
+        wait_for_CLOSED(lock);
     case S_CLOSED:
         ist_senders_.cancel();
         break;
@@ -289,6 +326,9 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 {
     sst_donor_ = state_donor;
     service_thd_.reset();
+
+    // make sure there was a proper initialization/cleanup
+    assert(WSREP_UUID_UNDEFINED == uuid_);
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
@@ -323,9 +363,12 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
 wsrep_status_t galera::ReplicatorSMM::close()
 {
-    if (state_() != S_CLOSED)
+    gu::Lock lock(closing_mutex_);
+
+    if (state_() > S_CLOSED)
     {
-        gcs_.close();
+        start_closing();
+        wait_for_CLOSED(lock);
     }
 
     return WSREP_OK;
@@ -336,9 +379,9 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 {
     assert(recv_ctx != 0);
 
-    if (state_() == S_CLOSED || state_() == S_CLOSING)
+    if (state_() <= S_CLOSED)
     {
-        log_error <<"async recv cannot start, provider in closed/closing state";
+        log_error <<"async recv cannot start, provider in CLOSED state";
         return WSREP_FATAL;
     }
 
@@ -348,7 +391,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     bool exit_loop(false);
     wsrep_status_t retval(WSREP_OK);
 
-    while (WSREP_OK == retval && state_() != S_CLOSING)
+    while (WSREP_OK == retval && state_() > S_CLOSED)
     {
         ssize_t rc;
 
@@ -383,28 +426,31 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     /* exiting loop already did proper checks */
     if (!exit_loop && receivers_.sub_and_fetch(1) == 0)
     {
-        if (state_() != S_CLOSING)
+        gu::Lock lock(closing_mutex_);
+
+        if (state_() > S_CLOSED && !closing_)
         {
-            if (retval == WSREP_OK)
-            {
-                log_warn << "Broken shutdown sequence, provider state: "
-                         << state_() << ", retval: " << retval;
-                assert (0);
-            }
-            else
-            {
-                // Generate zero view before exit to notify application
-                gcs_act_cchange const cc;
-                wsrep_uuid_t tmp(uuid_);
-                wsrep_view_info_t* const err_view
-                    (galera_view_info_create(cc, -1, tmp));
-                view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
-                free(err_view);
-            }
+            assert(WSREP_CONN_FAIL == retval);
+            /* Last recv thread exiting due to error but replicator is not
+             * closed. We need to at least gracefully leave the cluster.*/
+
+            log_warn << "Broken shutdown sequence, provider state: "
+                     << state_() << ", retval: " << retval;
+            assert (0);
+
             /* avoid abort in production */
-            state_.shift_to(S_CLOSING);
+            start_closing();
+
+            // Generate zero view before exit to notify application
+            gcs_act_cchange const cc;
+            wsrep_uuid_t tmp(uuid_);
+            wsrep_view_info_t* const err_view
+                (galera_view_info_create(cc, -1, tmp));
+            view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
+            free(err_view);
+
+            shift_to_CLOSED();
         }
-        state_.shift_to(S_CLOSED);
     }
 
     log_debug << "Slave thread exit. Return code: " << retval;
@@ -1491,8 +1537,6 @@ static galera::Replicator::State state2repl(gcs_node_state const my_state,
     switch (my_state)
     {
     case GCS_NODE_STATE_NON_PRIM:
-        if (my_idx >= 0) return galera::Replicator::S_CONNECTED;
-        else             return galera::Replicator::S_CLOSING;
     case GCS_NODE_STATE_PRIM:
         return galera::Replicator::S_CONNECTED;
     case GCS_NODE_STATE_JOINER:
@@ -1563,10 +1607,23 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
         else
         {
-            if (new_uuid != uuid_) // logical bug in galera_view_info_create()
+            if (view_info-> memb_num > 0 && view_info->my_idx < 0)
+                // something went wrong, member must be present in own view
             {
-                log_fatal << "Node UUID change during operation: "
-                          << uuid_ << " -> " << new_uuid;
+                std::stringstream msg;
+
+                msg << "Node UUID " << uuid_ << " is absent from the view:\n";
+
+                for (int m(0); m < view_info->memb_num; ++m)
+                {
+                    msg << '\t' << view_info->members[m].id << '\n';
+                }
+
+                msg << "most likely due to unexpected node identity change. "
+                    "Aborting.";
+
+                log_fatal << msg.str();
+
                 abort();
             }
         }
@@ -1625,7 +1682,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             assert(app_req_len <= 0);
             log_fatal << "SST request callback failed. This is unrecoverable, "
                       << "restart required.";
-            close();
             abort();
         }
         else if (0 == app_req_len && state_uuid_ != group_uuid)
@@ -1633,7 +1689,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             log_fatal << "Local state UUID " << state_uuid_
                       << " is different from group state UUID " << group_uuid
                       << ", and SST request is null: restart required.";
-            close();
             abort();
         }
 #ifndef NDEBUG
@@ -1653,7 +1708,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             log_fatal << "View callback failed. This is unrecoverable, "
                       << "restart required.";
-            close();
             abort();
         }
     }
@@ -1822,17 +1876,23 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             st_.set (state_uuid_, STATE_SEQNO());
         }
 
-        if (next_state != S_CONNECTED && next_state != S_CLOSING)
+        gcache_.free(const_cast<void*>(cc.buf));
+
+        gu::Lock lock(closing_mutex_);
+
+        if (S_CONNECTED != next_state)
         {
             log_fatal << "Internal error: unexpected next state for "
-                      << "non-prim: " << next_state << ". Restart required.";
-            close();
+                      << "non-prim: " << next_state
+                      << ". Current state: " << state_() <<". Restart required.";
             abort();
         }
 
-        state_.shift_to(next_state);
-
-        gcache_.free(const_cast<void*>(cc.buf));
+        if (state_() > S_CONNECTED)
+        {
+            assert(S_CONNECTED == next_state);
+            state_.shift_to(S_CONNECTED);
+        }
     }
 
     free(app_req);
@@ -1849,11 +1909,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     free(view_info);
 
     if (conf.conf_id < 0 && conf.memb.size() == 0) {
+        log_debug << "Received SELF-LEAVE. Connection closed.";
         assert(cc.seqno_l > 0);
-        assert(S_CLOSING == next_state);
-        log_debug << "Received SELF-LEAVE. Closing connection.";
-        // called after being shifted to S_CLOSING state.
-        gcs_.close();
+
+        gu::Lock lock(closing_mutex_);
+
+        shift_to_CLOSED();
     }
 }
 

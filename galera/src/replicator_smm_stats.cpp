@@ -30,7 +30,6 @@ static wsrep_member_status_t state2stats(galera::ReplicatorSMM::State state)
     {
     case galera::ReplicatorSMM::S_DESTROYED :
     case galera::ReplicatorSMM::S_CLOSED    :
-    case galera::ReplicatorSMM::S_CLOSING   :
     case galera::ReplicatorSMM::S_CONNECTED : return WSREP_MEMBER_UNDEFINED;
     case galera::ReplicatorSMM::S_JOINING   : return WSREP_MEMBER_JOINER;
     case galera::ReplicatorSMM::S_JOINED    : return WSREP_MEMBER_JOINED;
@@ -52,7 +51,6 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
     case galera::ReplicatorSMM::S_DESTROYED :
         return state_str[10];
     case galera::ReplicatorSMM::S_CLOSED :
-    case galera::ReplicatorSMM::S_CLOSING:
     case galera::ReplicatorSMM::S_CONNECTED:
     {
         if (sst_state == ReplicatorSMM::SST_REQ_FAILED)  return state_str[8];
