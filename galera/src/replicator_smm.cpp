@@ -1570,7 +1570,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 log_fatal << "Node UUID change during operation: "
                           << uuid_ << " -> " << new_uuid;
-                close();
                 abort();
             }
         }
@@ -1607,7 +1606,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 log_fatal << "Application returned error "
                           << cret
                           << " from connect callback, aborting";
-                close();
                 abort();
             }
         }
