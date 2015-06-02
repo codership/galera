@@ -309,6 +309,19 @@ typedef struct wsrep_view_info {
     wsrep_member_info_t members[1];//!< array of member information
 } wsrep_view_info_t;
 
+
+/*!
+ * @brief connected to group
+ *
+ * This handler is called once the first primary view is seen.
+ * The purpose of this call is to provide basic information only,
+ * like node UUID and group UUID.
+ */
+typedef enum wsrep_cb_status (*wsrep_connected_cb_t) (
+    void*                    app_ctx,
+    const wsrep_view_info_t* view
+);
+
 /*!
  * @brief group view handler
  *
@@ -505,6 +518,7 @@ struct wsrep_init_args
 
     /* Application callbacks */
     wsrep_log_cb_t         logger_cb;       //!< logging handler
+    wsrep_connected_cb_t   connected_cb;    //!< connected to group
     wsrep_view_cb_t        view_cb;         //!< group view change handler
     wsrep_sst_request_cb_t sst_request_cb;          //!< SST request creator
 

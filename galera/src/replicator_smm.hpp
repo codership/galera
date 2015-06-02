@@ -546,6 +546,7 @@ namespace galera
 
         // application callbacks
         void*                  app_ctx_;
+        wsrep_connected_cb_t   connected_cb_;
         wsrep_view_cb_t        view_cb_;
         wsrep_sst_request_cb_t sst_request_cb_;
         wsrep_apply_cb_t       apply_cb_;

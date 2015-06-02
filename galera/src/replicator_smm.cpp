@@ -153,6 +153,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     cc_lowest_trx_seqno_(WSREP_SEQNO_UNDEFINED),
     pause_seqno_        (WSREP_SEQNO_UNDEFINED),
     app_ctx_            (args->app_ctx),
+    connected_cb_       (args->connected_cb),
     view_cb_            (args->view_cb),
     sst_request_cb_     (args->sst_request_cb),
     apply_cb_           (args->apply_cb),
@@ -1601,9 +1602,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (!from_IST)
     {
+        bool first_view(false);
         if (WSREP_UUID_UNDEFINED == uuid_)
         {
             uuid_ = new_uuid;
+            first_view = true;
         }
         else
         {
@@ -1648,6 +1651,20 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             wsrep_seqno_t const upto(cert_.position());
             gu_trace(drain_monitors(upto));
             // IST recv thread drains monitors itself
+        }
+
+        // First view from the group or group uuid has changed,
+        // call connected callback to notify application.
+        if ((first_view || state_uuid_ != group_uuid) && connected_cb_)
+        {
+            wsrep_cb_status_t cret(connected_cb_(0, view_info));
+            if (cret != WSREP_CB_SUCCESS)
+            {
+                log_fatal << "Application returned error "
+                          << cret
+                          << " from connect callback, aborting";
+                abort();
+            }
         }
     }
 
