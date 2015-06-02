@@ -46,6 +46,7 @@ Commandline Options:
     bpostatic=path      a path to static libboost_program_options.a
     extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
     bits=[32bit|64bit]
+    gcov=[True|False]   compile Galera for code coverage reporting
 ''')
 # bpostatic option added on Percona request
 
@@ -76,6 +77,8 @@ build_dir = ARGUMENTS.get('build_dir', '')
 debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
 
+gcov = ARGUMENTS.get('gcov', False)
+
 debug_lvl = int(debug)
 if debug_lvl >= 0 and debug_lvl < 3:
     opt_flags = ' -g -O%d -fno-inline' % debug_lvl
@@ -86,6 +89,8 @@ elif debug_lvl == 3:
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
+if gcov:
+    opt_flags = opt_flags + ' --coverage -g'
 
 if x86 == 32:
     compile_arch = ' -m32 -march=i686'
@@ -215,6 +220,9 @@ if sysname != 'sunos':
 # static linking have beed addressed
 #
 env.Append(LINKFLAGS = link_arch)
+
+if gcov:
+   env.Append(LINKFLAGS = '--coverage -g')
 
 #
 # Check required headers and libraries (autoconf functionality)

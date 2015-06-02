@@ -40,3 +40,5 @@ tests/conf/nodes.conf
 tests/conf/common_my.cnf
 tests/conf/my[0-9]*.cnf
 docs/build
+*.gcno
+*.gcda
