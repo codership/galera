@@ -35,7 +35,7 @@ Prefix: %{_prefix}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 3.9
+ %define galera_version 3.11
 %endif
 
 %if %{undefined galera_revision}
