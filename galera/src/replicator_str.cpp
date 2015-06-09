@@ -373,10 +373,15 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
 
-                    rcode = sst_donate_cb_(app_ctx_, recv_ctx,
-                                           streq->sst_req(),
-                                           streq->sst_len(),
-                                           &state_id, 0, 0, true);
+                    wsrep_cb_status const err
+                        (sst_donate_cb_(app_ctx_, recv_ctx,
+                                        streq->sst_req(),
+                                        streq->sst_len(),
+                                        &state_id, 0, 0, true));
+
+                    rcode = (WSREP_CB_SUCCESS == err ?
+                             istr.last_applied() : -ECANCELED);
+
                     // we will join in sst_sent.
                     join_now = false;
                 }
@@ -405,8 +410,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 }
                 else
                 {
-                    log_error << "Failed to bypass SST: " << -rcode
-                              << " (" << strerror (-rcode) << ')';
+                    log_error << "Failed to bypass SST";
                 }
 
                 goto out;
@@ -421,9 +425,20 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            rcode = sst_donate_cb_(app_ctx_, recv_ctx,
-                                   streq->sst_req(), streq->sst_len(),
-                                   &state_id, 0, 0, false);
+            wsrep_cb_status const err
+                (sst_donate_cb_(app_ctx_, recv_ctx,
+                                streq->sst_req(), streq->sst_len(),
+                                &state_id, 0, 0, false));
+
+            if (WSREP_CB_SUCCESS == err)
+            {
+                rcode = state_id.seqno;
+            }
+            else
+            {
+                log_error << "SST failed";
+                rcode = -ECANCELED;
+            }
             // we will join in sst_sent.
             join_now = false;
         }
