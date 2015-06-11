@@ -2113,7 +2113,7 @@ _set_recv_q_hard_limit (gcs_conn_t* conn, const char* value)
 
         if (limit > LONG_MAX) limit = LONG_MAX;
 
-        long long limit_fixed = limit * gcs_fc_hard_limit_fix;
+        long long limit_fixed = limit * GCS_FC_HARD_LIMIT_FIX;
 
         if (conn->params.recv_q_hard_limit == limit_fixed) return 0;
 

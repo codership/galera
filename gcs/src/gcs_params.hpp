@@ -31,6 +31,8 @@ extern const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT;
 extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
 extern const char* const GCS_PARAMS_MAX_THROTTLE;
 
+extern const double GCS_FC_HARD_LIMIT_FIX;
+
 /*! Register configuration parameters */
 extern bool
 gcs_params_register(gu_config_t* config);
