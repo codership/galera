@@ -86,7 +86,7 @@ void gu::ssl_init_options(gu::Config& conf)
         }
         catch (asio::system_error& ec)
         {
-            gu_throw_error(EINVAL) << "Initializing SSL options failed: "
+            gu_throw_error(EINVAL) << "Initializing SSL context failed: "
                                    << extra_error_info(ec.code());
         }
     }
@@ -129,8 +129,24 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
     SSLPasswordCallback cb(conf);
     ctx.set_password_callback(
         boost::bind(&SSLPasswordCallback::get_password, &cb));
-    ctx.use_private_key_file(conf.get(conf::ssl_key), asio::ssl::context::pem);
-    ctx.use_certificate_file(conf.get(conf::ssl_cert), asio::ssl::context::pem);
-    ctx.load_verify_file(conf.get(conf::ssl_ca, conf.get(conf::ssl_cert)));
-    SSL_CTX_set_cipher_list(ctx.impl(), conf.get(conf::ssl_cipher).c_str());
+
+    std::string param;
+
+    try
+    {
+        param = conf::ssl_key;
+        ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
+        param = conf::ssl_cert;
+        ctx.use_certificate_file(conf.get(param), asio::ssl::context::pem);
+        param = conf::ssl_ca;
+        ctx.load_verify_file(conf.get(param, conf.get(conf::ssl_cert)));
+        param = conf::ssl_cipher;
+        SSL_CTX_set_cipher_list(ctx.impl(), conf.get(param).c_str());
+    }
+    catch (asio::system_error& ec)
+    {
+        gu_throw_error(EINVAL) << "Bad value '" << conf.get(param, "")
+                               << "' for SSL parameter '" << param
+                               << "': " << extra_error_info(ec.code());
+    }
 }
