@@ -49,7 +49,7 @@ private:
 galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
                                    const struct gcs_action& act)
     :
-    trx_(TrxHandleSlave::New(pool))
+    trx_(TrxHandleSlave::New(false, pool))
     // TODO: this dynamic allocation should be unnecessary
 {
     assert(act.seqno_l != GCS_SEQNO_ILL);

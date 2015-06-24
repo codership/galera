@@ -144,7 +144,7 @@ namespace galera
 
         const wsrep_uuid_t& source_id() const { return source_id_; }
         wsrep_trx_id_t      trx_id()    const { return trx_id_;    }
-        bool                is_local()  const { return local_; }
+        bool                local()     const { return local_; }
 
         wsrep_conn_id_t conn_id() const { return conn_id_;   }
         void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
@@ -169,8 +169,6 @@ namespace galera
         virtual void   ref()   = 0;
         virtual void   unref() = 0;
 
-        bool local() const { return local_; }
-
         virtual int refcnt() const  = 0;
 
         void print(std::ostream& os) const;
@@ -181,7 +179,7 @@ namespace galera
 
         /* slave trx ctor */
         explicit
-        TrxHandle()
+        TrxHandle(bool local)
             :
             source_id_         (WSREP_UUID_UNDEFINED),
             conn_id_           (-1),
@@ -190,7 +188,7 @@ namespace galera
             timestamp_         (),
             version_           (-1),
             write_set_flags_   (0),
-            local_             (false)
+            local_             (local)
         {}
 
         /* local trx ctor */
@@ -216,6 +214,10 @@ namespace galera
         int64_t                timestamp_;
         int                    version_;
         uint32_t               write_set_flags_;
+        // Boolean denoting if the TrxHandle was generated locally.
+        // Always true for TrxHandleMaster, set to true to
+        // TrxHandleSlave if there exists TrxHandleMaster object corresponding
+        // to TrxHandleSlave.
         bool                   local_;
 
     private:
@@ -314,13 +316,13 @@ namespace galera
     public:
 
         typedef gu::MemPool<true> Pool;
-        static TrxHandleSlave* New(Pool& pool)
+        static TrxHandleSlave* New(bool local, Pool& pool)
         {
             assert(pool.buf_size() == sizeof(TrxHandleSlave));
 
             void* const buf(pool.acquire());
 
-            return new(buf) TrxHandleSlave(pool, buf);
+            return new(buf) TrxHandleSlave(local, pool, buf);
         }
 
         void lock()   const { mutex_.lock(); }
@@ -473,8 +475,8 @@ namespace galera
 
     protected:
 
-        TrxHandleSlave(gu::MemPool<true>& mp, void* buf) :
-            TrxHandle          (),
+        TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
+            TrxHandle          (local),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
@@ -775,7 +777,7 @@ namespace galera
             :
             TrxHandle(source_id, conn_id, trx_id, params.version_),
             params_            (params),
-            tr_                (mp, this),
+            tr_                (true, mp, this),
             repl_              (&tr_),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),

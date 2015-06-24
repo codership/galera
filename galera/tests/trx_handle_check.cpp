@@ -146,7 +146,7 @@ START_TEST(test_states)
     trx->unref();
 
     // smooth operation slave
-    TrxHandleSlave* txs(TrxHandleSlave::New(sp));
+    TrxHandleSlave* txs(TrxHandleSlave::New(false, sp));
     txs->lock();
     txs->set_state(TrxHandle::S_CERTIFYING);
     txs->set_state(TrxHandle::S_APPLYING);
@@ -156,7 +156,7 @@ START_TEST(test_states)
     txs->unref();
 
     // certification failure slave
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_CERTIFYING);
     txs->set_state(TrxHandle::S_MUST_ABORT);
@@ -165,7 +165,7 @@ START_TEST(test_states)
     txs->unref();
 
     // replaying fragment aborted BEFORE certification
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_MUST_ABORT);
     txs->set_state(TrxHandle::S_REPLICATING);
@@ -175,7 +175,7 @@ START_TEST(test_states)
     txs->unref();
 
     // replaying fragment aborted AFTER certification
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_MUST_ABORT);
     txs->set_state(TrxHandle::S_MUST_REPLAY);
@@ -185,7 +185,7 @@ START_TEST(test_states)
     txs->unref();
 
     // replaying replicating fragment
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_REPLAYING);
     txs->set_state(TrxHandle::S_COMMITTED);
@@ -193,7 +193,7 @@ START_TEST(test_states)
     txs->unref();
 
     // replaying certifying fragment
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_CERTIFYING);
     txs->set_state(TrxHandle::S_REPLAYING);
@@ -202,7 +202,7 @@ START_TEST(test_states)
     txs->unref();
 
     // replaying committed fragment
-    txs = TrxHandleSlave::New(sp);
+    txs = TrxHandleSlave::New(false, sp);
     txs->lock();
     txs->set_state(TrxHandle::S_CERTIFYING);
     txs->set_state(TrxHandle::S_APPLYING);
@@ -233,7 +233,7 @@ START_TEST(test_serialization)
         trx->serialize(0, buf);
         fail_unless(buf.size() > 0);
 
-        TrxHandleSlave* txs1(TrxHandleSlave::New(sp));
+        TrxHandleSlave* txs1(TrxHandleSlave::New(false, sp));
         fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
         txs1->unref();
 
@@ -297,7 +297,7 @@ START_TEST(test_streaming)
         fail_if(txs->flags() & TrxHandle::F_COMMIT);
         txs->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
-    trx->add_replicated(TrxHandleSlave::New(sp));
+    trx->add_replicated(TrxHandleSlave::New(false, sp));
     {
         // 1. middle fragment B
         trx->append_data(&src[1], 1, WSREP_DATA_ORDERED, false);
@@ -314,7 +314,7 @@ START_TEST(test_streaming)
         fail_if(txs->flags() & TrxHandle::F_COMMIT);
         txs->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
-    trx->add_replicated(TrxHandleSlave::New(sp));
+    trx->add_replicated(TrxHandleSlave::New(false, sp));
     {
         // 2. last fragment C
         trx->append_data(&src[2], 1, WSREP_DATA_ORDERED, false);
