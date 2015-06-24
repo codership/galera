@@ -901,7 +901,7 @@ class IstTrx  // to ensure automatic trx cleanup on exception
 {
 public:
     IstTrx(TrxHandleSlave::Pool& p)
-        : trx_(TrxHandleSlave::New(p)) { trx_->lock(); }
+        : trx_(TrxHandleSlave::New(false, p)) { trx_->lock(); }
     ~IstTrx() { trx_->unlock(); trx_->unref(); }
     TrxHandleSlave* const trx_;
 };

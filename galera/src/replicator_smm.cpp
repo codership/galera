@@ -466,7 +466,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
     assert(trx->global_seqno() > 0);
     assert(trx->is_certified() /*Repl*/ || trx->preordered() /*IST*/);
     assert(trx->global_seqno() > STATE_SEQNO());
-    assert(trx->is_local() == false);
+    assert(trx->local() == false);
 
     ApplyOrder ao(*trx);
     CommitOrder co(*trx, co_mode_);
@@ -689,7 +689,7 @@ void
 galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
 {
     assert(trx != 0);
-    assert(trx->is_local() == true);
+    assert(trx->local() == true);
     assert(trx->locked());
 
     log_debug << "aborting trx " << *trx << " " << trx;
@@ -1066,7 +1066,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandleMaster* trx)
     {
         // continue streaming - and add a new fragment handle
         trx->set_state(TrxHandle::S_EXECUTING);
-        TrxHandleSlave* const tr(TrxHandleSlave::New(slave_pool_));
+        TrxHandleSlave* const tr(TrxHandleSlave::New(true, slave_pool_));
         trx->add_replicated(tr);
     }
 
@@ -1423,7 +1423,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 void galera::ReplicatorSMM::cancel_seqno(const wsrep_seqno_t& seqno)
 {
     // To enter monitors we need to fake trx object
-    TrxHandleSlave* const dummy(TrxHandleSlave::New(slave_pool_));
+    TrxHandleSlave* const dummy(TrxHandleSlave::New(true, slave_pool_));
 
     dummy->set_received(NULL, WSREP_SEQNO_UNDEFINED, seqno);
     dummy->set_depends_seqno(dummy->global_seqno() - 1);
@@ -2140,7 +2140,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleSlave* trx)
                          << *trx;
                 assert(0);
             }
-            local_cert_failures_ += trx->is_local();
+            local_cert_failures_ += trx->local();
             if (trx->state() != TrxHandle::S_MUST_ABORT)
                 trx->set_state(TrxHandle::S_MUST_ABORT);
             retval = WSREP_TRX_FAIL;

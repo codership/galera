@@ -183,7 +183,7 @@ extern "C" void* trx_thread(void* arg)
             return 0;
         }
 
-        galera::TrxHandleSlave* trx(TrxHandleSlave::New(targs->pool_));
+        galera::TrxHandleSlave* trx(TrxHandleSlave::New(false, targs->pool_));
 
         if (GCS_ACT_WRITESET == act.type)
         {

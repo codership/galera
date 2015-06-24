@@ -250,7 +250,7 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (trx_ != 0 && trx_->is_local())
+                if (trx_ != 0 && trx_->local())
                 {
                     unlock();
                     mutex.unlock();
@@ -282,14 +282,14 @@ namespace galera
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
-                return (trx_.is_local() == true ||
+                return (trx_.local() == true ||
                         last_left >= trx_.depends_seqno());
             }
 
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (trx_.is_local())
+                if (trx_.local())
                 {
                     unlock();
                     mutex.unlock();
@@ -356,7 +356,7 @@ namespace galera
                 case OOOC:
                     return true;
                 case LOCAL_OOOC:
-                    return trx_.is_local();
+                    return trx_.local();
                     // in case of remote trx fall through
                 case NO_OOOC:
                     return (last_left + 1 == trx_.global_seqno());
@@ -367,7 +367,7 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (trx_.is_local())
+                if (trx_.local())
                 {
                     unlock();
                     mutex.unlock();
