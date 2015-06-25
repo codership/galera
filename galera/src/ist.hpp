@@ -37,8 +37,8 @@ namespace galera
         {
         public:
             virtual void preload_index(const gcs_action&) = 0;
-            virtual void wait(const wsrep_seqno_t&) = 0;
-            virtual void drain_monitors(const wsrep_seqno_t&) = 0;
+            virtual void wait(wsrep_seqno_t) = 0;
+            virtual void drain_monitors(wsrep_seqno_t) = 0;
         protected:
             ~ActionHandler() {}
         };

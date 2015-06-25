@@ -1,9 +1,8 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
-#include "uuid.hpp"
 
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
@@ -490,12 +489,12 @@ galera::Certification::~Certification()
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
     trx_map_.clear();
     service_thd_.release_seqno(position_);
-    service_thd_.flush();
+    service_thd_.flush(gu::UUID());
 }
 
 
-void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
-                                                    int           version)
+void galera::Certification::assign_initial_position(const gu::GTID& gtid,
+                                                    int const       version)
 {
     switch (version)
     {
@@ -520,11 +519,12 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     assert(cert_index_ng_.empty());
 
     service_thd_.release_seqno(position_);
-    service_thd_.flush();
+    service_thd_.flush(gtid.uuid());
 
-    log_info << "####### Assign initial position for certification: " << seqno
+    log_info << "####### Assign initial position for certification: " << gtid
              << ", protocol version: " << version;
 
+    wsrep_seqno_t const seqno(gtid.seqno());
     initial_position_      = seqno;
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
@@ -536,15 +536,14 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
 
 
 void
-galera::Certification::adjust_position(wsrep_seqno_t const seqno,
-                                       int const version)
+galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
 {
     gu::Lock lock(mutex_);
 
 // this assert is too strong: local ordered transactions may get canceled without
 // entering certification    assert(position_ + 1 == seqno || 0 == position_);
 
-    log_info << "####### Adjusting cert position to " << seqno;
+    log_info << "####### Adjusting cert position to " << gtid;
 
     if (version != version_)
     {
@@ -554,10 +553,10 @@ galera::Certification::adjust_position(wsrep_seqno_t const seqno,
         assert(cert_index_ng_.empty());
 
         service_thd_.release_seqno(position_);
-        service_thd_.flush();
+        service_thd_.flush(gtid.uuid());
     }
 
-    position_       = seqno;
+    position_       = gtid.seqno();
 //            last_pa_unsafe_ = position_;
     version_        = version;
 }

@@ -1,10 +1,10 @@
 // Copyright (C) 2015 Codership Oy <info@codership.com>
 
-#ifndef __gu_gtid_test__
-#define __gu_gtid_test__
+#ifndef gu_gtid_test_hpp
+#define gu_gtid_test_hpp
 
 #include <check.h>
 
 Suite* gu_gtid_suite(void);
 
-#endif /* __gu_gtid_test__ */
+#endif /* gu_gtid_test_hpp */

@@ -8,15 +8,6 @@
  * Top-level application interface implementation.
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <math.h>
-#include <errno.h>
-#include <assert.h>
-
-#include <galerautils.h>
-
 #include "gcs_priv.hpp"
 #include "gcs_params.hpp"
 #include "gcs_fc.hpp"
@@ -25,6 +16,16 @@
 #include "gcs_fifo_lite.hpp"
 #include "gcs_sm.hpp"
 #include "gcs_gcache.hpp"
+
+#include <galerautils.h>
+#include <gu_logger.hpp>
+
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <math.h>
+#include <errno.h>
+#include <assert.h>
 
 const char* gcs_node_state_to_str (gcs_node_state_t state)
 {
@@ -102,6 +103,7 @@ __attribute__((__packed__));
 
 struct gcs_conn
 {
+    gu::UUID group_uuid;
     long  my_idx;
     long  memb_num;
     char* my_name;
@@ -148,8 +150,9 @@ struct gcs_conn
     gcs_fc_t     stfc; // state transfer FC object
 
     /* #603, #606 join control */
-    bool        volatile need_to_join;
-    gcs_seqno_t volatile join_seqno;
+    bool         need_to_join;
+    gu::GTID     join_gtid;
+    int          join_code;
 
     /* sync control */
     bool         sync_sent;
@@ -282,6 +285,8 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
         goto sm_create_failed;
     }
 
+    assert(conn->group_uuid == GU_UUID_NIL);
+
     conn->state        = GCS_CONN_CLOSED;
     conn->my_idx       = -1;
     conn->local_act_id = GCS_SEQNO_FIRST;
@@ -322,10 +327,10 @@ init_params_failed:
 }
 
 long
-gcs_init (gcs_conn_t* conn, gcs_seqno_t seqno, const uint8_t uuid[GU_UUID_LEN])
+gcs_init (gcs_conn_t* conn, const gu::GTID& position)
 {
     if (GCS_CONN_CLOSED == conn->state) {
-        return gcs_core_init (conn->core, seqno, (const gu_uuid_t*)uuid);
+        return gcs_core_init (conn->core, position);
     }
     else {
         gu_error ("State must be CLOSED");
@@ -498,7 +503,8 @@ gcs_send_sync_end (gcs_conn_t* conn)
 
     gu_debug ("SENDING SYNC");
 
-    ret = gcs_core_send_sync (conn->core, 0);
+    ret = gcs_core_send_sync (conn->core, gu::GTID(conn->group_uuid,
+                                                   conn->global_seqno));
 
     if (gu_likely (ret >= 0)) {
         ret = 0;
@@ -669,7 +675,8 @@ gcs_become_donor (gcs_conn_t* conn)
                  "Rejecting.", gcs_conn_state_str[conn->state]);
         // reject the request.
         // error handling currently is way too simplistic
-        err = gcs_join (conn, -EPROTO);
+        err = gcs_join (conn, gu::GTID(conn->group_uuid, conn->global_seqno),
+                        -EPROTO);
         if (err < 0 && !(err == -ENOTCONN || err == -EBADFD)) {
             gu_fatal ("Failed to send State Transfer Request rejection: "
                       "%zd (%s)", err, (strerror (-err)));
@@ -792,24 +799,21 @@ _reset_pkt_size(gcs_conn_t* conn)
 }
 
 static long
-_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 {
     long err;
 
-    while (-EAGAIN == (err = gcs_core_send_join (conn->core, seqno)))
+    while (-EAGAIN == (err = gcs_core_send_join (conn->core, gtid, code)))
         usleep (10000);
 
-    switch (err)
+    if (gu_unlikely(err < 0))
     {
-    case -ENOTCONN:
         gu_warn ("Sending JOIN failed: %d (%s). "
                  "Will retry in new primary component.", err, strerror(-err));
-    case 0:
-        return 0;
-    default:
-        gu_error ("Sending JOIN failed: %d (%s).", err, strerror(-err));
         return err;
     }
+
+    return 0;
 }
 
 /*! Handles configuration action */
@@ -823,6 +827,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd* rcvd)
 
     assert(rcvd->id >= 0 || 0 == conf.memb.size());
 
+    conn->group_uuid = conf.uuid;
     conn->my_idx = rcvd->id;
 
     long ret;
@@ -942,7 +947,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd* rcvd)
         /* #603, #606 - duplicate JOIN msg in case we lost it */
         assert (conf.conf_id >= 0);
 
-        if (conn->need_to_join) _join (conn, conn->join_seqno);
+        if (conn->need_to_join) _join (conn, conn->join_gtid, conn->join_code);
 
         break;
     default:
@@ -1665,26 +1670,24 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
     return ret;
 }
 
-long gcs_request_state_transfer (gcs_conn_t  *conn,
-                                 int          version,
-                                 const void  *req,
-                                 size_t       size,
-                                 const char  *donor,
-                                 const gu_uuid_t* ist_uuid,
-                                 gcs_seqno_t ist_seqno,
-                                 gcs_seqno_t *local)
+long gcs_request_state_transfer (gcs_conn_t*    conn,
+                                 int            version,
+                                 const void*    req,
+                                 size_t         size,
+                                 const char*    donor,
+                                 const gu::GTID& ist_gtid,
+                                 gcs_seqno_t&   order)
 {
     long   ret       = -ENOMEM;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
-    size_t rst_size  = size + donor_len + sizeof(*ist_uuid) + sizeof(ist_seqno) + 2;
+    size_t rst_size  = size + donor_len + ist_gtid.serial_size() + 2;
     // for simplicity, allocate maximum space what we need here.
     char*  rst       = (char*)gu_malloc (rst_size);
 
-    *local = GCS_SEQNO_ILL;
+    order = GCS_SEQNO_ILL;
 
     if (rst) {
-        gu_debug("ist_uuid[" GU_UUID_FORMAT "], ist_seqno[%lld]",
-                 GU_UUID_ARGS(ist_uuid), (long long)ist_seqno);
+        log_debug << "ist_gtid " << ist_gtid;
 
         int offset = 0;
 
@@ -1695,6 +1698,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
          *       for the receiver part. */
 
         if (version < 2) {
+            assert(0); // this branch should not be exercised any more
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
             memcpy (rst + offset, req, size);
@@ -1710,15 +1714,18 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         // and ist_uuid starts with hex character in lower case.
         // it's safe to use 'V' as separator.
         else {
+            log_info << "0 offset : " << offset; // remove
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
+            log_info << "1 offset : " << offset; // remove
             rst[offset++] = 'V';
             rst[offset++] = (char)version;
-            memcpy (rst + offset, ist_uuid, sizeof(*ist_uuid));
-            offset += sizeof(*ist_uuid);
-            *(gcs_seqno_t*) (rst + offset) = gcs_seqno_htog(ist_seqno);
-            offset += sizeof(ist_seqno);
+            log_info << "2 offset : " << offset; // remove
+            offset = ist_gtid.serialize(rst, rst_size, offset);
+            log_info << "3 offset : " << offset; // remove
             memcpy (rst + offset, req, size);
+            assert(offset + size == rst_size);
+            log_info << "      SST sending: " << (char*)req << ", " << rst_size; // remove
         }
 
         struct gcs_action action;
@@ -1730,7 +1737,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 
         gu_free (rst);
 
-        *local = action.seqno_l;
+        order = action.seqno_l;
 
         if (ret > 0) {
             assert (action.buf != rst);
@@ -1756,15 +1763,15 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     return ret;
 }
 
-long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* local)
+long gcs_desync (gcs_conn_t* conn, gcs_seqno_t& order)
 {
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
     // for desync operation we use the lowest str_version.
     long ret = gcs_request_state_transfer (conn, 0,
                                            "", 1, GCS_DESYNC_REQ,
-                                           &ist_uuid, ist_seqno,
-                                           local);
+                                           gu::GTID(ist_uuid, ist_seqno),
+                                           order);
 
     if (ret >= 0) {
         return 0;
@@ -1909,7 +1916,7 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 }
 
 long
-gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
+gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid,uint64_t const code)
 {
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
@@ -1917,7 +1924,7 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     long ret = gcs_sm_enter (conn->sm, &cond, false, false);
 
     if (!ret) {
-        ret = gcs_core_set_last_applied (conn->core, seqno);
+        ret = gcs_core_set_last_applied (conn->core, gtid, code);
         gcs_sm_leave (conn->sm);
     }
 
@@ -1927,12 +1934,13 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 }
 
 long
-gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 {
-    conn->join_seqno   = seqno;
+    conn->join_gtid    = gtid;
+    conn->join_code    = code;
     conn->need_to_join = true;
 
-    return _join (conn, seqno);
+    return _join (conn, gtid, code);
 }
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)

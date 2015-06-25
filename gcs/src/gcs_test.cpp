@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <stdbool.h>
 
+#include <GCache.hpp>
 #include <galerautils.h>
 
 #include "gcs.hpp"
@@ -28,7 +29,7 @@
 
 static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static gcache_t* gcache = NULL;
+static gcache_t* cache = NULL;
 
 typedef struct gcs_test_log
 {
@@ -294,6 +295,7 @@ test_log_in_to (gu_to_t* to, gcs_seqno_t seqno, const char* msg)
 }
 
 static gcs_seqno_t group_seqno = 0;
+static gu::UUID    group_uuid;
 
 static inline long
 test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
@@ -303,15 +305,15 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 #define SEND_LAST_MASK ((1 << 14) - 1) // every 16K seqno
 
     if (!(my_seqno & SEND_LAST_MASK)) {
-            ret = gcs_set_last_applied (gcs, my_seqno);
-            if (ret) {
-                fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
-                         (long long)my_seqno, ret);
-            }
-//            if (!throughput) {
-                fprintf (stdout, "Last applied: my = %lld, group = %lld\n",
-                         (long long)my_seqno, (long long)group_seqno);
-//            }
+        ret = gcs_set_last_applied (gcs, gu::GTID(group_uuid, my_seqno), 0);
+        if (ret) {
+            fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
+                     (long long)my_seqno, ret);
+        }
+//      if (!throughput) {
+            fprintf (stdout, "Last applied: my = %lld, group = %lld\n",
+                     (long long)my_seqno, (long long)group_seqno);
+//      }
     }
     return ret;
 }
@@ -361,7 +363,7 @@ test_after_recv (gcs_test_thread_t* thread)
 //    fprintf (stdout, "SEQNO applied %lld", thread->local_act_id);
 
     if (thread->act.type == GCS_ACT_WRITESET)
-        gcache_free (gcache, thread->act.buf);
+        gcache_free (cache, thread->act.buf);
 
     return ret;
 }
@@ -449,19 +451,24 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     //       we don't keep track of them (and don't do real transfers),
     //       so for simplicity, just check conf_id.
     while (-EAGAIN == (ret = gu_to_grab (to, thread->act.seqno_l)));
+
     if (0 == ret) {
+        group_uuid = conf.uuid;
+
         if (my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
             fprintf (stdout,"Gap in configurations: ours: %lld, group: %lld.\n",
                      (long long)conf_id, (long long)conf.conf_id);
             fflush (stdout);
 
+            int err(gcs_request_state_transfer(gcs, 0, &conf.seqno,
+                                               sizeof(conf.seqno),"",
+                                               gu::GTID(ist_uuid, ist_seqno),
+                                               seqno));
+
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
                      (long long)conf.seqno, // this is global seqno
-                     strerror (-gcs_request_state_transfer(gcs, 0, &conf.seqno,
-                                                           sizeof(conf.seqno),"",
-                                                           &ist_uuid, ist_seqno,
-                                                           &seqno)));
+                     strerror (-err));
 
             // pretend that state transfer is complete, cancel every action up
             // to seqno
@@ -469,7 +476,8 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                 gu_to_self_cancel (to, s); // this is local seqno
             }
 
-            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fprintf (stdout, "Sending JOIN: %s\n",
+                     strerror(-gcs_join(gcs, gu::GTID(group_uuid, seqno), 0)));
             fflush (stdout);
         }
 
@@ -526,7 +534,9 @@ void *gcs_test_recv (void *arg)
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
             gu_to_grab (to, thread->act.seqno_l);
-            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fprintf (stdout, "Sending JOIN: %s\n",
+                     strerror(-gcs_join(gcs, gu::GTID(group_uuid, group_seqno),
+                                        0)));
             fflush (stdout);
             gu_to_release (to, thread->act.seqno_l);
             break;
@@ -711,11 +721,14 @@ int main (int argc, char *argv[])
     gconf = gu_config_create ();
     if (!gconf) goto out;
 
-    if (gu_config_add(gconf, "gcache.size", "0")) goto out;
-    if (gu_config_add(gconf, "gcache.page_size", "1M")) goto out;
+    gcache::GCache::register_params(*reinterpret_cast<gu::Config*>(gconf));
+    gu_config_set_string(gconf, "gcache.size", "0");
+    gu_config_set_string(gconf, "gcache.page_size", "1M");
 
-    if (!(gcache = gcache_create (gconf, ""))) goto out;
-    if (!(gcs = gcs_create (gconf, gcache, NULL, NULL, 0, 0))) goto out;
+    gcs_register_params(gconf);
+
+    if (!(cache = gcache_create (gconf, ""))) goto out;
+    if (!(gcs = gcs_create (gconf, cache, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);
     /* the following hack won't work if there is 0.0.0.0 in URL options */
     bstrap = (NULL != strstr(conf.backend, "0.0.0.0"));
@@ -797,7 +810,7 @@ int main (int argc, char *argv[])
     printf ("done\n"); fflush (stdout);
 
     printf ("Destroying GCache object:\n");
-    gcache_destroy (gcache);
+    gcache_destroy (cache);
 
     gcs_test_thread_pool_destroy (&repl_pool);
     gcs_test_thread_pool_destroy (&send_pool);

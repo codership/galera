@@ -1,11 +1,10 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
 #include "replicator_smm.hpp"
 #include "galera_exception.hpp"
-#include "uuid.hpp"
 
 #include "galera_info.hpp"
 
@@ -257,7 +256,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     // Initialize cert index position to zero in the case recovery information
     // was provided. This is required to avoid initializing cert position
     // above index rebuild trx seqnos.
-    cert_.assign_initial_position(seqno < 0 ? seqno : 0, trx_proto_ver());
+    cert_.assign_initial_position(gu::GTID(uuid, seqno < 0 ? seqno : 0),
+                                  trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
 }
@@ -335,10 +335,11 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     wsrep_status_t ret(WSREP_OK);
     wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
+    gu::GTID      const inpos(gcs_uuid, seqno);
 
-    log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
+    log_info << "Setting initial position to " << inpos;
 
-    if ((err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
+    if ((err = gcs_.set_initial_position(inpos)) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
@@ -1328,7 +1329,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
 
 
 wsrep_status_t
-galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
+galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
 {
     assert (rcode <= 0);
     assert (rcode == 0 || state_id.seqno == WSREP_SEQNO_UNDEFINED);
@@ -1340,17 +1341,15 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
         return WSREP_CONN_FAIL;
     }
 
-    gcs_seqno_t seqno(rcode ? rcode : state_id.seqno);
-
-    if (state_id.uuid != state_uuid_ && seqno >= 0)
+    if (state_id.uuid != state_uuid_ && rcode >= 0)
     {
         // state we have sent no longer corresponds to the current group state
         // mark an error
-        seqno = -EREMCHG;
+        rcode = -EREMCHG;
     }
 
     try {
-        gcs_.join(seqno);
+        gcs_.join(gu::GTID(state_id.uuid, state_id.seqno), rcode);
         return WSREP_OK;
     }
     catch (gu::Exception& e)
@@ -1420,7 +1419,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 }
 
 
-void galera::ReplicatorSMM::cancel_seqno(const wsrep_seqno_t& seqno)
+void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
 {
     // To enter monitors we need to fake trx object
     TrxHandleSlave* const dummy(TrxHandleSlave::New(true, slave_pool_));
@@ -1443,7 +1442,7 @@ void galera::ReplicatorSMM::cancel_seqno(const wsrep_seqno_t& seqno)
 }
 
 void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
-                                                 const wsrep_seqno_t& seqno)
+                                                 wsrep_seqno_t const seqno)
 {
     update_state_uuid(uuid);
     apply_monitor_.set_initial_position(seqno);
@@ -1759,7 +1758,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             log_info << "Cert index reset " << protocol_version_ <<
                 ", state transfer needed: " << (st_required ? "yes" : "no");
             cert_.assign_initial_position(
-                protocol_version_ < 8 ? STATE_SEQNO() : 0,
+                gu::GTID(group_uuid, protocol_version_ < 8 ? STATE_SEQNO() : 0),
                 trx_params_.version_);
 
             // at this point there is no ongoing master or slave transactions
@@ -1795,7 +1794,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
             /* since CC does not pass certification, need to adjust cert
              * position explicitly (when processed in order) */
-            cert_.adjust_position(conf.seqno, trx_params_.version_);
+            cert_.adjust_position(gu::GTID(conf.uuid, conf.seqno),
+                                  trx_params_.version_);
 
             log_info << "####### Setting monitor position to "
                      << group_seqno;
@@ -1871,7 +1871,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
              * 2) we failed here previously (probably due to partition).
              */
             try {
-                gcs_.join(sst_seqno_);
+                gcs_.join(gu::GTID(state_uuid_, sst_seqno_), 0);
                 sst_state_ = SST_NONE;
             }
             catch (gu::Exception& e)
@@ -2029,7 +2029,7 @@ void galera::ReplicatorSMM::desync()
 {
     wsrep_seqno_t seqno_l;
 
-    ssize_t const ret(gcs_.desync(&seqno_l));
+    ssize_t const ret(gcs_.desync(seqno_l));
 
     if (seqno_l > 0)
     {
@@ -2065,7 +2065,7 @@ void galera::ReplicatorSMM::desync()
 
 void galera::ReplicatorSMM::resync()
 {
-    gcs_.join(commit_monitor_.last_left());
+    gcs_.join(gu::GTID(state_uuid_, commit_monitor_.last_left()), 0);
 }
 
 

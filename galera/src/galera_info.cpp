@@ -1,13 +1,11 @@
 // Copyright (C) 2009-2015 Codership Oy <info@codership.com>
 
 #include "galera_info.hpp"
-#include "uuid.hpp"
-#include <galerautils.h>
+
+#include <gu_uuid.hpp>
+
 #include <string.h>
-
 #include <vector>
-
-using namespace galera;
 
 static size_t
 view_info_size (int members)
@@ -25,10 +23,9 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
 
     if (ret)
     {
-        wsrep_uuid_t  const uuid(to_wsrep_uuid(conf.uuid));
         wsrep_seqno_t const seqno
             (conf.seqno != GCS_SEQNO_ILL ? conf.seqno : WSREP_SEQNO_UNDEFINED);
-        wsrep_gtid_t const gtid = { uuid, seqno };
+        wsrep_gtid_t const gtid = { conf.uuid, seqno };
 
         ret->state_id  = gtid;
         ret->view      = conf.conf_id;
@@ -43,7 +40,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
             const gcs_act_cchange::member& cm(conf.memb[m]);    // from
             wsrep_member_info_t&           wm(ret->members[m]); // to
 
-            wm.id = to_wsrep_uuid(cm.uuid_);
+            wm.id = cm.uuid_;
 
             if (wm.id == my_uuid)
             {

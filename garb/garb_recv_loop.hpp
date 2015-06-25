@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2014 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2015 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_RECV_LOOP_HPP_
 #define _GARB_RECV_LOOP_HPP_
@@ -51,7 +51,11 @@ private:
     }
         parse_;
 
-    Gcs           gcs_;
+    Gcs gcs_;
+
+    gu::UUID    uuid_;
+    gu::seqno_t seqno_;
+
 }; /* RecvLoop */
 
 } /* namespace garb */

@@ -2,6 +2,8 @@
 
 #include "../src/gu_gtid.hpp"
 
+#include <sstream>
+
 #include "gu_gtid_test.hpp"
 
 START_TEST(gtid)
@@ -9,7 +11,8 @@ START_TEST(gtid)
     gu::GTID g0;
 
     fail_if(g0.uuid() != GU_UUID_NIL);
-    fail_if(g0.seqno() != -1);
+    fail_if(g0.seqno() != gu::GTID::SEQNO_UNDEFINED);
+    fail_if(g0.is_undefined() != true);
 
     gu::UUID const    u(NULL, 0);
     gu::seqno_t const s(1234);
@@ -21,12 +24,13 @@ START_TEST(gtid)
     fail_if(g1.seqno() != s);
     fail_if(g1.uuid()  == g0.uuid());
     fail_if(g1.seqno() == g0.seqno());
+    fail_if(g1.is_undefined());
 
     gu::GTID g2(g1);
 
     fail_if(g1 != g2);
 
-    gu::byte_t buf[128];
+    gu::byte_t buf[27];
     size_t const buflen(sizeof(buf));
 
     fail_if(buflen < gu::GTID::serial_size());

@@ -43,8 +43,8 @@ namespace galera
         {
             data_.reserve(data_.size() + data_len);
             data_.insert(data_.end(),
-                         reinterpret_cast<const gu::byte_t*>(data),
-                         reinterpret_cast<const gu::byte_t*>(data) + data_len);
+                         static_cast<const gu::byte_t*>(data),
+                         static_cast<const gu::byte_t*>(data) + data_len);
         }
 
         void get_keys(KeySequence&) const;

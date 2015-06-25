@@ -173,7 +173,7 @@ namespace galera
                            GatherVector&          out);
 
             /* records last_seen, timestamp and CRC before replication */
-            void finalize(const wsrep_seqno_t& ls, int pa_range);
+            void finalize(wsrep_seqno_t ls, int pa_range);
 
             /* records partial seqno, pa_range, timestamp and CRC before
              * replication (for preordered events)*/
@@ -315,7 +315,7 @@ namespace galera
             }
 
             /* to set seqno and parallel applying range after certification */
-            void set_seqno(const wsrep_seqno_t& seqno, uint16_t pa_range);
+            void set_seqno(wsrep_seqno_t seqno, uint16_t pa_range);
 
             gu::Buf copy(bool include_keys, bool include_unrd) const;
 
@@ -588,7 +588,7 @@ namespace galera
             return out_size;
         }
 
-        void finalize(const wsrep_seqno_t& ls, int pa_range)
+        void finalize(wsrep_seqno_t const ls, int const pa_range)
         {
             header_.finalize(ls, pa_range);
         }
@@ -599,7 +599,7 @@ namespace galera
                        const wsrep_uuid_t&      source,
                        const wsrep_conn_id_t&   conn,
                        const wsrep_trx_id_t&    trx,
-                       const wsrep_seqno_t&     last_seen,
+                       const wsrep_seqno_t      last_seen,
                        const int                pa_range = -1)
         {
             WriteSetNG::GatherVector out;
@@ -811,7 +811,7 @@ namespace galera
             return (data_.get_checksum());
         }
 
-        void set_seqno(const wsrep_seqno_t& seqno, ssize_t pa_range)
+        void set_seqno(wsrep_seqno_t const seqno, int pa_range)
         {
             assert (seqno    >  0);
             assert (pa_range >= 0);
