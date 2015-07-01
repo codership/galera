@@ -759,12 +759,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
-    try
+    while (true)
     {
-        while (true)
+        TrxHandle* trx(0);
+        int err;
+        try
         {
-            TrxHandle* trx(0);
-            int err;
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
                 assert(trx != 0);
@@ -790,7 +790,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     trx->set_state(TrxHandle::S_CERTIFYING);
                     apply_trx(recv_ctx, trx);
                     GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx")
-                }
+                        }
             }
             else
             {
@@ -798,16 +798,18 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             trx->unref();
         }
-    }
-    catch (gu::Exception& e)
-    {
-        log_fatal << "receiving IST failed, node restart required: "
-                  << e.what();
-        st_.mark_corrupt();
-        gcs_.close();
-        gu_abort();
+        catch (gu::Exception& e)
+        {
+            log_fatal << "receiving IST failed, node restart required: "
+                      << e.what();
+            if (trx)
+            {
+                log_fatal << "failed trx: " << *trx;
+            }
+            st_.mark_corrupt();
+            gcs_.close();
+            gu_abort();
+        }
     }
 }
-
-
 } /* namespace galera */
