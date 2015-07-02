@@ -101,7 +101,7 @@ namespace gcache
             assert_size_free();
         }
 
-        size_t actual_pool_size ();
+        size_t allocated_pool_size ();
 
     private:
 
@@ -117,6 +117,8 @@ namespace gcache
         uint8_t*     const end_;      // first byte after cache area
         uint8_t*           first_;    // pointer to the first (oldest) buffer
         uint8_t*           next_;     // pointer to the next free space
+
+        ssize_t            max_used_; // maximal memory usage (in bytes)
 
         ssize_t      const size_cache_;
         ssize_t            size_free_;

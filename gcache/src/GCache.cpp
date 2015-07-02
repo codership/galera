@@ -21,6 +21,7 @@ namespace gcache
 
         mallocs  = 0;
         reallocs = 0;
+        frees    = 0;
 
         seqno_locked   = SEQNO_NONE;
         seqno_max      = SEQNO_NONE;
@@ -71,12 +72,12 @@ namespace gcache
                   << "\n" << "GCache frees   : " << frees;
     }
 
-    size_t GCache::actual_pool_size ()
+    size_t GCache::allocated_pool_size ()
     {
         gu::Lock lock(mtx);
-        return mem.actual_pool_size() +
-               rb.actual_pool_size() +
-               ps.actual_pool_size();
+        return mem.allocated_pool_size() +
+               rb.allocated_pool_size() +
+               ps.allocated_pool_size();
     }
 
     /*! prints object properties */

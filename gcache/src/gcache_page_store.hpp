@@ -52,7 +52,7 @@ namespace gcache
 
         void  set_keep_size (ssize_t size) { keep_size_ = size; }
 
-        size_t actual_pool_size ();
+        size_t allocated_pool_size ();
 
     private:
 

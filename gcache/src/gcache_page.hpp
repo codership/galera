@@ -54,7 +54,7 @@ namespace gcache
 
         void* parent() const { return ps_; }
 
-        size_t actual_pool_size ();
+        size_t allocated_pool_size ();
 
     private:
 
@@ -64,6 +64,7 @@ namespace gcache
         uint8_t*           next_;
         ssize_t            space_;
         ssize_t            used_;
+        ssize_t            min_space_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);

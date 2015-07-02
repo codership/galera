@@ -36,6 +36,8 @@ gcache::Page::reset ()
 
     space_ = mmap_.size;
     next_  = static_cast<uint8_t*>(mmap_.ptr);
+
+    BH_clear (reinterpret_cast<BufferHeader*>(next_));
 }
 
 void
@@ -61,7 +63,8 @@ gcache::Page::Page (void* ps, const std::string& name, ssize_t size)
     ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
     space_(mmap_.size),
-    used_ (0)
+    used_ (0),
+    min_space_ (space_)
 {
     log_info << "Created page " << name << " of size " << space_
              << " bytes";
@@ -85,6 +88,11 @@ gcache::Page::malloc (int size)
         space_ -= size;
         next_  += size;
         used_++;
+
+        if (min_space_ > space_)
+        {
+            min_space_ = space_;
+        }
 
 #ifndef NDEBUG
         if (space_ >= static_cast<ssize_t>(sizeof(BufferHeader)))
@@ -120,7 +128,21 @@ gcache::Page::realloc (void* ptr, int size)
             bh->size += diff_size;
             space_   -= diff_size;
             next_    += diff_size;
-            BH_clear (BH_cast(next_));
+
+            if (min_space_ > space_)
+            {
+                min_space_ = space_;
+            }
+
+#ifndef NDEBUG
+            if (space_ >= static_cast<ssize_t>(sizeof(BufferHeader)))
+            {
+                BH_clear (BH_cast(next_));
+                assert (reinterpret_cast<uint8_t*>(bh + 1) < next_);
+            }
+
+            assert (next_ <= static_cast<uint8_t*>(mmap_.ptr) + mmap_.size);
+#endif
 
             return ptr;
         }
@@ -148,7 +170,7 @@ gcache::Page::realloc (void* ptr, int size)
     }
 }
 
-size_t gcache::Page::actual_pool_size ()
+size_t gcache::Page::allocated_pool_size ()
 {
-    return gu_actual_memory_usage(static_cast<void *> (mmap_.ptr), mmap_.size);
+    return mmap_.size - min_space_;
 }
