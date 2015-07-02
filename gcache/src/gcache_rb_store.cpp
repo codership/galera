@@ -51,6 +51,8 @@ namespace gcache
         end_       (reinterpret_cast<uint8_t*>(preamble_ + mmap_.size)),
         first_     (start_),
         next_      (first_),
+        max_used_  (first_ - static_cast<uint8_t*>(mmap_.ptr) +
+                    sizeof(BufferHeader)),
         size_cache_(end_ - start_ - sizeof(BufferHeader)),
         size_free_ (size_cache_),
         size_used_ (0),
@@ -220,6 +222,15 @@ namespace gcache
         bh->ctx     = this;
 
         next_ = ret + size;
+
+        ssize_t max_used=
+            next_ - static_cast<uint8_t*>(mmap_.ptr) + sizeof(BufferHeader);
+
+        if (max_used > max_used_)
+        {
+            max_used_ = max_used;
+        }
+
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));
         assert_sizes();
@@ -471,9 +482,9 @@ namespace gcache
         assert_sizes();
     }
 
-    size_t RingBuffer::actual_pool_size ()
+    size_t RingBuffer::allocated_pool_size ()
     {
-       return gu_actual_memory_usage(static_cast<void *> (mmap_.ptr), mmap_.size);
+       return max_used_;
     }
 
     void RingBuffer::print (std::ostream& os) const

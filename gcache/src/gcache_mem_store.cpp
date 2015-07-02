@@ -14,7 +14,7 @@ namespace gcache
 bool
 MemStore::have_free_space (ssize_t size)
 {
-    while ((size_ + size > max_size_) && !seqno2ptr_.empty())
+    while ((size_ > max_size_ - size) && !seqno2ptr_.empty())
     {
         /* try to free some released bufs */
         seqno2ptr_iter_t const i  (seqno2ptr_.begin());
@@ -51,7 +51,7 @@ MemStore::have_free_space (ssize_t size)
         }
     }
 
-    return (size_ + size <= max_size_);
+    return (size_ <= max_size_ - size);
 }
 
 void
@@ -75,36 +75,9 @@ MemStore::seqno_reset()
     }
 }
 
-size_t MemStore::actual_pool_size ()
+size_t MemStore::allocated_pool_size ()
 {
-  size_t size= 0;
-  for (std::set<void*>::iterator buf(allocd_.begin());
-                                 buf != allocd_.end(); ++buf)
-  {
-    BufferHeader* const bh(static_cast<BufferHeader*>(*buf));
-    switch (bh->store)
-    {
-      case BUFFER_IN_MEM:
-        size += bh->size;
-        break;
-      case BUFFER_IN_RB:
-        {
-          RingBuffer* const rb (static_cast<RingBuffer*>(bh->ctx));
-          size += rb->actual_pool_size();
-          break;
-        }
-      case BUFFER_IN_PAGE:
-        {
-          Page* const page (static_cast<Page*>(bh->ctx));
-          size += page->actual_pool_size();
-          break;
-        }
-      default:
-        log_fatal << "Corrupt buffer header: " << bh;
-        abort();
-    }
-  }
-  return size;
+  return size_;
 }
 
 } /* namespace gcache */

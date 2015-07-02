@@ -233,7 +233,7 @@ galera::ReplicatorSMM::stats_get()
     sv[STATS_CERT_INDEX_SIZE     ].value._int64 = index_size;
     sv[STATS_CERT_BUCKET_COUNT   ].value._int64 = cert_.bucket_count();
 
-    sv[STATS_GCACHE_POOL_SIZE    ].value._int64 = gcache_.actual_pool_size();
+    sv[STATS_GCACHE_POOL_SIZE    ].value._int64 = gcache_.allocated_pool_size();
 
     double oooe;
     double oool;
