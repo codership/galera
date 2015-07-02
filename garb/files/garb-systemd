@@ -37,7 +37,7 @@ start() {
 
 	GALERA_PORT=${GALERA_PORT:-4567}
 
-	OPTIONS="-d -a gcomm://${GALERA_NODES// /,}"
+	OPTIONS="-a gcomm://${GALERA_NODES// /,}"
 	# substitute space with comma for backward compatibility
 
 	[ -n "${GALERA_GROUP:-}" ]   && OPTIONS="$OPTIONS -g '$GALERA_GROUP'"
