@@ -288,6 +288,14 @@ namespace galera
                     mutex.lock();
                     lock();
                 }
+                else
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("apply_monitor_slave_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
             }
 #endif // GU_DBUG_ON
 
