@@ -1714,18 +1714,13 @@ long gcs_request_state_transfer (gcs_conn_t*    conn,
         // and ist_uuid starts with hex character in lower case.
         // it's safe to use 'V' as separator.
         else {
-            log_info << "0 offset : " << offset; // remove
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
-            log_info << "1 offset : " << offset; // remove
             rst[offset++] = 'V';
             rst[offset++] = (char)version;
-            log_info << "2 offset : " << offset; // remove
             offset = ist_gtid.serialize(rst, rst_size, offset);
-            log_info << "3 offset : " << offset; // remove
             memcpy (rst + offset, req, size);
             assert(offset + size == rst_size);
-            log_info << "      SST sending: " << (char*)req << ", " << rst_size; // remove
         }
 
         struct gcs_action action;
@@ -1768,7 +1763,7 @@ long gcs_desync (gcs_conn_t* conn, gcs_seqno_t& order)
     gu_uuid_t ist_uuid = {{0, }};
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
     // for desync operation we use the lowest str_version.
-    long ret = gcs_request_state_transfer (conn, 0,
+    long ret = gcs_request_state_transfer (conn, 2,
                                            "", 1, GCS_DESYNC_REQ,
                                            gu::GTID(ist_uuid, ist_seqno),
                                            order);
