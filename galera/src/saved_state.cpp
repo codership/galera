@@ -1,10 +1,10 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2015 Codership Oy <info@codership.com>
 //
 
 #include "saved_state.hpp"
-#include "gu_dbug.h"
-#include "uuid.hpp"
+#include <gu_dbug.h>
+#include <gu_uuid.hpp>
 
 #include <fstream>
 

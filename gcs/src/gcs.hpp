@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -16,7 +16,8 @@
 #include <gu_config.h>
 #include <gu_buf.h>
 #include <gu_errno.h>
-#include <gu_uuid.h>
+#include <gu_uuid.hpp>
+#include <gu_gtid.hpp>
 #include <gu_status.hpp>
 
 #include <stdint.h>
@@ -69,17 +70,15 @@ gcs_create  (gu_config_t* conf, gcache_t* cache,
  *
  * This function must be called before gcs_open() or after gcs_close().
  *
- * @param seqno Sequence number of the application state (last action applied).
- *              Should be negative for undefined state.
- * @param uuid  UUID of the sequence (group ID).
- *              Should be all zeroes for undefined state.
+ * @param position Global Transaction ID corresponding to the current
+ *                 application state.
+ *                 Should be undefined for undefined state.
  *
  * @return 0 in case of success, -EBUSY if conneciton is already opened,
  *         -EBADFD if connection object is being destroyed.
  */
-extern long gcs_init (gcs_conn_t   *conn,
-                      gcs_seqno_t   seqno,
-                      const uint8_t uuid[GCS_UUID_LEN]);
+extern long gcs_init (gcs_conn_t*     conn,
+                      const gu::GTID& position);
 
 /*! @brief Opens connection to group (joins channel).
  *
@@ -299,41 +298,41 @@ extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
  * @param size  request size
  * @param donor desired state transfer donor name. Supply empty string to
  *              choose automatically.
- * @param seqno response to request was ordered with this seqno.
+ * @param ist_gtid where to start IST from
+ * @param order response to request was ordered with this local order.
  *              Must be skipped in local queues.
  * @return negative error code, index of state transfer donor in case of success
  *         (notably, -EAGAIN means try later, -EHOSTUNREACH means desired donor
  *         is unavailable)
  */
-extern long gcs_request_state_transfer (gcs_conn_t  *conn,
-                                        int          ver,
-                                        const void  *req,
-                                        size_t       size,
-                                        const char  *donor,
-                                        const gu_uuid_t* ist_uuid,
-                                        gcs_seqno_t ist_seqno,
-                                        gcs_seqno_t *seqno);
+extern long gcs_request_state_transfer (gcs_conn_t*     conn,
+                                        int             ver,
+                                        const void*     req,
+                                        size_t          size,
+                                        const char*     donor,
+                                        const gu::GTID& ist_gtid,
+                                        gcs_seqno_t&    order);
 
 /*! @brief Turns off flow control on the node.
  * Effectively desynchronizes the node from the cluster (while the node keeps on
  * receiving all the actions). Requires gcs_join() to return to normal.
  *
  * @param conn  connection to group
- * @param seqno response to request was ordered with this seqno.
+ * @param order response to request was ordered with this seqno.
  *              Must be skipped in local queues.
  * @return negative error code, 0 in case of success.
  */
-extern long gcs_desync (gcs_conn_t* conn, gcs_seqno_t* seqno);
+extern long gcs_desync (gcs_conn_t* conn, gcs_seqno_t& order);
 
 /*! @brief Informs group on behalf of donor that state stransfer is over.
  * If status is non-negative, joiner will be considered fully joined to group.
  *
  * @param conn opened connection to group
- * @param status negative error code in case of state transfer failure,
- *               0 or (optional) seqno corresponding to transferred state.
+ * @param gtid containing negative error code in case of state transfer failure,
+ *             or gtid of joined state.
  * @return negative error code, 0 in case of success
  */
-extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
+extern long gcs_join (gcs_conn_t *conn, const gu::GTID& gtid, int code);
 
 /*! @brief Allocate local seqno for accessing local resources.
  *
@@ -349,7 +348,8 @@ extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
 /* Service functions */
 
 /*! Informs group about the last applied action on this node */
-extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
+extern long
+gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid, uint64_t code);
 
 /* GCS Configuration */
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -8,20 +8,24 @@
  * See gcs_core.h
  */
 
-#include "gu_throw.hpp"
-
 #define GCS_COMP_MSG_ACCESS
 
 #include "gcs_core.hpp"
 
 #include "gcs_backend.hpp"
 #include "gcs_comp_msg.hpp"
+#include "gcs_code_msg.hpp"
 #include "gcs_fifo_lite.hpp"
 #include "gcs_group.hpp"
 #include "gcs_gcache.hpp"
 
+#include <gu_throw.hpp>
+#include <gu_logger.hpp>
+
 #include <string.h> // for mempcpy
 #include <errno.h>
+
+using namespace gcs::core;
 
 bool
 gcs_core_register (gu_config_t* conf)
@@ -66,6 +70,7 @@ struct gcs_core
 
     /* recv part */
     gcs_recv_msg_t  recv_msg;
+    gcs_seqno_t     code_msg_buf;
 
     /* local action FIFO */
     gcs_fifo_lite_t* fifo;
@@ -158,10 +163,10 @@ gcs_core_create (gu_config_t* const conf,
 }
 
 long
-gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid)
+gcs_core_init (gcs_core_t* core, const gu::GTID& position)
 {
     if (core->state == CORE_CLOSED) {
-        return gcs_group_init_history (&core->group, seqno, uuid);
+        return gcs_group_init_history (&core->group, position);
     }
     else {
         gu_error ("State must be CLOSED");
@@ -672,10 +677,12 @@ core_handle_last_msg (gcs_core_t*          core,
                       struct gcs_act*      act)
 {
     assert (GCS_MSG_LAST == msg->type);
+    assert (CodeMsg::serial_size() == msg->size);
 
     if (gcs_group_is_primary(&core->group)) {
-        gcs_seqno_t commit_cut =
-            gcs_group_handle_last_msg (&core->group, msg);
+
+        gcs_seqno_t const commit_cut(gcs_group_handle_last_msg(&core->group,
+                                                               msg));
         if (commit_cut) {
             /* commit cut changed */
             if ((act->buf = malloc (sizeof (commit_cut)))) {
@@ -683,7 +690,7 @@ core_handle_last_msg (gcs_core_t*          core,
                 /* #701 - everything that goes into the action buffer
                  *        is expected to be serialized. */
                 *((gcs_seqno_t*)act->buf) = gcs_seqno_htog(commit_cut);
-                act->buf_len              = sizeof(commit_cut);
+                act->buf_len              = sizeof(gcs_seqno_t);
                 return act->buf_len;
             }
             else {
@@ -964,6 +971,30 @@ core_handle_state_msg (gcs_core_t*          core,
     return ret;
 }
 
+/* returns code in serialized form */
+static gcs_seqno_t
+core_msg_code (const struct gcs_recv_msg* const msg, int const proto_ver)
+{
+    if (gu_likely(proto_ver >= 1 &&
+                  msg->size == gcs::core::CodeMsg::serial_size()))
+    {
+        const gcs::core::CodeMsg* const cm
+            (static_cast<const gcs::core::CodeMsg*>(msg->buf));
+        return gu::htog(cm->code());
+    }
+    else if (proto_ver == 0 && msg->size == sizeof(gcs_seqno_t))
+    {
+        return *(static_cast<const gcs_seqno_t*>(msg->buf));
+        // no deserialization
+    }
+    else
+    {
+        log_warn << "Bogus code message size: " << msg->size;
+        assert(0);
+        return gu::htog(gcs_seqno_t(-EINVAL));
+    }
+}
+
 /*!
  * Some service actions are for internal use and consist of a single message
  * (FLOW, JOIN, SYNC)
@@ -971,37 +1002,49 @@ core_handle_state_msg (gcs_core_t*          core,
  * can guarantee that we don't deallocate it. Action here is just a wrapper
  * to deliver message to the upper level.
  */
-static ssize_t
+static int
 core_msg_to_action (gcs_core_t*          core,
                     struct gcs_recv_msg* msg,
                     struct gcs_act*      act)
 {
-    ssize_t      ret = 0;
+    int          ret = 0;
     gcs_group_t* group = &core->group;
 
     if (GCS_GROUP_PRIMARY == gcs_group_state (group)) {
-        gcs_act_type_t act_type;
-
         switch (msg->type) {
         case GCS_MSG_FLOW: // most frequent
             ret = 1;
-            act_type = GCS_ACT_FLOW;
+            act->type    = GCS_ACT_FLOW;
+            act->buf     = msg->buf;
+            act->buf_len = msg->size;
             break;
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg (group, msg);
             assert (gcs_group_my_idx(group) == msg->sender_idx || 0 >= ret);
-            if (-ENOTRECOVERABLE == ret) {
+            if (gu_likely(ret > 0))
+            {
+                core->code_msg_buf = core_msg_code(msg, core->proto_ver);
+                act->type    = GCS_ACT_JOIN;
+                act->buf     = &core->code_msg_buf;
+                act->buf_len = sizeof(core->code_msg_buf);
+            }
+            else if (-ENOTRECOVERABLE == ret) {
                 core->backend.close(&core->backend);
                 // See #165.
                 // There is nobody to pass this error to for graceful shutdown:
                 // application thread is blocked waiting for SST.
                 gu_abort();
             }
-            act_type = GCS_ACT_JOIN;
             break;
         case GCS_MSG_SYNC:
             ret = gcs_group_handle_sync_msg (group, msg);
-            act_type = GCS_ACT_SYNC;
+            if (gu_likely(ret > 0))
+            {
+                core->code_msg_buf = core_msg_code(msg, core->proto_ver);
+                act->type    = GCS_ACT_SYNC;
+                act->buf     = &core->code_msg_buf;
+                act->buf_len = sizeof(core->code_msg_buf);
+            }
             break;
         default:
             gu_error ("Iternal error. Unexpected message type %s from ld%",
@@ -1010,12 +1053,7 @@ core_msg_to_action (gcs_core_t*          core,
             ret = -EPROTO;
         }
 
-        if (ret > 0) {
-            act->type    = act_type;
-            act->buf     = msg->buf;
-            act->buf_len = msg->size;
-            ret          = msg->size;
-        }
+        if (gu_likely(ret > 0)) ret = act->buf_len;
     }
     else {
         gu_warn ("%s message from member %ld in non-primary configuration. "
@@ -1053,7 +1091,6 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
                        long long            timeout)
 {
-//    struct gcs_act_rcvd  recv_act;
     struct gcs_recv_msg* const recv_msg(&conn->recv_msg);
     ssize_t ret(0);
 
@@ -1062,7 +1099,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                 0,
                 GCS_ACT_ERROR),
         NULL,
-        -1,   // GCS_SEQNO_ILL
+        GCS_SEQNO_ILL,
         -1);
 
     *recv_act = zero_act;
@@ -1083,6 +1120,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         }
 
         assert(recv_msg->buf);
+        assert(recv_msg->buf_len >= recv_msg->size);
 
         switch (recv_msg->type) {
         case GCS_MSG_ACTION:
@@ -1300,34 +1338,50 @@ core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
     ssize_t           ret   = core_msg_send_retry (core, &htogs,
                                                    sizeof(htogs),
                                                    msg_type);
-    if (ret > 0) {
-        assert(ret == sizeof(seqno));
-        ret = 0;
+    if (ret > 0) { assert(ret == sizeof(seqno)); }
+
+    return ret;
+}
+
+static inline int
+core_send_code (gcs_core_t* const core, const gu::GTID& gtid, int64_t code,
+                gcs_msg_type_t const msg_type)
+{
+    if (gu_unlikely(core->proto_ver < 1))
+    {
+        return core_send_seqno (core, code < 0 ? code : gtid.seqno(), msg_type);
     }
+
+    CodeMsg const msg(gtid, code);
+
+    int ret(core_msg_send_retry (core, msg(), msg.serial_size(), msg_type));
+
+    if (ret > 0) { assert(ret == msg.serial_size()); }
 
     return ret;
 }
 
 long
-gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
+gcs_core_set_last_applied (gcs_core_t* const core, const gu::GTID& gtid,
+                           uint64_t const code)
 {
-    return core_send_seqno (core, seqno, GCS_MSG_LAST);
+    return core_send_code (core, gtid, code, GCS_MSG_LAST);
 }
 
 long
-gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno)
+gcs_core_send_join (gcs_core_t* const core, const gu::GTID& gtid, int code)
 {
-    return core_send_seqno (core, seqno, GCS_MSG_JOIN);
+    return core_send_code (core, gtid, code, GCS_MSG_JOIN);
 }
 
 long
-gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno)
+gcs_core_send_sync (gcs_core_t* const core, const gu::GTID& gtid)
 {
-    return core_send_seqno (core, seqno, GCS_MSG_SYNC);
+    return core_send_code (core, gtid, 0, GCS_MSG_SYNC);
 }
 
 long
-gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
+gcs_core_send_fc (gcs_core_t* core, const void* const fc, size_t const fc_size)
 {
     ssize_t ret;
     ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW);
@@ -1439,4 +1493,11 @@ gcs_core_get_fifo (gcs_core_t* core)
 {
     return core->fifo;
 }
+
+int
+gcs_core_get_proto (gcs_core_t* core)
+{
+    return core->proto_ver;
+}
+
 #endif /* GCS_CORE_TESTING */

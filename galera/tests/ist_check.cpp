@@ -6,11 +6,11 @@
 #include "ist.hpp"
 #include "ist_proto.hpp"
 #include "trx_handle.hpp"
-#include "uuid.hpp"
 #include "monitor.hpp"
-#include "GCache.hpp"
-#include "gu_arch.h"
 #include "replicator_smm.hpp"
+
+#include <GCache.hpp>
+#include <gu_arch.h>
 #include <check.h>
 
 using namespace galera;
@@ -229,8 +229,8 @@ class PreIST : public galera::ist::ActionHandler
 {
 public:
     void preload_index(const gcs_action& act) { }
-    void wait(const wsrep_seqno_t& upto) { }
-    void drain_monitors(const wsrep_seqno_t& upto) { }
+    void wait(wsrep_seqno_t const upto) { }
+    void drain_monitors(wsrep_seqno_t const upto) { }
     virtual ~PreIST() {}
 };
 

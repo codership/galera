@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -51,9 +51,9 @@ gcs_core_create (gu_config_t* conf,
                  int          appl_proto_ver,
                  int          gcs_proto_ver = GCS_PROTO_MAX);
 
-/* initializes action history (global seqno, group UUID). See gcs.h */
+/* initializes action history position from gtid. See gcs.hpp */
 extern long
-gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid);
+gcs_core_init (gcs_core_t* core, const gu::GTID& position);
 
 /*
  * gcs_core_open() opens connection
@@ -142,15 +142,15 @@ gcs_core_set_pkt_size (gcs_core_t* conn, long pkt_size);
 
 /* sends this node's last applied value to group */
 extern long
-gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
+gcs_core_set_last_applied (gcs_core_t* core, const gu::GTID& gtid,uint64_t code);
 
-/* sends status of the ended snapshot (snapshot seqno or error code) */
+/* sends status of the ended snapshot (snapshot gtid or error code) */
 extern long
-gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno);
+gcs_core_send_join (gcs_core_t* core, const gu::GTID& gtid, int code);
 
-/* sends SYNC notice, seqno currently has no meaning */
+/* sends SYNC notice, gtid currently has no meaning */
 extern long
-gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno);
+gcs_core_send_sync (gcs_core_t* core, const gu::GTID& gtid);
 
 /* sends flow control message */
 extern long
@@ -167,7 +167,7 @@ gcs_core_param_get (gcs_core_t* core, const char* key);
 
 void gcs_core_get_status(gcs_core_t* core, gu::Status& status);
 
-#ifdef GCS_CORE_TESTING
+#ifdef GCS_CORE_TESTING // things compiled only for unit tests
 
 /* gcs_core_send() interface does not allow enough concurrency control to model
  * various race conditions for unit testing - it is not atomic. The functions
@@ -198,6 +198,9 @@ gcs_core_get_group (const gcs_core_t* core);
 #include "gcs_fifo_lite.hpp"
 extern gcs_fifo_lite_t*
 gcs_core_get_fifo (gcs_core_t* core);
+
+extern int
+gcs_core_get_proto(gcs_core_t* core);
 
 #endif /* GCS_CORE_TESTING */
 

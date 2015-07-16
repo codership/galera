@@ -189,7 +189,7 @@ std::ostream& gcomm::View::write_stream(std::ostream& os) const
         const UUID& uuid(it -> first);
         const Node& node(it -> second);
         os << "member: ";
-        uuid.write_stream(os) << " ";
+        uuid.print(os) << " ";
         node.write_stream(os) << std::endl;
     }
     os << "#vwend" << std::endl;
@@ -213,7 +213,7 @@ std::istream& gcomm::View::read_stream(std::istream& is)
         } else if (param == "member:") {
             UUID uuid;
             Node node(0);
-            uuid.read_stream(istr);
+            uuid.scan(istr);
             node.read_stream(istr);
             add_member(uuid, node.segment());
         }
@@ -224,7 +224,7 @@ std::istream& gcomm::View::read_stream(std::istream& is)
 std::ostream& gcomm::ViewState::write_stream(std::ostream& os) const
 {
     os << "my_uuid: ";
-    my_uuid_.write_stream(os) << std::endl;
+    my_uuid_.print(os) << std::endl;
     view_.write_stream(os);
     return os;
 }
@@ -238,7 +238,7 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
         std::istringstream istr(line);
         istr >> param;
         if (param == "my_uuid:") {
-            my_uuid_.read_stream(istr);
+            my_uuid_.scan(istr);
         } else if (param == "#vwbeg") {
             // read from next line.
             view_.read_stream(is);

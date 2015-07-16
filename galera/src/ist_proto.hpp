@@ -247,7 +247,7 @@ namespace galera
                     Type     type,
                     uint8_t  flags,
                     uint32_t len,
-                    const wsrep_seqno_t& seqno)
+                    wsrep_seqno_t const seqno)
                 :
                 Message(version, type, flags, 0, len, seqno)
             { }

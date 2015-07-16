@@ -98,8 +98,8 @@ WriteSetNG::Header::gather (KeySet::Version const  kver,
 
 
 void
-WriteSetNG::Header::finalize(const wsrep_seqno_t& last_seen,
-                             int const            pa_range)
+WriteSetNG::Header::finalize(wsrep_seqno_t const last_seen,
+                             int const           pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
@@ -118,7 +118,7 @@ WriteSetNG::Header::finalize(const wsrep_seqno_t& last_seen,
 
 
 void
-WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno,
+WriteSetNG::Header::set_seqno(wsrep_seqno_t const seqno,
                               uint16_t const pa_range)
 {
     assert (ptr_);

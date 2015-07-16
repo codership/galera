@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,6 +13,7 @@
 #define _gu_uuid_h_
 
 #include "gu_types.h"
+#include <wsrep_api.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,9 +22,10 @@ extern "C" {
 /*! UUID internally is represented as a BE integer which allows using
  *  memcmp() as comparison function and straightforward printing */
 #define GU_UUID_LEN 16
-typedef struct {
-    uint8_t data[GU_UUID_LEN];
-} gu_uuid_t;
+//typedef struct {
+//    uint8_t data[GU_UUID_LEN];
+//}
+typedef wsrep_uuid_t gu_uuid_t;
 
 extern const gu_uuid_t GU_UUID_NIL;
 

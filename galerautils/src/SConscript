@@ -5,6 +5,7 @@ libgalerautils_env = env.Clone()
 # Include paths
 libgalerautils_env.Append(CPPPATH = Split('''
                                              #
+                                             #common
                                           '''))
 
 # C part
@@ -86,6 +87,7 @@ libgalerautilsxx_sources = [
     'gu_uri.cpp',
     'gu_buffer.cpp',
     'gu_utils++.cpp',
+    'gu_gtid.cpp',
     'gu_config.cpp',
     'gu_fdesc.cpp',
     'gu_mmap.cpp',
@@ -104,11 +106,11 @@ libgalerautilsxx_sources = [
 libgalerautilsxx_sobjs = libgalerautilsxx_env.SharedObject(
                          libgalerautilsxx_sources)
 
-#hexdump_obj  = libgalerautilsxx_env.Object('gu_hexdump++','gu_hexdump.cpp')
 hexdump_sobj = libgalerautilsxx_env.SharedObject('gu_hexdump++','gu_hexdump.cpp')
+uuid_sobj = libgalerautilsxx_env.SharedObject('gu_uuid++','gu_uuid.cpp')
 
-#libgalerautilsxx_objs  += hexdump_obj
 libgalerautilsxx_sobjs += hexdump_sobj
+libgalerautilsxx_sobjs += uuid_sobj
 
 #if '-DGALERA_USE_GU_NETWORK' in libgalerautils_env['CPPFLAGS']:
 #    libgalerautilsxx_sources = [libgalerautilsxx_sources,

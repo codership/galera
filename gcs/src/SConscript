@@ -7,6 +7,7 @@ libgcs_env = env.Clone()
 
 # Include paths
 libgcs_env.Append(CPPPATH = Split('''
+                                     #/common
                                      #/galerautils/src
                                      #/gcomm/src
                                      #/gcache/src
@@ -44,6 +45,7 @@ libgcs_sources = Split('''
                           gcs_state_msg.cpp
                           gcs_node.cpp
                           gcs_act_cchange.cpp
+                          gcs_code_msg.cpp
                           gcs_group.cpp
                           gcs_core.cpp
                           gcs_fc.cpp
