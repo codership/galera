@@ -81,23 +81,25 @@ size_t gu_uuid_unserialize(const void* buf, size_t buflen, size_t offset,
                            gu_uuid_t& uuid);
 
 namespace gu {
+    class UUID_base;
     class UUID;
 }
 
-class gu::UUID
+/* This class should not be used directly. It is here to allow
+ * gu::UUID and gcomm::UUID to inherit from it without the virtual table
+(* overhead. */
+class gu::UUID_base
 {
 public:
 
-    UUID() : uuid_(GU_UUID_NIL) {}
+    UUID_base() : uuid_(GU_UUID_NIL) {}
 
-    UUID(const void* node, const size_t node_len) : uuid_()
+    UUID_base(const void* node, const size_t node_len) : uuid_()
     {
         gu_uuid_generate(&uuid_, node, node_len);
     }
 
-    UUID(gu_uuid_t uuid) : uuid_(uuid) {}
-
-//    virtual ~UUID() {}
+    UUID_base(gu_uuid_t uuid) : uuid_(uuid) {}
 
     size_t unserialize(const void* buf, const size_t buflen, const size_t offset)
     {
@@ -136,22 +138,32 @@ public:
         return &uuid_;
     }
 
-    bool operator<(const UUID& cmp) const
+    bool operator<(const UUID_base& cmp) const
     {
         return (gu_uuid_compare(&uuid_, &cmp.uuid_) < 0);
     }
 
-    bool operator==(const UUID& cmp) const
+    bool operator==(const gu_uuid_t& cmp) const
     {
-        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
+        return (gu_uuid_compare(&uuid_, &cmp) == 0);
     }
 
-    bool operator!=(const UUID& cmp) const
+    bool operator!=(const gu_uuid_t& cmp) const
     {
         return !(*this == cmp);
     }
 
-    bool older(const UUID& cmp) const
+    bool operator==(const UUID_base& cmp) const
+    {
+        return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
+    }
+
+    bool operator!=(const UUID_base& cmp) const
+    {
+        return !(*this == cmp);
+    }
+
+    bool older(const UUID_base& cmp) const
     {
         return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
@@ -166,7 +178,7 @@ public:
         return (is >> uuid_);
     }
 
-    UUID& operator=(const gu_uuid_t& other)
+    UUID_base& operator=(const gu_uuid_t& other)
     {
         uuid_ = other;
         return *this;
@@ -178,20 +190,35 @@ public:
     }
 
 protected:
+
+    ~UUID_base() {}
+
     gu_uuid_t uuid_;
 
 private:
     GU_COMPILE_ASSERT(sizeof(gu_uuid_t) == GU_UUID_LEN, UUID_size);
-}; // class UUID
+}; /* class UUID_base */
+
+class gu::UUID : public UUID_base
+{
+public:
+
+    UUID() : UUID_base() {}
+
+    UUID(const void* node, const size_t node_len) : UUID_base(node, node_len)
+    {}
+
+    UUID(gu_uuid_t uuid) : UUID_base(uuid) {}
+}; /* class UUID */
 
 namespace gu
 {
-inline std::ostream& operator<< (std::ostream& os, const gu::UUID& uuid)
+inline std::ostream& operator<< (std::ostream& os, const gu::UUID_base& uuid)
 {
     uuid.print(os); return os;
 }
 
-inline std::istream& operator>> (std::istream& is, gu::UUID& uuid)
+inline std::istream& operator>> (std::istream& is, gu::UUID_base& uuid)
 {
     uuid.scan(is); return is;
 }
