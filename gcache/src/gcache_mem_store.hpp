@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -9,6 +9,7 @@
 
 #include "gcache_memops.hpp"
 #include "gcache_bh.hpp"
+#include "gcache_limits.hpp"
 
 #include <string>
 #include <set>
@@ -23,7 +24,7 @@ namespace gcache
 
     public:
 
-        MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr)
+        MemStore (size_t max_size, seqno2ptr_t& seqno2ptr)
             : max_size_ (max_size),
               size_     (0),
               allocd_   (),
@@ -44,8 +45,10 @@ namespace gcache
 
         ~MemStore () { reset(); }
 
-        void* malloc  (int size)
+        void* malloc  (size_type size)
         {
+            Limits::assert_size(size);
+
             if (size > max_size_ || have_free_space(size) == false) return 0;
 
             assert (size_ + size <= max_size_);
@@ -81,10 +84,10 @@ namespace gcache
             if (SEQNO_NONE == bh->seqno_g) discard (bh);
         }
 
-        void* realloc (void* ptr, int size)
+        void* realloc (void* ptr, size_type size)
         {
             BufferHeader* bh(0);
-            ssize_t old_size(0);
+            size_type old_size(0);
 
             if (ptr)
             {
@@ -93,7 +96,7 @@ namespace gcache
                 old_size = bh->size;
             }
 
-            ssize_t const diff_size(size - old_size);
+            diff_type const diff_size(size - old_size);
 
             if (size > max_size_ ||
                 have_free_space(diff_size) == false) return 0;
@@ -128,21 +131,21 @@ namespace gcache
             allocd_.erase(bh);
         }
 
-        void set_max_size (ssize_t size) { max_size_ = size; }
+        void set_max_size (size_t size) { max_size_ = size; }
 
         void seqno_reset();
 
         // for unit tests only
-        ssize_t _allocd () const { return size_; }
+        size_t _allocd () const { return size_; }
 
         size_t allocated_pool_size ();
 
     private:
 
-        bool have_free_space (ssize_t size);
+        bool have_free_space (size_type size);
 
-        ssize_t         max_size_;
-        ssize_t         size_;
+        size_t          max_size_;
+        size_t          size_;
         std::set<void*> allocd_;
         seqno2ptr_t&    seqno2ptr_;
     };

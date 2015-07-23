@@ -3,14 +3,14 @@
 
 # REMOVE THIS AFTER CONFIGURATION
 
-# A space-separated list of node addresses (address[:port]) in the cluster
+# A comma-separated list of node addresses (address[:port]) in the cluster
 # GALERA_NODES=""
 
 # Galera cluster name, should be the same as on the rest of the nodes.
 # GALERA_GROUP=""
 
 # Optional Galera internal options string (e.g. SSL settings)
-# see http://www.codership.com/wiki/doku.php?id=galera_parameters
+# see http://galeracluster.com/documentation-webpages/galeraparameters.html
 # GALERA_OPTIONS=""
 
 # Log file for garbd. Optional, by default logs to syslog

@@ -20,7 +20,7 @@ import string
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
-bits = platform.architecture()[0]
+bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
 x86 = 0
@@ -47,6 +47,7 @@ Commandline Options:
     revno=XXXX          source code revision number
     bpostatic=path      a path to static libboost_program_options.a
     extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
+    bits=[32bit|64bit]
 ''')
 # bpostatic option added on Percona request
 
@@ -303,7 +304,7 @@ if boost == 1:
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
     # Common procedure to find boost static library
-    boost_libpaths = [ boost_library_path, '/usr/local/lib', '/usr/local/lib64', '/usr/lib', '/usr/lib64' ]
+    boost_libpaths = [ boost_library_path, '/usr/lib64', '/usr/local/lib64'] if x86 == 64 else [ boost_library_path, '/usr/local/lib', '/usr/lib' ]
     def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
         libName = libBaseName + boost_library_suffix
         if configuredLibPath != '' and not os.path.isfile(configuredLibPath):

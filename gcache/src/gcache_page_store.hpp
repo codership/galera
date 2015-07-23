@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file page store class */
@@ -20,8 +20,8 @@ namespace gcache
     public:
 
         PageStore (const std::string& dir_name,
-                   ssize_t            keep_size,
-                   ssize_t            page_size,
+                   size_t             keep_size,
+                   size_t             page_size,
                    bool               keep_page);
 
         ~PageStore ();
@@ -31,11 +31,11 @@ namespace gcache
             return static_cast<PageStore*>(p->parent());
         }
 
-        void* malloc  (int size);
+        void* malloc  (size_type size);
 
         void  free    (BufferHeader* bh) { assert(0); }
 
-        void* realloc (void* ptr, int size);
+        void* realloc (void* ptr, size_type size);
 
         void  discard (BufferHeader* bh)
         {
@@ -46,30 +46,30 @@ namespace gcache
 
         void  reset();
 
-        ssize_t count() const { return count_; } // for unit tests
+        size_t count() const { return count_; } // for unit tests
 
-        void  set_page_size (ssize_t size) { page_size_ = size; }
+        void  set_page_size (size_t size) { page_size_ = size; }
 
-        void  set_keep_size (ssize_t size) { keep_size_ = size; }
+        void  set_keep_size (size_t size) { keep_size_ = size; }
 
         size_t allocated_pool_size ();
 
     private:
 
         std::string const base_name_; /* /.../.../gcache.page. */
-        ssize_t           keep_size_; /* how much pages to keep after freeing*/
-        ssize_t           page_size_; /* min size of the individual page */
+        size_t            keep_size_; /* how much pages to keep after freeing*/
+        size_t            page_size_; /* min size of the individual page */
         bool        const keep_page_; /* whether to keep the last page */
-        ssize_t           count_;
+        size_t            count_;
         std::deque<Page*> pages_;
         Page*             current_;
-        ssize_t           total_size_;
+        size_t            total_size_;
         pthread_attr_t    delete_page_attr_;
 #ifndef GCACHE_DETACH_THREAD
         pthread_t         delete_thr_;
 #endif /* GCACHE_DETACH_THREAD */
 
-        void new_page    (ssize_t size);
+        void new_page    (size_type size);
 
         // returns true if a page could be deleted
         bool delete_page ();
@@ -77,7 +77,7 @@ namespace gcache
         // cleans up extra pages.
         void cleanup     ();
 
-        void* malloc_new (unsigned int size);
+        void* malloc_new (size_type size);
 
         void
         free_page_ptr (Page* page, BufferHeader* bh)

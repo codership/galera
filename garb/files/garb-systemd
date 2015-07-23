@@ -12,7 +12,7 @@ log_failure() {
 
 program_start() {
 	echo "Starting garbd"
-        /usr/bin/garbd $* 
+        /usr/bin/garbd "$@"
 }
 
 
@@ -35,31 +35,14 @@ start() {
 
 	GALERA_PORT=${GALERA_PORT:-4567}
 
-	# Find a working node
-	for ADDRESS in ${GALERA_NODES} 0; do
-		HOST=$(echo $ADDRESS | cut -d \: -f 1 )
-		PORT=$(echo $ADDRESS | cut -s -d \: -f 2 )
-		PORT=${PORT:-$GALERA_PORT}
-		if [[ -x `which nc` ]] && nc -h 2>&1 | grep -q  -- '-z';then
-                    nc -z $HOST $PORT >/dev/null && break
-                elif [[ -x `which nmap` ]];then
-                    nmap -Pn -p$PORT $HOST | awk "\$1 ~ /$PORT/ {print \$2}" | grep -q open && break
-                else
-                    log_failure "Neither netcat nor nmap are present for zero I/O scanning"
-                    return 1
-                fi
-	done
-	if [ ${ADDRESS} == "0" ]; then
-		log_failure "None of the nodes in $GALERA_NODES is accessible"
-		return 1
-	fi
+	OPTIONS="-a gcomm://${GALERA_NODES// /,}"
+	# substitute space with comma for backward compatibility
 
-	OPTIONS=" -a gcomm://$ADDRESS "
-	[ -n "${GALERA_GROUP:-}" ]   && OPTIONS="$OPTIONS -g $GALERA_GROUP"
-	[ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o $GALERA_OPTIONS"
-	[ -n "${LOG_FILE:-}" ]       && OPTIONS="$OPTIONS -l $LOG_FILE"
+	[ -n "${GALERA_GROUP:-}" ]   && OPTIONS="$OPTIONS -g '$GALERA_GROUP'"
+	[ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o '$GALERA_OPTIONS'"
+	[ -n "${LOG_FILE:-}" ]       && OPTIONS="$OPTIONS -l '$LOG_FILE'"
 
-	program_start $OPTIONS
+	eval program_start $OPTIONS
 }
 
 

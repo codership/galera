@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 #include "gcache_mem_store.hpp"
@@ -12,7 +12,7 @@ namespace gcache
 {
 
 bool
-MemStore::have_free_space (ssize_t size)
+MemStore::have_free_space (size_type size)
 {
     while ((size_ > max_size_ - size) && !seqno2ptr_.empty())
     {

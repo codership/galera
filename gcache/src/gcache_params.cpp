@@ -57,36 +57,18 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     :
     rb_name_  (name_value (cfg, data_dir)),
     dir_name_ (cfg.get(GCACHE_PARAMS_DIR)),
-    mem_size_ (cfg.get<ssize_t>(GCACHE_PARAMS_MEM_SIZE)),
-    rb_size_  (cfg.get<ssize_t>(GCACHE_PARAMS_RB_SIZE)),
-    page_size_(cfg.get<ssize_t>(GCACHE_PARAMS_PAGE_SIZE)),
-    keep_pages_size_(cfg.get<ssize_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
+    mem_size_ (cfg.get<size_t>(GCACHE_PARAMS_MEM_SIZE)),
+    rb_size_  (cfg.get<size_t>(GCACHE_PARAMS_RB_SIZE)),
+    page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
+    keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
 {
-    if (page_size_ < 0)
-    {
-        log_error << "Negative page buffer size";
-    }
-
-    if (rb_size_ < 0)
-    {
-        log_error << "Negative ring buffer size";
-    }
-
-    if (mem_size_ < 0)
-    {
-        log_error << "Negative memory buffer size";
-    }
-    else if (mem_size_)
+    if (mem_size_)
     {
         log_warn << GCACHE_PARAMS_MEM_SIZE
                  << " parameter is buggy and DEPRECATED,"
                  << " use it with care.";
     }
 
-    if (keep_pages_size_ < 0)
-    {
-        log_error << "Negative keep pages size";
-    }
 }
 
 void
@@ -102,13 +84,9 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
     }
     else if (key == GCACHE_PARAMS_MEM_SIZE)
     {
-        ssize_t tmp_size = gu::Config::from_config<ssize_t>(val);
+        size_t tmp_size = gu::Config::from_config<size_t>(val);
 
-        if (tmp_size < 0)
-        {
-            gu_throw_error(EINVAL) << "Negative memory buffer size";
-        }
-        else if (tmp_size)
+        if (tmp_size)
         {
             log_warn << GCACHE_PARAMS_MEM_SIZE
                      << " parameter is buggy and DEPRECATED,"
@@ -119,7 +97,7 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
         /* locking here serves two purposes: ensures atomic setting of config
          * and params.ram_size and syncs with malloc() method */
 
-        config.set<ssize_t>(key, tmp_size);
+        config.set<size_t>(key, tmp_size);
         params.mem_size(tmp_size);
         mem.set_max_size(params.mem_size());
     }
@@ -129,31 +107,25 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
     }
     else if (key == GCACHE_PARAMS_PAGE_SIZE)
     {
-        ssize_t tmp_size = gu::Config::from_config<ssize_t>(val);
-
-        if (tmp_size < 0)
-            gu_throw_error(EINVAL) << "Negative page buffer size";
+        size_t tmp_size = gu::Config::from_config<size_t>(val);
 
         gu::Lock lock(mtx);
         /* locking here serves two purposes: ensures atomic setting of config
          * and params.ram_size and syncs with malloc() method */
 
-        config.set<ssize_t>(key, tmp_size);
+        config.set<size_t>(key, tmp_size);
         params.page_size(tmp_size);
         ps.set_page_size(params.page_size());
     }
     else if (key == GCACHE_PARAMS_KEEP_PAGES_SIZE)
     {
-        ssize_t tmp_size = gu::Config::from_config<ssize_t>(val);
-
-        if (tmp_size < 0)
-            gu_throw_error(EINVAL) << "Negative keep pages size";
+        size_t tmp_size = gu::Config::from_config<size_t>(val);
 
         gu::Lock lock(mtx);
         /* locking here serves two purposes: ensures atomic setting of config
          * and params.ram_size and syncs with malloc() method */
 
-        config.set<ssize_t>(key, tmp_size);
+        config.set<size_t>(key, tmp_size);
         params.keep_pages_size(tmp_size);
         ps.set_keep_size(params.keep_pages_size());
     }

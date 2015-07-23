@@ -116,10 +116,7 @@ Requires(preun): initscripts
 %endif
 %endif # systemd
 
-Requires:      openssl nmap
-%if 0%{?centos} == 6
-Requires: nc
-%endif
+Requires:      openssl
 
 Provides:      wsrep, %{name} = %{version}-%{release}
 Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -21,10 +21,10 @@ namespace gcache
     {
     public:
 
-        Page (void* ps, const std::string& name, ssize_t size);
+        Page (void* ps, const std::string& name, size_t size);
         ~Page () {}
 
-        void* malloc  (int size);
+        void* malloc  (size_type size);
 
         void  free    (BufferHeader* bh)
         {
@@ -36,13 +36,13 @@ namespace gcache
             used_--;
         }
 
-        void* realloc (void* ptr, int size);
+        void* realloc (void* ptr, size_type size);
 
         void discard (BufferHeader* ptr) {}
 
-        ssize_t used () const { return used_; }
+        size_t used () const { return used_; }
 
-        ssize_t size () const /* total page size */
+        size_t size () const /* total page size */
         { return mmap_.size - sizeof(BufferHeader); }
 
         const std::string& name() const { return fd_.name(); }
@@ -62,9 +62,9 @@ namespace gcache
         gu::MMap           mmap_;
         void* const        ps_;
         uint8_t*           next_;
-        ssize_t            space_;
-        ssize_t            used_;
-        ssize_t            min_space_;
+        size_t            space_;
+        size_t            used_;
+        size_t            min_space_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);
