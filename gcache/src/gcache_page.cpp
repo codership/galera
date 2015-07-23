@@ -132,7 +132,7 @@ gcache::Page::realloc (void* ptr, size_type size)
             }
 
 #ifndef NDEBUG
-            if (space_ >= static_cast<ssize_t>(sizeof(BufferHeader)))
+            if (space_ >= static_cast<size_t>(sizeof(BufferHeader)))
             {
                 BH_clear (BH_cast(next_));
                 assert (reinterpret_cast<uint8_t*>(bh + 1) < next_);

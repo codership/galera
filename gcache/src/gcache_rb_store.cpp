@@ -225,7 +225,7 @@ namespace gcache
 
         next_ = ret + size;
 
-        ssize_t max_used=
+        size_t max_used=
             next_ - static_cast<uint8_t*>(mmap_.ptr) + sizeof(BufferHeader);
 
         if (max_used > max_used_)
