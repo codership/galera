@@ -71,18 +71,18 @@ public:
 
     void scan(std::istream& is);
 
-    static size_t serial_size() { return UUID::serial_size() + sizeof(seqno_); }
+    static size_t serial_size() { return UUID::serial_size() +sizeof(int64_t); }
 
     size_t serialize_unchecked(void* const buf, size_t const buflen,
                                size_t offset) const
     {
-        assert(serial_size() == (uuid_.serial_size() + sizeof(seqno_)));
+        assert(serial_size() == (uuid_.serial_size() + sizeof(int64_t)));
         assert(buflen - offset >= serial_size());
 
         offset = uuid_.serialize_unchecked(buf, buflen, offset);
 
         void* const seqno_ptr(static_cast<byte_t*>(buf) + offset);
-        *static_cast<seqno_t*>(seqno_ptr) = htog(seqno_);
+        *static_cast<int64_t*>(seqno_ptr) = htog(int64_t(seqno_));
 
         return offset + sizeof(seqno_t);
     }
@@ -96,9 +96,9 @@ public:
         offset = uuid_.unserialize_unchecked(buf, buflen, offset);
 
         const void* const seqno_ptr(static_cast<const byte_t*>(buf) + offset);
-        seqno_ = gtoh(*static_cast<const seqno_t*>(seqno_ptr));
+        seqno_ = gtoh(*static_cast<const int64_t*>(seqno_ptr));
 
-        return offset + sizeof(seqno_t);
+        return offset + sizeof(int64_t);
     }
 
     size_t serialize  (void* buf, size_t buflen, size_t offset) const;

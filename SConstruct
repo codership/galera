@@ -391,16 +391,25 @@ if ssl == 1:
         Exit(1)
 conf.env['CPPPATH'] = cpppath_saved
 
+CXX = conf.env.get('CXX').split()
+from subprocess import check_output
+CXX_VERSION = check_output(CXX + ['-dumpversion'])
 # these will be used only with our softaware
 if strict_build_flags == 1:
     conf.env.Append(CPPFLAGS = ' -Werror')
     conf.env.Append(CCFLAGS  = ' -pedantic')
-    if 'clang' not in conf.env['CXX']:
-        conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
-    else:
-        conf.env.Append(CPPFLAGS = ' -Wno-self-assign')
-        if 'ccache' in conf.env['CXX']:
+    if 'g++' in CXX:
+        if CXX_VERSION >= "4.9.0":
+            conf.env.Append(CXXFLAGS = ' -Weffc++')
+        else:
+            conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
+        conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
+    elif 'clang++' in CXX:
+        conf.env.Append(CPPFLAGS = ' -Wnon-virtual-dtor -Wno-self-assign')
+        if 'ccache' in CXX:
             conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
+
+# Many unit tests fail conf.env.Append(CXXFLAGS = ' -std=c++11')
 
 env = conf.Finish()
 

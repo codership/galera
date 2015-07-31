@@ -19,6 +19,20 @@ namespace core
 /* helper class to hold code message in serialized form */
 class CodeMsg
 {
+    union Msg
+    {
+        gu_byte_t buf_[32];
+        struct
+        {
+            gu_uuid_t uuid_;
+            int64_t   seqno_;
+            int64_t   code_;
+        } s_;
+    } msg_;
+
+    // ensure that union is properly packed
+    GU_COMPILE_ASSERT(sizeof(Msg) == sizeof(Msg().buf_), msg_not_packed);
+
 public:
     CodeMsg(const gu::GTID& gtid, int64_t code)
     {
@@ -40,24 +54,9 @@ public:
 
     const void* operator()() const { return &msg_; }
 
-    static int serial_size() { return sizeof(msg_); }
+    static int serial_size() { return sizeof(Msg); }
 
     void print(std::ostream& os) const;
-
-private:
-    union
-    {
-        gu_byte_t buf_[32];
-        struct
-        {
-            gu_uuid_t uuid_;
-            int64_t   seqno_;
-            int64_t   code_;
-        } s_;
-    } msg_;
-
-    // ensure that union is properly packed
-    GU_COMPILE_ASSERT(sizeof(msg_) == sizeof(msg_.buf_), msg_not_packed);
 
 }; /* class CodeMsg */
 
