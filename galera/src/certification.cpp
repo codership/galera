@@ -769,8 +769,10 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 galera::Certification::TestResult
 galera::Certification::do_test_preordered(TrxHandle* trx)
 {
-    // todo: enable when source id bug is fixed
+    /* Source ID is not always available for preordered events (e.g. event
+     * producer didn't provide any) so for now we must accept undefined IDs. */
     //assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+
     assert(trx->new_version());
     assert(trx->preordered());
 
