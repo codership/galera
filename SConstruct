@@ -25,9 +25,9 @@ print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
 x86 = 0
 if bits == '32bit':
-    x86 = 32
+    bits = 32
 elif bits == '64bit':
-    x86 = 64
+    bits = 64
 
 #
 # Print Help
@@ -87,22 +87,29 @@ if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
 
-if x86 == 32:
+if machine == 'ppc64':
+    compile_arch = ' -mtune=native'
+    link_arch    = ''
+elif machine == 's390x':
+    compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
+    link_arch    = ''
+    if bits == 32:
+        compile_arch += ' -m32'
+elif sysname == 'sunos':
+    compile_arch = ' -mtune=native'
+    link_arch    = ''
+elif bits == 32:
+    x86 = 1
     compile_arch = ' -m32 -march=i686'
     link_arch    = compile_arch
     if sysname == 'linux':
         link_arch = link_arch + ' -Wl,-melf_i386'
-elif x86 == 64 and sysname != 'sunos':
+elif bits == 64:
+    x86 = 1
     compile_arch = ' -m64'
     link_arch    = compile_arch
     if sysname == 'linux':
         link_arch = link_arch + ' -Wl,-melf_x86_64'
-elif machine == 'ppc64':
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
-elif sysname == 'sunos':
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
 else:
     compile_arch = ''
     link_arch    = ''
@@ -304,7 +311,7 @@ if boost == 1:
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
     # Common procedure to find boost static library
-    boost_libpaths = [ boost_library_path, '/usr/lib64', '/usr/local/lib64'] if x86 == 64 else [ boost_library_path, '/usr/local/lib', '/usr/lib' ]
+    boost_libpaths = [ boost_library_path, '/usr/lib64', '/usr/local/lib64'] if bits == 64 else [ boost_library_path, '/usr/local/lib', '/usr/lib' ]
     def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
         libName = libBaseName + boost_library_suffix
         if configuredLibPath != '' and not os.path.isfile(configuredLibPath):
@@ -396,7 +403,7 @@ if strict_build_flags == 1:
 
 env = conf.Finish()
 
-Export('x86', 'env', 'sysname', 'libboost_program_options')
+Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
