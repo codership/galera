@@ -125,6 +125,13 @@
 #define ARCH_CPU_32_BITS 1
 #endif
 #define ARCH_CPU_BIG_ENDIAN 1
+#elif defined(__s390__)
+#if defined(__s390x__)
+#define ARCH_CPU_64_BITS 1
+#else
+#define ARCH_CPU_32_BITS 1
+#endif
+#define ARCH_CPU_BIG_ENDIAN 1
 #else
 #error Please add support for your architecture in build/build_config.h
 #endif
