@@ -159,8 +159,8 @@ namespace galera
         }
 
         void preload_index(const gcs_action&);
-        void wait(const wsrep_seqno_t&);
-        void drain_monitors(const wsrep_seqno_t&);
+        void wait(wsrep_seqno_t);
+        void drain_monitors(wsrep_seqno_t);
 
         struct InitConfig
         {
@@ -434,9 +434,9 @@ namespace galera
 
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
 
-        void cancel_seqno(const wsrep_seqno_t& seqno);
+        void cancel_seqno(wsrep_seqno_t);
 
-        void set_initial_position(const wsrep_uuid_t&, const wsrep_seqno_t&);
+        void set_initial_position(const wsrep_uuid_t&, wsrep_seqno_t);
 
         void establish_protocol_versions (int version);
 

@@ -43,10 +43,34 @@
 #include "../gcs_dummy.hpp"
 #include "../gcs_seqno.hpp"
 #include "../gcs_state_msg.hpp"
+#include "../gcs_code_msg.hpp"
 
 #include <galerautils.h>
 
 #include "gcs_core_test.hpp" // must be included last
+
+START_TEST(gcs_code_msg)
+{
+    gu::UUID    const u0(NULL, 0);
+    gcs_seqno_t const s0(1234);
+    uint64_t    const c0(4312);
+
+    gcs::core::CodeMsg cm0(gu::GTID(u0, s0), c0);
+
+    const void* const buf(cm0());
+
+    const gcs::core::CodeMsg* const cm1
+        (static_cast<const gcs::core::CodeMsg*>(buf));
+
+    gu::UUID    const u1(cm1->uuid());
+    gcs_seqno_t const s1(cm1->seqno());
+    uint64_t    const c1(cm1->code());
+
+    fail_if(u0 != u1);
+    fail_if(s0 != s1);
+    fail_if(c0 != c1);
+}
+END_TEST
 
 extern ssize_t gcs_tests_get_allocated();
 
@@ -57,6 +81,7 @@ static gcache::GCache* Cache   = NULL;
 static gcs_core_t*     Core    = NULL;
 static gcs_backend_t*  Backend = NULL;
 static gcs_seqno_t     Seqno   = 0;
+static gu::UUID        Uuid;
 
 typedef struct action {
     const struct gu_buf* in;
@@ -139,11 +164,6 @@ core_recv_thread (void* arg)
         return true;                                          \
     }
 
-/*
- * Huge macros which follow below cannot be functions for the purpose
- * of correct line reporting.
- */
-
 // Start a thread to receive an action
 // args: action_t object
 static inline bool CORE_RECV_START(action_t* act)
@@ -154,13 +174,13 @@ static inline bool CORE_RECV_START(action_t* act)
 
 static bool COMMON_RECV_CHECKS(action_t*      act,
                                const char*    buf,
-                               ssize_t        size,
+                               int            size,
                                gcs_act_type_t type,
                                gcs_seqno_t*   seqno)
 {
     FAIL_IF (size != UNKNOWN_SIZE && size != act->size,
-             "gcs_core_recv(): expected %lld, returned %zd (%s)",
-             (long long) size, act->size, strerror (-act->size));
+             "gcs_core_recv(): expected size %d, returned %d (%s)",
+             size, act->size, strerror (-act->size));
     FAIL_IF (act->type != type,
              "type does not match: expected %d, got %d", type, act->type);
     FAIL_IF (act->size > 0 && act->out == NULL,
@@ -168,7 +188,8 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
 
     if (act->type == GCS_ACT_STATE_REQ) return false;
 
-    // action is ordered only if it is of type GCS_ACT_WRITESET and not an error
+    // action is ordered only if it is of type GCS_ACT_WRITESET or
+    // GCS_ACT_CCHANGE and not an error
     if (act->seqno >= GCS_SEQNO_NIL) {
         FAIL_IF (GCS_ACT_WRITESET != act->type && GCS_ACT_CCHANGE != act->type,
                  "GCS_ACT_WRITESET != act->type (%d), while act->seqno: %lld",
@@ -188,6 +209,8 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
 
             FAIL_IF (act->seqno < 0, "Negative seqno: %lld",
                      (long long)act->seqno);
+
+            Uuid = gcs_core_get_group(Core)->group_uuid;
 
             if (gcs_core_proto_ver(Core) >= 1) *seqno = *seqno + 1;
         }
@@ -335,7 +358,7 @@ core_test_set_payload_size (ssize_t s)
 
 // Initialises core and backend objects + some common tests
 static inline void
-core_test_init (bool bootstrap = true, int gcs_proto_ver = 1)
+core_test_init (bool bootstrap = true, int const gcs_proto_ver = 1)
 {
     long     ret;
     action_t act;
@@ -401,16 +424,28 @@ core_test_init (bool bootstrap = true, int gcs_proto_ver = 1)
     act.in = act1;
     fail_if (CORE_RECV_ACT (&act, act1_str, sizeof(act1_str), GCS_ACT_WRITESET));
 
-    ret = gcs_core_send_join (Core, Seqno);
-    fail_if (ret != 0, "gcs_core_send_join(): %ld (%s)",
+    ret = gcs_core_send_join (Core, gu::GTID(Uuid, Seqno), 0);
+    fail_if (ret < 0, "gcs_core_send_join(): %ld (%s)",
              ret, strerror(-ret));
     // no action to be received (we're joined already)
 
-    ret = gcs_core_send_sync (Core, Seqno);
-    fail_if (ret != 0, "gcs_core_send_sync(): %ld (%s)",
-             ret, strerror(-ret));
+    ret = gcs_core_send_sync (Core, gu::GTID(Uuid, Seqno));
+
+    int const proto(gcs_core_get_proto(Core));
+    fail_if (proto != gcs_proto_ver); // checking just in case
+
+    int const expected_ret
+        (proto >= 1 ? gcs::core::CodeMsg::serial_size() : sizeof(gcs_seqno_t));
+    fail_if (ret != expected_ret,
+             "gcs_core_send_sync(): %ld (%s)", ret, strerror(-ret));
+
     fail_if (CORE_RECV_ACT(&act, NULL, sizeof(gcs_seqno_t), GCS_ACT_SYNC));
-    fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act.out));
+
+    gcs_seqno_t const s(gcs_seqno_gtoh(*(gcs_seqno_t*)act.out));
+
+    int const expected_s(proto >= 1 ? 0 : Seqno);
+    fail_if (s != expected_s, "Expected code %lld, got %lld",
+             (long long)expected_s, (long long)s);
 
     gcs_core_send_lock_step (Core, true);
     mark_point();
@@ -493,18 +528,18 @@ START_TEST (gcs_core_test_api)
         fail_if (CORE_SEND_END (&act_s, act_size));
         fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
 
-        ret = gcs_core_set_last_applied (Core, Seqno);
-        fail_if (ret != 0, "gcs_core_set_last_applied(): %ld (%s)",
+        ret = gcs_core_set_last_applied (Core, gu::GTID(Uuid, Seqno), 0);
+        fail_if (ret < 0, "gcs_core_set_last_applied(): %ld (%s)",
                  ret, strerror(-ret));
-        fail_if (CORE_RECV_ACT (&act_r, NULL, sizeof(gcs_seqno_t),
-                                GCS_ACT_COMMIT_CUT));
+        /* commit cut action size should be 8 */
+        fail_if (CORE_RECV_ACT (&act_r, NULL, 8, GCS_ACT_COMMIT_CUT));
         fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act_r.out));
         free(act_r.out); // commit cut is allocated by malloc()
     }
 
     // send fake flow control action, its contents is not important
     gcs_core_send_fc (Core, act, act_size);
-    fail_if (ret != 0, "gcs_core_send_fc(): %ld (%s)",
+    fail_if (ret < 0, "gcs_core_send_fc(): %ld (%s)",
              ret, strerror(-ret));
     fail_if (CORE_RECV_ACT(&act_r, act, act_size, GCS_ACT_FLOW));
 
@@ -983,6 +1018,7 @@ Suite *gcs_core_suite(void)
 
   bool skip = false;
   if (skip == false) {
+      tcase_add_test  (tcase, gcs_code_msg);
       tcase_add_test  (tcase, gcs_core_test_api);
       tcase_add_test  (tcase, gcs_core_test_own_v0);
       tcase_add_test  (tcase, gcs_core_test_own_v1);

@@ -498,9 +498,6 @@ START_TEST(test_gcs_group_find_donor)
     gcs_group_init(&group, NULL, "", "", 0, 0, 0);
     const char* s_group_uuid = "0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d";
     gu_uuid_scan(s_group_uuid, strlen(s_group_uuid), &group.group_uuid);
-    gu_uuid_t* group_uuid = &group.group_uuid;
-    gu_uuid_t empty_uuid;
-    memset(&empty_uuid, 0, sizeof(empty_uuid));
 
     // five nodes
     // idx name segment  seqno
@@ -518,7 +515,7 @@ START_TEST(test_gcs_group_find_donor)
     const gcs_seqno_t seqnos[] = {90, 95, 105, 100, 90, 95, 105};
     gcs_node_t* nodes = group.nodes;
     const int joiner = 3;
-    const gcs_seqno_t ist_seqno = 100;
+
     for(int i = 0; i < number; i++)
     {
         char name[32];
@@ -527,12 +524,13 @@ START_TEST(test_gcs_group_find_donor)
                       "", 0, 0, 0, i > joiner ? 1 : 0);
         nodes[i].status = GCS_NODE_STATE_SYNCED;
         nodes[i].state_msg = gcs_state_msg_create(
-            &empty_uuid, &empty_uuid, &empty_uuid,
+            &GU_UUID_NIL, &GU_UUID_NIL, &GU_UUID_NIL,
             0, 0, seqnos[i], 0,
             GCS_NODE_STATE_SYNCED,
             GCS_NODE_STATE_SYNCED,
             "", "", 0, 0, 0, 0);
     }
+
     group.quorum.act_id = 0; // in safe range.
     fail_if (group.quorum.gcs_proto_ver != -1);
     fail_if (group.gcs_proto_ver != 0);
@@ -542,39 +540,41 @@ START_TEST(test_gcs_group_find_donor)
     const int sv = 2; // str version.
 #define SARGS(s) s, strlen(s)
     //========== sst ==========
+    gu::GTID const empty_gtid;
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 empty_gtid);
     fail_if(donor != -EHOSTDOWN);
 
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 empty_gtid);
     fail_if(donor != 1);
 
     nodes[1].status = GCS_NODE_STATE_JOINER;
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 empty_gtid);
     fail_if(donor != 2);
     nodes[1].status = GCS_NODE_STATE_SYNCED;
 
     // handle dangling comma.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3,"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 empty_gtid);
     fail_if(donor != 0);
 
     // ========== ist ==========
     // by name.
+    gu::GTID const group_gtid(group.group_uuid, 100);
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home0,home1,home2"),
-                                 group_uuid, ist_seqno);
+                                 group_gtid);
     fail_if(donor != 1);
 
     group.quorum.act_id = 1498; // not in safe range.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_gtid);
     fail_if(donor != 2);
 
     group.quorum.act_id = 1497; // in safe range. in segment.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_gtid);
     fail_if(donor != 1);
 
     group.quorum.act_id = 1497; // in safe range. cross segment.
@@ -582,7 +582,7 @@ START_TEST(test_gcs_group_find_donor)
     nodes[1].status = GCS_NODE_STATE_JOINER;
     nodes[2].status = GCS_NODE_STATE_JOINER;
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_gtid);
     fail_if(donor != 5);
     nodes[0].status = GCS_NODE_STATE_SYNCED;
     nodes[1].status = GCS_NODE_STATE_SYNCED;

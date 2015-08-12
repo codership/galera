@@ -642,7 +642,7 @@ namespace galera
             return write_set_out().is_empty();
         }
 
-        void finalize(const wsrep_seqno_t& last_seen_seqno)
+        void finalize(wsrep_seqno_t const last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);
             assert (last_seen_seqno >= this->last_seen_seqno());
@@ -663,7 +663,7 @@ namespace galera
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */
-        void serialize(const wsrep_seqno_t&     last_seen,
+        void serialize(wsrep_seqno_t const last_seen,
                        std::vector<gu::byte_t>& ret)
         {
             write_set_out().serialize(ret, source_id(), conn_id(), trx_id(),

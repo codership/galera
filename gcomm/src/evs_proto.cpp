@@ -404,7 +404,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         {
             UUID uuid;
             std::istringstream is(val);
-            uuid.read_stream(is);
+            is >> uuid;
             log_info << "Evicting node " << uuid << " permanently from cluster";
             evict(uuid);
             if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)

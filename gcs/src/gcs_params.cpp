@@ -105,7 +105,7 @@ params_init_long (gu_config_t* conf, const char* const name,
         }
 
         if (val < min_val || val > max_val) {
-            gu_error ("%s value out of range [%ld, %ld]: %"PRIi64,
+            gu_error ("%s value out of range [%ld, %ld]: %" PRIi64,
                       name, min_val, max_val, val);
             return -EINVAL;
         }
@@ -133,8 +133,8 @@ params_init_int64 (gu_config_t* conf, const char* const name,
     else {
         /* Found parameter value */
         if ((min_val != max_val) && (val < min_val || val > max_val)) {
-            gu_error ("%s value out of range [%"PRIi64", %"PRIi64"]: %"PRIi64,
-                      name, min_val, max_val, val);
+            gu_error ("%s value out of range [%" PRIi64 ", %" PRIi64 "]: %"
+                      PRIi64, name, min_val, max_val, val);
             return -EINVAL;
         }
     }

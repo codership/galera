@@ -1,7 +1,7 @@
-/* Copyright (C) 2010 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2010-2015 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
-#include "uuid.hpp"
+
 #include <gu_debug_sync.hpp>
 #include <gu_mem.h>
 

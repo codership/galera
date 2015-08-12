@@ -83,9 +83,8 @@ gcs_group_init (gcs_group_t* group,
  * Initialize group action history parameters. See gcs.h
  */
 extern int
-gcs_group_init_history (gcs_group_t*     group,
-                        gcs_seqno_t      seqno,
-                        const gu_uuid_t* uuid);
+gcs_group_init_history (gcs_group_t*    group,
+                        const gu::GTID& position);
 
 /*!
  * Free group resources
@@ -242,6 +241,6 @@ gcs_group_find_donor(const gcs_group_t* group,
                      int const str_version,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,
-                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
+                     const gu::GTID& ist_gtid);
 
 #endif /* _gcs_group_h_ */

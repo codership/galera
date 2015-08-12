@@ -3,7 +3,7 @@
 //
 
 #include "trx_handle.hpp"
-#include "uuid.hpp"
+#include <gu_uuid.hpp>
 
 #include <check.h>
 
@@ -225,7 +225,7 @@ START_TEST(test_serialization)
         galera::TrxHandleMaster::Params const trx_params("", version,
                                                          KeySet::MAX_VERSION);
         wsrep_uuid_t uuid;
-        gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
+        gu_uuid_generate(&uuid, 0, 0);
         TrxHandleMaster* trx
             (TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
 
@@ -272,7 +272,7 @@ START_TEST(test_streaming)
     galera::TrxHandleMaster::Params const trx_params("", version,
                                                      KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;
-    gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
+    gu_uuid_generate(&uuid, 0, 0);
     TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
     trx->lock();
 

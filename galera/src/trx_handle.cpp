@@ -1,12 +1,12 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
-#include "uuid.hpp"
 #include "galera_exception.hpp"
 
-#include "gu_serialize.hpp"
+#include <gu_serialize.hpp>
+#include <gu_uuid.hpp>
 
 const galera::TrxHandleMaster::Params
 galera::TrxHandleMaster::Defaults(".", -1, KeySet::MAX_VERSION, false);

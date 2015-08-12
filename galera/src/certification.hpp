@@ -9,9 +9,10 @@
 #include "key_entry_ng.hpp"
 #include "galera_service_thd.hpp"
 
-#include "gu_unordered.hpp"
-#include "gu_lock.hpp"
-#include "gu_config.hpp"
+#include <gu_unordered.hpp>
+#include <gu_lock.hpp>
+#include <gu_config.hpp>
+#include <gu_gtid.hpp>
 
 #include <map>
 #include <set>
@@ -51,14 +52,14 @@ namespace galera
         Certification(gu::Config& conf, ServiceThd& thd);
         ~Certification();
 
-        void assign_initial_position(wsrep_seqno_t seqno, int version);
+        void assign_initial_position(const gu::GTID& gtid, int version);
         TestResult append_trx(TrxHandleSlave*);
         TestResult test(TrxHandleSlave*, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
         /* this is for configuration change use */
         void
-        adjust_position(wsrep_seqno_t seqno, int version);
+        adjust_position(const gu::GTID& gtid, int version);
 
         wsrep_seqno_t
         get_safe_to_discard_seqno() const

@@ -3,7 +3,6 @@
 //
 
 #include "galera_gcs.hpp"
-#include "uuid.hpp"
 
 namespace galera
 {
@@ -20,7 +19,7 @@ namespace galera
         cond_          (),
         global_seqno_  (0),
         local_seqno_   (0),
-        uuid_          (),
+        uuid_          (NULL, 0),
         last_applied_  (GCS_SEQNO_ILL),
         state_         (S_OPEN),
         schedule_      (0),
@@ -31,9 +30,7 @@ namespace galera
         repl_proto_ver_(repl_proto_ver),
         appl_proto_ver_(appl_proto_ver),
         report_last_applied_(false)
-    {
-        gu_uuid_generate (&uuid_, 0, 0);
-    }
+    {}
 
     DummyGcs::DummyGcs()
         :
@@ -43,7 +40,7 @@ namespace galera
         cond_          (),
         global_seqno_  (0),
         local_seqno_   (0),
-        uuid_          (),
+        uuid_          (NULL, 0),
         last_applied_  (GCS_SEQNO_ILL),
         state_         (S_OPEN),
         schedule_      (0),
@@ -54,9 +51,7 @@ namespace galera
         repl_proto_ver_(1),
         appl_proto_ver_(1),
         report_last_applied_(false)
-    {
-        gu_uuid_generate (&uuid_, 0, 0);
-    }
+    {}
 
     DummyGcs::~DummyGcs()
     {
@@ -84,14 +79,14 @@ namespace galera
 
             cc.seqno   = global_seqno_;
             cc.conf_id = 1;
-            cc.uuid    = uuid_;
+            cc.uuid    = *uuid_.ptr();
             cc.repl_proto_ver = repl_proto_ver_;
             cc.appl_proto_ver = appl_proto_ver_;
 
             /* we have single member here */
             gcs_act_cchange::member m;
 
-            m.uuid_     = uuid_;
+            m.uuid_     = *uuid_.ptr();
             m.name_     = my_name_;
             m.incoming_ = incoming_;
             m.state_    = my_state;
@@ -134,17 +129,16 @@ namespace galera
     }
 
     ssize_t
-    DummyGcs::set_initial_position(const wsrep_uuid_t& uuid,
-                                   gcs_seqno_t seqno)
+    DummyGcs::set_initial_position(const gu::GTID& gtid)
     {
         gu::Lock lock(mtx_);
 
-        if (memcmp(&uuid, &GU_UUID_NIL, sizeof(wsrep_uuid_t)) &&
-            seqno >= 0)
+        if (gtid.uuid() != GU_UUID_NIL && gtid.seqno() >= 0)
         {
-            uuid_ = *(reinterpret_cast<const gu_uuid_t*>(&uuid));
-            global_seqno_ = seqno;
+            uuid_ = gtid.uuid();
+            global_seqno_ = gtid.seqno();
         }
+
         return 0;
     }
 
