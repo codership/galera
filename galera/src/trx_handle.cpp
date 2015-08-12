@@ -90,6 +90,7 @@ void galera::TrxHandleSlave::print(std::ostream& os) const
        << ", s: "        << last_seen_seqno_
        << ", d: "        << depends_seqno_
        << ")";
+    os << " pa_range: " << write_set().pa_range();
 
     if (write_set().annotated())
     {

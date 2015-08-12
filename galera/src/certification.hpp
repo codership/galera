@@ -148,8 +148,14 @@ namespace galera
             {
                 {
                     TrxHandleSlave* trx(vt.second);
-                    TrxHandleLock   lock(*trx);
+                    // Trying to lock trx mutex here may cause deadlock
+                    // with streaming replication. Locking can be skipped
+                    // because trx is only read here and refcount uses atomics.
+                    // Memory barrier is provided by certification mutex.
+                    //
+                    // TrxHandleLock   lock(*trx);
 
+                    assert(trx->is_committed() == true);
                     if (trx->is_committed() == false)
                     {
                         log_warn << "trx not committed in purge and discard: "

@@ -653,10 +653,10 @@ namespace galera
             {
                 /* make sure this fragment depends on the previous */
                 assert(version() >= 4);
-                wsrep_seqno_t const prev_seqno(repl_->global_seqno());
-                assert(prev_seqno <= last_seen_seqno);
+                assert(prev_seqno_ >= 0);
+                assert(prev_seqno_ <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
-                                    last_seen_seqno - prev_seqno);
+                                    last_seen_seqno - prev_seqno_);
             }
 
             write_set_out().finalize(last_seen_seqno, pa_range);
@@ -694,6 +694,8 @@ namespace galera
         {
             assert(locked());
             assert(!ts->locked());
+
+            prev_seqno_ = repl_->global_seqno();
 
             ts->lock();
             assert(ts->refcnt() == 1);
@@ -782,7 +784,8 @@ namespace galera
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
             trx_start_         (true),
-            wso_               (false)
+            wso_               (false),
+            prev_seqno_        (-1)
         {
             assert(reserved_size > sizeof(*this) + 1024);
         }
@@ -809,6 +812,7 @@ namespace galera
         int                    gcs_handle_;
         bool                   trx_start_;
         bool                   wso_;
+        wsrep_seqno_t          prev_seqno_; // Seqno of the last replicated fragment
 
         friend class TrxHandleSlave;
 
