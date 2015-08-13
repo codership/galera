@@ -58,6 +58,16 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
     return str[GCS_ACT_UNKNOWN];
 }
 
+std::ostream& operator <<(std::ostream& os, const gcs_action& act)
+{
+    os << gcs_act_type_to_str(act.type)
+       << ", g: " << act.seqno_g
+       << ", l: " << act.seqno_l
+       << ", ptr: "  << act.buf
+       << ", size: " << act.size;
+    return os;
+}
+
 static const long GCS_MAX_REPL_THREADS = 16384;
 
 typedef enum

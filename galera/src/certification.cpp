@@ -323,6 +323,8 @@ cert_fail:
 galera::Certification::TestResult
 galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 {
+    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+
     if (trx->version() != version_)
     {
         log_warn << "trx protocol version: "
@@ -408,6 +410,10 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 galera::Certification::TestResult
 galera::Certification::do_test_preordered(TrxHandleSlave* trx)
 {
+    /* Source ID is not always available for preordered events (e.g. event
+     * producer didn't provide any) so for now we must accept undefined IDs. */
+    //assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+
     assert(trx->version() >= 3);
     assert(trx->preordered());
 
@@ -624,8 +630,6 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 galera::Certification::TestResult
 galera::Certification::append_trx(TrxHandleSlave* trx)
 {
-    // todo: enable when source id bug is fixed
-    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 

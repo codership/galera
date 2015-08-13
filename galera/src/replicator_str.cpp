@@ -384,10 +384,15 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     wsrep_gtid_t state_id = { istr.uuid(), istr.last_applied() };
 
-                    rcode = sst_donate_cb_(app_ctx_, recv_ctx,
-                                           streq->sst_req(),
-                                           streq->sst_len(),
-                                           &state_id, 0, 0, true);
+                    wsrep_cb_status const err
+                        (sst_donate_cb_(app_ctx_, recv_ctx,
+                                        streq->sst_req(),
+                                        streq->sst_len(),
+                                        &state_id, 0, 0, true));
+
+                    rcode = (WSREP_CB_SUCCESS == err ?
+                             istr.last_applied() : -ECANCELED);
+
                     // we will join in sst_sent.
                     join_now = false;
                 }
@@ -415,8 +420,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 }
                 else
                 {
-                    log_error << "Failed to bypass SST: " << -rcode
-                              << " (" << strerror (-rcode) << ')';
+                    log_error << "Failed to bypass SST";
                 }
 
                 goto out;
@@ -474,9 +478,20 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                  protocol_version_);
             }
 
-            rcode = sst_donate_cb_(app_ctx_, recv_ctx,
-                                   streq->sst_req(), streq->sst_len(),
-                                   &state_id, 0, 0, false);
+            wsrep_cb_status const err
+                (sst_donate_cb_(app_ctx_, recv_ctx,
+                                streq->sst_req(), streq->sst_len(),
+                                &state_id, 0, 0, false));
+
+            if (WSREP_CB_SUCCESS == err)
+            {
+                rcode = state_id.seqno;
+            }
+            else
+            {
+                log_error << "SST failed";
+                rcode = -ECANCELED;
+            }
             // we will join in sst_sent.
             join_now = false;
         }
@@ -982,13 +997,14 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
+    gcs_action act;
+
     try
     {
         bool exit_loop(false);
 
         while (!exit_loop)
         {
-            gcs_action act;
             int err;
 
             if (gu_likely((err = ist_receiver_.recv(act)) == 0))
@@ -1001,6 +1017,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                 {
                     assert(GCS_ACT_CCHANGE == act.type);
                     process_conf_change(recv_ctx, act);
+                    GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
                 }
             }
             else
@@ -1014,6 +1031,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
+        log_fatal << "failed action: " << act;
         st_.mark_corrupt();
         gcs_.close();
         gu_abort();

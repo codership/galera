@@ -30,7 +30,7 @@ override_dh_auto_build:
 
 # Start earlier than MySQL which has value 19
 override_dh_installinit-arch:
-	dh_installinit --name=garb -- defaults 18 22
+	dh_installinit -n --name=garb -- defaults 18 22
 
 override_dh_strip:
 	dh_strip -pgalera-4 --dbg-package=galera-4-dbg

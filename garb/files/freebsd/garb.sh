@@ -63,14 +63,11 @@ garb_prestart()
 
 	GALERA_PORT=${GALERA_PORT:-4567}
 
-	# Find a working node
-	for ADDRESS in ${garb_galera_nodes} 0; do
-		HOST=$(echo $ADDRESS | cut -d \: -f 1)
-		PORT=$(echo $ADDRESS | cut -d \: -f 2)
-		PORT=${PORT:-$GALERA_PORT}
-		nc -z $HOST $PORT >/dev/null 2>&1 && break
+	# Concatenate all nodes in the list (for backward compatibility)
+	ADDRESS=
+	for NODE in ${garb_galera_nodes}; do
+		[ -z "$ADDRESS" ] && ADDRESS="$NODE" || ADDRESS="$ADDRESS,$NODE"
 	done
-	[ ${ADDRESS} == "0" ] && err 1 "None of the nodes in $garb_galera_nodes is accessible"
 
 	command_args="$command_args -a gcomm://$ADDRESS"
 	[ -n "$garb_galera_group" ]   && command_args="$command_args -g $garb_galera_group"
