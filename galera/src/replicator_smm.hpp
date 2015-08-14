@@ -455,6 +455,9 @@ namespace galera
                                      const void*         sst_req,
                                      ssize_t             sst_req_len);
 
+        wsrep_seqno_t donate_sst(void* recv_ctx, const StateRequest& streq,
+                                 const wsrep_gtid_t& state_id, bool bypass);
+
         /* local state seqno for internal use (macro mock up) */
         wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }
 
