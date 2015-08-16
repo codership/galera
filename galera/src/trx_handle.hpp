@@ -589,7 +589,7 @@ namespace galera
             TrxHandle::set_state(s);
             if (gu_unlikely(TrxHandle::S_MUST_ABORT == s))
             {
-                if (tr_.state() != s) tr_.set_state(s);
+                if (repl_->state() != s) repl_->set_state(s);
             }
         }
 
