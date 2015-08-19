@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp"
@@ -304,6 +304,35 @@ sst_is_trivial (const void* const req, size_t const len)
             !memcmp (req, ReplicatorSMM::TRIVIAL_SST, trivial_len));
 }
 
+wsrep_seqno_t
+ReplicatorSMM::donate_sst(void* const         recv_ctx,
+                          const StateRequest& streq,
+                          const wsrep_gtid_t& state_id,
+                          bool const          bypass)
+{
+    wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx,
+                                             streq.sst_req(), streq.sst_len(),
+                                             &state_id, 0, 0, bypass));
+
+    /* The fix to codership/galera#284 may break backward comatibility due to
+     * different (now correct) interpretation of retrun value. Default to old
+     * interpretation which is forward compatible with the new one. */
+#if NO_BACKWARD_COMPATIBILITY
+    wsrep_seqno_t const ret
+        (WSREP_CB_SUCCESS == err ? state_id.seqno : -ECANCELED);
+#else
+    wsrep_seqno_t const ret
+        (int(err) >= 0 ? state_id.seqno : int(err));
+#endif /* NO_BACKWARD_COMPATIBILITY */
+
+    if (ret < 0)
+    {
+        log_error << "SST " << (bypass ? "bypass " : "") << "failed: " << err;
+    }
+
+    return ret;
+}
+
 void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       const void* req,
                                       size_t      req_size,
@@ -371,16 +400,10 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
                 if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
-                    wsrep_gtid_t state_id = { istr.uuid(),istr.last_applied()};
+                    wsrep_gtid_t const state_id =
+                        { istr.uuid(), istr.last_applied() };
 
-                    wsrep_cb_status const err
-                        (sst_donate_cb_(app_ctx_, recv_ctx,
-                                        streq->sst_req(),
-                                        streq->sst_len(),
-                                        &state_id, 0, 0, true));
-
-                    rcode = (WSREP_CB_SUCCESS == err ?
-                             istr.last_applied() : -ECANCELED);
+                    rcode = donate_sst(recv_ctx, *streq, state_id, true);
 
                     // we will join in sst_sent.
                     join_now = false;
@@ -425,20 +448,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            wsrep_cb_status const err
-                (sst_donate_cb_(app_ctx_, recv_ctx,
-                                streq->sst_req(), streq->sst_len(),
-                                &state_id, 0, 0, false));
+            rcode = donate_sst(recv_ctx, *streq, state_id, false);
 
-            if (WSREP_CB_SUCCESS == err)
-            {
-                rcode = state_id.seqno;
-            }
-            else
-            {
-                log_error << "SST failed";
-                rcode = -ECANCELED;
-            }
             // we will join in sst_sent.
             join_now = false;
         }
