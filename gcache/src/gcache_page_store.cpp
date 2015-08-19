@@ -215,7 +215,7 @@ gcache::PageStore::malloc_new (size_type size)
     }
     catch (gu::Exception& e)
     {
-        log_error << "Cannot create new cache page (out of disk space?): "
+        log_error << "Cannot create new cache page: "
                   << e.what();
         // abort();
     }
