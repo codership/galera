@@ -637,7 +637,6 @@ core_handle_act_msg (gcs_core_t*          core,
         else if (gu_unlikely(ret < 0)){
             gu_fatal ("Failed to handle action fragment: %zd (%s)",
                       ret, strerror(-ret));
-            assert (0);
             return -ENOTRECOVERABLE;
         }
     }
@@ -1082,7 +1081,6 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, recv_act);
             assert (ret == recv_act->act.buf_len || ret <= 0);
-            assert (recv_act->sender_idx >= 0    || ret == 0);
             break;
         case GCS_MSG_LAST:
             ret = core_handle_last_msg(conn, recv_msg, &recv_act->act);
