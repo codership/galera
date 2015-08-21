@@ -123,11 +123,15 @@ namespace galera
 
         bool index_purge_required()
         {
+            static unsigned int const KEYS_THRESHOLD (1   << 10); // 1K
+            static unsigned int const BYTES_THRESHOLD(128 << 20); // 128M
+            static unsigned int const TRXS_THRESHOLD (127);
+
             /* if either key count, byte count or trx count exceed their
-             * upper limit, zero up counts and return true. */
-            return ((key_count_  > Certification::purge_interval_ ||
-                     byte_count_ > (128 << 20 /* 128M */)         ||
-                     trx_count_  > 127)
+             * threshold, zero up counts and return true. */
+            return ((key_count_  > KEYS_THRESHOLD  ||
+                     byte_count_ > BYTES_THRESHOLD ||
+                     trx_count_  > TRXS_THRESHOLD)
                      &&
                      (key_count_ = 0, byte_count_ = 0, trx_count_ = 0, true));
         }
@@ -205,7 +209,6 @@ namespace galera
                                           * on trx certification interval */
 
         unsigned int const max_length_check_; /* Mask how often to check */
-        static int   const purge_interval_ = (1UL<<10);
 
         bool               log_conflicts_;
     };
