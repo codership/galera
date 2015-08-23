@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1913,6 +1913,9 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 long
 gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid,uint64_t const code)
 {
+    assert(gtid.uuid()  != GU_UUID_NIL);
+    assert(gtid.seqno() >= 0);
+
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 

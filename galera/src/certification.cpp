@@ -538,6 +538,9 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
 void
 galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
 {
+    assert(gtid.uuid()  != GU_UUID_NIL);
+    assert(gtid.seqno() >= 0);
+
     gu::Lock lock(mutex_);
 
 // this assert is too strong: local ordered transactions may get canceled without
@@ -553,8 +556,10 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
         assert(cert_index_ng_.empty());
 
         service_thd_.release_seqno(position_);
-        service_thd_.flush(gtid.uuid());
     }
+
+    /* update group UUID */
+    service_thd_.flush(gtid.uuid());
 
     position_       = gtid.seqno();
 //            last_pa_unsafe_ = position_;
