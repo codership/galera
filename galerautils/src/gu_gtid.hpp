@@ -54,6 +54,8 @@ public:
     void set(const gu::UUID& u) { uuid_  = u; }
     void set(seqno_t const   s) { seqno_ = s; }
 
+    void set(const gu::UUID& u, seqno_t const s) { set(u); set(s); }
+
     bool operator==(const GTID& other) const
     {
         return (seqno_ == other.seqno_ && uuid_ == other.uuid_);

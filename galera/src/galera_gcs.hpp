@@ -154,6 +154,9 @@ namespace galera
 
         ssize_t set_last_applied(const gu::GTID& gtid, uint64_t const code)
         {
+            assert(gtid.uuid()  != GU_UUID_NIL);
+            assert(gtid.seqno() >= 0);
+
             return gcs_set_last_applied(conn_, gtid, code);
         }
 
