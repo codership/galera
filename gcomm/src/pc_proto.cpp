@@ -423,8 +423,8 @@ void gcomm::pc::Proto::handle_first_trans(const View& view)
 
 // Compute weighted sum of members in node list. If member cannot be found
 // from node_map its weight is assumed to be zero.
-static size_t weighted_sum(const gcomm::NodeList& node_list,
-                           const gcomm::pc::NodeMap& node_map)
+size_t weighted_sum(const gcomm::NodeList& node_list,
+                    const gcomm::pc::NodeMap& node_map)
 {
     size_t sum(0);
     for (gcomm::NodeList::const_iterator i(node_list.begin());
