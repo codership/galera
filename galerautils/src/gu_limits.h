@@ -55,8 +55,9 @@ static inline size_t gu_avphys_bytes()
 #define GU_ULONG_MAX      ULONG_MAX
 #define GU_LONG_MAX       LONG_MAX
 #define GU_LONG_MIN       LONG_MIN
-#define GU_ULONG_LONG_MAX ULLONG_MAX
-#define GU_LONG_LONG_MAX  LLONG_MAX
-#define GU_LONG_LONG_MIN  LLONG_MIN
+
+#define GU_ULONG_LONG_MAX 0xffffffffffffffffULL 
+#define GU_LONG_LONG_MAX  0x7fffffffffffffffLL 
+#define GU_LONG_LONG_MIN  (-GU_LONG_LONG_MAX - 1)
 
 #endif /* _gu_limits_h_ */

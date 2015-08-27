@@ -29,7 +29,10 @@ function MD5SUM()
 THIS_DIR=$(pwd -P)
 
 cd $2
-WSREP_REV=$(bzr revno -q --tree)
+WSREP_REV=$(git log --pretty=oneline | wc -l) || \
+WSREP_REV=$(bzr revno --tree -q)              || \
+WSREP_REV="XXXX"
+WSREP_REV=${WSREP_REV//[[:space:]]/}
 WSREP_PATCH_SPEC=$1-$WSREP_REV
 
 # Check existing file
@@ -61,10 +64,11 @@ rm -f $WSREP_PATCH_FILE
 #fi
 
 WSREP_PATCH_TMP="$THIS_DIR/$WSREP_PATCH_SPEC.diff"
-# normally we expect bzr diff return 1 (changes available)
+git diff $1..HEAD > $WSREP_PATCH_TMP || \
 bzr diff -p1 -v --diff-options " --exclude=.bzrignore " \
     -r tag:$1..branch:$2 \
     > "$WSREP_PATCH_TMP" || if [ $? -gt 1 ]; then exit -1; fi
+# normally we expect bzr diff return 1 (changes available)
 WSREP_PATCH_MD5SUM=$(MD5SUM $WSREP_PATCH_TMP | awk '{ print $1 }')
 WSREP_PATCH_FILE=$THIS_DIR/${WSREP_PATCH_SPEC}_${WSREP_PATCH_MD5SUM}_.diff
 mv $WSREP_PATCH_TMP $WSREP_PATCH_FILE
