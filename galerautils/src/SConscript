@@ -39,7 +39,7 @@ crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
 
-if x86 != 0:
+if x86:
     crc32c_env.Append(CFLAGS = ' -msse4.2')
     if sysname == 'sunos':
         # Ideally we want to simply strip SSE4.2 flag from the resulting

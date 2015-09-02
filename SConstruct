@@ -23,7 +23,8 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = 0
+x86 = any(arch in machine for arch in [ 'x86', 'i686', 'i386' ])
+
 if bits == '32bit':
     bits = 32
 elif bits == '64bit':
@@ -91,32 +92,27 @@ elif debug_lvl == 3:
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
-
-if machine == 'ppc64':
+if sysname == 'sunos':
     compile_arch = ' -mtune=native'
     link_arch    = ''
+elif x86:
+    if bits == 32:
+        compile_arch = ' -m32 -march=i686'
+        link_arch    = compile_arch
+        if sysname == 'linux':
+            link_arch = link_arch + ' -Wl,-melf_i386'
+    else:
+        compile_arch = ' -m64'
+        link_arch    = compile_arch
+        if sysname == 'linux':
+            link_arch = link_arch + ' -Wl,-melf_x86_64'
 elif machine == 's390x':
     compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
     link_arch    = ''
     if bits == 32:
         compile_arch += ' -m32'
-elif sysname == 'sunos':
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
-elif bits == 32:
-    x86 = 1
-    compile_arch = ' -m32 -march=i686'
-    link_arch    = compile_arch
-    if sysname == 'linux':
-        link_arch = link_arch + ' -Wl,-melf_i386'
-elif bits == 64:
-    x86 = 1
-    compile_arch = ' -m64'
-    link_arch    = compile_arch
-    if sysname == 'linux':
-        link_arch = link_arch + ' -Wl,-melf_x86_64'
 else:
-    compile_arch = ''
+    compile_arch = ' -mtune=native'
     link_arch    = ''
 
 
@@ -128,7 +124,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.11')
+GALERA_VER = ARGUMENTS.get('version', '3.12')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -237,7 +233,7 @@ if not conf.CheckLib('pthread'):
 
 # libatomic may be needed on some 32bit platforms (and 32bit userland PPC64)
 # for 8 byte atomics but not generally required
-if 0 == x86:
+if not x86:
     conf.CheckLib('atomic')
 
 if sysname != 'darwin':
