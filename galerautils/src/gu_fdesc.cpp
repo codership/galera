@@ -56,7 +56,8 @@ namespace gu
 
         if (0 == err)
         {
-            unsigned long long  const free_size(stat.f_bavail * stat.f_bsize);
+            unsigned long long const free_size=
+               static_cast<unsigned long long>(stat.f_bavail) * stat.f_bsize;
 
             if (reserve < free_size)
             {
@@ -203,7 +204,8 @@ namespace gu
     FileDescriptor::write_file (off_t const start)
     {
         // last byte of the start page
-        off_t offset = (start / GU_PAGE_SIZE + 1) * GU_PAGE_SIZE - 1;
+        off_t offset=
+           (start / GU_PAGE_SIZE) * GU_PAGE_SIZE + (GU_PAGE_SIZE - 1);
 
         log_info << "Preallocating " << (size_ - start) << '/' << size_
                  << " bytes in '" << name_ << "'...";
