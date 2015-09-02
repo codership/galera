@@ -350,13 +350,6 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(donor_seq);
 
-    desync_mutex_.lock();
-    if (desync_ == 0)
-    {
-        desync_ = 1;
-    }
-    desync_mutex_.unlock();
-
     state_.shift_to(S_DONOR);
 
     StateRequest* const streq (read_state_request (req, req_size));
