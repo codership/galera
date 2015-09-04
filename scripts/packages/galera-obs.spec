@@ -60,7 +60,7 @@ Vendor:        Codership Oy
 
 BuildRoot:     %{_tmppath}/%{name}_%{version}-build
 
-BuildRequires: boost-devel
+BuildRequires: boost-devel >= 1.41
 BuildRequires: check-devel
 BuildRequires: glibc-devel
 BuildRequires: openssl-devel
