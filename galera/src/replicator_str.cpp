@@ -927,8 +927,8 @@ class IstTrx  // to ensure automatic trx cleanup on exception
 {
 public:
     IstTrx(TrxHandleSlave::Pool& p)
-        : trx_(TrxHandleSlave::New(false, p)) { trx_->lock(); }
-    ~IstTrx() { trx_->unlock(); trx_->unref(); }
+        : trx_(TrxHandleSlave::New(false, p)) { }
+    ~IstTrx() { trx_->unref(); }
     TrxHandleSlave* const trx_;
 };
 
@@ -937,7 +937,7 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     assert(GCS_ACT_WRITESET == act.type);
 
     IstTrx ist_trx(slave_pool_);
-    TrxHandleSlave* const trx(ist_trx.trx_);
+    TrxHandleSlave* const ts(ist_trx.trx_);
     bool exit_loop(false);
 
     bool const skip(0 == act.size);
@@ -946,37 +946,37 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     {
         assert(act.buf != NULL);
 
-        gu_trace(trx->unserialize(
+        gu_trace(ts->unserialize(
                      static_cast<const gu::byte_t*>(act.buf), act.size, 0));
 
-        trx->verify_checksum();
+        ts->verify_checksum();
 
-        assert(trx->is_certified());
+        assert(ts->is_certified());
 
         // replicating and certifying stages have been
         // processed on donor, just adjust states here
-        trx->set_state(TrxHandle::S_CERTIFYING);
+        ts->set_state(TrxHandle::S_CERTIFYING);
 
-        assert(trx->global_seqno() == act.seqno_g);
-        assert(trx->depends_seqno() >= 0);
+        assert(ts->global_seqno() == act.seqno_g);
+        assert(ts->depends_seqno() >= 0);
 
-        gu_trace(apply_trx(recv_ctx, trx));
+        gu_trace(apply_trx(recv_ctx, ts));
         GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
 
-        exit_loop = trx->exit_loop();
+        exit_loop = ts->exit_loop();
     }
     else
     {
-        trx->set_received(0, WSREP_SEQNO_UNDEFINED, act.seqno_g);
-        trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
-        trx->mark_certified();
+        ts->set_received(0, WSREP_SEQNO_UNDEFINED, act.seqno_g);
+        ts->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
+        ts->mark_certified();
 
-        ApplyOrder ao(*trx);
+        ApplyOrder ao(0, *ts);
         apply_monitor_.self_cancel(ao);
 
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
-            CommitOrder co(*trx, co_mode_);
+            CommitOrder co(0, *ts, co_mode_);
             commit_monitor_.self_cancel(co);
         }
     }
@@ -987,7 +987,7 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
         std::ostringstream os;
 
         if (gu_likely(!skip))
-            os << "IST received trx body: " << *trx;
+            os << "IST received trx body: " << *ts;
         else
             os << "IST skipping trx " << act.seqno_g;
 
@@ -1047,30 +1047,30 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
     assert(GCS_ACT_WRITESET == act.type);
 
     IstTrx ist_trx(slave_pool_);
-    TrxHandleSlave* const trx(ist_trx.trx_);
+    TrxHandleSlave* const ts(ist_trx.trx_);
 
     if (gu_likely(0 != act.size))
     {
         assert(act.buf != NULL);
 
-        gu_trace(trx->unserialize(
+        gu_trace(ts->unserialize(
                      static_cast<const gu::byte_t*>(act.buf), act.size, 0));
 
-        assert(trx->global_seqno() == act.seqno_g);
-        assert(trx->depends_seqno() >= 0);
+        assert(ts->global_seqno() == act.seqno_g);
+        assert(ts->depends_seqno() >= 0);
 
-        trx->verify_checksum();
+        ts->verify_checksum();
 
         if (gu_unlikely(cert_.position() == 0))
         {
             // This is the first pre IST trx for rebuilding cert index
             cert_.assign_initial_position(
                 /* proper UUID will be installed by CC */
-                gu::GTID(gu::UUID(), trx->global_seqno() - 1),
-                         trx->version());
+                gu::GTID(gu::UUID(), ts->global_seqno() - 1),
+                         ts->version());
         }
 
-        Certification::TestResult result(cert_.append_trx(trx));
+        Certification::TestResult result(cert_.append_trx(ts));
 
         if (result != Certification::TEST_OK)
         {
@@ -1079,7 +1079,7 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
                            << ", expected " << Certification::TEST_OK
                            << "must abort to maintain consistency";
         }
-        cert_.set_trx_committed(trx);
+        cert_.set_trx_committed(ts);
     }
 }
 

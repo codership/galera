@@ -63,14 +63,12 @@ galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
     //trx_->append_write_set(buf + offset, act.size - offset);
     // moved to unserialize trx_->set_write_set_buffer(buf + offset, act.size - offset);
     trx_->set_received(act.buf, act.seqno_l, act.seqno_g);
-    trx_->lock();
 }
 
 
 galera::GcsActionTrx::~GcsActionTrx()
 {
     assert(trx_->refcnt() >= 1);
-    trx_->unlock();
     trx_->unref();
 }
 
