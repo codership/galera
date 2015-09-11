@@ -32,6 +32,26 @@ namespace galera
     static int const WS_NG_VERSION = WriteSetNG::VER3;
     /* new WS version to be used */
 
+    // Helper template for building FSMs.
+    template <typename T>
+    class TransMapBuilder
+    {
+    public:
+
+        TransMapBuilder() { }
+
+        void add(typename T::State from, typename T::State to)
+        {
+            trans_map_.insert_unique(
+                std::make_pair(typename T::Transition(from, to),
+                               typename T::Fsm::TransAttr()));
+        }
+    private:
+        typename T::Fsm::TransMap& trans_map_;
+    };
+
+
+
     class TrxHandle
     {
     public:
@@ -131,14 +151,6 @@ namespace galera
         }; // class Transition
 
         typedef FSM<State, Transition> Fsm;
-        static Fsm::TransMap trans_map_master;
-        static Fsm::TransMap trans_map_slave;
-
-        virtual void lock()   const = 0;
-#ifndef NDEBUG
-        virtual bool locked() const = 0;
-#endif
-        virtual void unlock() const = 0;
 
         int  version()     const { return version_; }
 
@@ -152,10 +164,6 @@ namespace galera
         State state() const { return state_(); }
         void  set_state(State state)
         {
-#ifndef NDEBUG
-//            print_set_state(state);
-            assert(locked());
-#endif
             state_.shift_to(state);
         }
 
@@ -179,12 +187,12 @@ namespace galera
 
         /* slave trx ctor */
         explicit
-        TrxHandle(bool local)
+        TrxHandle(Fsm::TransMap* trans_map, bool local)
             :
+            state_             (trans_map, S_REPLICATING),
             source_id_         (WSREP_UUID_UNDEFINED),
             conn_id_           (-1),
             trx_id_            (-1),
-            state_             (&trans_map_slave, S_REPLICATING),
             timestamp_         (),
             version_           (-1),
             write_set_flags_   (0),
@@ -192,25 +200,26 @@ namespace galera
         {}
 
         /* local trx ctor */
-        TrxHandle(const wsrep_uuid_t& source_id,
+        TrxHandle(Fsm::TransMap*      trans_map,
+                  const wsrep_uuid_t& source_id,
                   wsrep_conn_id_t     conn_id,
                   wsrep_trx_id_t      trx_id,
                   int                 version)
             :
+            state_             (trans_map, S_EXECUTING),
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
-            state_             (&trans_map_master, S_EXECUTING),
             timestamp_         (gu_time_calendar()),
             version_           (version),
             write_set_flags_   (0),
             local_             (true)
         {}
 
+        Fsm state_;
         wsrep_uuid_t           source_id_;
         wsrep_conn_id_t        conn_id_;
         wsrep_trx_id_t         trx_id_;
-        FSM<State, Transition> state_;
         int64_t                timestamp_;
         int                    version_;
         uint32_t               write_set_flags_;
@@ -323,16 +332,6 @@ namespace galera
             void* const buf(pool.acquire());
 
             return new(buf) TrxHandleSlave(local, pool, buf);
-        }
-
-        void lock()   const { mutex_.lock(); }
-#ifndef NDEBUG
-        bool locked() const { return mutex_.locked(); }
-#endif /* NDEBUG */
-        void unlock() const
-        {
-            assert(locked());
-            mutex_.unlock();
         }
 
         size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
@@ -448,8 +447,6 @@ namespace galera
 
             if (count == 0)
             {
-                assert(!locked());
-
                 void* const buf(buf_);
                 bool  const local(buf != static_cast<void*>(this));
                 gu::MemPool<true>& mp(mem_pool_);
@@ -476,14 +473,13 @@ namespace galera
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
-            TrxHandle          (local),
+            TrxHandle          (&trans_map_, local),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             mem_pool_          (mp),
             write_set_         (),
-            mutex_             (),
             buf_               (buf),
             action_            (0),
             refcnt_            (1),
@@ -493,8 +489,11 @@ namespace galera
         {}
 
         friend class TrxHandleMaster;
+        friend class TransMapBuilder<TrxHandleSlave>;
 
     private:
+
+        static Fsm::TransMap trans_map_;
 
         wsrep_seqno_t          local_seqno_;
         wsrep_seqno_t          global_seqno_;
@@ -502,7 +501,6 @@ namespace galera
         wsrep_seqno_t          depends_seqno_;
         gu::MemPool<true>&     mem_pool_;
         WriteSetIn             write_set_;
-        gu::Mutex mutable      mutex_;
         void* const            buf_;
         const void*            action_;
         gu::Atomic<int>        refcnt_;
@@ -567,30 +565,25 @@ namespace galera
                                             buf_size);
         }
 
-        void lock()   const
+        void lock()
         {
-            tr_.lock();
-            if (&tr_ != repl_) repl_->lock();
+            mutex_.lock();
         }
 
 #ifndef NDEBUG
-        bool locked() const { return repl_->locked(); }
+        bool locked() { return mutex_.locked(); }
 #endif /* NDEBUG */
 
-        void unlock() const
+        void unlock()
         {
             assert(locked());
-            if (&tr_ != repl_) repl_->unlock();
-            tr_.unlock();
+            mutex_.unlock();
         }
 
         void set_state(TrxHandle::State const s)
         {
+            assert(locked());
             TrxHandle::set_state(s);
-            if (gu_unlikely(TrxHandle::S_MUST_ABORT == s))
-            {
-                if (repl_->state() != s) repl_->set_state(s);
-            }
         }
 
         long gcs_handle() const { return gcs_handle_; }
@@ -693,11 +686,9 @@ namespace galera
         void add_replicated(TrxHandleSlave* const ts)
         {
             assert(locked());
-            assert(!ts->locked());
 
             prev_seqno_ = repl_->global_seqno();
 
-            ts->lock();
             assert(ts->refcnt() == 1);
 
             TrxHandleSlave* const old(repl_);
@@ -705,13 +696,10 @@ namespace galera
 
             if (old != &tr_)
             {
-                old->unlock();
                 old->unref();
             }
 
             trx_start_ = false;
-
-            assert(locked());
         }
 
         WriteSetOut& write_set_out()
@@ -777,7 +765,7 @@ namespace galera
                         wsrep_trx_id_t      trx_id,
                         size_t              reserved_size)
             :
-            TrxHandle(source_id, conn_id, trx_id, params.version_),
+            TrxHandle(&trans_map_, source_id, conn_id, trx_id, params.version_),
             params_            (params),
             tr_                (true, mp, this),
             repl_              (&tr_),
@@ -804,6 +792,9 @@ namespace galera
             if (repl_ != &tr_) { repl_->unref(); }
         }
 
+        gu::Mutex              mutex_;
+
+        static Fsm::TransMap   trans_map_;
         Params const           params_;
         TrxHandleSlave         tr_;   // first fragment handle (there will be
                                       // at least one)
@@ -815,6 +806,7 @@ namespace galera
         wsrep_seqno_t          prev_seqno_; // Seqno of the last replicated fragment
 
         friend class TrxHandleSlave;
+        friend class TransMapBuilder<TrxHandleMaster>;
 
         // overrides
         TrxHandleMaster(const TrxHandleMaster&);
@@ -824,10 +816,10 @@ namespace galera
     class TrxHandleLock
     {
     public:
-        TrxHandleLock(TrxHandle& trx) : trx_(trx) { trx_.lock(); }
+        TrxHandleLock(TrxHandleMaster& trx) : trx_(trx) { trx_.lock(); }
         ~TrxHandleLock() { trx_.unlock(); }
     private:
-        TrxHandle& trx_;
+        TrxHandleMaster& trx_;
 
     }; /* class TrxHnadleLock */
 

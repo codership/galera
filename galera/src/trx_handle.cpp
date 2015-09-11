@@ -106,97 +106,115 @@ galera::operator<<(std::ostream& os, const TrxHandleSlave& th)
     th.print(os); return os;
 }
 
-galera::TrxHandle::Fsm::TransMap galera::TrxHandle::trans_map_master;
-galera::TrxHandle::Fsm::TransMap galera::TrxHandle::trans_map_slave;
 
-class TransMapBuilder
+galera::TrxHandleMaster::Fsm::TransMap galera::TrxHandleMaster::trans_map_;
+galera::TrxHandleSlave::Fsm::TransMap galera::TrxHandleSlave::trans_map_;
+
+
+namespace galera {
+template<>
+TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
+    :
+    trans_map_(TrxHandleMaster::trans_map_)
 {
-public:
-    void add(galera::TrxHandle::State from, galera::TrxHandle::State to)
-    {
-        using galera::TrxHandle;
-        using std::make_pair;
-        typedef TrxHandle::Transition Transition;
-        typedef TrxHandle::Fsm::TransAttr TransAttr;
-        trans_map_.insert_unique(make_pair(Transition(from, to), TransAttr()));
-    }
+    //
+    //  0                                                   COMMITTED <-|
+    //  |                                                         ^     |
+    //  |                             SR                          |     |
+    //  |  |------------------------------------------------------|     |
+    //  v  v                                                      |     |
+    // EXECUTING -> REPLICATING -> CERTIFYING -> APPLYING -> COMMITTING |
+    //  |  |            |               |            |            |     |
+    //  |  |-------------------------------------------------------     |
+    //  |  | BF Abort   ----------------|                               |
+    //  |  v            |   Cert Fail                                   |
+    //  | MUST_ABORT -----------------------------------------          |
+    //  |               |                    |               |          |
+    //  |               | Pre Repl           V               |     REPLAYING
+    //  |               |          MUST_CERT_AND_REPLAY------|          |
+    //  |               v                    |               | Cert OK  |
+    //  |           ABORTING <---------------|               v          |
+    //  |               |        Cert Fail             MUST_REPLAY_AM   |
+    //  |               v                                    |          |
+    //  ----------> ROLLED_BACK                              v          |
+    //                                                 MUST_REPLAY_CM   |
+    //                                                       |          |
+    //                                                       v          |
+    //                                                 MUST_REPLAY-------
+    //
 
-    TransMapBuilder(galera::TrxHandle::Fsm::TransMap& map) :
-        trans_map_(map)
-    {
-        using galera::TrxHandle;
+    // Executing
+    add(TrxHandle::S_EXECUTING,  TrxHandle::S_REPLICATING);
+    add(TrxHandle::S_EXECUTING,  TrxHandle::S_ROLLED_BACK);
+    add(TrxHandle::S_EXECUTING,  TrxHandle::S_MUST_ABORT);
 
-        bool const local_fsm(&trans_map_ == &TrxHandle::trans_map_master);
+    // Replicating
+    add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
+    add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
 
-        if (local_fsm)
-        {
-            add(TrxHandle::S_EXECUTING,  TrxHandle::S_REPLICATING);
-            add(TrxHandle::S_EXECUTING,  TrxHandle::S_ROLLED_BACK);
-            add(TrxHandle::S_EXECUTING,  TrxHandle::S_MUST_CERT_AND_REPLAY);
-            add(TrxHandle::S_EXECUTING,  TrxHandle::S_MUST_ABORT);
+    // Certifying
+    add(TrxHandle::S_CERTIFYING, TrxHandle::S_APPLYING);
+    add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
+    add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
 
-            // trx replay
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_REPLAY_AM);
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_CERT_AND_REPLAY);//
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);//
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_COMMITTING);
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_ROLLED_BACK);
-            // streaming trx
-            add(TrxHandle::S_COMMITTING, TrxHandle::S_EXECUTING);
+    // Applying
+    add(TrxHandle::S_APPLYING, TrxHandle::S_COMMITTING);
+    add(TrxHandle::S_APPLYING, TrxHandle::S_MUST_ABORT);
 
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_AM);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_CM);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_ABORT);
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
+    // Committing
+    add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
+    add(TrxHandle::S_COMMITTING, TrxHandle::S_EXECUTING); // SR
 
-            add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
-            add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_ABORT);
+    // BF aborted
+    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
+    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_AM);
+    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_CM);
+    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
+    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
-            add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
-            add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
+    // Cert and Replay
+    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
+    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
 
-            add(TrxHandle::S_ABORTING,       TrxHandle::S_ROLLED_BACK);
-        }
-        else
-        {
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
+    // Replay, interrupted before grabbing apply monitor
+    add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
 
-            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
-            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_MUST_ABORT);
+    // Replay, interrupted before grabbing commit monitor
+    add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
 
-            add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
-            add(TrxHandle::S_APPLYING,    TrxHandle::S_MUST_ABORT);
+    // Replay, detected after commit monitor (how?)
+    add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
 
-            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_ROLLED_BACK);
+    // Replay stage
+    add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
 
-            // in case of replay
-            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_REPLICATING);//before cert
-            add(TrxHandle::S_MUST_ABORT,  TrxHandle::S_MUST_REPLAY);//after cert
-            add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLAYING);
-            add(TrxHandle::S_CERTIFYING,  TrxHandle::S_REPLAYING);
-            add(TrxHandle::S_COMMITTED,   TrxHandle::S_REPLAYING);
+    // BF aborted and/or cert failed
+    add(TrxHandle::S_ABORTING,       TrxHandle::S_ROLLED_BACK);
+}
 
-#ifdef NDEBUG
-            add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_ABORT);
-#endif
-        }
+template<>
+TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
+    :
+    trans_map_(TrxHandleSlave::trans_map_)
+{
+    //                                 Cert OK
+    // 0 --> REPLICATING -> CERTIFYING ------> APPLYING -> COMMITTING
+    //                          |                               |
+    //                          v                               v
+    //                      ROLLED_BACK                    COMMITTED
+    //
+    add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
+    add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
+    add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ROLLED_BACK);
+    add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
+}
 
-        add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
-        add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
-        add(TrxHandle::S_MUST_REPLAY,TrxHandle::S_REPLAYING);
-        add(TrxHandle::S_REPLAYING,  TrxHandle::S_COMMITTED);
-    }
+static TransMapBuilder<TrxHandleMaster> master;
+static TransMapBuilder<TrxHandleSlave> slave;
 
-private:
+}
 
-    galera::TrxHandle::Fsm::TransMap& trans_map_;
-};
-
-static TransMapBuilder master(galera::TrxHandle::trans_map_master);
-static TransMapBuilder slave(galera::TrxHandle::trans_map_slave);
 
 void
 galera::TrxHandleSlave::sanity_checks() const
