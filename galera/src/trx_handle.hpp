@@ -650,7 +650,8 @@ namespace galera
 
             int pa_range(pa_range_default());
 
-            if (gu_unlikely(false == trx_start_))
+            if (gu_unlikely(false == trx_start_ &&
+                            (flags() & TrxHandle::F_ROLLBACK) == 0))
             {
                 /* make sure this fragment depends on the previous */
                 assert(version() >= 4);
@@ -658,6 +659,10 @@ namespace galera
                 assert(prev_seqno_ <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno_);
+            }
+            else if (flags() & TrxHandle::F_ROLLBACK)
+            {
+                pa_range = 0;
             }
 
             write_set_out().finalize(last_seen_seqno, pa_range);
