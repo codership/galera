@@ -124,16 +124,16 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     //  |  |------------------------------------------------------|     |
     //  v  v                                                      |     |
     // EXECUTING -> REPLICATING -> CERTIFYING -> APPLYING -> COMMITTING |
-    //  |  |            |               |            |            |     |
-    //  |  |-------------------------------------------------------     |
-    //  |  | BF Abort   ----------------|                               |
-    //  |  v            |   Cert Fail                                   |
-    //  | MUST_ABORT -----------------------------------------          |
-    //  |               |           |                         |         |
-    //  |      Pre Repl |           v                         |    REPLAYING
-    //  |               |  MUST_CERT_AND_REPLAY -> CERTIFYING -         ^
-    //  |               v           |               --------- | Cert OK  |
-    //  |           ABORTING <-------               |         v          |
+    //  |^ |            |               |            |            |     |
+    //  || |-------------------------------------------------------     |
+    //  || | BF Abort   ----------------|                               |
+    //  || v            |   Cert Fail                                   |
+    //  ||MUST_ABORT -----------------------------------------          |
+    //  ||              |           |                         |         |
+    //  ||     Pre Repl |           v                         |    REPLAYING
+    //  ||              |  MUST_CERT_AND_REPLAY -> CERTIFYING -         ^
+    //  || SR Rollback  v           |               --------- | Cert OK  |
+    //  | --------- ABORTING <-------               |         v          |
     //  |               |        Cert Fail          |   MUST_REPLAY_AM   |
     //  |               v                           |         |          |
     //  ----------> ROLLED_BACK                     |         v          |
@@ -195,6 +195,9 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
 
     // BF aborted and/or cert failed
     add(TrxHandle::S_ABORTING,       TrxHandle::S_ROLLED_BACK);
+
+    // SR rollback
+    add(TrxHandle::S_ABORTING, TrxHandle::S_EXECUTING);
 }
 
 template<>
