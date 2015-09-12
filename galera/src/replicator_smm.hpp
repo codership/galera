@@ -211,7 +211,7 @@ namespace galera
 
         wsrep_status_t cert             (TrxHandleMaster*, TrxHandleSlave*);
         wsrep_status_t cert_and_catch   (TrxHandleMaster*, TrxHandleSlave*);
-        wsrep_status_t cert_for_aborted (TrxHandleMaster*, TrxHandleSlave*);
+        wsrep_status_t cert_for_aborted (TrxHandleSlave*);
 
         void update_state_uuid    (const wsrep_uuid_t& u);
         void update_incoming_list (const wsrep_view_info_t& v);
@@ -226,20 +226,17 @@ namespace galera
             explicit
             LocalOrder(TrxHandleMaster* trx, const TrxHandleSlave& ts)
                 :
-                seqno_(ts_->local_seqno()),
-                trx_(trx),
-                ts_ (&ts)
+                seqno_(ts.local_seqno()),
+                trx_  (trx),
+                ts_   (&ts)
             { }
 
             LocalOrder(wsrep_seqno_t seqno)
                 :
                 seqno_(seqno),
-                trx_(0),
-                ts_ (0)
+                trx_  (0),
+                ts_   (0)
             { }
-
-            void lock()   { if (trx_ != 0) trx_->lock();   }
-            void unlock() { if (trx_ != 0) trx_->unlock(); }
 
             wsrep_seqno_t seqno() const { return seqno_; }
 
@@ -254,11 +251,9 @@ namespace galera
             {
                 if (ts_ != 0 && ts_->local())
                 {
-                    unlock();
                     mutex.unlock();
                     GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
                     mutex.lock();
-                    lock();
                 }
             }
 #endif // GU_DBUG_ON
@@ -282,9 +277,6 @@ namespace galera
                 ts_(ts)
             { }
 
-            void lock()   { if (trx_) trx_->lock();   }
-            void unlock() { if (trx_) trx_->unlock(); }
-
             wsrep_seqno_t seqno() const { return ts_.global_seqno(); }
 
             bool condition(wsrep_seqno_t last_entered,
@@ -299,11 +291,9 @@ namespace galera
             {
                 if (ts_.local())
                 {
-                    unlock();
                     mutex.unlock();
                     GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
                     mutex.lock();
-                    lock();
                 }
             }
 #endif // GU_DBUG_ON
@@ -354,8 +344,6 @@ namespace galera
                 mode_(mode)
             { }
 
-            void lock()   { if (trx_) trx_->lock();   }
-            void unlock() { if (trx_) trx_->unlock(); }
             wsrep_seqno_t seqno() const { return ts_.global_seqno(); }
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
@@ -381,11 +369,9 @@ namespace galera
             {
                 if (ts_.local())
                 {
-                    unlock();
                     mutex.unlock();
                     GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
                     mutex.lock();
-                    lock();
                 }
             }
 #endif // GU_DBUG_ON
