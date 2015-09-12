@@ -525,6 +525,16 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
+    // SR rollback
+    if (trx->state() == TrxHandle::S_ABORTING &&
+        (trx->flags() & TrxHandle::F_ROLLBACK))
+    {
+        trx->set_state(TrxHandle::S_EXECUTING);
+        TrxHandleSlave* const ts(TrxHandleSlave::New(true, slave_pool_));
+        trx->add_replicated(ts);
+    }
+
+
     assert(trx->state() == TrxHandle::S_EXECUTING ||
            trx->state() == TrxHandle::S_MUST_ABORT);
 
@@ -657,8 +667,16 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
         }
         else
         {
-            trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-
+            // If the transaction was committing, it must replay.
+            if (ts->flags() & TrxHandle::F_COMMIT)
+            {
+                trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
+            }
+            else
+            {
+                trx->set_state(TrxHandle::S_ABORTING);
+                retval = WSREP_TRX_FAIL;
+            }
             if (meta != 0)
             {
                 meta->gtid.uuid  = state_uuid_;
@@ -2117,7 +2135,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         {
             assert(WSREP_BF_ABORT == retval);
             assert(trx != 0);
-            if (trx != 0) trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
+            if (trx != 0)
+            {
+                // If the transaction was committing, it must replay.
+                if (ts->flags() & TrxHandle::F_COMMIT)
+                {
+                    trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
+                }
+                else
+                {
+                    trx->set_state(TrxHandle::S_ABORTING);
+                    retval = WSREP_TRX_FAIL;
+                }
+            }
         }
     }
     else
