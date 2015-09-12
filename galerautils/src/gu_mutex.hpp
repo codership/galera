@@ -48,6 +48,7 @@ namespace gu
             {
 #ifndef NDEBUG
                 locked_ = true;
+                owned_  = pthread_self();
 #endif /* NDEBUG */
             }
             else
@@ -75,6 +76,7 @@ namespace gu
 
 #ifndef NDEBUG
         bool locked() const { return locked_; }
+        bool owned() const { return (owned_ == pthread_self()); }
 #endif /* NDEBUG */
 
     protected:
@@ -82,6 +84,7 @@ namespace gu
         gu_mutex_t mutable value_;
 #ifndef NDEBUG
         bool       mutable locked_;
+        pthread_t  mutable owned_;
 #endif /* NDEBUG */
 
     private:

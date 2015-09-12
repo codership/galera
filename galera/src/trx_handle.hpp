@@ -162,10 +162,6 @@ namespace galera
         void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
 
         State state() const { return state_(); }
-        void  set_state(State state)
-        {
-            state_.shift_to(state);
-        }
 
         void print_set_state(State state) const;
 
@@ -184,6 +180,11 @@ namespace galera
         virtual ~TrxHandle() {}
 
     protected:
+
+        void  set_state(State state)
+        {
+            state_.shift_to(state);
+        }
 
         /* slave trx ctor */
         explicit
@@ -404,6 +405,11 @@ namespace galera
             depends_seqno_ = seqno_lt;
         }
 
+        void set_state(TrxHandle::State const state)
+        {
+            TrxHandle::set_state(state);
+        }
+
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
                    const wsrep_trx_meta_t& meta) const /* throws */;
@@ -572,6 +578,7 @@ namespace galera
 
 #ifndef NDEBUG
         bool locked() { return mutex_.locked(); }
+        bool owned()  { return mutex_.owned(); }
 #endif /* NDEBUG */
 
         void unlock()
@@ -583,6 +590,7 @@ namespace galera
         void set_state(TrxHandle::State const s)
         {
             assert(locked());
+            assert(owned());
             TrxHandle::set_state(s);
         }
 

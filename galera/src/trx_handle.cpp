@@ -129,18 +129,20 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     //  |  | BF Abort   ----------------|                               |
     //  |  v            |   Cert Fail                                   |
     //  | MUST_ABORT -----------------------------------------          |
-    //  |               |                    |               |          |
-    //  |               | Pre Repl           V               |     REPLAYING
-    //  |               |          MUST_CERT_AND_REPLAY------|          |
-    //  |               v                    |               | Cert OK  |
-    //  |           ABORTING <---------------|               v          |
-    //  |               |        Cert Fail             MUST_REPLAY_AM   |
-    //  |               v                                    |          |
-    //  ----------> ROLLED_BACK                              v          |
-    //                                                 MUST_REPLAY_CM   |
-    //                                                       |          |
-    //                                                       v          |
-    //                                                 MUST_REPLAY-------
+    //  |               |           |                         |         |
+    //  |      Pre Repl |           v                         |    REPLAYING
+    //  |               |  MUST_CERT_AND_REPLAY -> CERTIFYING -         ^
+    //  |               v           |               --------- | Cert OK  |
+    //  |           ABORTING <-------               |         v          |
+    //  |               |        Cert Fail          |   MUST_REPLAY_AM   |
+    //  |               v                           |         |          |
+    //  ----------> ROLLED_BACK                     |         v          |
+    //                                              |-> MUST_REPLAY_CM   |
+    //                                              |         |          |
+    //                                              |         v          |
+    //                                              |-> MUST_REPLAY      |
+    //                                                        |          |
+    //                                                        ------------
     //
 
     // Executing
@@ -154,6 +156,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
 
     // Certifying
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_APPLYING);
+    add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_REPLAY_AM);
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
 
@@ -163,6 +166,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
 
     // Committing
     add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
+    add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
     add(TrxHandle::S_COMMITTING, TrxHandle::S_EXECUTING); // SR
 
     // BF aborted
@@ -173,7 +177,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
     // Cert and Replay
-    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
+    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_CERTIFYING);
     add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
 
     // Replay, interrupted before grabbing apply monitor
@@ -182,7 +186,8 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     // Replay, interrupted before grabbing commit monitor
     add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
 
-    // Replay, detected after commit monitor (how?)
+    // Replay, BF abort happens on application side after
+    // commit monitor has been grabbed
     add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
 
     // Replay stage
@@ -199,14 +204,22 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
 {
     //                                 Cert OK
     // 0 --> REPLICATING -> CERTIFYING ------> APPLYING -> COMMITTING
-    //                          |                               |
-    //                          v                               v
-    //                      ROLLED_BACK                    COMMITTED
+    //            |             |                               |
+    //            |             v                               v
+    //            |-------> ROLLED_BACK                    COMMITTED
     //
+
+    // Enter in-order cert after replication
     add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
+    // Enter out-of-order cert after replication
+    add(TrxHandle::S_REPLICATING, TrxHandle::S_ROLLED_BACK);
+    // Applying after certification
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
+    // Roll back due to cert failure (maybe would be better to use ABORTING?)
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ROLLED_BACK);
+    // Committing after applying
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
+    // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
 }
 
