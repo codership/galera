@@ -675,6 +675,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             }
             else
             {
+                LocalOrder  lo(trx, *ts);
+                ApplyOrder  ao(trx, *ts);
+                CommitOrder co(trx, *ts, co_mode_);
+                local_monitor_.self_cancel(lo);
+                apply_monitor_.self_cancel(ao);
+                if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+
                 trx->set_state(TrxHandle::S_ABORTING);
                 retval = WSREP_TRX_FAIL;
             }
@@ -2145,6 +2152,15 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                 }
                 else
                 {
+                    if (interrupted == true)
+                    {
+                        local_monitor_.self_cancel(lo);
+                    }
+                    else
+                    {
+                        local_monitor_.leave(lo);
+                    }
+
                     trx->set_state(TrxHandle::S_ABORTING);
                     retval = WSREP_TRX_FAIL;
                 }
