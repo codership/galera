@@ -32,5 +32,11 @@
 #ifndef ENODATA
 #  define ENODATA         (GU_ELAST+6)
 #endif
+#ifndef EPROTO
+#  define EPROTO          (GU_ELAST+7)
+#endif
+#ifndef EBADMSG
+#  define EBADMSG         (GU_ELAST+8)
+#endif
 
 #endif /* GU_STR_H */

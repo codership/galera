@@ -231,6 +231,8 @@ namespace gu
 
 #if defined(__APPLE__)
         if (0 != fcntl (fd_, F_SETSIZE, size_) && 0 != ftruncate (fd_, size_))
+#elif defined(__OpenBSD__)
+        errno = EINVAL;		/* no means of allocating space */
 #else
         if (0 != posix_fallocate (fd_, start, diff))
 #endif

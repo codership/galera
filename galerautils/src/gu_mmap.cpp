@@ -30,8 +30,8 @@ namespace gu
                                   << "' failed";
         }
 
-#if !defined(__sun__) && !defined(__APPLE__) && !defined(__FreeBSD__)
-        /* Solaris, Darwin, and FreeBSD do not have MADV_DONTFORK */
+#if !defined(__sun__) && !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
+        /* Solaris, Darwin, FreeBSD and OpenBSD do not have MADV_DONTFORK */
         if (posix_madvise (ptr, size, MADV_DONTFORK))
         {
             int const err(errno);

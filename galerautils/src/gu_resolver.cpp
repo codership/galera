@@ -17,17 +17,17 @@
 #include <map>
 #include <stdexcept>
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 # include <ifaddrs.h>
 # define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
 # define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
-#else /* !__APPLE__ && !__FreeBSD__ */
+#else /* !__APPLE__ && !__FreeBSD__ && !__OpenBSD__ */
 extern "C" /* old style cast */
 {
 static int const GU_SIOCGIFCONF  = SIOCGIFCONF;
 static int const GU_SIOCGIFINDEX = SIOCGIFINDEX;
 }
-#endif /* !__APPLE__ && !__FreeBSD__ */
+#endif /* !__APPLE__ && !__FreeBSD__ && !__OpenBSD__ */
 
 //using namespace std;
 using std::make_pair;
@@ -79,7 +79,7 @@ private:
             family,
             socktype,
             protocol,
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 	    0, // FreeBSD gives ENOMEM error with non-zero value
 #else
             sizeof(struct sockaddr),
@@ -196,7 +196,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
 
     unsigned int idx(-1);
     int err(0);
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
     struct ifaddrs *if_addrs = NULL;
     struct ifaddrs *if_addr = NULL;
 
@@ -223,7 +223,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     }
 
 out:
-# else /* !__APPLE__ && !__FreeBSD__ */
+# else /* !__APPLE__ && !__FreeBSD__ && !__OpenBSD__ */
     struct ifconf ifc;
     memset(&ifc, 0, sizeof(struct ifconf));
     ifc.ifc_len = 16*sizeof(struct ifreq);

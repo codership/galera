@@ -50,6 +50,12 @@
 #elif defined(__APPLE__) || defined(__FreeBSD__)
 # include <stdint.h>
 # define GU_WORDSIZE __WORDSIZE
+#elif defined(__OpenBSD__)
+# if defined(__LP64__)
+#  define GU_WORDSIZE 64
+# else
+#  define GU_WORDSIZE 32
+# endif
 #else
 # include <bits/wordsize.h>
 # define GU_WORDSIZE __WORDSIZE

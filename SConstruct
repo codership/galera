@@ -168,7 +168,7 @@ env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
 env.Append(CPPFLAGS = ' -pthread')
 
 # Freebsd ports are installed under /usr/local
-if sysname == 'freebsd' or sysname == 'sunos':
+if sysname == 'freebsd' or sysname == 'sunos' or sysname == 'openbsd':
     env.Append(LIBPATH  = ['/usr/local/lib'])
     env.Append(CPPFLAGS = ' -I/usr/local/include ')
 if sysname == 'sunos':
@@ -191,7 +191,7 @@ if extra_sysroot != '':
 # print env.Dump()
 
 # Preprocessor flags
-if sysname != 'sunos' and sysname != 'darwin' and sysname != 'freebsd':
+if sysname != 'sunos' and sysname != 'darwin' and sysname != 'freebsd' and sysname != 'openbsd':
     env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
 if sysname == 'sunos':
     env.Append(CPPFLAGS = ' -D__EXTENSIONS__')
@@ -236,7 +236,7 @@ if not conf.CheckLib('pthread'):
 if not x86:
     conf.CheckLib('atomic')
 
-if sysname != 'darwin':
+if sysname != 'darwin' and sysname != 'openbsd':
     if not conf.CheckLib('rt'):
         print 'Error: rt library not found'
         Exit(1)
@@ -384,8 +384,8 @@ if ssl == 1:
         print 'ssl support required but asio/ssl.hpp not found or not usable'
         print 'compile with ssl=0 or check that openssl devel headers are usable'
         Exit(1)
-    if conf.CheckLib('ssl'):
-        conf.CheckLib('crypto')
+    if conf.CheckLib('crypto'):
+        conf.CheckLib('ssl')
     else:
         print 'ssl support required but openssl library not found'
         print 'compile with ssl=0 or check that openssl library is usable'
@@ -438,7 +438,7 @@ if not conf.CheckLib('m'):
     print 'Error: math library not found or not usable'
     Exit(1)
 
-if sysname != 'darwin':
+if sysname != 'darwin' and sysname != 'openbsd':
     if not conf.CheckLib('rt'):
         print 'Error: realtime library not found or not usable'
         Exit(1)

@@ -36,12 +36,16 @@ uint32_t crc32cSarwate   (uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy4(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
 
+#if !defined(__OpenBSD__)
+
 #if defined(__x86_64) || defined(_M_AMD64) || defined(_M_X64)
 #define CRC32C_x86_64
 #endif
 
 #if defined(CRC32C_x86_64) || defined(__i386) || defined(_M_X86)
 #define CRC32C_x86
+#endif
+
 #endif
 
 #if !defined(CRC32C_x86)
