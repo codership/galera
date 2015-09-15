@@ -131,7 +131,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     //  ||MUST_ABORT -----------------------------------------          |
     //  ||              |           |                         |         |
     //  ||     Pre Repl |           v                         |    REPLAYING
-    //  ||              |  MUST_CERT_AND_REPLAY -> CERTIFYING -         ^
+    //  ||              |  MUST_CERT_AND_REPLAY --------------|         ^
     //  || SR Rollback  v           |               --------- | Cert OK  |
     //  | --------- ABORTING <-------               |         v          |
     //  |               |        Cert Fail          |   MUST_REPLAY_AM   |
@@ -156,7 +156,6 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
 
     // Certifying
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_APPLYING);
-    add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_REPLAY_AM);
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
     add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
 
@@ -177,8 +176,8 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
     // Cert and Replay
-    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_CERTIFYING);
     add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
+    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
 
     // Replay, interrupted before grabbing apply monitor
     add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
