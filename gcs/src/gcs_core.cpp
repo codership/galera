@@ -1351,6 +1351,7 @@ core_send_code (gcs_core_t* const core, const gu::GTID& gtid, int64_t code,
     }
 
     CodeMsg const msg(gtid, code);
+    assert(msg.uuid() != GU_UUID_NIL);
 
     int ret(core_msg_send_retry (core, msg(), msg.serial_size(), msg_type));
 

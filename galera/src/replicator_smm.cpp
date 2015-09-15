@@ -254,12 +254,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     set_initial_position(uuid, seqno);
 
-    // Initialize cert index position to zero in the case recovery information
-    // was provided. This is required to avoid initializing cert position
-    // above index rebuild trx seqnos.
-    cert_.assign_initial_position(gu::GTID(uuid, seqno < 0 ? seqno : 0),
-                                  trx_proto_ver());
-
     build_stats_vars(wsrep_stats_);
 }
 
@@ -338,7 +332,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
     gu::GTID      const inpos(gcs_uuid, seqno);
 
-    log_info << "Setting initial position to " << inpos;
+    log_info << "Setting GCS initial position to " << inpos;
 
     if ((err = gcs_.set_initial_position(inpos)) != 0)
     {
@@ -1756,11 +1750,24 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (index_reset)
         {
-            log_info << "Cert index reset " << protocol_version_ <<
-                ", state transfer needed: " << (st_required ? "yes" : "no");
-            cert_.assign_initial_position(
-                gu::GTID(group_uuid, protocol_version_ < 8 ? STATE_SEQNO() : 0),
-                trx_params_.version_);
+            gu::GTID position;
+
+            if (protocol_version_ < 8)
+            {
+                position.set(group_uuid, STATE_SEQNO());
+            }
+            else
+            {
+                position.set(GU_UUID_NIL, 0);
+            }
+
+            /* 2 reasons for this here:
+             * 1 - compatibility with protocols < 8
+             * 2 - preparing cert index for preloading by setting seqno to 0 */
+            log_info << "Cert index reset to " << position << " (proto: "
+                     << protocol_version_ << "), state transfer needed: "
+                     << (st_required ? "yes" : "no");
+            cert_.assign_initial_position(position, trx_params_.version_);
 
             // at this point there is no ongoing master or slave transactions
             // and no new requests to service thread should be possible
