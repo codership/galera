@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2014 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2012-2015 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
 #include "gcs.hpp"
@@ -7,7 +7,6 @@
 #include "gu_uri.hpp"
 #include "write_set_ng.hpp"
 #include "gu_throw.hpp"
-#include "wsrep_params.hpp"
 
 const std::string galera::ReplicatorSMM::Param::base_host = "base_host";
 const std::string galera::ReplicatorSMM::Param::base_port = "base_port";
@@ -126,9 +125,30 @@ galera::ReplicatorSMM::ParseOptions::ParseOptions(Replicator&       repl,
                                                   const char* const opts)
 {
     conf.parse(opts);
-    // Set initial wsrep params here to enable debug logging etc
-    // for the rest of the initialization
-    wsrep_set_params(repl, opts);
+
+    if (conf.get<bool>(Replicator::Param::debug_log))
+    {
+        gu_conf_debug_on();
+    }
+    else
+    {
+        gu_conf_debug_off();
+    }
+#ifdef GU_DBUG_ON
+    if (conf.is_set(galera::Replicator::Param::dbug))
+    {
+        GU_DBUG_PUSH(conf.get(galera::Replicator::Param::dbug).c_str());
+    }
+    else
+    {
+        GU_DBUG_POP();
+    }
+
+    if (conf.is_set(galera::Replicator::Param::signal))
+    {
+        gu_debug_sync_signal(conf.get(galera::Replicator::Param::signal));
+    }
+#endif /* GU_DBUG_ON */
 }
 
 
