@@ -117,6 +117,8 @@ namespace galera
             S_ROLLED_BACK
         } State;
 
+        static const int num_states_ = S_ROLLED_BACK + 1;
+
         static void print_state(std::ostream&, State);
 
         class Transition
@@ -178,6 +180,12 @@ namespace galera
         void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
+
+        // Force state, for testing purposes only.
+        void force_state(State state)
+        {
+            state_.force(state);
+        }
 
     protected:
 
@@ -584,6 +592,7 @@ namespace galera
         void unlock()
         {
             assert(locked());
+            assert(owned());
             mutex_.unlock();
         }
 

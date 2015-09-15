@@ -2098,7 +2098,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     {
         if (trx != 0)
         {
-            trx->set_state(TrxHandle::S_CERTIFYING);
+            if (in_replay == false) trx->set_state(TrxHandle::S_CERTIFYING);
             trx->unlock();
         }
         if (in_replay == false || local_monitor_.entered(lo) == false)
@@ -2108,7 +2108,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         if (trx != 0) trx->lock();
         assert(trx == 0 ||
                (trx->state() == TrxHandle::S_CERTIFYING ||
-                trx->state() == TrxHandle::S_MUST_ABORT));
+                trx->state() == TrxHandle::S_MUST_ABORT ||
+                trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY));
     }
     catch (gu::Exception& e)
     {
