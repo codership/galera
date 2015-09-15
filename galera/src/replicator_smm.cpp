@@ -500,6 +500,11 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* ts)
     }
     ts->set_state(TrxHandle::S_COMMITTED);
 
+    if (ts->local() == false)
+    {
+        GU_DBUG_SYNC_WAIT("after_commit_slave_sync");
+    }
+
     if (ts->local_seqno() != -1)
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
@@ -709,6 +714,8 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
     assert(trx->locked());
 
     log_debug << "aborting trx " << *trx << " " << trx;
+
+
     const TrxHandleSlave* const ts(trx->repld());
     switch (trx->state())
     {
@@ -831,7 +838,15 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
     try
     {
         trx->unlock();
-        gu_trace(apply_monitor_.enter(ao));
+        if ((ts->flags() & TrxHandle::F_ROLLBACK) != 0)
+        {
+            // SR rollback must be processed out of order
+            gu_trace(apply_monitor_.enter(ao));
+        }
+        else
+        {
+            gu_trace(apply_monitor_.enter(ao));
+        }
         trx->lock();
         assert(trx->state() == TrxHandle::S_APPLYING ||
                trx->state() == TrxHandle::S_MUST_ABORT);
@@ -862,7 +877,15 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             try
             {
                 trx->unlock();
-                gu_trace(commit_monitor_.enter(co));
+                if ((ts->flags() & TrxHandle::F_ROLLBACK) != 0)
+                {
+                    // SR rollback must be processed out of order
+                    gu_trace(commit_monitor_.self_cancel(co));
+                }
+                else
+                {
+                    gu_trace(commit_monitor_.enter(co));
+                }
                 trx->lock();
                 assert(trx->state() == TrxHandle::S_COMMITTING ||
                        trx->state() == TrxHandle::S_MUST_ABORT);
@@ -1029,13 +1052,19 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandleMaster* trx)
     assert(ts->state() == TrxHandle::S_COMMITTING);
     assert(ts->local_seqno() > -1 && ts->global_seqno() > -1);
 
-    CommitOrder co(trx, *ts, co_mode_);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+    if ((ts->flags() & TrxHandle::F_ROLLBACK) == 0)
+    {
+        // In SR rollback monitors have been self canceled in
+        // pre_commit(), leaving monitors is necessary only
+        // for SR frag commit or trx commit.
+        CommitOrder co(trx, *ts, co_mode_);
+        if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
 
-    ApplyOrder ao(trx, *ts);
+        ApplyOrder ao(trx, *ts);
+        apply_monitor_.leave(ao);
+    }
+
     report_last_committed(cert_.set_trx_committed(ts));
-    apply_monitor_.leave(ao);
-
 
     ts->set_state(TrxHandle::S_COMMITTED);
 

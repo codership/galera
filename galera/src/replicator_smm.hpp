@@ -249,10 +249,16 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_ != 0 && ts_->local())
+                if (ts_ != 0 && ts_->local() == true)
                 {
                     mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                    GU_DBUG_SYNC_WAIT("local_monitor_master_enter_sync");
+                    mutex.lock();
+                }
+                else if (ts_ != 0 && ts_->local() == false)
+                {
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("local_monitor_slave_enter_sync");
                     mutex.lock();
                 }
             }
@@ -289,10 +295,16 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_.local())
+                if (ts_.local() == true)
                 {
                     mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("apply_monitor_enter_sync");
+                    GU_DBUG_SYNC_WAIT("apply_monitor_master_enter_sync");
+                    mutex.lock();
+                }
+                else
+                {
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("apply_monitor_slave_enter_sync");
                     mutex.lock();
                 }
             }
@@ -367,10 +379,16 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_.local())
+                if (ts_.local() == true)
                 {
                     mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("commit_monitor_enter_sync");
+                    GU_DBUG_SYNC_WAIT("commit_monitor_master_enter_sync");
+                    mutex.lock();
+                }
+                else
+                {
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("commit_monitor_master_enter_sync");
                     mutex.lock();
                 }
             }
