@@ -22,7 +22,6 @@ void check_states_graph(
     // Depth first search for allowed paths
     std::vector<int> visited(TrxHandle::num_states_);
     std::fill(visited.begin(), visited.end(), 0);
-    std::stack<int* > state_stack;
 
     for (int i(0); i < TrxHandle::num_states_; ++i)
     {

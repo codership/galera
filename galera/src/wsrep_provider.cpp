@@ -363,6 +363,8 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 
     repl->unref_local_trx(trx);
 
+    GU_DBUG_SYNC_WAIT("abort_trx_end");
+
     return retval;
 }
 
