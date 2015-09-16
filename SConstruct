@@ -92,29 +92,6 @@ elif debug_lvl == 3:
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
-if sysname == 'sunos':
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
-elif x86:
-    if bits == 32:
-        compile_arch = ' -m32 -march=i686'
-        link_arch    = compile_arch
-        if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_i386'
-    else:
-        compile_arch = ' -m64'
-        link_arch    = compile_arch
-        if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_x86_64'
-elif machine == 's390x':
-    compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
-    link_arch    = ''
-    if bits == 32:
-        compile_arch += ' -m32'
-else:
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
-
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
@@ -161,16 +138,20 @@ if link != 'default':
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
+env.Replace(CCFLAGS = os.getenv('CCFLAGS', ''))
+env.Replace(CFLAGS = os.getenv('CFLAGS', ''))
+env.Replace(CXXFLAGS = os.getenv('CXXFLAGS', ''))
+env.Replace(LINKFLAGS = os.getenv('LDFLAGS', ''))
 env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
 
 # Set -pthread flag explicitly to make sure that pthreads are
 # enabled on all platforms.
-env.Append(CPPFLAGS = ' -pthread')
+env.Append(CCFLAGS = ' -pthread')
 
 # Freebsd ports are installed under /usr/local
 if sysname == 'freebsd' or sysname == 'sunos':
     env.Append(LIBPATH  = ['/usr/local/lib'])
-    env.Append(CPPFLAGS = ' -I/usr/local/include ')
+    env.Append(CCFLAGS = ' -I/usr/local/include ')
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
 
@@ -186,7 +167,7 @@ if sysname == 'darwin' and extra_sysroot == '':
         extra_sysroot = '/sw'
 if extra_sysroot != '':
     env.Append(LIBPATH = [extra_sysroot + '/lib'])
-    env.Append(CPPFLAGS = ' -I' + extra_sysroot + '/include')
+    env.Append(CCFLAGS = ' -I' + extra_sysroot + '/include')
 
 # print env.Dump()
 
@@ -199,16 +180,16 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Replace(CCFLAGS = opt_flags + compile_arch +
+env.Append(CCFLAGS = opt_flags + compile_arch +
                       ' -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
-env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
+env.Append(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
 
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Replace(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+env.Append(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
 if sysname != 'sunos':
     env.Append(CXXFLAGS = ' -pipe')
 
@@ -407,14 +388,13 @@ conf.env['CPPPATH'] = cpppath_saved
 
 # these will be used only with our softaware
 if strict_build_flags == 1:
-    conf.env.Append(CPPFLAGS = ' -Werror')
-    conf.env.Append(CCFLAGS  = ' -pedantic')
+    conf.env.Append(CCFLAGS  = ' -pedantic -Werror')
     if 'clang' not in conf.env['CXX']:
         conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
     else:
-        conf.env.Append(CPPFLAGS = ' -Wno-self-assign')
+        conf.env.Append(CCFLAGS = ' -Wno-self-assign')
         if 'ccache' in conf.env['CXX']:
-            conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
+            conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
 env = conf.Finish()
 Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'static_ssl', 'with_ssl')
