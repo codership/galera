@@ -396,7 +396,7 @@ namespace galera
                 else
                 {
                     mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("commit_monitor_master_enter_sync");
+                    GU_DBUG_SYNC_WAIT("commit_monitor_slave_enter_sync");
                     mutex.lock();
                 }
             }
