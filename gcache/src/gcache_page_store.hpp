@@ -22,7 +22,7 @@ namespace gcache
         PageStore (const std::string& dir_name,
                    size_t             keep_size,
                    size_t             page_size,
-                   bool               keep_page);
+                   size_t             keep_page);
 
         ~PageStore ();
 
@@ -48,9 +48,11 @@ namespace gcache
 
         size_t count() const { return count_; } // for unit tests
 
-        void  set_page_size (size_t size) { page_size_ = size; }
+        void  set_page_size (size_t size) { page_size_ = size; cleanup();}
 
-        void  set_keep_size (size_t size) { keep_size_ = size; }
+        void  set_keep_size (size_t size) { keep_size_ = size; cleanup();}
+
+        void  set_keep_count (size_t count) { keep_page_ = count; cleanup();}
 
         size_t allocated_pool_size ();
 
@@ -59,7 +61,7 @@ namespace gcache
         std::string const base_name_; /* /.../.../gcache.page. */
         size_t            keep_size_; /* how much pages to keep after freeing*/
         size_t            page_size_; /* min size of the individual page */
-        bool        const keep_page_; /* whether to keep the last page */
+        size_t            keep_page_; /* whether to keep the last page(s) */
         size_t            count_;
         std::deque<Page*> pages_;
         Page*             current_;

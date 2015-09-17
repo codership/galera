@@ -50,6 +50,8 @@ namespace gcache
                    params.keep_pages_size(),
                    params.page_size(),
                    /* keep last page if PS is the only storage */
+                   params.keep_pages_count() ?
+                   params.keep_pages_count() :
                    !((params.mem_size() + params.rb_size()) > 0)),
         mallocs   (0),
         reallocs  (0),

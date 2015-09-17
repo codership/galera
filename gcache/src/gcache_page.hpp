@@ -43,7 +43,7 @@ namespace gcache
         size_t used () const { return used_; }
 
         size_t size () const /* total page size */
-        { return mmap_.size - sizeof(BufferHeader); }
+        { return size_; }
 
         const std::string& name() const { return fd_.name(); }
 
@@ -62,9 +62,10 @@ namespace gcache
         gu::MMap           mmap_;
         void* const        ps_;
         uint8_t*           next_;
-        size_t            space_;
-        size_t            used_;
-        size_t            min_space_;
+        size_t             size_;
+        size_t             space_;
+        size_t             used_;
+        size_t             min_space_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);

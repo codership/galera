@@ -15,17 +15,20 @@ static const std::string GCACHE_DEFAULT_RB_SIZE   ("128M");
 static const std::string GCACHE_PARAMS_PAGE_SIZE  ("gcache.page_size");
 static const std::string GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
 static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size");
+static const std::string GCACHE_PARAMS_KEEP_PAGES_COUNT("gcache.keep_pages_count");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
+static const std::string GCACHE_DEFAULT_KEEP_PAGES_COUNT("0");
 
 void
 gcache::GCache::Params::register_params(gu::Config& cfg)
 {
-    cfg.add(GCACHE_PARAMS_DIR,             GCACHE_DEFAULT_DIR);
-    cfg.add(GCACHE_PARAMS_RB_NAME,         GCACHE_DEFAULT_RB_NAME);
-    cfg.add(GCACHE_PARAMS_MEM_SIZE,        GCACHE_DEFAULT_MEM_SIZE);
-    cfg.add(GCACHE_PARAMS_RB_SIZE,         GCACHE_DEFAULT_RB_SIZE);
-    cfg.add(GCACHE_PARAMS_PAGE_SIZE,       GCACHE_DEFAULT_PAGE_SIZE);
-    cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE, GCACHE_DEFAULT_KEEP_PAGES_SIZE);
+    cfg.add(GCACHE_PARAMS_DIR,              GCACHE_DEFAULT_DIR);
+    cfg.add(GCACHE_PARAMS_RB_NAME,          GCACHE_DEFAULT_RB_NAME);
+    cfg.add(GCACHE_PARAMS_MEM_SIZE,         GCACHE_DEFAULT_MEM_SIZE);
+    cfg.add(GCACHE_PARAMS_RB_SIZE,          GCACHE_DEFAULT_RB_SIZE);
+    cfg.add(GCACHE_PARAMS_PAGE_SIZE,        GCACHE_DEFAULT_PAGE_SIZE);
+    cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE,  GCACHE_DEFAULT_KEEP_PAGES_SIZE);
+    cfg.add(GCACHE_PARAMS_KEEP_PAGES_COUNT, GCACHE_DEFAULT_KEEP_PAGES_COUNT);
 }
 
 static const std::string&
@@ -60,7 +63,8 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     mem_size_ (cfg.get<size_t>(GCACHE_PARAMS_MEM_SIZE)),
     rb_size_  (cfg.get<size_t>(GCACHE_PARAMS_RB_SIZE)),
     page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
-    keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
+    keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE)),
+    keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
 {
     if (mem_size_)
     {
@@ -68,7 +72,6 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
                  << " parameter is buggy and DEPRECATED,"
                  << " use it with care.";
     }
-
 }
 
 void
@@ -128,6 +131,21 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
         config.set<size_t>(key, tmp_size);
         params.keep_pages_size(tmp_size);
         ps.set_keep_size(params.keep_pages_size());
+    }
+    else if (key == GCACHE_PARAMS_KEEP_PAGES_COUNT)
+    {
+        size_t tmp_size = gu::Config::from_config<size_t>(val);
+
+        gu::Lock lock(mtx);
+        /* locking here serves two purposes: ensures atomic setting of config
+         * and params.ram_size and syncs with malloc() method */
+
+        config.set<size_t>(key, tmp_size);
+        params.keep_pages_count(tmp_size);
+        /* keep last page if PS is the only storage: */
+        ps.set_keep_count(params.keep_pages_count() ?
+                          params.keep_pages_count() :
+                          !((params.mem_size() + params.rb_size()) > 0));
     }
     else
     {

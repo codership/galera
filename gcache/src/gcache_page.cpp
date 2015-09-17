@@ -38,7 +38,7 @@ gcache::Page::drop_fs_cache() const
     mmap_.dont_need();
 
 #if !defined(__APPLE__)
-    int const err (posix_fadvise (fd_.get(), 0, fd_.size(),
+    int const err (posix_fadvise (fd_.get(), 0, size_,
                                   POSIX_FADV_DONTNEED));
     if (err != 0)
     {
@@ -54,7 +54,8 @@ gcache::Page::Page (void* ps, const std::string& name, size_t size)
     mmap_ (fd_),
     ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
-    space_(mmap_.size),
+    size_ (mmap_.size),
+    space_(size_),
     used_ (0),
     min_space_ (space_)
 {

@@ -116,10 +116,24 @@ gcache::PageStore::delete_page ()
 void
 gcache::PageStore::cleanup ()
 {
+#ifndef NDEBUG
+    size_t counter = 0;
+#endif
     while (total_size_   > keep_size_ &&
-           pages_.size() > keep_page_ &&
+          (pages_.size() > keep_page_ ||
+           pages_.front()->size() != page_size_) &&
            delete_page())
-    {}
+    {
+#ifndef NDEBUG
+       counter++;
+#endif
+    }
+#ifndef NDEBUG
+    if (counter)
+    {
+        log_info << "gcache: " << counter << " page(s) deallocated...";
+    }
+#endif
 }
 
 void
@@ -134,7 +148,7 @@ gcache::PageStore::new_page (size_type size)
     Page* const page(new Page(this, make_page_name (base_name_, count_), size));
 
     pages_.push_back (page);
-    total_size_ += size;
+    total_size_ += page->size();
     current_ = page;
     count_++;
 }
@@ -142,7 +156,7 @@ gcache::PageStore::new_page (size_type size)
 gcache::PageStore::PageStore (const std::string& dir_name,
                               size_t             keep_size,
                               size_t             page_size,
-                              bool               keep_page)
+                              size_t             keep_page)
     :
     base_name_ (make_base_name(dir_name)),
     keep_size_ (keep_size),
