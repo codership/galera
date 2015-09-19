@@ -107,7 +107,7 @@ elif machine == 's390x':
     if bits == 32:
         compile_arch += ' -m32'
 else:
-    compile_arch = ' -mtune=native'
+    compile_arch = ''
     link_arch    = ''
 
 
@@ -437,6 +437,9 @@ if not conf.CheckLib('check'):
 if not conf.CheckLib('m'):
     print 'Error: math library not found or not usable'
     Exit(1)
+
+# potential check dependency, link if present
+conf.CheckLib('subunit')
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
