@@ -89,27 +89,23 @@ if dbug:
 
 if sysname == 'sunos':
     compile_arch = ' -mtune=native'
-    link_arch    = ''
 elif x86:
     if bits == 32:
-        compile_arch = ' -m32 -march=i686'
-        link_arch    = compile_arch
-        if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_i386'
+        if machine == 'x86_64':
+            compile_arch = ' -mx32'
+        else:
+            compile_arch = ' -m32 -march=i686'
+            if sysname == 'linux':
+                link_arch = ' -Wl,-melf_i386'
     else:
         compile_arch = ' -m64'
-        link_arch    = compile_arch
         if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_x86_64'
+            link_arch = ' -Wl,-melf_x86_64'
+    link_arch = compile_arch + link_arch
 elif machine == 's390x':
     compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
-    link_arch    = ''
     if bits == 32:
         compile_arch += ' -m32'
-else:
-    compile_arch = ''
-    link_arch    = ''
-
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
