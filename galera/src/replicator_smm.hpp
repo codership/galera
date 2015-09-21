@@ -224,17 +224,15 @@ namespace galera
         public:
 
             explicit
-            LocalOrder(TrxHandleMaster* trx, const TrxHandleSlave& ts)
+            LocalOrder(const TrxHandleSlave& ts)
                 :
                 seqno_(ts.local_seqno()),
-                trx_  (trx),
                 ts_   (&ts)
             { }
 
             LocalOrder(wsrep_seqno_t seqno)
                 :
                 seqno_(seqno),
-                trx_  (0),
                 ts_   (0)
             { }
 
@@ -267,7 +265,6 @@ namespace galera
 
             LocalOrder(const LocalOrder&);
             wsrep_seqno_t const seqno_;
-            TrxHandleMaster* const trx_;
             const TrxHandleSlave* const ts_;
         };
 
@@ -276,10 +273,8 @@ namespace galera
         public:
 
             explicit
-            ApplyOrder(TrxHandleMaster* trx,
-                       const TrxHandleSlave& ts)
+            ApplyOrder(const TrxHandleSlave& ts)
                 :
-                trx_(trx),
                 ts_(ts)
             { }
 
@@ -313,7 +308,6 @@ namespace galera
         private:
 
             ApplyOrder(const ApplyOrder&);
-            TrxHandleMaster* const trx_;
             const TrxHandleSlave&  ts_;
         };
 
@@ -347,11 +341,9 @@ namespace galera
                 return static_cast<Mode>(ret);
             }
 
-            CommitOrder(TrxHandleMaster*      trx,
-                        const TrxHandleSlave& ts,
+            CommitOrder(const TrxHandleSlave& ts,
                         Mode mode)
                 :
-                trx_ (trx ),
                 ts_  (ts  ),
                 mode_(mode)
             { }
@@ -396,7 +388,6 @@ namespace galera
 
         private:
             CommitOrder(const CommitOrder&);
-            TrxHandleMaster* const trx_;
             const TrxHandleSlave&  ts_;
             const Mode             mode_;
         };

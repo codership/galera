@@ -953,12 +953,12 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
         ts->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
         ts->mark_certified();
 
-        ApplyOrder ao(0, *ts);
+        ApplyOrder ao(*ts);
         apply_monitor_.self_cancel(ao);
 
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
-            CommitOrder co(0, *ts, co_mode_);
+            CommitOrder co(*ts, co_mode_);
             commit_monitor_.self_cancel(co);
         }
     }
