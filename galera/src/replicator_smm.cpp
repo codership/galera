@@ -464,8 +464,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* ts)
     assert(ts->global_seqno() > STATE_SEQNO());
     assert(ts->local() == false);
 
-    ApplyOrder ao(0, *ts);
-    CommitOrder co(0, *ts, co_mode_);
+    ApplyOrder ao(*ts);
+    CommitOrder co(*ts, co_mode_);
 
     gu_trace(apply_monitor_.enter(ao));
     ts->set_state(TrxHandle::S_APPLYING);
@@ -659,9 +659,9 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
         if (retval != WSREP_BF_ABORT)
         {
-            LocalOrder  lo(trx, *ts);
-            ApplyOrder  ao(trx, *ts);
-            CommitOrder co(trx, *ts, co_mode_);
+            LocalOrder  lo(*ts);
+            ApplyOrder  ao(*ts);
+            CommitOrder co(*ts, co_mode_);
             local_monitor_.self_cancel(lo);
             apply_monitor_.self_cancel(ao);
             if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
@@ -680,9 +680,9 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             }
             else
             {
-                LocalOrder  lo(trx, *ts);
-                ApplyOrder  ao(trx, *ts);
-                CommitOrder co(trx, *ts, co_mode_);
+                LocalOrder  lo(*ts);
+                ApplyOrder  ao(*ts);
+                CommitOrder co(*ts, co_mode_);
                 local_monitor_.self_cancel(lo);
                 apply_monitor_.self_cancel(ao);
                 if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
@@ -750,7 +750,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
         assert(ts);
         assert(ts->global_seqno() > 0);
         trx->set_state(TrxHandle::S_MUST_ABORT);
-        LocalOrder lo(trx, *ts);
+        LocalOrder lo(*ts);
         local_monitor_.interrupt(lo);
         break;
     }
@@ -760,7 +760,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
         assert(ts);
         assert(ts->global_seqno() > 0);
         trx->set_state(TrxHandle::S_MUST_ABORT);
-        ApplyOrder ao(trx, *ts);
+        ApplyOrder ao(*ts);
         apply_monitor_.interrupt(ao);
         break;
     }
@@ -772,7 +772,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx)
         trx->set_state(TrxHandle::S_MUST_ABORT);
         if (co_mode_ != CommitOrder::BYPASS)
         {
-            CommitOrder co(trx, *ts, co_mode_);
+            CommitOrder co(*ts, co_mode_);
             commit_monitor_.interrupt(co);
         }
         break;
@@ -832,8 +832,8 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
 
     trx->set_state(TrxHandle::S_APPLYING);
 
-    ApplyOrder  ao(trx, *ts);
-    CommitOrder co(trx, *ts, co_mode_);
+    ApplyOrder  ao(*ts);
+    CommitOrder co(*ts, co_mode_);
     bool interrupted(false);
 
     try
@@ -875,7 +875,8 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             if (interrupted == true)
             {
                 apply_monitor_.self_cancel(ao);
-                commit_monitor_.self_cancel(co);
+                if (co_mode_ != CommitOrder::BYPASS)
+                    commit_monitor_.self_cancel(co);
             }
             trx->set_state(TrxHandle::S_ABORTING);
             retval = WSREP_TRX_FAIL;
@@ -894,11 +895,13 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                 if ((ts->flags() & TrxHandle::F_ROLLBACK) != 0)
                 {
                     // SR rollback must be processed out of order
-                    gu_trace(commit_monitor_.self_cancel(co));
+                    if (co_mode_ != CommitOrder::BYPASS)
+                        gu_trace(commit_monitor_.self_cancel(co));
                 }
                 else
                 {
-                    gu_trace(commit_monitor_.enter(co));
+                    if (co_mode_ != CommitOrder::BYPASS)
+                        gu_trace(commit_monitor_.enter(co));
                 }
                 trx->lock();
                 assert(trx->state() == TrxHandle::S_COMMITTING ||
@@ -928,7 +931,8 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                 {
                     if (interrupted == true)
                     {
-                        commit_monitor_.self_cancel(co);
+                        if (co_mode_ != CommitOrder::BYPASS)
+                            commit_monitor_.self_cancel(co);
                     }
                     apply_monitor_.leave(ao);
                     trx->set_state(TrxHandle::S_ABORTING);
@@ -991,7 +995,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
         // safety measure to make sure that all preceding trxs finish before
         // replaying
         ts->set_depends_seqno(ts->global_seqno() - 1);
-        ApplyOrder ao(0, *ts);
+        ApplyOrder ao(*ts);
         if (apply_monitor_.entered(ao) == false)
         {
             gu_trace(apply_monitor_.enter(ao));
@@ -1003,7 +1007,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {
-            CommitOrder co(0, *ts, co_mode_);
+            CommitOrder co(*ts, co_mode_);
             if (commit_monitor_.entered(co) == false)
             {
                 gu_trace(commit_monitor_.enter(co));
@@ -1088,10 +1092,10 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandleMaster* trx)
         // In SR rollback monitors have been self canceled in
         // pre_commit(), leaving monitors is necessary only
         // for SR frag commit or trx commit.
-        CommitOrder co(trx, *ts, co_mode_);
+        CommitOrder co(*ts, co_mode_);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
 
-        ApplyOrder ao(trx, *ts);
+        ApplyOrder ao(*ts);
         apply_monitor_.leave(ao);
     }
 
@@ -1204,8 +1208,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster*  trx,
     {
     case WSREP_OK:
     {
-        ApplyOrder ao(trx, *ts);
-        CommitOrder co(trx, *ts, co_mode_);
+        ApplyOrder ao(*ts);
+        CommitOrder co(*ts, co_mode_);
 
         trx->set_state(TrxHandle::S_APPLYING);
         ts->set_state(TrxHandle::S_APPLYING);
@@ -1256,9 +1260,9 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster* trx)
     assert(trx->state() == TrxHandle::S_COMMITTING);
     assert(ts->state() == TrxHandle::S_COMMITTING);
 
-    CommitOrder co(0, *ts, co_mode_);
+    CommitOrder co(*ts, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
-    ApplyOrder ao(0, *ts);
+    ApplyOrder ao(*ts);
     report_last_committed(cert_.set_trx_committed(ts));
     apply_monitor_.leave(ao);
 
@@ -1473,12 +1477,12 @@ void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
     dummy->set_received(NULL, WSREP_SEQNO_UNDEFINED, seqno);
     dummy->set_depends_seqno(dummy->global_seqno() - 1);
 
-    ApplyOrder  ao(0, *dummy);
+    ApplyOrder  ao(*dummy);
     apply_monitor_.self_cancel(ao);
 
     if (co_mode_ != CommitOrder::BYPASS)
     {
-        CommitOrder co(0, *dummy, co_mode_);
+        CommitOrder co(*dummy, co_mode_);
         commit_monitor_.self_cancel(co);
     }
 
@@ -2148,7 +2152,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     assert(ts->last_seen_seqno() >= 0);
     assert(ts->last_seen_seqno() < ts->global_seqno());
 
-    LocalOrder lo(trx, *ts);
+    LocalOrder lo(*ts);
     bool       interrupted(false);
     bool       in_replay(trx != 0 &&
                          trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY);
@@ -2281,8 +2285,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     if (gu_unlikely(WSREP_TRX_FAIL == retval && applicable))
     {
         // applicable but failed certification: self-cancel monitors
-        ApplyOrder  ao(trx, *ts);
-        CommitOrder co(trx, *ts, co_mode_);
+        ApplyOrder  ao(*ts);
+        CommitOrder co(*ts, co_mode_);
 
         apply_monitor_.self_cancel(ao);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
