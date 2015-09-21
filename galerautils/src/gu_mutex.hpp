@@ -76,7 +76,7 @@ namespace gu
 
 #ifndef NDEBUG
         bool locked() const { return locked_; }
-        bool owned() const { return (owned_ == pthread_self()); }
+        bool owned() const { return pthread_equal(owned_, pthread_self()); }
 #endif /* NDEBUG */
 
     protected:
