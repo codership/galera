@@ -61,7 +61,8 @@ apply_trx_ws(void*                    recv_ctx,
                         (TrxHandle::trx_flags_to_wsrep_flags(trx.flags()) |
                          WSREP_FLAG_ROLLBACK);
                     wsrep_bool_t unused(false);
-                    int const rcode(commit_cb(recv_ctx, flags, &meta, &unused));
+                    wsrep_cb_status const rcode
+                        (commit_cb(recv_ctx, flags, &meta, &unused));
 
                     if (WSREP_CB_SUCCESS != rcode)
                     {
@@ -489,7 +490,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* trx)
 
     wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, flags, &meta,&exit_loop));
 
-    if (gu_unlikely (rcode > 0))
+    if (gu_unlikely (rcode != WSREP_CB_SUCCESS))
         gu_throw_fatal << (trx->flags() & TrxHandle::F_ROLLBACK ?
                            "Rollback" : "Commit")
                        << " failed. Trx: " << trx;

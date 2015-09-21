@@ -204,6 +204,8 @@ struct gcs_action {
     gcs_act_type_t type;
 };
 
+std::ostream& operator <<(std::ostream& os, const gcs_action& act);
+
 /*! @brief Replicates a vector of buffers as a single action.
  * Sends action to group and blocks until it is received. Upon return global
  * and local IDs are set. Arguments are the same as in gcs_recv().

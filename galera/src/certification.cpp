@@ -323,6 +323,8 @@ cert_fail:
 galera::Certification::TestResult
 galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 {
+    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+
     if (trx->version() != version_)
     {
         log_warn << "trx protocol version: "
@@ -361,8 +363,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 
     TestResult res(TEST_FAILED);
 
-    gu::Lock lock(mutex_); // why do we need that? certification access
-                           // must be fully guarded by the local_monitor_
+    gu::Lock lock(mutex_); // why do we need that? - e.g. set_trx_committed()
 
     /* initialize parent seqno */
     if ((trx->flags() & (TrxHandle::F_ISOLATION | TrxHandle::F_PA_UNSAFE))
@@ -394,12 +395,15 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 
     if (store_keys == true && res == TEST_OK)
     {
+        ++trx_count_;
         gu::Lock lock(stats_mutex_);
         ++n_certified_;
         deps_dist_ += (trx->global_seqno() - trx->depends_seqno());
         cert_interval_ += (trx->global_seqno() - trx->last_seen_seqno() - 1);
         index_size_ = (cert_index_.size() + cert_index_ng_.size());
     }
+
+    byte_count_ += trx->size();
 
     return res;
 }
@@ -408,6 +412,10 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 galera::Certification::TestResult
 galera::Certification::do_test_preordered(TrxHandleSlave* trx)
 {
+    /* Source ID is not always available for preordered events (e.g. event
+     * producer didn't provide any) so for now we must accept undefined IDs. */
+    //assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+
     assert(trx->version() >= 3);
     assert(trx->preordered());
 
@@ -463,6 +471,8 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     cert_interval_         (0),
     index_size_            (0),
     key_count_             (0),
+    byte_count_            (0),
+    trx_count_             (0),
 
     max_length_            (max_length(conf)),
     max_length_check_      (length_check(conf)),
@@ -629,8 +639,6 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 galera::Certification::TestResult
 galera::Certification::append_trx(TrxHandleSlave* trx)
 {
-    // todo: enable when source id bug is fixed
-    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 

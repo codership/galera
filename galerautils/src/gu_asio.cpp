@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014 Codership Oy <info@codership.com>
+// Copyright (C) 2014-2015 Codership Oy <info@codership.com>
 //
 
 #include "gu_config.hpp"
@@ -18,18 +18,45 @@ void gu::ssl_register_params(gu::Config& conf)
     conf.add(gu::conf::ssl_password_file);
 }
 
+/* checks if all mandatory SSL options are set */
+static bool ssl_check_conf(const gu::Config& conf)
+{
+    using namespace gu;
+
+    bool explicit_ssl(false);
+
+    if (conf.is_set(conf::use_ssl))
+    {
+        if  (conf.get<bool>(conf::use_ssl) == false)
+        {
+            return false; // SSL is explicitly disabled
+        }
+        else
+        {
+            explicit_ssl = true;
+        }
+    }
+
+    int count(0);
+
+    count += conf.is_set(conf::ssl_key);
+    count += conf.is_set(conf::ssl_cert);
+
+    bool const use_ssl(explicit_ssl || count > 0);
+
+    if (use_ssl && count < 2)
+    {
+        gu_throw_error(EINVAL) << "To enable SSL at least both of '"
+                               << conf::ssl_key << "' and '" << conf::ssl_cert
+                               << "' must be set";
+    }
+
+    return use_ssl;
+}
 
 void gu::ssl_init_options(gu::Config& conf)
 {
-    // SSL is turned on implicitly if key or cert file is defined
-    bool use_ssl(conf.is_set(conf::ssl_key) ||
-                 conf.is_set(conf::ssl_cert));
-
-    // However, it can be turned off explicitly using socket.use_ssl
-    if (conf.is_set(conf::use_ssl))
-    {
-        use_ssl = conf.get<bool>(conf::use_ssl);
-    }
+    bool use_ssl(ssl_check_conf(conf));
 
     if (use_ssl == true)
     {
@@ -59,7 +86,7 @@ void gu::ssl_init_options(gu::Config& conf)
         }
         catch (asio::system_error& ec)
         {
-            gu_throw_error(EINVAL) << "Initializing SSL options failed: "
+            gu_throw_error(EINVAL) << "Initializing SSL context failed: "
                                    << extra_error_info(ec.code());
         }
     }
@@ -81,8 +108,7 @@ namespace
             if (ifs.good() == false)
             {
                 gu_throw_error(errno) <<
-                    "could not open password file '" << file
-                                                     << "'";
+                    "could not open password file '" << file << "'";
             }
 
             std::string ret;
@@ -103,8 +129,24 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
     SSLPasswordCallback cb(conf);
     ctx.set_password_callback(
         boost::bind(&SSLPasswordCallback::get_password, &cb));
-    ctx.use_private_key_file(conf.get(conf::ssl_key), asio::ssl::context::pem);
-    ctx.use_certificate_file(conf.get(conf::ssl_cert), asio::ssl::context::pem);
-    ctx.load_verify_file(conf.get(conf::ssl_ca, conf.get(conf::ssl_cert)));
-    SSL_CTX_set_cipher_list(ctx.impl(), conf.get(conf::ssl_cipher).c_str());
+
+    std::string param;
+
+    try
+    {
+        param = conf::ssl_key;
+        ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
+        param = conf::ssl_cert;
+        ctx.use_certificate_file(conf.get(param), asio::ssl::context::pem);
+        param = conf::ssl_ca;
+        ctx.load_verify_file(conf.get(param, conf.get(conf::ssl_cert)));
+        param = conf::ssl_cipher;
+        SSL_CTX_set_cipher_list(ctx.impl(), conf.get(param).c_str());
+    }
+    catch (asio::system_error& ec)
+    {
+        gu_throw_error(EINVAL) << "Bad value '" << conf.get(param, "")
+                               << "' for SSL parameter '" << param
+                               << "': " << extra_error_info(ec.code());
+    }
 }

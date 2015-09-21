@@ -110,15 +110,6 @@ namespace galera
             index_size_ = 0;
         }
 
-        bool index_purge_required()
-        {
-            register long const count(key_count_.fetch_and_zero());
-            return ((count > Certification::purge_interval_ ||
-                     (trx_map_.size() + 1) % 128 == 0)
-                    ||
-                    (key_count_ += count /* restore count */, false));
-        }
-
         void set_log_conflicts(const std::string& str);
 
         wsrep_seqno_t lowest_trx_seqno() const
@@ -138,6 +129,21 @@ namespace galera
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
         wsrep_seqno_t purge_trxs_upto_(wsrep_seqno_t, bool sync);
+
+        bool index_purge_required()
+        {
+            static unsigned int const KEYS_THRESHOLD (1   << 10); // 1K
+            static unsigned int const BYTES_THRESHOLD(128 << 20); // 128M
+            static unsigned int const TRXS_THRESHOLD (127);
+
+            /* if either key count, byte count or trx count exceed their
+             * threshold, zero up counts and return true. */
+            return ((key_count_  > KEYS_THRESHOLD  ||
+                     byte_count_ > BYTES_THRESHOLD ||
+                     trx_count_  > TRXS_THRESHOLD)
+                     &&
+                     (key_count_ = 0, byte_count_ = 0, trx_count_ = 0, true));
+        }
 
         class PurgeAndDiscard
         {
@@ -206,7 +212,9 @@ namespace galera
         wsrep_seqno_t cert_interval_;
         size_t        index_size_;
 
-        gu::Atomic<long>    key_count_;
+        size_t        key_count_;
+        size_t        byte_count_;
+        size_t        trx_count_;
 
         /* The only reason those are not static constants is because
          * there might be a need to thange them without recompilation.
@@ -216,7 +224,6 @@ namespace galera
                                           * on trx certification interval */
 
         unsigned int const max_length_check_; /* Mask how often to check */
-        static int   const purge_interval_ = (1UL<<10);
 
         bool               log_conflicts_;
     };

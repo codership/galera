@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,8 +18,11 @@ extern "C" {
 #endif
 
 #include <cerrno>
+#include <limits>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #ifndef O_CLOEXEC // CentOS < 6.0 does not have it
 #define O_CLOEXEC 0
@@ -44,6 +47,35 @@ namespace gu
         constructor_common();
     }
 
+    static unsigned long long
+    available_storage(const std::string& name, size_t size)
+    {
+        static size_t const reserve(1 << 20); // reserve 1M free space
+        struct statvfs stat;
+        int const err(statvfs(name.c_str(), &stat));
+
+        if (0 == err)
+        {
+            unsigned long long  const free_size(stat.f_bavail * stat.f_bsize);
+
+            if (reserve < free_size)
+            {
+                return free_size - reserve;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            int const errn(errno);
+            log_warn << "statvfs() failed on '" << name << "' partition: "
+                     << errn << " (" << strerror(errn) <<"). Proceeding anyway.";
+            return std::numeric_limits<unsigned long long>::max();
+        }
+    }
+
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     size_t const       size,
                                     bool   const       allocate,
@@ -59,6 +91,18 @@ namespace gu
 
         if (current_size < size_)
         {
+            unsigned long long const available(available_storage(name_, size_));
+
+            if (size_t(size_) > available)
+            {
+                ::close(fd_);
+                ::unlink(name_.c_str());
+                gu_throw_error(ENOSPC) << "Requested size " << size_ << " for '"
+                                       << name_
+                                       << "' exceeds available storage space "
+                                       << available;
+            }
+
             if (allocate)
             {
                 // reserve space that hasn't been reserved
@@ -66,7 +110,8 @@ namespace gu
             }
             else
             {
-                write_byte (size_ - 1); // reserve size
+                // reserve size or bus error follows mmap()
+                write_byte (size_ - 1);
             }
         }
         else if (current_size > size_)

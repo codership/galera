@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -297,6 +297,14 @@ namespace galera
                     mutex.lock();
                     lock();
                 }
+                else
+                {
+                    unlock();
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("apply_monitor_slave_enter_sync");
+                    mutex.lock();
+                    lock();
+                }
             }
 #endif // GU_DBUG_ON
 
@@ -471,6 +479,9 @@ namespace galera
         void start_closing();
         void shift_to_CLOSED();
         void wait_for_CLOSED(gu::Lock&);
+
+        wsrep_seqno_t donate_sst(void* recv_ctx, const StateRequest& streq,
+                                 const wsrep_gtid_t& state_id, bool bypass);
 
         /* local state seqno for internal use (macro mock up) */
         wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }

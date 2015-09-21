@@ -855,10 +855,10 @@ void gcomm::GMCast::update_addresses()
 
                 if (addr_blacklist_.find(link_addr) != addr_blacklist_.end())
                 {
-                    log_info << self_string()
-                             << " address '" << link_addr
-                             << "' pointing to uuid " << link_uuid
-                             << " is blacklisted, skipping";
+                    log_debug << self_string()
+                              << " address '" << link_addr
+                              << "' pointing to uuid " << link_uuid
+                              << " is blacklisted, skipping";
                     continue;
                 }
 

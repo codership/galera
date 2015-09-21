@@ -23,11 +23,12 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = 0
+x86 = any(arch in machine for arch in [ 'x86', 'i686', 'i386' ])
+
 if bits == '32bit':
-    x86 = 32
+    bits = 32
 elif bits == '64bit':
-    x86 = 64
+    bits = 64
 
 #
 # Print Help
@@ -92,24 +93,27 @@ if dbug:
 if gcov:
     opt_flags = opt_flags + ' --coverage -g'
 
-if x86 == 32:
-    compile_arch = ' -m32 -march=i686'
-    link_arch    = compile_arch
-    if sysname == 'linux':
-        link_arch = link_arch + ' -Wl,-melf_i386'
-elif x86 == 64 and sysname != 'sunos':
-    compile_arch = ' -m64'
-    link_arch    = compile_arch
-    if sysname == 'linux':
-        link_arch = link_arch + ' -Wl,-melf_x86_64'
-elif machine == 'ppc64':
+if sysname == 'sunos':
     compile_arch = ' -mtune=native'
     link_arch    = ''
-elif sysname == 'sunos':
-    compile_arch = ' -mtune=native'
+elif x86:
+    if bits == 32:
+        compile_arch = ' -m32 -march=i686'
+        link_arch    = compile_arch
+        if sysname == 'linux':
+            link_arch = link_arch + ' -Wl,-melf_i386'
+    else:
+        compile_arch = ' -m64'
+        link_arch    = compile_arch
+        if sysname == 'linux':
+            link_arch = link_arch + ' -Wl,-melf_x86_64'
+elif machine == 's390x':
+    compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
     link_arch    = ''
+    if bits == 32:
+        compile_arch += ' -m32'
 else:
-    compile_arch = ''
+    compile_arch = ' -mtune=native'
     link_arch    = ''
 
 
@@ -238,7 +242,7 @@ if not conf.CheckLib('pthread'):
 
 # libatomic may be needed on some 32bit platforms (and 32bit userland PPC64)
 # for 8 byte atomics but not generally required
-if 0 == x86:
+if not x86:
     conf.CheckLib('atomic')
 
 if sysname != 'darwin':
@@ -311,8 +315,13 @@ if boost == 1:
         boost_library_path = ''
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
+
     # Common procedure to find boost static library
-    boost_libpaths = [ boost_library_path, '/usr/lib64', '/usr/local/lib64'] if x86 == 64 else [ boost_library_path, '/usr/local/lib', '/usr/lib' ]
+    if bits == 64:
+        boost_libpaths = [ boost_library_path, '/usr/lib64', '/usr/local/lib64' ]
+    else:
+        boost_libpaths = [ boost_library_path, '/usr/local/lib', '/usr/lib' ]
+
     def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
         libName = libBaseName + boost_library_suffix
         if configuredLibPath != '' and not os.path.isfile(configuredLibPath):
@@ -340,6 +349,7 @@ if boost == 1:
                 print 'Error: library %s does not exist' % libName
                 Exit (1)
             return [libName]
+
     # Required boost headers/libraries
     #
     if boost_pool == 1:
@@ -413,7 +423,7 @@ if strict_build_flags == 1:
 
 env = conf.Finish()
 
-Export('x86', 'env', 'sysname', 'libboost_program_options')
+Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
