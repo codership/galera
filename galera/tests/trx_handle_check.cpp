@@ -19,7 +19,7 @@ void check_states_graph(
     T*   trx,
     const std::vector<int>& visits)
 {
-    // Depth first search for allowed paths
+    // Check that no allowed state transition causes an abort
     std::vector<int> visited(TrxHandle::num_states_);
     std::fill(visited.begin(), visited.end(), 0);
 
