@@ -135,7 +135,7 @@ namespace gcache
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
 #ifndef NDEBUG
-                if (!(seqno_released + 1 == it->first ||
+                if (!(seqno_released < it->first ||
                       seqno_released == SEQNO_NONE))
                 {
                     log_info << "seqno_released: " << seqno_released
@@ -144,7 +144,7 @@ namespace gcache
                              << "\nstart: " << start << "; end: " << end
                              << " batch_size: " << batch_size << "; gap: "
                              << new_gap << "; seqno_max: " << seqno_max;
-                    assert(seqno_released + 1 == it->first ||
+                    assert(seqno_released < it->first ||
                            seqno_released == SEQNO_NONE);
                 }
 #endif

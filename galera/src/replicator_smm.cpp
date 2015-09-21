@@ -842,7 +842,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         if ((ts->flags() & TrxHandle::F_ROLLBACK) != 0)
         {
             // SR rollback must be processed out of order
-            gu_trace(apply_monitor_.enter(ao));
+            gu_trace(apply_monitor_.self_cancel(ao));
         }
         else
         {
@@ -865,8 +865,21 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
     if (gu_unlikely(interrupted || trx->state() == TrxHandle::S_MUST_ABORT))
     {
         assert(trx->state() == TrxHandle::S_MUST_ABORT);
-        trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-        retval = WSREP_BF_ABORT;
+        if (ts->flags() & TrxHandle::F_COMMIT)
+        {
+            trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
+            retval = WSREP_BF_ABORT;
+        }
+        else
+        {
+            if (interrupted == true)
+            {
+                apply_monitor_.self_cancel(ao);
+                commit_monitor_.self_cancel(co);
+            }
+            trx->set_state(TrxHandle::S_ABORTING);
+            retval = WSREP_TRX_FAIL;
+        }
     }
     else
     {
@@ -904,9 +917,23 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             if (gu_unlikely(interrupted ||
                             trx->state() == TrxHandle::S_MUST_ABORT))
             {
+
                 assert(trx->state() == TrxHandle::S_MUST_ABORT);
-                trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-                retval = WSREP_BF_ABORT;
+                if (ts->flags() & TrxHandle::F_COMMIT)
+                {
+                    trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+                    retval = WSREP_BF_ABORT;
+                }
+                else
+                {
+                    if (interrupted == true)
+                    {
+                        commit_monitor_.self_cancel(co);
+                    }
+                    apply_monitor_.leave(ao);
+                    trx->set_state(TrxHandle::S_ABORTING);
+                    retval = WSREP_TRX_FAIL;
+                }
             }
             else
             {
@@ -920,7 +947,10 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
            ||
            (retval == WSREP_BF_ABORT && (
                trx->state() == TrxHandle::S_MUST_REPLAY_AM ||
-               trx->state() == TrxHandle::S_MUST_REPLAY_CM)));
+               trx->state() == TrxHandle::S_MUST_REPLAY_CM))
+           ||
+           (retval == WSREP_TRX_FAIL && trx->state() == TrxHandle::S_ABORTING)
+        );
 
     return retval;
 }
