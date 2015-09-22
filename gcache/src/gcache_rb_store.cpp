@@ -146,9 +146,9 @@ namespace gcache
 
         assert (ret <= first_);
 
-        if (first_ >= ret + size_next) { assert(size_free_ >= size); }
+        if (size_t(first_ - ret) >= size_next) { assert(size_free_ >= size); }
 
-        while (first_ < ret + size_next) {
+        while (size_t(first_ - ret) < size_next) {
             // try to discard first buffer to get more space
             BufferHeader* bh = BH_cast(first_);
 
@@ -178,7 +178,7 @@ namespace gcache
                 first_ = start_;
                 assert_size_free();
 
-                if (end_ >= ret + size_next)
+                if (size_t(end_ - ret) >= size_next)
                 {
                     assert(size_free_ >= size);
                     size_trail_ = 0;
@@ -194,8 +194,10 @@ namespace gcache
             assert(ret <= first_);
         }
 
+        assert (ret <= first_);
+
 #ifndef NDEBUG
-        if (first_ < ret + size_next) {
+        if (size_t(first_ - ret) < size_next) {
             log_fatal << "Assertion ((first - ret) >= size_next) failed: "
                       << std::endl
                       << "first offt = " << (first_ - start_) << std::endl
