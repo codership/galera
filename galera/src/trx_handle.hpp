@@ -195,7 +195,6 @@ namespace galera
         }
 
         /* slave trx ctor */
-        explicit
         TrxHandle(Fsm::TransMap* trans_map, bool local)
             :
             state_             (trans_map, S_REPLICATING),
