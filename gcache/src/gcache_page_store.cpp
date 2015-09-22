@@ -134,7 +134,7 @@ gcache::PageStore::new_page (size_type size)
     Page* const page(new Page(this, make_page_name (base_name_, count_), size));
 
     pages_.push_back (page);
-    total_size_ += size;
+    total_size_ += page->size();
     current_ = page;
     count_++;
 }

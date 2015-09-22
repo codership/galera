@@ -20,7 +20,7 @@ using namespace galera;
 static void*
 thread_routine (void* arg)
 {
-    SavedState* st(reinterpret_cast<SavedState*>(arg));
+    SavedState* st(static_cast<SavedState*>(arg));
 
     do
     {
