@@ -670,6 +670,7 @@ namespace galera
             }
             else if (flags() & TrxHandle::F_ROLLBACK)
             {
+                assert(false == trx_start_);
                 pa_range = 0;
             }
 
@@ -743,6 +744,8 @@ namespace galera
                 wso_ = false;
             }
         }
+
+        bool trx_start() const { return trx_start_; }
 
         void ref()   { tr_.ref();   }
         void unref() { tr_.unref(); }

@@ -52,7 +52,7 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
 
 std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State const s)
 {
-galera::TrxHandle::print_state(os, s);
+    galera::TrxHandle::print_state(os, s);
     return os;
 }
 
@@ -71,7 +71,8 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " flags: "   << flags()
        << " conn_id: " << int64_t(conn_id())
        << " trx_id: "  << int64_t(trx_id())  // for readability
-       << " tstamp: "  << timestamp();
+       << " tstamp: "  << timestamp()
+       << " refcnt: "  << refcnt();
 
 }
 
@@ -239,6 +240,7 @@ galera::TrxHandleSlave::sanity_checks() const
     {
         log_warn << "Both F_BEGIN and F_ROLLBACK are set on trx. "
                  << "This trx should not have been replicated at all: " << *this;
+        assert(0);
     }
 }
 

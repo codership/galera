@@ -340,8 +340,15 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     wsrep_status_t   retval;
     TrxHandleMaster* trx(repl->get_local_trx(victim_trx));
 
-    if (!trx) return WSREP_OK;
-
+    if (!trx)
+    {
+        log_warn << "trx to abort "
+                 << victim_trx
+                 << " with bf seqno "
+                 << bf_seqno <<
+            " not found";
+        return WSREP_OK;
+    }
     try
     {
         TrxHandleLock lock(*trx);
@@ -419,6 +426,9 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
     case TrxHandle::S_EXECUTING:
         /* trx ready for new fragment */
         break;
+    case TrxHandle::S_ABORTING:
+        // SR trx was BF aborted between pre_commit() and post_commit()
+        break;
     default:
         assert(0);
     }
@@ -495,6 +505,10 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
     TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
 
+    // TRX_START and ROLLBACK flags should not be set together
+    assert((flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_ROLLBACK))
+           != (WSREP_FLAG_TRX_START | WSREP_FLAG_ROLLBACK));
+
     if (gu_unlikely(trx == 0))
     {
         if (meta != 0)
@@ -521,23 +535,44 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
     try
     {
         TrxHandleLock lock(*trx);
+
         trx->set_conn_id(conn_id);
 
         trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
 
-        retval = repl->replicate(trx, meta);
+        assert((trx->flags() & (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK))
+               != (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK));
 
-        assert((!(retval == WSREP_OK || retval == WSREP_BF_ABORT) ||
-                trx->global_seqno() > 0));
 
-        if (retval == WSREP_OK)
+        if (flags & WSREP_FLAG_ROLLBACK)
         {
-            assert(trx->last_seen_seqno() >= 0);
-            retval = repl->pre_commit(trx, meta);
+            if (trx->trx_start() == true)
+            {
+                // No fragments replicated, just return OK
+                retval = WSREP_OK;
+            }
+            else
+            {
+                trx->set_flags(trx->flags() | TrxHandle::F_PA_UNSAFE);
+                retval = repl->send(trx, meta);
+                assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL);
+            }
         }
+        else
+        {
+            retval = repl->replicate(trx, meta);
 
-        assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
-               retval == WSREP_BF_ABORT);
+            assert((!(retval == WSREP_OK || retval == WSREP_BF_ABORT) ||
+                    trx->global_seqno() > 0));
+
+            if (retval == WSREP_OK)
+            {
+                assert(trx->last_seen_seqno() >= 0);
+                retval = repl->pre_commit(trx, meta);
+            }
+            assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
+                   retval == WSREP_BF_ABORT);
+        }
     }
     catch (gu::Exception& e)
     {
