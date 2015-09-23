@@ -3,7 +3,7 @@
 #include "gu_backtrace.h"
 #include "gu_log.h"
 
-#ifdef __GNUC__
+#if defined(HAVE_EXECINFO_H) && defined(__GNUC__)
 #include <execinfo.h>
 #include <stdlib.h>
 

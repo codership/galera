@@ -273,6 +273,9 @@ elif sysname != 'darwin':
     print 'can\'t find byte order information'
     Exit(1)
 
+if conf.CheckHeader('execinfo.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_EXECINFO_H')
+
 # Additional C headers and libraries
 
 # boost headers
