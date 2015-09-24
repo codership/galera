@@ -20,7 +20,7 @@ namespace gcache
         /* although size value passed to GCache should be representable by
          * a signed integer type, internally the buffer allocated will also
          * incur header overhead, so it has to be represented by unsigned int.
-         * However the difference between to internal sizes should never exceed
+         * However the difference between two internal sizes should never exceed
          * signed representation. */
         typedef          int ssize_type; // size passed to GCache
         typedef unsigned int size_type;  // internal size representation
