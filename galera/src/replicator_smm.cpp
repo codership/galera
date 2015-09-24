@@ -2261,6 +2261,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             }
             local_cert_failures_ += ts->local();
             if (trx != 0) trx->set_state(TrxHandle::S_ABORTING);
+            ts->set_state(TrxHandle::S_ROLLED_BACK);
             retval = WSREP_TRX_FAIL;
             break;
         }
