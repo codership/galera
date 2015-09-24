@@ -23,7 +23,7 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = any(arch in machine for arch in [ 'x86', 'i686', 'i386' ])
+x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386' ])
 
 if bits == '32bit':
     bits = 32
@@ -268,6 +268,9 @@ elif conf.CheckHeader('sys/byteorder.h'):
 elif sysname != 'darwin':
     print 'can\'t find byte order information'
     Exit(1)
+
+if conf.CheckHeader('execinfo.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_EXECINFO_H')
 
 # Additional C headers and libraries
 
