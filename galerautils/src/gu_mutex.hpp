@@ -26,6 +26,7 @@ namespace gu
         Mutex () : value_()
 #ifndef NDEBUG
                  , locked_()
+                 , owned_()
 #endif /* NDEBUG*/
         {
             gu_mutex_init (&value_, NULL); // always succeeds
