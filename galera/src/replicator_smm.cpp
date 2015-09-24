@@ -1441,7 +1441,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandleSlave* ts)
         break;
     case WSREP_TRX_FAIL:
         // certification failed, apply monitor has been canceled
-        ts->set_state(TrxHandle::S_ROLLED_BACK);
+        assert(ts->state() == TrxHandle::S_ROLLED_BACK);
         break;
     default:
         // this should not happen for remote actions
