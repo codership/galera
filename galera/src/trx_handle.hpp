@@ -790,6 +790,7 @@ namespace galera
                         size_t              reserved_size)
             :
             TrxHandle(&trans_map_, source_id, conn_id, trx_id, params.version_),
+            mutex_             (),
             params_            (params),
             tr_                (true, mp, this),
             repl_              (&tr_),
