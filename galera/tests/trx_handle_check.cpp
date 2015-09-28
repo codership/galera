@@ -5,213 +5,163 @@
 #include "trx_handle.hpp"
 #include <gu_uuid.hpp>
 
+#include <vector>
+
 #include <check.h>
 
 using namespace std;
 using namespace galera;
 
-START_TEST(test_states)
+
+template <class T>
+void check_states_graph(
+    int  graph[TrxHandle::num_states_][TrxHandle::num_states_],
+    T*   trx,
+    const std::vector<int>& visits)
 {
+    // Check that no allowed state transition causes an abort
+    std::vector<int> visited(TrxHandle::num_states_);
+    std::fill(visited.begin(), visited.end(), 0);
+
+    for (int i(0); i < TrxHandle::num_states_; ++i)
+    {
+        trx->force_state(TrxHandle::State(i));
+        for (int j(0); j < TrxHandle::num_states_; ++j)
+        {
+            if (graph[i][j]){
+                log_info << "Checking transition "
+                         << trx->state()
+                         << " -> "
+                         << TrxHandle::State(j);
+                trx->set_state(TrxHandle::State(j));
+                visited[i] = 1;
+                visited[j] = 1;
+            }
+            else
+            {
+                // TODO: Currently FSM transition calls abort on
+                // unknown transition, figure out how to fix it
+                // to verify also that incorrect transitions cause
+                // proper error.
+            }
+            trx->force_state(TrxHandle::State(i));
+        }
+    }
+
+    for (int i(0); i < TrxHandle::num_states_; ++i)
+    {
+        fail_unless(visited[i] == visits[i],
+                    "i = %i visited = %i visits = %i",
+                    i, visited[i], visits[i]);
+    }
+}
+
+START_TEST(test_states_master)
+{
+    log_info << "START test_states_master";
     TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 16,
                              "test_states_master");
-    TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "test_states_slave");
+
 
     wsrep_uuid_t uuid = {{1, }};
 
-    // first check basic stuff
-    // 1) initial state is executing
-    // 2) invalid state changes are caught
-    // 3) valid state changes change state
-    TrxHandleMaster* trx(TrxHandleMaster::New(tp, TrxHandleMaster::Defaults,
-                                              uuid, -1, 1));
-    trx->lock();
+        // first check basic stuff
+        // 1) initial state is executing
+        // 2) invalid state changes are caught
+        // 3) valid state changes change state
+        TrxHandleMaster* trx(TrxHandleMaster::New(tp, TrxHandleMaster::Defaults,
+                                                  uuid, -1, 1));
+        trx->lock();
 
-    log_info << *trx;
-    fail_unless(trx->state() == TrxHandle::S_EXECUTING);
-
-#if 0 // now setting wrong state results in abort
-    try
-    {
-        trx->set_state(TrxHandle::S_COMMITTED);
-        fail("");
-    }
-    catch (...)
-    {
         fail_unless(trx->state() == TrxHandle::S_EXECUTING);
-    }
-#endif
 
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_COMMITTING);
-    fail_unless(trx->state() == TrxHandle::S_COMMITTING);
-    trx->unlock();
-    trx->unref();
+        // Matrix representing directed graph of TrxHandleMaster transitions,
+        // see galera/src/trx_handle.cpp
 
-    // abort before replication
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_ABORTING);
-    trx->set_state(TrxHandle::S_ROLLED_BACK);
-    trx->unlock();
-    trx->unref();
+        // EXECUTING 0
+        // MUST_ABORT 1
+        // ABORTING 2
+        // REPLICATING 3
+        // CERTIFYING 4
+        // MUST_CERT_AND_REPLAY 5
+        // MUST_REPLAY_AM 6
+        // MUST_REPLAY_CM 7
+        // MUST_REPLAY  8
+        // REPLAYING 9
+        // APPLYING 10
+        // COMMITTING 11
+        // COMMITTED 12
+        // ROLLED_BACK 13
 
-    // aborted during replication and does not certify
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_ABORTING);
-    trx->set_state(TrxHandle::S_ROLLED_BACK);
-    trx->unlock();
-    trx->unref();
+        int state_trans_master[TrxHandle::num_states_][TrxHandle::num_states_] = {
+            // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+            {  0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 0
+            {  0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 }, // 1
+            {  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 2
+            {  0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
+            {  0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4
+            {  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 5
+            {  0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 }, // 6
+            {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 }, // 7
+            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 8
+            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 9
+            {  0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
+            {  1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
+            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
+            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
+        };
 
-    // aborted during replication and certifies but does not certify
-    // during replay (is this even possible?)
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-//    trx->set_state(TrxHandle::S_EXECUTING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_ABORTING);
-    trx->set_state(TrxHandle::S_ROLLED_BACK);
-    trx->unlock();
-    trx->unref();
+        // Visits all states
+        std::vector<int> visits(TrxHandle::num_states_);
+        std::fill(visits.begin(), visits.end(), 1);
 
-    // aborted during replication, certifies and commits
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-//    trx->set_state(TrxHandle::S_EXECUTING);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY);
-    trx->set_state(TrxHandle::S_REPLAYING);
-    trx->set_state(TrxHandle::S_COMMITTED);
-    trx->unlock();
-    trx->unref();
+        check_states_graph(state_trans_master, trx, visits);
 
-    // aborted during certification, replays and commits
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-//    trx->set_state(TrxHandle::S_EXECUTING);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY);
-    trx->set_state(TrxHandle::S_REPLAYING);
-    trx->set_state(TrxHandle::S_COMMITTED);
-    trx->unlock();
-    trx->unref();
+        trx->unlock();
+        trx->unref();
 
-    // aborted while waiting applying, replays and commits
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY);
-    trx->set_state(TrxHandle::S_REPLAYING);
-    trx->set_state(TrxHandle::S_COMMITTED);
-    trx->unlock();
-    trx->unref();
+}
+END_TEST
 
-    // aborted while waiting for commit order, replays and commits
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_COMMITTING);
-    trx->set_state(TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-    trx->set_state(TrxHandle::S_MUST_REPLAY);
-    trx->set_state(TrxHandle::S_REPLAYING);
-    trx->set_state(TrxHandle::S_COMMITTED);
-    trx->unlock();
-    trx->unref();
+START_TEST(test_states_slave)
+{
+    log_info << "START test_states_slave";
+    TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "test_states_slave");
+    int state_trans_slave[TrxHandle::num_states_][TrxHandle::num_states_] = {
 
-    // smooth operation master
-    trx = TrxHandleMaster::New(tp, TrxHandleMaster::Defaults, uuid, -1, 1);
-    trx->lock();
-    trx->set_state(TrxHandle::S_REPLICATING);
-    trx->set_state(TrxHandle::S_COMMITTING);
-    trx->set_state(TrxHandle::S_COMMITTED);
-    trx->unlock();
-    trx->unref();
+        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 2
+        {  0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 }, // 4
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 7
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 8
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
+    };
 
-    // smooth operation slave
-    TrxHandleSlave* txs(TrxHandleSlave::New(false, sp));
-    txs->lock();
-    txs->set_state(TrxHandle::S_CERTIFYING);
-    txs->set_state(TrxHandle::S_APPLYING);
-    txs->set_state(TrxHandle::S_COMMITTING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
+    TrxHandleSlave* ts(TrxHandleSlave::New(false, sp));
+    fail_unless(ts->state() == TrxHandle::S_REPLICATING);
 
-    // certification failure slave
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_CERTIFYING);
-    txs->set_state(TrxHandle::S_MUST_ABORT);
-    txs->set_state(TrxHandle::S_ROLLED_BACK);
-    txs->unlock();
-    txs->unref();
+    // Visits only REPLICATING, CERTIFYING, APPLYING, COMMITTING, COMMITTED,
+    // ROLLED_BACK
+    std::vector<int> visits(TrxHandle::num_states_);
+    std::fill(visits.begin(), visits.end(), 0);
+    visits[TrxHandle::S_REPLICATING] = 1;
+    visits[TrxHandle::S_CERTIFYING] = 1;
+    visits[TrxHandle::S_APPLYING] = 1;
+    visits[TrxHandle::S_COMMITTING] = 1;
+    visits[TrxHandle::S_COMMITTED] = 1;
+    visits[TrxHandle::S_ROLLED_BACK] = 1;
 
-    // replaying fragment aborted BEFORE certification
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_MUST_ABORT);
-    txs->set_state(TrxHandle::S_REPLICATING);
-    txs->set_state(TrxHandle::S_REPLAYING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
-
-    // replaying fragment aborted AFTER certification
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_MUST_ABORT);
-    txs->set_state(TrxHandle::S_MUST_REPLAY);
-    txs->set_state(TrxHandle::S_REPLAYING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
-
-    // replaying replicating fragment
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_REPLAYING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
-
-    // replaying certifying fragment
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_CERTIFYING);
-    txs->set_state(TrxHandle::S_REPLAYING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
-
-    // replaying committed fragment
-    txs = TrxHandleSlave::New(false, sp);
-    txs->lock();
-    txs->set_state(TrxHandle::S_CERTIFYING);
-    txs->set_state(TrxHandle::S_APPLYING);
-    txs->set_state(TrxHandle::S_COMMITTING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->set_state(TrxHandle::S_REPLAYING);
-    txs->set_state(TrxHandle::S_COMMITTED);
-    txs->unlock();
-    txs->unref();
+    check_states_graph(state_trans_slave, ts, visits);
+    ts->unref();
 }
 END_TEST
 
@@ -344,9 +294,14 @@ Suite* trx_handle_suite()
     Suite* s = suite_create("trx_handle");
     TCase* tc;
 
-    tc = tcase_create("test_states");
-    tcase_add_test(tc, test_states);
+    tc = tcase_create("test_states_master");
+    tcase_add_test(tc, test_states_master);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_states_slave");
+    tcase_add_test(tc, test_states_slave);
+    suite_add_tcase(s, tc);
+
 
     tc = tcase_create("test_serialization");
     tcase_add_test(tc, test_serialization);

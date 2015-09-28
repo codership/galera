@@ -123,6 +123,11 @@ namespace galera
             }
         }
 
+        void force(State const state)
+        {
+            state_ = state;
+        }
+
         const State& operator()() const { return state_; }
 
         void add_transition(Transition const& trans)

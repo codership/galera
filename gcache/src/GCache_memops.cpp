@@ -83,13 +83,13 @@ namespace gcache
         if (gu_likely(SEQNO_NONE != bh->seqno_g))
         {
 #ifndef NDEBUG
-            if (!(seqno_released + 1 == bh->seqno_g ||
+            if (!(seqno_released < bh->seqno_g ||
                   SEQNO_NONE == seqno_released))
             {
                 log_fatal << "OOO release: seqno_released " << seqno_released
                           << ", releasing " << bh->seqno_g;
             }
-            assert(seqno_released + 1 == bh->seqno_g ||
+            assert(seqno_released < bh->seqno_g ||
                    SEQNO_NONE == seqno_released);
 #endif
             seqno_released = bh->seqno_g;
