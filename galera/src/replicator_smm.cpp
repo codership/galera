@@ -592,9 +592,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
-    // Rollback write sets should go through ReplicatorSMM::send()
-    assert((trx->flags() & TrxHandle::F_ROLLBACK) == 0);
-
     assert(trx->state() == TrxHandle::S_EXECUTING ||
            trx->state() == TrxHandle::S_MUST_ABORT);
 
@@ -706,6 +703,28 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
     assert(trx->global_seqno() == ts->global_seqno());
     assert(trx->global_seqno() == act.seqno_g);
     assert(trx->last_seen_seqno() == ts->last_seen_seqno());
+
+    // ROLLBACK event shortcut to avoid blocking in monitors or
+    // getting BF aborted inside provider
+
+    if (trx->flags() & TrxHandle::F_ROLLBACK)
+    {
+        LocalOrder  lo(*ts);
+        ApplyOrder  ao(*ts);
+        CommitOrder co(*ts, co_mode_);
+        local_monitor_.self_cancel(lo);
+        apply_monitor_.self_cancel(ao);
+        if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+        if (meta != 0)
+        {
+            meta->gtid.uuid  = state_uuid_;
+            meta->gtid.seqno = ts->global_seqno();
+            meta->depends_on = ts->depends_seqno();
+        }
+        trx->set_state(TrxHandle::S_MUST_ABORT);
+        trx->set_state(TrxHandle::S_ABORTING);
+        return WSREP_OK;
+    }
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
