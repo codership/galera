@@ -1,8 +1,18 @@
 ###################################################################
 #
-# Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
+#
+# How to control the build with environment variables:
+# Set CC       to specify C compiler
+# Set CXX      to specify C++ compiler
+# Set CPPFLAGS to add non-standard include paths and preprocessor macros
+# Set CCFLAGS  to *override* optimization and architecture-specific options
+# Set CFLAGS   to supply C compiler options
+# Set CXXFLAGS to supply C++ compiler options
+# Set LDFLAGS  to *override* linking flags
+# Set LIBPATH  to add non-standard linker paths
 #
 # Script structure:
 # - Help message
@@ -23,7 +33,7 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = any(arch in machine for arch in [ 'x86', 'i686', 'i386' ])
+x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386' ])
 
 if bits == '32bit':
     bits = 32
@@ -101,7 +111,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.12')
+GALERA_VER = ARGUMENTS.get('version', '3.13dev')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -195,10 +205,10 @@ if sysname != 'sunos':
 
 
 # Linker flags
-# TODO: enable '-Wl,--warn-common -Wl,--fatal-warnings' after warnings from
+# TODO: enable ' -Wl,--warn-common -Wl,--fatal-warnings' after warnings from
 # static linking have beed addressed
 #
-env.Append(LINKFLAGS = link_arch)
+#env.Append(LINKFLAGS = ' -Wl,--warn-common -Wl,--fatal-warnings')
 
 #
 # Check required headers and libraries (autoconf functionality)
@@ -253,6 +263,9 @@ elif conf.CheckHeader('sys/byteorder.h'):
 elif sysname != 'darwin':
     print 'can\'t find byte order information'
     Exit(1)
+
+if conf.CheckHeader('execinfo.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_EXECINFO_H')
 
 # Additional C headers and libraries
 
@@ -429,6 +442,9 @@ if not conf.CheckLib('check'):
 if not conf.CheckLib('m'):
     print 'Error: math library not found or not usable'
     Exit(1)
+
+# potential check dependency, link if present
+conf.CheckLib('subunit')
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):

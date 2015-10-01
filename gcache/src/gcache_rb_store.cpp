@@ -202,6 +202,8 @@ namespace gcache
             assert(ret <= first_);
         }
 
+        assert (ret <= first_);
+
 #ifndef NDEBUG
         /* Compare with difference to avoid integer overflow: */
         if (static_cast<size_t>(first_ - ret) < size_next)
