@@ -42,7 +42,7 @@ namespace gcache
 
         size_t used () const { return used_; }
 
-        size_t size() const { return fd_.size(); } /* size on storage */
+        size_t size() const { return size_; } /* size on storage */
 
         const std::string& name() const { return fd_.name(); }
 

@@ -64,7 +64,7 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     rb_size_  (cfg.get<size_t>(GCACHE_PARAMS_RB_SIZE)),
     page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
     keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE)),
-    keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE))
+    keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_COUNT))
 {
     if (mem_size_)
     {
