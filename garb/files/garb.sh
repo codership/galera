@@ -45,6 +45,11 @@ log_failure() {
 	fi
 }
 
+if grep -q -E '^# REMOVE' $config; then
+	log_failure "Garbd config $config is not configured yet"
+	return 0
+fi
+
 PIDFILE=/var/run/garbd
 
 prog="/usr/bin/garbd"
@@ -129,11 +134,6 @@ program_status() {
 start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
-
-	if grep -q -E '^# REMOVE' $config; then
-	    log_failure "Garbd config $config is not configured yet"
-	    return 0
-	fi
 
 	if [ -r $PIDFILE ]; then
 		local PID=$(cat ${PIDFILE})
