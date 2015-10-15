@@ -9,9 +9,10 @@ WantedBy=multi-user.target
 Alias=garbd.service
 
 [Service]
-User=nobody
+User=garb
 EnvironmentFile=/etc/sysconfig/garb
 ExecStart=/usr/bin/garb-systemd start
+WorkingDirectory=~
 
 # Use SIGINT because with the default SIGTERM
 # garbd fails to reliably transition to 'destroyed' state
