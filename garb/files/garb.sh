@@ -47,7 +47,7 @@ log_failure() {
 
 if grep -q -E '^# REMOVE' $config; then
 	log_failure "Garbd config $config is not configured yet"
-	return 0
+	exit 0
 fi
 
 PIDFILE=/var/run/garbd
