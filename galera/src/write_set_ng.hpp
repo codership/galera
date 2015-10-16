@@ -560,7 +560,7 @@ namespace galera
 
 
         /* !!! This returns header without checksum! *
-         *     Use set_last_seen() to finalize it.   */
+         *     Use finalize() to finalize it.   */
         size_t gather(const wsrep_uuid_t&       source,
                       const wsrep_conn_id_t&    conn,
                       const wsrep_trx_id_t&     trx,
