@@ -1,4 +1,4 @@
-percona-xtradb-cluster-galera-3.x (@@GALERA_VERSION@@-1) unstable; urgency=low
+percona-xtradb-cluster-galera-3.x (@@GALERA_VERSION@@-@@DEB_RELEASE@@) unstable; urgency=low
 
   * Added GALERA_VERSION variable.
 
