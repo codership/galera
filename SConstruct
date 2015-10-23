@@ -218,12 +218,12 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 env.Append(CCFLAGS = ' -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
-env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
+env.Append(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
 
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Replace(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+env.Append(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
 if sysname != 'sunos':
     env.Append(CXXFLAGS = ' -pipe')
 
