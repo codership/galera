@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2015 Codership Oy <info@codership.com>
 
 /**
  * @file routines to generate "random" seeds for RNGs by collecting some easy
@@ -16,13 +16,14 @@
 
 /*! Structure to hold entropy data.
  *  Should be at least 20 bytes on 32-bit systems and 28 bytes on 64-bit */
+/*  Packed to avoid uninitialized data warnings when passed to hash */
 struct gu_rse
 {
     long long   time;
     const void* heap_ptr;
     const void* stack_ptr;
     long        pid;
-};
+}__attribute__((packed));
 
 typedef struct gu_rse gu_rse_t;
 

@@ -34,7 +34,6 @@
 #ifndef BASE_MEMORY_ALIGNED_MEMORY_H_
 #define BASE_MEMORY_ALIGNED_MEMORY_H_
 
-//#include "base/basictypes.h"
 #include "compile_assert.h"
 #include "compiler_specific.h"
 

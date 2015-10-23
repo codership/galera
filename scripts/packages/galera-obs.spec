@@ -15,8 +15,9 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-%{!?name: %define name galera-3}
-%{!?version: %define version 25_3.x}
+%{!?name: %define name galera-4}
+%{!?wsrep_api: %define wsrep_api 26}
+%{!?version: %define version %{wsrep_api}_4.x}
 %{!?release: %define release 2}
 %define revision XXXX
 %define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
@@ -60,7 +61,7 @@ Vendor:        Codership Oy
 
 BuildRoot:     %{_tmppath}/%{name}_%{version}-build
 
-BuildRequires: boost-devel
+BuildRequires: boost-devel >= 1.41
 BuildRequires: check-devel
 BuildRequires: glibc-devel
 BuildRequires: openssl-devel
@@ -119,7 +120,7 @@ Requires(preun): initscripts
 Requires:      openssl
 
 Provides:      wsrep, %{name} = %{version}-%{release}
-Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
+Provides:      galera, galera4, Percona-XtraDB-Cluster-galera-%{wsrep_api}
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
@@ -159,8 +160,8 @@ NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && ech
 scons -j$(echo $NUM_JOBS) revno=%{revision}
 
 %install
-RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
-RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
+RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-4-4.x-44.1.x86_64
+RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-4.x
 # When downloading from GitHub the contents is in a folder
 # that is named by the branch it was exported from.
 

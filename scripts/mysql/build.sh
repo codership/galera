@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/bash -eux
 
 if test -z "$MYSQL_SRC"
 then
@@ -85,8 +85,10 @@ else
     CC=${CC:-"gcc"}
     CXX=${CXX:-"g++"}
 fi
-CC=${CC:+$(which "$CC" 2>/dev/null)}
-CXX=${CXX:+$(which "$CXX" 2>/dev/null)}
+
+if ! which "$CC" ; then echo "Can't execute $CC" ; exit 1; fi
+if ! which "$CXX"; then echo "Can't execute $CXX"; exit 1; fi
+
 export CC CXX LD_LIBRARY_PATH
 
 EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
@@ -343,7 +345,7 @@ then
         url1=ftp://sunsite.informatik.rwth-aachen.de/pub/mirror/www.mysql.com/Downloads/MySQL-$MYSQL_MAJOR
         if [ ! -r $mysql_orig_tar_gz ]
         then
-            echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
+            echo "Downloading $mysql_orig_tar_gz..."
             wget -N $url1/$mysql_orig_tar_gz || wget -N $url2/$mysql_orig_tar_gz
         fi
         echo "Getting wsrep patch..."
@@ -647,7 +649,7 @@ if [ $TAR == "yes" ]; then
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
     then
-         for d in $GALERA_BINS $GALERA_LIBS \
+        for d in $GALERA_BINS $GALERA_LIBS \
                  $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib $MYSQL_DIST_DIR/sbin
         do
             for f in $d/*

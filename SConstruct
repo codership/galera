@@ -1,8 +1,18 @@
 ###################################################################
 #
-# Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
+#
+# How to control the build with environment variables:
+# Set CC       to specify C compiler
+# Set CXX      to specify C++ compiler
+# Set CPPFLAGS to add non-standard include paths and preprocessor macros
+# Set CCFLAGS  to *override* optimization and architecture-specific options
+# Set CFLAGS   to supply C compiler options
+# Set CXXFLAGS to supply C++ compiler options
+# Set LDFLAGS  to *override* linking flags
+# Set LIBPATH  to add non-standard linker paths
 #
 # Script structure:
 # - Help message
@@ -23,7 +33,7 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = any(arch in machine for arch in [ 'x86', 'i686', 'i386' ])
+x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386' ])
 
 if bits == '32bit':
     bits = 32
@@ -95,27 +105,23 @@ if gcov:
 
 if sysname == 'sunos':
     compile_arch = ' -mtune=native'
-    link_arch    = ''
 elif x86:
     if bits == 32:
-        compile_arch = ' -m32 -march=i686'
-        link_arch    = compile_arch
-        if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_i386'
+        if machine == 'x86_64':
+            compile_arch = ' -mx32'
+        else:
+            compile_arch = ' -m32 -march=i686'
+            if sysname == 'linux':
+                link_arch = ' -Wl,-melf_i386'
     else:
         compile_arch = ' -m64'
-        link_arch    = compile_arch
         if sysname == 'linux':
-            link_arch = link_arch + ' -Wl,-melf_x86_64'
+            link_arch = ' -Wl,-melf_x86_64'
+    link_arch = compile_arch + link_arch
 elif machine == 's390x':
     compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
-    link_arch    = ''
     if bits == 32:
         compile_arch += ' -m32'
-else:
-    compile_arch = ' -mtune=native'
-    link_arch    = ''
-
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
@@ -166,12 +172,16 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
-env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
-env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
+env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
+env.Replace(CCFLAGS   = os.getenv('CCFLAGS',  opt_flags + compile_arch))
+env.Replace(CFLAGS    = os.getenv('CFLAGS',   ''))
+env.Replace(CXXFLAGS  = os.getenv('CXXFLAGS', ''))
+env.Replace(LINKFLAGS = os.getenv('LDFLAGS',  link_arch))
+env.Replace(LIBPATH   = [os.getenv('LIBPATH', '')])
 
 # Set -pthread flag explicitly to make sure that pthreads are
 # enabled on all platforms.
-env.Append(CPPFLAGS = ' -pthread')
+env.Append(CCFLAGS = ' -pthread')
 
 # Freebsd ports are installed under /usr/local
 if sysname == 'freebsd' or sysname == 'sunos':
@@ -205,8 +215,7 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Replace(CCFLAGS = opt_flags + compile_arch +
-                      ' -Wall -Wextra -Wno-unused-parameter')
+env.Append(CCFLAGS = ' -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
 env.Replace(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
@@ -220,10 +229,10 @@ if sysname != 'sunos':
 
 
 # Linker flags
-# TODO: enable '-Wl,--warn-common -Wl,--fatal-warnings' after warnings from
+# TODO: enable ' -Wl,--warn-common -Wl,--fatal-warnings' after warnings from
 # static linking have beed addressed
 #
-env.Append(LINKFLAGS = link_arch)
+#env.Append(LINKFLAGS = ' -Wl,--warn-common -Wl,--fatal-warnings')
 
 if gcov:
    env.Append(LINKFLAGS = '--coverage -g')
@@ -281,6 +290,9 @@ elif conf.CheckHeader('sys/byteorder.h'):
 elif sysname != 'darwin':
     print 'can\'t find byte order information'
     Exit(1)
+
+if conf.CheckHeader('execinfo.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_EXECINFO_H')
 
 # Additional C headers and libraries
 
@@ -406,8 +418,7 @@ from subprocess import check_output
 CXX_VERSION = check_output(CXX + ['-dumpversion'])
 # these will be used only with our softaware
 if strict_build_flags == 1:
-    conf.env.Append(CPPFLAGS = ' -Werror')
-    conf.env.Append(CCFLAGS  = ' -pedantic')
+    conf.env.Append(CCFLAGS = ' -Werror -pedantic')
     if 'g++' in CXX:
         if CXX_VERSION >= "4.9.0":
             conf.env.Append(CXXFLAGS = ' -Weffc++')
@@ -415,7 +426,8 @@ if strict_build_flags == 1:
             conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
     elif 'clang++' in CXX:
-        conf.env.Append(CPPFLAGS = ' -Wnon-virtual-dtor -Wno-self-assign')
+        conf.env.Append(CCFLAGS = ' -Wno-self-assign')
+        conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         if 'ccache' in CXX:
             conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
 
@@ -455,6 +467,9 @@ if not conf.CheckLib('check'):
 if not conf.CheckLib('m'):
     print 'Error: math library not found or not usable'
     Exit(1)
+
+# potential check dependency, link if present
+conf.CheckLib('subunit')
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):

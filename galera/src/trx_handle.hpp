@@ -787,6 +787,7 @@ namespace galera
                         size_t              reserved_size)
             :
             TrxHandle(&trans_map_, source_id, conn_id, trx_id, params.version_),
+            mutex_             (),
             params_            (params),
             tr_                (true, mp, this),
             repl_              (&tr_),
@@ -813,9 +814,9 @@ namespace galera
             if (repl_ != &tr_) { repl_->unref(); }
         }
 
-        gu::Mutex              mutex_;
-
         static Fsm::TransMap   trans_map_;
+
+        gu::Mutex              mutex_;
         Params const           params_;
         TrxHandleSlave         tr_;   // first fragment handle (there will be
                                       // at least one)
