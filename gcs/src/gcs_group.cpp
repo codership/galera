@@ -11,6 +11,7 @@
 
 #include <gu_logger.hpp>
 #include <gu_macros.hpp>
+#include <gu_throw.hpp>
 
 #include <errno.h>
 
@@ -1569,14 +1570,6 @@ int
 gcs_group_param_set(gcs_group_t& group,
                     const std::string& key, const std::string& val)
 {
-    if (GCS_VOTE_POLICY_KEY == key)
-    {
-        gu_throw_error(ENOTSUP) << "Setting '" << key << "' in runtime may "
-            "have unintended consequences and is currently not supported. "
-            "Cluster voting policy should be decided on before starting the "
-            "cluster.";
-    }
-
     return 1;
 }
 

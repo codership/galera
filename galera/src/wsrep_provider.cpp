@@ -696,8 +696,10 @@ wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
 
 
 extern "C"
-wsrep_status_t galera_causal_read(wsrep_t*      const wsrep,
-                                  wsrep_gtid_t* const gtid)
+wsrep_status_t galera_sync_wait(wsrep_t*      const wsrep,
+                                wsrep_gtid_t* const upto,
+                                int                 tout,
+                                wsrep_gtid_t* const gtid)
 {
     assert(wsrep != 0);
     assert(wsrep->ctx != 0);
@@ -706,7 +708,34 @@ wsrep_status_t galera_causal_read(wsrep_t*      const wsrep,
     wsrep_status_t retval;
     try
     {
-        retval = repl->causal_read(gtid);
+        retval = repl->sync_wait(upto, tout, gtid);
+    }
+    catch (std::exception& e)
+    {
+        log_warn << e.what();
+        retval = WSREP_CONN_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+    return retval;
+}
+
+
+extern "C"
+wsrep_status_t galera_last_committed_id(wsrep_t*      const wsrep,
+                                        wsrep_gtid_t* const gtid)
+{
+    assert(wsrep != 0);
+    assert(wsrep->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
+    wsrep_status_t retval;
+    try
+    {
+        retval = repl->last_committed_id(gtid);
     }
     catch (std::exception& e)
     {
@@ -1154,7 +1183,8 @@ static wsrep_t galera_str = {
     &galera_abort_pre_commit,
     &galera_append_key,
     &galera_append_data,
-    &galera_causal_read,
+    &galera_sync_wait,
+    &galera_last_committed_id,
     &galera_free_connection,
     &galera_to_execute_start,
     &galera_to_execute_end,

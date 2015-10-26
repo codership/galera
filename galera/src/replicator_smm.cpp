@@ -231,7 +231,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_DONOR, S_CONNECTED));
     state_.add_transition(Transition(S_DONOR, S_JOINED));
 
-    local_monitor_.set_initial_position(0);
+    local_monitor_.set_initial_position(WSREP_UUID_UNDEFINED, 0);
 
     wsrep_uuid_t  uuid;
     wsrep_seqno_t seqno;
@@ -1214,15 +1214,25 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
+wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
+                                                int           tout,
+                                                wsrep_gtid_t* gtid)
 {
-    wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
+    gu::GTID wait_gtid;
 
-    if (cseq < 0)
+    if (upto == 0)
     {
-        log_warn << "gcs_caused() returned " << cseq << " (" << strerror(-cseq)
-                 << ')';
-        return WSREP_TRX_FAIL;
+        long ret = gcs_.caused(wait_gtid);
+        if (ret < 0)
+        {
+            log_warn << "gcs_caused() returned " << ret
+                     << " ("  << strerror(-ret) << ')';
+            return WSREP_TRX_FAIL;
+        }
+    }
+    else
+    {
+        wait_gtid.set(upto->uuid, upto->seqno);
     }
 
     try
@@ -1234,30 +1244,47 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
         // at monitor drain and disallowing further waits until
         // configuration change related operations (SST etc) have been
         // finished.
-        gu::datetime::Date wait_until(gu::datetime::Date::calendar()
-                                      + causal_read_timeout_);
+        gu::datetime::Period timeout(causal_read_timeout_);
+        if (tout != -1)
+        {
+            timeout = gu::datetime::Period(tout * gu::datetime::Sec);
+        }
+        gu::datetime::Date wait_until(gu::datetime::Date::calendar() + timeout);
+
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
-            commit_monitor_.wait(cseq, wait_until);
+            commit_monitor_.wait(wait_gtid, wait_until);
         }
         else
         {
-            apply_monitor_.wait(cseq, wait_until);
+            apply_monitor_.wait(wait_gtid, wait_until);
         }
         if (gtid != 0)
         {
-            gtid->uuid = state_uuid_;
-            gtid->seqno = cseq;
+            commit_monitor_.last_left_gtid(*gtid);
         }
         ++causal_reads_;
         return WSREP_OK;
     }
+    catch (gu::NotFound& e)
+    {
+        log_debug << "monitor wait failed for sync_wait: UUID mismatch";
+        return WSREP_TRX_MISSING;
+    }
     catch (gu::Exception& e)
     {
-        log_debug << "monitor wait failed for causal read: " << e.what();
+        log_debug << "monitor wait failed for sync_wait: " << e.what();
         return WSREP_TRX_FAIL;
     }
 }
+
+wsrep_status_t galera::ReplicatorSMM::last_committed_id(wsrep_gtid_t* gtid)
+{
+    commit_monitor_.last_left_gtid(*gtid);
+    return WSREP_OK;
+}
+
+
 
 
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster*  trx,
@@ -1605,10 +1632,10 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
                                                  wsrep_seqno_t const seqno)
 {
     update_state_uuid(uuid);
-    apply_monitor_.set_initial_position(seqno);
+    apply_monitor_.set_initial_position(uuid, seqno);
 
     if (co_mode_ != CommitOrder::BYPASS)
-        commit_monitor_.set_initial_position(seqno);
+        commit_monitor_.set_initial_position(uuid, seqno);
 }
 
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)

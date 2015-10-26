@@ -49,6 +49,7 @@ namespace galera
             :
             mutex_(),
             cond_(),
+            uuid_(WSREP_UUID_UNDEFINED),
             last_entered_(-1),
             last_left_(-1),
             drain_seqno_(LLONG_MAX),
@@ -80,10 +81,14 @@ namespace galera
          * - merely advances it to seqno if current position is behind.
          * Assumes that monitor has been drained.
          */
-        void set_initial_position(wsrep_seqno_t const seqno)
+        void set_initial_position(const wsrep_uuid_t& uuid,
+                                  wsrep_seqno_t const seqno)
         {
             gu::Lock lock(mutex_);
 
+            state_debug_print("set_initial_position", seqno);
+
+            uuid_ = uuid;
             if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset
@@ -263,6 +268,14 @@ namespace galera
             gu::Lock lock(mutex_);
             return last_left_;
         }
+
+        void last_left_gtid(wsrep_gtid_t& gtid) const
+        {
+            gu::Lock lock(mutex_);
+            gtid.uuid = uuid_;
+            gtid.seqno = last_left_;
+        }
+
         ssize_t       size()        const { return process_size_; }
 
         bool would_block (wsrep_seqno_t seqno) const
@@ -292,23 +305,26 @@ namespace galera
         void wait(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
-            if (last_left_ < seqno)
+            while (last_left_ < seqno)
             {
                 size_t idx(indexof(seqno));
                 lock.wait(process_[idx].wait_cond_);
             }
         }
 
-        void wait(wsrep_seqno_t seqno, const gu::datetime::Date& wait_until)
+        void wait(gu::GTID& gtid, const gu::datetime::Date& wait_until)
         {
             gu::Lock lock(mutex_);
-            if (last_left_ < seqno)
+            if (gtid.uuid() != uuid_)
             {
-                size_t idx(indexof(seqno));
+                throw gu::NotFound();
+            }
+            while (last_left_ < gtid.seqno())
+            {
+                size_t idx(indexof(gtid.seqno()));
                 lock.wait(process_[idx].wait_cond_, wait_until);
             }
         }
-
 
         void get_stats(double* oooe, double* oool, double* win_size) const
         {
@@ -472,6 +488,7 @@ namespace galera
         mutable
         gu::Mutex mutex_;
         gu::Cond  cond_;
+        wsrep_uuid_t  uuid_;
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         wsrep_seqno_t drain_seqno_;

@@ -100,7 +100,8 @@ core_act_t;
 
 typedef struct causal_act
 {
-    gcs_seqno_t* act_id;
+    gcs_seqno_t*  act_id;
+    gu_uuid_t*    act_uuid;
     gu_mutex_t*  mtx;
     gu_cond_t*   cond;
 } causal_act_t;
@@ -1075,13 +1076,13 @@ static long core_msg_causal(gcs_core_t* conn,
         return -EPROTO;
     }
 
-    gcs_seqno_t const causal_seqno =
-        GCS_GROUP_PRIMARY == conn->group.state ?
-        conn->group.act_id_ : GCS_SEQNO_ILL;
-
     act = (causal_act_t*)msg->buf;
     gu_mutex_lock(act->mtx);
-    *act->act_id = causal_seqno;
+    if (conn->group.state == GCS_GROUP_PRIMARY)
+    {
+        *act->act_id = conn->group.act_id_;
+        *act->act_uuid = conn->group.group_uuid;
+    }
     gu_cond_signal(act->cond);
     gu_mutex_unlock(act->mtx);
     return msg->size;
@@ -1392,14 +1393,15 @@ gcs_core_send_fc (gcs_core_t* core, const void* const fc, size_t const fc_size)
     return ret;
 }
 
-gcs_seqno_t
-gcs_core_caused(gcs_core_t* core)
+long
+gcs_core_caused (gcs_core_t* core, gu::GTID& gtid)
 {
     long         ret;
     gcs_seqno_t  act_id = GCS_SEQNO_ILL;
+    gu_uuid_t    act_uuid = GU_UUID_NIL;
     gu_mutex_t   mtx;
     gu_cond_t    cond;
-    causal_act_t act = {&act_id, &mtx, &cond};
+    causal_act_t act = {&act_id, &act_uuid, &mtx, &cond};
 
     gu_mutex_init (&mtx, NULL);
     gu_cond_init  (&cond, NULL);
@@ -1410,18 +1412,19 @@ gcs_core_caused(gcs_core_t* core)
         if (ret == sizeof(act))
         {
             gu_cond_wait (&cond, &mtx);
+            gtid.set (act_uuid, act_id);
         }
         else
         {
             assert (ret < 0);
-            act_id = ret;
+            gtid.set (GU_UUID_NIL, GCS_SEQNO_ILL);
         }
     }
     gu_mutex_unlock  (&mtx);
     gu_mutex_destroy (&mtx);
     gu_cond_destroy  (&cond);
 
-    return act_id;
+    return ret;
 }
 
 long

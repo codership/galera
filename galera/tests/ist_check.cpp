@@ -17,6 +17,7 @@ using namespace galera;
 
 // Message tests
 
+
 START_TEST(test_ist_message)
 {
 
@@ -231,6 +232,8 @@ public:
     virtual ~PreIST() {}
 };
 
+static gu::UUID UUID(NULL, 0);
+
 extern "C" void* receiver_thd(void* arg)
 {
     mark_point();
@@ -260,7 +263,8 @@ extern "C" void* receiver_thd(void* arg)
 
     mark_point();
 
-    trx_thd_args.monitor_.set_initial_position(rargs->first_ - 1);
+    trx_thd_args.monitor_.set_initial_position(
+        *reinterpret_cast<wsrep_uuid_t*>(&UUID), rargs->first_ - 1);
     pthread_barrier_wait(&start_barrier);
     trx_thd_args.monitor_.wait(rargs->last_);
 

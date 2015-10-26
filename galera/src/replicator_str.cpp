@@ -838,13 +838,13 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 // with higher versions this happens in cert index preload
             }
 
-            apply_monitor_.set_initial_position(-1);
-            apply_monitor_.set_initial_position(sst_seqno_);
+            apply_monitor_.set_initial_position(WSREP_UUID_UNDEFINED, -1);
+            apply_monitor_.set_initial_position(sst_uuid_, sst_seqno_);
 
             if (co_mode_ != CommitOrder::BYPASS)
             {
-                commit_monitor_.set_initial_position(-1);
-                commit_monitor_.set_initial_position(sst_seqno_);
+                commit_monitor_.set_initial_position(WSREP_UUID_UNDEFINED, -1);
+                commit_monitor_.set_initial_position(sst_uuid_, sst_seqno_);
             }
 
             log_info << "Installed new state from SST: " << state_uuid_ << ":"

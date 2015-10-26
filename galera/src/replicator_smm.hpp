@@ -98,7 +98,11 @@ namespace galera
         wsrep_status_t post_commit(TrxHandleMaster* trx);
         wsrep_status_t post_rollback(TrxHandleMaster* trx);
 
-        wsrep_status_t causal_read(wsrep_gtid_t*);
+        wsrep_status_t sync_wait(wsrep_gtid_t* upto,
+                                 int           tout,
+                                 wsrep_gtid_t* gtid);
+        wsrep_status_t last_committed_id(wsrep_gtid_t* gtid);
+
         wsrep_status_t to_isolation_begin(TrxHandleMaster* trx,
                                           wsrep_trx_meta_t*);
         wsrep_status_t to_isolation_end(TrxHandleMaster* trx,

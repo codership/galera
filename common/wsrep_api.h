@@ -210,6 +210,18 @@ wsrep_uuid_scan (const char* str, size_t str_len, wsrep_uuid_t* uuid);
 extern int
 wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
 
+/*!
+ * @brief Compare two UUIDs
+ *
+ * Performs a byte by byte comparison of lhs and rhs.
+ * Returns 0 if lhs and rhs match, otherwise -1 or 1 according to the
+ * difference of the first byte that differs in lsh and rhs.
+ *
+ * @return -1, 0, 1 if lhs is respectively smaller, equal, or greater than rhs
+ */
+extern int
+wsrep_uuid_compare (const wsrep_uuid_t* lhs, const wsrep_uuid_t* rhs);
+
 #define WSREP_MEMBER_NAME_LEN 32  //!< maximum logical member name length
 #define WSREP_INCOMING_LEN    256 //!< max Domain Name length + 0x00
 
@@ -867,18 +879,39 @@ struct wsrep {
                                   wsrep_bool_t            copy);
 
   /*!
-   * @brief Get causal ordering for read operation
+   * @brief Blocks until the given GTID is committed
    *
-   * This call will block until causal ordering with all possible
-   * preceding writes in the cluster is guaranteed. If pointer to
-   * gtid is non-null, the call stores the global transaction ID
-   * of the last transaction which is guaranteed to be ordered
-   * causally before this call.
+   * This call will block the caller until the given GTID
+   * is guaranteed to be committed, or until a timeout occurs.
+   * The timeout value is given in parameter tout, if tout is -1,
+   * then the global causal read timeout applies.
    *
-   * @param wsrep provider handle
-   * @param gtid  location to store GTID
+   * If no pointer upto is provided the call will block until
+   * causal ordering with all possible preceding writes in the
+   * cluster is guaranteed.
+   *
+   * If pointer to gtid is non-null, the call stores the global
+   * transaction ID of the last transaction which is guaranteed
+   * to be committed when the call returns.
+   *
+   * @param wsrep  provider handle
+   * @param upto   gtid to wait upto
+   * @param tout   timeout in seconds
+   *               -1 wait for global causal read timeout
+   * @param gtid   location to store GTID
    */
-    wsrep_status_t (*causal_read)(wsrep_t* wsrep, wsrep_gtid_t* gtid);
+    wsrep_status_t (*sync_wait)(wsrep_t*      wsrep,
+                                wsrep_gtid_t* upto,
+                                int           tout,
+                                wsrep_gtid_t* gtid);
+
+  /*!
+   * @brief Returns the last committed gtid
+   *
+   * @param gtid location to store GTID
+   */
+    wsrep_status_t (*last_committed_id)(wsrep_t*      wsrep,
+                                        wsrep_gtid_t* gtid);
 
   /*!
    * @brief Clears allocated connection context.

@@ -287,7 +287,7 @@ extern long gcs_resume_recv (gcs_conn_t* conn);
  *
  * @return global sequence number or negative error code
  */
-extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
+extern long gcs_caused(gcs_conn_t* conn, gu::GTID& gtid);
 
 /*! @brief Sends state transfer request
  * Broadcasts state transfer request which will be passed to one of the
