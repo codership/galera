@@ -21,6 +21,7 @@
 
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
+#include "gu_debug_sync.hpp"
 
 #include <string.h> // for mempcpy
 #include <errno.h>
@@ -383,6 +384,7 @@ gcs_core_send (gcs_core_t*          const conn,
 #endif
         ret = core_msg_send_retry (conn, conn->send_buf, send_size,
                                    GCS_MSG_ACTION);
+        GU_DBUG_SYNC_WAIT("gcs_core_after_frag_send");
 #ifdef GCS_CORE_TESTING
 //        gu_lock_step_wait (&conn->ls); // pause after every fragment
 //        gu_info ("Sent %p of size %zu, ret: %zd. Total sent: %zu, left: %zu",
