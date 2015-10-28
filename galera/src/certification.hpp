@@ -114,8 +114,7 @@ namespace galera
 
         wsrep_seqno_t lowest_trx_seqno() const
         {
-            return (trx_map_.empty() ?
-                    position_ : trx_map_.begin()->second->global_seqno());
+            return (trx_map_.empty() ? position_ : trx_map_.begin()->first);
         }
 
     private:
