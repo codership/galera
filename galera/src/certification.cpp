@@ -374,8 +374,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     else
     {
         wsrep_seqno_t const ds
-            (std::max(trx->depends_seqno(),
-                      trx_map_.begin()->second->global_seqno() - 1));
+            (std::max(trx->depends_seqno(), trx_map_.begin()->first - 1));
         trx->set_depends_seqno(ds);
     }
 
@@ -561,6 +560,7 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
     if (version != version_)
     {
         std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        assert(trx_map_.end()->first + 1 == position_);
         trx_map_.clear();
         assert(cert_index_.empty());
         assert(cert_index_ng_.empty());
@@ -572,7 +572,6 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
     service_thd_.flush(gtid.uuid());
 
     position_       = gtid.seqno();
-//            last_pa_unsafe_ = position_;
     version_        = version;
 }
 
