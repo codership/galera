@@ -414,8 +414,10 @@ if ssl == 1:
 conf.env['CPPPATH'] = cpppath_saved
 
 CXX = conf.env.get('CXX').split()
-from subprocess import check_output
-CXX_VERSION = check_output(CXX + ['-dumpversion'])
+from subprocess import Popen, PIPE
+p = Popen(CXX + ['-dumpversion'], shell=False, stdin=None, stdout=PIPE, stderr=None, close_fds=True)
+CXX_VERSION = p.stdout.read().strip()
+
 # these will be used only with our softaware
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
