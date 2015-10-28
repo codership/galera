@@ -455,9 +455,16 @@ then
             fi
 
             pushd $MYSQL_BUILD_DIR
+
+            # cmake wants either absolute path or a link from build directory
+            # Incidentally link trick also allows us to use ccache
+            # (at least it distinguishes between gcc/clang)
+            ln -sf $(which ccache || which $CC)  $(basename $CC)
+            ln -sf $(which ccache || which $CXX) $(basename $CXX)
+
             cmake \
-                  ${CC:+-DCMAKE_C_COMPILER="$CC"} \
-                  ${CXX:+-DCMAKE_CXX_COMPILER="$CXX"} \
+                  -DCMAKE_C_COMPILER=$(basename $CC) \
+                  -DCMAKE_CXX_COMPILER=$(basename $CXX) \
                   -DBUILD_CONFIG=mysql_release \
                   "${CMAKE_LAYOUT_OPTIONS[@]}" \
                   $BUILD_OPT \
