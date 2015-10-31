@@ -106,7 +106,8 @@ namespace galera
         wsrep_status_t causal_read(wsrep_gtid_t*);
         wsrep_status_t to_isolation_begin(TrxHandleMaster* trx,
                                           wsrep_trx_meta_t*);
-        wsrep_status_t to_isolation_end(TrxHandleMaster* trx);
+        wsrep_status_t to_isolation_end(TrxHandleMaster* trx,
+                                        int              err);
         wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
                                           const struct wsrep_buf* data,
                                           size_t                  count,

@@ -1249,7 +1249,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster*  trx,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster* trx)
+wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster* trx,
+                                                       int const err)
 {
 
     TrxHandleSlave* const ts(trx->repld());

@@ -482,6 +482,15 @@ append_data_array (TrxHandleMaster*        const trx,
 
 
 extern "C"
+wsrep_status_t galera_assign_read_view(wsrep_t*           const  gh,
+                                       wsrep_ws_handle_t* const  handle,
+                                       const wsrep_gtid_t* const rv)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
+
+
+extern "C"
 wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
                                  wsrep_conn_id_t    const conn_id,
                                  wsrep_ws_handle_t* const trx_handle,
@@ -793,7 +802,8 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
 extern "C"
 wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
-                                     wsrep_conn_id_t const conn_id)
+                                     wsrep_conn_id_t const conn_id,
+                                     int             const err)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -806,7 +816,7 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     try
     {
         TrxHandleLock lock(*trx);
-        gu_trace(repl->to_isolation_end(trx));
+        gu_trace(repl->to_isolation_end(trx, err));
         retval =  WSREP_OK;
         // trx will be unreferenced (destructed) during purge
     }
@@ -1103,6 +1113,7 @@ static wsrep_t galera_str = {
     &galera_connect,
     &galera_disconnect,
     &galera_recv,
+    &galera_assign_read_view,
     &galera_pre_commit,
     &galera_post_commit,
     &galera_post_rollback,

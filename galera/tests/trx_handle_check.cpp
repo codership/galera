@@ -192,7 +192,7 @@ START_TEST(test_serialization)
 }
 END_TEST
 
-static enum wsrep_cb_status
+static int
 apply_cb(
     void*                   ctx,
     const void*             data,
@@ -210,7 +210,7 @@ apply_cb(
 
     res->push_back(*c);
 
-    return WSREP_CB_SUCCESS;
+    return 0;
 }
 
 START_TEST(test_streaming)

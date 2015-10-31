@@ -325,7 +325,7 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
                                wsrep_apply_cb_t        apply_cb,
                                const wsrep_trx_meta_t& meta) const
 {
-    wsrep_cb_status_t err(WSREP_CB_SUCCESS);
+    int err(0);
 
     assert(version() >= WS_NG_VERSION);
 
@@ -341,12 +341,12 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
                         trx_flags_to_wsrep_flags(flags()), &meta);
     }
 
-    if (gu_unlikely(err != WSREP_CB_SUCCESS))
+    if (gu_unlikely(0 != err))
     {
         std::ostringstream os;
 
         os << "Failed to apply app buffer: seqno: " << global_seqno()
-           << ", status: " << err;
+           << ", code: " << err;
 
         galera::ApplyException ae(os.str(), err);
 
