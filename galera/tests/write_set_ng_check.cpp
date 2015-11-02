@@ -103,10 +103,10 @@ START_TEST (ver3_basic)
         wsi.verify_checksum();
 
         wsi.set_seqno (seqno, pa_range);
-        fail_unless(wsi.certified(),
-                    "wsi.certified: %d"
-                    "\nwsi.pa_range = %lld\n    pa_range = %lld",
-                    static_cast<int>(wsi.certified()), wsi.pa_range(), pa_range);
+        fail_unless(wsi.pa_range() == pa_range,
+                    "wsi.pa_range = %lld\n    pa_range = %lld",
+                    wsi.pa_range(), pa_range);
+        fail_unless(wsi.certified());
     }
     /* repeat reading buffer after "certification" */
     {
@@ -115,7 +115,7 @@ START_TEST (ver3_basic)
         wsi.verify_checksum();
         fail_unless(wsi.certified());
         fail_if (wsi.seqno() != seqno);
-        fail_if (wsi.flags() != flags);
+        fail_if (wsi.flags() != (flags | WriteSetNG::F_CERTIFIED));
         fail_if (0 == wsi.timestamp());
 
         mark_point();

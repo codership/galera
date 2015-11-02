@@ -458,7 +458,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave* ts)
 {
     assert(ts != 0);
     assert(ts->global_seqno() > 0);
-    assert(ts->is_certified() /*Repl*/ || ts->preordered() /*IST*/);
+    assert(ts->certified());
     assert(ts->global_seqno() > STATE_SEQNO());
     assert(ts->local() == false);
 
@@ -608,7 +608,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
         assert(rcode != -EINTR || trx->state() == TrxHandle::S_MUST_ABORT);
         assert(act.seqno_l == GCS_SEQNO_ILL && act.seqno_g == GCS_SEQNO_ILL);
-        assert(NULL == act.buf /*|| !trx->new_version()*/);
+        assert(NULL == act.buf);
 
         if (trx->state() != TrxHandle::S_MUST_ABORT)
         {
@@ -628,11 +628,9 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
     TrxHandleSlave* const ts(trx->repld());
 
-    gu_trace(ts->unserialize(static_cast<const gu::byte_t*>(act.buf),
-                             act.size, 0));
+    gu_trace(ts->unserialize<true>(act));
 
     ts->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
-    ts->set_received(act.buf, act.seqno_l, act.seqno_g);
 
     ++replicated_;
     replicated_bytes_ += rcode;
@@ -1340,8 +1338,10 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
 
     if (gu_likely(true == commit))
     {
+        assert(source != WSREP_UUID_UNDEFINED);
+
         ws->set_flags (WriteSetNG::wsrep_flags_to_ws_flags(flags) |
-                       WriteSetNG::F_CERTIFIED);
+                       WriteSetNG::F_PREORDERED);
 
         /* by loooking at trx_id we should be able to detect gaps / lost events
          * (however resending is not implemented yet). Something like
@@ -1369,7 +1369,8 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
                 << "Replication of preordered writeset failed.";
     }
 
-    delete ws;
+    delete ws; // cleanup regardless of commit flag
+
     handle.opaque = NULL;
 
     return WSREP_OK;
@@ -1472,8 +1473,7 @@ void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
     // To enter monitors we need to fake trx object
     TrxHandleSlave* const dummy(TrxHandleSlave::New(true, slave_pool_));
 
-    dummy->set_received(NULL, WSREP_SEQNO_UNDEFINED, seqno);
-    dummy->set_depends_seqno(dummy->global_seqno() - 1);
+    dummy->set_global_seqno(seqno);
 
     ApplyOrder  ao(*dummy);
     apply_monitor_.self_cancel(ao);
