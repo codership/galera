@@ -1566,11 +1566,12 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
     gu_trace(pop_header(msg, dg));
     sent_msgs_[Message::T_USER]++;
 
-    if (delivering_ == false && input_map_->has_deliverables() == true)
+    if (delivering_ == false)
     {
         gu_trace(deliver());
+        gu_trace(deliver_local());
     }
-    gu_trace(deliver_local());
+
     return 0;
 }
 
@@ -2074,10 +2075,22 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
     seqno_t seq(range.lu());
     while (seq <= range.hs())
     {
-        InputMap::iterator msg_i = input_map_->find(NodeMap::value(self_i_).index(), seq);
+        InputMap::iterator msg_i = input_map_->find(
+            NodeMap::value(self_i_).index(), seq);
         if (msg_i == input_map_->end())
         {
-            gu_trace(msg_i = input_map_->recover(NodeMap::value(self_i_).index(), seq));
+            try
+            {
+                gu_trace(msg_i = input_map_->recover(
+                             NodeMap::value(self_i_).index(), seq));
+            }
+            catch (...)
+            {
+                evs_log_debug(D_RETRANS) << "could not recover message "
+                                         << gap_source << ":" << seq;
+                seq = seq + 1;
+                continue;
+            }
         }
 
         const UserMessage& msg(InputMapMsgIndex::value(msg_i).msg());
@@ -2537,6 +2550,32 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
             causal_keepalive_period_ > gu::datetime::Period(0) &&
             last_causal_keepalive_ + causal_keepalive_period_ > now)
         {
+
+            assert(last_sent_ == input_map_->aru_seq());
+            // Input map should either be empty (all messages
+            // delivered) or the undelivered messages have higher
+            // seqno than safe_seq. Even if the delivry is
+            // done below if needed, this assertion should stay
+            // to catch errors in logic elsewhere in the code.
+            assert(input_map_->begin() == input_map_->end() ||
+                   input_map_->is_safe(input_map_->begin()) == false);
+
+
+            if (input_map_->begin() != input_map_->end() &&
+                input_map_->is_safe(input_map_->begin()) == true)
+            {
+                gu_trace(deliver());
+            }
+
+            if (input_map_->begin() != input_map_->end() &&
+                input_map_->is_safe(input_map_->begin()) == true)
+            {
+                // If the input map state is still not good for fast path,
+                // the situation is not likely to clear immediately. Retur
+                // error to retry later.
+                return EAGAIN;
+            }
+
             hs_local_causal_.insert(0.0);
             deliver_causal(dm.user_type(), last_sent_, wb);
         }
@@ -2901,6 +2940,10 @@ void gcomm::evs::Proto::deliver_local(bool trans)
     // local causal
     const seqno_t causal_seq(trans == false ? input_map_->safe_seq() : last_sent_);
     gu::datetime::Date now(gu::datetime::Date::now());
+
+    assert(input_map_->begin() == input_map_->end() ||
+           input_map_->is_safe(input_map_->begin()) == false);
+
     while (causal_queue_.empty() == false &&
            causal_queue_.front().seqno() <= causal_seq)
     {
@@ -3025,50 +3068,36 @@ void gcomm::evs::Proto::deliver()
         << " aru_seq="   << input_map_->aru_seq()
         << " safe_seq=" << input_map_->safe_seq();
 
-    InputMapMsgIndex::iterator i, i_next;
-    for (i = input_map_->begin(); i != input_map_->end(); i = i_next)
+    // Read input map head until a message which cannot be
+    // delivered is enountered.
+    InputMapMsgIndex::iterator i;
+    while ((i = input_map_->begin()) != input_map_->end())
     {
-        i_next = i;
-        ++i_next;
         const InputMapMsg& msg(InputMapMsgIndex::value(i));
-        bool deliver = false;
-        switch (msg.msg().order())
-        {
-        case O_SAFE:
-            if (input_map_->is_safe(i) == true)
-            {
-                deliver = true;
-            }
-            break;
-        case O_AGREED:
-            if (input_map_->is_agreed(i) == true)
-            {
-                deliver = true;
-            }
-            break;
-        case O_FIFO:
-        case O_DROP:
-            if (input_map_->is_fifo(i) == true)
-            {
-                deliver = true;
-            }
-            break;
-        default:
-            gu_throw_fatal << "invalid safety prefix "
-                              << msg.msg().order();
-        }
-
-        if (deliver == true)
+        if ((msg.msg().order() <= O_SAFE &&
+             input_map_->is_safe(i) == true) ||
+            (msg.msg().order() <= O_AGREED &&
+             input_map_->is_agreed(i) == true) ||
+            (msg.msg().order() <= O_FIFO &&
+             input_map_->is_fifo(i) == true))
         {
             deliver_finish(msg);
             gu_trace(input_map_->erase(i));
         }
-        else if (input_map_->has_deliverables() == false)
+        else
         {
+            if (msg.msg().order() > O_SAFE)
+            {
+                gu_throw_fatal << "Message with order " << msg.msg().order()
+                               << " in input map, cannot continue safely";
+            }
             break;
         }
     }
     delivering_ = false;
+
+    assert(input_map_->begin() == input_map_->end() ||
+           input_map_->is_safe(input_map_->begin()) == false);
 
 }
 
@@ -3413,10 +3442,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     // Deliver messages
     profile_enter(delivery_prof_);
-    if (input_map_->has_deliverables() == true)
-    {
-        gu_trace(deliver());
-    }
+    gu_trace(deliver());
     gu_trace(deliver_local());
     profile_leave(delivery_prof_);
 
@@ -3614,10 +3640,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
 
     profile_enter(delivery_prof_);
-    if (input_map_->has_deliverables() == true)
-    {
-        gu_trace(deliver());
-    }
+    gu_trace(deliver());
     gu_trace(deliver_local());
     profile_leave(delivery_prof_);
 
