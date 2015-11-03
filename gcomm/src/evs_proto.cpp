@@ -2565,15 +2565,14 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
                 input_map_->is_safe(input_map_->begin()) == true)
             {
                 gu_trace(deliver());
-            }
-
-            if (input_map_->begin() != input_map_->end() &&
-                input_map_->is_safe(input_map_->begin()) == true)
-            {
-                // If the input map state is still not good for fast path,
-                // the situation is not likely to clear immediately. Retur
-                // error to retry later.
-                return EAGAIN;
+                if (input_map_->begin() != input_map_->end() &&
+                    input_map_->is_safe(input_map_->begin()) == true)
+                {
+                    // If the input map state is still not good for fast path,
+                    // the situation is not likely to clear immediately. Retur
+                    // error to retry later.
+                    return EAGAIN;
+                }
             }
 
             hs_local_causal_.insert(0.0);
