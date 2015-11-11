@@ -69,7 +69,7 @@ Commandline Options:
 build_target = 'all'
 
 # Optimization level
-opt_flags    = ' -g -O3 -DNDEBUG'
+opt_flags    = ' -g -O3 -fno-omit-frame-pointer -DNDEBUG'
 
 # Architecture (defaults to build host type)
 compile_arch = ''
@@ -97,7 +97,7 @@ if debug_lvl >= 0 and debug_lvl < 3:
     opt_flags = ' -g -O%d -fno-inline' % debug_lvl
     dbug = True
 elif debug_lvl == 3:
-    opt_flags = ' -g -O3'
+    opt_flags = ' -g -O3 -fno-omit-frame-pointer'
 
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
