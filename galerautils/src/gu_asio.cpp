@@ -5,6 +5,7 @@
 #include "gu_config.hpp"
 #include "gu_asio.hpp"
 
+#include <boost/bind.hpp>
 
 void gu::ssl_register_params(gu::Config& conf)
 {

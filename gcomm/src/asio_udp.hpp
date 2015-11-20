@@ -10,6 +10,17 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <vector>
 
+//
+// Boost enable_shared_from_this<> does not have virtual destructor,
+// therefore need to ignore -Weffc++
+//
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
 namespace gcomm
 {
     class AsioUdpSocket;
@@ -42,5 +53,11 @@ private:
     asio::ip::udp::endpoint  source_ep_;
     std::vector<gu::byte_t>  recv_buf_;
 };
+
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#endif
 
 #endif // GCOMM_ASIO_UDP_HPP
