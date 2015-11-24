@@ -9,7 +9,8 @@ Build-Depends: check,
                libboost-dev (>= 1.41),
                libboost-program-options-dev (>= 1.41),
                libssl-dev,
-               scons (>= 2)
+               scons (>= 2),
+               libasio-dev
 Homepage: http://www.galeracluster.com/
 Vcs-Git: git://github.com/codership/galera.git
 Vcs-Browser: http://github.com/codership/galera.git

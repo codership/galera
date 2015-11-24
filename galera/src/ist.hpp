@@ -70,6 +70,10 @@ namespace galera
 
             private:
 
+                // Non-copyable
+                Consumer(const Consumer&);
+                Consumer& operator=(const Consumer&);
+
                 gu::Cond   cond_;
                 TrxHandle* trx_;
             };
@@ -95,7 +99,7 @@ namespace galera
                    gcache::GCache& gcache,
                    const std::string& peer,
                    int version);
-            ~Sender();
+            virtual ~Sender();
 
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
 
