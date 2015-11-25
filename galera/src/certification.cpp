@@ -139,8 +139,7 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
         // 3) Trx has not been certified yet. Already certified trxs show up
         //    here during index rebuild.
         if ((trx->source_id() != ref_trx->source_id() || ref_trx->is_toi()) &&
-            ref_seqno >  trx->last_seen_seqno() &&
-            trx->is_certified() == false)
+            ref_seqno >  trx->last_seen_seqno() && trx->certified() == false)
         {
             if (gu_unlikely(log_conflict == true))
             {
@@ -290,7 +289,7 @@ cert_fail:
             // Clean up cert_index_ from entries which were added by this trx
             CertIndexNG::iterator ci(cert_index_ng_.find(&ke));
 
-            if (ci != cert_index_ng_.end())
+            if (gu_likely(ci != cert_index_ng_.end()))
             {
                 KeyEntryNG* kep(*ci);
 
@@ -306,13 +305,14 @@ cert_fail:
 
                 delete kep;
             }
-            else
+            else if(ke.key().shared())
             {
                 assert(0); // we actually should never be here, the key should
                            // be either added to cert_index_ or be there already
-                log_warn  << "could not find key '"
+                log_warn  << "could not find shared key '"
                           << ke.key() << "' from cert index";
             }
+            else { /* exclusive can duplicate shared */ }
         }
         assert(cert_index_ng_.size() == prev_cert_index_size);
     }
@@ -336,7 +336,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
 
     // trx->is_certified() == true during index rebuild from IST, do_test()
     // must not fail, just populate index
-    if (gu_unlikely(trx->is_certified() == false &&
+    if (gu_unlikely(trx->certified() == false &&
                     (trx->last_seen_seqno() < initial_position_ ||
                      trx->global_seqno()-trx->last_seen_seqno() > max_length_)))
     {
@@ -374,8 +374,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     else
     {
         wsrep_seqno_t const ds
-            (std::max(trx->depends_seqno(),
-                      trx_map_.begin()->second->global_seqno() - 1));
+            (std::max(trx->depends_seqno(), trx_map_.begin()->first - 1));
         trx->set_depends_seqno(ds);
     }
 
@@ -441,6 +440,7 @@ galera::Certification::do_test_preordered(TrxHandleSlave* trx)
     trx->set_depends_seqno(last_preordered_seqno_ -
                            trx->write_set().pa_range() + 1);
     // +1 compensates for subtracting from a previous seqno, rather than own.
+    trx->mark_certified();
 
     last_preordered_seqno_ = trx->global_seqno();
     last_preordered_id_    = trx->trx_id();
@@ -561,6 +561,7 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
     if (version != version_)
     {
         std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        assert(trx_map_.end()->first + 1 == position_);
         trx_map_.clear();
         assert(cert_index_.empty());
         assert(cert_index_ng_.empty());
@@ -572,7 +573,6 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
     service_thd_.flush(gtid.uuid());
 
     position_       = gtid.seqno();
-//            last_pa_unsafe_ = position_;
     version_        = version;
 }
 
@@ -701,7 +701,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
         assert(deps_set_.size() <= trx_map_.size());
     }
 
-    if (!trx->is_certified()) trx->mark_certified();
+    if (!trx->certified()) trx->mark_certified();
 
     return retval;
 }
@@ -715,7 +715,7 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave* trx)
     wsrep_seqno_t ret(-1);
     {
         gu::Lock lock(mutex_);
-        if (trx->is_certified() == true)
+        if (trx->certified() == true)
         {
             // trxs with depends_seqno == -1 haven't gone through
             // append_trx

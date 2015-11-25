@@ -630,7 +630,6 @@ namespace galera
 
                     assert(msg.seqno() > 0);
 
-
                     /* Backward compatibility code above could change msg type.
                      * but it should not change below. Saving const for later
                      * assert(). */

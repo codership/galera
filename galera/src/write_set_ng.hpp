@@ -107,9 +107,11 @@ namespace galera
             F_NATIVE      = 1 << 5,
             F_BEGIN       = 1 << 6,
             /*
-             * reserved for extension
+             * reserved for provider extension
              */
-            F_CERTIFIED   = 1 << 15  // should be used only for VER4 and up.
+            F_CERTIFIED   = 1 << 14, // needed to correctly interprete pa_range
+                                     // field (VER4 and up)
+            F_PREORDERED  = 1 << 15  // (VER4 and up)
         };
 
         static bool const FLAGS_MATCH_API_FLAGS =
@@ -560,7 +562,7 @@ namespace galera
 
 
         /* !!! This returns header without checksum! *
-         *     Use set_last_seen() to finalize it.   */
+         *     Use finalize() to finalize it.   */
         size_t gather(const wsrep_uuid_t&       source,
                       const wsrep_conn_id_t&    conn,
                       const wsrep_trx_id_t&     trx,
@@ -741,12 +743,12 @@ namespace galera
             init (st);
         }
 
-        void read_buf (const gu::byte_t* const ptr, ssize_t const len,
+        void read_buf (const void* const ptr, ssize_t const len,
                        ssize_t const st = SIZE_THRESHOLD)
         {
             assert (ptr != NULL);
             assert (len >= 0);
-            gu::Buf tmp = { ptr, len };
+            gu::Buf tmp = { static_cast<const gu::byte_t*>(ptr), len };
             read_buf (tmp, st);
         }
 

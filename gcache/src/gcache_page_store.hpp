@@ -46,11 +46,14 @@ namespace gcache
 
         void  reset();
 
-        size_t count() const { return count_; } // for unit tests
-
         void  set_page_size (size_t size) { page_size_ = size; }
 
         void  set_keep_size (size_t size) { keep_size_ = size; }
+
+        /* for unit tests */
+        size_t count()       const { return count_;        }
+        size_t total_pages() const { return pages_.size(); }
+        size_t total_size()  const { return total_size_;   }
 
     private:
 

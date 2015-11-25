@@ -191,8 +191,7 @@ extern "C" void* trx_thread(void* arg)
             {
                 assert(act.buf != NULL);
 
-                gu_trace(trx->unserialize(
-                         static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+                gu_trace(trx->unserialize<false>(act));
 
                 trx->verify_checksum();
                 trx->set_state(TrxHandle::S_CERTIFYING);
@@ -201,8 +200,7 @@ extern "C" void* trx_thread(void* arg)
             {
                 assert(act.buf == NULL);
 
-                trx->set_received(NULL, -1, act.seqno_g);
-                trx->set_depends_seqno(0);
+                trx->set_global_seqno(act.seqno_g);
             }
         }
         else
@@ -213,8 +211,7 @@ extern "C" void* trx_thread(void* arg)
 
             assert(act.seqno_g == cc.seqno);
 
-            trx->set_received(NULL, -1, cc.seqno);
-            trx->set_depends_seqno(cc.seqno - 1);
+            trx->set_global_seqno(cc.seqno);
         }
 
         TestOrder to(*trx);
@@ -336,6 +333,7 @@ static void store_trx(gcache::GCache* const gcache,
                                                      trx->conn_id(),
                                                      trx->trx_id(),
                                                      bufs));
+        mark_point();
         trx->finalize(last_seen);
         ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
 
@@ -348,6 +346,7 @@ static void store_trx(gcache::GCache* const gcache,
         assert ((p - ptr) == trx_size);
 
         gu::Buf ws_buf = { ptr, trx_size };
+        mark_point();
         galera::WriteSetIn wsi(ws_buf);
         assert (wsi.last_seen() == last_seen);
         assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER4 ?

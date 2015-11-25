@@ -231,7 +231,6 @@ static TransMapBuilder<TrxHandleSlave> slave;
 
 }
 
-
 void
 galera::TrxHandleSlave::sanity_checks() const
 {
@@ -239,88 +238,23 @@ galera::TrxHandleSlave::sanity_checks() const
                     (F_ROLLBACK | F_BEGIN)))
     {
         log_warn << "Both F_BEGIN and F_ROLLBACK are set on trx. "
-                 << "This trx should not have been replicated at all: " << *this;
+                 << "This trx should not have been replicated at all: "
+                 << *this;
         assert(0);
     }
 }
 
-size_t
-galera::TrxHandleSlave::unserialize(const gu::byte_t* const buf,
-                                    size_t const buflen,
-                                    size_t offset)
+void
+galera::TrxHandleSlave::deserialize_error_log(const gu::Exception& e) const
 {
-    try
-    {
-        version_ = WriteSetNG::version(buf, buflen);
-
-        switch (version_)
-        {
-        case WriteSetNG::VER3:
-        case WriteSetNG::VER4:
-            write_set_.read_buf (buf, buflen);
-            assert(version_ == write_set_.version());
-            write_set_flags_ = ws_flags_to_trx_flags(write_set_.flags());
-            source_id_       = write_set_.source_id();
-            conn_id_         = write_set_.conn_id();
-            trx_id_          = write_set_.trx_id();
-#ifndef NDEBUG
-            write_set_.verify_checksum();
-            assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
-#endif
-            if (write_set_.certified())
-            {
-                assert(!local_);
-                assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
-
-                global_seqno_  = write_set_.seqno();
-                depends_seqno_ = global_seqno_ - write_set_.pa_range();
-                assert(depends_seqno_ < global_seqno_);
-                assert(depends_seqno_ >= 0);
-                certified_ = true;
-            }
-            else
-            {
-
-                last_seen_seqno_ = write_set_.last_seen();
-                assert(last_seen_seqno_ >= 0);
-
-                if (gu_likely(version_) >= WriteSetNG::VER4)
-                {
-                    depends_seqno_ = last_seen_seqno_ - write_set_.pa_range();
-                }
-                else
-                {
-                    assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
-                }
-            }
-
-            timestamp_ = write_set_.timestamp();
-
-            sanity_checks();
-
-            break;
-        default:
-            gu_throw_error(EPROTONOSUPPORT) << "Unsupported WS version: "
-                                            << version_;
-        }
-
-        return buflen;
-    }
-    catch (gu::Exception& e)
-    {
-        GU_TRACE(e);
-
-        log_fatal << "Writeset deserialization failed: " << e.what()
-                  << std::endl << "WS flags:      " << write_set_flags_
-                  << std::endl << "Trx proto:     " << version_
-                  << std::endl << "Trx source:    " << source_id_
-                  << std::endl << "Trx conn_id:   " << conn_id_
-                  << std::endl << "Trx trx_id:    " << trx_id_
-                  << std::endl << "Trx last_seen: " << last_seen_seqno_;
-        throw;
-    }
+    log_fatal << "Writeset deserialization failed: " << e.what()
+              << std::endl << "WS flags:      " << write_set_flags_
+              << std::endl << "Trx proto:     " << version_
+              << std::endl << "Trx source:    " << source_id_
+              << std::endl << "Trx conn_id:   " << conn_id_
+              << std::endl << "Trx trx_id:    " << trx_id_
+              << std::endl << "Trx last_seen: " << last_seen_seqno_;
 }
-
 
 void
 galera::TrxHandleSlave::apply (void*                   recv_ctx,

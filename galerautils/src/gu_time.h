@@ -20,7 +20,7 @@ extern "C" {
 static inline double
 gu_timeval_diff (struct timeval* left, struct timeval* right)
 {
-    register long long diff = left->tv_sec;
+    long long diff = left->tv_sec;
     diff = ((diff - right->tv_sec)*1000000LL) + left->tv_usec - right->tv_usec;
     return (((double)diff) * 1.0e-06);
 }

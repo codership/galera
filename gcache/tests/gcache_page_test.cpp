@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -26,23 +26,35 @@ START_TEST(test1)
 
     gcache::PageStore ps (dir_name, keep_size, page_size, false);
 
-    mark_point();
+    fail_if(ps.count()       != 0,"expected count 0, got %zu",ps.count());
+    fail_if(ps.total_pages() != 0,"expected 0 pages, got %zu",ps.total_pages());
+    fail_if(ps.total_size()  != 0,"expected size 0, got %zu", ps.total_size());
 
     void* buf = ps.malloc (3 + bh_size);
 
     fail_if (0 == buf);
+    fail_if(ps.count()       != 1,"expected count 1, got %zu",ps.count());
+    fail_if(ps.total_pages() != 1,"expected 1 pages, got %zu",ps.total_pages());
 
     void* tmp = ps.realloc (buf, 2 + bh_size);
 
     fail_if (buf != tmp);
+    fail_if(ps.count()       != 1,"expected count 1, got %zu",ps.count());
+    fail_if(ps.total_pages() != 1,"expected 1 pages, got %zu",ps.total_pages());
 
     tmp = ps.realloc (buf, 4 + bh_size); // here new page should be allocated
 
     fail_if (0 == tmp);
     fail_if (buf == tmp);
+    fail_if(ps.count()       != 2,"expected count 2, got %zu",ps.count());
+    fail_if(ps.total_pages() != 1,"expected 1 pages, got %zu",ps.total_pages());
 
     ps_free(tmp);
     ps.discard (ptr2BH(tmp));
+
+    fail_if(ps.count()       != 2,"expected count 2, got %zu",ps.count());
+    fail_if(ps.total_pages() != 0,"expected 0 pages, got %zu",ps.total_pages());
+    fail_if(ps.total_size()  != 0,"expected size 0, got %zu", ps.total_size());
 }
 END_TEST
 

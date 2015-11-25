@@ -301,9 +301,10 @@ namespace galera
             if (gu_likely(0 != gcache_ && ret > 0))
             {
                 assert (ret == act.size);
-                void* ptr(gcache_->malloc(act.size));
+                void* const ptr(gcache_->malloc(act.size));
                 memcpy (ptr, act.buf, act.size);
                 act.buf = ptr;
+                // no freeing here - initial act.buf belongs to the caller
             }
 
             return ret;

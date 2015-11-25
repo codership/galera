@@ -313,8 +313,8 @@ group_post_state_exchange (gcs_group_t* group)
                 gu_fatal("Reversing history: %lld -> %lld, this member has "
                          "applied %lld more events than the primary component."
                          "Data loss is possible. Aborting.",
-                         group->act_id_, quorum->act_id,
-                         group->act_id_ - quorum->act_id);
+                         (long long)group->act_id_, (long long)quorum->act_id,
+                         (long long)(group->act_id_ - quorum->act_id));
                 assert(0);
                 gu_abort();
             }

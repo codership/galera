@@ -168,7 +168,7 @@ namespace galera
         ++local_seqno_;
 
         act.buf     = seqno;
-        act.size    = sizeof(gcs_seqno_t);
+        act.size    = sizeof(*seqno);
         act.seqno_l = local_seqno_;
         act.type    = type;
 

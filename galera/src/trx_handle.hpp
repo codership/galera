@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
 //
 
 
@@ -22,6 +22,7 @@
 #include "gu_macros.hpp"
 #include "gu_mem_pool.hpp"
 #include "gu_vector.hpp"
+#include "gcs.hpp"
 
 #include <set>
 
@@ -68,7 +69,7 @@ namespace galera
             /*
              * reserved for extension
              */
-            F_PREORDERED  = 1 << 31 // flag specific to TrxHandle
+            F_PREORDERED  = 1 << 15 // flag specific to TrxHandle
         };
 
         static bool const FLAGS_MATCH_API_FLAGS =
@@ -78,7 +79,8 @@ namespace galera
                                   WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
                                   WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
                                   WSREP_FLAG_NATIVE      == F_NATIVE       &&
-                                  WSREP_FLAG_TRX_START   == F_BEGIN);
+                                  WSREP_FLAG_TRX_START   == F_BEGIN        &&
+                                  int(WriteSetNG::F_PREORDERED) ==F_PREORDERED);
 
         static uint32_t wsrep_flags_to_trx_flags (uint32_t flags);
         static uint32_t trx_flags_to_wsrep_flags (uint32_t flags);
@@ -258,6 +260,7 @@ namespace galera
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
             if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
+            if (flags & WriteSetNG::F_PREORDERED)ret |= F_PREORDERED;
 
             return ret;
         }
@@ -342,7 +345,98 @@ namespace galera
             return new(buf) TrxHandleSlave(local, pool, buf);
         }
 
-        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset);
+        template <bool from_group>
+        size_t unserialize(const gcs_action& act)
+        {
+            assert(GCS_ACT_WRITESET == act.type);
+
+            try
+            {
+                version_ = WriteSetNG::version(act.buf, act.size);
+                action_  = act.buf;
+
+                switch (version_)
+                {
+                case WriteSetNG::VER3:
+                case WriteSetNG::VER4:
+                    write_set_.read_buf (act.buf, act.size);
+                    assert(version_ == write_set_.version());
+                    write_set_flags_ =ws_flags_to_trx_flags(write_set_.flags());
+                    source_id_       = write_set_.source_id();
+                    conn_id_         = write_set_.conn_id();
+                    trx_id_          = write_set_.trx_id();
+#ifndef NDEBUG
+                    write_set_.verify_checksum();
+                    assert(source_id_ != WSREP_UUID_UNDEFINED);
+                    assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
+                    assert(WSREP_SEQNO_UNDEFINED == local_seqno_);
+                    assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
+#endif
+                    if (from_group)
+                    {
+                        local_seqno_     = act.seqno_l;
+                        global_seqno_    = act.seqno_g;
+
+                        if (write_set_flags_ & F_PREORDERED)
+                        {
+                            last_seen_seqno_ = global_seqno_ - 1;
+                        }
+                        else
+                        {
+                            last_seen_seqno_ = write_set_.last_seen();
+                        }
+#ifndef NDEBUG
+                        assert(last_seen_seqno_ >= 0);
+                        if (last_seen_seqno_ >= global_seqno_)
+                        {
+                            log_fatal << "S: global: "   << global_seqno_
+                                      << ", last_seen: " << last_seen_seqno_
+                                      << ", checksum: "
+                                      << reinterpret_cast<void*>
+                                (write_set_.get_checksum());
+                        }
+                        assert(last_seen_seqno_ < global_seqno_);
+#endif
+                        if (gu_likely(version_) >= WriteSetNG::VER4)
+                        {
+                            depends_seqno_ =
+                                last_seen_seqno_ - write_set_.pa_range();
+                        }
+                        else
+                        {
+                            assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+                        }
+                    }
+                    else
+                    {
+                        assert(!local_);
+
+                        global_seqno_  = write_set_.seqno();
+                        depends_seqno_ = global_seqno_ - write_set_.pa_range();
+                        assert(depends_seqno_ < global_seqno_);
+                        assert(depends_seqno_ >= 0);
+                        certified_ = true;
+                    }
+
+                    timestamp_ = write_set_.timestamp();
+
+                    sanity_checks();
+
+                    break;
+                default:
+                    gu_throw_error(EPROTONOSUPPORT) <<"Unsupported WS version: "
+                                                    << version_;
+                }
+
+                return act.size;
+            }
+            catch (gu::Exception& e)
+            {
+                GU_TRACE(e);
+                deserialize_error_log(e);
+                throw;
+            }
+        }
 
         void verify_checksum() const /* throws */
         {
@@ -362,31 +456,7 @@ namespace galera
             ub += write_set_.unrdset().size();
         }
 
-        void set_received (const void*   action,
-                           wsrep_seqno_t seqno_l,
-                           wsrep_seqno_t seqno_g)
-        {
-#ifndef NDEBUG
-            if (last_seen_seqno_ >= seqno_g)
-            {
-                log_fatal << "S: seqno_g: " << seqno_g << ", last_seen: "
-                          << last_seen_seqno_ << ", checksum: "
-                          << reinterpret_cast<void*>(write_set_.get_checksum());
-            }
-            assert(last_seen_seqno_ < seqno_g);
-#endif
-            action_       = action;
-            local_seqno_  = seqno_l;
-            global_seqno_ = seqno_g;
-
-            if (flags() & F_PREORDERED)
-            {
-                assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
-                last_seen_seqno_ = global_seqno_ - 1;
-            }
-        }
-
-        bool is_certified() const { return certified_; }
+        bool certified() const { return certified_; }
 
         void mark_certified()
         {
@@ -410,6 +480,11 @@ namespace galera
         void set_depends_seqno(wsrep_seqno_t seqno_lt)
         {
             depends_seqno_ = seqno_lt;
+        }
+
+        void set_global_seqno(wsrep_seqno_t s) // for monitor cancellation
+        {
+            global_seqno_ = s;
         }
 
         void set_state(TrxHandle::State const state)
@@ -529,6 +604,8 @@ namespace galera
         void destroy_local(void* ptr);
 
         void sanity_checks() const;
+
+        void deserialize_error_log(const gu::Exception& e) const;
 
     }; /* TrxHandleSlave */
 
@@ -817,9 +894,9 @@ namespace galera
             if (repl_ != &tr_) { repl_->unref(); }
         }
 
-        gu::Mutex              mutex_;
-
         static Fsm::TransMap   trans_map_;
+
+        gu::Mutex              mutex_;
         Params const           params_;
         TrxHandleSlave         tr_;   // first fragment handle (there will be
                                       // at least one)

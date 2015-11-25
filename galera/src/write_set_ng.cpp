@@ -119,11 +119,12 @@ WriteSetNG::Header::finalize(wsrep_seqno_t const last_seen,
 
 void
 WriteSetNG::Header::set_seqno(wsrep_seqno_t const seqno,
-                              uint16_t const pa_range)
+                              uint16_t      const pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
     assert (seqno > 0);
+    assert (wsrep_seqno_t(pa_range) <= seqno);
 
     uint16_t* const fl(reinterpret_cast<uint16_t*>(ptr_ + V3_FLAGS_OFF));
     uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
