@@ -72,6 +72,8 @@ namespace galera
             F_PREORDERED  = 1 << 15 // flag specific to TrxHandle
         };
 
+        static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 7) - 1);
+
         static bool const FLAGS_MATCH_API_FLAGS =
                                  (WSREP_FLAG_TRX_END     == F_COMMIT       &&
                                   WSREP_FLAG_ROLLBACK    == F_ROLLBACK     &&
@@ -260,7 +262,6 @@ namespace galera
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
             if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
-            if (flags & WriteSetNG::F_PREORDERED)ret |= F_PREORDERED;
 
             return ret;
         }
@@ -295,6 +296,7 @@ namespace galera
             if (flags & WriteSetNG::F_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WriteSetNG::F_NATIVE)      ret |= F_NATIVE;
             if (flags & WriteSetNG::F_BEGIN)       ret |= F_BEGIN;
+            if (flags & WriteSetNG::F_PREORDERED)  ret |= F_PREORDERED;
 
             return ret;
         }
@@ -319,10 +321,7 @@ namespace galera
 
     template <> inline uint32_t
     TrxHandle::ws_flags_to_trx_flags_tmpl<true>(uint32_t flags)
-    {
-                                                 // clear ws-specific flags
-        return wsrep_flags_to_trx_flags(flags & WSREP_FLAGS_MASK);
-    }
+    { return (flags & TRXHANDLE_FLAGS_MASK); }
 
     inline uint32_t
     TrxHandle::ws_flags_to_trx_flags (uint32_t const flags)
