@@ -157,6 +157,8 @@ namespace galera
             assert(process_[idx].state_ == Process::S_CANCELED);
             process_[idx].state_ = Process::S_IDLE;
 
+
+            state_debug_print("enter canceled", obj_seqno);
             gu_throw_error(EINTR);
         }
 
@@ -336,7 +338,7 @@ namespace galera
                                wsrep_seqno_t obj_seqno)
         {
 #ifdef GALERA_MONITOR_DEBUG_PRINT
-            log_info << typeid(C).name() << "::" << method
+            log_info << typeid(C).name() << ": " << method
                      << "(" << obj_seqno << "): "
                      << " le: " << last_entered_ << " ll: " << last_left_;
 #endif // GALERA_MONITOR_DEBUG_PRINT

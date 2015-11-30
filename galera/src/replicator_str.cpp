@@ -946,12 +946,11 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     {
         assert(act.buf != NULL);
 
-        gu_trace(ts->unserialize(
-                     static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+        gu_trace(ts->unserialize<false>(act));
 
         ts->verify_checksum();
 
-        assert(ts->is_certified());
+        assert(ts->certified());
 
         // replicating and certifying stages have been
         // processed on donor, just adjust states here
@@ -967,9 +966,7 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
     }
     else
     {
-        ts->set_received(0, WSREP_SEQNO_UNDEFINED, act.seqno_g);
-        ts->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
-        ts->mark_certified();
+        ts->set_global_seqno(act.seqno_g);
 
         ApplyOrder ao(*ts);
         apply_monitor_.self_cancel(ao);
@@ -1053,8 +1050,7 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
     {
         assert(act.buf != NULL);
 
-        gu_trace(ts->unserialize(
-                     static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+        gu_trace(ts->unserialize<false>(act));
 
         assert(ts->global_seqno() == act.seqno_g);
         assert(ts->depends_seqno() >= 0);

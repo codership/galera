@@ -183,8 +183,13 @@ START_TEST(test_serialization)
         trx->serialize(0, buf);
         fail_unless(buf.size() > 0);
 
+        gcs_action const act =
+            { 1, 2, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
+
         TrxHandleSlave* txs1(TrxHandleSlave::New(false, sp));
-        fail_unless(txs1->unserialize(&buf[0], buf.size(), 0) > 0);
+        fail_unless(txs1->unserialize<true>(act) > 0);
+        fail_if(txs1->global_seqno() != act.seqno_g);
+        fail_if(txs1->local_seqno()  != act.seqno_l);
         txs1->unref();
 
         trx->unref();
@@ -241,8 +246,11 @@ START_TEST(test_streaming)
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        gcs_action const act =
+            { 1, 2, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
+
         TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize(&buf[0], buf.size(), 0) > 0);
+        fail_unless(txs->unserialize<true>(act) > 0);
         fail_unless(txs->flags() & TrxHandle::F_BEGIN);
         fail_if(txs->flags() & TrxHandle::F_COMMIT);
         txs->apply(&res, apply_cb, wsrep_trx_meta_t());
@@ -258,8 +266,11 @@ START_TEST(test_streaming)
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        gcs_action const act =
+            { 2, 3, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
+
         TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize(&buf[0], buf.size(), 0) > 0);
+        fail_unless(txs->unserialize<true>(act) > 0);
         fail_if(txs->flags() & TrxHandle::F_BEGIN);
         fail_if(txs->flags() & TrxHandle::F_COMMIT);
         txs->apply(&res, apply_cb, wsrep_trx_meta_t());
@@ -275,8 +286,11 @@ START_TEST(test_streaming)
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        gcs_action const act =
+            { 3, 4, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
+
         TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize(&buf[0], buf.size(), 0) > 0);
+        fail_unless(txs->unserialize<true>(act) > 0);
         fail_if(txs->flags() & TrxHandle::F_BEGIN);
         fail_unless(txs->flags() & TrxHandle::F_COMMIT);
         txs->apply(&res, apply_cb, wsrep_trx_meta_t());

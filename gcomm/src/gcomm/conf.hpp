@@ -516,7 +516,16 @@ namespace gcomm
     {
         std::string ret(def);
         ret = conf.get(key, ret);
-        return gu::from_string<T>(uri.get_option(key, ret), f);
+        try
+        {
+            return gu::from_string<T>(uri.get_option(key, ret), f);
+        }
+        catch(gu::NotFound& e)
+        {
+            gu_throw_error(EINVAL) << "invalid value '" << ret << "' for "
+                                   << key;
+            throw;
+        }
     }
 
     template <typename T>
