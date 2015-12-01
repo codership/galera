@@ -183,7 +183,8 @@ extern "C" void* trx_thread(void* arg)
             return 0;
         }
 
-        galera::TrxHandleSlave* trx(TrxHandleSlave::New(false, targs->pool_));
+        galera::TrxHandleSlavePtr trx(TrxHandleSlave::New(false, targs->pool_),
+                                      TrxHandleSlaveDeleter());
 
         if (GCS_ACT_WRITESET == act.type)
         {
@@ -217,7 +218,6 @@ extern "C" void* trx_thread(void* arg)
         TestOrder to(*trx);
         targs->monitor_.enter(to);
         targs->monitor_.leave(to);
-        trx->unref();
     }
     return 0;
 }
@@ -305,8 +305,9 @@ static void store_trx(gcache::GCache* const gcache,
                       const wsrep_uuid_t& uuid,
                       int const i)
 {
-    TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i,
-                                              5678+i));
+    TrxHandleMasterPtr trx(TrxHandleMaster::New(lp, trx_params, uuid, 1234+i,
+                                                5678+i),
+                           TrxHandleMasterDeleter());
 
     const wsrep_buf_t key[2] = {
         {"key1", 4},
@@ -357,7 +358,6 @@ static void store_trx(gcache::GCache* const gcache,
     }
 
     gcache->seqno_assign(ptr, i, GCS_ACT_WRITESET, (i - pa_range) <= 0);
-    trx->unref();
 }
 
 static void store_cc(gcache::GCache* const gcache,

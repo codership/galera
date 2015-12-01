@@ -71,8 +71,8 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " flags: "   << flags()
        << " conn_id: " << int64_t(conn_id())
        << " trx_id: "  << int64_t(trx_id())  // for readability
-       << " tstamp: "  << timestamp()
-       << " refcnt: "  << refcnt();
+       << " tstamp: "  << timestamp();
+
 
 }
 
@@ -269,12 +269,24 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
 
     ws.rewind(); // make sure we always start from the beginning
 
-    for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
+    if (ws.count() > 0)
     {
-        gu::Buf buf = ws.next();
+        for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
+        {
+            gu::Buf buf = ws.next();
 
-        err = apply_cb (recv_ctx, buf.ptr, buf.size,
-                        trx_flags_to_wsrep_flags(flags()), &meta);
+            err = apply_cb (recv_ctx, buf.ptr, buf.size,
+                            trx_flags_to_wsrep_flags(flags()), &meta);
+        }
+    }
+    else
+    {
+        // Apply also zero sized write set to inform application side
+        // about transaction meta data. This is done to avoid spreading
+        // logic around in apply and commit callbacks with streaming
+        // replication.
+        err = apply_cb(recv_ctx, 0, 0, trx_flags_to_wsrep_flags(flags()),
+                       &meta);
     }
 
     if (gu_unlikely(err != WSREP_CB_SUCCESS))

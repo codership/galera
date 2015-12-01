@@ -174,11 +174,6 @@ namespace galera
 
         uint64_t timestamp() const { return timestamp_; }
 
-        virtual void   ref()   = 0;
-        virtual void   unref() = 0;
-
-        virtual int refcnt() const  = 0;
-
         void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
@@ -222,7 +217,7 @@ namespace galera
             trx_id_            (trx_id),
             timestamp_         (gu_time_calendar()),
             version_           (version),
-            write_set_flags_   (0),
+            write_set_flags_   (F_BEGIN),
             local_             (true)
         {}
 
@@ -528,32 +523,6 @@ namespace galera
 
         void print(std::ostream& os) const;
 
-        void ref()   { ++refcnt_; }
-        void unref()
-        {
-            int const count(refcnt_.sub_and_fetch(1));
-
-            if (count == 0)
-            {
-                void* const buf(buf_);
-                bool  const local(buf != static_cast<void*>(this));
-                gu::MemPool<true>& mp(mem_pool_);
-
-                if (local)
-                {
-                    destroy_local(buf);
-                }
-                else
-                {
-                    this->~TrxHandleSlave();
-                }
-
-                mp.recycle(buf);
-            }
-        }
-
-        int refcnt() const { return refcnt_(); }
-
         uint64_t get_checksum() const { return write_set_.get_checksum(); }
 
         size_t   size()         const { return write_set_.size(); }
@@ -578,7 +547,7 @@ namespace galera
 
         friend class TrxHandleMaster;
         friend class TransMapBuilder<TrxHandleSlave>;
-
+        friend class TrxHandleSlaveDeleter;
     private:
 
         static Fsm::TransMap trans_map_;
@@ -608,6 +577,18 @@ namespace galera
         void deserialize_error_log(const gu::Exception& e) const;
 
     }; /* TrxHandleSlave */
+
+    typedef boost::shared_ptr<TrxHandleSlave> TrxHandleSlavePtr;
+    class TrxHandleSlaveDeleter
+    {
+    public:
+        void operator()(TrxHandleSlave* ptr)
+        {
+            gu::MemPool<true>& mp(ptr->mem_pool_);
+            ptr->~TrxHandleSlave();
+            mp.recycle(ptr);
+        }
+    };
 
     std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& trx);
 
@@ -687,9 +668,6 @@ namespace galera
             TrxHandle::set_flags(flags);
 
             uint16_t ws_flags(WriteSetNG::wsrep_flags_to_ws_flags(flags));
-
-            ws_flags |= (trx_start_ * WriteSetNG::F_BEGIN);
-
             write_set_out().set_flags(ws_flags);
         }
 
@@ -730,27 +708,30 @@ namespace galera
 
         void finalize(wsrep_seqno_t const last_seen_seqno)
         {
-            assert (last_seen_seqno >= 0);
-            assert (last_seen_seqno >= this->last_seen_seqno());
+            assert(last_seen_seqno >= 0);
+            assert(ts_ == 0 || last_seen_seqno >= ts_->last_seen_seqno());
 
             int pa_range(pa_range_default());
 
-            if (gu_unlikely(false == trx_start_ &&
+            if (gu_unlikely((flags() & TrxHandle::F_BEGIN) == 0 &&
                             (flags() & TrxHandle::F_ROLLBACK) == 0))
             {
                 /* make sure this fragment depends on the previous */
+                assert(ts_ != 0);
+                wsrep_seqno_t prev_seqno(ts_->global_seqno());
                 assert(version() >= 4);
-                assert(prev_seqno_ >= 0);
-                assert(prev_seqno_ <= last_seen_seqno);
+                assert(prev_seqno >= 0);
+                assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
-                                    last_seen_seqno - prev_seqno_);
+                                    last_seen_seqno - prev_seqno);
             }
             else if (flags() & TrxHandle::F_ROLLBACK)
             {
-                assert(false == trx_start_);
+                assert((flags() & TrxHandle::F_BEGIN) == 0);
                 pa_range = 0;
             }
 
+            write_set_out().set_flags(write_set_flags_);
             write_set_out().finalize(last_seen_seqno, pa_range);
         }
 
@@ -767,38 +748,16 @@ namespace galera
             release_write_set_out();
         }
 
-        TrxHandleSlave* repld() const
+        TrxHandleSlavePtr ts()
         {
-            return repl_;
+            return ts_;
         }
 
-        wsrep_seqno_t global_seqno() const
-        {
-            return repl_->global_seqno();
-        }
-
-        wsrep_seqno_t last_seen_seqno() const
-        {
-            return repl_->last_seen_seqno();
-        }
-
-        void add_replicated(TrxHandleSlave* const ts)
+        void add_replicated(TrxHandleSlavePtr ts)
         {
             assert(locked());
-
-            prev_seqno_ = repl_->global_seqno();
-
-            assert(ts->refcnt() == 1);
-
-            TrxHandleSlave* const old(repl_);
-            repl_ = ts;
-
-            if (old != &tr_)
-            {
-                old->unref();
-            }
-
-            trx_start_ = false;
+            write_set_flags_ &= ~TrxHandle::F_BEGIN;
+            ts_ = ts;
         }
 
         WriteSetOut& write_set_out()
@@ -821,13 +780,6 @@ namespace galera
                 wso_ = false;
             }
         }
-
-        bool trx_start() const { return trx_start_; }
-
-        void ref()   { tr_.ref();   }
-        void unref() { tr_.unref(); }
-
-        int  refcnt() const { return tr_.refcnt(); }
 
     private:
 
@@ -868,14 +820,12 @@ namespace galera
             :
             TrxHandle(&trans_map_, source_id, conn_id, trx_id, params.version_),
             mutex_             (),
+            mem_pool_          (mp),
             params_            (params),
-            tr_                (true, mp, this),
-            repl_              (&tr_),
+            ts_                (),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
-            trx_start_         (true),
-            wso_               (false),
-            prev_seqno_        (-1)
+            wso_               (false)
         {
             assert(reserved_size > sizeof(*this) + 1024);
         }
@@ -888,32 +838,39 @@ namespace galera
         ~TrxHandleMaster()
         {
             release_write_set_out();
-
-            assert(refcnt() == 0);
-
-            if (repl_ != &tr_) { repl_->unref(); }
         }
 
+        gu::Mutex              mutex_;
+        gu::MemPool<true>&     mem_pool_;
         static Fsm::TransMap   trans_map_;
 
-        gu::Mutex              mutex_;
         Params const           params_;
-        TrxHandleSlave         tr_;   // first fragment handle (there will be
-                                      // at least one)
-        TrxHandleSlave*        repl_; // current fragment handle ptr
+        TrxHandleSlavePtr      ts_; // current fragment handle
         size_t const           wso_buf_size_;
         int                    gcs_handle_;
-        bool                   trx_start_;
         bool                   wso_;
-        wsrep_seqno_t          prev_seqno_; // Seqno of the last replicated fragment
 
         friend class TrxHandleSlave;
+        friend class TrxHandleMasterDeleter;
         friend class TransMapBuilder<TrxHandleMaster>;
 
         // overrides
         TrxHandleMaster(const TrxHandleMaster&);
         TrxHandleMaster& operator=(const TrxHandleMaster&);
     };
+
+    typedef boost::shared_ptr<TrxHandleMaster> TrxHandleMasterPtr;
+    class TrxHandleMasterDeleter
+    {
+    public:
+        void operator()(TrxHandleMaster* ptr)
+        {
+            gu::MemPool<true>& mp(ptr->mem_pool_);
+            ptr->~TrxHandleMaster();
+            mp.recycle(ptr);
+        }
+    };
+
 
     class TrxHandleLock
     {
@@ -924,13 +881,6 @@ namespace galera
         TrxHandleMaster& trx_;
 
     }; /* class TrxHnadleLock */
-
-    template <typename T>
-    class Unref2nd
-    {
-    public:
-        void operator()(T& t) const { t.second->unref(); }
-    };
 
 } /* namespace galera*/
 

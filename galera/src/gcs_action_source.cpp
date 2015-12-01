@@ -46,26 +46,6 @@ private:
 };
 
 
-galera::GcsActionTrx::GcsActionTrx(TrxHandleSlave::Pool&    pool,
-                                   const struct gcs_action& act)
-    :
-    trx_(TrxHandleSlave::New(false, pool))
-    // TODO: this dynamic allocation should be unnecessary
-{
-    assert(act.seqno_l != GCS_SEQNO_ILL);
-    assert(act.seqno_g != GCS_SEQNO_ILL);
-
-    gu_trace(trx_->unserialize<true>(act));
-}
-
-
-galera::GcsActionTrx::~GcsActionTrx()
-{
-    assert(trx_->refcnt() >= 1);
-    trx_->unref();
-}
-
-
 void galera::GcsActionSource::dispatch(void* const              recv_ctx,
                                        const struct gcs_action& act,
                                        bool&                    exit_loop)
@@ -79,9 +59,14 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     case GCS_ACT_WRITESET:
     {
         assert(act.seqno_g > 0);
-        GcsActionTrx trx(trx_pool_, act);
-        gu_trace(replicator_.process_trx(recv_ctx, trx.trx()));
-        exit_loop = trx.trx()->exit_loop(); // this is the end of trx lifespan
+        assert(act.seqno_l != GCS_SEQNO_ILL);
+        assert(act.seqno_g != GCS_SEQNO_ILL);
+        TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
+                              TrxHandleSlaveDeleter());
+        gu_trace(tsp->unserialize<true>(act));
+
+        gu_trace(replicator_.process_trx(recv_ctx, tsp));
+        exit_loop = tsp->exit_loop(); // this is the end of trx lifespan
         break;
     }
     case GCS_ACT_COMMIT_CUT:

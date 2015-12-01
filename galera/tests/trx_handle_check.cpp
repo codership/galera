@@ -65,61 +65,58 @@ START_TEST(test_states_master)
 
     wsrep_uuid_t uuid = {{1, }};
 
-        // first check basic stuff
-        // 1) initial state is executing
-        // 2) invalid state changes are caught
-        // 3) valid state changes change state
-        TrxHandleMaster* trx(TrxHandleMaster::New(tp, TrxHandleMaster::Defaults,
-                                                  uuid, -1, 1));
-        trx->lock();
+    // first check basic stuff
+    // 1) initial state is executing
+    // 2) invalid state changes are caught
+    // 3) valid state changes change state
+    TrxHandleMasterPtr trx(TrxHandleMaster::New(tp, TrxHandleMaster::Defaults,
+                                                uuid, -1, 1),
+                           TrxHandleMasterDeleter());
+    galera::TrxHandleLock lock(*trx);
 
-        fail_unless(trx->state() == TrxHandle::S_EXECUTING);
+    fail_unless(trx->state() == TrxHandle::S_EXECUTING);
 
-        // Matrix representing directed graph of TrxHandleMaster transitions,
-        // see galera/src/trx_handle.cpp
+    // Matrix representing directed graph of TrxHandleMaster transitions,
+    // see galera/src/trx_handle.cpp
 
-        // EXECUTING 0
-        // MUST_ABORT 1
-        // ABORTING 2
-        // REPLICATING 3
-        // CERTIFYING 4
-        // MUST_CERT_AND_REPLAY 5
-        // MUST_REPLAY_AM 6
-        // MUST_REPLAY_CM 7
-        // MUST_REPLAY  8
-        // REPLAYING 9
-        // APPLYING 10
-        // COMMITTING 11
-        // COMMITTED 12
-        // ROLLED_BACK 13
+    // EXECUTING 0
+    // MUST_ABORT 1
+    // ABORTING 2
+    // REPLICATING 3
+    // CERTIFYING 4
+    // MUST_CERT_AND_REPLAY 5
+    // MUST_REPLAY_AM 6
+    // MUST_REPLAY_CM 7
+    // MUST_REPLAY  8
+    // REPLAYING 9
+    // APPLYING 10
+    // COMMITTING 11
+    // COMMITTED 12
+    // ROLLED_BACK 13
 
-        int state_trans_master[TrxHandle::num_states_][TrxHandle::num_states_] = {
-            // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-            {  0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 0
-            {  0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 }, // 1
-            {  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 2
-            {  0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
-            {  0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4
-            {  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 5
-            {  0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 }, // 6
-            {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 }, // 7
-            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 8
-            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 9
-            {  0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
-            {  1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
-            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
-            {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
-        };
+    int state_trans_master[TrxHandle::num_states_][TrxHandle::num_states_] = {
+        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+        {  0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 0
+        {  0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 }, // 1
+        {  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 2
+        {  0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
+        {  0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4
+        {  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 5
+        {  0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 }, // 6
+        {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 }, // 7
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 8
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 9
+        {  0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
+        {  1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
+    };
 
-        // Visits all states
-        std::vector<int> visits(TrxHandle::num_states_);
-        std::fill(visits.begin(), visits.end(), 1);
+    // Visits all states
+    std::vector<int> visits(TrxHandle::num_states_);
+    std::fill(visits.begin(), visits.end(), 1);
 
-        check_states_graph(state_trans_master, trx, visits);
-
-        trx->unlock();
-        trx->unref();
-
+    check_states_graph(state_trans_master, trx.get(), visits);
 }
 END_TEST
 
@@ -146,7 +143,8 @@ START_TEST(test_states_slave)
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
     };
 
-    TrxHandleSlave* ts(TrxHandleSlave::New(false, sp));
+    TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
+                         TrxHandleSlaveDeleter());
     fail_unless(ts->state() == TrxHandle::S_REPLICATING);
 
     // Visits only REPLICATING, CERTIFYING, APPLYING, COMMITTING, COMMITTED,
@@ -160,8 +158,7 @@ START_TEST(test_states_slave)
     visits[TrxHandle::S_COMMITTED] = 1;
     visits[TrxHandle::S_ROLLED_BACK] = 1;
 
-    check_states_graph(state_trans_slave, ts, visits);
-    ts->unref();
+    check_states_graph(state_trans_slave, ts.get(), visits);
 }
 END_TEST
 
@@ -176,23 +173,21 @@ START_TEST(test_serialization)
                                                          KeySet::MAX_VERSION);
         wsrep_uuid_t uuid;
         gu_uuid_generate(&uuid, 0, 0);
-        TrxHandleMaster* trx
-            (TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
+        TrxHandleMasterPtr trx
+            (TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910),
+             TrxHandleMasterDeleter());
 
         std::vector<gu::byte_t> buf;
         trx->serialize(0, buf);
         fail_unless(buf.size() > 0);
 
+        TrxHandleSlavePtr txs1(TrxHandleSlave::New(false, sp),
+                               TrxHandleSlaveDeleter());
         gcs_action const act =
             { 1, 2, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
-
-        TrxHandleSlave* txs1(TrxHandleSlave::New(false, sp));
         fail_unless(txs1->unserialize<true>(act) > 0);
         fail_if(txs1->global_seqno() != act.seqno_g);
         fail_if(txs1->local_seqno()  != act.seqno_l);
-        txs1->unref();
-
-        trx->unref();
     }
 }
 END_TEST
@@ -223,81 +218,88 @@ START_TEST(test_streaming)
     TrxHandleMaster::Pool lp(4096, 16, "streaming_lp");
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "streaming_sp");
 
-    int const version(3);
+    int const version(4);
     galera::TrxHandleMaster::Params const trx_params("", version,
                                                      KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;
     gu_uuid_generate(&uuid, 0, 0);
-    TrxHandleMaster* trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910));
-    trx->lock();
+    TrxHandleMasterPtr trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910),
+                           TrxHandleMasterDeleter());
+    
+    galera::TrxHandleLock lock(*trx);
 
     std::vector<char> src(3); // initial wirteset
     src[0] = 'a'; src[1] = 'b'; src[2] = 'c';
 
     std::vector<char> res;          // apply_cb should reproduce src in res
     fail_if(src == res);
+
+    fail_unless(trx->flags() & TrxHandle::F_BEGIN);
+
     {
         // 0. first fragment A
         trx->append_data(&src[0], 1, WSREP_DATA_ORDERED, false);
-        trx->set_flags(0); // no special flags
+        trx->finalize(0);
 
         std::vector<gu::byte_t> buf;
         trx->serialize(0, buf);
+
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
+                             TrxHandleSlaveDeleter());
         gcs_action const act =
             { 1, 2, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
+        fail_unless(ts->unserialize<true>(act) > 0);
+        fail_unless(ts->flags() & TrxHandle::F_BEGIN);
+        fail_if(ts->flags() & TrxHandle::F_COMMIT);
+        trx->add_replicated(ts);
 
-        TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize<true>(act) > 0);
-        fail_unless(txs->flags() & TrxHandle::F_BEGIN);
-        fail_if(txs->flags() & TrxHandle::F_COMMIT);
-        txs->apply(&res, apply_cb, wsrep_trx_meta_t());
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
-    trx->add_replicated(TrxHandleSlave::New(false, sp));
     {
         // 1. middle fragment B
         trx->append_data(&src[1], 1, WSREP_DATA_ORDERED, false);
-        trx->set_flags(0); // no special flags
+        trx->finalize(1);
 
         std::vector<gu::byte_t> buf;
         trx->serialize(0, buf);
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
+                             TrxHandleSlaveDeleter());
         gcs_action const act =
             { 2, 3, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
-
-        TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize<true>(act) > 0);
-        fail_if(txs->flags() & TrxHandle::F_BEGIN);
-        fail_if(txs->flags() & TrxHandle::F_COMMIT);
-        txs->apply(&res, apply_cb, wsrep_trx_meta_t());
+        fail_unless(ts->unserialize<true>(act) > 0);
+        fail_if(ts->flags() & TrxHandle::F_BEGIN);
+        fail_if(ts->flags() & TrxHandle::F_COMMIT);
+        trx->add_replicated(ts);
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
-    trx->add_replicated(TrxHandleSlave::New(false, sp));
+
     {
         // 2. last fragment C
         trx->append_data(&src[2], 1, WSREP_DATA_ORDERED, false);
         trx->set_flags(TrxHandle::F_COMMIT); // commit
+        trx->finalize(2);
 
         std::vector<gu::byte_t> buf;
         trx->serialize(0, buf);
         fail_unless(buf.size() > 0);
         trx->release_write_set_out();
 
+        TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
+                             TrxHandleSlaveDeleter());
         gcs_action const act =
             { 3, 4, buf.data(), int(buf.size()), GCS_ACT_WRITESET};
-
-        TrxHandleSlave* txs(trx->repld());
-        fail_unless(txs->unserialize<true>(act) > 0);
-        fail_if(txs->flags() & TrxHandle::F_BEGIN);
-        fail_unless(txs->flags() & TrxHandle::F_COMMIT);
-        txs->apply(&res, apply_cb, wsrep_trx_meta_t());
+        fail_unless(ts->unserialize<true>(act) > 0);
+        fail_if(ts->flags() & TrxHandle::F_BEGIN);
+        fail_unless(ts->flags() & TrxHandle::F_COMMIT);
+        trx->add_replicated(ts);
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
-
-    trx->unlock();
-    trx->unref(); // after this point replicated trx handles should be unrefd too
 
     fail_if(res != src);
 }

@@ -53,19 +53,6 @@ namespace galera
         gu::Atomic<long long> received_;
         gu::Atomic<long long> received_bytes_;
     };
-
-    class GcsActionTrx
-    {
-    public:
-        GcsActionTrx(TrxHandleSlave::Pool& sp, const struct gcs_action& act);
-        ~GcsActionTrx();
-        TrxHandleSlave* trx() const { return trx_; }
-    private:
-        GcsActionTrx(const GcsActionTrx&);
-        void operator=(const GcsActionTrx&);
-        TrxHandleSlave* trx_;
-    };
-
 }
 
 #endif // GALERA_GCS_ACTION_SOURCE_HPP
