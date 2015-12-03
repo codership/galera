@@ -111,7 +111,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_CAP_UNORDERED             ( 1ULL << 12 )
 #define WSREP_CAP_ANNOTATION            ( 1ULL << 13 )
 #define WSREP_CAP_PREORDERED            ( 1ULL << 14 )
-
+#define WSREP_CAP_SNAPSHOT              ( 1ULL << 15 )
 
 /*!
  *  Writeset flags
@@ -135,6 +135,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 4 )
 #define WSREP_FLAG_NATIVE               ( 1ULL << 5 )
 #define WSREP_FLAG_TRX_START            ( 1ULL << 6 )
+#define WSREP_FLAG_SNAPSHOT             ( 1ULL << 7 )
 
 #define WSREP_FLAGS_LAST                WSREP_FLAG_TRX_START
 #define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
@@ -322,6 +323,7 @@ typedef enum wsrep_cb_status (*wsrep_connected_cb_t) (
     const wsrep_view_info_t* view
 );
 
+
 /*!
  * @brief group view handler
  *
@@ -400,12 +402,11 @@ typedef enum wsrep_cb_status (*wsrep_sst_request_cb_t) (
  * @param flags    WSREP_FLAG_... flags
  * @param meta     transaction meta data of the writeset to be applied
  *
- * @return success code:
- * @retval WSREP_OK
- * @retval WSREP_NOT_IMPLEMENTED appl. does not support the writeset format
- * @retval WSREP_ERROR failed to apply the writeset
+ * @return error code:
+ * @retval 0 - success
+ * @retval non-0 - application-specific error code
  */
-typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
+typedef int (*wsrep_apply_cb_t) (
     void*                     recv_ctx,
     const void*               data,
     size_t                    size,
@@ -426,8 +427,8 @@ typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
  * @param commit   true - commit writeset, false - rollback writeset
  *
  * @return success code:
- * @retval WSREP_OK
- * @retval WSREP_ERROR call failed
+ * @retval WSREP_CB_SUCCESS
+ * @retval WSREP_CB_FAILURE
  */
 typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
@@ -718,6 +719,18 @@ struct wsrep {
     wsrep_status_t (*recv)(wsrep_t* wsrep, void* recv_ctx);
 
   /*!
+   * @brief Tells provider that a given writeset has a read view associated
+   *        with it.
+   *
+   * @param wsrep  provider handle
+   * @param handle writeet handle
+   * @param rv     read view astablished by the caller or if NULL, by provider
+   */
+    wsrep_status_t (*assign_read_view)(wsrep_t*            wsrep,
+                                       wsrep_ws_handle_t*  handle,
+                                       const wsrep_gtid_t* rv);
+
+  /*!
    * @brief Replicates/logs result of transaction to other nodes and allocates
    * required resources.
    *
@@ -914,12 +927,15 @@ struct wsrep {
    *
    * @param wsrep provider handle
    * @param conn_id connection ID
+   * @param rcode TOI operation error code (same as return code of apply_cb())
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*to_execute_end)(wsrep_t* wsrep, wsrep_conn_id_t conn_id);
+    wsrep_status_t (*to_execute_end)(wsrep_t*        wsrep,
+                                     wsrep_conn_id_t conn_id,
+                                     int             rcode);
 
   /*!
    * @brief Collects preordered replication events into a writeset.
