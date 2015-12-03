@@ -637,7 +637,7 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 
 
 galera::Certification::TestResult
-galera::Certification::append_trx(TrxHandleSlavePtr trx)
+galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 {
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);

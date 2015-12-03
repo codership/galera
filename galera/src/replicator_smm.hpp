@@ -117,7 +117,7 @@ namespace galera
                                     size_t              state_len,
                                     int                 rcode);
 
-        void process_trx(void* recv_ctx, TrxHandleSlavePtr trx);
+        void process_trx(void* recv_ctx, const TrxHandleSlavePtr& trx);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
         void process_conf_change(void* recv_ctx, const struct gcs_action& cc);
         void process_state_req(void* recv_ctx, const void* req,
@@ -204,9 +204,11 @@ namespace galera
             }
         }
 
-        wsrep_status_t cert             (TrxHandleMaster*, TrxHandleSlavePtr);
-        wsrep_status_t cert_and_catch   (TrxHandleMaster*, TrxHandleSlavePtr);
-        wsrep_status_t cert_for_aborted (TrxHandleSlavePtr);
+        wsrep_status_t cert             (TrxHandleMaster*,
+                                         const TrxHandleSlavePtr&);
+        wsrep_status_t cert_and_catch   (TrxHandleMaster*,
+                                         const TrxHandleSlavePtr&);
+        wsrep_status_t cert_for_aborted (const TrxHandleSlavePtr&);
 
         void update_state_uuid    (const wsrep_uuid_t& u);
         void update_incoming_list (const wsrep_view_info_t& v);

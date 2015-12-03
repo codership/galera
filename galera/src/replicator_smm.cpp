@@ -1498,7 +1498,8 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
 }
 
 
-void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandleSlavePtr ts)
+void galera::ReplicatorSMM::process_trx(void* recv_ctx,
+                                        const TrxHandleSlavePtr& ts)
 {
     assert(recv_ctx != 0);
     assert(ts != 0);
@@ -2225,7 +2226,7 @@ void galera::ReplicatorSMM::resync()
 /* don't use this directly, use cert_and_catch() instead */
 inline
 wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
-                                           TrxHandleSlavePtr ts)
+                                           const TrxHandleSlavePtr& ts)
 {
     assert(trx == 0 ||
            (trx->state() == TrxHandle::S_REPLICATING ||
@@ -2395,8 +2396,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
 }
 
 /* pretty much any exception in cert() is fatal as it blocks local_monitor_ */
-wsrep_status_t galera::ReplicatorSMM::cert_and_catch(TrxHandleMaster* trx,
-                                                     TrxHandleSlavePtr ts)
+wsrep_status_t galera::ReplicatorSMM::cert_and_catch(
+    TrxHandleMaster* trx,
+    const TrxHandleSlavePtr& ts)
 {
     try
     {
@@ -2415,7 +2417,8 @@ wsrep_status_t galera::ReplicatorSMM::cert_and_catch(TrxHandleMaster* trx,
 
 /* This must be called BEFORE local_monitor_.self_cancel() due to
  * gcache_.seqno_assign() */
-wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandleSlavePtr ts)
+wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
+    const TrxHandleSlavePtr& ts)
 {
     // trx was BF aborted either while it was replicating or
     // while it was waiting for local monitor

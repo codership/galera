@@ -53,7 +53,7 @@ namespace galera
         ~Certification();
 
         void assign_initial_position(const gu::GTID& gtid, int version);
-        TestResult append_trx(TrxHandleSlavePtr);
+        TestResult append_trx(const TrxHandleSlavePtr&);
         TestResult test(TrxHandleSlave*, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 

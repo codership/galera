@@ -22,6 +22,7 @@
 #include "gu_macros.hpp"
 #include "gu_mem_pool.hpp"
 #include "gu_vector.hpp"
+#include "gu_shared_ptr.hpp"
 #include "gcs.hpp"
 
 #include <set>
@@ -578,7 +579,8 @@ namespace galera
 
     }; /* TrxHandleSlave */
 
-    typedef boost::shared_ptr<TrxHandleSlave> TrxHandleSlavePtr;
+    typedef gu::shared_ptr<TrxHandleSlave>::type TrxHandleSlavePtr;
+
     class TrxHandleSlaveDeleter
     {
     public:
@@ -753,7 +755,7 @@ namespace galera
             return ts_;
         }
 
-        void add_replicated(TrxHandleSlavePtr ts)
+        void add_replicated(const TrxHandleSlavePtr& ts)
         {
             assert(locked());
             write_set_flags_ &= ~TrxHandle::F_BEGIN;
@@ -859,7 +861,8 @@ namespace galera
         TrxHandleMaster& operator=(const TrxHandleMaster&);
     };
 
-    typedef boost::shared_ptr<TrxHandleMaster> TrxHandleMasterPtr;
+    typedef gu::shared_ptr<TrxHandleMaster>::type TrxHandleMasterPtr;
+
     class TrxHandleMasterDeleter
     {
     public:

@@ -96,7 +96,8 @@ namespace galera
                                             int                 rcode) = 0;
 
         // action source interface
-        virtual void process_trx(void* recv_ctx, TrxHandleSlavePtr trx) = 0;
+        virtual void process_trx(void* recv_ctx,
+                                 const TrxHandleSlavePtr& trx) = 0;
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l) = 0;
         virtual void process_conf_change(void*                    recv_ctx,

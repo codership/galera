@@ -296,13 +296,15 @@ if conf.CheckHeader('execinfo.h'):
 
 # Additional C headers and libraries
 
-# boost headers
 
-if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
-    print 'boost/shared_ptr.hpp not found or not usable'
+# shared_ptr
+if conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
+else:
+    print 'no suitable shared_ptr headers found'
     Exit(1)
-conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 
+# unordered_map
 if conf.CheckCXXHeader('unordered_map'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_UNORDERED_MAP')
 elif conf.CheckCXXHeader('tr1/unordered_map'):
