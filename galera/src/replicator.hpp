@@ -7,6 +7,7 @@
 
 #include "wsrep_api.h"
 #include "galera_exception.hpp"
+#include "trx_handle.hpp"
 
 struct gcs_action;
 
@@ -17,9 +18,6 @@ namespace galera
 {
     class Statement;
     class RowId;
-    class TrxHandle;
-    class TrxHandleMaster;
-    class TrxHandleSlave;
 
     //! @class Galera
     //
@@ -63,11 +61,10 @@ namespace galera
         virtual int trx_proto_ver() const = 0;
         virtual int repl_proto_ver() const = 0;
 
-        virtual TrxHandleMaster* get_local_trx(wsrep_trx_id_t, bool) = 0;
-        virtual void unref_local_trx(TrxHandleMaster* trx) = 0;
+        virtual TrxHandleMasterPtr get_local_trx(wsrep_trx_id_t, bool) = 0;
         virtual void discard_local_trx(TrxHandleMaster* trx_id) = 0;
 
-        virtual TrxHandleMaster* local_conn_trx(wsrep_conn_id_t conn_id,
+        virtual TrxHandleMasterPtr local_conn_trx(wsrep_conn_id_t conn_id,
                                           bool create) = 0;
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
@@ -100,7 +97,8 @@ namespace galera
                                             int                 rcode) = 0;
 
         // action source interface
-        virtual void process_trx(void* recv_ctx, TrxHandleSlave* trx) = 0;
+        virtual void process_trx(void* recv_ctx,
+                                 const TrxHandleSlavePtr& trx) = 0;
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l) = 0;
         virtual void process_conf_change(void*                    recv_ctx,

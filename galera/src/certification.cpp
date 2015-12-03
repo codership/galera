@@ -637,12 +637,11 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 
 
 galera::Certification::TestResult
-galera::Certification::append_trx(TrxHandleSlave* trx)
+galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 {
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 
-    trx->ref();
     {
         gu::Lock lock(mutex_);
 
@@ -688,7 +687,7 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
         }
     }
 
-    const TestResult retval(test(trx, true));
+    const TestResult retval(test(trx.get(), true));
 
     {
         gu::Lock lock(mutex_);
@@ -707,19 +706,19 @@ galera::Certification::append_trx(TrxHandleSlave* trx)
 }
 
 
-wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave* trx)
+wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
 {
-    assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */  &&
-           trx->is_committed() == false);
+    assert(trx.global_seqno() >= 0 /* && trx->local_seqno() >= 0 */  &&
+           trx.is_committed() == false);
 
     wsrep_seqno_t ret(-1);
     {
         gu::Lock lock(mutex_);
-        if (trx->certified() == true)
+        if (trx.certified() == true)
         {
             // trxs with depends_seqno == -1 haven't gone through
             // append_trx
-            DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
+            DepsSet::iterator i(deps_set_.find(trx.last_seen_seqno()));
             assert(i != deps_set_.end());
 
             if (deps_set_.size() == 1) safe_to_discard_seqno_ = *i;
@@ -733,22 +732,9 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave* trx)
         }
     }
 
-    trx->mark_committed();
-//needed?    trx->clear();
+    trx.mark_committed();
 
     return ret;
-}
-
-galera::TrxHandleSlave* galera::Certification::get_trx(wsrep_seqno_t seqno)
-{
-    gu::Lock lock(mutex_);
-    TrxMap::iterator i(trx_map_.find(seqno));
-
-    if (i == trx_map_.end()) return 0;
-
-    i->second->ref();
-
-    return i->second;
 }
 
 void

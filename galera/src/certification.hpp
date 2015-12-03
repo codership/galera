@@ -39,7 +39,7 @@ namespace galera
 
         typedef std::multiset<wsrep_seqno_t>             DepsSet;
 
-        typedef std::map<wsrep_seqno_t, TrxHandleSlave*> TrxMap;
+        typedef std::map<wsrep_seqno_t, TrxHandleSlavePtr> TrxMap;
 
     public:
 
@@ -53,7 +53,7 @@ namespace galera
         ~Certification();
 
         void assign_initial_position(const gu::GTID& gtid, int version);
-        TestResult append_trx(TrxHandleSlave*);
+        TestResult append_trx(const TrxHandleSlavePtr&);
         TestResult test(TrxHandleSlave*, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
@@ -82,8 +82,7 @@ namespace galera
 
         // Set trx corresponding to handle committed. Return purge seqno if
         // index purge is required, -1 otherwise.
-        wsrep_seqno_t set_trx_committed(TrxHandleSlave*);
-        TrxHandleSlave* get_trx(wsrep_seqno_t);
+        wsrep_seqno_t set_trx_committed(TrxHandleSlave&);
 
         // statistics section
         void stats_get(double& avg_cert_interval,
@@ -153,7 +152,7 @@ namespace galera
             void operator()(TrxMap::value_type& vt) const
             {
                 {
-                    TrxHandleSlave* trx(vt.second);
+                    TrxHandleSlave* trx(vt.second.get());
                     // Trying to lock trx mutex here may cause deadlock
                     // with streaming replication. Locking can be skipped
                     // because trx is only read here and refcount uses atomics.
@@ -172,14 +171,7 @@ namespace galera
                     {
                         cert_.purge_for_trx(trx);
                     }
-
-                    if (trx->refcnt() > 1)
-                    {
-                        log_debug << "trx "     << trx->trx_id()
-                                  << " refcnt " << trx->refcnt();
-                    }
                 }
-                vt.second->unref();
             }
 
             PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_)

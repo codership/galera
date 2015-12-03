@@ -923,21 +923,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     delete req;
 }
 
-class IstTrx  // to ensure automatic trx cleanup on exception
-{
-public:
-    IstTrx(TrxHandleSlave::Pool& p)
-        : trx_(TrxHandleSlave::New(false, p)) { }
-    ~IstTrx() { trx_->unref(); }
-    TrxHandleSlave* const trx_;
-};
-
 bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
 {
     assert(GCS_ACT_WRITESET == act.type);
 
-    IstTrx ist_trx(slave_pool_);
-    TrxHandleSlave* const ts(ist_trx.trx_);
+    TrxHandleSlavePtr ts(TrxHandleSlave::New(false, slave_pool_),
+                         TrxHandleSlaveDeleter());
     bool exit_loop(false);
 
     bool const skip(0 == act.size);
@@ -959,7 +950,7 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
         assert(ts->global_seqno() == act.seqno_g);
         assert(ts->depends_seqno() >= 0);
 
-        gu_trace(apply_trx(recv_ctx, ts));
+        gu_trace(apply_trx(recv_ctx, *ts));
         GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
 
         exit_loop = ts->exit_loop();
@@ -1043,8 +1034,9 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
 {
     assert(GCS_ACT_WRITESET == act.type);
 
-    IstTrx ist_trx(slave_pool_);
-    TrxHandleSlave* const ts(ist_trx.trx_);
+
+    TrxHandleSlavePtr ts(TrxHandleSlave::New(false, slave_pool_),
+                         TrxHandleSlaveDeleter());
 
     if (gu_likely(0 != act.size))
     {
@@ -1075,7 +1067,7 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
                            << ", expected " << Certification::TEST_OK
                            << "must abort to maintain consistency";
         }
-        cert_.set_trx_committed(ts);
+        cert_.set_trx_committed(*ts);
     }
 }
 
