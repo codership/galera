@@ -2,6 +2,10 @@
  * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
  */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "common/common.h"
 
 #include "gcomm/view.hpp"
@@ -250,16 +254,85 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
 std::string gcomm::ViewState::get_viewstate_file_name(gu::Config& conf)
 {
     std::string dir_name = COMMON_BASE_DIR_DEFAULT;
-
     try {
         // If base_dir is set in the configuration we should use
         // it instead of current directory default.
         dir_name = conf.get(COMMON_BASE_DIR_KEY, dir_name);
     } catch (const gu::NotFound &) {
-        // In case it is not known we do not have to do
-        // anything and use default.
+        std::string tmp;
+        FILE* probe = NULL;
+#if defined(_GNU_SOURCE)
+       char* cwd = get_current_dir_name();
+#elif defined(_MSC_VER)
+       char* cwd = _getcwd(NULL, 0);
+#elif defined(_BSD_SOURCE) || (defined(_XOPEN_SOURCE) && \
+    (_XOPEN_SOURCE >= 500 || \
+     _XOPEN_SOURCE && _XOPEN_SOURCE_EXTENDED) && \
+   !(_POSIX_C_SOURCE >= 200809L || _XOPEN_SOURCE >= 700))
+       char buf [PATH_MAX];
+       char* cwd = getcwd(buf, sizeof(buf));
+#else
+       char* cwd = NULL;
+#endif
+       // Verify that the current directory is not a root ("/")
+       // or an inaccessible "(unreachable)" directory:
+       if (cwd && cwd[0] != '(' && (strlen(cwd) != 1 || cwd[0] != '/'))
+       {
+          // We will check whether we have the rights to write into
+          // default directory (usually it is "."):
+          tmp = dir_name + '/' + COMMON_VIEW_STAT_FILE + ".probe";
+          probe = fopen(tmp.c_str(), "w");
+       }
+#if defined(_GNU_SOURCE) || defined(_MSC_VER)
+       if (cwd)
+       {
+           free(cwd);
+       }
+#endif
+       if (probe == NULL)
+       {
+           struct stat fs;
+           // We do not have access to the default directory.
+           // Probably, our process is running as a daemon.
+           // Then try to use the "/var/lib/galera" (or another
+           // directory, which is intended for files recorded
+           // by the daemons):
+           dir_name = COMMON_BASE_DIR_DAEMON;
+           // We need to check whether there is a such directory?
+           if (stat(dir_name.c_str(), &fs))
+           {
+               // If the directory does not exist - try to create it:
+               if (mkdir(dir_name.c_str(), 0770))
+               {
+                   gu_throw_fatal << "Unable to create "
+                                  << dir_name << " directory ("
+                                  << strerror(errno) << ")";
+               }
+           }
+           else
+           {
+               // We will check whether we have the rights to write into
+               // directory, which is intended for files recorded by the
+               // daemons:
+               tmp = dir_name + '/' + COMMON_VIEW_STAT_FILE + ".probe";
+               probe = fopen(tmp.c_str(), "w");
+               if (probe == NULL)
+               {
+                   gu_throw_fatal << "Unable to write into "
+                                  << dir_name << " directory ("
+                                  << strerror(errno) << ")";
+               }
+           }
+       }
+       if (probe)
+       {
+           // We have the rights to write into desired directory -
+           // we should delete a test file:
+           fclose(probe);
+           unlink(tmp.c_str());
+       }
     }
-    return dir_name + '/' +  COMMON_VIEW_STAT_FILE;
+    return dir_name + '/' + COMMON_VIEW_STAT_FILE;
 }
 
 void gcomm::ViewState::write_file() const
