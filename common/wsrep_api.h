@@ -723,8 +723,9 @@ struct wsrep {
    *        with it.
    *
    * @param wsrep  provider handle
-   * @param handle writeet handle
-   * @param rv     read view astablished by the caller or if NULL, by provider
+   * @param handle writset handle
+   * @param rv     read view GTID established by the caller or if NULL,
+   *               provider will infer it internally.
    */
     wsrep_status_t (*assign_read_view)(wsrep_t*            wsrep,
                                        wsrep_ws_handle_t*  handle,
