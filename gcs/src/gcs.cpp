@@ -964,8 +964,8 @@ gcs_handle_act_state_req (gcs_conn_t*          conn,
 
 /*! Allocates buffer with malloc to pass to the upper layer. */
 static long
-gcs_handle_state_change (gcs_conn_t*           conn,
-                         const struct gcs_act* act)
+gcs_handle_state_change (gcs_conn_t*     conn,
+                         struct gcs_act* act)
 {
     gu_debug ("Got '%s' dated %lld", gcs_act_type_to_str (act->type),
               gcs_seqno_gtoh(*(gcs_seqno_t*)act->buf));
@@ -975,7 +975,7 @@ gcs_handle_state_change (gcs_conn_t*           conn,
     if (buf) {
         memcpy (buf, act->buf, act->buf_len);
         /* initially act->buf points to internal static recv buffer. No leak here */
-        ((struct gcs_act*)act)->buf = buf;
+        act->buf = buf;
         return 1;
     }
     else {
