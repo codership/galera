@@ -661,7 +661,7 @@ cert_fail:
             // Clean up cert_index_ from entries which were added by this trx
             CertIndexNG::iterator ci(cert_index_ng_.find(&ke));
 
-            if (ci != cert_index_ng_.end())
+            if (gu_likely(ci != cert_index_ng_.end()))
             {
                 KeyEntryNG* kep(*ci);
 
@@ -678,13 +678,14 @@ cert_fail:
                 delete kep;
 
             }
-            else
+            else if(ke.key().shared())
             {
                 assert(0); // we actually should never be here, the key should
                            // be either added to cert_index_ or be there already
-                log_warn  << "could not find key '"
+                log_warn  << "could not find shared key '"
                           << ke.key() << "' from cert index";
             }
+            else { /* exclusive can duplicate shared */ }
         }
         assert(cert_index_.size() == prev_cert_index_size);
     }

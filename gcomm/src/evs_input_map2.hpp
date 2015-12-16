@@ -269,26 +269,6 @@ public:
         return (node.range().lu() > seq);
     }
 
-    bool has_deliverables() const
-    {
-        if (msg_index_->empty() == false)
-        {
-            if (n_msgs_[O_FIFO] > 0 && is_fifo(msg_index_->begin()))
-                return true;
-            else if (n_msgs_[O_AGREED] > 0 && is_agreed(msg_index_->begin()))
-                return true;
-            else if (n_msgs_[O_SAFE] > 0 && is_safe(msg_index_->begin()))
-                return true;
-            else if (n_msgs_[O_DROP] > max_droppable_)
-                return true;
-            return false;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
     /*!
      * Insert new message into input map.
      *
@@ -373,9 +353,6 @@ private:
     InputMapNodeIndex* node_index_;     /*!< Index of nodes          */
     InputMapMsgIndex*  msg_index_;      /*!< Index of messages       */
     InputMapMsgIndex*  recovery_index_; /*!< Recovery index          */
-
-    std::vector<size_t> n_msgs_;
-    size_t max_droppable_;
 };
 
 #endif // EVS_INPUT_MAP2_HPP
