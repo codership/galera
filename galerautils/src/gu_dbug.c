@@ -399,7 +399,7 @@ struct state_map {
 static struct state_map *_gu_db_state_map[_GU_DB_STATE_MAP_BUCKETS];
 
 /*
- * This hash is probably good enough. Golden ratio 2654435761U from 
+ * This hash is probably good enough. Golden ratio 2654435761U from
  * http://www.concentric.net/~Ttwang/tech/inthash.htm
  *
  * UPDATE: it is good enough for input with significant variation in
@@ -429,9 +429,9 @@ void state_map_insert(const pthread_t th, CODE_STATE *state)
 
     unsigned int key;
     struct state_map *sm;
-    
+
     assert(state_map_find(th) == NULL);
-    
+
     key = pt_hash(th);
 
 
@@ -440,13 +440,13 @@ void state_map_insert(const pthread_t th, CODE_STATE *state)
     sm->th = th;
 
     pthread_mutex_lock(&_gu_db_mutex);
-    
+
     sm->prev = NULL;
     sm->next = _gu_db_state_map[key];
     if (sm->next)
 	sm->next->prev = sm;
     _gu_db_state_map[key] = sm;
-    
+
     pthread_mutex_unlock(&_gu_db_mutex);
 }
 
@@ -500,7 +500,7 @@ static void code_state_cleanup(CODE_STATE *state)
 static void _gu_db_init()
 {
     if (!_gu_db_fp_)
-	_gu_db_fp_ = stderr;	 /* Output stream, default stderr */    
+	_gu_db_fp_ = stderr;	 /* Output stream, default stderr */
     memset(_gu_db_state_map, 0, sizeof(_gu_db_state_map));
 }
 
@@ -2016,10 +2016,13 @@ Delay(int ticks)
 static void
 dbug_flush(CODE_STATE * state)
 {
+    int check_gu_flags = 1;
+    int no_check_gu_flags = 1;
 #ifndef THREAD
-    if (_gu_db_stack->flags & FLUSH_ON_WRITE)
+    check_gu_flags = (_gu_db_stack->flags & FLUSH_ON_WRITE);
+    no_check_gu_flags = !(_gu_db_stack->flags & FLUSH_ON_WRITE);
 #endif
-    {
+    if (check_gu_flags) {
 #if defined(MSDOS) || defined(__WIN__)
 	if (_gu_db_fp_ != stdout && _gu_db_fp_ != stderr) {
 	    if (!(freopen(_gu_db_stack->name, "a", _gu_db_fp_))) {
@@ -2029,8 +2032,9 @@ dbug_flush(CODE_STATE * state)
 		_gu_db_stack->out_file = _gu_db_fp_;
 		_gu_db_stack->flags |= FLUSH_ON_WRITE;
 	    }
-	} else
+	}
 #endif
+  if (no_check_gu_flags)
 	{
 	    (void) fflush(_gu_db_fp_);
 	    if (_gu_db_stack->delay)
