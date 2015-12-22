@@ -546,12 +546,14 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         trx->set_flags(trx->flags() |
                        TrxHandle::wsrep_flags_to_trx_flags(flags));
 
-        assert((trx->flags() & (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK))
-               != (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK));
-
-
         if (flags & WSREP_FLAG_ROLLBACK)
         {
+            if ((trx->flags() & (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK)) ==
+                (TrxHandle::F_BEGIN | TrxHandle::F_ROLLBACK))
+            {
+                return WSREP_TRX_MISSING;
+            }
+
             trx->set_flags(trx->flags() | TrxHandle::F_PA_UNSAFE);
             if (trx->state() == TrxHandle::S_ABORTING)
             {
