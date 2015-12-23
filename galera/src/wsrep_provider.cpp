@@ -803,6 +803,15 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
             retval = repl->to_isolation_begin(trx, meta);
         }
     }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+
+        if (e.get_errno() == EMSGSIZE)
+            retval = WSREP_SIZE_EXCEEDED;
+        else
+            retval = WSREP_CONN_FAIL;
+    }
     catch (std::exception& e)
     {
         log_warn << e.what();
