@@ -3,14 +3,14 @@ Maintainer: Codership Oy <info@codership.com>
 Uploaders: Otto Kekäläinen <otto@seravo.fi>
 Section: database
 Priority: optional
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Build-Depends: check,
                debhelper (>= 9),
+               libasio-dev,
                libboost-dev (>= 1.41),
                libboost-program-options-dev (>= 1.41),
                libssl-dev,
-               scons (>= 2),
-               libasio-dev
+               scons (>= 2)
 Homepage: http://www.galeracluster.com/
 Vcs-Git: git://github.com/codership/galera.git
 Vcs-Browser: http://github.com/codership/galera.git
@@ -27,9 +27,9 @@ Conflicts: garbd-2,
            percona-xtradb-cluster-galera-3.x,
            percona-xtradb-cluster-garbd-2.x,
            percona-xtradb-cluster-garbd-3.x
+Provides: galera, galera3, percona-xtradb-cluster-galera-25, wsrep
 Breaks: galera
 Replaces: galera
-Provides: galera-3, wsrep
 Description: Replication framework for transactional applications
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
