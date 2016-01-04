@@ -76,7 +76,7 @@ typedef enum status_vars
 {
     STATS_STATE_UUID = 0,
     STATS_PROTOCOL_VERSION,
-    STATS_LAST_APPLIED,
+    STATS_LAST_COMMITTED,
     STATS_REPLICATED,
     STATS_REPLICATED_BYTES,
     STATS_KEYS_COUNT,
@@ -187,7 +187,7 @@ galera::ReplicatorSMM::stats_get() const
     std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
-    sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
+    sv[STATS_LAST_COMMITTED     ].value._int64  = commit_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
     sv[STATS_KEYS_COUNT         ].value._int64  = keys_count_();
