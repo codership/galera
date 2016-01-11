@@ -119,9 +119,7 @@ gcomm::evs::InputMap::InputMap() :
     aru_seq_        (-1),
     node_index_     (new InputMapNodeIndex()),
     msg_index_      (new InputMapMsgIndex()),
-    recovery_index_ (new InputMapMsgIndex()),
-    n_msgs_         (O_SAFE + 1),
-    max_droppable_  (16)
+    recovery_index_ (new InputMapMsgIndex())
 { }
 
 
@@ -145,8 +143,7 @@ gcomm::evs::InputMap::~InputMap()
 void gcomm::evs::InputMap::reset(const size_t nodes, const seqno_t window)
 {
     gcomm_assert(msg_index_->empty()                           == true &&
-                 recovery_index_->empty()                      == true &&
-                 accumulate(n_msgs_.begin(), n_msgs_.end(), 0) == 0);
+                 recovery_index_->empty()                      == true);
     node_index_->clear();
 
     window_ = window;
@@ -231,7 +228,6 @@ void gcomm::evs::InputMap::clear()
     node_index_->clear();
     aru_seq_ = -1;
     safe_seq_ = -1;
-    fill(n_msgs_.begin(), n_msgs_.end(), 0);
 }
 
 
@@ -305,7 +301,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
                                               msg.aru_seq(),
                                               0,
                                               O_DROP)), ins_dg))));
-            ++n_msgs_[msg.order()];
         }
 
         // Update highest seen
@@ -340,8 +335,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 
 void gcomm::evs::InputMap::erase(iterator i)
 {
-    const UserMessage& msg(InputMapMsgIndex::value(i).msg());
-    --n_msgs_[msg.order()];
     gu_trace(recovery_index_->insert_unique(*i));
     gu_trace(msg_index_->erase(i));
 }

@@ -33,7 +33,7 @@ static size_t version_to_hash_size (KeySet::Version const ver)
     case KeySet::FLAT16A: return 16;
     case KeySet::FLAT8:   fail ("FLAT8 is not supported by test");
     case KeySet::FLAT8A:  return 8;
-    default:      fail ("Unsupported KeySet verison: %d", ver);
+    default:              fail ("Unsupported KeySet verison: %d", ver);
     }
 
     abort();
