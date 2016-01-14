@@ -366,8 +366,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
     gu::Lock lock(mutex_); // why do we need that? - e.g. set_trx_committed()
 
     /* initialize parent seqno */
-    if ((trx->flags() & (TrxHandle::F_ISOLATION | TrxHandle::F_PA_UNSAFE))
-        || trx_map_.empty())
+    if (gu_unlikely(trx_map_.empty()))
     {
         trx->set_depends_seqno(trx->global_seqno() - 1);
     }
@@ -437,8 +436,8 @@ galera::Certification::do_test_preordered(TrxHandleSlave* trx)
         assert(0);
     }
 
-    trx->set_depends_seqno(last_preordered_seqno_ -
-                           trx->write_set().pa_range() + 1);
+    trx->set_depends_seqno(last_preordered_seqno_ + 1 -
+                           trx->write_set().pa_range());
     // +1 compensates for subtracting from a previous seqno, rather than own.
     trx->mark_certified();
 

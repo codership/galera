@@ -156,7 +156,8 @@ namespace galera
 
         void preload_index(const gcs_action&);
         void wait(wsrep_seqno_t);
-        void cancel_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g);
+        void cancel_monitors(const TrxHandleSlave& ts);
+        void cancel_monitors(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g=0);
         void drain_monitors(wsrep_seqno_t seqno_g);
 
         void mark_corrupt_and_close()

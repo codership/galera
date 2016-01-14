@@ -780,7 +780,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
-            GU_DBUG_SYNC_WAIT("ist_sender_send_after_get_buffers")
+            GU_DBUG_SYNC_WAIT("ist_sender_send_after_get_buffers");
             //log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
@@ -816,7 +816,6 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
             // resize buf_vec to avoid scanning gcache past last
             size_t next_size(std::min(static_cast<size_t>(last - first + 1),
                                       static_cast<size_t>(1024)));
-
             if (buf_vec.size() != next_size)
             {
                 buf_vec.resize(next_size);

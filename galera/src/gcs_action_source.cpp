@@ -123,7 +123,7 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
     }
     else if (rc > 0 && skip)
     {
-        replicator_.cancel_seqnos(act.seqno_l, act.seqno_g);
+        replicator_.cancel_monitors(act.seqno_l, act.seqno_g);
     }
     else
     {

@@ -326,6 +326,9 @@ namespace galera
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
     std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
 
+    class TrxHandleSlave;
+    std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& th);
+
     class TrxHandleSlave : public TrxHandle
     {
     public:
@@ -356,7 +359,7 @@ namespace galera
                 case WriteSetNG::VER4:
                     write_set_.read_buf (act.buf, act.size);
                     assert(version_ == write_set_.version());
-                    write_set_flags_ =ws_flags_to_trx_flags(write_set_.flags());
+                    write_set_flags_ = ws_flags_to_trx_flags(write_set_.flags());
                     source_id_       = write_set_.source_id();
                     conn_id_         = write_set_.conn_id();
                     trx_id_          = write_set_.trx_id();
@@ -386,20 +389,28 @@ namespace galera
                         {
                             log_fatal << "S: global: "   << global_seqno_
                                       << ", last_seen: " << last_seen_seqno_
-                                      << ", checksum: "
-                                      << reinterpret_cast<void*>
-                                (write_set_.get_checksum());
+                                      << ", checksum: "  <<
+                                gu::PrintBase<>(write_set_.get_checksum());
                         }
                         assert(last_seen_seqno_ < global_seqno_);
 #endif
-                        if (gu_likely(version_) >= WriteSetNG::VER4)
+                        if (gu_likely(0 ==
+                                      (flags() & (TrxHandle::F_ISOLATION |
+                                                  TrxHandle::F_PA_UNSAFE))))
                         {
-                            depends_seqno_ =
-                                last_seen_seqno_ - write_set_.pa_range();
+                            if (gu_likely(version_) >= WriteSetNG::VER4)
+                            {
+                                depends_seqno_ =
+                                    last_seen_seqno_ - write_set_.pa_range();
+                            }
+                            else
+                            {
+                                assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+                            }
                         }
                         else
                         {
-                            assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+                            depends_seqno_ = global_seqno_ - 1;
                         }
                     }
                     else
@@ -457,23 +468,28 @@ namespace galera
         {
             assert(!certified_);
 
-            if (write_set_.size() > 0)
+            int dw(0);
+
+            if (gu_likely(depends_seqno_ >= 0))
             {
-                int dw(0);
-
-                if (gu_likely(depends_seqno_ >= 0))
-                {
-                    dw = global_seqno_ - depends_seqno_;
-                }
-
-                write_set_.set_seqno(global_seqno_, dw);
+                dw = global_seqno_ - depends_seqno_;
             }
+
+            /* make sure to not exceed original pa_range() */
+            assert(last_seen_seqno_ - write_set_.pa_range() <=
+                   global_seqno_ - dw || preordered());
+
+            write_set_.set_seqno(global_seqno_, dw);
 
             certified_ = true;
         }
 
         void set_depends_seqno(wsrep_seqno_t seqno_lt)
         {
+            /* make sure depends_seqno_ never goes down */
+            assert(seqno_lt >= depends_seqno_ ||
+                   seqno_lt == WSREP_SEQNO_UNDEFINED ||
+                   preordered());
             depends_seqno_ = seqno_lt;
         }
 
@@ -590,8 +606,6 @@ namespace galera
             mp.recycle(ptr);
         }
     };
-
-    std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& trx);
 
     class TrxHandleMaster : public TrxHandle
     {
@@ -714,8 +728,7 @@ namespace galera
 
             int pa_range(pa_range_default());
 
-            if (gu_unlikely((flags() & TrxHandle::F_BEGIN) == 0 &&
-                            (flags() & TrxHandle::F_ROLLBACK) == 0))
+            if (gu_unlikely((flags() & TrxHandle::F_BEGIN) == 0))
             {
                 /* make sure this fragment depends on the previous */
                 assert(ts_ != 0);
@@ -726,10 +739,9 @@ namespace galera
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno);
             }
-            else if (flags() & TrxHandle::F_ROLLBACK)
+            else
             {
-                assert((flags() & TrxHandle::F_BEGIN) == 0);
-                pa_range = 0;
+                assert((flags() & TrxHandle::F_ROLLBACK) == 0);
             }
 
             write_set_out().set_flags(write_set_flags_);
