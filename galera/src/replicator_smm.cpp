@@ -2010,7 +2010,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                         break;
                     case S_SYNCED:
                         state_.shift_to(S_SYNCED);
-                        synced_cb_(app_ctx_);
+                        if (synced_cb_(app_ctx_) != WSREP_CB_SUCCESS)
+                        {
+                            log_fatal << "Synced callback failed. This is "
+                                      << "unrecoverable, restart required.";
+                            abort();
+                        }
                         break;
                     default:
                         log_debug << "next_state " << next_state;
@@ -2148,7 +2153,12 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
     drain_monitors(upto);
 
     state_.shift_to(S_SYNCED);
-    synced_cb_(app_ctx_);
+    if (synced_cb_(app_ctx_) != WSREP_CB_SUCCESS)
+    {
+        log_fatal << "Synced callback failed. This is unrecoverable, "
+                  << "restart required.";
+        abort();
+    }
     local_monitor_.leave(lo);
 }
 

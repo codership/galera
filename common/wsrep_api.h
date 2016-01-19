@@ -493,8 +493,10 @@ typedef enum wsrep_cb_status (*wsrep_sst_donate_cb_t) (
  * rest of the cluster.
  *
  * @param app_ctx application context
+ *
+ * @return wsrep_cb_status enum
  */
-typedef void (*wsrep_synced_cb_t) (void* app_ctx);
+typedef enum wsrep_cb_status (*wsrep_synced_cb_t) (void* app_ctx);
 
 
 /*!
