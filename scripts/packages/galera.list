@@ -15,6 +15,8 @@ f 755 root root $INIT_DEST/garb  $BUILD_BASE/garb/files/garb.sh
 d 755 root root $BINS_DEST -
 f 755 root root $BINS_DEST/garbd $BUILD_BASE/garb/garbd
 
+d 755 nobody nobody /var/lib/galera -
+
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST/libgalera_smm.so $BUILD_BASE/libgalera_smm.so
 

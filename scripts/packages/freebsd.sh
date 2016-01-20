@@ -18,6 +18,9 @@ rm -rf "$PBR"
 mkdir -p "$PBR"
 
 install -d "$PBR/"{bin,lib/galera,share/doc/galera,etc/rc.d,libdata/ldconfig}
+
+install -m 755 -d "$PBR/"{var/lib/galera}
+
 install -m 555 "$PBD/garb/files/freebsd/garb.sh"      "$PBR/etc/rc.d/garb"
 install -m 555 "$PBD/garb/garbd"                      "$PBR/bin/garbd"
 install -m 444 "$PBD/libgalera_smm.so"                "$PBR/lib/galera/libgalera_smm.so"
