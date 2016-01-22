@@ -7,7 +7,6 @@ garb_env = env.Clone()
 # Include paths
 garb_env.Append(CPPPATH = Split('''
                                    #
-                                   #/asio
                                    #/common
                                    #/galerautils/src
                                    #/gcs/src

@@ -111,7 +111,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.13')
+GALERA_VER = ARGUMENTS.get('version', '3.14')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -214,7 +214,34 @@ if sysname != 'sunos':
 # Check required headers and libraries (autoconf functionality)
 #
 
-conf = Configure(env)
+#
+# Custom tests:
+#
+
+def CheckSystemASIOVersion(context):
+    system_asio_test_source_file = """
+#include <asio.hpp>
+
+#if ASIO_VERSION < 101001
+#error "Included asio version is too old"
+#endif
+
+int main()
+{
+    return 0;
+}
+
+"""
+    context.Message('Checking ASIO version (> 1.10.1) ... ')
+    result = context.TryLink(system_asio_test_source_file, '.cpp')
+    context.Result(result)
+    return result
+
+
+#
+# Construct confuration context
+#
+conf = Configure(env, custom_tests = {'CheckSystemASIOVersion': CheckSystemASIOVersion})
 
 # System headers and libraries
 
@@ -361,14 +388,21 @@ else:
     print 'Not using boost'
 
 # asio
-cpppath_saved = conf.env.get('CPPPATH')
-
-conf.env.Append(CPPPATH = [ '#/asio' ])
-if conf.CheckCXXHeader('asio.hpp'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
+use_system_asio = False
+if conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
+    use_system_asio = True
+    conf.env.Append(CPPFLAGS = ' -DHAVE_SYSTEM_ASIO -DHAVE_ASIO_HPP')
 else:
-    print 'asio headers not found or not usable'
-    Exit(1)
+    print "Falling back to bundled asio"
+
+if not use_system_asio:
+    # Fall back to embedded asio
+    conf.env.Append(CPPPATH = [ '#/asio' ])
+    if conf.CheckCXXHeader('asio.hpp'):
+        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
+    else:
+        print 'asio headers not found or not usable'
+        Exit(1)
 
 # asio/ssl
 if ssl == 1:
@@ -396,7 +430,6 @@ if ssl == 1:
             print 'compile with ssl=0 or check that' 
             print 'openssl static librares - libssl.a, libcrypto.a, libz.a are available'
             Exit(1)
-conf.env['CPPPATH'] = cpppath_saved
 
 
 # these will be used only with our softaware
