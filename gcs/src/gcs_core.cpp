@@ -1428,7 +1428,9 @@ long
 gcs_core_param_set (gcs_core_t* core, const char* key, const char* value)
 {
     if (core->backend.conn) {
-        return core->backend.param_set (&core->backend, key, value);
+        return
+            gcs_group_param_set(core->group, key, value) &&
+            core->backend.param_set(&core->backend, key, value);
     }
     else {
         return 1;

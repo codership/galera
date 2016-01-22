@@ -243,4 +243,8 @@ gcs_group_find_donor(const gcs_group_t* group,
                      const char* const donor_string, int const donor_len,
                      const gu::GTID& ist_gtid);
 
+extern int
+gcs_group_param_set(gcs_group_t& group,
+                    const std::string& key, const std::string& val);
+
 #endif /* _gcs_group_h_ */

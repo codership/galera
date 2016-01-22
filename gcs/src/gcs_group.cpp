@@ -1564,3 +1564,19 @@ gcs_group_get_state (const gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
+
+int
+gcs_group_param_set(gcs_group_t& group,
+                    const std::string& key, const std::string& val)
+{
+    if (GCS_VOTE_POLICY_KEY == key)
+    {
+        gu_throw_error(ENOTSUP) << "Setting '" << key << "' in runtime may "
+            "have unintended consequences and is currently not supported. "
+            "Cluster voting policy should be decided on before starting the "
+            "cluster.";
+    }
+
+    return 1;
+}
+
