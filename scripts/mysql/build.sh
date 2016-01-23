@@ -634,6 +634,8 @@ if [ $TAR == "yes" ]; then
     install -m 755 -d $GALERA_BINS
     install -m 755 -d $GALERA_LIBS
 
+    install -m 755 -d $GALERA_DIST_DIR/var/lib/galera
+
     if [ "$SCONS" == "yes" ]
     then
         SCONS_VD=$GALERA_SRC
