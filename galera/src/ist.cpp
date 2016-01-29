@@ -80,6 +80,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 TrxHandle::SlavePool& sp,
                                 const char*           addr)
     :
+    recv_addr_    (),
     io_service_   (),
     acceptor_     (io_service_),
     ssl_ctx_      (io_service_, asio::ssl::context::sslv23),

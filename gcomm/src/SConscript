@@ -7,7 +7,6 @@ libgcomm_env = env.Clone()
 # Include paths
 libgcomm_env.Append(CPPPATH = Split('''
                                        #
-                                       #/asio
                                        #/common
                                        #/galerautils/src
                                        #/gcomm/src

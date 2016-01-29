@@ -433,9 +433,12 @@ namespace galera
         class StateAction
         {
         public:
-            StateAction ()
+            StateAction () :
+                repl_(),
+                f_()
             {
             }
+
             StateAction (ReplicatorSMM * const repl,
                          void (ReplicatorSMM::* f) ()) :
                 repl_(repl),

@@ -132,6 +132,7 @@ install -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.cnf \
     $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/garb
 install -d "$RPM_BUILD_ROOT/%{_bindir}"
 install -d "$RPM_BUILD_ROOT/%{_libdir}"
+install -d "$RPM_BUILD_ROOT/%{_sharedstatedir}/galera"
 
 %if 0%{?systemd}
 install -D -m 644 $RPM_BUILD_DIR/%{src_dir}/garb/files/garb.service \
@@ -179,6 +180,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
+%attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 # This is a symlink
 %attr(0755,root,root) %{_libdir}/libgalera_smm.so
 %attr(0755,root,root) %{_libdir}/galera3/libgalera_smm.so
@@ -190,10 +192,10 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0644,root,root) %{docs}/LICENSE.crc32c
 %doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 
-
 %files -n Percona-XtraDB-Cluster-garbd-3
 %defattr(-,root,root,-)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
+%attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 %if 0%{?systemd}
     %attr(0644, root, root) %{_unitdir}/garb.service
     %attr(0755,root,root) %{_bindir}/garb-systemd

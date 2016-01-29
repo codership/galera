@@ -13,8 +13,18 @@
 #include "gu_macros.h" // gu_likely()
 #include "common.h"    //
 
-#pragma GCC diagnostic ignored "-Weffc++"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
+#ifndef HAVE_SYSTEM_ASIO
+// Using embedded copy of ASIO requires turning off some
+// compiler warnings.
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
+# pragma GCC diagnostic ignored "-Wold-style-cast"
+#endif
+#endif // ! HAVE_SYSTEM_ASIO
+
 #include "asio.hpp"
 #include "asio/ssl.hpp"
 
@@ -157,5 +167,12 @@ namespace gu
     }
 }
 
+#ifndef HAVE_SYSTEM_ASIO
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#endif
+#endif // ! HAVE_SYSTEM_ASIO
 
 #endif // GU_ASIO_HPP

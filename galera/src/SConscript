@@ -6,7 +6,6 @@ libgaleraxx_env = env.Clone()
 # Include paths
 libgaleraxx_env.Append(CPPPATH = Split('''
                                           #
-                                          #/asio
                                           #/common
                                           #/galerautils/src
                                           #/gcache/src
