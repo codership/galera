@@ -17,6 +17,7 @@ in the same directory as this file.
 Authors from Codership Oy:
 
  * Alexey Yurchenko <alexey.yurchenko@galeracluster.com>, Codership Oy
+ * Seppo Jaakola <seppo.jaakola@galeracluster.com>, Codership Oy
  [Codership employees, add name and email/username above this line, but leave this line intact]
 
 Other contributors:
