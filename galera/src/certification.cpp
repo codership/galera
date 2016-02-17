@@ -707,8 +707,8 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 
 wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
 {
-    assert(trx.global_seqno() >= 0 /* && trx->local_seqno() >= 0 */  &&
-           trx.is_committed() == false);
+    assert(trx.global_seqno() >= 0);
+    assert(trx.is_committed() == false);
 
     wsrep_seqno_t ret(-1);
     {

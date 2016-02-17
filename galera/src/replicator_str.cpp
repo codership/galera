@@ -1065,7 +1065,7 @@ void ReplicatorSMM::preload_index_trx(const gcs_action& act)
             cert_.assign_initial_position(
                 /* proper UUID will be installed by CC */
                 gu::GTID(gu::UUID(), ts->global_seqno() - 1),
-                         ts->version());
+                ts->version());
         }
 
         Certification::TestResult result(cert_.append_trx(ts));

@@ -504,10 +504,11 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         GU_DBUG_SYNC_WAIT("after_commit_slave_sync");
     }
 
-    if (ts.local_seqno() != -1)
+    wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
+    if (gu_likely(ts.local_seqno() != -1))
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
-        report_last_committed(cert_.set_trx_committed(ts));
+        report_last_committed(safe_to_discard);
     }
 
     /* For now need to keep it inside apply monitor to ensure all processing
