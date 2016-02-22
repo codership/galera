@@ -278,6 +278,18 @@ void galera::ReplicatorSMM::shift_to_CLOSED()
     /* Cleanup for re-opening. */
     uuid_ = WSREP_UUID_UNDEFINED;
     closing_ = false;
+    if (st_.corrupt())
+    {
+        // this should erase the memory of a pre-existing state.
+        set_initial_position(WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED);
+        cert_.assign_initial_position(gu::GTID(GU_UUID_NIL, -1),
+                                      trx_params_.version_);
+        sst_uuid_            = WSREP_UUID_UNDEFINED;
+        sst_seqno_           = WSREP_SEQNO_UNDEFINED;
+        cc_seqno_            = WSREP_SEQNO_UNDEFINED;
+        cc_lowest_trx_seqno_ = WSREP_SEQNO_UNDEFINED;
+        pause_seqno_         = WSREP_SEQNO_UNDEFINED;
+    }
 
     closing_cond_.broadcast();
 }
