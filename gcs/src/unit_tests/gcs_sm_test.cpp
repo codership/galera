@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -6,6 +6,7 @@
 #include "../gcs_sm.hpp"
 
 #include <check.h>
+#include <math.h> // fabs
 #include <string.h>
 
 #include "gcs_sm_test.hpp"
@@ -214,6 +215,8 @@ static void* pausing_thread (void* data)
     return NULL;
 }
 
+static double const EPS = 1.0e-15; // double precision
+
 START_TEST (gcs_sm_test_pause)
 {
     int       q_len;
@@ -236,9 +239,12 @@ START_TEST (gcs_sm_test_pause)
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &paused_ns, &paused_avg);
-    fail_if (paused_ns  != 0.0);
-    fail_if (paused_avg != 0.0);
-    fail_if (q_len_avg  != 0.0);
+    fail_if (paused_ns != 0,
+             "paused_ns: expected 0, got %lld", paused_ns);
+    fail_if (fabs(paused_avg) > EPS,
+             "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
+    fail_if (fabs(q_len_avg) > EPS,
+             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     fail_if (q_len      != 0);
     fail_if (q_len_max  != 0);
     fail_if (q_len_min  != 0);
@@ -257,7 +263,8 @@ START_TEST (gcs_sm_test_pause)
                       &paused_ns, &paused_avg);
     fail_if (paused_ns  <= 0.0);
     fail_if (paused_avg <= 0.0);
-    fail_if (q_len_avg  != 0.0);
+    fail_if (fabs(q_len_avg) > EPS,
+             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
 
     gu_info ("Calling gcs_sm_continue()");
     gcs_sm_continue (sm);
@@ -275,7 +282,8 @@ START_TEST (gcs_sm_test_pause)
                       &tmp, &paused_avg);
     fail_if (tmp <= paused_ns); paused_ns = tmp;
     fail_if (paused_avg <= 0.0);
-    fail_if (q_len_avg  != 0.0);
+    fail_if (fabs(q_len_avg) > EPS,
+             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     gcs_sm_stats_flush(sm);
 
     // Testing scheduling capability
@@ -304,14 +312,16 @@ START_TEST (gcs_sm_test_pause)
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
     fail_if (tmp < paused_ns); paused_ns = tmp;
-    fail_if (paused_avg != 0.0);
+    fail_if (fabs(paused_avg) > EPS,
+             "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
     fail_if (q_len != sm->users, "found q_len %d, expected = %d",
              q_len, sm->users);
     fail_if (q_len_max != q_len, "found q_len_max %d, expected = %d",
              q_len_max, q_len);
     fail_if (q_len_min != 0, "found q_len_min %d, expected = 0",
              q_len_min);
-    fail_if ((q_len_avg - 0.5) > 0.0000001 || (q_len_avg - 0.5) < -0.0000001);
+    fail_if (fabs(q_len_avg - 0.5) > EPS,
+             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     gcs_sm_stats_flush(sm);
 
     gu_info ("Started pause thread, users = %ld", sm->users);
@@ -351,7 +361,8 @@ START_TEST (gcs_sm_test_pause)
                       &tmp, &paused_avg);
     fail_if (tmp <= paused_ns); paused_ns = tmp;
     fail_if (paused_avg <= 0.0);
-    fail_if (q_len_avg  != 0.0);
+    fail_if (fabs(q_len_avg) > EPS,
+             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
 
     gcs_sm_enter (sm, &cond, false, true); // by now paused thread exited monitor
     fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);
