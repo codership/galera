@@ -1920,10 +1920,28 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 long
 gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
-    conn->join_seqno   = seqno;
-    conn->need_to_join = true;
+    // Even when node is evicted from the cluster in middle of SST,
+    // the SST may completes normally. After this, the node calls
+    // the gcs_join function and tries to join the cluster. However,
+    // this is impossible, because the node is already evicted.
+    // Therefore, the _join() function (which called from gcs_join)
+    // fails. Then node does IST (which also fails), after/during
+    // which it is aborted. To fix this, we should avoid joining
+    // the cluster through gcs_join function if node is evicted.
+    // To do this, we should check the current connection state
+    // in the gcs_join() function to return from it immediately
+    // if the node's communication channel was closed:
 
-    return _join (conn, seqno);
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        conn->join_seqno   = seqno;
+        conn->need_to_join = true;
+        return _join (conn, seqno);
+    }
+    else
+    {
+        return GCS_CLOSED_ERROR;
+    }
 }
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)

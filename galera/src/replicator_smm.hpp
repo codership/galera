@@ -471,7 +471,7 @@ namespace galera
                                              const wsrep_uuid_t& group_uuid,
                                              wsrep_seqno_t       group_seqno);
 
-        void send_state_request (const StateRequest* req);
+        long send_state_request (const StateRequest* req, const bool unsafe);
 
         void request_state_transfer (void* recv_ctx,
                                      const wsrep_uuid_t& group_uuid,
