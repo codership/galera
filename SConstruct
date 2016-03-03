@@ -113,7 +113,7 @@ elif x86:
             link_arch = ' -Wl,-melf_x86_64'
     link_arch = compile_arch + link_arch
 elif machine == 's390x':
-    compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
+    compile_arch = ' -mzarch'
     if bits == 32:
         compile_arch += ' -m32'
 
