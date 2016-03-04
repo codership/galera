@@ -113,7 +113,7 @@ elif x86:
             link_arch = ' -Wl,-melf_x86_64'
     link_arch = compile_arch + link_arch
 elif machine == 's390x':
-    compile_arch = ' -mzarch -march=z196 -mtune=zEC12'
+    compile_arch = ' -mzarch'
     if bits == 32:
         compile_arch += ' -m32'
 
@@ -124,7 +124,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.13')
+GALERA_VER = ARGUMENTS.get('version', '3.15')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 
 # Attempt to read from file if not given
