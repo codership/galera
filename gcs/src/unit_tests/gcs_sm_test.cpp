@@ -215,7 +215,7 @@ static void* pausing_thread (void* data)
     return NULL;
 }
 
-static double const EPS = 1.0e-15; // double precision 
+static double const EPS = 1.0e-15; // double precision
 
 START_TEST (gcs_sm_test_pause)
 {
@@ -239,8 +239,8 @@ START_TEST (gcs_sm_test_pause)
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &paused_ns, &paused_avg);
-    fail_if (fabs(paused_ns) > EPS,
-             "paused_ns: expected <= %e, got %e", EPS, fabs(paused_ns));
+    fail_if (paused_ns != 0,
+             "paused_ns: expected 0, got %lld", paused_ns);
     fail_if (fabs(paused_avg) > EPS,
              "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
     fail_if (fabs(q_len_avg) > EPS,
