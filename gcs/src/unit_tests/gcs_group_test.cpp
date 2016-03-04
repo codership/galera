@@ -4,16 +4,17 @@
  * $Id$
  */
 
-#include <check.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 
-#include "gcs_group_test.hpp"
 #include "../gcs_group.hpp"
 #include "../gcs_act_proto.hpp"
 #include "../gcs_comp_msg.hpp"
+
+#include <check.h>
+#include "gcs_group_test.hpp"
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
@@ -536,7 +537,7 @@ START_TEST(test_gcs_group_find_donor)
             0, 0, seqnos[i], 0,
             GCS_NODE_STATE_SYNCED,
             GCS_NODE_STATE_SYNCED,
-            "", "", 0, 0, 0, 0);
+            "", "", 0, 0, 0, 0, 0);
     }
     group.quorum.act_id = 0; // in safe range.
     fail_if (group.quorum.gcs_proto_ver != -1);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,6 +18,9 @@
 #include "gcs_recv_msg.hpp"
 #include "gcs_seqno.hpp"
 #include "gcs_state_msg.hpp"
+
+#include "gu_status.hpp"
+#include "gu_utils.hpp"
 
 typedef enum gcs_group_state
 {
@@ -243,5 +246,8 @@ gcs_group_find_donor(const gcs_group_t* group,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,
                      const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
+
+extern void
+gcs_group_get_status(const gcs_group_t* group, gu::Status& status);
 
 #endif /* _gcs_group_h_ */

@@ -1390,6 +1390,7 @@ void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
         gu_throw_fatal << "could not lock mutex";
     if (core->state < CORE_CLOSED)
     {
+        gcs_group_get_status(&core->group, status);
         core->backend.status_get(&core->backend, status);
     }
     gu_mutex_unlock(&core->send_lock);
