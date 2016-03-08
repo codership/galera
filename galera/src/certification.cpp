@@ -695,8 +695,14 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
                 std::make_pair(trx->global_seqno(), trx)).second == false)
             gu_throw_fatal << "duplicate trx entry " << *trx;
 
-        deps_set_.insert(trx->last_seen_seqno());
-        assert(deps_set_.size() <= trx_map_.size());
+        // trx with local seqno WSREP_SEQNO_UNDEFINED originates from
+        // IST so deps set tracking should not be done
+        if (trx->local_seqno() != WSREP_SEQNO_UNDEFINED)
+        {
+            assert(trx->last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
+            deps_set_.insert(trx->last_seen_seqno());
+            assert(deps_set_.size() <= trx_map_.size());
+        }
     }
 
     if (!trx->certified()) trx->mark_certified();
@@ -713,10 +719,13 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
     wsrep_seqno_t ret(-1);
     {
         gu::Lock lock(mutex_);
-        if (trx.certified() == true)
+
+        // certified trx with local seqno WSREP_SEQNO_UNDEFINED originates from
+        // IST so deps set tracking should not be done
+        if (trx.certified()   == true &&
+            trx.local_seqno() != WSREP_SEQNO_UNDEFINED)
         {
-            // trxs with depends_seqno == -1 haven't gone through
-            // append_trx
+            assert(trx.last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
             DepsSet::iterator i(deps_set_.find(trx.last_seen_seqno()));
             assert(i != deps_set_.end());
 
