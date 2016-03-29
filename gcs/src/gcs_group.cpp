@@ -1226,6 +1226,7 @@ group_select_donor (gcs_group_t* group,
             gcs_node_t& donor(group->nodes[donor_idx]);
             assert(donor.desync_count == 0 || group->quorum.version >= 4);
             assert(donor.desync_count == 0 || st == GCS_NODE_STATE_DONOR);
+            (void)donor; // keep optimised build happy
         }
         else
             donor_idx = -EAGAIN;
