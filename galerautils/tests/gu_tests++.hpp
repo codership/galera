@@ -25,6 +25,7 @@
 #include "gu_datetime_test.hpp"
 #include "gu_histogram_test.hpp"
 #include "gu_stats_test.hpp"
+#include "gu_thread_test.hpp"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -45,6 +46,7 @@ static suite_creator_t suites[] =
     gu_datetime_suite,
     gu_histogram_suite,
     gu_stats_suite,
+    gu_thread_suite,
     0
 };
 
