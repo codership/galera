@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -173,6 +173,14 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
         switch (node->status)
         {
         case GCS_NODE_STATE_DONOR:
+            if (quorum->version >= 4) {
+                node->desync_count =
+                    gcs_state_msg_get_desync_count(node->state_msg);
+                assert(node->desync_count > 0);
+            }
+            else {
+                node->desync_count = 1;
+            }
         case GCS_NODE_STATE_SYNCED:
             node->count_last_applied = true;
             break;
@@ -205,4 +213,8 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
     /* Clear bootstrap flag so that it does not get carried to
      * subsequent configuration changes. */
     node->bootstrap = false;
+
+    assert(GCS_NODE_STATE_DONOR == node->status || 0 == node->desync_count);
+    /* node in DONOR/desync state must have desync count > 0 */
+    assert(GCS_NODE_STATE_DONOR != node->status || 0 <  node->desync_count);
 }

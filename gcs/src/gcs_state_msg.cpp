@@ -13,7 +13,7 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_MSG_VER 3
+#define GCS_STATE_MSG_VER 4
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.hpp"
@@ -34,6 +34,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       int              gcs_proto_ver,
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              desync_count,
                       uint8_t          flags)
 {
 #define CHECK_PROTO_RANGE(LEVEL)                                        \
@@ -66,6 +67,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->gcs_proto_ver = gcs_proto_ver;
         ret->repl_proto_ver= repl_proto_ver;
         ret->appl_proto_ver= appl_proto_ver;
+        ret->desync_count  = desync_count;
         ret->name          = (char*)(ret + 1);
         ret->inc_addr      = ret->name + name_len;
         ret->flags         = flags;
@@ -109,7 +111,9 @@ gcs_state_msg_len (gcs_state_msg_t* state)
 // V1-2 stuff
         sizeof (uint8_t)     +   // appl_proto_ver (in preparation for V1)
 // V3 stuff
-        sizeof (int64_t)         // cached
+        sizeof (int64_t)     +   // cached
+// V4 stuff
+        sizeof (int32_t)         // desync count
         );
 }
 
@@ -153,6 +157,7 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     char*     inc_addr  = name + strlen (state->name) + 1;
     uint8_t*  appl_proto_ver = (uint8_t*)(inc_addr + strlen(state->inc_addr) + 1);
     int64_t*  cached         = (int64_t*)(appl_proto_ver + 1);
+    int32_t*  desync_count   = (int32_t*)(cached + 1);
 
     *version        = GCS_STATE_MSG_VER;
     *flags          = state->flags;
@@ -170,8 +175,9 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
     *cached         = htog64(state->cached);
+    *desync_count   = htog32(state->desync_count);
 
-    return ((uint8_t*)(cached + 1) - (uint8_t*)buf);
+    return ((uint8_t*)(desync_count + 1) - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
@@ -198,6 +204,13 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         cached = gtoh64(*cached_ptr);
     }
 
+    int32_t  desync_count = 0;
+    int32_t* desync_count_ptr = (int32_t*)(cached_ptr + 1);
+    if (*version >= 4) {
+        assert(buf_len >= (uint8_t*)(desync_count_ptr + 1) - (uint8_t*)buf);
+        desync_count = gtoh32(*desync_count_ptr);
+    }
+
     gcs_state_msg_t* ret = gcs_state_msg_create (
         state_uuid,
         group_uuid,
@@ -213,6 +226,7 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         *gcs_proto_ver,
         *repl_proto_ver,
         appl_proto_ver,
+        desync_count,
         *flags
         );
 
@@ -231,6 +245,7 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tFlags        : %#02hhx"
                      "\n\tProtocols    : %d / %d / %d"
                      "\n\tState        : %s"
+                     "\n\tDesync count : %d"
                      "\n\tPrim state   : %s"
                      "\n\tPrim UUID    : "GU_UUID_FORMAT
                      "\n\tPrim  seqno  : %lld"
@@ -246,6 +261,7 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      state->gcs_proto_ver, state->repl_proto_ver,
                      state->appl_proto_ver,
                      gcs_node_state_to_str(state->current_state),
+                     state->desync_count,
                      gcs_node_state_to_str(state->prim_state),
                      GU_UUID_ARGS(&state->prim_uuid),
                      (long long)state->prim_seqno,
@@ -325,6 +341,12 @@ gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
     *gcs_proto_ver  = state->gcs_proto_ver;
     *repl_proto_ver = state->repl_proto_ver;
     *appl_proto_ver = state->appl_proto_ver;
+}
+
+int
+gcs_state_msg_get_desync_count (const gcs_state_msg_t* state)
+{
+    return state->desync_count;
 }
 
 /* Get state message flags */

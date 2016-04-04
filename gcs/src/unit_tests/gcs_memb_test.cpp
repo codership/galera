@@ -4,15 +4,14 @@
  * $Id$
  */
 
-#include <check.h>
-
-#include "gcs_memb_test.hpp"
-
 #include "../gcs_group.hpp"
 #include "../gcs_comp_msg.hpp"
 
 #include <gu_uuid.h>
 #include <stdbool.h>
+
+#include <check.h>
+#include "gcs_memb_test.hpp"
 
 struct node
 {
@@ -245,6 +244,7 @@ deliver_join_sync_msg (struct group* const group, int const src,
         switch (type) {
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg(gr, &msg);
+            mark_point();
             if (i == src) {
                 fail_if (ret != 1,
                          "%d failed to handle own JOIN message: %d (%s)",
@@ -297,7 +297,7 @@ verify_node_state_across_group (struct group* group, int const idx,
     return ret;
 }
 
-/* start SST on behald of node idx (joiner) */
+/* start SST on behalf of node idx (joiner) */
 static long
 group_sst_start (struct group* group, int const src_idx, const char* donor)
 {
@@ -351,14 +351,20 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
     fail_if (donor_idx < 0, "Failed to select donor");
 
     for (i = 0; i < group->nodes_num; i++) {
-        gcs_node_state_t state;
-        gcs_group_t* gr = &group->nodes[i]->group;
-        state = gr->nodes[donor_idx].status;
+        gcs_group_t* const gr = &group->nodes[i]->group;
+        gcs_node_t* const donor = &gr->nodes[donor_idx];
+        gcs_node_state_t state = donor->status;
         fail_if (state != GCS_NODE_STATE_DONOR, "%d is not donor at %d",
                  donor_idx, i);
-        state = gr->nodes[src_idx].status;
+        int dc = donor->desync_count;
+        fail_if (dc < 1, "donor %d at %d has desync_count %d", donor_idx, i,dc);
+
+        gcs_node_t* const joiner = &gr->nodes[src_idx];
+        state = joiner->status;
         fail_if (state != GCS_NODE_STATE_JOINER, "%d is not joiner at %d",
                  src_idx, i);
+        dc = joiner->desync_count;
+        fail_if (dc != 0, "joiner %d at %d has desync_count %d",donor_idx,i,dc);
 
         /* check that donor and joiner point at each other */
         fail_if (memcmp (gr->nodes[donor_idx].joiner, gr->nodes[src_idx].id,
@@ -421,6 +427,7 @@ START_TEST(gcs_memb_test_465)
     fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
 
     group_sst_start (&group, 2, nodes[0].group.nodes[0].name);
+    mark_point();
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
     deliver_join_sync_msg (&group, 2, GCS_MSG_SYNC); // joiner can't sync
