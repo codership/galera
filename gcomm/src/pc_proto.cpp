@@ -62,6 +62,24 @@ public:
     }
 };
 
+class UUIDFixedPartCmp
+{
+public:
+    UUIDFixedPartCmp(const gcomm::UUID& uuid) : uuid_(uuid) { }
+    bool operator()(const gcomm::NodeList::value_type& vt) const
+    {
+        return uuid_.fixed_part_matches(vt.first);
+    }
+private:
+    const gcomm::UUID& uuid_;
+};
+
+static bool UUID_fixed_part_pred(const gcomm::NodeList::value_type& lhs,
+                                 const gcomm::NodeList::value_type& rhs)
+{
+    return lhs.first.fixed_part_matches(rhs.first);
+}
+
 // Return max to seq found from states, -1 if states is empty
 static int64_t get_max_to_seq(const gcomm::pc::Proto::SMMap& states)
 {
@@ -239,8 +257,11 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
             i != instances_.end(); ++i) {
             const UUID& uuid(NodeMap::key(i));
             // just consider property of nodes in restored view.
-            if (rst_view_ -> members().find(uuid) !=
-                rst_view_ -> members().end()) {
+            if (std::find_if(rst_view_->members().begin(),
+                             rst_view_->members().end(),
+                             UUIDFixedPartCmp(uuid))
+                != rst_view_->members().end())
+            {
                 const Node& node(NodeMap::value(i));
                 const ViewId& last_prim(node.last_prim());
                 if (last_prim.type() != V_NON_PRIM ||
@@ -267,7 +288,9 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
             log_debug << v;
 
             if (rst_view_ -> id().seq() == max_view_seqno &&
-                rst_view_ -> members() == v.members()) {
+                std::equal(v.members().begin(), v.members().end(),
+                           rst_view_->members().begin(), UUID_fixed_part_pred))
+            {
                 log_info << "promote to primary component";
                 // since all of them are non-primary component
                 // we need to bootstrap.

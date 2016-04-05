@@ -255,6 +255,8 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
     if (pc_recovery_) {
         if (vst.read_file()) {
             log_info << "restore pc from disk successfully";
+            rst_uuid_.increment_incarnation();
+            vst.write_file();
             restored = true;
         } else {
             log_info << "restore pc from disk failed";
