@@ -77,7 +77,10 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
     // infinitely wait on the sst_cond_ condition variable, for which no one
     // will call the signal() function:
 
-    if (state_() == S_JOINING)
+    // S_CONNECTED also valid here if sst_received() called just after
+    // send_state_request(), when the state yet not shifted to S_JOINING:
+
+    if (state_() == S_JOINING || state_() == S_CONNECTED)
     {
         return WSREP_OK;
     }
