@@ -158,13 +158,17 @@ SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s)
 
     if (corrupt_) return;
 
-    uuid_ = u;
-    seqno_ = s;
+    // Write new state if uuid or seqno was changed:
+    if (uuid_ != u || seqno_ != s)
+    {
+        uuid_ = u;
+        seqno_ = s;
 
-    if (0 == unsafe_())
-        write_and_flush (u, s);
-    else
-        log_debug << "Not writing state: unsafe counter is " << unsafe_();
+        if (0 == unsafe_())
+            write_and_flush (u, s);
+        else
+            log_debug << "Not writing state: unsafe counter is " << unsafe_();
+    }
 }
 
 /* the goal of unsafe_, written_uuid_, current_len_ below is

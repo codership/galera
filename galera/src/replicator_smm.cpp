@@ -177,6 +177,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     as_                 (0),
     gcs_as_             (slave_pool_, gcs_, *this, gcache_),
     ist_receiver_       (config_, slave_pool_, args->node_address),
+    ist_prepared_       (false),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_, service_thd_),
@@ -260,7 +261,11 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     log_debug << "End state: " << uuid << ':' << seqno << " #################";
 
-    update_state_uuid (uuid);
+    // We need to set the current value of uuid and update
+    // stored seqno value, if the non-trivial recovery
+    // information provided on startup:
+
+    update_state_uuid (uuid, seqno);
 
     cc_seqno_ = seqno; // is it needed here?
     apply_monitor_.set_initial_position(seqno);
@@ -336,6 +341,14 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
 wsrep_status_t galera::ReplicatorSMM::close()
 {
+    // We must be sure that IST receiver will be stopped,
+    // even if the IST during the execution:
+    if (ist_prepared_)
+    {
+        ist_prepared_ = false;
+        sst_seqno_ = ist_receiver_.finished();
+    }
+
     if (state_() != S_CLOSED)
     {
         gcs_.close();
@@ -1371,6 +1384,16 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     update_incoming_list(view_info);
 
+    // If SST operation was canceled, we shall immediately
+    // return from the function to avoid hang-up in the monitor
+    // drain code and avoid restart of the SST.
+    if (sst_state_ == SST_CANCELED)
+    {
+        // We must resume receiving messages from gcs.
+        gcs_.resume_recv();
+        return;
+    }
+
     LocalOrder lo(seqno_l);
     gu_trace(local_monitor_.enter(lo));
 
@@ -1455,7 +1478,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         {
             if (view_info.view == 1 || !app_wants_st)
             {
-                update_state_uuid (group_uuid);
+                update_state_uuid (group_uuid, group_seqno);
                 apply_monitor_.set_initial_position(group_seqno);
                 if (co_mode_ != CommitOrder::BYPASS)
                     commit_monitor_.set_initial_position(group_seqno);
@@ -1490,7 +1513,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
         }
 
-        if (state_() == S_JOINING && sst_state_ != SST_NONE)
+        if (state_() == S_JOINING && sst_state_ != SST_NONE
+                                  && sst_state_ != SST_CANCELED)
         {
             /* There are two reasons we can be here:
              * 1) we just got state transfer in request_state_transfer() above;
@@ -1954,7 +1978,8 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
 
 
 void
-galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
+galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid,
+                                          const wsrep_seqno_t seqno)
 {
     if (state_uuid_ != uuid)
     {
@@ -1966,15 +1991,12 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
                 sizeof(state_uuid_str_));
     }
 
-    st_.set(uuid, WSREP_SEQNO_UNDEFINED);
+    st_.set(uuid, seqno);
 }
 
 void
 galera::ReplicatorSMM::abort()
 {
-    if (state_() != S_CLOSED)
-    {
-       gcs_.close();
-    }
+    close();
     gu_abort();
 }

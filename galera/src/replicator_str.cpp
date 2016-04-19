@@ -61,7 +61,15 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
                             size_t              state_len,
                             int                 rcode)
 {
-    log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
+    if (rcode != -ECANCELED)
+    {
+        log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
+    }
+    else
+    {
+        log_info << "SST request was cancelled";
+        sst_state_ = SST_CANCELED;
+    }
 
     gu::Lock lock(sst_mutex_);
 
@@ -514,6 +522,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
     std::string recv_addr = ist_receiver_.prepare(
         local_seqno + 1, group_seqno, protocol_version_);
+    ist_prepared_ = true;
 
     os << IST_request(recv_addr, state_uuid_, local_seqno, group_seqno);
 
@@ -729,6 +738,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         st_.mark_unsafe();
     }
 
+    // We must set SST state to "wait" before
+    // sending request, to avoid racing condition
+    // in the sst_received.
+
+    sst_state_ = SST_WAIT;
+
     // We should not wait for completion of the SST or to handle it
     // results if an error has occurred when sending the request:
 
@@ -741,7 +756,6 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     GU_DBUG_SYNC_WAIT("after_send_state_request");
 
     state_.shift_to(S_JOINING);
-    sst_state_ = SST_WAIT;
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may involve some IO too */
     gcache_.seqno_reset();
@@ -759,7 +773,19 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             lock.wait(sst_cond_);
         }
 
-        if (sst_uuid_ != group_uuid)
+        if (sst_state_ == SST_CANCELED)
+        {
+            // SST request was cancelled, new SST required
+            // after restart, state must be marked as "unsafe":
+            if (! unsafe)
+            {
+                st_.mark_unsafe();
+            }
+
+            close();
+            return;
+        }
+        else if (sst_uuid_ != group_uuid)
         {
             log_fatal << "Application received wrong state: "
                       << "\n\tReceived: " << sst_uuid_
@@ -778,7 +804,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
-            update_state_uuid (sst_uuid_);
+            update_state_uuid (sst_uuid_, sst_seqno_);
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
 
@@ -807,16 +833,25 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     {
         // We should not do the IST when we left S_JOINING state
         // (for example, if we have lost the connection to the
-        // network or we were evicted from the cluster):
+        // network or we were evicted from the cluster) or when
+        // SST was failed or cancelled:
 
-        if (state_() == S_JOINING && STATE_SEQNO() < group_seqno)
+        if (sst_state_ < SST_REQ_FAILED &&
+            state_() == S_JOINING && STATE_SEQNO() < group_seqno)
         {
             log_info << "Receiving IST: " << (group_seqno - STATE_SEQNO())
                      << " writesets, seqnos " << STATE_SEQNO()
                      << "-" << group_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
-            sst_seqno_ = ist_receiver_.finished();
+
+            // IST process could already be interrupted if Galera
+            // is in the process of shutting down:
+            if (ist_prepared_)
+            {
+                ist_prepared_ = false;
+                sst_seqno_ = ist_receiver_.finished();
+            }
 
             // Note: apply_monitor_ must be drained to avoid race between
             // IST appliers and GCS appliers, GCS action source may
@@ -826,7 +861,26 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
-            (void)ist_receiver_.finished();
+            // IST process could already be interrupted if Galera
+            // is in the process of shutting down:
+            if (ist_prepared_)
+            {
+                ist_prepared_ = false;
+                (void)ist_receiver_.finished();
+            }
+        }
+    }
+    else
+    {
+        // We should mark the position as undefined
+        // (if position is not marked as undefined before),
+        // to prevent data loss if the server crashes.
+        wsrep_uuid_t  uuid;
+        wsrep_seqno_t seqno;
+        st_.get (uuid, seqno);
+        if (seqno != WSREP_SEQNO_UNDEFINED)
+        {
+           st_.set (uuid, WSREP_SEQNO_UNDEFINED);
         }
     }
 
@@ -836,6 +890,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
+    bool first= true;
     while (true)
     {
         TrxHandle* trx(0);
@@ -844,6 +899,23 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
         {
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
+                // If the current position is defined (for example, when
+                // there were no SST before IST), then we need to change
+                // it to an undefined position before applying the first
+                // transaction, since during the application of transactions
+                // (or after the IST) server may fail:
+                if (first)
+                {
+                    first = false;
+                    wsrep_uuid_t  uuid;
+                    wsrep_seqno_t seqno;
+                    st_.get (uuid, seqno);
+                    if (seqno != WSREP_SEQNO_UNDEFINED)
+                    {
+                       st_.set (uuid, WSREP_SEQNO_UNDEFINED);
+                    }
+                }
+
                 assert(trx != 0);
                 TrxHandleLock lock(*trx);
                 // Verify checksum before applying. This is also required
@@ -871,6 +943,19 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             else
             {
+                // If the current position is defined, then we need
+                // to change it to an undefined position, to prevent
+                // data loss if the server crashes:
+                if (first)
+                {
+                    wsrep_uuid_t  uuid;
+                    wsrep_seqno_t seqno;
+                    st_.get (uuid, seqno);
+                    if (seqno != WSREP_SEQNO_UNDEFINED)
+                    {
+                       st_.set (uuid, WSREP_SEQNO_UNDEFINED);
+                    }
+                }
                 return;
             }
             trx->unref();
@@ -884,8 +969,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                 log_fatal << "failed trx: " << *trx;
             }
             st_.mark_corrupt();
-            gcs_.close();
-            gu_abort();
+            abort();
         }
     }
 }
