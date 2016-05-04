@@ -39,6 +39,7 @@ namespace gcomm
         static std::string const EvsDelayMargin           ;
         static std::string const EvsDelayedKeepPeriod     ;
         static std::string const EvsAutoEvict             ;
+        static std::string const EvsVersion               ;
         static std::string const PcAnnounceTimeout        ;
         static std::string const PcChecksum               ;
         static std::string const PcIgnoreQuorum           ;
