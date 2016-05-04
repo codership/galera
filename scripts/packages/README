@@ -443,6 +443,12 @@ recv_addr
     turns on incremental state transfer. IST will use SSL if SSL is configured
     as described above. No default.
 
+recv_bind
+    Address to which the incremental state transfer is bound. This
+    configuration is optional. When it is not set it will take its value from
+    recv_addr. It can be useful if the node is running behind a NAT, where the
+    public address and the internal address differ.
+
 
 4. GALERA ARBITRATOR
 
