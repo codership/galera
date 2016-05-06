@@ -42,6 +42,7 @@ namespace galera
             SST_NONE,
             SST_WAIT,
             SST_REQ_FAILED,
+            SST_CANCELED,
             SST_FAILED
         } SstState;
 
@@ -207,7 +208,8 @@ namespace galera
         wsrep_status_t cert_and_catch(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
 
-        void update_state_uuid (const wsrep_uuid_t& u);
+        void update_state_uuid (const wsrep_uuid_t& u,
+                                const wsrep_seqno_t seqno);
         void update_incoming_list (const wsrep_view_info_t& v);
 
         /* aborts/exits the program in a clean way */
@@ -588,6 +590,7 @@ namespace galera
         ActionSource*        as_;
         GcsActionSource      gcs_as_;
         ist::Receiver        ist_receiver_;
+        bool                 ist_prepared_;
         ist::AsyncSenderMap  ist_senders_;
 
         // trx processing
