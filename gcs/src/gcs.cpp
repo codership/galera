@@ -750,6 +750,11 @@ _set_fc_limits (gcs_conn_t* conn)
     conn->upper_limit = conn->params.fc_base_limit * fn + .5;
     conn->lower_limit = conn->upper_limit * conn->params.fc_resume_factor + .5;
 
+    /* The upper/lower limits cannot exceed the number of items in the
+     * receive queue, so bound them by the max length. */
+    conn->upper_limit = std::min(conn->upper_limit, gu_fifo_max_length(conn->recv_q));
+    conn->lower_limit = std::min(conn->lower_limit, gu_fifo_max_length(conn->recv_q));
+
     gu_info ("Flow-control interval: [%ld, %ld]",
              conn->lower_limit, conn->upper_limit);
 }

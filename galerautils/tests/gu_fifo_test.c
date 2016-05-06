@@ -33,6 +33,8 @@ START_TEST (gu_fifo_test)
     fail_if (gu_fifo_length(fifo) != 0, "fifo->used is %lu for an empty FIFO",
              gu_fifo_length(fifo));
 
+    fail_if (gu_fifo_max_length(fifo) < FIFO_LENGTH);
+
     // fill FIFO
     for (i = 0; i < FIFO_LENGTH; i++) {
         item = gu_fifo_get_tail (fifo);
@@ -205,6 +207,77 @@ START_TEST(gu_fifo_cancel_test)
 }
 END_TEST
 
+/* Test the functionality when a row gets deleted if the head
+   reaches the end of a row (we have to ensure that the tail is
+   in the same row).
+*/
+START_TEST(gu_fifo_wrap_around_test)
+{
+    gu_fifo_t* fifo;
+    long i;
+    size_t* item;
+    long used;
+
+    #define FIFO_WRAP_LENGTH 2048
+
+    fifo = gu_fifo_create (FIFO_WRAP_LENGTH, sizeof(i));
+    fail_if (fifo == NULL);
+    fail_if (gu_fifo_length(fifo) != 0, "fifo->used is %lu for an empty FIFO",
+             gu_fifo_length(fifo));
+
+    /* fill FIFO */
+    for (i = 0; i < FIFO_WRAP_LENGTH; i++) {
+        item = gu_fifo_get_tail (fifo);
+        fail_if (item == NULL, "could not get item %ld", i);
+        *item = 0xCCCC;
+        gu_fifo_push_tail (fifo);
+    }
+
+    used = i;
+    fail_if (gu_fifo_length(fifo) != used, "used is %zu, expected %zu", 
+             used, gu_fifo_length(fifo));
+
+    /* run through the queue (ensure that we do gu_fifo_pop_head() at the
+     * end of a row) */
+    for (i = 0; i < FIFO_WRAP_LENGTH*2; i++) {
+        int err;
+        item = gu_fifo_get_head (fifo, &err);
+        fail_if (item == NULL, "could not get item %ld", i);
+        fail_if (*item != (ulong)0xCCCC, "got %ld, expected %lx", *item, 0xCCCC);
+        gu_fifo_pop_head (fifo);
+
+        item = gu_fifo_get_tail (fifo);
+        fail_if (item == NULL, "could not get item %ld", i);
+        *item = 0xCCCC;
+        gu_fifo_push_tail (fifo);
+    }
+
+    /* drain the queue */
+    used = gu_fifo_length(fifo);
+    for (i = 0; i < used; i++) {
+        int err;
+        item = gu_fifo_get_head (fifo, &err);
+        fail_if (item == NULL, "could not get item %ld", i);
+        fail_if (*item != (ulong)0xCCCC, "got %ld, expected %lx", *item, 0xCCCC);
+        gu_fifo_pop_head (fifo);
+    }
+
+    fail_if (gu_fifo_length(fifo) != 0,
+             "gu_fifo_length() for empty queue is %lx",
+             gu_fifo_length(fifo));
+
+    gu_fifo_close (fifo);
+
+    int err;
+    item = gu_fifo_get_head (fifo, &err);
+    fail_if (item != NULL);
+    fail_if (err  != -ENODATA);
+
+    gu_fifo_destroy (fifo);
+
+}
+END_TEST
+
 Suite *gu_fifo_suite(void)
 {
     Suite *s  = suite_create("Galera FIFO functions");
@@ -213,6 +286,7 @@ Suite *gu_fifo_suite(void)
     suite_add_tcase (s, tc);
     tcase_add_test  (tc, gu_fifo_test);
     tcase_add_test  (tc, gu_fifo_cancel_test);
+    tcase_add_test  (tc, gu_fifo_wrap_around_test);
     return s;
 }
 
