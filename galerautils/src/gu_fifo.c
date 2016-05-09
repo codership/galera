@@ -306,8 +306,11 @@ void* gu_fifo_get_head (gu_fifo_t* q, int* err)
 /*! Advances FIFO head and unlocks FIFO. */
 void gu_fifo_pop_head (gu_fifo_t* q)
 {
-    if (FIFO_COL(q, q->head) == q->col_mask) {
-        /* removing last unit from the row */
+    if ((FIFO_COL(q, q->head) == q->col_mask) &&
+        (FIFO_ROW(q, q->head) != FIFO_ROW(q, q->tail)))
+     {
+        /* free the row if we are removing the last unit from the row and
+         * if the tail is not in the same row as the head */
         ulong row = FIFO_ROW (q, q->head);
         assert (q->rows[row] != NULL);
         gu_free (q->rows[row]);
@@ -322,7 +325,7 @@ void gu_fifo_pop_head (gu_fifo_t* q)
     }
 
     if (fifo_unlock_get(q)) {
-        gu_fatal ("Faled to unlock queue to get item.");
+        gu_fatal ("Failed to unlock queue to get item.");
         abort();
     }
 }
@@ -379,7 +382,7 @@ void gu_fifo_push_tail (gu_fifo_t* q)
     q->q_len_samples++;
 
     if (fifo_unlock_put(q)) {
-        gu_fatal ("Faled to unlock queue to put item.");
+        gu_fatal ("Failed to unlock queue to put item.");
         abort();
     }
 }
@@ -388,6 +391,15 @@ void gu_fifo_push_tail (gu_fifo_t* q)
 long gu_fifo_length (gu_fifo_t* q)
 {
     return q->used;
+}
+
+/*! Returns the maximum number of items allowed in the queue */
+long gu_fifo_max_length (gu_fifo_t* q)
+{
+    /* tail always points to the next free item, so there must
+     * always be one free slot, thus the max length is q->length-1
+    */
+    return q->length-1;
 }
 
 /*! returns how many items were in the queue per push_tail() */
@@ -462,11 +474,10 @@ void gu_fifo_destroy   (gu_fifo_t *queue)
 
     while (gu_mutex_destroy (&queue->lock)) continue;
 
-    /* only one row migth be left */
+    /* only one row might be left */
     {
         ulong row = FIFO_ROW(queue, queue->tail);
         if (queue->rows[row]) {
-            assert (FIFO_COL(queue, queue->tail) != 0);
             gu_free (queue->rows[row]);
             queue->alloc -= queue->row_size;
         }

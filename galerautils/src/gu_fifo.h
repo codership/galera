@@ -51,6 +51,8 @@ extern void* gu_fifo_get_tail  (gu_fifo_t* q);
 extern void  gu_fifo_push_tail (gu_fifo_t* q);
 /*! Return how many items are in the queue (unprotected) */
 extern long  gu_fifo_length    (gu_fifo_t* q);
+/*! Returns the maximum number of items allowed in the queue (unprotected) */
+extern long  gu_fifo_max_length(gu_fifo_t* q);
 /*! Return how many items were in the queue on average per push_tail() */
 extern void  gu_fifo_stats_get (gu_fifo_t* q, int* q_len, int* q_len_max,
                                 int* q_len_min, double* q_len_avg);
