@@ -102,6 +102,25 @@ elif debug_lvl == 3:
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
+if sysname == 'sunos':
+    compile_arch = ' -mtune=native'
+elif x86:
+    if bits == 32:
+        if machine == 'x86_64':
+            compile_arch = ' -mx32'
+        else:
+            compile_arch = ' -m32 -march=i686'
+            if sysname == 'linux':
+                link_arch = ' -Wl,-melf_i386'
+    else:
+        compile_arch = ' -m64'
+        if sysname == 'linux':
+            link_arch = ' -Wl,-melf_x86_64'
+    link_arch = compile_arch + link_arch
+elif machine == 's390x':
+    compile_arch = ' -mzarch'
+    if bits == 32:
+        compile_arch += ' -m32'
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
@@ -111,7 +130,7 @@ tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.14')
+GALERA_VER = ARGUMENTS.get('version', '3.15')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
