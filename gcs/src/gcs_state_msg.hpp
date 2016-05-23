@@ -40,6 +40,7 @@ typedef struct gcs_state_msg
     int              repl_proto_ver;
     int              appl_proto_ver;
     int              prim_joined;   // number of joined nodes in its last PC
+    int              desync_count;
     gcs_node_state_t prim_state;    // state of the node in its last PC
     gcs_node_state_t current_state; // current state of the node
     uint8_t          flags;
@@ -86,6 +87,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       int              gcs_proto_ver,
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              desync_count,
                       uint8_t          flags);
 
 extern void
@@ -145,6 +147,10 @@ gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
                              int* gcs_proto_ver,
                              int* repl_proto_ver,
                              int* appl_proto_ver);
+
+/* Get desync count */
+extern int
+gcs_state_msg_get_desync_count(const gcs_state_msg_t* state);
 
 /* Get state message flags */
 extern uint8_t

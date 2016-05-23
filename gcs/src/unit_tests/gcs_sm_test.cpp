@@ -3,15 +3,15 @@
 // $Id$
 
 
+#include <string.h>
+
 #include "../gcs_sm.hpp"
 
-#include <check.h>
 #include <math.h> // fabs
 #include <string.h>
 
+#include <check.h>
 #include "gcs_sm_test.hpp"
-
-
 
 #define TEST_USLEEP 10000
 

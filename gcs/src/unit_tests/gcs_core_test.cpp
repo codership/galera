@@ -36,8 +36,6 @@
  *
  */
 
-#include "gcs_core_test.hpp"
-
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_core.hpp"
 #include "../gcs_dummy.hpp"
@@ -48,6 +46,9 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <check.h>
+
+#include "gcs_core_test.hpp"
 
 extern ssize_t gcs_tests_get_allocated();
 

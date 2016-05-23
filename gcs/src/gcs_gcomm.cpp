@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -32,6 +32,8 @@
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
 #include <gu_prodcons.hpp>
+#include <gu_barrier.hpp>
+#include <gu_thread.hpp>
 
 #include <deque>
 
@@ -41,6 +43,8 @@ using namespace gu::prodcons;
 using namespace gu::datetime;
 using namespace gcomm;
 using namespace prof;
+
+static const std::string gcomm_thread_schedparam_opt("gcomm.thread_prio");
 
 class RecvBufData
 {
@@ -177,6 +181,8 @@ public:
         conf_(cnf),
         uuid_(),
         thd_(),
+        schedparam_(conf_.get(gcomm_thread_schedparam_opt)),
+        barrier_(2),
         uri_(u),
         net_(Protonet::create(conf_)),
         tp_(0),
@@ -206,12 +212,38 @@ public:
 
     void connect(bool) { }
 
+
     void connect(const string& channel, bool const bootstrap)
     {
         if (tp_ != 0)
         {
             gu_throw_fatal << "backend connection already open";
         }
+
+
+        error_ = ENOTCONN;
+        int err;
+        if ((err = pthread_create(&thd_, 0, &run_fn, this)) != 0)
+        {
+            gu_throw_error(err) << "Failed to create thread";
+        }
+
+        // Helper to call barrier_.wait() when goes out of scope
+        class StartBarrier
+        {
+        public:
+            StartBarrier(Barrier& barrier) : barrier_(barrier) { }
+            ~StartBarrier()
+            {
+                barrier_.wait();
+            }
+        private:
+            Barrier& barrier_;
+        } start_barrier(barrier_);
+
+        thread_set_schedparam(thd_, schedparam_);
+        log_info << "gcomm thread scheduling priority set to "
+                 << thread_get_schedparam(thd_) << " ";
 
         uri_.set_option("gmcast.group", channel);
         tp_ = Transport::create(*net_, uri_);
@@ -248,12 +280,8 @@ public:
 
         uuid_ = tp_->uuid();
 
-        int err;
+        error_ = 0;
 
-        if ((err = pthread_create(&thd_, 0, &run_fn, this)) != 0)
-        {
-            gu_throw_error(err);
-        }
         log_info << "gcomm: connected";
     }
 
@@ -326,6 +354,8 @@ public:
         if (tp_ != 0) tp_->get_status(status);
     }
 
+    gu::ThreadSchedparam schedparam() const { return schedparam_; }
+
     class Ref
     {
     public:
@@ -373,19 +403,21 @@ private:
 
     void unref() { }
 
-    gu::Config& conf_;
-    gcomm::UUID        uuid_;
-    pthread_t   thd_;
-    URI         uri_;
-    Protonet*   net_;
-    Transport*  tp_;
-    Mutex       mutex_;
-    size_t      refcnt_;
-    bool        terminated_;
-    int         error_;
-    RecvBuf     recv_buf_;
-    View        current_view_;
-    Profile     prof_;
+    gu::Config&       conf_;
+    gcomm::UUID       uuid_;
+    pthread_t         thd_;
+    ThreadSchedparam  schedparam_;
+    Barrier           barrier_;
+    URI               uri_;
+    Protonet*         net_;
+    Transport*        tp_;
+    Mutex             mutex_;
+    size_t            refcnt_;
+    bool              terminated_;
+    int               error_;
+    RecvBuf           recv_buf_;
+    View              current_view_;
+    Profile           prof_;
 };
 
 
@@ -444,8 +476,12 @@ void GCommConn::queue_and_wait(const Message& msg, Message* ack)
 }
 
 
+
 void GCommConn::run()
 {
+    barrier_.wait();
+    if (error_ != 0) pthread_exit(0);
+
     while (true)
     {
         {
@@ -540,15 +576,52 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
         SharedBuffer(
             new Buffer(reinterpret_cast<const byte_t*>(buf),
                        reinterpret_cast<const byte_t*>(buf) + len)));
-    gcomm::Critical<Protonet> crit(conn.get_pnet());
-    if (gu_unlikely(conn.get_error() != 0))
+
+    int err;
+    // Set thread scheduling params if gcomm thread runs with
+    // non-default params
+    gu::ThreadSchedparam orig_sp;
+    if (conn.schedparam() != gu::ThreadSchedparam::system_default)
     {
-        return -ECONNABORTED;
+        try
+        {
+            orig_sp = gu::thread_get_schedparam(pthread_self());
+            gu::thread_set_schedparam(pthread_self(), conn.schedparam());
+        }
+        catch (gu::Exception& e)
+        {
+            err = e.get_errno();
+        }
     }
-    int err = conn.send_down(
-        dg,
-        ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ?
-                      O_LOCAL_CAUSAL : O_SAFE));
+
+
+    {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
+        if (gu_unlikely(conn.get_error() != 0))
+        {
+            err = ECONNABORTED;
+        }
+        else
+        {
+            err = conn.send_down(
+                dg,
+                ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ?
+                              O_LOCAL_CAUSAL : O_SAFE));
+        }
+    }
+
+    if (conn.schedparam() != gu::ThreadSchedparam::system_default)
+    {
+        try
+        {
+            gu::thread_set_schedparam(pthread_self(), orig_sp);
+        }
+        catch (gu::Exception& e)
+        {
+            err = e.get_errno();
+        }
+    }
+
     return (err == 0 ? len : -err);
 }
 
@@ -865,6 +938,7 @@ GCS_BACKEND_REGISTER_FN(gcs_gcomm_register)
 {
     try
     {
+        reinterpret_cast<gu::Config*>(cnf)->add(gcomm_thread_schedparam_opt, "");
         gcomm::Conf::register_params(*reinterpret_cast<gu::Config*>(cnf));
         return false;
     }

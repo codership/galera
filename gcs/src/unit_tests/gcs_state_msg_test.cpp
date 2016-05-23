@@ -8,7 +8,7 @@
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_state_msg.hpp"
 
-static int const QUORUM_VERSION = 3;
+static int const QUORUM_VERSION = 4;
 
 START_TEST (gcs_state_msg_test_basic)
 {
@@ -37,6 +37,7 @@ START_TEST (gcs_state_msg_test_basic)
                                        0,                  // gcs_proto_ver
                                        1,                  // repl_proto_ver
                                        1,                  // appl_proto_ver
+                                       0,                  // desync_count
                                        GCS_STATE_FREP      // flags
         );
 
@@ -122,21 +123,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno - 1, act2_seqno - 1, act2_seqno-1,
                                   5, GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 0);
+                                  0, 1, 1, 0, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 1, 3,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 2, 5,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 1);
+                                  0, 1, 1, 0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Inherited 1");
@@ -159,7 +160,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim1_seqno, act1_seqno, act1_seqno - 3, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_DONOR,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Inherited 2");
@@ -182,7 +183,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno - 1, act2_seqno - 1, -1, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node0", "",
-                                  0, 1, 1, 0);
+                                  0, 1, 1, 0, 0);
     fail_if(NULL == st[0]);
 
     gu_info ("                  Inherited 3");
@@ -205,7 +206,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim1_seqno, act1_seqno, act1_seqno -3, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Inherited 4");
@@ -228,7 +229,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno, act2_seqno, act2_seqno - 2, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node2", "",
-                                  0, 1, 1, 0);
+                                  0, 1, 1, 0, 0);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Inherited 5");
@@ -282,21 +283,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 0);
+                                  0, 1, 1, 0, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 3, 3,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, -1, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 1);
+                                  0, 1, 1, 0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Remerged 1");
@@ -319,8 +320,9 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim2_seqno - 1, act2_seqno - 1, -1, 5,
                                   GCS_NODE_STATE_DONOR, GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 0);
+                                  0, 1, 1, 3, 0);
     fail_if(NULL == st[0]);
+    fail_if(3 != gcs_state_msg_get_desync_count(st[0]));
 
     gu_info ("                  Remerged 2");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
@@ -342,7 +344,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim2_seqno, act2_seqno, act2_seqno - 3, 5,
                                   GCS_NODE_STATE_JOINED,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 1);
+                                  0, 1, 1, 0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Remerged 3");
@@ -365,7 +367,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim1_seqno, act1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Remerged 4");
@@ -388,7 +390,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim1_seqno, act1_seqno, act1_seqno - 2, 3,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_JOINER,
                                   "node1", "",
-                                  0, 1, 0, 0);
+                                  0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Remerged 5");
@@ -435,21 +437,21 @@ START_TEST(gcs_state_msg_test_gh24)
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home0", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[0] != 0);
     st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home1", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[1] != 0);
     st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home2", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[2] != 0);
 
     // last four are 37.
@@ -458,28 +460,28 @@ START_TEST(gcs_state_msg_test_gh24)
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home3", "",
-                                 0, 4, 2, 3);
+                                 0, 4, 2, 0, 3);
     fail_unless(st[3] != 0);
     st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home4", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[4] != 0);
     st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home5", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[5] != 0);
     st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_PRIM,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home6", "",
-                                 0, 4, 2, 2);
+                                 0, 4, 2, 0, 2);
     fail_unless(st[6] != 0);
     int ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 7,
                                        &quorum);
@@ -515,7 +517,6 @@ Suite *gcs_state_msg_suite(void)
   suite_add_tcase (s, tc_remerge);
   tcase_add_test  (tc_remerge, gcs_state_msg_test_quorum_remerge);
   tcase_add_test  (tc_remerge, gcs_state_msg_test_gh24);
-
 
   return s;
 }

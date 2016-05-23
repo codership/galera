@@ -68,11 +68,14 @@ namespace galera
 
 std::string const
 galera::ist::Receiver::RECV_ADDR("ist.recv_addr");
+std::string const
+galera::ist::Receiver::RECV_BIND("ist.recv_bind");
 
 void
 galera::ist::register_params(gu::Config& conf)
 {
     conf.add(Receiver::RECV_ADDR);
+    conf.add(Receiver::RECV_BIND);
     conf.add(CONF_KEEP_KEYS);
 }
 
@@ -81,6 +84,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 const char*           addr)
     :
     recv_addr_    (),
+    recv_bind_    (),
     io_service_   (),
     acceptor_     (io_service_),
     ssl_ctx_      (io_service_, asio::ssl::context::sslv23),
@@ -100,6 +104,14 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     ready_        (false)
 {
     std::string recv_addr;
+    std::string recv_bind;
+
+    try
+    {
+        recv_bind = conf_.get(RECV_BIND);
+        // no return
+    }
+    catch (gu::NotSet& e) {}
 
     try /* check if receive address is explicitly set */
     {
@@ -205,7 +217,58 @@ IST_determine_recv_addr (gu::Config& conf)
         recv_addr += ":" + gu::to_string(port);
     }
 
+    log_info << "IST receiver addr using " << recv_addr;
     return recv_addr;
+}
+
+static std::string
+IST_determine_recv_bind(gu::Config& conf)
+{
+    std::string recv_bind;
+
+    recv_bind = conf.get(galera::ist::Receiver::RECV_BIND);
+
+    /* check if explicit scheme is present */
+    if (recv_bind.find("://") == std::string::npos) {
+        bool ssl(false);
+
+        try {
+            std::string ssl_key = conf.get(gu::conf::ssl_key);
+            if (ssl_key.length() != 0)
+                ssl = true;
+        } catch (gu::NotSet&) {
+        }
+
+        if (ssl)
+            recv_bind.insert(0, "ssl://");
+        else
+            recv_bind.insert(0, "tcp://");
+    }
+
+    gu::URI rb_uri(recv_bind);
+
+    try /* check for explicit port,
+     TODO: make it possible to use any free port (explicit 0?) */
+    {
+        rb_uri.get_port();
+    } catch (gu::NotSet&) /* use gmcast listen port + 1 */
+    {
+        int port(0);
+
+        try {
+            port = gu::from_string<uint16_t>(conf.get(galera::BASE_PORT_KEY));
+
+        } catch (...) {
+            port = gu::from_string<uint16_t>(galera::BASE_PORT_DEFAULT);
+        }
+
+        port += 1;
+
+        recv_bind += ":" + gu::to_string(port);
+    }
+
+	log_info<< "IST receiver bind using " << recv_bind;
+    return recv_bind;
 }
 
 std::string
@@ -216,10 +279,19 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     ready_ = false;
     version_ = version;
     recv_addr_ = IST_determine_recv_addr(conf_);
-    gu::URI     const uri(recv_addr_);
     try
     {
-        if (uri.get_scheme() == "ssl")
+        recv_bind_ = IST_determine_recv_bind(conf_);
+    }
+    catch (gu::NotSet&)
+    {
+        recv_bind_ = recv_addr_;
+    }
+    gu::URI     const uri_addr(recv_addr_);
+    gu::URI     const uri_bind(recv_bind_);
+    try
+    {
+        if (uri_addr.get_scheme() == "ssl")
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
@@ -232,8 +304,8 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
 
         asio::ip::tcp::resolver resolver(io_service_);
         asio::ip::tcp::resolver::query
-            query(gu::unescape_addr(uri.get_host()),
-                  uri.get_port(),
+            query(gu::unescape_addr(uri_bind.get_host()),
+                  uri_bind.get_port(),
                   asio::ip::tcp::resolver::query::flags(0));
         asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
         acceptor_.open(i->endpoint().protocol());
@@ -242,9 +314,9 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         acceptor_.bind(*i);
         acceptor_.listen();
         // read recv_addr_ from acceptor_ in case zero port was specified
-        recv_addr_ = uri.get_scheme()
+        recv_addr_ = uri_addr.get_scheme()
             + "://"
-            + uri.get_host()
+            + uri_addr.get_host()
             + ":"
             + gu::to_string(acceptor_.local_endpoint().port());
     }
@@ -253,7 +325,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         recv_addr_ = "";
         gu_throw_error(e.code().value())
             << "Failed to open IST listener at "
-            << uri.to_string()
+            << uri_bind.to_string()
             << "', asio error '" << e.what() << "'";
     }
 
@@ -269,7 +341,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     running_ = true;
 
     log_info << "Prepared IST receiver, listening at: "
-             << (uri.get_scheme()
+             << (uri_bind.get_scheme()
                  + "://"
                  + gu::escape_addr(acceptor_.local_endpoint().address())
                  + ":"
