@@ -161,8 +161,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     desync_             (0),
     desync_mutex_       (),
     desync_cond_        (),
-    desync_act_on_      (this, &ReplicatorSMM::desync_on),
-    desync_act_off_     (this, &ReplicatorSMM::desync_off),
     sst_donor_          (),
     sst_uuid_           (WSREP_UUID_UNDEFINED),
     sst_seqno_          (WSREP_SEQNO_UNDEFINED),
@@ -217,8 +215,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_CONNECTED, S_DONOR));
     state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
 
-    state_.add_post_action(Transition(S_CONNECTED, S_DONOR), desync_act_on_);
-
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
     // the following is possible if one non-prim conf follows another
     state_.add_transition(Transition(S_JOINING, S_CONNECTED));
@@ -232,15 +228,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_SYNCED, S_CONNECTED));
     state_.add_transition(Transition(S_SYNCED, S_DONOR));
 
-    state_.add_post_action(Transition(S_SYNCED, S_DONOR), desync_act_on_);
-
     state_.add_transition(Transition(S_DONOR, S_CLOSING));
     state_.add_transition(Transition(S_DONOR, S_CONNECTED));
     state_.add_transition(Transition(S_DONOR, S_JOINED));
-
-    state_.add_post_action(Transition(S_DONOR, S_CLOSING),   desync_act_off_);
-    state_.add_post_action(Transition(S_DONOR, S_CONNECTED), desync_act_off_);
-    state_.add_post_action(Transition(S_DONOR, S_JOINED),    desync_act_off_);
 
     local_monitor_.set_initial_position(0);
 
@@ -1652,51 +1642,9 @@ void galera::ReplicatorSMM::resume()
     log_info << "Provider resumed.";
 }
 
-void galera::ReplicatorSMM::desync_wait()
-{
-    gu::Lock lock(desync_mutex_);
-    int desync_prev = desync_;
-    desync_ = desync_prev + 1;
-    if (gu_unlikely(desync_prev))
-    {
-        /* Wait for completion of previous synchronization: */
-        lock.wait(desync_cond_);
-    }
-}
-
-void galera::ReplicatorSMM::desync_on()
-{
-    desync_mutex_.lock();
-    if (desync_ == 0)
-    {
-        desync_ = 1;
-    }
-    desync_mutex_.unlock();
-}
-
-void galera::ReplicatorSMM::desync_off()
-{
-    /* Push the thread that waiting the completion
-     * of [de]synchronization:
-     */
-    desync_mutex_.lock();
-    int desync_prev = desync_;
-    if (desync_prev)
-    {
-        desync_ = desync_prev - 1;
-    }
-    desync_mutex_.unlock();
-    if (desync_prev > 1)
-    {
-        desync_cond_.signal();
-    }
-}
-
 void galera::ReplicatorSMM::desync()
 {
     wsrep_seqno_t seqno_l;
-
-    desync_wait();
 
     ssize_t ret(gcs_.desync(&seqno_l));
 
@@ -1724,61 +1672,6 @@ void galera::ReplicatorSMM::desync()
         {
             local_monitor_.self_cancel(lo);
         }
-    }
-    /* Using the local monitor to streamline desync operations
-     * and prevent them from overlapping in the time with each other:
-     */
-    while (ret == -EAGAIN && seqno_l > 0)
-    {
-        /* By analogy with the code above, but now we do this
-         * operation under the local monitor:
-         */
-        wsrep_seqno_t next_seqno = seqno_l;
-        LocalOrder next(seqno_l);
-        local_monitor_.enter(next);
-        ret = gcs_.desync(&seqno_l);
-        if (seqno_l > 0)
-        {
-            LocalOrder lo(seqno_l);
-            if (ret == 0)
-            {
-                /* Re-acquire monitor again if the required position
-                 * is higher than the current position in the sequence:
-                 */
-                if (seqno_l > next_seqno)
-                {
-                    local_monitor_.leave(next);
-                    local_monitor_.enter(lo);
-                }
-                else
-                {
-                    lo = next;
-                }
-                state_.shift_to(S_DONOR);
-                local_monitor_.leave(lo);
-            }
-            else
-            {
-                /* Desynchronization has failed, it is necessary to push
-                 * (and cancel) all the threads that are waiting for the
-                 * capture of the local monitor:
-                 */
-                local_monitor_.leave(next);
-                if (ret != EAGAIN && seqno_l > next_seqno)
-                {
-                    local_monitor_.self_cancel(lo);
-                }
-            }
-        }
-        else
-        {
-            local_monitor_.leave(next);
-        }
-    }
-
-    if ((ret || seqno_l < 0) && state_() != S_DONOR)
-    {
-        desync_off();
     }
 
     if (ret)
