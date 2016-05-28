@@ -125,7 +125,8 @@ gcs_core_send (gcs_core_t*          core,
 extern ssize_t
 gcs_core_recv (gcs_core_t*          conn,
                struct gcs_act_rcvd* recv_act,
-               long long            timeout);
+               long long            timeout,
+               bool*                sync_sent_ref = NULL);
 
 /* group protocol version */
 extern gcs_proto_t
