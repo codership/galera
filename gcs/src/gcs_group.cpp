@@ -805,7 +805,15 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        if (GCS_NODE_STATE_SYNCED != sender->status) {
+        int ret = 0;
+
+        if (GCS_NODE_STATE_DONOR == sender->status) {
+            gu_info ("SYNC message ignored as node %d.%d (%s) was"
+                     " re-transitioned to DONOR mode before it synced.",
+                     sender_idx, sender->segment, sender->name);
+            ret = -1;
+        }
+        else if (GCS_NODE_STATE_SYNCED != sender->status) {
             gu_warn ("SYNC message sender from non-JOINED %d.%d (%s). Ignored.",
                      sender_idx, sender->segment, sender->name);
         }
@@ -813,7 +821,8 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_debug ("Redundant SYNC message from %d.%d (%s).",
                       sender_idx, sender->segment, sender->name);
         }
-        return 0;
+
+        return ret;
     }
 }
 

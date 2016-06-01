@@ -1193,7 +1193,9 @@ static void *gcs_recv_thread (void *arg)
         struct gcs_repl_act** repl_act_ptr;
         struct gcs_act_rcvd   rcvd;
 
-        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout);
+        bool* sync_sent = (conn->state == GCS_CONN_DONOR
+                           ? &conn->sync_sent : NULL);
+        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout, sync_sent);
 
         if (gu_unlikely(ret <= 0)) {
 
