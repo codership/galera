@@ -1049,7 +1049,8 @@ static long core_msg_causal(gcs_core_t* conn,
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
-                       long long            timeout)
+                       long long            timeout,
+                       bool*                sync_sent_ref)
 {
 //    struct gcs_act_rcvd  recv_act;
     struct gcs_recv_msg* recv_msg = &conn->recv_msg;
@@ -1110,6 +1111,20 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         case GCS_MSG_FLOW:
             ret = core_msg_to_action (conn, recv_msg, &recv_act->act);
             assert (ret == recv_act->act.buf_len || ret <= 0);
+            if (ret == -1) {
+                /* This is to flag transition of node from JOINED -> DONOR.
+                Generally node goes from DONOR -> JOINED -> SYNCED but if
+                parallel desync request is recieved while node is in JOINED
+                state and it is processed before SYNCED message then node
+                can go from JOINED to DONOR state by-passing SYNCED state.
+                In such case we need to ignore SYNC request that is lying
+                from previous state transition and reset sync_sent so that
+                connection restart sending the request. */
+                if (sync_sent_ref) {
+                    *sync_sent_ref = false;
+                }
+                ret = 0;
+            }
             break;
         case GCS_MSG_CAUSAL:
             ret = core_msg_causal(conn, recv_msg);
@@ -1390,6 +1405,7 @@ void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
         gu_throw_fatal << "could not lock mutex";
     if (core->state < CORE_CLOSED)
     {
+        gcs_group_get_status(&core->group, status);
         core->backend.status_get(&core->backend, status);
     }
     gu_mutex_unlock(&core->send_lock);

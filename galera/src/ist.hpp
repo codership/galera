@@ -36,6 +36,7 @@ namespace galera
         {
         public:
             static std::string const RECV_ADDR;
+            static std::string const RECV_BIND;
 
             Receiver(gu::Config& conf, TrxHandle::SlavePool&, const char* addr);
             ~Receiver();
@@ -51,6 +52,7 @@ namespace galera
             void interrupt();
 
             std::string                                   recv_addr_;
+            std::string                                   recv_bind_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
             asio::ssl::context                            ssl_ctx_;

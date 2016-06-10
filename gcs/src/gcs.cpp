@@ -529,14 +529,14 @@ gcs_send_sync (gcs_conn_t* conn)
  */
 
 static bool
-gcs_shift_state (gcs_conn_t*      conn,
-                 gcs_conn_state_t new_state)
+gcs_shift_state (gcs_conn_t*      const conn,
+                 gcs_conn_state_t const new_state)
 {
     static const bool allowed [GCS_CONN_STATE_MAX][GCS_CONN_STATE_MAX] = {
        // SYNCED JOINED DONOR  JOINER PRIM   OPEN   CLOSED DESTR
         { false, true,  false, false, false, false, false, false }, // SYNCED
         { false, false, true,  true,  false, false, false, false }, // JOINED
-        { true,  true,  false, false, false, false, false, false }, // DONOR
+        { true,  true,  true,  false, false, false, false, false }, // DONOR
         { false, false, false, false, true,  false, false, false }, // JOINER
         { true,  true,  true,  true,  true,  true,  false, false }, // PRIMARY
         { true,  true,  true,  true,  true,  false, true,  false }, // OPEN
@@ -544,7 +544,7 @@ gcs_shift_state (gcs_conn_t*      conn,
         { false, false, false, false, false, false, true,  false }  // DESTROYED
     };
 
-    gcs_conn_state_t old_state = conn->state;
+    gcs_conn_state_t const old_state = conn->state;
 
     if (!allowed[new_state][old_state]) {
         if (old_state != new_state) {
@@ -555,10 +555,11 @@ gcs_shift_state (gcs_conn_t*      conn,
         return false;
     }
 
-    gu_info ("Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
-             gcs_conn_state_str[new_state], conn->global_seqno);
-
-    conn->state = new_state;
+    if (old_state != new_state) {
+        gu_info ("Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
+                 gcs_conn_state_str[new_state], conn->global_seqno);
+        conn->state = new_state;
+    }
 
     return true;
 }
@@ -1192,7 +1193,9 @@ static void *gcs_recv_thread (void *arg)
         struct gcs_repl_act** repl_act_ptr;
         struct gcs_act_rcvd   rcvd;
 
-        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout);
+        bool* sync_sent = (conn->state == GCS_CONN_DONOR
+                           ? &conn->sync_sent : NULL);
+        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout, sync_sent);
 
         if (gu_unlikely(ret <= 0)) {
 

@@ -514,18 +514,28 @@ namespace gcomm
             const std::string& def,
             std::ios_base& (*f)(std::ios_base&) = std::dec)
     {
-        std::string ret(def);
-        ret = conf.get(key, ret);
+        T ret;
+
         try
         {
-            return gu::from_string<T>(uri.get_option(key, ret), f);
+            std::string cnf(conf.get(key, def));
+            std::string val(uri.get_option(key, cnf));
+            try
+            {
+                ret = gu::from_string<T>(val, f);
+            }
+            catch (gu::NotFound)
+            {
+                gu_throw_error(EINVAL) << "Bad value '" << val
+                                       << "' for parameter '" << key << "'";
+            }
         }
-        catch(gu::NotFound& e)
+        catch (gu::NotFound)
         {
-            gu_throw_error(EINVAL) << "invalid value '" << ret << "' for "
-                                   << key;
-            throw;
+            gu_throw_error(EINVAL) << "Unrecognized parameter '" << key << "'";
         }
+
+        return ret;
     }
 
     template <typename T>
