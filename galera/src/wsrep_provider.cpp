@@ -22,6 +22,11 @@ using galera::TrxHandle;
 using galera::TrxHandleLock;
 
 
+extern "C" {
+    const char* wsrep_interface_version = (char*)WSREP_INTERFACE_VERSION;
+}
+
+
 extern "C"
 wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 {
