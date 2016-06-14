@@ -1668,6 +1668,7 @@ void galera::ReplicatorSMM::desync()
             local_monitor_.enter(lo);
             if (state_() != S_DONOR) state_.shift_to(S_DONOR);
             local_monitor_.leave(lo);
+            GU_DBUG_SYNC_WAIT("wsrep_desync_left_local_monitor");
         }
         else if (ret != -EAGAIN)
         {
