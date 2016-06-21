@@ -559,11 +559,6 @@ namespace galera
         wsrep_sst_donate_cb_t sst_donate_cb_;
         wsrep_synced_cb_t     synced_cb_;
 
-        // desync control variables
-        int       desync_; // 0 = synched, 1 = desynched, 2 = in wait for resync.
-        gu::Mutex desync_mutex_;
-        gu::Cond  desync_cond_;
-
         // SST
         std::string   sst_donor_;
         wsrep_uuid_t  sst_uuid_;
