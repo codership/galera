@@ -98,7 +98,12 @@ public:
  */
 class gu::prodcons::Producer
 {
+#ifdef HAVE_PSI_INTERFACE
+    gu::CondWithPFS cond;  /*! Condition variable */
+#else
     gu::Cond cond;  /*! Condition variable */
+#endif /* HAVE_PSI_INTERFACE */
+
     Consumer& cons; /*! Consumer associated to this producer */
 
     /*!
@@ -106,7 +111,11 @@ class gu::prodcons::Producer
      *
      * @return Reference to condition variable
      */
+#ifdef HAVE_PSI_INTERFACE
+    CondWithPFS& get_cond() { return cond; }
+#else
     Cond& get_cond() { return cond; }
+#endif /* HAVE_PSI_INTERFACE */
     friend class Consumer;
 public:
     /*!
@@ -115,7 +124,11 @@ public:
      * @param cons_ Consumer associated to this producer
      */
     Producer(Consumer& cons_) :
+#ifdef HAVE_PSI_INTERFACE
+        cond(WSREP_PFS_INSTR_TAG_PRODCONS_CONDVAR),
+#else
         cond(),
+#endif /* HAVE_PSI_INTERFACE */
         cons(cons_)
     { }
 
@@ -133,7 +146,11 @@ public:
  */
 class gu::prodcons::Consumer
 {
-    Mutex mutex; /*! Mutex for internal locking */
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS mutex; /*! Mutex for internal locking */
+#else
+    gu::Mutex mutex; /*! Mutex for internal locking */
+#endif /* HAVE_PSI_INTERFACE */
     MessageQueue* mque; /*! Message queue for producer messages */
     MessageQueue* rque; /*! Message queue for ack messages */
 

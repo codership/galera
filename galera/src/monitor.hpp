@@ -47,8 +47,13 @@ namespace galera
 
         Monitor()
             :
+#ifdef HAVE_PSI_INTERFACE
+            mutex_(WSREP_PFS_INSTR_TAG_MONITOR_MUTEX),
+            cond_(WSREP_PFS_INSTR_TAG_MONITOR_CONDVAR),
+#else
             mutex_(),
             cond_(),
+#endif /* HAVE_PSI_INTERFACE */
             last_entered_(-1),
             last_left_(-1),
             drain_seqno_(LLONG_MAX),
@@ -430,8 +435,13 @@ namespace galera
         Monitor(const Monitor&);
         void operator=(const Monitor&);
 
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS mutex_;
+        gu::CondWithPFS  cond_;
+#else
         gu::Mutex mutex_;
         gu::Cond  cond_;
+#endif /* HAVE_PSI_INTERFACE */
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         wsrep_seqno_t drain_seqno_;

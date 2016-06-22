@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "25"
+#define WSREP_INTERFACE_VERSION "26"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -452,6 +452,122 @@ typedef enum wsrep_cb_status (*wsrep_sst_donate_cb_t) (
  */
 typedef void (*wsrep_synced_cb_t) (void* app_ctx);
 
+/*!
+ * @brief different instruments that we want to monitor through PFS.
+ */
+typedef enum wsrep_pfs_instr_type
+{
+    WSREP_PFS_INSTR_TYPE_UNKNOWN,
+    WSREP_PFS_INSTR_TYPE_MUTEX,
+    WSREP_PFS_INSTR_TYPE_CONDVAR,
+    WSREP_PFS_INSTR_TYPE_THREAD,
+    WSREP_PFS_INSTR_TYPE_FILE
+} wsrep_pfs_instr_type_t;
+
+/*!
+ * @brief type of operation on instruments to monitor.
+ */
+typedef enum wsrep_pfs_instr_ops
+{
+    WSREP_PFS_INSTR_OPS_UNKNOWN,
+    WSREP_PFS_INSTR_OPS_INIT,
+    WSREP_PFS_INSTR_OPS_DESTROY,
+    WSREP_PFS_INSTR_OPS_LOCK,
+    WSREP_PFS_INSTR_OPS_UNLOCK,
+    WSREP_PFS_INSTR_OPS_WAIT,
+    WSREP_PFS_INSTR_OPS_TIMEDWAIT,
+    WSREP_PFS_INSTR_OPS_SIGNAL,
+    WSREP_PFS_INSTR_OPS_BROADCAST,
+    WSREP_PFS_INSTR_OPS_CREATE,
+    WSREP_PFS_INSTR_OPS_OPEN,
+    WSREP_PFS_INSTR_OPS_CLOSE,
+    WSREP_PFS_INSTR_OPS_DELETE
+} wsrep_pfs_instr_ops_t;
+
+/*!
+ * @brief name/tag of different instruments.
+ */
+typedef enum wsrep_pfs_instr_tag
+{
+    /* Mutex tag */
+    WSREP_PFS_INSTR_TAG_CERT_MUTEX = 0,
+    WSREP_PFS_INSTR_TAG_STATS_MUTEX = 1,
+    WSREP_PFS_INSTR_TAG_DUMMY_GCS_MUTEX = 2,
+    WSREP_PFS_INSTR_TAG_SERVICE_THD_MUTEX = 3,
+    WSREP_PFS_INSTR_TAG_IST_RECEIVER_MUTEX = 4,
+    WSREP_PFS_INSTR_TAG_MONITOR_MUTEX = 5,
+    WSREP_PFS_INSTR_TAG_SST_MUTEX = 6,
+    WSREP_PFS_INSTR_TAG_INCOMING_MUTEX = 7,
+    WSREP_PFS_INSTR_TAG_SAVED_STATE_MUTEX = 8,
+    WSREP_PFS_INSTR_TAG_TRX_HANDLE_MUTEX = 9,
+    WSREP_PFS_INSTR_TAG_WSDB_TRX_MUTEX = 10,
+    WSREP_PFS_INSTR_TAG_WSDB_CONN_MUTEX = 11,
+    WSREP_PFS_INSTR_TAG_GU_DBUG_SYNC_MUTEX = 12,
+    WSREP_PFS_INSTR_TAG_PROFILE_MUTEX = 13,
+    WSREP_PFS_INSTR_TAG_GCACHE_MUTEX = 14,
+    WSREP_PFS_INSTR_TAG_PROTSTACK_MUTEX = 15,
+    WSREP_PFS_INSTR_TAG_PRODCONS_MUTEX = 16,
+    WSREP_PFS_INSTR_TAG_GU_MONITOR_MUTEX = 17,
+    WSREP_PFS_INSTR_TAG_GCOMMCONN_MUTEX = 18,
+    WSREP_PFS_INSTR_TAG_RECVBUF_MUTEX = 19,
+    WSREP_PFS_INSTR_TAG_MEMPOOL_MUTEX = 20,
+
+    /* CondVar tag */
+    WSREP_PFS_INSTR_TAG_DUMMY_GCS_CONDVAR = 21,
+    WSREP_PFS_INSTR_TAG_SERVICE_THD_CONDVAR = 22,
+    WSREP_PFS_INSTR_TAG_SERVICE_THD_FLUSH_CONDVAR = 23,
+    WSREP_PFS_INSTR_TAG_IST_RECEIVER_CONDVAR = 24,
+    WSREP_PFS_INSTR_TAG_IST_CONSUMER_CONDVAR = 25,
+    WSREP_PFS_INSTR_TAG_MONITOR_PROCESS1_CONDVAR = 26,
+    WSREP_PFS_INSTR_TAG_MONITOR_PROCESS2_CONDVAR = 27,
+    WSREP_PFS_INSTR_TAG_MONITOR_CONDVAR = 28,
+    WSREP_PFS_INSTR_TAG_SST_CONDVAR = 29,
+    WSREP_PFS_INSTR_TAG_GU_DBUG_SYNC_CONDVAR = 30,
+    WSREP_PFS_INSTR_TAG_PRODCONS_CONDVAR = 31,
+    WSREP_PFS_INSTR_TAG_GCACHE_CONDVAR = 32,
+    WSREP_PFS_INSTR_TAG_GU_MONITOR_CONDVAR = 33,
+    WSREP_PFS_INSTR_TAG_RECVBUF_CONDVAR = 34,
+
+    /* Thread tag */
+    WSREP_PFS_INSTR_TAG_SERVICE_THD_THREAD = 35,
+    WSREP_PFS_INSTR_TAG_IST_RECEIVER_THREAD = 36,
+    WSREP_PFS_INSTR_TAG_IST_ASYNC_SENDER_THREAD = 37,
+    WSREP_PFS_INSTR_TAG_WRITESET_CHECKSUM_THREAD = 38,
+    WSREP_PFS_INSTR_TAG_GCACHE_REMOVEFILE_THREAD = 39,
+    WSREP_PFS_INSTR_TAG_RECEIVER_THREAD = 40,
+    WSREP_PFS_INSTR_TAG_GCOMMCONN_THREAD = 41,
+
+    /* File tag */
+    WSREP_PFS_INSTR_TAG_RECORDSET_FILE = 42,
+    WSREP_PFS_INSTR_TAG_RINGBUFFER_FILE = 43,
+    WSREP_PFS_INSTR_TAG_GCACHE_PAGE_FILE = 44,
+    WSREP_PFS_INSTR_TAG_GRASTATE_FILE = 45,
+    WSREP_PFS_INSTR_TAG_GVWSTATE_FILE = 46
+
+} wsrep_pfs_instr_tag_t;
+
+/*!
+ * @brief a callback to create PFS instrumented mutex/condition variables
+ *
+ *
+ * @param type          mutex or condition variable
+ * @param ops           add/init or remove/destory mutex/condition variable
+ * @param tag           tag/name of instrument to monitor
+ * @param value         created mutex or condition variable
+ * @param alliedvalue   allied value for supporting operation.
+                        for example: while waiting for cond-var corresponding
+                        mutex is passes through this variable.
+ * @param ts      time to wait for condition.
+ */
+typedef void (*wsrep_pfs_instr_cb_t) (
+    wsrep_pfs_instr_type_t        type,
+    wsrep_pfs_instr_ops_t         ops,
+    wsrep_pfs_instr_tag_t         tag,
+    void**                        value,
+    void**                        alliedvalue,
+    const void*                   ts);
+
+typedef wsrep_pfs_instr_cb_t gu_pfs_instr_cb_t;
 
 /*!
  * Initialization parameters for wsrep provider.
@@ -485,6 +601,11 @@ struct wsrep_init_args
     /* State Snapshot Transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
     wsrep_synced_cb_t     synced_cb;       //!< synced with group
+
+   /* Instrument mutex/condition variables through MySQL Performance
+   Schema infrastructure. Callback help in creating these mutexes in MySQL
+   space with needed infrastructure to register them. */
+   wsrep_pfs_instr_cb_t   pfs_instr_cb;    //!< register for pfs instrumentation
 };
 
 

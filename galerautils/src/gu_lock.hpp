@@ -21,14 +21,20 @@ namespace gu
     {
         pthread_mutex_t* const value;
 
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS* const mutex;
+#endif /* HAVE_PSI_INTERFACE */
+
         Lock (const Lock&);
         Lock& operator=(const Lock&);
 
     public:
 
         Lock (const Mutex& mtx) : value(&mtx.value)
+#if HAVE_PSI_INTERFACE
+            , mutex()
+#endif
         {
-
             int err = pthread_mutex_lock (value);
             if (gu_unlikely(err))
             {
@@ -40,6 +46,13 @@ namespace gu
 
         virtual ~Lock ()
         {
+#ifdef HAVE_PSI_INTERFACE
+            if (mutex != NULL)
+            {
+                mutex->unlock();
+                return;
+            }
+#endif /* HAVE_PSI_INTERFACE */
             int err = pthread_mutex_unlock (value);
             if (gu_unlikely(err))
             {
@@ -68,6 +81,45 @@ namespace gu
 
             if (gu_unlikely(ret)) gu_throw_error(ret);
         }
+
+#ifdef HAVE_PSI_INTERFACE
+        Lock (const MutexWithPFS& mtx)
+            :
+            value(mtx.value),
+            mutex(const_cast<gu::MutexWithPFS*>(&mtx))
+        {
+            mutex->lock();
+        }
+
+        inline void wait (const CondWithPFS& cond)
+        {
+            cond.ref_count++;
+            pfs_instr_callback(
+                WSREP_PFS_INSTR_TYPE_CONDVAR,
+                WSREP_PFS_INSTR_OPS_WAIT,
+                cond.m_tag,
+                reinterpret_cast<void**>(const_cast<gu_cond_t**>(&(cond.cond))),
+                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(&value)),
+                NULL);
+            cond.ref_count--;
+        }
+
+        inline void wait (const CondWithPFS& cond, const datetime::Date& date)
+        {
+            timespec ts;
+
+            date._timespec(ts);
+            cond.ref_count++;
+            pfs_instr_callback(
+                WSREP_PFS_INSTR_TYPE_CONDVAR,
+                WSREP_PFS_INSTR_OPS_WAIT,
+                cond.m_tag,
+                reinterpret_cast<void**>(const_cast<gu_cond_t**>(&(cond.cond))),
+                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(&value)),
+                &ts);
+            cond.ref_count--;
+        }
+#endif /* HAVE_PSI_INTERFACE */
     };
 }
 

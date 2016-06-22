@@ -396,8 +396,15 @@ namespace galera
 
         gu::Config*  gconf_;
         gcache::GCache* gcache_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS
+                     mtx_;
+        gu::CondWithPFS
+                     cond_;
+#else
         gu::Mutex    mtx_;
         gu::Cond     cond_;
+#endif /* HAVE_PSI_INTERFACE */
         gcs_seqno_t  global_seqno_;
         gcs_seqno_t  local_seqno_;
         gu_uuid_t    uuid_;

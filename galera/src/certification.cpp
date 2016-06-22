@@ -825,7 +825,11 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     cert_index_ng_         (),
     deps_set_              (),
     service_thd_           (thd),
+#ifdef HAVE_PSI_INTERFACE
+    mutex_                 (WSREP_PFS_INSTR_TAG_CERT_MUTEX),
+#else
     mutex_                 (),
+#endif /* HAVE_PSI_INTERFACE */
     trx_size_warn_count_   (0),
     initial_position_      (-1),
     position_              (-1),
@@ -833,7 +837,11 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     last_pa_unsafe_        (-1),
     last_preordered_seqno_ (position_),
     last_preordered_id_    (0),
+#ifdef HAVE_PSI_INTERFACE
+    stats_mutex_           (WSREP_PFS_INSTR_TAG_STATS_MUTEX),
+#else
     stats_mutex_           (),
+#endif /* HAVE_PSI_INTERFACE */
     n_certified_           (0),
     deps_dist_             (0),
     cert_interval_         (0),

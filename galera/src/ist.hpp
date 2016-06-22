@@ -56,17 +56,34 @@ namespace galera
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
             asio::ssl::context                            ssl_ctx_;
+#ifdef HAVE_PSI_INTERFACE
+            gu::MutexWithPFS                              mutex_;
+            gu::CondWithPFS                               cond_;
+#else
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
+#endif /* HAVE_PSI_INTERFACE */
 
             class Consumer
             {
             public:
 
+#ifdef HAVE_PSI_INTERFACE
+                Consumer()
+                    :
+                    cond_(WSREP_PFS_INSTR_TAG_IST_CONSUMER_CONDVAR),
+                    trx_(0)
+                { }
+#else
                 Consumer() : cond_(), trx_(0) { }
+#endif
                 ~Consumer() { }
 
+#ifdef HAVE_PSI_INTERFACE
+                gu::CondWithPFS&  cond()        { return cond_; }
+#else
                 gu::Cond&  cond()              { return cond_; }
+#endif /* HAVE_PSI_INTERFACE */
                 void       trx(TrxHandle* trx) { trx_ = trx;   }
                 TrxHandle* trx() const         { return trx_;  }
 
@@ -76,7 +93,11 @@ namespace galera
                 Consumer(const Consumer&);
                 Consumer& operator=(const Consumer&);
 
+#ifdef HAVE_PSI_INTERFACE
+                gu::CondWithPFS   cond_;
+#else
                 gu::Cond   cond_;
+#endif /* HAVE_PSI_INTERFACE */
                 TrxHandle* trx_;
             };
 

@@ -48,7 +48,11 @@ gu::Allocator::FilePage::FilePage (const std::string& name,
                                    page_size_type const size)
     :
     Page (0, 0),
+#ifdef HAVE_PSI_INTERFACE
+    fd_  (name, WSREP_PFS_INSTR_TAG_RECORDSET_FILE, size, false, false),
+#else
     fd_  (name, size, false, false),
+#endif /* HAVE_PSI_INTERFACE */
     mmap_(fd_, true)
 {
     base_ptr_ = reinterpret_cast<byte_t*>(mmap_.ptr);

@@ -178,7 +178,14 @@ namespace gu
 
         explicit
         MemPool(int buf_size, int reserve = 0, const char* name = "")
-            : base_(buf_size, reserve, name), mtx_ () {}
+            :
+            base_(buf_size, reserve, name),
+#ifdef HAVE_PSI_INTERFACE
+            mtx_ (WSREP_PFS_INSTR_TAG_MEMPOOL_MUTEX)
+#else
+            mtx_ ()
+#endif /* HAVE_PSI_INTERFACE */
+        {}
 
         ~MemPool() {}
 
@@ -219,7 +226,11 @@ namespace gu
     private:
 
         MemPool<false> base_;
-        Mutex          mtx_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS mtx_;
+#else
+        gu::Mutex      mtx_;
+#endif /* HAVE_PSI_INTERFACE */
 
     }; /* class MemPool<true>: thread-safe */
 

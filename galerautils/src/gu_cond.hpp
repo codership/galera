@@ -67,6 +67,72 @@ namespace gu
         }
 
     };
+
+#ifdef HAVE_PSI_INTERFACE
+    // TODO: Check for return value
+    class CondWithPFS
+    {
+    public:
+
+        CondWithPFS (wsrep_pfs_instr_tag_t tag)
+            :
+            cond(),
+            ref_count(0),
+            m_tag(tag)
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_CONDVAR,
+                               WSREP_PFS_INSTR_OPS_INIT,
+                               m_tag, reinterpret_cast<void**> (&cond),
+                               NULL, NULL);
+        }
+
+        ~CondWithPFS ()
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_CONDVAR,
+                               WSREP_PFS_INSTR_OPS_DESTROY,
+                               m_tag, reinterpret_cast<void**> (&cond),
+                               NULL, NULL);
+        }
+
+        inline void signal () const
+        {
+            if (ref_count > 0) {
+                pfs_instr_callback(
+                    WSREP_PFS_INSTR_TYPE_CONDVAR,
+                    WSREP_PFS_INSTR_OPS_SIGNAL, m_tag,
+                    reinterpret_cast<void**> (const_cast<gu_cond_t**>(&cond)),
+                    NULL, NULL);
+            }
+        }
+
+        inline void broadcast () const
+        {
+            if (ref_count > 0) {
+                pfs_instr_callback(
+                    WSREP_PFS_INSTR_TYPE_CONDVAR,
+                    WSREP_PFS_INSTR_OPS_BROADCAST, m_tag,
+                    reinterpret_cast<void**> (const_cast<gu_cond_t**>(&cond)),
+                    NULL, NULL);
+            }
+        }
+
+    protected:
+
+        gu_cond_t*      cond;
+        long mutable    ref_count;
+
+    private:
+
+        wsrep_pfs_instr_tag_t m_tag;
+
+        // non-copyable
+        CondWithPFS(const CondWithPFS&);
+        void operator=(const CondWithPFS&);
+
+        friend class Lock;
+
+    };
+#endif /* HAVE_PSI_INTERFACE */
 }
 
 #endif // __GU_COND__

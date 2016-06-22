@@ -119,9 +119,19 @@ namespace galera
 
         TrxMap       trx_map_;
         ConnTrxMap   conn_trx_map_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS
+                     trx_mutex_;
+#else
         gu::Mutex    trx_mutex_;
+#endif /* HAVE_PSI_INTERFACE */
         ConnMap      conn_map_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS
+                     conn_mutex_;
+#else
         gu::Mutex    conn_mutex_;
+#endif /* HAVE_PSI_INTERFACE */
     };
 
     inline std::ostream& operator<<(std::ostream& os, const Wsdb& w)

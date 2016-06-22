@@ -816,8 +816,22 @@ namespace galera
 
         static void* checksum_thread (void* arg)
         {
+#ifdef HAVE_PSI_INTERFACE
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                               WSREP_PFS_INSTR_OPS_INIT,
+                               WSREP_PFS_INSTR_TAG_WRITESET_CHECKSUM_THREAD,
+                               NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
             WriteSetIn* ws(reinterpret_cast<WriteSetIn*>(arg));
             ws->checksum();
+
+#ifdef HAVE_PSI_INTERFACE
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                               WSREP_PFS_INSTR_OPS_DESTROY,
+                               WSREP_PFS_INSTR_TAG_WRITESET_CHECKSUM_THREAD,
+                               NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
             return NULL;
         }
 

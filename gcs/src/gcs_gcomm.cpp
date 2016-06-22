@@ -101,7 +101,16 @@ private:
 
 public:
 
-    RecvBuf() : mutex_(), cond_(), queue_(), waiting_(false) { }
+    RecvBuf()
+        :
+#ifdef HAVE_PSI_INTERFACE
+        mutex_(WSREP_PFS_INSTR_TAG_RECVBUF_MUTEX),
+        cond_(WSREP_PFS_INSTR_TAG_RECVBUF_CONDVAR),
+#else
+        mutex_(),
+        cond_(),
+#endif /* HAVE_PSI_INTERFACE */
+        queue_(), waiting_(false) { }
 
     void push_back(const RecvBufData& p)
     {
@@ -142,8 +151,13 @@ public:
 
 private:
 
-    Mutex mutex_;
-    Cond cond_;
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS mutex_;
+    gu::CondWithPFS cond_;
+#else
+    gu::Mutex mutex_;
+    gu::Cond cond_;
+#endif /* HAVE_PSI_INTERFACE */
     RecvBufQueue queue_;
     bool waiting_;
 };
@@ -186,7 +200,11 @@ public:
         uri_(u),
         net_(Protonet::create(conf_)),
         tp_(0),
+#ifdef HAVE_PSI_INTERFACE
+        mutex_(WSREP_PFS_INSTR_TAG_GCOMMCONN_MUTEX),
+#else
         mutex_(),
+#endif /* HAVE_PSI_INTERFACE */
         refcnt_(0),
         terminated_(false),
         error_(0),
@@ -206,7 +224,23 @@ public:
 
     static void* run_fn(void* arg)
     {
+
+#ifdef HAVE_PSI_INTERFACE
+        pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                           WSREP_PFS_INSTR_OPS_INIT,
+                           WSREP_PFS_INSTR_TAG_GCOMMCONN_THREAD,
+                           NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
         static_cast<GCommConn*>(arg)->run();
+
+#ifdef HAVE_PSI_INTERFACE
+        pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                           WSREP_PFS_INSTR_OPS_DESTROY,
+                           WSREP_PFS_INSTR_TAG_GCOMMCONN_THREAD,
+                           NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
         return 0;
     }
 
@@ -223,7 +257,7 @@ public:
 
         error_ = ENOTCONN;
         int err;
-        if ((err = pthread_create(&thd_, 0, &run_fn, this)) != 0)
+        if ((err = gu_thread_create(&thd_, 0, &run_fn, this)) != 0)
         {
             gu_throw_error(err) << "Failed to create thread";
         }
@@ -411,7 +445,11 @@ private:
     URI               uri_;
     Protonet*         net_;
     Transport*        tp_;
-    Mutex             mutex_;
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS  mutex_;
+#else
+    gu::Mutex         mutex_;
+#endif /* HAVE_PSI_INTERFACE */
     size_t            refcnt_;
     bool              terminated_;
     int               error_;

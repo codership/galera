@@ -243,7 +243,11 @@ namespace galera
             }
 
 #ifdef GU_DBUG_ON
+#ifdef HAVE_PSI_INTERFACE
+            void debug_sync(gu::MutexWithPFS& mutex)
+#else
             void debug_sync(gu::Mutex& mutex)
+#endif /* HAVE_PSI_INTERFACE */
             {
                 if (trx_ != 0 && trx_->is_local())
                 {
@@ -280,7 +284,11 @@ namespace galera
             }
 
 #ifdef GU_DBUG_ON
+#ifdef HAVE_PSI_INTERFACE
+            void debug_sync(gu::MutexWithPFS& mutex)
+#else
             void debug_sync(gu::Mutex& mutex)
+#endif /* HAVE_PSI_INTERFACE */
             {
                 if (trx_.is_local())
                 {
@@ -365,7 +373,11 @@ namespace galera
             }
 
 #ifdef GU_DBUG_ON
+#ifdef HAVE_PSI_INTERFACE
+            void debug_sync(gu::MutexWithPFS& mutex)
+#else
             void debug_sync(gu::Mutex& mutex)
+#endif /* HAVE_PSI_INTERFACE */
             {
                 if (trx_.is_local())
                 {
@@ -490,7 +502,8 @@ namespace galera
         class InitLib /* Library initialization routines */
         {
         public:
-            InitLib (gu_log_cb_t cb) { gu_init(cb); }
+            InitLib (gu_log_cb_t cb, gu_pfs_instr_cb_t pfs_instr_cb)
+            { gu_init(cb, pfs_instr_cb); }
         };
 
         InitLib                init_lib_;
@@ -563,8 +576,13 @@ namespace galera
         std::string   sst_donor_;
         wsrep_uuid_t  sst_uuid_;
         wsrep_seqno_t sst_seqno_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS sst_mutex_;
+        gu::CondWithPFS  sst_cond_;
+#else
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
+#endif /* HAVE_PSI_INTERFACE */
         int           sst_retry_sec_;
 
         // services
@@ -608,7 +626,11 @@ namespace galera
 
         // non-atomic stats
         std::string           incoming_list_;
+#ifdef HAVE_PSI_INTERFACE
+        mutable gu::MutexWithPFS incoming_mutex_;
+#else
         mutable gu::Mutex     incoming_mutex_;
+#endif /* HAVE_PSI_INTERFACE */
 
         mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
     };

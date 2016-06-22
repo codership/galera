@@ -11,6 +11,9 @@
 
 #include <pthread.h>
 
+// To the get declaration of pfs callback.
+#include "../common/wsrep_api.h"
+
 struct gu_mutex
 {
     pthread_mutex_t  target_mutex;      //!< for critical section
@@ -41,6 +44,8 @@ int gu_cond_wait_dbg     (pthread_cond_t *cond,
                           struct gu_mutex *mutex,
                           const char *file, unsigned int line);
 /*@}*/
+
+extern gu_pfs_instr_cb_t pfs_instr_callback;
 
 /** Shorter mutex API for applications.
  *  Depending on compile-time flags application will either use

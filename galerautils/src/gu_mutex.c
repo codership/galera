@@ -10,6 +10,18 @@
 #include <string.h>
 #include "galerautils.h"
 
+// To the get declaration of pfs callback.
+#include "../common/wsrep_api.h"
+
+gu_pfs_instr_cb_t pfs_instr_callback = NULL;
+
+int
+gu_conf_set_pfs_instr_callback (gu_pfs_instr_cb_t callback)
+{
+  pfs_instr_callback = callback;
+  return 0;
+}
+
 #if 0 /* Is it usable? */
 static const struct gu_mutex
 gu_mutex_init = { .target_mutex      = PTHREAD_MUTEX_INITIALIZER,

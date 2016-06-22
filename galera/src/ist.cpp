@@ -88,8 +88,13 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     io_service_   (),
     acceptor_     (io_service_),
     ssl_ctx_      (io_service_, asio::ssl::context::sslv23),
+#ifdef HAVE_PSI_INTERFACE
+    mutex_        (WSREP_PFS_INSTR_TAG_IST_RECEIVER_MUTEX),
+    cond_         (WSREP_PFS_INSTR_TAG_IST_RECEIVER_CONDVAR),
+#else
     mutex_        (),
     cond_         (),
+#endif /* HAVE_PSI_INTERFACE */
     consumers_    (),
     current_seqno_(-1),
     last_seqno_   (-1),
@@ -139,8 +144,22 @@ galera::ist::Receiver::~Receiver()
 
 extern "C" void* run_receiver_thread(void* arg)
 {
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_INIT,
+                       WSREP_PFS_INSTR_TAG_IST_RECEIVER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     galera::ist::Receiver* receiver(static_cast<galera::ist::Receiver*>(arg));
     receiver->run();
+
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_DESTROY,
+                       WSREP_PFS_INSTR_TAG_IST_RECEIVER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
     return 0;
 }
 
@@ -332,7 +351,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     current_seqno_ = first_seqno;
     last_seqno_    = last_seqno;
     int err;
-    if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
+    if ((err = gu_thread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
         recv_addr_ = "";
         gu_throw_error(err) << "Unable to create receiver thread";
@@ -793,6 +812,14 @@ extern "C"
 void* run_async_sender(void* arg)
 {
     galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
+
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_INIT,
+                       WSREP_PFS_INSTR_TAG_IST_ASYNC_SENDER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     log_info << "async IST sender starting to serve " << as->peer().c_str()
              << " sending " << as->first() << "-" << as->last();
     wsrep_seqno_t join_seqno;
@@ -825,6 +852,13 @@ void* run_async_sender(void* arg)
     }
     log_info << "async IST sender served";
 
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_DESTROY,
+                       WSREP_PFS_INSTR_TAG_IST_ASYNC_SENDER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     return 0;
 }
 
@@ -837,7 +871,7 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
 {
     gu::Critical crit(monitor_);
     AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
-    int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
+    int err(gu_thread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {
         delete as;

@@ -58,9 +58,16 @@ namespace galera
         gcache::GCache& gcache_;
         GcsI&           gcs_;
         gu_thread_t     thd_;
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS
+                        mtx_;
+        gu::CondWithPFS cond_;  // service request condition
+        gu::CondWithPFS flush_; // flush condition
+#else
         gu::Mutex       mtx_;
         gu::Cond        cond_;  // service request condition
         gu::Cond        flush_; // flush condition
+#endif /* HAVE_PSI_INTERFACE */
         Data            data_;
 
         static void* thd_func (void*);
