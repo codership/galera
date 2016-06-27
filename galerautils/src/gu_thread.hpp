@@ -98,7 +98,7 @@ namespace gu
     //
     // Insertion operator for ThreadSchedparam
     //
-    static std::ostream& operator<<(std::ostream& os,
+    inline std::ostream& operator<<(std::ostream& os,
                                     const gu::ThreadSchedparam& sp)
     {
         sp.print(os); return os;
