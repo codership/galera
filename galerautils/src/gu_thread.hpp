@@ -75,7 +75,10 @@ namespace gu
         // Default system ThreadSchedparam
         static ThreadSchedparam system_default;
 
+        void print(std::ostream& os) const;
+
     private:
+
         int policy_; // Scheduling policy
         int prio_;   // Scheduling priority
     };
@@ -92,13 +95,16 @@ namespace gu
     //
     void thread_set_schedparam(pthread_t thread, const ThreadSchedparam&);
 
-
+    //
+    // Insertion operator for ThreadSchedparam
+    //
+    inline std::ostream& operator<<(std::ostream& os,
+                                    const gu::ThreadSchedparam& sp)
+    {
+        sp.print(os); return os;
+    }
 }
 
-//
-// Insertion operator for ThreadSchedparam
-//
-std::ostream& operator<<(std::ostream& os, const gu::ThreadSchedparam& sp);
 
 
 #endif // GU_THREAD_HPP
