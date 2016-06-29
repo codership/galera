@@ -758,6 +758,7 @@ namespace galera
     }; /* class TrxHandle */
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
+    std::ostream& operator<<(std::ostream& os, const TrxHandle& th);
 
     class TrxHandleLock
     {

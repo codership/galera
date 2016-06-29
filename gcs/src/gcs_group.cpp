@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -283,7 +283,7 @@ group_post_state_exchange (gcs_group_t* group)
                               gcs_state_msg_uuid(states[i]))))
             return; // not all states from THIS state exch. received, wait
     }
-    gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
+    gu_debug ("STATE EXCHANGE: " GU_UUID_FORMAT " complete.",
               GU_UUID_ARGS(&group->state_uuid));
 
     gcs_state_msg_get_quorum (states, group->num, quorum);
@@ -356,7 +356,7 @@ group_post_state_exchange (gcs_group_t* group)
              "\n\tact_id     = %lld,"
              "\n\tlast_appl. = %lld,"
              "\n\tprotocols  = %d/%d/%d (gcs/repl/appl),"
-             "\n\tgroup UUID = "GU_UUID_FORMAT,
+             "\n\tgroup UUID = " GU_UUID_FORMAT,
              quorum->version,
              quorum->primary ? "PRIMARY" : "NON-PRIMARY",
              quorum->conf_id,
@@ -466,7 +466,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                     // no history provided: start a new one
                     group->act_id_ = GCS_SEQNO_NIL;
                     gu_uuid_generate (&group->group_uuid, NULL, 0);
-                    gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
+                    gu_info ("Starting new group from scratch: " GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
                 }
 // the following should be removed under #474
@@ -546,7 +546,7 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         group->state      = GCS_GROUP_WAIT_STATE_MSG;
     }
     else {
-        gu_warn ("Stray state UUID msg: "GU_UUID_FORMAT
+        gu_warn ("Stray state UUID msg: " GU_UUID_FORMAT
                  " from node %ld (%s), current group state %s",
                  GU_UUID_ARGS((gu_uuid_t*)msg->buf),
                  msg->sender_idx, group->nodes[msg->sender_idx].name,
@@ -577,7 +577,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
             if (!gu_uuid_compare(&group->state_uuid, state_uuid)) {
 
-                gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
+                gu_info ("STATE EXCHANGE: got state msg: " GU_UUID_FORMAT
                          " from %d (%s)", GU_UUID_ARGS(state_uuid),
                          msg->sender_idx, gcs_state_msg_name(state));
 
@@ -587,7 +587,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 group_post_state_exchange (group);
             }
             else {
-                gu_debug ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
+                gu_debug ("STATE EXCHANGE: stray state msg: " GU_UUID_FORMAT
                           " from node %ld (%s), current state UUID: "
                           GU_UUID_FORMAT,
                           GU_UUID_ARGS(state_uuid),
@@ -681,7 +681,10 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             }
             else {
                 assert(sender->count_last_applied);
-                sender->status = GCS_NODE_STATE_JOINED;
+                assert(sender->desync_count > 0);
+                sender->desync_count -= 1;
+                if (0 == sender->desync_count)
+                    sender->status = GCS_NODE_STATE_JOINED;
             }
         }
         else {
@@ -744,8 +747,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         else {
             if (sender_idx == peer_idx) {
-                gu_info ("Member %d.%d (%s) resyncs itself to group",
-                         sender_idx, sender->segment, sender->name);
+                if (GCS_NODE_STATE_JOINED == sender->status) {
+                    gu_info ("Member %d.%d (%s) resyncs itself to group",
+                             sender_idx, sender->segment, sender->name);
+                }
+                else {
+                    assert(sender->desync_count > 0);
+                    return 0; // don't deliver up
+                }
             }
             else {
                 gu_info ("%d.%d (%s): State transfer %s %d.%d (%s) complete.",
@@ -1210,9 +1219,15 @@ group_select_donor (gcs_group_t* group,
 
     if (desync) { /* sender wants to become "donor" itself */
         assert(donor_len > 0);
-        gcs_node_state_t const st = group->nodes[joiner_idx].status;
-        if (st >= min_donor_state)
+        gcs_node_state_t const st(group->nodes[joiner_idx].status);
+        if (st >= min_donor_state ||
+            (st >= GCS_NODE_STATE_DONOR && group->quorum.version >= 4)) {
             donor_idx = joiner_idx;
+            gcs_node_t& donor(group->nodes[donor_idx]);
+            assert(donor.desync_count == 0 || group->quorum.version >= 4);
+            assert(donor.desync_count == 0 || st == GCS_NODE_STATE_DONOR);
+            (void)donor; // keep optimised build happy
+        }
         else
             donor_idx = -EAGAIN;
     }
@@ -1230,11 +1245,13 @@ group_select_donor (gcs_group_t* group,
         gcs_node_t* const joiner = &group->nodes[joiner_idx];
         gcs_node_t* const donor  = &group->nodes[donor_idx];
 
-        if (desync) {
+        donor->desync_count += 1;
+
+        if (desync && 1 == donor->desync_count) {
             gu_info ("Member %d.%d (%s) desyncs itself from group",
                      donor_idx, donor->segment, donor->name);
         }
-        else {
+        else if (!desync) {
             gu_info ("Member %d.%d (%s) requested state transfer from '%s'. "
                      "Selected %d.%d (%s)(%s) as donor.",
                      joiner_idx, joiner->segment, joiner->name,
@@ -1246,8 +1263,15 @@ group_select_donor (gcs_group_t* group,
         // reserve donor, confirm joiner (! assignment order is significant !)
         joiner->status = GCS_NODE_STATE_JOINER;
         donor->status  = GCS_NODE_STATE_DONOR;
-        memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
-        memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
+
+        if (1 == donor->desync_count) {
+            /* SST or first desync */
+            memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
+            memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
+        }
+        else {
+            assert(true == desync);
+        }
     }
     else {
         gu_warn ("Member %d.%d (%s) requested state transfer from '%s', "
@@ -1495,6 +1519,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         node->gcs_proto_ver,
         node->repl_proto_ver,
         node->appl_proto_ver,
+        node->desync_count,
         flags
         );
 }
@@ -1505,3 +1530,13 @@ gcs_group_get_state (const gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);
 }
+
+void
+gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
+{
+    std::string const desync_count_val
+        (gu::to_string(group->nodes[group->my_idx].desync_count));
+    status.insert("desync_count", desync_count_val);
+}
+
+

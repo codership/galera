@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -42,6 +42,7 @@ struct gcs_node
     int              gcs_proto_ver;// supported protocol versions
     int              repl_proto_ver;
     int              appl_proto_ver;
+    int              desync_count;
     gcs_node_state_t status;       // node status
     gcs_segment_t    segment;
     bool             count_last_applied; // should it be counted

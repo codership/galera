@@ -26,6 +26,7 @@ Authors from Codership Oy:
 Other contributors:
 
  * Stefan Langenmaier <stefan.langenmaier@gmail.com>
+ * Christian Hesse <mail@eworm.de>
  * Andrzej Godziuk <gdr@gdr.name>
  [add name and email/username above this line, but leave this line intact]
 
