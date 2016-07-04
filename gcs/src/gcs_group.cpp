@@ -7,6 +7,7 @@
 #include "gcs_group.hpp"
 #include "gcs_gcache.hpp"
 #include "gcs_priv.hpp"
+#include "gu_debug_sync.hpp"
 
 #include <errno.h>
 
@@ -59,6 +60,8 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
     group->quorum = GCS_QUORUM_NON_PRIMARY;
 
     group->last_applied_proto_ver = -1;
+
+    gu_mutex_init (&group->index_lock, NULL);
 
     return 0;
 }
@@ -501,12 +504,25 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         new_memb |= (old_idx == group->num);
     }
 
+    if (gu_unlikely(0 != gu_mutex_lock (&group->index_lock))) abort();
+
     /* free old nodes array */
     group_nodes_free (group);
 
     group->my_idx = new_my_idx;
     group->num    = new_nodes_num;
     group->nodes  = new_nodes;
+
+    gu_mutex_unlock (&group->index_lock);
+
+#ifdef GU_DBUG_ON
+    if (new_my_idx == -1)
+    {
+        GU_DBUG_EXECUTE("self_leave_non_prim", {
+                            gu_debug_sync_signal("gcs_get_status");
+                        });
+    }
+#endif
 
     if (gcs_comp_msg_primary(comp) || bootstrap) {
         /* TODO: for now pretend that we always have new nodes and perform
@@ -1541,10 +1557,31 @@ gcs_group_get_state (const gcs_group_t* group)
 }
 
 void
-gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
+gcs_group_get_status (gcs_group_t* group, gu::Status& status)
 {
-    std::string const desync_count_val
-        (gu::to_string(group->nodes[group->my_idx].desync_count));
+    /* We should not read desync counter until the gcs_group_handle_comp_msg
+     * function returns group->my_idx to the definite state: */
+
+    if (gu_unlikely(0 != gu_mutex_lock (&group->index_lock))) abort();
+
+    const long my_idx = group->my_idx;
+
+    std::string desync_count_val;
+
+    if (my_idx != -1)
+    {
+        desync_count_val =
+            gu::to_string(group->nodes[my_idx].desync_count);
+    }
+    else
+    {
+        /* After receiving self-leave message node is always
+         * desynchronized: */
+        desync_count_val = gu::to_string(1);
+    }
+
+    gu_mutex_unlock (&group->index_lock);
+
     status.insert("desync_count", desync_count_val);
 }
 

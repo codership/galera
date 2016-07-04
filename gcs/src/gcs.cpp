@@ -16,6 +16,7 @@
 #include <assert.h>
 
 #include <galerautils.h>
+#include "gu_debug_sync.hpp"
 
 #include "gcs_priv.hpp"
 #include "gcs_params.hpp"
@@ -1442,6 +1443,9 @@ long gcs_close (gcs_conn_t *conn)
     }
     /* recv_thread() is supposed to set state to CLOSED when exiting */
     assert (GCS_CONN_CLOSED == conn->state);
+#ifdef GU_DBUG_ON
+    GU_DBUG_SYNC_WAIT("gcs_close_before_exit");
+#endif
     return ret;
 }
 
@@ -2009,6 +2013,9 @@ void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
 {
     if (conn->state < GCS_CONN_CLOSED)
     {
+#ifdef GU_DBUG_ON
+        GU_DBUG_SYNC_WAIT("gcs_get_status");
+#endif
         gcs_core_get_status(conn->core, status);
     }
 }
