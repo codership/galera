@@ -3,7 +3,7 @@ to this file in connection with their first contribution. If you are making
 a contribution on behalf of a company, you should add the said company name.
 
 By adding your name and [Github username/email] to this file you agree that
-your contribution is a contribution under a contributior agreement between
+your contribution is a contribution under a contributor agreement between
 you and Codership Oy. To the extent that you are an employee of a company and
 contribute in that role, you confirm that your contribution is a contribution
 under the contribution license agreement between your employer and Codership
@@ -28,5 +28,5 @@ Other contributors:
  * Stefan Langenmaier <stefan.langenmaier@gmail.com>
  * Christian Hesse <mail@eworm.de>
  * Andrzej Godziuk <gdr@gdr.name>
+ * Otto Kekäläinen <otto@seravo.fi>, Seravo Oy
  [add name and email/username above this line, but leave this line intact]
-
