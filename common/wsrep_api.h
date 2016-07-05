@@ -548,16 +548,18 @@ typedef enum wsrep_pfs_instr_tag
 
 /*!
  * @brief a callback to create PFS instrumented mutex/condition variables
+ * threads/file-instances
  *
  *
- * @param type          mutex or condition variable
+ * @param type          mutex/condition variable/thread/file-instance
  * @param ops           add/init or remove/destory mutex/condition variable
  * @param tag           tag/name of instrument to monitor
- * @param value         created mutex or condition variable
+ * @param value         created mutex/condition variable/file-descriptor.
  * @param alliedvalue   allied value for supporting operation.
                         for example: while waiting for cond-var corresponding
                         mutex is passes through this variable.
- * @param ts      time to wait for condition.
+ * @param ts            if cond-var then time to wait
+                        if file then name of the file.
  */
 typedef void (*wsrep_pfs_instr_cb_t) (
     wsrep_pfs_instr_type_t        type,
