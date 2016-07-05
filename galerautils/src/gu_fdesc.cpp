@@ -38,13 +38,28 @@ namespace gu
     static int const CREATE_FLAGS = OPEN_FLAGS | O_CREAT /*| O_TRUNC*/;
 
     FileDescriptor::FileDescriptor (const std::string& fname,
+#ifdef HAVE_PSI_INTERFACE
+                                    wsrep_pfs_instr_tag_t tag,
+#endif /* HAVE_PSI_INTERFACE */
                                     bool const          sync)
         : name_(fname),
           fd_  (open (name_.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
           size_(lseek (fd_, 0, SEEK_END)),
           sync_(sync)
+#ifdef HAVE_PSI_INTERFACE
+          ,tag_(tag)
+#endif /* HAVE_PSI_INTERFACE */
     {
         constructor_common();
+#ifdef HAVE_PSI_INTERFACE
+        {
+            int* file_ref = const_cast<int*>(&fd_);
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                               WSREP_PFS_INSTR_OPS_OPEN, tag_,
+                               reinterpret_cast<void**>(&file_ref),
+                               NULL, name_.c_str());
+        }
+#endif /* HAVE_PSI_INTERFACE */
     }
 
     static unsigned long long
@@ -78,6 +93,9 @@ namespace gu
     }
 
     FileDescriptor::FileDescriptor (const std::string& fname,
+#ifdef HAVE_PSI_INTERFACE
+                                    wsrep_pfs_instr_tag_t tag,
+#endif /* HAVE_PSI_INTERFACE */
                                     size_t const       size,
                                     bool   const       allocate,
                                     bool   const       sync)
@@ -85,8 +103,21 @@ namespace gu
           fd_  (open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
           size_(size),
           sync_(sync)
+#ifdef HAVE_PSI_INTERFACE
+          ,tag_(tag)
+#endif /* HAVE_PSI_INTERFACE */
     {
         constructor_common();
+
+#ifdef HAVE_PSI_INTERFACE
+        {
+            int* file_ref = const_cast<int*>(&fd_);
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                               WSREP_PFS_INSTR_OPS_CREATE, tag_,
+                               reinterpret_cast<void**>(&file_ref),
+                               NULL, name_.c_str());
+        }
+#endif /* HAVE_PSI_INTERFACE */
 
         off_t const current_size(lseek (fd_, 0, SEEK_END));
 
@@ -96,8 +127,26 @@ namespace gu
 
             if (size_t(size_) > available)
             {
+#ifdef HAVE_PSI_INTERFACE
+                {
+                    int* file_ref = const_cast<int*>(&fd_);
+                    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                                       WSREP_PFS_INSTR_OPS_CLOSE, tag_,
+                                       reinterpret_cast<void**>(&file_ref),
+                                       NULL, name_.c_str());
+                }
+#endif /* HAVE_PSI_INTERFACE */
                 ::close(fd_);
+
+#ifdef HAVE_PSI_INTERFACE
+                {
+                    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                                       WSREP_PFS_INSTR_OPS_DELETE, tag_,
+                                       NULL, NULL, name_.c_str());
+                }
+#endif /* HAVE_PSI_INTERFACE */
                 ::unlink(name_.c_str());
+
                 gu_throw_error(ENOSPC) << "Requested size " << size_ << " for '"
                                        << name_
                                        << "' exceeds available storage space "
@@ -161,6 +210,16 @@ namespace gu
                       << err << " (" << strerror(err) << '\'';
         }
 
+#ifdef HAVE_PSI_INTERFACE
+        {
+            int* file_ref = const_cast<int*>(&fd_);
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                               WSREP_PFS_INSTR_OPS_CLOSE, tag_,
+                               reinterpret_cast<void**>(&file_ref),
+                               NULL, name_.c_str());
+        }
+#endif /* HAVE_PSI_INTERFACE */
+
         if (close(fd_) != 0)
         {
             int const err(errno);
@@ -183,6 +242,17 @@ namespace gu
         }
 
         log_debug << "Flushed file '" << name_ << "'";
+    }
+
+    void
+    FileDescriptor::unlink() const
+    {
+#ifdef HAVE_PSI_INTERFACE
+        pfs_instr_callback(WSREP_PFS_INSTR_TYPE_FILE,
+                           WSREP_PFS_INSTR_OPS_DELETE, tag_,
+                           NULL, NULL, name_.c_str());
+#endif /* HAVE_PSI_INTERFACE */
+        ::unlink (name_.c_str());
     }
 
     bool

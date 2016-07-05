@@ -26,8 +26,13 @@ namespace gu
 class gu::Monitor
 {
     int mutable refcnt;
-    Mutex       mutex;
-    Cond        cond;
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS mutex;
+    gu::CondWithPFS  cond;
+#else
+    gu::Mutex   mutex;
+    gu::Cond     cond;
+#endif /* HAVE_PSI_INTERFACE */
 
 #ifndef NDEBUG
     pthread_t mutable holder;
@@ -41,11 +46,20 @@ class gu::Monitor
 
 public:
 
-#ifndef NDEBUG
-    Monitor() : refcnt(0), mutex(), cond(), holder(0) {}
+    Monitor()
+        :
+        refcnt(0),
+#ifdef HAVE_PSI_INTERFACE
+        mutex(WSREP_PFS_INSTR_TAG_GU_MONITOR_MUTEX),
+        cond(WSREP_PFS_INSTR_TAG_GU_MONITOR_CONDVAR)
 #else
-    Monitor() : refcnt(0), mutex(), cond() {}
+        mutex(),
+        cond()
+#endif /* HAVE_PSI_INTERFACE */
+#ifndef NDEBUG
+        , holder(0)
 #endif
+   {}
 
     ~Monitor() {}
 

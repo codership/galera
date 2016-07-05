@@ -56,6 +56,65 @@ namespace gu
         friend class Lock;
     };
 
+#ifdef HAVE_PSI_INTERFACE
+
+    /* MutexWithPFS can be instrumented with MySQL performance schema.
+    (provided mysql has performance schema enabled).
+    In order to faciliate instead of direclty creating instance of
+    pthread mutex, mysql mutex instances is created using callback.
+    MutexWithPFS just act as wrapper invoking appropriate calls from
+    MySQL space. */
+    class MutexWithPFS
+    {
+    public:
+
+        MutexWithPFS (wsrep_pfs_instr_tag_t tag) : value(), m_tag (tag)
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_MUTEX,
+                               WSREP_PFS_INSTR_OPS_INIT,
+                               m_tag, reinterpret_cast<void**> (&value),
+                               NULL, NULL);
+        }
+
+        ~MutexWithPFS ()
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_MUTEX,
+                               WSREP_PFS_INSTR_OPS_DESTROY,
+                               m_tag, reinterpret_cast<void**> (&value),
+                               NULL, NULL);
+        }
+
+        void lock()
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_MUTEX,
+                               WSREP_PFS_INSTR_OPS_LOCK,
+                               m_tag, reinterpret_cast<void**> (&value),
+                               NULL, NULL);
+        }
+
+        void unlock()
+        {
+            pfs_instr_callback(WSREP_PFS_INSTR_TYPE_MUTEX,
+                               WSREP_PFS_INSTR_OPS_UNLOCK,
+                               m_tag, reinterpret_cast<void**> (&value),
+                               NULL, NULL);
+        }
+
+   protected:
+
+        gu_mutex_t* value;
+
+    private:
+
+        wsrep_pfs_instr_tag_t m_tag;
+
+        MutexWithPFS (const MutexWithPFS&);
+        MutexWithPFS& operator= (const MutexWithPFS&);
+
+        friend class Lock;
+    };
+#endif /* HAVE_PSI_INTERFACE */
+
     class RecursiveMutex
     {
     public:

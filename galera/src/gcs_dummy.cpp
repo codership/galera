@@ -15,8 +15,13 @@ namespace galera
         :
         gconf_         (&config),
         gcache_        (&cache),
+#ifdef HAVE_PSI_INTERFACE
+        mtx_           (WSREP_PFS_INSTR_TAG_DUMMY_GCS_MUTEX),
+        cond_          (WSREP_PFS_INSTR_TAG_DUMMY_GCS_CONDVAR),
+#else
         mtx_           (),
         cond_          (),
+#endif /* HAVE_PSI_INTERFACE */
         global_seqno_  (0),
         local_seqno_   (0),
         uuid_          (),
@@ -38,8 +43,13 @@ namespace galera
         :
         gconf_         (0),
         gcache_        (0),
+#ifdef HAVE_PSI_INTERFACE
+        mtx_           (WSREP_PFS_INSTR_TAG_DUMMY_GCS_MUTEX),
+        cond_          (WSREP_PFS_INSTR_TAG_DUMMY_GCS_CONDVAR),
+#else
         mtx_           (),
         cond_          (),
+#endif /* HAVE_PSI_INTERFACE */
         global_seqno_  (0),
         local_seqno_   (0),
         uuid_          (),

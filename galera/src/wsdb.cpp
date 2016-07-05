@@ -35,9 +35,17 @@ galera::Wsdb::Wsdb()
     trx_pool_    (TrxHandle::LOCAL_STORAGE_SIZE, 512, "LocalTrxHandle"),
     trx_map_     (),
     conn_trx_map_(),
+#ifdef HAVE_PSI_INTERFACE
+    trx_mutex_   (WSREP_PFS_INSTR_TAG_WSDB_TRX_MUTEX),
+#else
     trx_mutex_   (),
+#endif /* HAVE_PSI_INTERFACE */
     conn_map_    (),
+#ifdef HAVE_PSI_INTERFACE
+    conn_mutex_  (WSREP_PFS_INSTR_TAG_WSDB_CONN_MUTEX)
+#else
     conn_mutex_  ()
+#endif /* HAVE_PSI_INTERFACE */
 {}
 
 

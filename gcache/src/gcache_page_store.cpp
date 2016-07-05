@@ -52,6 +52,13 @@ remove_file (void* __restrict__ arg)
 {
     char* const file_name (static_cast<char*>(arg));
 
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_INIT,
+                       WSREP_PFS_INSTR_TAG_GCACHE_REMOVEFILE_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     if (NULL != file_name)
     {
         if (remove (file_name))
@@ -72,6 +79,13 @@ remove_file (void* __restrict__ arg)
     {
         log_error << "Null file name in " << __FUNCTION__;
     }
+
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_DESTROY,
+                       WSREP_PFS_INSTR_TAG_GCACHE_REMOVEFILE_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
 
     pthread_exit(NULL);
 }
@@ -99,8 +113,8 @@ gcache::PageStore::delete_page ()
     if (delete_thr_ != pthread_t(-1)) pthread_join (delete_thr_, NULL);
 #endif /* GCACHE_DETACH_THERAD */
 
-    int err = pthread_create (&delete_thr_, &delete_page_attr_, remove_file,
-                              file_name);
+    int err = gu_thread_create (&delete_thr_, &delete_page_attr_, remove_file,
+                                file_name);
     if (0 != err)
     {
         delete_thr_ = pthread_t(-1);

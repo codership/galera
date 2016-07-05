@@ -1179,6 +1179,14 @@ _close(gcs_conn_t* conn, bool join_recv_thread)
 static void *gcs_recv_thread (void *arg)
 {
     gcs_conn_t* conn = (gcs_conn_t*)arg;
+
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_INIT,
+                       WSREP_PFS_INSTR_TAG_RECEIVER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     ssize_t     ret  = -ECONNABORTED;
 
     // To avoid race between gcs_open() and the following state check in while()
@@ -1341,6 +1349,14 @@ static void *gcs_recv_thread (void *arg)
         gcs_shift_state (conn, GCS_CONN_CLOSED);
     }
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
+
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_DESTROY,
+                       WSREP_PFS_INSTR_TAG_RECEIVER_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     return NULL;
 }
 

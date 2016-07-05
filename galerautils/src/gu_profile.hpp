@@ -200,7 +200,11 @@ public:
         name_(name),
         start_time_calendar_(gu_time_calendar()),
         start_time_thread_cputime_(gu_time_thread_cputime()),
+#ifdef HAVE_PSI_INTERFACE
+        mutex_(WSREP_PFS_INSTR_TAG_PROFILE_MUTEX),
+#else
         mutex_(),
+#endif /* HAVE_PSI_INTERFACE */
         points_()
     { }
 
@@ -236,7 +240,11 @@ public:
     std::string   const name_;
     long long int const start_time_calendar_;
     long long int const start_time_thread_cputime_;
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS    mutex_;
+#else
     gu::Mutex           mutex_;
+#endif /* HAVE_PSI_INTERFACE */
     mutable Map         points_;
 };
 

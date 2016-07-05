@@ -48,7 +48,11 @@ private:
 
     /* this mutex is needed because mark_safe() and mark_corrupt() will be
      * called outside local monitor, so race is possible */
+#ifdef HAVE_PSI_INTERFACE
+    gu::MutexWithPFS mtx_;
+#else
     gu::Mutex        mtx_;
+#endif /* HAVE_PSI_INTERFACE */
     wsrep_uuid_t     written_uuid_;
     ssize_t          current_len_;
     gu::Atomic<long> total_marks_;

@@ -216,8 +216,14 @@ namespace gcache
         }
             params;
 
+#ifdef HAVE_PSI_INTERFACE
+        gu::MutexWithPFS mtx;
+        gu::CondWithPFS  cond;
+#else
         gu::Mutex       mtx;
         gu::Cond        cond;
+#endif /* HAVE_PSI_INTERFACE */
+
 
         typedef std::map<int64_t, const void*>  seqno2ptr_t;
         typedef seqno2ptr_t::iterator           seqno2ptr_iter_t;

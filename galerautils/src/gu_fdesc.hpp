@@ -9,6 +9,7 @@
 
 #include "gu_exception.hpp"
 #include "gu_types.hpp" // for off_t, byte_t
+#include "../common/wsrep_api.h"
 
 #include <string>
 
@@ -21,10 +22,16 @@ public:
 
     /* open existing file */
     FileDescriptor (const std::string& fname,
+#ifdef HAVE_PSI_INTERFACE
+                    wsrep_pfs_instr_tag_t tag,
+#endif /* HAVE_PSI_INTERFACE */
                     bool               sync  = true);
 
     /* (re)create file */
     FileDescriptor (const std::string& fname,
+#ifdef HAVE_PSI_INTERFACE
+                    wsrep_pfs_instr_tag_t tag,
+#endif /* HAVE_PSI_INTERFACE */
                     size_t             length,
                     bool               allocate = true,
                     bool               sync     = true);
@@ -36,8 +43,7 @@ public:
     off_t              size()  const { return size_; }
 
     void               flush() const;
-
-    void               unlink() const { ::unlink (name_.c_str()); }
+    void               unlink() const;
 
 private:
 
@@ -45,6 +51,10 @@ private:
     int         const fd_;
     off_t       const size_;
     bool        const sync_; // sync on close
+
+#ifdef HAVE_PSI_INTERFACE
+    wsrep_pfs_instr_tag_t tag_;
+#endif /* HAVE_PSI_INTERFACE */
 
     bool write_byte (off_t offset);
     void write_file (off_t start = 0);

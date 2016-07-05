@@ -24,7 +24,11 @@ SavedState::SavedState  (const std::string& file) :
     seqno_        (WSREP_SEQNO_UNDEFINED),
     unsafe_       (0),
     corrupt_      (false),
+#ifdef HAVE_PSI_INTERFACE
+    mtx_          (WSREP_PFS_INSTR_TAG_SAVED_STATE_MUTEX),
+#else
     mtx_          (),
+#endif /* HAVE_PSI_INTERFACE */
     written_uuid_ (uuid_),
     current_len_  (0),
     total_marks_  (0),

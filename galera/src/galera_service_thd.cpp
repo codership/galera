@@ -20,6 +20,13 @@ galera::ServiceThd::thd_func (void* arg)
     galera::ServiceThd* st = reinterpret_cast<galera::ServiceThd*>(arg);
     bool exit = false;
 
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_INIT,
+                       WSREP_PFS_INSTR_TAG_SERVICE_THD_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     while (!exit)
     {
         galera::ServiceThd::Data data;
@@ -84,6 +91,13 @@ galera::ServiceThd::thd_func (void* arg)
         }
     }
 
+#ifdef HAVE_PSI_INTERFACE
+    pfs_instr_callback(WSREP_PFS_INSTR_TYPE_THREAD,
+                       WSREP_PFS_INSTR_OPS_DESTROY,
+                       WSREP_PFS_INSTR_TAG_SERVICE_THD_THREAD,
+                       NULL, NULL, NULL);
+#endif /* HAVE_PSI_INTERFACE */
+
     return 0;
 }
 
@@ -91,9 +105,15 @@ galera::ServiceThd::ServiceThd (GcsI& gcs, gcache::GCache& gcache) :
     gcache_ (gcache),
     gcs_    (gcs),
     thd_    (),
+#ifdef HAVE_PSI_INTERFACE
+    mtx_    (WSREP_PFS_INSTR_TAG_SERVICE_THD_MUTEX),
+    cond_   (WSREP_PFS_INSTR_TAG_SERVICE_THD_CONDVAR),
+    flush_  (WSREP_PFS_INSTR_TAG_SERVICE_THD_FLUSH_CONDVAR),
+#else
     mtx_    (),
     cond_   (),
     flush_  (),
+#endif /* HAVE_PSI_INTERFACE */
     data_   ()
 {
     gu_thread_create (&thd_, NULL, thd_func, this);

@@ -41,7 +41,11 @@ namespace gcache
     RingBuffer::RingBuffer (const std::string& name, size_t size,
                             std::map<int64_t, const void*> & seqno2ptr)
     :
+#ifdef HAVE_PSI_INTERFACE
+        fd_        (name, WSREP_PFS_INSTR_TAG_RINGBUFFER_FILE, check_size(size)),
+#else
         fd_        (name, check_size(size)),
+#endif /* HAVE_PSI_INTERFACE */
         mmap_      (fd_),
         open_      (true),
         preamble_  (static_cast<char*>(mmap_.ptr)),

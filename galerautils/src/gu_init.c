@@ -8,11 +8,13 @@
 #include "gu_limits.h"
 #include "gu_abort.h"
 #include "gu_crc32c.h"
+#include "gu_init.h"
 
 void
-gu_init (gu_log_cb_t log_cb)
+gu_init (gu_log_cb_t log_cb, gu_pfs_instr_cb_t pfs_instr_cb)
 {
     gu_conf_set_log_callback (log_cb);
+    gu_conf_set_pfs_instr_callback (pfs_instr_cb);
 
     if (gu_page_size() != GU_PAGE_SIZE)
     {

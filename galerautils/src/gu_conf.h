@@ -17,8 +17,10 @@ extern "C" {
 /* Logging options */
 #include <stdio.h>
 #include "gu_log.h"
+#include "gu_mutex.h"
 extern int gu_conf_set_log_file     (FILE* file);
 extern int gu_conf_set_log_callback (gu_log_cb_t callback);
+extern int gu_conf_set_pfs_instr_callback (gu_pfs_instr_cb_t callback);
 extern int gu_conf_self_tstamp_on   ();
 extern int gu_conf_self_tstamp_off  ();
 extern int gu_conf_debug_on         ();

@@ -620,7 +620,11 @@ namespace galera
             source_id_         (WSREP_UUID_UNDEFINED),
             conn_id_           (-1),
             trx_id_            (-1),
+#ifdef HAVE_PSI_INTERFACE
+            mutex_             (WSREP_PFS_INSTR_TAG_TRX_HANDLE_MUTEX),
+#else
             mutex_             (),
+#endif /* HAVE_PSI_INTERFACE */
             write_set_collection_(Defaults.working_dir_),
             state_             (&trans_map_, S_EXECUTING),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
@@ -659,7 +663,11 @@ namespace galera
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
+#ifdef HAVE_PSI_INTERFACE
+            mutex_             (WSREP_PFS_INSTR_TAG_TRX_HANDLE_MUTEX),
+#else
             mutex_             (),
+#endif /* HAVE_PSI_INTERFACE */
             write_set_collection_(params.working_dir_),
             state_             (&trans_map_, S_EXECUTING),
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
@@ -721,7 +729,11 @@ namespace galera
         wsrep_uuid_t           source_id_;
         wsrep_conn_id_t        conn_id_;
         wsrep_trx_id_t         trx_id_;
+#ifdef HAVE_PSI_INTERFACE
+        mutable gu::MutexWithPFS mutex_;
+#else
         mutable gu::Mutex      mutex_;
+#endif /* HAVE_PSI_INTERFACE */
         MappedBuffer           write_set_collection_;
         FSM<State, Transition> state_;
         wsrep_seqno_t          local_seqno_;
