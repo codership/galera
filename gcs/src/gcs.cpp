@@ -1066,7 +1066,7 @@ _handle_vote (gcs_conn_t& conn, const struct gcs_act& act)
 
     if (GCS_VOTE_REQUEST == res)
     {
-        log_debug << "Got vote request for " << seqno;
+        log_debug << "GCS got vote request for " << seqno;
         return 1; /* pass request straight to slave q */
     }
     assert(res <= 0);

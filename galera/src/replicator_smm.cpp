@@ -388,13 +388,14 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 void galera::ReplicatorSMM::process_apply_exception(TrxHandleSlave& trx,
                                                     const ApplyException& ae)
 {
+    gu::GTID const gtid(state_uuid_, trx.global_seqno());
     int res;
+
     if (trx.local_seqno() != -1 || trx.nbo_end())
     {
         /* this must be done IN ORDER to avoid multiple elections, hence
          * anything else but LOCAL_OOOC and NO_OOOC is potentially broken */
-        res = gcs_.vote(gu::GTID(state_uuid_, trx.global_seqno()), ae.status(),
-                        ae.data(), ae.data_len());
+        res = gcs_.vote(gtid, ae.status(), ae.data(), ae.data_len());
     }
     else res = 2;
 
@@ -403,14 +404,16 @@ void galera::ReplicatorSMM::process_apply_exception(TrxHandleSlave& trx,
         switch (res)
         {
         case 2:
-            log_error << "Failed on preordered: inconsistency.";
+            log_error << "Failed on preordered " << gtid
+                      << ": inconsistency.";
             break;
         case 1:
-            log_error << "Inconsistent by consensus.";
+            log_error << "Inconsistent by consensus on " << gtid;
             break;
         default:
             log_error
-                << "Could not reach consensus, assuming inconsistency.";
+                << "Could not reach consensus on " << gtid
+                << ", assuming inconsistency.";
         }
 
         GU_TRACE(ae);
@@ -1976,34 +1979,35 @@ void galera::ReplicatorSMM::process_vote(wsrep_seqno_t const seqno_g,
     std::ostringstream msg;
 
     LocalOrder lo(seqno_l);
-
     gu_trace(local_monitor_.enter(lo));
+
+    gu::GTID const gtid(state_uuid_, seqno_g);
 
     if (code > 0)  /* vote request */
     {
         assert(GCS_VOTE_REQUEST == code);
-        log_info << "Got vote request for seqno " << seqno_g; //remove
+        log_info << "Got vote request for seqno " << gtid; //remove
         /* make sure WS was either successfully applied or already voted */
         drain_monitors(seqno_g);
 
-        int const ret(gcs_.vote(gu::GTID(state_uuid_, seqno_g), 0, NULL, 0));
+        int const ret(gcs_.vote(gtid, 0, NULL, 0));
 
         switch (ret)
         {
         case 0:         /* majority agrees */
-            log_info << "Vote 0 (success) on seqno " << seqno_g
+            log_info << "Vote 0 (success) on " << gtid
                      << " is consistent with group. Continue.";
             goto out;
         case -EALREADY: /* already voted */
-            log_info << "Seqno " << seqno_g << " already voted on. Continue.";
+            log_info << gtid << " already voted on. Continue.";
             goto out;
         case 1:         /* majority disagrees */
-            msg << "Vote 0 (success) on seqno " << seqno_g
+            msg << "Vote 0 (success) on " << gtid
                 << " is inconsistent with group. Leaving cluster.";
             goto fail;
         default:        /* general error */
             assert(ret < 0);
-            msg << "Failed to vote on request for seqno " << seqno_g << ": "
+            msg << "Failed to vote on request for " << gtid << ": "
                 << -ret << " (" << ::strerror(-ret) << "). "
                 "Assuming inconsistency";
             goto fail;
@@ -2011,7 +2015,7 @@ void galera::ReplicatorSMM::process_vote(wsrep_seqno_t const seqno_g,
     }
     else if (code < 0)
     {
-        msg << "Got negative vote on successfully applied seqno " << seqno_g;
+        msg << "Got negative vote on successfully applied " << gtid;
     fail:
         log_error << msg.str();
         mark_corrupt_and_close();
