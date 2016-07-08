@@ -16,6 +16,7 @@ addons:
       - ubuntu-toolchain-r-test
 #     https://github.com/travis-ci/travis-ci/issues/3668
 #     for alternatives in container builds
+      - llvm-toolchain-precise-3.8
     packages:
       - libboost-program-options-dev
       - libssl-dev
@@ -23,6 +24,7 @@ addons:
       - scons
       - gcc-5
       - g++-5
+      - clang-3.8
 
 script:
   - if [ ${CC} != "clang" ]; then
@@ -37,6 +39,8 @@ script:
       ${CC} --version; ${CXX} --version;
       ./scripts/build.sh -j $MAX_JOBS;
     else
+      export CC=`which clang-3.8`;
+      export CXX=`which clang++-3.8`;
       ${CC} --version ; ${CXX} --version;
       ./scripts/build.sh;
     fi
