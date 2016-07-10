@@ -359,7 +359,6 @@ KeySetOut::append (const KeyData& kd)
                 tmp = kp; // <- updating parent for next iteration
 #endif /* CHECK_PREVIOUS_KEY */
 
-
 //            log_info << "pushed " << kp;
         }
         catch (KeyPart::DUPLICATE& e)
@@ -369,7 +368,7 @@ KeySetOut::append (const KeyData& kd)
              * even after parent was added as a new key. It does not matter:
              * a duplicate will be a duplicate in certification as well. */
 #ifndef NDEBUG
-            log_debug << "Returning after catching a DUPLICATE. Part: " << i;
+//            log_debug << "Returning after catching a DUPLICATE. Part: " << i;
 #endif /* NDEBUG */
             goto out;
         }

@@ -310,7 +310,8 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandleMaster* trx(get_local_trx(repl, trx_handle, false));
     assert(trx != 0);
-
+    assert(trx->ts() != 0);
+    log_debug << "replaying " << *(trx->ts());
     wsrep_status_t retval;
 
     try
@@ -330,6 +331,10 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
+    if (retval != WSREP_OK)
+    {
+        log_debug << "replaying failed for " << *(trx->ts());
+    }
     return retval;
 }
 
@@ -386,98 +391,6 @@ discard_local_trx(REPL_CLASS*        repl,
     ws_handle->opaque = 0;
 }
 
-extern "C"
-wsrep_status_t galera_post_commit (wsrep_t*            gh,
-                                   wsrep_ws_handle_t*  ws_handle)
-{
-    assert(gh != 0);
-    assert(gh->ctx != 0);
-
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
-
-    if (trx == 0)
-    {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
-        return WSREP_OK;
-    }
-
-    wsrep_status_t retval;
-
-    try
-    {
-        TrxHandleLock lock(*trx);
-        retval = repl->post_commit(trx);
-    }
-    catch (std::exception& e)
-    {
-        log_error << e.what();
-        retval = WSREP_NODE_FAIL;
-    }
-    catch (...)
-    {
-        log_fatal << "non-standard exception";
-        retval = WSREP_FATAL;
-    }
-
-    switch(trx->state())
-    {
-    case TrxHandle::S_COMMITTED:
-        discard_local_trx(repl, ws_handle, trx);
-    case TrxHandle::S_EXECUTING:
-        /* trx ready for new fragment */
-        break;
-    case TrxHandle::S_ABORTING:
-        // SR trx was BF aborted between pre_commit() and post_commit()
-        break;
-    default:
-        assert(0);
-    }
-
-    return retval;
-}
-
-
-extern "C"
-wsrep_status_t galera_post_rollback(wsrep_t*            gh,
-                                    wsrep_ws_handle_t*  ws_handle)
-{
-    assert(gh != 0);
-    assert(gh->ctx != 0);
-
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
-
-    if (trx == 0)
-    {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
-        return WSREP_OK;
-    }
-
-    wsrep_status_t retval;
-
-    try
-    {
-        TrxHandleLock lock(*trx);
-        retval = repl->post_rollback(trx);
-    }
-    catch (std::exception& e)
-    {
-        log_error << e.what();
-        retval = WSREP_NODE_FAIL;
-    }
-    catch (...)
-    {
-        log_fatal << "non-standard exception";
-        retval = WSREP_FATAL;
-    }
-
-    discard_local_trx(repl, ws_handle, trx);
-
-    return retval;
-}
-
-
 static inline void
 append_data_array (TrxHandleMaster*        const trx,
                    const struct wsrep_buf* const data,
@@ -532,6 +445,8 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
         return WSREP_OK;
     }
 
+    assert(trx->trx_id() != uint64_t(-1));
+
     if (meta != 0)
     {
         meta->gtid       = WSREP_GTID_UNDEFINED;
@@ -568,6 +483,22 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
         retval = repl->replicate(trx, meta);
 
+        if (meta)
+        {
+            if (trx->ts())
+            {
+                assert(meta->gtid.seqno > 0);
+                assert(meta->gtid.seqno == trx->ts()->global_seqno());
+                assert(meta->depends_on == trx->ts()->depends_seqno());
+            }
+            else
+            {
+                assert(meta->gtid.seqno == WSREP_SEQNO_UNDEFINED);
+                assert(meta->depends_on == WSREP_SEQNO_UNDEFINED);
+            }
+        }
+
+        assert(trx->trx_id() == meta->stid.trx);
         assert(!(retval == WSREP_OK || retval == WSREP_BF_ABORT) ||
                (trx->ts() && trx->ts()->global_seqno() > 0));
 
@@ -577,10 +508,18 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
             {
                 assert(trx->ts() && trx->ts()->last_seen_seqno() >= 0);
                 retval = repl->pre_commit(trx, meta);
+                if (meta) assert(meta->depends_on >= 0 || retval != WSREP_OK);
             }
         }
-        assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
-               retval == WSREP_BF_ABORT);
+        else
+        {
+            if (meta) meta->depends_on = -1;
+        }
+
+        assert(retval == WSREP_OK ||       // success
+               retval == WSREP_TRX_FAIL || // cert failure
+               retval == WSREP_BF_ABORT || // BF abort
+               retval == WSREP_CONN_FAIL); // not in joined/synced state
     }
     catch (gu::Exception& e)
     {
@@ -607,6 +546,109 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
     return retval;
 }
 
+
+extern "C"
+wsrep_status_t galera_post_rollback(wsrep_t*            gh,
+                                    wsrep_ws_handle_t*  ws_handle)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
+
+    if (trx == 0)
+    {
+        log_debug << "trx " << ws_handle->trx_id << " not found";
+        assert(0);
+        return WSREP_OK;
+    }
+
+    wsrep_status_t retval;
+
+    try
+    {
+        TrxHandleLock lock(*trx);
+        retval = repl->post_rollback(trx);
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+        retval = WSREP_NODE_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+
+    assert(WSREP_OK == retval);
+    return retval;
+}
+
+
+extern "C"
+wsrep_status_t galera_release(wsrep_t*            gh,
+                              wsrep_ws_handle_t*  ws_handle)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    TrxHandleMaster* trx(get_local_trx(repl, ws_handle, false));
+
+    if (trx == 0)
+    {
+        log_debug << "trx " << ws_handle->trx_id << " not found";
+        return WSREP_OK;
+    }
+
+    wsrep_status_t retval;
+
+    try
+    {
+        TrxHandleLock lock(*trx);
+
+        /* S_EXECUTING:  BF'ed / rolled back in local state
+         * S_MUST_ABORT: BF'ed before replication
+         * S_ABORTING:   BF'ed after  replication */
+        bool const commit(TrxHandle::S_EXECUTING  != trx->state() &&
+                          TrxHandle::S_MUST_ABORT != trx->state() &&
+                          TrxHandle::S_ABORTING   != trx->state());
+
+        if (gu_likely(commit))
+            retval = repl->release_commit(trx);
+        else
+            retval = repl->release_rollback(trx);
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+        retval = WSREP_NODE_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+
+    switch(trx->state())
+    {
+    case TrxHandle::S_COMMITTED:
+    case TrxHandle::S_ROLLED_BACK:
+        discard_local_trx(repl, ws_handle, trx);
+    case TrxHandle::S_EXECUTING:
+        /* trx ready for new fragment */
+        break;
+    case TrxHandle::S_ABORTING:
+        // SR trx was BF aborted between pre_commit() and post_commit()
+        break;
+    default:
+        assert(0);
+    }
+
+    return retval;
+}
 
 extern "C"
 wsrep_status_t galera_append_key(wsrep_t*           const gh,
@@ -790,6 +832,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
                                        size_t                  const keys_num,
                                        const struct wsrep_buf* const data,
                                        size_t                  const count,
+                                       uint32_t                const flags,
                                        wsrep_trx_meta_t*       const meta)
 {
     assert(gh != 0);
@@ -799,6 +842,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
     TrxHandleMaster* trx(repl->local_conn_trx(conn_id, true).get());
     assert(trx != 0);
+    assert(trx->state() == TrxHandle::S_EXECUTING);
 
     if (meta != 0)
     {
@@ -823,16 +867,27 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
-        trx->set_flags(trx->flags() | TrxHandle::wsrep_flags_to_trx_flags(
-                           WSREP_FLAG_TRX_END |
-                           WSREP_FLAG_ISOLATION));
-
-        retval = repl->replicate(trx, meta);
-
-        assert((retval == WSREP_OK && trx->ts() != 0 &&
-                trx->ts()->global_seqno() > 0) ||
-               (retval != WSREP_OK && (trx->ts() == 0 ||
-                                       trx->ts()->global_seqno() < 0)));
+        {
+            retval = repl->replicate(trx, meta);
+            assert((retval == WSREP_OK && trx->ts() != 0 &&
+                    trx->ts()->global_seqno() > 0) ||
+                   (retval != WSREP_OK && (trx->ts() == 0  ||
+                                           trx->ts()->global_seqno() < 0)));
+            if (meta)
+            {
+                if (trx->ts())
+                {
+                    assert(meta->gtid.seqno > 0);
+                    assert(meta->gtid.seqno == trx->ts()->global_seqno());
+                    assert(meta->depends_on == trx->ts()->depends_seqno());
+                }
+                else
+                {
+                    assert(meta->gtid.seqno == WSREP_SEQNO_UNDEFINED);
+                    assert(meta->depends_on == WSREP_SEQNO_UNDEFINED);
+                }
+            }
+        }
 
         if (retval == WSREP_OK)
         {
@@ -859,8 +914,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         retval = WSREP_FATAL;
     }
 
-    if (retval != WSREP_OK) // galera_to_execute_end() won't be called
+    if (trx->ts() == NULL || trx->ts()->global_seqno() < 0)
     {
+        // galera_to_execute_end() won't be called
         repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
     }
 
@@ -1182,8 +1238,8 @@ static wsrep_t galera_str = {
     &galera_recv,
     &galera_assign_read_view,
     &galera_pre_commit,
-    &galera_post_commit,
     &galera_post_rollback,
+    &galera_release,
     &galera_replay_trx,
     &galera_abort_pre_commit,
     &galera_append_key,

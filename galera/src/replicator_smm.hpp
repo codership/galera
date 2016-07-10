@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -95,10 +95,10 @@ namespace galera
         wsrep_status_t replicate(TrxHandleMaster* trx, wsrep_trx_meta_t*);
         void           abort_trx(TrxHandleMaster* trx);
         wsrep_status_t pre_commit(TrxHandleMaster*  trx, wsrep_trx_meta_t*);
-        wsrep_status_t replay_trx(TrxHandleMaster* trx, void* replay_ctx);
-
-        wsrep_status_t post_commit(TrxHandleMaster* trx);
         wsrep_status_t post_rollback(TrxHandleMaster* trx);
+        wsrep_status_t release_commit(TrxHandleMaster* trx);
+        wsrep_status_t release_rollback(TrxHandleMaster* trx);
+        wsrep_status_t replay_trx(TrxHandleMaster* trx, void* replay_ctx);
 
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                  int           tout,
@@ -167,10 +167,10 @@ namespace galera
         void ist_cc(const gcs_action&, bool must_apply, bool preload);
         void ist_end(int error);
 
-        // Cancel monitors for TrxHandleSlave
+        // Cancel local and apply monitors for TrxHandleSlave
         void cancel_monitors(const TrxHandleSlave& ts, bool nolocal);
-        // Cancel monitors for given seqnos
-        void cancel_monitors(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g=0);
+        // Cancel all monitors for given seqnos
+        void cancel_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g);
 
         // Drain apply and commit monitors up to seqno
         void drain_monitors(wsrep_seqno_t seqno);
@@ -580,7 +580,7 @@ namespace galera
                                  const wsrep_gtid_t& state_id, bool bypass);
 
         /* local state seqno for internal use (macro mock up) */
-        wsrep_seqno_t STATE_SEQNO(void) { return apply_monitor_.last_left(); }
+        wsrep_seqno_t STATE_SEQNO(void) { return commit_monitor_.last_left(); }
 
         class InitLib /* Library initialization routines */
         {

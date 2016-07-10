@@ -170,9 +170,9 @@ namespace
             assert(ts != 0);
             ts->verify_checksum();
 
-            if (ts->state() == TrxHandle::S_ROLLED_BACK)
+            if (ts->state() == TrxHandle::S_ABORTING)
             {
-                log_info << "ist_trx: rolled back: " << ts->global_seqno();
+                log_info << "ist_trx: aborting: " << ts->global_seqno();
             }
             else
             {

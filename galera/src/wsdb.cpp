@@ -84,7 +84,7 @@ galera::Wsdb::get_trx(const TrxHandleMaster::Params& params,
     }
     else if (i == trx_map_.end())
     {
-        throw gu::NotFound();
+        return TrxHandleMasterPtr();
     }
 
     return i->second;

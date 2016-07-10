@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -91,7 +91,8 @@ void galera::TrxHandleSlave::print(std::ostream& os) const
        << ", s: "        << last_seen_seqno_
        << ", d: "        << depends_seqno_
        << ")";
-    os << " pa_range: " << write_set().pa_range();
+
+    os << " WS pa_range: " << write_set().pa_range();
 
     if (write_set().annotated())
     {
@@ -194,7 +195,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
 
     // BF aborted and/or cert failed
-    add(TrxHandle::S_ABORTING,       TrxHandle::S_ROLLED_BACK);
+    add(TrxHandle::S_ABORTING,  TrxHandle::S_ROLLED_BACK);
 
     // SR rollback
     add(TrxHandle::S_ABORTING, TrxHandle::S_EXECUTING);
@@ -206,24 +207,34 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     trans_map_(TrxHandleSlave::trans_map_)
 {
     //                                 Cert OK
-    // 0 --> REPLICATING -> CERTIFYING ------> APPLYING -> COMMITTING
-    //            |             |                               |
-    //            |             v                               v
-    //            |-------> ROLLED_BACK                    COMMITTED
-    //
+    // 0 --> REPLICATING -> CERTIFYING ------> APPLYING --> COMMITTING
+    //            |             |                 ^             |
+    //            |             |Cert failed      |             |
+    //            |             |                 |             |
+    //            |             v                 |             v
+    //            +-------> ABORTING -------------+   COMMITTED / ROLLED_BACK
+    //                          |
+    //                          v
+    //                     ROLLED_BACK
 
     // Enter in-order cert after replication
     add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
-    // Enter out-of-order cert after replication
-    add(TrxHandle::S_REPLICATING, TrxHandle::S_ROLLED_BACK);
+    // BF'ed and IST-skipped
+    add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
     // Applying after certification
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
-    // Roll back due to cert failure (maybe would be better to use ABORTING?)
-    add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ROLLED_BACK);
-    // Committing after applying
+    // Roll back due to cert failure
+    add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ABORTING);
+    // Processing cert-failed and IST-skipped seqno
+    add(TrxHandle::S_ABORTING,    TrxHandle::S_APPLYING);
+    // Shortcut for BF'ed in release_rollback()
+    add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLED_BACK);
+    // Committing/Rolling back after applying
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
     // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
+    // Rollback cert-failed, apply-failed and IST-skipped seqno finished
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ROLLED_BACK);
 }
 
 static TransMapBuilder<TrxHandleMaster> master;
@@ -263,7 +274,7 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
 {
     int err(0);
 
-    assert(version() >= WS_NG_VERSION);
+    assert(version() >= WS_NG_VERSION || skip_event());
 
     const DataSetIn& ws(write_set_.dataset());
 

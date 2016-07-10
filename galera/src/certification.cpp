@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
@@ -388,6 +388,8 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
                        << version_ << " not implemented";
     }
 
+    assert(TEST_FAILED == res || trx->depends_seqno() >= 0);
+
     if (store_keys == true && res == TEST_OK)
     {
         ++trx_count_;
@@ -592,14 +594,12 @@ galera::Certification::test(const TrxHandleSlavePtr& trx, bool store_keys)
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
 
     const TestResult ret
-        (trx->preordered() ? do_test_preordered(trx.get()) : do_test(trx, store_keys));
+        (trx->preordered() ?
+         do_test_preordered(trx.get()) : do_test(trx, store_keys));
 
-    if (gu_unlikely(ret != TEST_OK))
-    {
-        // make sure that last depends seqno is -1 for trxs that failed
-        // certification
-        trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
-    }
+    assert(TEST_FAILED == ret || trx->depends_seqno() >= 0);
+
+    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(); }
 
     return ret;
 }
@@ -649,6 +649,7 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 galera::Certification::TestResult
 galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 {
+// explicit ROLLBACK is dummy()    assert(!trx->is_dummy());
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 
@@ -700,8 +701,9 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
     const TestResult retval(test(trx, true));
 
     {
-        gu::Lock lock(mutex_);
+        assert(trx->global_seqno() > 0);
 
+        gu::Lock lock(mutex_);
         if (trx_map_.insert(
                 std::make_pair(trx->global_seqno(), trx)).second == false)
             gu_throw_fatal << "duplicate trx entry " << *trx;
@@ -727,14 +729,15 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
     assert(trx.global_seqno() >= 0);
     assert(trx.is_committed() == false);
 
-    wsrep_seqno_t ret(-1);
+    wsrep_seqno_t ret(WSREP_SEQNO_UNDEFINED);
     {
         gu::Lock lock(mutex_);
 
         // certified trx with local seqno WSREP_SEQNO_UNDEFINED originates from
         // IST so deps set tracking should not be done
         if (trx.certified()   == true &&
-            trx.local_seqno() != WSREP_SEQNO_UNDEFINED)
+            trx.local_seqno() != WSREP_SEQNO_UNDEFINED &&
+            trx.is_dummy()    == false) // explicit rollbacks don't pass cert.
         {
             assert(trx.last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
             DepsSet::iterator i(deps_set_.find(trx.last_seen_seqno()));

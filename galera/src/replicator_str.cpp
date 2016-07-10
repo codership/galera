@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp"
@@ -937,12 +937,13 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
                                          const TrxHandleSlavePtr& ts_ptr)
 {
-
     TrxHandleSlave& ts(*ts_ptr);
 
     assert(ts.global_seqno() > 0);
+    assert(ts.state() != TrxHandle::S_COMMITTED);
+    assert(ts.state() != TrxHandle::S_ROLLED_BACK);
 
-    bool const skip(ts.state() == TrxHandle::S_ROLLED_BACK);
+    bool const skip(ts.is_dummy());
 
     if (gu_likely(!skip))
     {
@@ -950,21 +951,14 @@ void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
 
         assert(ts.certified());
         assert(ts.depends_seqno() >= 0);
-
-        gu_trace(apply_trx(recv_ctx, *ts_ptr));
-        GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
     }
     else
     {
-        ApplyOrder ao(ts);
-        apply_monitor_.self_cancel(ao);
-
-        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-        {
-            CommitOrder co(ts, co_mode_);
-            commit_monitor_.self_cancel(co);
-        }
+        assert(ts.is_dummy());
     }
+
+    gu_trace(apply_trx(recv_ctx, ts));
+    GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
 
     if (gu_unlikely
         (gu::Logger::no_log(gu::LOG_DEBUG) == false))
@@ -976,7 +970,7 @@ void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
         else
             os << "IST skipping trx " << ts.global_seqno();
 
-        log_debug << os;
+        log_debug << os.str();
     }
 }
 
@@ -1020,27 +1014,27 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 }
 
 
-void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
+void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
                             bool preload)
 {
-    assert(ts != 0);
-    assert(ts->depends_seqno() >= 0 || ts->state() == TrxHandle::S_ROLLED_BACK);
+    assert(tsp != 0);
+    TrxHandleSlave& ts(*tsp);
+    assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING);
 
     {
-        if (gu_unlikely(preload == true &&
-                        ts->state() != TrxHandle::S_ROLLED_BACK))
+        if (gu_unlikely(preload == true && !ts.is_dummy()))
         {
-            ts->verify_checksum();
+            ts.verify_checksum();
             if (gu_unlikely(cert_.position() == 0))
             {
                 // This is the first pre IST trx for rebuilding cert index
                 cert_.assign_initial_position(
                     /* proper UUID will be installed by CC */
-                    gu::GTID(gu::UUID(), ts->global_seqno() - 1),
-                    ts->version());
+                    gu::GTID(gu::UUID(), ts.global_seqno() - 1),
+                    ts.version());
             }
-            ts->set_state(TrxHandle::S_CERTIFYING);
-            Certification::TestResult result(cert_.append_trx(ts));
+            ts.set_state(TrxHandle::S_CERTIFYING);
+            Certification::TestResult result(cert_.append_trx(tsp));
             if (result != Certification::TEST_OK)
             {
                 gu_throw_fatal << "Pre IST trx append returned unexpected "
@@ -1050,13 +1044,13 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
             }
             // Mark trx committed for certification bookkeeping here
             // if it won't pass to applying stage
-            if (!must_apply) cert_.set_trx_committed(*ts);
+            if (!must_apply) cert_.set_trx_committed(ts);
         }
+    }
 
-        if (gu_likely(must_apply == true))
-        {
-            ist_event_queue_.push_back(ts);
-        }
+    if (gu_likely(must_apply == true))
+    {
+        ist_event_queue_.push_back(tsp);
     }
 }
 

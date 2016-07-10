@@ -74,7 +74,7 @@ namespace galera
         TrxHandleMasterPtr get_trx(const TrxHandleMaster::Params& params,
                                    const wsrep_uuid_t&            source_id,
                                    wsrep_trx_id_t                 trx_id,
-                                   bool                           create = false);
+                                   bool                           create =false);
 
         void discard_trx(wsrep_trx_id_t trx_id);
 

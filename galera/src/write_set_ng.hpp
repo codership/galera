@@ -513,7 +513,7 @@ namespace galera
             /* 2/8 of reserved goes to unordered set  */
             ubn_   (base_name_),
             unrd_  (reserved + reserved_size*6, reserved_size*2, ubn_, uver),
-            /* annotation set is not allocated unless requested */
+            /* annotation set is always dynamically allocated */
             abn_   (base_name_),
             annt_  (NULL),
             left_  (max_size - keys_.size() - data_.size() - unrd_.size()

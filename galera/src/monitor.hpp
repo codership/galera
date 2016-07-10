@@ -162,7 +162,6 @@ namespace galera
             assert(process_[idx].state_ == Process::S_CANCELED);
             process_[idx].state_ = Process::S_IDLE;
 
-
             state_debug_print("enter canceled", obj_seqno);
             gu_throw_error(EINTR);
         }

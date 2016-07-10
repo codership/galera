@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 
@@ -367,6 +367,7 @@ namespace galera
                     trx_id_          = write_set_.trx_id();
 #ifndef NDEBUG
                     write_set_.verify_checksum();
+
                     assert(source_id_ != WSREP_UUID_UNDEFINED);
                     assert(WSREP_SEQNO_UNDEFINED == last_seen_seqno_);
                     assert(WSREP_SEQNO_UNDEFINED == local_seqno_);
@@ -402,8 +403,9 @@ namespace galera
                         {
                             if (gu_likely(version_) >= WriteSetNG::VER4)
                             {
-                                depends_seqno_ =
-                                    last_seen_seqno_ - write_set_.pa_range();
+                                depends_seqno_ = std::max<wsrep_seqno_t>
+                                    (last_seen_seqno_ - write_set_.pa_range(),
+                                     WSREP_SEQNO_UNDEFINED);
                             }
                             else
                             {
@@ -428,6 +430,7 @@ namespace galera
 
                     timestamp_ = write_set_.timestamp();
 
+                    assert(trx_id() != uint64_t(-1) || is_toi());
                     sanity_checks();
 
                     break;
@@ -478,7 +481,7 @@ namespace galera
             }
 
             /* make sure to not exceed original pa_range() */
-            assert(last_seen_seqno_ - write_set_.pa_range() <=
+            assert(version_ < 4 || last_seen_seqno_ - write_set_.pa_range() <=
                    global_seqno_ - dw || preordered());
 
             write_set_.set_seqno(global_seqno_, dw);
@@ -486,7 +489,7 @@ namespace galera
             certified_ = true;
         }
 
-        void set_depends_seqno(wsrep_seqno_t seqno_lt)
+        void set_depends_seqno(wsrep_seqno_t const seqno_lt)
         {
             /* make sure depends_seqno_ never goes down */
             assert(seqno_lt >= depends_seqno_ ||
@@ -528,10 +531,6 @@ namespace galera
 
         wsrep_seqno_t depends_seqno()   const { return depends_seqno_; }
 
-        const wsrep_uuid_t& source_id() const { return write_set_.source_id(); }
-        wsrep_conn_id_t     conn_id()   const { return write_set_.conn_id();   }
-        wsrep_trx_id_t      trx_id()    const { return write_set_.trx_id();    }
-
         const WriteSetIn&  write_set () const { return write_set_;  }
 
         bool   exit_loop() const { return exit_loop_; }
@@ -547,6 +546,17 @@ namespace galera
         uint64_t get_checksum() const { return write_set_.get_checksum(); }
 
         size_t   size()         const { return write_set_.size(); }
+
+        void mark_dummy()
+        {
+            set_depends_seqno(WSREP_SEQNO_UNDEFINED);
+            set_flags(flags() | F_ROLLBACK);
+            assert(state() == S_CERTIFYING || state() == S_REPLICATING);
+            set_state(S_ABORTING);
+            // must be set to S_ROLLED_BACK after commit_cb()
+        }
+        bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
+        bool skip_event() const { return (flags() == F_ROLLBACK); }
 
     protected:
 
@@ -688,11 +698,26 @@ namespace galera
             TrxHandle::set_flags(flags);
 
             uint16_t ws_flags(WriteSetNG::wsrep_flags_to_ws_flags(flags));
+
             write_set_out().set_flags(ws_flags);
         }
 
         void append_key(const KeyData& key)
         {
+            // Current limitations with certification on trx versions 3 and 4
+            // impose the the following restrictions on keys
+
+            // The shared key behavior for TOI operations is completely
+            // untested, so don't allow it (and it probably does not even
+            // make any sense)
+            assert(is_toi() == false  || key.shared() == false);
+            // Shared key escalation to level 1 or 2 is not allowed
+            assert(key.parts_num == 3 || key.shared() == false);
+            // For key level less than 3 write set must be TOI because
+            // conflicts between different key levels are not detected
+            // correctly even if both keys are exclusive
+            assert(key.parts_num == 3 || is_toi() == true);
+
             /*! protection against protocol change during trx lifetime */
             if (key.proto_ver != version())
             {
@@ -726,6 +751,16 @@ namespace galera
             return write_set_out().is_empty();
         }
 
+        TrxHandleSlavePtr ts()
+        {
+            return ts_;
+        }
+
+        void reset_ts()
+        {
+            ts_ = TrxHandleSlavePtr();
+        }
+
         void finalize(wsrep_seqno_t const last_seen_seqno)
         {
             assert(last_seen_seqno >= 0);
@@ -733,7 +768,8 @@ namespace galera
 
             int pa_range(pa_range_default());
 
-            if (gu_unlikely((flags() & TrxHandle::F_BEGIN) == 0))
+            if (gu_unlikely((flags() & TrxHandle::F_BEGIN) == 0 &&
+                            (flags() & TrxHandle::F_ISOLATION) == 0))
             {
                 /* make sure this fragment depends on the previous */
                 assert(ts_ != 0);
@@ -743,14 +779,19 @@ namespace galera
                 assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno);
+                reset_ts();
             }
             else
             {
-                assert((flags() & TrxHandle::F_ROLLBACK) == 0);
+                assert(ts_ == 0);
+                assert(flags() & TrxHandle::F_ISOLATION ||
+                       (flags() & TrxHandle::F_ROLLBACK) == 0);
             }
 
             write_set_out().set_flags(write_set_flags_);
             write_set_out().finalize(last_seen_seqno, pa_range);
+
+            assert(ts_ == 0);
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */
@@ -766,15 +807,13 @@ namespace galera
             release_write_set_out();
         }
 
-        TrxHandleSlavePtr ts()
-        {
-            return ts_;
-        }
-
-        void add_replicated(const TrxHandleSlavePtr& ts)
+        void add_replicated(TrxHandleSlavePtr ts)
         {
             assert(locked());
-            write_set_flags_ &= ~TrxHandle::F_BEGIN;
+            if ((write_set_flags_ & TrxHandle::F_ISOLATION) == 0)
+            {
+                write_set_flags_ &= ~TrxHandle::F_BEGIN;
+            }
             ts_ = ts;
         }
 
@@ -809,7 +848,7 @@ namespace galera
         void init_write_set_out()
         {
             assert(!wso_);
-            assert(wso_buf_size_ > sizeof(WriteSetOut));
+            assert(wso_buf_size_ >= sizeof(WriteSetOut));
 
             gu::byte_t* const wso(static_cast<gu::byte_t*>(wso_buf()));
             gu::byte_t* const store(wso + sizeof(WriteSetOut));

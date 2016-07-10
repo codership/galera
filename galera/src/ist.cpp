@@ -102,7 +102,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     gcache_       (gc),
     slave_pool_   (slave_pool),
     source_id_    (WSREP_UUID_UNDEFINED),
-    observer_  (ob),
+    observer_     (ob),
     thread_       (),
     error_code_   (0),
     version_      (-1),
@@ -503,11 +503,8 @@ void galera::ist::Receiver::run()
                 }
                 else
                 {
-                    // Assign global seqno and set state to ROLLED_BACK
-                    // to indicate that monitors must be cancelled
-                    // and event must be discarded.
                     ts->set_global_seqno(act.seqno_g);
-                    ts->set_state(TrxHandle::S_ROLLED_BACK);
+                    ts->mark_dummy();
                 }
 
                 observer_.ist_trx(ts, must_apply, preload);
@@ -524,7 +521,8 @@ void galera::ist::Receiver::run()
     }
     catch (asio::system_error& e)
     {
-        log_error << "got error while reading ist stream: " << e.code();
+        log_error << "got asio system error while reading IST stream: "
+                  << e.code();
         ec = e.code().value();
     }
     catch (gu::Exception& e)
@@ -532,7 +530,7 @@ void galera::ist::Receiver::run()
         ec = e.get_errno();
         if (ec != EINTR)
         {
-            log_error << "got exception while reading ist stream: " << e.what();
+            log_error << "got exception while reading IST stream: " << e.what();
         }
     }
 

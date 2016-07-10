@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -58,8 +58,7 @@ namespace galera
         wsrep_seqno_t position() const { return position_; }
 
         /* this is for configuration change use */
-        void adjust_position(const View&, const gu::GTID& gtid,
-                             int version);
+        void adjust_position(const View&, const gu::GTID& gtid, int version);
 
         wsrep_seqno_t
         get_safe_to_discard_seqno() const

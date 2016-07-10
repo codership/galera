@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_REPLICATOR_HPP
@@ -73,8 +73,9 @@ namespace galera
                                          wsrep_trx_meta_t* meta) = 0;
         virtual wsrep_status_t pre_commit(TrxHandleMaster*  trx,
                                           wsrep_trx_meta_t* meta) =0;
-        virtual wsrep_status_t post_commit(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t post_rollback(TrxHandleMaster* trx) = 0;
+        virtual wsrep_status_t release_commit(TrxHandleMaster* trx) = 0;
+        virtual wsrep_status_t release_rollback(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandleMaster* trx,
                                           void*            replay_ctx) = 0;
         virtual void abort_trx(TrxHandleMaster* trx) = 0;
@@ -139,8 +140,8 @@ namespace galera
         virtual const wsrep_uuid_t& source_id() const = 0;
 
         virtual void cancel_monitors(const TrxHandleSlave& ts, bool) = 0;
-        virtual void cancel_monitors(wsrep_seqno_t seqno_g,
-                                     wsrep_seqno_t seqno_l) = 0;
+        virtual void cancel_seqnos(wsrep_seqno_t seqno_l,
+                                   wsrep_seqno_t seqno_g) = 0;
         virtual bool corrupt() const = 0;
 
     protected:

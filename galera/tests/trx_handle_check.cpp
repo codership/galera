@@ -126,21 +126,21 @@ START_TEST(test_states_slave)
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "test_states_slave");
     int state_trans_slave[TrxHandle::num_states_][TrxHandle::num_states_] = {
 
-        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 2
-        {  0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 }, // 4
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 7
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 8
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
+        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13  To / From
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0    EXECUTING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1    MUST_ABORT
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 }, // 2    ABORTING
+        {  0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3    REPLICATING
+        {  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4    CERTIFYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5    MUST_CERT_AND_REPL
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6    MUST_REPLAY_AM
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 7    MUST_REPLAY_CM
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 8    MUST_REPLAY
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9    REPLAYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10   APPLYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 }, // 11   COMMITTNG
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12   COMMITTED
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13   ROLLED_BACK
     };
 
     TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
@@ -156,6 +156,7 @@ START_TEST(test_states_slave)
     visits[TrxHandle::S_APPLYING] = 1;
     visits[TrxHandle::S_COMMITTING] = 1;
     visits[TrxHandle::S_COMMITTED] = 1;
+    visits[TrxHandle::S_ABORTING] = 1;
     visits[TrxHandle::S_ROLLED_BACK] = 1;
 
     check_states_graph(state_trans_slave, ts.get(), visits);
