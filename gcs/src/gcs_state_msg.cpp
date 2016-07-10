@@ -247,13 +247,13 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tState        : %s"
                      "\n\tDesync count : %d"
                      "\n\tPrim state   : %s"
-                     "\n\tPrim UUID    : "GU_UUID_FORMAT
+                     "\n\tPrim UUID    : " GU_UUID_FORMAT
                      "\n\tPrim  seqno  : %lld"
                      "\n\tFirst seqno  : %lld"
                      "\n\tLast  seqno  : %lld"
                      "\n\tPrim JOINED  : %d"
-                     "\n\tState UUID   : "GU_UUID_FORMAT
-                     "\n\tGroup UUID   : "GU_UUID_FORMAT
+                     "\n\tState UUID   : " GU_UUID_FORMAT
+                     "\n\tGroup UUID   : " GU_UUID_FORMAT
                      "\n\tName         : '%s'"
                      "\n\tIncoming addr: '%s'\n",
                      state->version,
@@ -657,11 +657,11 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
         }
         else {
             if (bootstrap) {
-                gu_info ("Bootstrapped primary "GU_UUID_FORMAT" found: %d.",
+                gu_info ("Bootstrapped primary " GU_UUID_FORMAT " found: %d.",
                          GU_UUID_ARGS(&rc->prim_uuid), rc->found);
             }
             else {
-                gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: "
+                gu_info ("%s re-merge of primary " GU_UUID_FORMAT " found: "
                          "%d of %d.",
                          rc->found == rc->prim_joined ? "Full" : "Partial",
                          GU_UUID_ARGS(&rc->prim_uuid),

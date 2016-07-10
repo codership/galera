@@ -48,7 +48,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     Protolay(conf),
     timers_(),
     version_(check_range(Conf::EvsVersion,
-                         param<int>(conf, uri, Conf::EvsVersion, "0"),
+                         param<int>(conf, uri, Conf::EvsVersion, Defaults::EvsVersion),
                          0, GCOMM_PROTOCOL_MAX_VERSION + 1)),
     debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
@@ -404,7 +404,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
         {
             UUID uuid;
             std::istringstream is(val);
-            uuid.read_stream(is);
+            is >> uuid;
             log_info << "Evicting node " << uuid << " permanently from cluster";
             evict(uuid);
             if (state() == S_OPERATIONAL && current_view_.is_member(uuid) == true)

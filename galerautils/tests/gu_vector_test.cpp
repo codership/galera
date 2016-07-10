@@ -46,11 +46,42 @@ START_TEST (simple_test)
 }
 END_TEST
 
+START_TEST(size_test)
+{
+    gu::Vector<void*, 1> v;
+    fail_if (v.size() != 0);
+
+    void* const ptr1(reinterpret_cast<void*>(1));
+    v.push_back(ptr1);
+    fail_if(v()[0] != ptr1);
+    fail_if(v[0] != ptr1);
+    fail_if(v().front() != ptr1);
+    fail_if(v.front() != ptr1);
+    fail_if(v().back() != ptr1);
+    fail_if(v.back() != ptr1);
+    fail_if(v.size() != 1, "v.size() expected 1, got %llu", v.size());
+
+    void* const ptr2(reinterpret_cast<void*>(2));
+    v.push_back(ptr2);
+    fail_if(v()[0] != ptr1);
+    fail_if(v[0] != ptr1);
+    fail_if(v()[1] != ptr2);
+    fail_if(v[1] != ptr2);
+    fail_if(v().front() != ptr1);
+    fail_if(v.front() != ptr1);
+    fail_if(v().back() != ptr2);
+    fail_if(v.back() != ptr2);
+    fail_if(v.size() != 2, "v.size() expected 2, got %llu", v.size());
+    fail_if(!v.in_heap());
+}
+END_TEST
+
 Suite*
 gu_vector_suite(void)
 {
     TCase* t = tcase_create ("simple_test");
     tcase_add_test (t, simple_test);
+    tcase_add_test (t, size_test);
 
     Suite* s = suite_create ("gu::Vector");
     suite_add_tcase (s, t);

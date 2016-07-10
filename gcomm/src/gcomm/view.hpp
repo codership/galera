@@ -90,7 +90,7 @@ namespace gcomm
 
         std::ostream& write_stream(std::ostream& os) const {
             os << static_cast<int>(type_) << " ";
-            uuid_.write_stream(os);
+            uuid_.print(os);
             os << " " << seq_;
             return os;
         }
@@ -98,7 +98,7 @@ namespace gcomm
             int t;
             is >> t;
             type_ = static_cast<ViewType>(t);
-            uuid_.read_stream(is);
+            uuid_.scan(is);
             is >> seq_;
             return is;
         }

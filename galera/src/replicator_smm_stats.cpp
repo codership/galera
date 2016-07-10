@@ -1,7 +1,6 @@
 /* Copyright (C) 2010 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
-#include "uuid.hpp"
 #include <gu_debug_sync.hpp>
 #include <gu_mem.h>
 
@@ -30,7 +29,6 @@ static wsrep_member_status_t state2stats(galera::ReplicatorSMM::State state)
     {
     case galera::ReplicatorSMM::S_DESTROYED :
     case galera::ReplicatorSMM::S_CLOSED    :
-    case galera::ReplicatorSMM::S_CLOSING   :
     case galera::ReplicatorSMM::S_CONNECTED : return WSREP_MEMBER_UNDEFINED;
     case galera::ReplicatorSMM::S_JOINING   : return WSREP_MEMBER_JOINER;
     case galera::ReplicatorSMM::S_JOINED    : return WSREP_MEMBER_JOINED;
@@ -52,7 +50,6 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
     case galera::ReplicatorSMM::S_DESTROYED :
         return state_str[10];
     case galera::ReplicatorSMM::S_CLOSED :
-    case galera::ReplicatorSMM::S_CLOSING:
     case galera::ReplicatorSMM::S_CONNECTED:
     {
         if (sst_state == ReplicatorSMM::SST_REQ_FAILED)  return state_str[8];
@@ -192,8 +189,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_KEYS_BYTES         ].value._int64  = keys_bytes_();
     sv[STATS_DATA_BYTES         ].value._int64  = data_bytes_();
     sv[STATS_UNRD_BYTES         ].value._int64  = unrd_bytes_();
-    sv[STATS_RECEIVED           ].value._int64  = gcs_as_.received();
-    sv[STATS_RECEIVED_BYTES     ].value._int64  = gcs_as_.received_bytes();
+    sv[STATS_RECEIVED           ].value._int64  = as_->received();
+    sv[STATS_RECEIVED_BYTES     ].value._int64  = as_->received_bytes();
     sv[STATS_LOCAL_COMMITS      ].value._int64  = local_commits_();
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
     sv[STATS_LOCAL_REPLAYS      ].value._int64  = local_replays_();

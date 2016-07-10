@@ -161,6 +161,42 @@ swap_array(T (&a)[N], T (&b)[N])
     for (size_t n(0); n < N; ++n) std::swap(a[n], b[n]);
 }
 
+typedef std::ios_base& (*base_t) (std::ios_base& str);
+
+template <base_t base = std::hex,
+          typename T  = unsigned long long,
+          bool prefix = false>
+class PrintBase
+{
+public:
+    explicit PrintBase(T t) : val_(t) {}
+    void print(std::ostream& os) const
+    {
+        using namespace std;
+
+        ios_base::fmtflags const old_flags(os.flags());
+        char               const old_fill (os.fill());
+
+        int width(sizeof(T) * 2); // default hex width
+        if (base == oct) width = width * 1.333334 + 0.5;
+
+        if (prefix) os << showbase;
+
+        os << internal << base << setfill('0') << setw(width) << val_;
+
+        os.flags(old_flags);
+        os.fill(old_fill);
+    }
+private:
+    T const val_;
+};
+
+template <base_t base, typename T>
+std::ostream& operator << (std::ostream& os, const PrintBase<base, T>& b)
+{
+    b.print(os); return os;
+}
+
 } // namespace gu
 
 #endif /* _gu_utils_hpp_ */

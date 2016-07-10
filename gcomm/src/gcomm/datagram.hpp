@@ -12,6 +12,7 @@
 #include <limits>
 
 #include <cstring>
+#include <cassert>
 #include <stdint.h>
 
 namespace gcomm

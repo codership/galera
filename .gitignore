@@ -16,6 +16,9 @@ galera.cache
 gvwstate.dat
 galera/tests/galera_check
 galera/tests/galera_check.passed
+galerautils/tests/avalanche
+galerautils/tests/avalanche.out
+galerautils/tests/gu_to_test
 galerautils/tests/gu_tests
 galerautils/tests/gu_tests++
 galerautils/tests/gu_tests++.passed

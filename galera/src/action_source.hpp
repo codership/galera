@@ -13,6 +13,8 @@ namespace galera
         ActionSource() { }
         virtual ~ActionSource() { }
         virtual ssize_t process(void* ctx, bool& exit_loop) = 0;
+        virtual long long received()       const = 0;
+        virtual long long received_bytes() const = 0;
     };
 }
 

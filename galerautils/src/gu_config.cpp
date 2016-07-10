@@ -138,6 +138,12 @@ gu::Config::set_longlong (const std::string& key, long long val)
 }
 
 void
+gu::Config::key_check (const std::string& key)
+{
+    if (key.size() == 0) { gu_throw_error(EINVAL) << "Empty key."; }
+}
+
+void
 gu::Config::check_conversion (const char* str,
                               const char* endptr,
                               const char* type)

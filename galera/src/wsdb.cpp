@@ -56,28 +56,16 @@ galera::Wsdb::~Wsdb()
 }
 
 
-inline galera::TrxHandle*
-galera::Wsdb::find_trx(wsrep_trx_id_t const trx_id)
-{
-    gu::Lock lock(trx_mutex_);
-
-    TrxMap::iterator const i(trx_map_.find(trx_id));
-
-    return (trx_map_.end() == i ? 0 : i->second);
-}
-
-
-inline galera::TrxHandle*
+inline galera::TrxHandlePtr
 galera::Wsdb::create_trx(const TrxHandle::Params& params,
                          const wsrep_uuid_t&  source_id,
                          wsrep_trx_id_t const trx_id)
 {
     TrxHandle* trx(TrxHandle::New(trx_pool_, params, source_id, -1, trx_id));
 
-    gu::Lock lock(trx_mutex_);
-
     std::pair<TrxMap::iterator, bool> i
-        (trx_map_.insert(std::make_pair(trx_id, trx)));
+        (trx_map_.insert(std::make_pair
+                         (trx_id, TrxHandlePtr(trx, TrxHandleDeleter()))));
 
     if (gu_unlikely(i.second == false)) gu_throw_fatal;
 
@@ -85,19 +73,24 @@ galera::Wsdb::create_trx(const TrxHandle::Params& params,
 }
 
 
-galera::TrxHandle*
+galera::TrxHandlePtr
 galera::Wsdb::get_trx(const TrxHandle::Params& params,
-                      const wsrep_uuid_t&  source_id,
-                      wsrep_trx_id_t const trx_id,
-                      bool const           create)
+                      const wsrep_uuid_t&      source_id,
+                      wsrep_trx_id_t const     trx_id,
+                      bool const               create)
 {
-    TrxHandle* retval(find_trx(trx_id));
+    gu::Lock lock(trx_mutex_);
+    TrxMap::iterator const i(trx_map_.find(trx_id));
+    if (i == trx_map_.end() && create)
+    {
+        return create_trx(params, source_id, trx_id);
+    }
+    else if (i == trx_map_.end())
+    {
+        return TrxHandlePtr();
+    }
 
-    if (0 == retval && create) retval = create_trx(params, source_id, trx_id);
-
-    if (retval != 0) retval->ref();
-
-    return retval;
+    return i->second;
 }
 
 
@@ -127,20 +120,24 @@ galera::Wsdb::get_conn(wsrep_conn_id_t const conn_id, bool const create)
 }
 
 
-galera::TrxHandle*
+galera::TrxHandlePtr
 galera::Wsdb::get_conn_query(const TrxHandle::Params& params,
-                             const wsrep_uuid_t&  source_id,
-                             wsrep_trx_id_t const conn_id,
-                             bool const           create)
+                             const wsrep_uuid_t&      source_id,
+                             wsrep_trx_id_t const     conn_id,
+                             bool const               create)
 {
     Conn* const conn(get_conn(conn_id, create));
 
-    if (0 == conn) return 0;
+    if (0 == conn)
+    {
+        throw gu::NotFound();
+    }
 
     if (conn->get_trx() == 0 && create == true)
     {
-        TrxHandle* trx
-            (TrxHandle::New(trx_pool_, params, source_id, conn_id, -1));
+        TrxHandlePtr trx
+            (TrxHandle::New(trx_pool_, params, source_id, conn_id, -1),
+             TrxHandleDeleter());
         conn->assign_trx(trx);
     }
 
@@ -154,7 +151,6 @@ void galera::Wsdb::discard_trx(wsrep_trx_id_t trx_id)
     TrxMap::iterator i;
     if ((i = trx_map_.find(trx_id)) != trx_map_.end())
     {
-        i->second->unref();
         trx_map_.erase(i);
     }
 }
@@ -166,7 +162,7 @@ void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     ConnMap::iterator i;
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
-        i->second.assign_trx(0);
+        i->second.reset_trx();
     }
 }
 

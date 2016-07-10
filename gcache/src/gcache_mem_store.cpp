@@ -30,11 +30,11 @@ MemStore::have_free_space (size_type size)
                 discard(bh);
                 break;
             case BUFFER_IN_RB:
-                bh->ctx->discard(bh);
+                BH_ctx(bh)->discard(bh);
                 break;
             case BUFFER_IN_PAGE:
             {
-                Page*      const page (static_cast<Page*>(bh->ctx));
+                Page*      const page (static_cast<Page*>(BH_ctx(bh)));
                 PageStore* const ps   (PageStore::page_store(page));
                 ps->discard(bh);
                 break;

@@ -33,7 +33,10 @@ namespace gu
             gu_throw_error (ERANGE) << from << " is unrepresentable with "
                                     << (std::numeric_limits<TO>::is_signed ?
                                         "signed" : "unsigned") << " "
-                                    << sizeof(TO) << " bytes.";
+                                    << sizeof(TO) << " bytes ("
+                                    << "min " << std::numeric_limits<TO>::min()
+                                    << " max " << std::numeric_limits<TO>::max()
+                                    << ")";
         }
 
         return static_cast<TO>(from);

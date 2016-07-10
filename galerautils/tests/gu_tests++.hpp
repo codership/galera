@@ -20,12 +20,14 @@
 #include "gu_rset_test.hpp"
 #include "gu_string_utils_test.hpp"
 #include "gu_uri_test.hpp"
+#include "gu_gtid_test.hpp"
 #include "gu_config_test.hpp"
 #include "gu_net_test.hpp"
 #include "gu_datetime_test.hpp"
 #include "gu_histogram_test.hpp"
 #include "gu_stats_test.hpp"
 #include "gu_thread_test.hpp"
+#include "gu_shared_ptr_test.hpp"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -41,12 +43,14 @@ static suite_creator_t suites[] =
     gu_rset_suite,
     gu_string_utils_suite,
     gu_uri_suite,
+    gu_gtid_suite,
     gu_config_suite,
     gu_net_suite,
     gu_datetime_suite,
     gu_histogram_suite,
     gu_stats_suite,
     gu_thread_suite,
+    gu_shared_ptr_suite,
     0
 };
 

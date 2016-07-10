@@ -16,9 +16,6 @@
 
 #include "gu_uri.hpp"
 
-#ifndef GCOMM_PC_MAX_VERSION
-#define GCOMM_PC_MAX_VERSION 0
-#endif // GCOMM_PC_MAX_VERSION
 
 namespace gcomm
 {

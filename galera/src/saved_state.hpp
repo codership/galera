@@ -31,6 +31,8 @@ public:
     void mark_safe();
     void mark_corrupt();
 
+    bool corrupt() const { return corrupt_; }
+
     void stats(long& marks, long& locks, long& writes)
     {
         marks  = total_marks_();

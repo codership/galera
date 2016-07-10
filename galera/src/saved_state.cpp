@@ -1,10 +1,10 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2015 Codership Oy <info@codership.com>
 //
 
 #include "saved_state.hpp"
-#include "gu_dbug.h"
-#include "uuid.hpp"
+#include <gu_dbug.h>
+#include <gu_uuid.hpp>
 
 #include <fstream>
 
@@ -215,9 +215,10 @@ SavedState::mark_safe()
 void
 SavedState::mark_corrupt()
 {
-    /* Half LONG_MAX keeps us equally far from overflow and underflow by
-       mark_unsafe()/mark_safe() calls */
-    unsafe_ = (std::numeric_limits<long>::max() >> 1);
+    /* Half LONG_MAX keeps us equally and sufficiently far from unsafe_
+       overflow/underflow by mark_unsafe()/mark_safe() calls */
+    static const long magic(std::numeric_limits<long>::max() >> 1);
+    unsafe_ = magic;
 
     gu::Lock lock(mtx_); ++total_locks_;
 

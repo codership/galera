@@ -61,6 +61,7 @@ public:
     void
     add (const std::string& key)
     {
+        gu_trace(key_check(key));
         if (!has(key)) { params_[key] = Parameter(); }
     }
 
@@ -68,6 +69,7 @@ public:
     void
     add (const std::string& key, const std::string& value)
     {
+        gu_trace(key_check(key));
         if (!has(key)) { params_[key] = Parameter(value); }
     }
 
@@ -120,9 +122,13 @@ public:
     get (const std::string& key) const
     {
         param_map_t::const_iterator const i(params_.find(key));
-        if (i == params_.end()) throw NotFound();
+        if (i == params_.end())
+        {
+            log_debug << "key '" << key << "' not found.";
+            throw NotFound();
+        }
         if (i->second.is_set()) return i->second.value();
-        log_debug << key << " not set.";
+        log_debug << "key '" << key << "' not set.";
         throw NotSet();
     }
 
@@ -200,6 +206,9 @@ public:
     const_iterator end()   const { return params_.end();   }
 
 private:
+
+    static void
+    key_check (const std::string& key);
 
     static void
     check_conversion (const char* ptr, const char* endptr, const char* type);

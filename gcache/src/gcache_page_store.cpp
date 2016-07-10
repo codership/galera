@@ -248,7 +248,7 @@ gcache::PageStore::realloc (void* ptr, size_type const size)
     assert(ptr != NULL);
 
     BufferHeader* const bh(ptr2BH(ptr));
-    Page* const page(static_cast<Page*>(bh->ctx));
+    Page* const page(static_cast<Page*>(BH_ctx(bh)));
 
     void* ret(page->realloc(ptr, size));
 

@@ -4,7 +4,7 @@
 
 #include "../src/saved_state.hpp"
 
-#include "../src/uuid.hpp"
+#include <gu_uuid.hpp>
 
 #include <check.h>
 #include <errno.h>
@@ -78,8 +78,7 @@ START_TEST(test_basic)
         fail_if (uuid  != WSREP_UUID_UNDEFINED);
         fail_if (seqno != WSREP_SEQNO_UNDEFINED);
 
-        gu_uuid_from_string("b2c01654-8dfe-11e1-0800-a834d641cfb5",
-                            to_gu_uuid(uuid));
+        gu_uuid_from_string("b2c01654-8dfe-11e1-0800-a834d641cfb5", uuid);
         seqno = 2345234LL;
 
         st.set(uuid, seqno);

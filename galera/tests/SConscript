@@ -17,8 +17,8 @@ env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
 env.Prepend(LIBS=File('#/gcs/src/libgcs.a'))
-env.Prepend(LIBS=File('#/galera/src/libgalera++.a'))
 env.Prepend(LIBS=File('#/gcache/src/libgcache.a'))
+env.Prepend(LIBS=File('#/galera/src/libgalera++.a'))
 
 galera_check = env.Program(target='galera_check',
                            source=Split('''
@@ -26,12 +26,12 @@ galera_check = env.Program(target='galera_check',
                                data_set_check.cpp
                                key_set_check.cpp
                                write_set_ng_check.cpp
-                               write_set_check.cpp
                                trx_handle_check.cpp
                                service_thd_check.cpp
                                ist_check.cpp
                                saved_state_check.cpp
                            '''))
+#                               write_set_check.cpp
 
 stamp = "galera_check.passed"
 env.Test(stamp, galera_check)

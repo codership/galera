@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -12,9 +12,9 @@
 #include "gu_unordered.hpp"
 #include "gu_lock.hpp"
 #include "gu_config.hpp"
+#include <gu_gtid.hpp>
 
 #include <map>
-#include <set>
 #include <list>
 
 namespace galera
@@ -36,9 +36,9 @@ namespace galera
 
     private:
 
-        typedef std::multiset<wsrep_seqno_t>        DepsSet;
+        typedef std::multiset<wsrep_seqno_t>          DepsSet;
 
-        typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
+        typedef std::map<wsrep_seqno_t, TrxHandlePtr> TrxMap;
 
     public:
 
@@ -52,10 +52,9 @@ namespace galera
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
-        TestResult append_trx(TrxHandle*);
-        TestResult test(TrxHandle*, bool = true);
+        TestResult append_trx(const TrxHandlePtr&);
+        TestResult test(const TrxHandlePtr&, bool = true);
         wsrep_seqno_t position() const { return position_; }
-
         wsrep_seqno_t
         get_safe_to_discard_seqno() const
         {
@@ -77,8 +76,7 @@ namespace galera
 
         // Set trx corresponding to handle committed. Return purge seqno if
         // index purge is required, -1 otherwise.
-        wsrep_seqno_t set_trx_committed(TrxHandle*);
-        TrxHandle* get_trx(wsrep_seqno_t);
+        wsrep_seqno_t set_trx_committed(TrxHandle&);
 
         // statistics section
         void stats_get(double& avg_cert_interval,
@@ -109,13 +107,14 @@ namespace galera
 
     private:
 
-        TestResult do_test(TrxHandle*, bool);
-        TestResult do_test_v1to2(TrxHandle*, bool);
+        // Non-copyable
+        Certification(const Certification&);
+        Certification& operator=(const Certification&);
+
+        TestResult do_test(const TrxHandlePtr&, bool);
         TestResult do_test_v3(TrxHandle*, bool);
         TestResult do_test_preordered(TrxHandle*);
         void purge_for_trx(TrxHandle*);
-        void purge_for_trx_v1to2(TrxHandle*);
-        void purge_for_trx_v3(TrxHandle*);
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
@@ -145,27 +144,32 @@ namespace galera
             void operator()(TrxMap::value_type& vt) const
             {
                 {
-                    TrxHandle* trx(vt.second);
+                    TrxHandle* trx(vt.second.get());
+                    // Locking can be skipped
+                    // because trx is only read here and refcount uses atomics.
+                    // Memory barrier is provided by certification mutex
+                    //
                     TrxHandleLock lock(*trx);
 
+                    assert(trx->is_committed() == true);
                     if (trx->is_committed() == false)
                     {
                         log_warn << "trx not committed in purge and discard: "
                                  << *trx;
+                        assert(0);
                     }
 
-                    if (trx->depends_seqno() > -1)
+                    // If depends seqno is not WSREP_SEQNO_UNDEFINED
+                    // write set certification has passed and keys have been
+                    // inserted into index and purge is needed.
+                    // TOI write sets will always pass regular certification
+                    // and keys will be inserted..
+                    if (trx->depends_seqno() >= 0 || trx->is_toi() == true)
                     {
                         cert_.purge_for_trx(trx);
                     }
 
-                    if (trx->refcnt() > 1)
-                    {
-                        log_debug << "trx "     << trx->trx_id()
-                                  << " refcnt " << trx->refcnt();
-                    }
                 }
-                vt.second->unref();
             }
 
             PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_)

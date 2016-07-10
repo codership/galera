@@ -39,14 +39,15 @@ namespace gcache
     void
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
-                          int64_t     const seqno_d)
+                          uint8_t     const type,
+                          bool        const skip)
     {
         gu::Lock lock(mtx);
 
         BufferHeader* bh = ptr2BH(ptr);
 
         assert (SEQNO_NONE == bh->seqno_g);
-        assert (SEQNO_ILL  == bh->seqno_d);
+        assert (seqno_g > 0);
         assert (!BH_is_released(bh));
 
         if (gu_likely(seqno_g > seqno_max))
@@ -62,6 +63,7 @@ namespace gcache
 
             if (false == res.second)
             {
+                assert(0);
                 gu_throw_fatal <<"Attempt to reuse the same seqno: " << seqno_g
                                <<". New ptr = " << ptr << ", previous ptr = "
                                << res.first->second;
@@ -69,7 +71,63 @@ namespace gcache
         }
 
         bh->seqno_g = seqno_g;
-        bh->seqno_d = seqno_d;
+        bh->flags  |= (BUFFER_SKIPPED * skip);
+        bh->type    = type;
+
+    }
+
+    /*!
+     * Mark buffer to be skipped
+     */
+    void
+    GCache::seqno_skip (const void* const ptr,
+                        int64_t     const seqno_g,
+                        uint8_t     const type)
+    {
+        gu::Lock lock(mtx);
+
+        BufferHeader* const bh(ptr2BH(ptr));
+        seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
+
+        /* sanity checks */
+        int reason(0);
+        std::ostringstream msg;
+
+        if (seqno_g <= 0) {
+            msg << "invalid seqno: " << seqno_g;
+            reason = 1;
+        }
+        else if (seqno_g != bh->seqno_g) {
+            msg << "seqno " << seqno_g << " does not match ptr seqno "
+                << bh->seqno_g;
+            reason = 2;
+        }
+        else if (type != bh->type) {
+             msg << "type " << type << " does not match ptr type "
+                 << bh->type;
+            reason = 3;
+        }
+        else if (p == seqno2ptr.end()) {
+            msg << "seqno " << seqno_g << " not found in the map";
+            reason = 4;
+        }
+        else if (ptr != p->second) {
+             msg << "ptr " << seqno_g << " does not match mapped ptr "
+                 << p->second;
+            reason = 5;
+        }
+
+        assert(0 == reason);
+        if (0 != reason)
+        {
+            gu_throw_fatal << "Skipping seqno sanity check failed: " << msg.str()
+                           << " (reason " << reason << ")";
+        }
+
+        assert (!BH_is_released(bh));
+        assert (!BH_is_skipped(bh));
+
+        bh->flags |= BUFFER_SKIPPED;
     }
 
     void
@@ -88,16 +146,11 @@ namespace gcache
         size_t old_gap(-1);
         int    batch_size(min_batch_size);
 
-        bool   loop(false);
+        bool   loop(seqno >= seqno_released);
 
-        do
+        while(loop)
         {
-            /* if we're doing this loop repeatedly, allow other threads to run*/
-            if (loop) sched_yield();
-
             gu::Lock lock(mtx);
-
-            assert(seqno >= seqno_released);
 
             seqno2ptr_iter_t it(seqno2ptr.upper_bound(seqno_released));
 
@@ -136,7 +189,7 @@ namespace gcache
                 BufferHeader* const bh(ptr2BH(it->second));
                 assert (bh->seqno_g == it->first);
 #ifndef NDEBUG
-                if (!(seqno_released + 1 == it->first ||
+                if (!(seqno_released < it->first ||
                       seqno_released == SEQNO_NONE))
                 {
                     log_info << "seqno_released: " << seqno_released
@@ -145,7 +198,7 @@ namespace gcache
                              << "\nstart: " << start << "; end: " << end
                              << " batch_size: " << batch_size << "; gap: "
                              << new_gap << "; seqno_max: " << seqno_max;
-                    assert(seqno_released + 1 == it->first ||
+                    assert(seqno_released < it->first ||
                            seqno_released == SEQNO_NONE);
                 }
 #endif
@@ -157,8 +210,10 @@ namespace gcache
             assert (loop || seqno == seqno_released);
 
             loop = (end < seqno) && loop;
+
+            /* if we're doing this loop repeatedly, allow other threads to run*/
+            if (loop) sched_yield();
         }
-        while(loop);
     }
 
     /*!
@@ -184,7 +239,6 @@ namespace gcache
      * @throws NotFound
      */
     const void* GCache::seqno_get_ptr (int64_t const seqno_g,
-                                       int64_t&      seqno_d,
                                        ssize_t&      size)
     {
         const void* ptr(0);
@@ -213,8 +267,7 @@ namespace gcache
         assert (ptr);
 
         const BufferHeader* const bh (ptr2BH(ptr)); // this can result in IO
-        seqno_d = bh->seqno_d;
-        size    = bh->size - sizeof(BufferHeader);
+        size = bh->size - sizeof(BufferHeader);
 
         return ptr;
     }
@@ -263,8 +316,9 @@ namespace gcache
             Limits::assert_size(bh->size);
 
             v[i].set_other (bh->seqno_g,
-                            bh->seqno_d,
-                            bh->size - sizeof(BufferHeader));
+                            bh->size - sizeof(BufferHeader),
+                            BH_is_skipped(bh),
+                            bh->type);
         }
 
         return found;

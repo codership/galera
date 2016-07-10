@@ -58,7 +58,7 @@ START_TEST (ver3_basic)
     wsrep_seqno_t const seqno(2);
     int const           pa_range(seqno - last_seen);
 
-    wso.set_last_seen(last_seen);
+    wso.finalize(last_seen, 0);
 
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in;
@@ -103,10 +103,10 @@ START_TEST (ver3_basic)
         wsi.verify_checksum();
 
         wsi.set_seqno (seqno, pa_range);
-        fail_unless(wsi.certified(),
-                    "wsi.certified: %d"
-                    "\nwsi.pa_range = %lld\n    pa_range = %lld",
-                    static_cast<int>(wsi.certified()), wsi.pa_range(), pa_range);
+        fail_unless(wsi.pa_range() == pa_range,
+                    "wsi.pa_range = %lld\n    pa_range = %lld",
+                    wsi.pa_range(), pa_range);
+        fail_unless(wsi.certified());
     }
     /* repeat reading buffer after "certification" */
     {
@@ -115,7 +115,6 @@ START_TEST (ver3_basic)
         wsi.verify_checksum();
         fail_unless(wsi.certified());
         fail_if (wsi.seqno() != seqno);
-        fail_if (wsi.flags() != flags);
         fail_if (0 == wsi.timestamp());
 
         mark_point();
@@ -300,7 +299,7 @@ START_TEST (ver3_annotation)
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
 
     wsrep_seqno_t const last_seen(1);
-    wso.set_last_seen(last_seen);
+    wso.finalize(last_seen, 0);
 
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in;

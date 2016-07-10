@@ -19,7 +19,7 @@ namespace galera
             Conn(wsrep_conn_id_t conn_id)
                 :
                 conn_id_(conn_id),
-                trx_(0)
+                trx_()
             { }
 
             Conn(const Conn& other)
@@ -28,15 +28,19 @@ namespace galera
                 trx_(other.trx_)
             { }
 
-            ~Conn() { if (trx_ != 0) trx_->unref(); }
+            ~Conn() { }
 
-            void assign_trx(TrxHandle* trx)
+            void assign_trx(TrxHandlePtr& trx)
             {
-                if (trx_ != 0) trx_->unref();
                 trx_ = trx;
             }
 
-            TrxHandle* get_trx()
+            void reset_trx()
+            {
+                trx_ = TrxHandlePtr();
+            }
+
+            TrxHandlePtr get_trx()
             {
                 return trx_;
             }
@@ -44,7 +48,7 @@ namespace galera
         private:
             void operator=(const Conn&);
             wsrep_conn_id_t conn_id_;
-            TrxHandle* trx_;
+            TrxHandlePtr trx_;
         };
 
 
@@ -54,7 +58,7 @@ namespace galera
             size_t operator()(const wsrep_trx_id_t& key) const { return key; }
         };
 
-        typedef gu::UnorderedMap<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
+        typedef gu::UnorderedMap<wsrep_trx_id_t, TrxHandlePtr, TrxHash> TrxMap;
 
         class ConnHash
         {
@@ -65,17 +69,18 @@ namespace galera
         typedef gu::UnorderedMap<wsrep_conn_id_t, Conn, ConnHash> ConnMap;
 
     public:
-        TrxHandle* get_trx(const TrxHandle::Params& params,
-                           const wsrep_uuid_t&      source_id,
-                           wsrep_trx_id_t           trx_id,
-                           bool                     create = false);
+
+        TrxHandlePtr get_trx(const TrxHandle::Params& params,
+                             const wsrep_uuid_t&      source_id,
+                             wsrep_trx_id_t           trx_id,
+                             bool                     create = false);
 
         void discard_trx(wsrep_trx_id_t trx_id);
 
-        TrxHandle* get_conn_query(const TrxHandle::Params&,
-                                  const wsrep_uuid_t&,
-                                  wsrep_conn_id_t conn_id,
-                                  bool create = false);
+        TrxHandlePtr get_conn_query(const TrxHandle::Params&,
+                                    const wsrep_uuid_t&,
+                                    wsrep_conn_id_t conn_id,
+                                    bool create = false);
 
         void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
@@ -86,13 +91,10 @@ namespace galera
         void print(std::ostream& os) const;
 
     private:
-        // Find existing trx handle in the map
-        TrxHandle* find_trx(wsrep_trx_id_t trx_id);
-
         // Create new trx handle
-        TrxHandle* create_trx(const TrxHandle::Params& params,
-                              const wsrep_uuid_t&      source_id,
-                              wsrep_trx_id_t           trx_id);
+        TrxHandlePtr create_trx(const TrxHandle::Params& params,
+                                const wsrep_uuid_t&      source_id,
+                                wsrep_trx_id_t           trx_id);
 
         Conn*      get_conn(wsrep_conn_id_t conn_id, bool create);
 

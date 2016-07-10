@@ -98,14 +98,18 @@ WriteSetNG::Header::gather (KeySet::Version const  kver,
 
 
 void
-WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
+WriteSetNG::Header::finalize(wsrep_seqno_t const last_seen,
+                             int const           pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
+    assert (pa_range >= -1);
 
-    uint64_t*   const ls  (reinterpret_cast<uint64_t*>(ptr_ +V3_LAST_SEEN_OFF));
-    uint64_t*   const ts  (reinterpret_cast<uint64_t*>(ptr_ +V3_TIMESTAMP_OFF));
+    uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
+    uint64_t* const ls(reinterpret_cast<uint64_t*>(ptr_ + V3_LAST_SEEN_OFF));
+    uint64_t* const ts(reinterpret_cast<uint64_t*>(ptr_ + V3_TIMESTAMP_OFF));
 
+    *pa = gu::htog<uint16_t>(std::min(int(MAX_PA_RANGE), pa_range));
     *ls = gu::htog<uint64_t>(last_seen);
     *ts = gu::htog<uint64_t>(gu_time_monotonic());
 
@@ -114,12 +118,13 @@ WriteSetNG::Header::set_last_seen(const wsrep_seqno_t& last_seen)
 
 
 void
-WriteSetNG::Header::set_seqno(const wsrep_seqno_t& seqno,
-                              uint16_t const pa_range)
+WriteSetNG::Header::set_seqno(wsrep_seqno_t const seqno,
+                              uint16_t      const pa_range)
 {
     assert (ptr_);
     assert (size_ > 0);
     assert (seqno > 0);
+    assert (wsrep_seqno_t(pa_range) <= seqno);
 
     uint16_t* const pa(reinterpret_cast<uint16_t*>(ptr_ + V3_PA_RANGE_OFF));
     uint64_t* const sq(reinterpret_cast<uint64_t*>(ptr_ + V3_SEQNO_OFF));

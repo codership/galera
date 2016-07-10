@@ -24,16 +24,16 @@ namespace gcomm
 }
 
 class gcomm::UUID :
-        public gu::UUID
+        public gu::UUID_base
 {
 public:
 
-    UUID() : gu::UUID() {}
+    UUID() : gu::UUID_base() {}
 
     UUID(const void* node, const size_t node_len) :
-            gu::UUID(node, node_len) {}
+            gu::UUID_base(node, node_len) {}
 
-    UUID(const int32_t idx) : gu::UUID()
+    UUID(const int32_t idx) : gu::UUID_base()
     {
         assert(idx > 0);
         memcpy(&uuid_, &idx, sizeof(idx));
@@ -75,9 +75,23 @@ public:
         return os.str();
     }
 
+    void increment_incarnation()
+    {
+        uint16_t* data = reinterpret_cast<uint16_t*>(uuid_.data);
+        uint16_t  inc  = gu_be16(data[4]);
+        inc++;
+        data[4] = gu_be16(inc);
+    }
+
+    bool fixed_part_matches(const gcomm::UUID& uuid) const
+    {
+        return ((memcmp(uuid_.data, uuid.ptr()->data, 8) == 0) &&
+                (memcmp(uuid_.data+10, uuid.ptr()->data+10, 6) == 0));
+    }
+
 private:
     static const UUID uuid_nil_;
-    UUID(gu_uuid_t uuid) : gu::UUID(uuid) {}
+    UUID(gu_uuid_t uuid) : gu::UUID_base(uuid) {}
 };
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)

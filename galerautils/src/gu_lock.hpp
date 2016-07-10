@@ -1,16 +1,11 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GU_LOCK__
 #define __GU_LOCK__
 
-#include <pthread.h>
-#include <cerrno>
-
-#include "gu_exception.hpp"
-#include "gu_logger.hpp"
 #include "gu_mutex.hpp"
 #include "gu_cond.hpp"
 #include "gu_datetime.hpp"
@@ -19,42 +14,31 @@ namespace gu
 {
     class Lock
     {
-        pthread_mutex_t* const value;
+        const gu::Mutex& mtx_;
 
         Lock (const Lock&);
         Lock& operator=(const Lock&);
 
     public:
 
-        Lock (const Mutex& mtx) : value(&mtx.value)
+        Lock (const Mutex& mtx) : mtx_(mtx)
         {
-
-            int err = pthread_mutex_lock (value);
-            if (gu_unlikely(err))
-            {
-                std::string msg = "Mutex lock failed: ";
-                msg = msg + strerror(err);
-                throw Exception(msg.c_str(), err);
-            }
+            mtx_.lock();
         }
 
         virtual ~Lock ()
         {
-            int err = pthread_mutex_unlock (value);
-            if (gu_unlikely(err))
-            {
-                log_fatal << "Mutex unlock failed: " << err << " ("
-                          << strerror(err) << "), Aborting.";
-                ::abort();
-            }
-            // log_debug << "Unlocked mutex " << value;
+            mtx_.unlock();
         }
 
         inline void wait (const Cond& cond)
         {
             cond.ref_count++;
-            pthread_cond_wait (&(cond.cond), value);
+            gu_cond_wait (&(cond.cond), &(mtx_.value_));
             cond.ref_count--;
+#ifndef NDEBUG
+            mtx_.locked_ = true;
+#endif /* NDEBUG */
         }
 
         inline void wait (const Cond& cond, const datetime::Date& date)
@@ -63,8 +47,11 @@ namespace gu
 
             date._timespec(ts);
             cond.ref_count++;
-            int ret = pthread_cond_timedwait (&(cond.cond), value, &ts);
+            int const ret(gu_cond_timedwait(&(cond.cond), &(mtx_.value_), &ts));
             cond.ref_count--;
+#ifndef NDEBUG
+            mtx_.locked_ = true;
+#endif /* NDEBUG */
 
             if (gu_unlikely(ret)) gu_throw_error(ret);
         }

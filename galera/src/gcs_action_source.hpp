@@ -59,11 +59,11 @@ namespace galera
     public:
         GcsActionTrx(TrxHandle::SlavePool& sp, const struct gcs_action& act);
         ~GcsActionTrx();
-        TrxHandle* trx() const { return trx_; }
+        const TrxHandlePtr& txp() const { return txp_; }
     private:
         GcsActionTrx(const GcsActionTrx&);
         void operator=(const GcsActionTrx&);
-        TrxHandle* trx_;
+        TrxHandlePtr txp_;
     };
 
 }

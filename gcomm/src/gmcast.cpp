@@ -609,8 +609,8 @@ void gcomm::GMCast::handle_established(Proto* est)
     else if (AddrList::value(i).uuid() != est->remote_uuid())
     {
         log_info << "remote endpoint " << est->remote_addr()
-                 << " changed identity " << AddrList::value(i).uuid()
-                 << " -> " << est->remote_uuid();
+                 << " changed identity " << AddrList::value(i).uuid().full_str()
+                 << " -> " << est->remote_uuid().full_str();
         remote_addrs_.erase(i);
         i = remote_addrs_.insert_unique(
             make_pair(est->remote_addr(),

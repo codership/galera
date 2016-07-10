@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2014 Codership Oy <info@codership.com>
 
 /*!
  * @file implementation of STL vector functionality "on the stack", that is
@@ -44,9 +44,15 @@ public:
     virtual       reference operator[] (size_type i)       = 0;
     virtual const_reference operator[] (size_type i) const = 0;
 
-    virtual size_type size    () const = 0;
-    virtual void      reserve (size_type n) = 0;
-    virtual void      resize  (size_type n, value_type val = value_type()) = 0;
+    virtual size_type size     () const = 0;
+    virtual void      reserve  (size_type n) = 0;
+    virtual void      resize   (size_type n, value_type val = value_type()) = 0;
+    virtual void      push_back(const value_type& val) = 0;
+
+          reference front()       { return operator[](0); }
+    const_reference front() const { return operator[](0); }
+          reference back ()       { return operator[](size() - 1); }
+    const_reference back () const { return operator[](size() - 1); }
 
     // Now iterators, which I have no time for ATM. Leaving unfinished.
 
@@ -61,6 +67,9 @@ template <typename T, typename VectorBase<T>::size_type capacity>
 class Vector
 {
 public:
+
+    typedef typename VectorBase<T>::size_type  size_type;
+    typedef typename VectorBase<T>::value_type value_type;
 
     Vector() : rv_() {}
 
@@ -79,26 +88,29 @@ public:
     typedef ReservedAllocator<T, capacity> Allocator;
     typedef std::vector<T, Allocator>      ContainerType;
 
-          ContainerType& operator() ()       { return rv_.container(); }
-    const ContainerType& operator() () const { return rv_.container(); }
+          ContainerType& operator() ()       { return container(); }
+    const ContainerType& operator() () const { return container(); }
 
-          ContainerType* operator-> ()       { return rv_.operator->(); }
-    const ContainerType* operator-> () const { return rv_.operator->(); }
+          ContainerType* operator-> ()       { return &container(); }
+    const ContainerType* operator-> () const { return &container(); }
 
-    typedef typename VectorBase<T>::size_type size_type;
+          T& operator[] (size_type i)       { return container()[i]; }
+    const T& operator[] (size_type i) const { return container()[i]; }
 
-          T& operator[] (size_type i)       { return operator()()[i]; }
-    const T& operator[] (size_type i) const { return operator()()[i]; }
-
-    size_type size    () const      { return operator()().size();     }
-    void      reserve (size_type n) {        operator()().reserve(n); }
-
-    typedef typename VectorBase<T>::value_type value_type;
+    size_type size    () const      { return container().size();     }
+    void      reserve (size_type n) {        container().reserve(n); }
 
     void      resize  (size_type n, value_type val = value_type())
     {
-        operator()().resize(n, val);
+        container().resize(n, val);
     }
+
+    void push_back (const value_type& val) { container().push_back(val); };
+
+          T& front()       { return container().front(); }
+    const T& front() const { return container().front(); }
+          T& back ()       { return container().back();  }
+    const T& back () const { return container().back();  }
 
     bool in_heap() const // for testing
     {
@@ -108,6 +120,9 @@ public:
 private:
 
     ReservedContainer<ContainerType, capacity> rv_;
+
+          ContainerType& container()       { return rv_.container(); }
+    const ContainerType& container() const { return rv_.container(); }
 
 }; /* class Vector*/
 
@@ -135,10 +150,8 @@ public:
 
     size_type size    () const { return v_.size(); }
     void      reserve (size_type n) { v_.reserve(); }
-    void      resize  (size_type n, value_type val = value_type())
-    {
-        v_.resize();
-    }
+    void      resize  (size_type n, value_type val = value_type()){ v_.resize();}
+    void      push_back(const value_type& val) { v_.push_back(); }
 
 private:
 

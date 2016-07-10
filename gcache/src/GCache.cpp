@@ -113,24 +113,3 @@ int64_t gcache_seqno_min (gcache_t* gc)
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     return gcache->seqno_min ();
 }
-
-#if DEPRECATED
-void  gcache_seqno_init   (gcache_t* gc, int64_t seqno)
-{
-    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
-    gcache->seqno_init (seqno);
-}
-
-void  gcache_seqno_assign(gcache_t* gc, const void* ptr, int64_t seqno)
-{
-    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
-    gcache->seqno_assign (ptr, seqno, -1, false);
-}
-
-void  gcache_seqno_release(gcache_t* gc, const void* ptr)
-{
-    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
-    gcache->seqno_release ();
-}
-#endif
-

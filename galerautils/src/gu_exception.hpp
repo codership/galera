@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  *
  */
 
@@ -20,23 +20,22 @@ namespace gu {
     {
     public:
 
-        Exception (const std::string& msg_, int err_)
-            : msg (msg_),
-              err (err_)
-        {}
+        Exception (const std::string& msg, int err) : msg_(msg), err_(err) {}
+
+        Exception (const Exception& e) : msg_(e.msg_), err_(e.err_) {}
 
         virtual ~Exception    () throw() {}
 
-        const char* what      () const throw() { return msg.c_str(); }
+        const char* what      () const throw() { return msg_.c_str(); }
 
-        int         get_errno () const { return err; }
+        int         get_errno () const { return err_; }
 
-        void        trace (const char* file, const char* func, int line);
+        void        trace (const char* file, const char* func, int line) const;
 
     private:
 
-        std::string msg;
-        const int   err;
+        mutable std::string msg_;
+        int err_;
     };
 }
 

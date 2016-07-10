@@ -287,6 +287,23 @@ private:
 };
 
 
+/*! serialize RecordSet::GatherVector into continuous buffer */
+static inline
+size_t serialize(const RecordSet::GatherVector& gvec, gu::byte_t* buf,
+                 size_t buf_size, size_t offset)
+{
+    for (size_t i(0); i < gvec.size(); ++i)
+    {
+        if (buf_size < gvec[i].size + offset)
+        {
+            gu_throw_fatal << "attempt to write out of range";
+        }
+        const gu::byte_t* ptr(static_cast<const gu::byte_t*>(gvec[i].ptr));
+        offset = std::copy(ptr, ptr + gvec[i].size, buf + offset) - buf;
+    }
+    return offset;
+}
+
 /*! class to recover records from a buffer */
 class RecordSetInBase : public RecordSet
 {

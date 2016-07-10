@@ -89,13 +89,13 @@ namespace gcache
                 case BUFFER_IN_RB:  discard(bh); break;
                 case BUFFER_IN_MEM:
                 {
-                    MemStore* const ms(static_cast<MemStore*>(bh->ctx));
+                    MemStore* const ms(static_cast<MemStore*>(BH_ctx(bh)));
                     ms->discard(bh);
                     break;
                 }
                 case BUFFER_IN_PAGE:
                 {
-                    Page*      const page (static_cast<Page*>(bh->ctx));
+                    Page*      const page (static_cast<Page*>(BH_ctx(bh)));
                     PageStore* const ps   (PageStore::page_store(page));
                     ps->discard(bh);
                     break;
@@ -218,11 +218,9 @@ namespace gcache
         BufferHeader* const bh(BH_cast(ret));
         bh->size    = size;
         bh->seqno_g = SEQNO_NONE;
-        bh->seqno_d = SEQNO_ILL;
         bh->flags   = 0;
         bh->store   = BUFFER_IN_RB;
-        bh->ctx     = this;
-
+        bh->ctx     = reinterpret_cast<BH_ctx_t>(this);
         next_ = ret + size;
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));
@@ -354,8 +352,8 @@ namespace gcache
                 {
                     log_fatal << "Buffer "
                               << reinterpret_cast<const void*>(r->second)
-                              << ", seqno_g " << b->seqno_g << ", seqno_d "
-                              << b->seqno_d << " is not released.";
+                              << ", seqno_g " << b->seqno_g
+                              << " is not released.";
                     assert(0);
                 }
 #endif
