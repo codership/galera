@@ -1218,49 +1218,48 @@ gcs_core_group_protocol_version (const gcs_core_t* conn)
     return conn->proto_ver;
 }
 
-long
-gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
+int
+gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
 {
-    long     hdr_size, msg_size;
-    uint8_t* new_send_buf = NULL;
-    long     ret = 0;
-
     if (core->state >= CORE_CLOSED) {
         gu_error ("Attempt to set packet size on a closed connection.");
         return -EBADFD;
     }
 
-    hdr_size = gcs_act_proto_hdr_size (core->proto_ver);
+    int const hdr_size(gcs_act_proto_hdr_size(core->proto_ver));
     if (hdr_size < 0) return hdr_size;
 
-    msg_size = core->backend.msg_size (&core->backend, pkt_size);
-    if (msg_size <= hdr_size) {
+    int const min_msg_size(hdr_size + 1);
+
+    int msg_size(core->backend.msg_size(&core->backend, pkt_size));
+    if (msg_size < min_msg_size) {
         gu_warn ("Requested packet size %d is too small, "
                  "using smallest possible: %d",
-                 pkt_size, pkt_size + (hdr_size - msg_size + 1));
-        msg_size = hdr_size + 1;
+                 pkt_size, pkt_size + (min_msg_size - msg_size));
+        msg_size = min_msg_size;
     }
 
     /* even if backend may not support limiting packet size force max message
      * size at this level */
-    msg_size = std::min(pkt_size, msg_size);
+    msg_size = std::min(std::max(min_msg_size, pkt_size), msg_size);
 
-    gu_info ("Changing maximum packet size to %ld, resulting msg size: %ld",
-              pkt_size, msg_size);
+    gu_info ("Changing maximum packet size to %d, resulting msg size: %d",
+             pkt_size, msg_size);
 
-    ret = msg_size - hdr_size; // message payload
+    int ret(msg_size - hdr_size); // message payload
+    assert(ret > 0);
 
     if (core->send_buf_len == (size_t)msg_size) return ret;
 
     if (gu_mutex_lock (&core->send_lock)) abort();
     {
         if (core->state != CORE_DESTROYED) {
-            new_send_buf = (uint8_t*)gu_realloc (core->send_buf, msg_size);
+            void* new_send_buf(gu_realloc(core->send_buf, msg_size));
             if (new_send_buf) {
                 core->send_buf     = new_send_buf;
                 core->send_buf_len = msg_size;
                 memset (core->send_buf, 0, hdr_size); // to pacify valgrind
-                gu_debug ("Message payload (action fragment size): %ld", ret);
+                gu_debug ("Message payload (action fragment size): %d", ret);
             }
             else {
                 ret = -ENOMEM;
