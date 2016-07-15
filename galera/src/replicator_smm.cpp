@@ -901,7 +901,18 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         catch (gu::Exception& e)
         {
             st_.mark_corrupt();
-            throw;
+
+            /* Ideally this shouldn't fail but if it does then we need
+            to ensure clean shutdown with termination of all mysql threads
+            and galera replication and rollback threads.
+            Currently wsrep part of the code just invokes unireg_abort
+            which doesn't ensure this clean shutdown.
+            So for now we take the same approach like we do with normal
+            apply transaction failure. */
+            log_fatal << "Failed to re-apply trx: " << *trx;
+            log_fatal << e.what();
+            log_fatal << "Node consistency compromized, aborting...";
+            abort();
         }
 
         // apply, commit monitors are released in post commit
