@@ -1596,9 +1596,45 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
     return retval;
 }
 
+static void
+dump_buf(std::ostream& os, const void* const buf, size_t const buf_len)
+{
+    std::ios_base::fmtflags const saved_flags(os.flags());
+    char                    const saved_fill (os.fill('0'));
 
-wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
-                                                       int const err)
+    os << std::oct;
+
+    const char* const str(static_cast<const char*>(buf));
+    for (size_t i(0); i < buf_len; ++i)
+    {
+        char const c(str[i]);
+
+        if ('\0' == c) break;
+
+        try
+        {
+            if (isprint(c) || isspace(c))
+            {
+                os.put(c);
+            }
+            else
+            {
+                os << '\\' << std::setw(2) << int(c);
+            }
+        }
+        catch (std::ios_base::failure& f)
+        {
+            log_warn << "Failed to dump " << i << "th byte: " << f.what();
+        }
+    }
+
+    os.flags(saved_flags);
+    os.fill (saved_fill);
+}
+
+wsrep_status_t
+galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
+                                        const wsrep_buf_t* const err)
 {
     TrxHandleSlavePtr ts_ptr(trx.ts());
     TrxHandleSlave& ts(*ts_ptr);
@@ -1613,16 +1649,17 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
     bool inconsistency(false);
     ApplyException ae;
 
-    if (0 != err)
+    if (NULL != err && NULL != err->ptr)
     {
-        void*  err_msg(NULL); // for future use with updated API
-        size_t err_msg_len(0);
+        assert(err->len > 0);
+
         std::ostringstream os;
-
         os << "Failed to execute TOI action: seqno: " << ts.global_seqno()
-           << ", code: " << err;
+           << ", error: ";
 
-        galera::ApplyException tmp(os.str(), err, err_msg, err_msg_len);
+        dump_buf(os, err->ptr, err->len);
+
+        galera::ApplyException tmp(os.str(), NULL, err->ptr, err->len);
 
         GU_TRACE(tmp);
         try { gu_trace(process_apply_exception(ts, tmp)); }
@@ -1677,7 +1714,6 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
 
     return WSREP_OK;
 }
-
 
 
 namespace galera

@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "26a"
+#define WSREP_INTERFACE_VERSION "26"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -139,7 +139,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_FLAG_TRX_START            ( 1ULL << 6 )
 #define WSREP_FLAG_SNAPSHOT             ( 1ULL << 7 )
 
-#define WSREP_FLAGS_LAST                WSREP_FLAG_TRX_START
+#define WSREP_FLAGS_LAST                WSREP_FLAG_SNAPSHOT
 #define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
 
 
@@ -279,6 +279,12 @@ typedef struct wsrep_trx_meta
                                    this transaction may depend on */
 } wsrep_trx_meta_t;
 
+/*! Abstract data buffer structure */
+typedef struct wsrep_buf
+{
+    const void* ptr; /*!< Pointer to data buffer */
+    size_t      len; /*!< Length of buffer */
+} wsrep_buf_t;
 
 /*!
  * member status
@@ -376,6 +382,7 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
  */
 #define WSREP_STATE_TRANSFER_NONE "none"
 
+
 /*!
  * @brief Creates and returns State Snapshot Transfer request for provider.
  *
@@ -393,7 +400,7 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
  *
  * @note Currently it is assumed that sst_req is allocated using
  *       malloc()/calloc()/realloc() and it will be freed by
- *       wsrep implementation.
+ *       wsrep provider.
  *
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code,
@@ -412,21 +419,25 @@ typedef enum wsrep_cb_status (*wsrep_sst_request_cb_t) (
  * Must support brute force applying for multi-master operation
  *
  * @param recv_ctx receiver context pointer provided by the application
- * @param data     data buffer containing the writeset
- * @param size     data buffer size
  * @param flags    WSREP_FLAG_... flags
  * @param meta     transaction meta data of the writeset to be applied
+ * @param data     data buffer containing the writeset
+ * @param err_buf  buffer containing error info (null/empty for no error)
+ *                 Callback semantics implies that the buffer is dynamically
+ *                 allocated by the callback and must be freed by provider.
+ * @param err_len  error buffer size
  *
  * @return error code:
  * @retval 0 - success
  * @retval non-0 - application-specific error code
  */
 typedef int (*wsrep_apply_cb_t) (
-    void*                     recv_ctx,
-    const void*               data,
-    size_t                    size,
-    uint32_t                  flags,
-    const wsrep_trx_meta_t*   meta
+    void*                   recv_ctx,
+    uint32_t                flags,
+    const wsrep_buf_t*      data,
+    const wsrep_trx_meta_t* meta,
+    void**                  err_buf,
+    size_t*                 err_len
 );
 
 
@@ -461,12 +472,10 @@ typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
  *
  * @param recv_ctx receiver context pointer provided by the application
  * @param data     data buffer containing the writeset
- * @param size     data buffer size
  */
 typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (
-    void*       recv_ctx,
-    const void* data,
-    size_t      size
+    void*              recv_ctx,
+    const wsrep_buf_t* data
 );
 
 
@@ -481,21 +490,17 @@ typedef enum wsrep_cb_status (*wsrep_unordered_cb_t) (
  *
  * @param app_ctx   application context
  * @param recv_ctx  receiver context
- * @param msg       state transfer request message
- * @param msg_len   state transfer request message length
+ * @param str_msg   state transfer request message
  * @param gtid      current state ID on this node
  * @param state     current wsrep internal state buffer
- * @param state_len current wsrep internal state buffer len
  * @param bypass    bypass snapshot transfer, only transfer uuid:seqno pair
  */
 typedef enum wsrep_cb_status (*wsrep_sst_donate_cb_t) (
     void*               app_ctx,
     void*               recv_ctx,
-    const void*         msg,
-    size_t              msg_len,
+    const wsrep_buf_t*  str_msg,
     const wsrep_gtid_t* state_id,
-    const char*         state,
-    size_t              state_len,
+    const wsrep_buf_t*  state,
     wsrep_bool_t        bypass
 );
 
@@ -531,8 +536,7 @@ struct wsrep_init_args
 
     /* Application initial state information. */
     const wsrep_gtid_t* state_id;    //!< Application state GTID
-    const char*         state;       //!< Initial state for wsrep provider
-    size_t              state_len;   //!< Length of state buffer
+    const wsrep_buf_t*  state;       //!< Initial state for wsrep provider
 
     /* Application callbacks */
     wsrep_log_cb_t         logger_cb;       //!< logging handler
@@ -572,13 +576,6 @@ struct wsrep_stats_var
     } value;                   //!< variable value
 };
 
-
-/*! Abstract data buffer structure */
-typedef struct wsrep_buf
-{
-    const void* ptr; /*!< Pointer to data buffer */
-    size_t      len; /*!< Length of buffer */
-} wsrep_buf_t;
 
 /*! Key struct used to pass certification keys for transaction handling calls.
  *  A key consists of zero or more key parts. */
@@ -886,12 +883,12 @@ struct wsrep {
    * @param type       type of data
    * @param copy       can be set to FALSE if data persists through commit.
    */
-    wsrep_status_t (*append_data)(wsrep_t*                wsrep,
-                                  wsrep_ws_handle_t*      ws_handle,
-                                  const struct wsrep_buf* data,
-                                  size_t                  count,
-                                  enum wsrep_data_type    type,
-                                  wsrep_bool_t            copy);
+    wsrep_status_t (*append_data)(wsrep_t*             wsrep,
+                                  wsrep_ws_handle_t*   ws_handle,
+                                  const wsrep_buf_t*   data,
+                                  size_t               count,
+                                  enum wsrep_data_type type,
+                                  wsrep_bool_t         copy);
 
   /*!
    * @brief Blocks until the given GTID is committed
@@ -984,14 +981,14 @@ struct wsrep {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*to_execute_start)(wsrep_t*                wsrep,
-                                       wsrep_conn_id_t         conn_id,
-                                       const wsrep_key_t*      keys,
-                                       size_t                  keys_num,
-                                       const struct wsrep_buf* action,
-                                       size_t                  count,
-                                       uint32_t                flags,
-                                       wsrep_trx_meta_t*       meta);
+    wsrep_status_t (*to_execute_start)(wsrep_t*           wsrep,
+                                       wsrep_conn_id_t    conn_id,
+                                       const wsrep_key_t* keys,
+                                       size_t             keys_num,
+                                       const wsrep_buf_t* action,
+                                       size_t             count,
+                                       uint32_t           flags,
+                                       wsrep_trx_meta_t*  meta);
 
   /*!
    * @brief Ends the total order isolation section.
@@ -999,17 +996,17 @@ struct wsrep {
    * Marks the end of total order isolation. TO locks are freed
    * and other transactions are free to commit from this point on.
    *
-   * @param wsrep provider handle
+   * @param wsrep   provider handle
    * @param conn_id connection ID
-   * @param rcode TOI operation error code (same as return code of apply_cb())
+   * @param error   error information about TOI operation (empty for no error)
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*to_execute_end)(wsrep_t*        wsrep,
-                                     wsrep_conn_id_t conn_id,
-                                     int             rcode);
+    wsrep_status_t (*to_execute_end)(wsrep_t*           wsrep,
+                                     wsrep_conn_id_t    conn_id,
+                                     const wsrep_buf_t* error);
 
 
   /*!
@@ -1025,11 +1022,11 @@ struct wsrep {
    * @retval WSREP_TRX_FAIL   operation failed (e.g. trx size exceeded limit)
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*preordered_collect) (wsrep_t*                 wsrep,
-                                          wsrep_po_handle_t*       handle,
-                                          const struct wsrep_buf*  data,
-                                          size_t                   count,
-                                          wsrep_bool_t             copy);
+    wsrep_status_t (*preordered_collect) (wsrep_t*           wsrep,
+                                          wsrep_po_handle_t* handle,
+                                          const wsrep_buf_t* data,
+                                          size_t             count,
+                                          wsrep_bool_t       copy);
 
   /*!
    * @brief "Commits" preordered writeset to cluster.
@@ -1080,13 +1077,11 @@ struct wsrep {
    * @param wsrep     provider handle
    * @param state_id  state ID
    * @param state     initial state provided by SST donor
-   * @param state_len length of state buffer
    * @param rcode     0 or negative error code of the operation.
    */
     wsrep_status_t (*sst_received)(wsrep_t*            wsrep,
                                    const wsrep_gtid_t* state_id,
-                                   const void*         state,
-                                   size_t              state_len,
+                                   const wsrep_buf_t*  state,
                                    int                 rcode);
 
 
@@ -1104,10 +1099,9 @@ struct wsrep {
    * @param msg_len    length of context message
    * @param donor_spec list of snapshot donors
    */
-    wsrep_status_t (*snapshot)(wsrep_t*    wsrep,
-                               const void* msg,
-                               size_t      msg_len,
-                               const char* donor_spec);
+    wsrep_status_t (*snapshot)(wsrep_t*           wsrep,
+                               const wsrep_buf_t* msg,
+                               const char*        donor_spec);
 
   /*!
    * @brief Returns an array of status variables.

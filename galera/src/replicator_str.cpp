@@ -56,9 +56,8 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
 
 wsrep_status_t
 ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
-                            const void*         state,
-                            size_t              state_len,
-                            int                 rcode)
+                            const wsrep_buf_t* const state,
+                            int                const rcode)
 {
     log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
 
@@ -324,9 +323,10 @@ ReplicatorSMM::donate_sst(void* const         recv_ctx,
                           const wsrep_gtid_t& state_id,
                           bool const          bypass)
 {
-    wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx,
-                                             streq.sst_req(), streq.sst_len(),
-                                             &state_id, 0, 0, bypass));
+    wsrep_buf_t const str = { streq.sst_req(), size_t(streq.sst_len()) };
+
+    wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx, &str,
+                                             &state_id, NULL, bypass));
 
     wsrep_seqno_t const ret
         (WSREP_CB_SUCCESS == err ? state_id.seqno : -ECANCELED);
