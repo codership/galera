@@ -135,7 +135,8 @@ struct trx_thread_args
     trx_thread_args(galera::ist::Receiver& receiver)
         :
         receiver_(receiver),
-        monitor_()
+        monitor_(WSREP_PFS_INSTR_TAG_IST_RECEIVER_MONITOR_MUTEX,
+                 WSREP_PFS_INSTR_TAG_IST_RECEIVER_MONITOR_CONDVAR)
     { }
 };
 

@@ -45,12 +45,14 @@ namespace galera
 
     public:
 
+#ifdef HAVE_PSI_INTERFACE
+        Monitor(wsrep_pfs_instr_tag mtag, wsrep_pfs_instr_tag ctag)
+            :
+            mutex_(mtag),
+            cond_(ctag),
+#else
         Monitor()
             :
-#ifdef HAVE_PSI_INTERFACE
-            mutex_(WSREP_PFS_INSTR_TAG_MONITOR_MUTEX),
-            cond_(WSREP_PFS_INSTR_TAG_MONITOR_CONDVAR),
-#else
             mutex_(),
             cond_(),
 #endif /* HAVE_PSI_INTERFACE */

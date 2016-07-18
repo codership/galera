@@ -46,13 +46,16 @@ class gu::Monitor
 
 public:
 
+#ifdef HAVE_PSI_INTERFACE
+    Monitor(wsrep_pfs_instr_tag mtag, wsrep_pfs_instr_tag ctag)
+        :
+        refcnt(0),
+        mutex(mtag),
+        cond(ctag)
+#else
     Monitor()
         :
         refcnt(0),
-#ifdef HAVE_PSI_INTERFACE
-        mutex(WSREP_PFS_INSTR_TAG_GU_MONITOR_MUTEX),
-        cond(WSREP_PFS_INSTR_TAG_GU_MONITOR_CONDVAR)
-#else
         mutex(),
         cond()
 #endif /* HAVE_PSI_INTERFACE */
