@@ -64,6 +64,11 @@ namespace gcomm
         static std::string const SocketChecksum;
 
         /*!
+         * @brief Socket receive buffer size in bytes
+         */
+        static std::string const SocketRecvBufSize;
+
+        /*!
          * @brief GMCast scheme for transport URI ("gmcast")
          */
         static std::string const GMCastScheme;

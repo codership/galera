@@ -49,6 +49,7 @@ public:
     void close();
     void write_handler(const asio::error_code& ec,
                        size_t bytes_transferred);
+    void set_option(const std::string& key, const std::string& val);
     int send(const Datagram& dg);
     size_t read_completion_condition(
         const asio::error_code& ec,
@@ -67,6 +68,7 @@ private:
     AsioTcpSocket(const AsioTcpSocket&);
     void operator=(const AsioTcpSocket&);
 
+    void set_socket_options();
     void read_one(boost::array<asio::mutable_buffer, 1>& mbs);
     void write_one(const boost::array<asio::const_buffer, 2>& cbs);
     void close_socket();

@@ -18,6 +18,8 @@ std::string const gcomm::Conf::TcpNonBlocking =
     SocketPrefix + "non_blocking";
 std::string const gcomm::Conf::SocketChecksum =
     SocketPrefix + "checksum";
+std::string const gcomm::Conf::SocketRecvBufSize =
+    SocketPrefix + "recv_buf_size";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
@@ -124,6 +126,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
 
     GCOMM_CONF_ADD        (TcpNonBlocking);
     GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
+    GCOMM_CONF_ADD_DEFAULT(SocketRecvBufSize);
 
     GCOMM_CONF_ADD_DEFAULT(GMCastVersion);
     GCOMM_CONF_ADD        (GMCastGroup);

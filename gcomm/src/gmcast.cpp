@@ -548,9 +548,9 @@ void gcomm::GMCast::handle_connected(Proto* rp)
 
 void gcomm::GMCast::handle_established(Proto* est)
 {
-    log_debug << self_string() << " connection established to "
-              << est->remote_uuid() << " "
-              << est->remote_addr();
+    log_info << self_string() << " connection established to "
+             << est->remote_uuid() << " "
+             << est->remote_addr();
 
     if (is_evicted(est->remote_uuid()))
     {
@@ -1082,11 +1082,11 @@ void gcomm::GMCast::check_liveness()
             p->state() < Proto::S_FAILED &&
             p->tstamp() + peer_timeout_ < now)
         {
-            log_debug << self_string()
-                      << " connection to peer "
-                      << p->remote_uuid() << " with addr "
-                      << p->remote_addr()
-                      << " timed out";
+            log_info << self_string()
+                     << " connection to peer "
+                     << p->remote_uuid() << " with addr "
+                     << p->remote_addr()
+                     << " timed out, no messages seen in " << peer_timeout_;
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }
@@ -1725,6 +1725,29 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
             }
             segment_map_.clear();
         }
+        return true;
+    }
+    else if (key == Conf::SocketRecvBufSize)
+    {
+        // Verify that the value is sensible
+        long long llval;
+        const char* str(val.c_str());
+        const char* ptr(gu_str2ll(str, &llval));
+        if (ptr == str || *ptr != '\0' || errno == ERANGE || llval <= 0)
+        {
+            gu_throw_error(EINVAL) << "error parsing " << key
+                                   << " value '" << val << "'";
+        }
+        conf_.set(Conf::SocketRecvBufSize, llval);
+        // Reopen all sockets to for value to take effect
+        for (ProtoMap::iterator pi(proto_map_->begin());
+             pi != proto_map_->end(); ++pi)
+        {
+            pi->second->socket()->set_option(key, val);
+            // erase_proto(pi++);
+        }
+        // segment_map_.clear();
+        // reconnect();
         return true;
     }
     else if (key == Conf::GMCastGroup ||
