@@ -1344,9 +1344,12 @@ static void *gcs_recv_thread (void *arg)
     }
     else if (ret < 0)
     {
+        /* We must set connection state to 'closed' to avoid the race
+           condition between gcs_recv_thread() and gcs_recv(), which
+           could lead to assertion in gcs_recv: */
+        gcs_shift_state (conn, GCS_CONN_CLOSED);
         /* In case of error call _close() to release repl_q waiters. */
         (void)_close(conn, false);
-        gcs_shift_state (conn, GCS_CONN_CLOSED);
     }
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
 
