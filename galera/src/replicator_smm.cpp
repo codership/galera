@@ -475,10 +475,10 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 {
+    assert(ts.global_seqno() > 0);
     if (!ts.skip_event())
     {
         assert(ts.trx_id() != uint64_t(-1) || ts.is_toi());
-        assert(ts.global_seqno() > 0);
         assert(ts.certified() /*Repl*/ || ts.preordered() /*IST*/);
         assert(ts.local() == false);
     }
@@ -754,7 +754,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
         ts->mark_certified();
         gcache_.seqno_assign(ts->action().first, ts->global_seqno(),
                              GCS_ACT_WRITESET, false);
-        cancel_monitors(*ts, false);
+        cancel_monitors<true>(*ts);
 
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_ABORTING);
@@ -769,7 +769,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
         if (retval != WSREP_BF_ABORT)
         {
-            cancel_monitors(*ts, false);
+            cancel_monitors<true>(*ts);
 
             assert(trx->state() == TrxHandle::S_MUST_ABORT);
             trx->set_state(TrxHandle::S_ABORTING);
@@ -785,7 +785,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             }
             else
             {
-                cancel_monitors(*ts, false);
+                cancel_monitors<true>(*ts);
 
                 trx->set_state(TrxHandle::S_ABORTING);
                 ts->mark_dummy();
@@ -1740,21 +1740,6 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t const seq,
     log_debug << "Got commit cut from GCS: " << seq;
 }
 
-void galera::ReplicatorSMM::cancel_monitors(const TrxHandleSlave& ts,
-                                            bool const nolocal)
-{
-    if (nolocal == false)
-    {
-        LocalOrder  lo(ts);
-        local_monitor_.self_cancel(lo);
-    }
-
-    if (ts.pa_unsafe() == false)
-    {
-        ApplyOrder  ao(ts);
-        apply_monitor_.self_cancel(ao);
-    }
-}
 
 /* NB: the only use for this method is in cancel_seqnos() below */
 void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
@@ -2610,7 +2595,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     {
         assert(ts->state() == TrxHandle::S_ABORTING);
         // applicable but failed certification: self-cancel monitors
-        cancel_monitors(*ts, true);
+        cancel_monitors<false>(*ts);
     }
     else
     {

@@ -270,7 +270,7 @@ IST_determine_recv_bind(gu::Config& conf)
         recv_bind += ":" + gu::to_string(port);
     }
 
-	log_info<< "IST receiver bind using " << recv_bind;
+    log_info << "IST receiver bind using " << recv_bind;
     return recv_bind;
 }
 
@@ -507,11 +507,12 @@ void galera::ist::Receiver::run()
                     ts->mark_dummy();
                 }
 
+                //log_info << "####### Passing WS " << act.seqno_g;
                 observer_.ist_trx(ts, must_apply, preload);
                 break;
             }
             case GCS_ACT_CCHANGE:
-                log_info << "####### Passing CC " << act.seqno_g;
+                //log_info << "####### Passing CC " << act.seqno_g;
                 observer_.ist_cc(act, must_apply, preload);
                 break;
             default:
@@ -820,6 +821,9 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
                 // should be set.
                 bool preload_flag(preload_start > 0 &&
                                   buf_vec[i].seqno_g() >= preload_start);
+                //log_info << "Sender::send(): seqno " << buf_vec[i].seqno_g()
+                //         << ", size " << buf_vec[i].size() << ", preload: "
+                //         << preload_flag;
                 if (use_ssl_ == true)
                 {
                     p.send_ordered(*ssl_stream_, buf_vec[i], preload_flag);
