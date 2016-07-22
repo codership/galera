@@ -73,14 +73,23 @@ galera::TrxHandle::print(std::ostream& os) const
        << ", ts: "       << timestamp_
        << ")";
 
-    if (write_set_in().size() > 0)
-        os << " WS pa_range: " << write_set_in().pa_range();
-
-    if (write_set_in().annotated())
+    if (!skip_event())
     {
-        os << "\nAnnotation:\n";
-        write_set_in().write_annotation(os);
-        os << std::endl;
+        if (write_set_in().size() > 0)
+        {
+            os << " WS pa_range: " << write_set_in().pa_range();
+
+            if (write_set_in().annotated())
+            {
+                os << "\nAnnotation:\n";
+                write_set_in().write_annotation(os);
+                os << std::endl;
+            }
+        }
+    }
+    else
+    {
+        os << " skip event";
     }
 }
 

@@ -266,7 +266,7 @@ IST_determine_recv_bind(gu::Config& conf)
         recv_bind += ":" + gu::to_string(port);
     }
 
-	log_info<< "IST receiver bind using " << recv_bind;
+    log_info << "IST receiver bind using " << recv_bind;
     return recv_bind;
 }
 
@@ -450,7 +450,6 @@ void galera::ist::Receiver::run()
                     ec = EINVAL;
                     goto err;
                 }
-                log_info << "####### IST current seqno initialized to " << act.seqno_g;
                 current_seqno_ = act.seqno_g;
             }
             else
