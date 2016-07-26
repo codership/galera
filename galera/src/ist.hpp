@@ -162,8 +162,12 @@ namespace galera
             AsyncSenderMap(GCS_IMPL& gcs, gcache::GCache& gcache)
                 :
                 senders_(),
+#ifdef HAVE_PSI_INTERFACE
                 monitor_(WSREP_PFS_INSTR_TAG_ASYNC_SENDER_MONITOR_MUTEX,
                          WSREP_PFS_INSTR_TAG_ASYNC_SENDER_MONITOR_CONDVAR),
+#else
+                monitor_(),
+#endif /* HAVE_PSI_INTERFACE */
                 gcache_(gcache) { }
             void run(const gu::Config& conf,
                      const std::string& peer,

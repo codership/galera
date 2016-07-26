@@ -135,8 +135,12 @@ struct trx_thread_args
     trx_thread_args(galera::ist::Receiver& receiver)
         :
         receiver_(receiver),
+#ifdef HAVE_PSI_INTERFACE
         monitor_(WSREP_PFS_INSTR_TAG_IST_RECEIVER_MONITOR_MUTEX,
                  WSREP_PFS_INSTR_TAG_IST_RECEIVER_MONITOR_CONDVAR)
+#else
+        monitor_()
+#endif /* HAVE_PSI_INTERFACE */
     { }
 };
 

@@ -182,12 +182,18 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_, service_thd_),
+#ifdef HAVE_PSI_INTERFACE
     local_monitor_      (WSREP_PFS_INSTR_TAG_LOCAL_MONITOR_MUTEX,
                          WSREP_PFS_INSTR_TAG_LOCAL_MONITOR_CONDVAR),
     apply_monitor_      (WSREP_PFS_INSTR_TAG_APPLY_MONITOR_MUTEX,
                          WSREP_PFS_INSTR_TAG_APPLY_MONITOR_CONDVAR),
     commit_monitor_     (WSREP_PFS_INSTR_TAG_COMMIT_MONITOR_MUTEX,
                          WSREP_PFS_INSTR_TAG_COMMIT_MONITOR_CONDVAR),
+#else
+    local_monitor_      (),
+    apply_monitor_      (),
+    commit_monitor_     (),
+#endif /* HAVE_PSI_INTERFACE */
     causal_read_timeout_(config_.get(Param::causal_read_timeout)),
     receivers_          (),
     replicated_         (),
