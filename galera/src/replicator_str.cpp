@@ -572,8 +572,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     log_info << "####### IST uuid:" << state_uuid_ << " f: " << first_needed
              << ", l: " << last_needed << ", p: " << protocol_version_; //remove
 
-    std::string recv_addr (ist_receiver_.prepare(first_needed, last_needed,
-                                                 protocol_version_, source_id()));
+    std::string recv_addr(ist_receiver_.prepare(first_needed, last_needed,
+                                                protocol_version_, source_id()));
 
     std::ostringstream os;
 
@@ -1037,11 +1037,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             log_fatal << "failed action: " << *ts;
         else
             log_fatal << "null action";
-        st_.mark_corrupt();
-        gcs_.close();
-        gu_abort();
 
-        gu::Lock lock(closing_mutex_);
         mark_corrupt_and_close();
     }
 }

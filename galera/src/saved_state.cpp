@@ -202,7 +202,8 @@ SavedState::mark_safe()
     {
         gu::Lock lock(mtx_); ++total_locks_;
 
-        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0) && !corrupt_)
+        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0) &&
+            !corrupt_)
         {
             /* this will write down proper seqno if set() was called too early
              * (in unsafe state) */

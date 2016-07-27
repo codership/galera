@@ -62,7 +62,8 @@ namespace galera
         wsrep_status_t close();
         wsrep_status_t async_recv(void* recv_ctx);
 
-        TrxHandleMasterPtr get_local_trx(wsrep_trx_id_t trx_id, bool create = false)
+        TrxHandleMasterPtr get_local_trx(wsrep_trx_id_t trx_id,
+                                         bool create = false)
         {
             return wsdb_.get_trx(trx_params_, uuid_, trx_id, create);
         }
@@ -113,11 +114,11 @@ namespace galera
                                           const struct wsrep_buf* data,
                                           size_t                  count,
                                           bool                    copy);
-        wsrep_status_t preordered_commit(wsrep_po_handle_t&      handle,
-                                         const wsrep_uuid_t&     source,
-                                         uint64_t                flags,
-                                         int                     pa_range,
-                                         bool                    commit);
+        wsrep_status_t preordered_commit(wsrep_po_handle_t&       handle,
+                                         const wsrep_uuid_t&      source,
+                                         uint64_t                 flags,
+                                         int                      pa_range,
+                                         bool                     commit);
         wsrep_status_t sst_sent(const wsrep_gtid_t& state_id, int rcode);
         wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
                                     const wsrep_buf_t*  state,

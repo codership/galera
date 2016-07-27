@@ -439,7 +439,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     }
 
     ApplyException ae;
-    bool inconsistency(false);
 
     ApplyOrder ao(ts);
     CommitOrder co(ts, co_mode_);
@@ -500,11 +499,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         end_state = TrxHandle::S_ROLLED_BACK;
         try
         {
-            gu_trace(process_apply_exception(ts, ae));
+            if (!st_.corrupt())
+                gu_trace(process_apply_exception(ts, ae));
         }
         catch (ApplyException& e)
         {
-            inconsistency = true;
+            mark_corrupt_and_close();
         }
         catch (gu::Exception& e)
         {
@@ -562,8 +562,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 
         apply_monitor_.leave(ao);
     }
-
-    if (gu_unlikely(inconsistency)) throw ae;
 
     ts.set_exit_loop(exit_loop);
 }
@@ -653,7 +651,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             trx->reset_ts();
         }
 
-        return WSREP_CONN_FAIL;
+        return (st_.corrupt() ? WSREP_NODE_FAIL : WSREP_CONN_FAIL);
     }
 
     WriteSetNG::GatherVector actv;
@@ -1179,7 +1177,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
         catch (gu::Exception& e)
         {
             mark_corrupt_and_close();
-            throw;
+            return WSREP_NODE_FAIL;
         }
 
         // apply, commit monitors are released in post commit
@@ -1646,9 +1644,6 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
     assert(ts.state() == TrxHandle::S_COMMITTING ||
            ts.state() == TrxHandle::S_ABORTING);
 
-    bool inconsistency(false);
-    ApplyException ae;
-
     if (NULL != err && NULL != err->ptr)
     {
         assert(err->len > 0);
@@ -1659,14 +1654,17 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
 
         dump_buf(os, err->ptr, err->len);
 
-        galera::ApplyException tmp(os.str(), NULL, err->ptr, err->len);
+        galera::ApplyException ae(os.str(), NULL, err->ptr, err->len);
 
-        GU_TRACE(tmp);
-        try { gu_trace(process_apply_exception(ts, tmp)); }
+        GU_TRACE(ae);
+        try
+        {
+            if (!st_.corrupt())
+                gu_trace(process_apply_exception(ts, ae));
+        }
         catch (ApplyException& e)
         {
             mark_corrupt_and_close();
-            inconsistency = true;
         }
         catch (gu::Exception& e)
         {
@@ -1680,28 +1678,22 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
             assert(0);
             abort();
         }
-        tmp.free();
-        ae = tmp;
+        ae.free();
     }
-
-    if (inconsistency) throw ae;
 
     CommitOrder co(ts, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
-    ApplyOrder ao(ts);
     report_last_committed(cert_.set_trx_committed(ts));
 
     if (ts.state() == TrxHandle::S_COMMITTING)
     {
+        ApplyOrder ao(ts);
         apply_monitor_.leave(ao);
         assert(trx.state() == TrxHandle::S_COMMITTING);
         trx.set_state(TrxHandle::S_COMMITTED);
         ts.set_state(TrxHandle::S_COMMITTED);
 
-        if (trx.nbo_start() == false)
-        {
-            st_.mark_safe();
-        }
+        if (trx.nbo_start() == false) st_.mark_safe();
     }
     else
     {
@@ -1914,6 +1906,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx,
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, leaving cluster...";
             mark_corrupt_and_close();
+            assert(0); // this is an unexpected exception
             // keep processing events from the queue until provider is closed
         }
         break;
@@ -2025,6 +2018,7 @@ void galera::ReplicatorSMM::process_vote(wsrep_seqno_t const seqno_g,
         log_info << "Got vote request for seqno " << gtid; //remove
         /* make sure WS was either successfully applied or already voted */
         drain_monitors(seqno_g);
+        if (st_.corrupt()) goto out;
 
         int const ret(gcs_.vote(gtid, 0, NULL, 0));
 

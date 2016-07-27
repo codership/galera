@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_SAVED_STATE_HPP
