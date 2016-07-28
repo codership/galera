@@ -78,6 +78,13 @@ private:
     void assign_local_addr();
     void assign_remote_addr();
 
+    // returns real socket to use
+    typedef asio::basic_socket<asio::ip::tcp,
+                               asio::stream_socket_service<asio::ip::tcp> >
+    basic_socket_t;
+    basic_socket_t&
+    socket() { return (ssl_socket_ ? ssl_socket_->lowest_layer() : socket_); }
+
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
 #ifdef HAVE_ASIO_SSL_HPP
@@ -91,6 +98,19 @@ private:
     // so need to maintain copy for diagnostics logging
     std::string                               local_addr_;
     std::string                               remote_addr_;
+
+    template <typename T> unsigned long long
+    check_socket_option(const std::string& key, unsigned long long val)
+    {
+        T option;
+        socket().get_option(option);
+        if (val != static_cast<unsigned long long>(option.value()))
+        {
+            log_info << "Setting '" << key << "' to " << val
+                     << " failed. Resulting value is " << option.value();
+        }
+        return option.value();
+    }
 };
 
 

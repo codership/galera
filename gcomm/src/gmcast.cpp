@@ -1688,79 +1688,87 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
 
 bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
 {
-    if (key == Conf::GMCastMaxInitialReconnectAttempts)
+    try
     {
-        max_initial_reconnect_attempts_ = gu::from_string<int>(val);
-        return true;
-    }
-    else if (key == Conf::GMCastPeerAddr)
-    {
-        try
+        if (key == Conf::GMCastMaxInitialReconnectAttempts)
         {
-            add_or_del_addr(val);
+            max_initial_reconnect_attempts_ = gu::from_string<int>(val);
+            return true;
         }
-        catch (gu::NotFound& nf)
+        else if (key == Conf::GMCastPeerAddr)
         {
-            gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
-        }
-        catch (gu::NotSet& ns)
-        {
-            gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
-        }
-        return true;
-    }
-    else if (key == Conf::GMCastIsolate)
-    {
-        isolate_ = gu::from_string<bool>(val);
-        log_info << "turning isolation "
-                 << (isolate_ == true ? "on" : "off");
-        if (isolate_ == true)
-        {
-            // delete all entries in proto map
-            ProtoMap::iterator pi, pi_next;
-            for (pi = proto_map_->begin(); pi != proto_map_->end(); pi = pi_next)
+            try
             {
-                pi_next = pi, ++pi_next;
-                erase_proto(pi);
+                add_or_del_addr(val);
             }
-            segment_map_.clear();
+            catch (gu::NotFound& nf)
+            {
+                gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+            }
+            catch (gu::NotSet& ns)
+            {
+                gu_throw_error(EINVAL) << "invalid addr spec '" << val << "'";
+            }
+            return true;
         }
-        return true;
-    }
-    else if (key == Conf::SocketRecvBufSize)
-    {
-        // Verify that the value is sensible
-        long long llval;
-        const char* str(val.c_str());
-        const char* ptr(gu_str2ll(str, &llval));
-        if (ptr == str || *ptr != '\0' || errno == ERANGE || llval <= 0)
+        else if (key == Conf::GMCastIsolate)
         {
-            gu_throw_error(EINVAL) << "error parsing " << key
-                                   << " value '" << val << "'";
+            isolate_ = gu::from_string<bool>(val);
+            log_info << "turning isolation "
+                     << (isolate_ == true ? "on" : "off");
+            if (isolate_ == true)
+            {
+                // delete all entries in proto map
+                ProtoMap::iterator pi, pi_next;
+                for (pi = proto_map_->begin(); pi != proto_map_->end();
+                     pi = pi_next)
+                {
+                    pi_next = pi, ++pi_next;
+                    erase_proto(pi);
+                }
+                segment_map_.clear();
+            }
+            return true;
         }
-        conf_.set(Conf::SocketRecvBufSize, llval);
-        // Reopen all sockets to for value to take effect
-        for (ProtoMap::iterator pi(proto_map_->begin());
-             pi != proto_map_->end(); ++pi)
+        else if (key == Conf::SocketRecvBufSize)
         {
-            pi->second->socket()->set_option(key, val);
-            // erase_proto(pi++);
+            gu_trace(Conf::check_recv_buf_size(val));
+            conf_.set(key, val);
+
+            for (ProtoMap::iterator pi(proto_map_->begin());
+                 pi != proto_map_->end(); ++pi)
+            {
+                gu_trace(pi->second->socket()->set_option(key, val));
+                // erase_proto(pi++);
+            }
+            // segment_map_.clear();
+            // reconnect();
+            return true;
         }
-        // segment_map_.clear();
-        // reconnect();
-        return true;
+        else if (key == Conf::GMCastGroup       ||
+                 key == Conf::GMCastListenAddr  ||
+                 key == Conf::GMCastMCastAddr   ||
+                 key == Conf::GMCastMCastPort   ||
+                 key == Conf::GMCastMCastTTL    ||
+                 key == Conf::GMCastTimeWait    ||
+                 key == Conf::GMCastPeerTimeout ||
+                 key == Conf::GMCastSegment)
+        {
+            gu_throw_error(EPERM) << "can't change value during runtime";
+        }
     }
-    else if (key == Conf::GMCastGroup ||
-             key == Conf::GMCastListenAddr ||
-             key == Conf::GMCastMCastAddr ||
-             key == Conf::GMCastMCastPort ||
-             key == Conf::GMCastMCastTTL ||
-             key == Conf::GMCastTimeWait ||
-             key == Conf::GMCastPeerTimeout ||
-             key == Conf::GMCastSegment)
+    catch (gu::Exception& e)
     {
-        gu_throw_error(EPERM) << "can't change value for '"
-                              << key << "' during runtime";
+        GU_TRACE(e); throw;
     }
+    catch (std::exception& e)
+    {
+        gu_throw_error(EINVAL) << e.what();
+    }
+    catch (...)
+    {
+        gu_throw_error(EINVAL) << "exception";
+    }
+
     return false;
 }

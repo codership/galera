@@ -85,8 +85,9 @@ from_string<std::string>(const std::string& s,
 
 /*! Specialized template for reading pointers. Default base is hex.
  * @throws NotFound */
-template <> inline void* from_string<void*>(const std::string& s,
-                                            std::ios_base& (*f)(std::ios_base&))
+template <> inline void*
+from_string<void*>(const std::string& s,
+                   std::ios_base& (*f)(std::ios_base&))
 {
     std::istringstream iss(s);
     void*              ret;
@@ -100,12 +101,14 @@ extern "C" const char* gu_str2bool (const char* str, bool* bl);
 
 /*! Specialized template for reading bool. Tries both 1|0 and true|false
  * @throws NotFound */
-template <> inline bool from_string<bool> (const std::string& s,
-                                           std::ios_base& (*f)(std::ios_base&))
+template <> inline bool
+from_string<bool> (const std::string& s,
+                   std::ios_base& (*f)(std::ios_base&))
 {
     bool ret;
-    const char* endptr(gu_str2bool(s.c_str(), &ret));
-    if (endptr == 0 || *endptr != '\0') throw NotFound();
+    const char* const str(s.c_str());
+    const char* const endptr(gu_str2bool(str, &ret));
+    if (endptr == str || endptr == 0 || *endptr != '\0') throw NotFound();
     return ret;
 }
 

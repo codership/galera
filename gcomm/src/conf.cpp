@@ -6,6 +6,8 @@
 #include "defaults.hpp"
 #include "common.h"
 
+#include <limits>
+
 static std::string const Delim = ".";
 
 // Protonet
@@ -178,4 +180,16 @@ gcomm::Conf::register_params(gu::Config& cnf)
 
 #undef GCOMM_CONF_ADD
 #undef GCOMM_CONF_ADD_DEFAULT
+}
+
+void gcomm::Conf::check_params(const gu::Config& conf)
+{
+    check_recv_buf_size(conf.get(SocketRecvBufSize));
+}
+
+size_t gcomm::Conf::check_recv_buf_size(const std::string& str)
+{
+    // signed type to check for negative values
+    return check_range<long long>(SocketRecvBufSize, str,
+                                  0, std::numeric_limits<long long>::max());
 }

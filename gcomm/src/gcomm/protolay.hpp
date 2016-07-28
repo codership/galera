@@ -404,14 +404,13 @@ private:
 
     Protolay (const Protolay&);
     Protolay& operator=(const Protolay&);
-
-
 };
 
-class gcomm::Toplay : public Protolay
+
+class gcomm::Toplay : protected Conf::Check, public Protolay
 {
 public:
-    Toplay(gu::Config& conf) : Protolay(conf) { }
+    Toplay(gu::Config& conf) : Conf::Check(conf), Protolay(conf) { }
 private:
     int handle_down(Datagram& dg, const ProtoDownMeta& dm)
     {

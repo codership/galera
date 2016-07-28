@@ -287,28 +287,18 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     }
 }
 
-
 void gcomm::AsioTcpSocket::set_option(const std::string& key,
                                       const std::string& val)
 {
     if (key == Conf::SocketRecvBufSize)
     {
-        long long llval;
-        const char* str(val.c_str());
-        const char* ptr(gu_str2ll(str, &llval));
-        if (ptr == str || *ptr != '\0' || errno == ERANGE || llval <= 0)
-        {
-            gu_throw_error(EINVAL) << "error parsing " << key
-                                   << " value '" << val << "'";
-        }
-        if (ssl_socket_)
-        {
-            ssl_socket_->lowest_layer().set_option(asio::socket_base::receive_buffer_size(llval));
-        }
-        else
-        {
-            socket_.set_option(asio::socket_base::receive_buffer_size(llval));
-        }
+        size_t llval;
+        gu_trace(llval = Conf::check_recv_buf_size(val));
+        socket().set_option(asio::socket_base::receive_buffer_size(llval));
+#if GCOMM_CHECK_RECV_BUF_SIZE
+        check_socket_option<asio::socket_base::receive_buffer_size>
+            (key, llval);
+#endif
     }
 }
 
@@ -521,30 +511,29 @@ std::string gcomm::AsioTcpSocket::remote_addr() const
 
 void gcomm::AsioTcpSocket::set_socket_options()
 {
-    size_t recv_buf_size(net_.conf().get<size_t>(
-                             gcomm::Conf::SocketRecvBufSize));
+    basic_socket_t& sock(socket());
 
-    if (ssl_socket_)
+    gu::set_fd_options(sock);
+    sock.set_option(asio::ip::tcp::no_delay(true));
+
+    size_t const recv_buf_size
+        (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
+    assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
+    sock.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
+
+#if GCOMM_CHECK_RECV_BUF_SIZE
+    size_t new_val(check_socket_option<asio::socket_base::receive_buffer_size>
+                   (gcomm::Conf::SocketRecvBufSize, recv_buf_size));
+    if (new_val < recv_buf_size)
     {
-        gu::set_fd_options(ssl_socket_->lowest_layer());
-        ssl_socket_->lowest_layer().set_option(asio::ip::tcp::no_delay(true));
-        ssl_socket_->lowest_layer().set_option(
-            asio::socket_base::receive_buffer_size(recv_buf_size));
-        asio::socket_base::receive_buffer_size option;
-        ssl_socket_->lowest_layer().get_option(option);
-        recv_buf_size = option.value();
+        // apparently there's a limit
+        net_.conf().set(gcomm::Conf::SocketRecvBufSize, new_val);
     }
-    else
-    {
-        gu::set_fd_options(socket_);
-        socket_.set_option(asio::ip::tcp::no_delay(true));
-        socket_.set_option(
-            asio::socket_base::receive_buffer_size(recv_buf_size));
-        asio::socket_base::receive_buffer_size option;
-        socket_.get_option(option);
-        recv_buf_size = option.value();
-    }
-    log_debug << "socket recv buf size " << recv_buf_size;
+#else
+    asio::socket_base::receive_buffer_size option;
+    sock.get_option(option);
+    log_debug << "socket recv buf size " << option.value();
+#endif
 }
 
 void gcomm::AsioTcpSocket::read_one(boost::array<asio::mutable_buffer, 1>& mbs)
