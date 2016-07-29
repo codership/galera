@@ -101,8 +101,10 @@ namespace galera
         append (const void* const src, size_t const size, bool const store)
         {
             /* append data as is, don't count as a new record */
-            gu::RecordSetOut<DataSet::RecordOut>::append (src, size, store,
-                                                          false);
+            gu_trace(
+                gu::RecordSetOut<DataSet::RecordOut>::append (src, size, store,
+                                                              false);
+                );
             /* this will be deserialized using DataSet::RecordIn in DataSetIn */
 
             return size;
