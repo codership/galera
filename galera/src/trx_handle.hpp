@@ -322,7 +322,7 @@ namespace galera
                                        << version() << "'";
             }
 
-            write_set_out().append_key(key);
+            gu_trace(write_set_out().append_key(key));
         }
 
         void append_data(const void* data, const size_t data_len,
@@ -331,13 +331,13 @@ namespace galera
             switch (type)
             {
             case WSREP_DATA_ORDERED:
-                write_set_out().append_data(data, data_len, store);
+                gu_trace(write_set_out().append_data(data, data_len, store));
                 break;
             case WSREP_DATA_UNORDERED:
-                write_set_out().append_unordered(data, data_len, store);
+                gu_trace(write_set_out().append_unordered(data,data_len,store));
                 break;
             case WSREP_DATA_ANNOTATION:
-                write_set_out().append_annotation(data, data_len, store);
+                gu_trace(write_set_out().append_annotation(data,data_len,store));
                 break;
             }
         }

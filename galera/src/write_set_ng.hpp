@@ -193,7 +193,7 @@ namespace galera
                 ver_ = version(buf);
                 ptr_ =
                     reinterpret_cast<gu::byte_t*>(const_cast<void*>(buf.ptr));
-                size_ = check_size (ver_, ptr_, buf.size);
+                gu_trace(size_ = check_size (ver_, ptr_, buf.size));
                 Checksum::verify(ver_, ptr_, size_);
             }
 
@@ -556,7 +556,7 @@ namespace galera
                       WriteSetNG::GatherVector& out)
         {
             assert(flags_ != 0);
-            check_size();
+            gu_trace(check_size());
 
             out->reserve (out->size() + keys_.page_count() + data_.page_count()
                           + unrd_.page_count() + 1 /* global header */);
