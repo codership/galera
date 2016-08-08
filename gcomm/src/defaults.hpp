@@ -14,6 +14,7 @@ namespace gcomm
         static std::string const ProtonetBackend          ;
         static std::string const ProtonetVersion          ;
         static std::string const SocketChecksum           ;
+        static std::string const SocketRecvBufSize        ;
         static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
         static std::string const GMCastSegment            ;

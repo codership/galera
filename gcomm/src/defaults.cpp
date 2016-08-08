@@ -16,6 +16,7 @@ namespace gcomm
 
     std::string const Defaults::ProtonetVersion         = "0";
     std::string const Defaults::SocketChecksum          = "2";
+    std::string const Defaults::SocketRecvBufSize       = "212992";
     std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
     std::string const Defaults::GMCastSegment           = "0";

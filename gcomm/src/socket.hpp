@@ -56,6 +56,7 @@ public:
     virtual void connect(const gu::URI& uri) = 0;
     virtual void close() = 0;
 
+    virtual void set_option(const std::string& key, const std::string& val) = 0;
     virtual int send(const Datagram& dg) = 0;
     virtual void async_receive() = 0;
 

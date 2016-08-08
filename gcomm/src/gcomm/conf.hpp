@@ -64,6 +64,11 @@ namespace gcomm
         static std::string const SocketChecksum;
 
         /*!
+         * @brief Socket receive buffer size in bytes
+         */
+        static std::string const SocketRecvBufSize;
+
+        /*!
          * @brief GMCast scheme for transport URI ("gmcast")
          */
         static std::string const GMCastScheme;
@@ -411,6 +416,16 @@ namespace gcomm
         static std::string const PcRecovery;
 
         static void register_params(gu::Config&);
+
+        static void check_params(const gu::Config&);
+
+        struct Check
+        {
+            Check(gu::Config& conf) { check_params(conf); }
+            virtual ~Check() {} // to pacify older GCCs with -Werror=effc++
+        };
+
+        static size_t check_recv_buf_size(const std::string& val);
     };
 
 
@@ -546,11 +561,29 @@ namespace gcomm
     {
         if (val < min || val >= max)
         {
-            gu_throw_error(ERANGE) << "param '" << key << "' value " << val
-                                   << " out of range [" << min
+            gu_throw_error(ERANGE) << "parameter '" << key << "' value " << val
+                                   << " is out of range [" << min
                                    << "," << max << ")";
         }
         return val;
+    }
+
+    template <typename T>
+    T check_range(const std::string& key,
+                  const std::string& val,
+                  const T&           min,
+                  const T&           max)
+    {
+        return check_range<T>(key, gu::Config::from_config<T>(val), min, max);
+    }
+
+    template <typename T>
+    T check_range(const gu::Config&  conf,
+                  const std::string& key,
+                  const T&           min,
+                  const T&           max)
+    {
+        return check_range<T>(key, conf.get(key), min, max);
     }
 
 } // namespace gcomm
