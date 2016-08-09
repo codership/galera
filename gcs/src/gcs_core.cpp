@@ -863,7 +863,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
                     else {
                         // This may happen if new configuraiton chage goes on.
                         // What shall we do in this case? Is it unrecoverable?
-                        gu_error ("STATE EXCHANGE: failed for: "GU_UUID_FORMAT
+                        gu_error ("STATE EXCHANGE: failed for: " GU_UUID_FORMAT
                                  ": %d (%s)",
                                  GU_UUID_ARGS(state_uuid), ret, strerror(-ret));
                     }
