@@ -633,7 +633,8 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             size_t const nbo_size(cert_.nbo_size());
             if (nbo_size)
             {
-                log_info << "Non-blocking operation is ongoing. Node can receive IST only.";
+                log_info << "Non-blocking operation is ongoing. "
+                    "Node can receive IST only.";
             }
             StateRequest* ret = new StateRequest_v1 (
                 nbo_size ? 0 : sst_req,
@@ -1048,8 +1049,9 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
 {
     assert(tsp != 0);
     TrxHandleSlave& ts(*tsp);
-    //log_info << "~~~~~ preprocessing TRX " << ts;
-    assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING);
+
+    assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING ||
+           ts.nbo_end());
 
     if (ts.nbo_start() == true || ts.nbo_end() == true)
     {
@@ -1099,6 +1101,13 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             assert(preload == true);
             log_debug << "Skipping NBO event: " << ts;
         }
+#if 0
+        log_info << "\n     IST processing NBO_"
+                 << (ts.nbo_start() ? "START(" : "END(")
+                 << ts.global_seqno() << ")"
+                 << (must_apply ? ", must apply" : ", skip")
+                 << ", ends NBO: " << ts.ends_nbo();
+#endif
     }
     else
     {

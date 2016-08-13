@@ -497,7 +497,7 @@ void galera::ist::Receiver::run()
                     gu_trace(ts->unserialize<false>(act));
                     ts->set_local(false);
                     assert(ts->global_seqno() == act.seqno_g);
-                    assert(ts->depends_seqno() >= 0);
+                    assert(ts->depends_seqno() >= 0 || ts->nbo_end());
                     assert(ts->action().first && ts->action().second);
                     // Checksum is verified later on
                 }

@@ -1545,8 +1545,18 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
     assert(ts.global_seqno() > STATE_SEQNO());
 
     CommitOrder co(ts, co_mode_);
-    wsrep_status_t retval;
-    switch ((retval = cert_and_catch(&trx, ts_ptr)))
+    wsrep_status_t const retval(cert_and_catch(&trx, ts_ptr));
+#if 0
+    if (ts.nbo_start() == true || ts.nbo_end() == true)
+    {
+        log_info << "\n     MASTER processing NBO_"
+                 << (ts.nbo_start() ? "START(" : "END(")
+                 << ts.global_seqno() << ")"
+                 << (WSREP_OK == retval ? ", must apply" : ", skip")
+                 << ", ends NBO: " << ts.ends_nbo();
+    }
+#endif
+    switch (retval)
     {
     case WSREP_OK:
     {
@@ -1854,56 +1864,69 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
 
 
 void galera::ReplicatorSMM::process_trx(void* recv_ctx,
-                                        const TrxHandleSlavePtr& ts)
+                                        const TrxHandleSlavePtr& ts_ptr)
 {
     assert(recv_ctx != 0);
-    assert(ts != 0);
-    assert(ts->local_seqno() > 0);
-    assert(ts->global_seqno() > 0);
-    assert(ts->last_seen_seqno() >= 0);
-    assert(ts->depends_seqno() == -1 || ts->version() >= 4);
-    assert(ts->state() == TrxHandle::S_REPLICATING);
+    assert(ts_ptr != 0);
 
-    wsrep_status_t const retval(cert_and_catch(0, ts));
+    TrxHandleSlave& ts(*ts_ptr);
 
+    assert(ts.local_seqno() > 0);
+    assert(ts.global_seqno() > 0);
+    assert(ts.last_seen_seqno() >= 0);
+    assert(ts.depends_seqno() == -1 || ts.version() >= 4);
+    assert(ts.state() == TrxHandle::S_REPLICATING);
+
+    wsrep_status_t const retval(cert_and_catch(0, ts_ptr));
+#if 0
+    if (ts.nbo_start() == true || ts.nbo_end() == true)
+    {
+        log_info << "\n     SLAVE processing NBO_"
+                 << (ts.nbo_start() ? "START(" : "END(")
+                 << ts.global_seqno() << ")"
+                 << (WSREP_OK == retval ? ", must apply" : ", skip")
+                 << ", ends NBO: " << ts.ends_nbo();
+    }
+#endif
     switch (retval)
     {
     case WSREP_TRX_FAIL:
-        assert(ts->state() == TrxHandle::S_ABORTING);
+        assert(ts.state() == TrxHandle::S_ABORTING);
         /* fall through to apply_trx() */
     case WSREP_OK:
         try
         {
-            if (ts->nbo_end() == true && WSREP_OK == retval)
+            if (ts.nbo_end() == true)
             {
                 // NBO-end events are for internal operation only, not to be
                 // consumed by application. If the NBO end happens with
                 // different seqno than the current event's global seqno,
                 // release monitors. In other case monitors will be grabbed
                 // by local NBO handler threads.
-                if (ts->ends_nbo() == WSREP_SEQNO_UNDEFINED)
+                if (ts.ends_nbo() == WSREP_SEQNO_UNDEFINED)
                 {
-                    cancel_monitors<false>(*ts);
-                    report_last_committed(cert_.set_trx_committed(*ts));
+                    assert(WSREP_OK != retval);
+                    assert(ts.state() == TrxHandle::S_ABORTING);
                 }
                 else
                 {
+                    assert(WSREP_OK == retval);
+                    assert(ts.ends_nbo() > 0);
                     // Signal NBO waiter here after leaving local ordering
                     // critical section.
                     boost::shared_ptr<NBOCtx> nbo_ctx(
-                        cert_.nbo_ctx(ts->ends_nbo()));
+                        cert_.nbo_ctx(ts.ends_nbo()));
                     assert(nbo_ctx != 0);
-                    nbo_ctx->set_ts(ts);
+                    nbo_ctx->set_ts(ts_ptr);
+                    break;
                 }
             }
-            else
-            {
-                gu_trace(apply_trx(recv_ctx, *ts));
-            }
+
+            gu_trace(apply_trx(recv_ctx, ts));
         }
         catch (std::exception& e)
         {
-            log_fatal << "Failed to apply trx: " << *ts;
+            log_fatal << "Failed to apply trx: " << ts;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, leaving cluster...";
             mark_corrupt_and_close();
@@ -1912,14 +1935,14 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx,
         }
         break;
     case WSREP_TRX_MISSING: // must be skipped due to SST
-        assert(ts->state() == TrxHandle::S_ABORTING);
-        report_last_committed(cert_.set_trx_committed(*ts));
+        assert(ts.state() == TrxHandle::S_ABORTING);
+        report_last_committed(cert_.set_trx_committed(ts));
         break;
     default:
         // this should not happen for remote actions
         gu_throw_error(EINVAL)
             << "unrecognized retval for remote trx certification: "
-            << retval << " trx: " << *ts;
+            << retval << " trx: " << ts;
     }
 }
 
@@ -2810,6 +2833,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         switch (cert_.append_trx(ts))
         {
         case Certification::TEST_OK:
+            // NBO_END should certify positively only if it ends NBO
+            assert(ts->ends_nbo() > 0 || !ts->nbo_end());
             if (gu_likely(applicable))
             {
                 retval = WSREP_OK;
@@ -2826,7 +2851,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             }
             break;
         case Certification::TEST_FAILED:
-            assert(ts->state() == TrxHandle::S_ABORTING);
+            if (ts->nbo_end()) assert(ts->ends_nbo() == WSREP_SEQNO_UNDEFINED);
+            assert(ts->state() == TrxHandle::S_ABORTING );
             // This check is not valid anymore. NBO may reserve resource
             // access for longer period, which must cause certification
             // to fail for all operations until the operation is over.
@@ -2849,10 +2875,10 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         ts->verify_checksum();
 
         // we must do it 'in order' for std::map reasons, so keeping
-        // it inside the monitor
+        // it inside the monitor. NBO end should never be skipped.
+        bool const skip(ts->depends_seqno() < 0 && !ts->nbo_end());
         gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
-                              GCS_ACT_WRITESET, ts->depends_seqno() < 0);
-
+                              GCS_ACT_WRITESET, skip);
         local_monitor_.leave(lo);
     }
 
@@ -2927,6 +2953,7 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
         ts->verify_checksum();
         gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
                               GCS_ACT_WRITESET, true);
+        assert(!ts->nbo_end()); // should never be skipped in seqno_assign()
         return WSREP_TRX_FAIL;
 
     default:

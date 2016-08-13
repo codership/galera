@@ -270,7 +270,6 @@ namespace galera
 
             wsrep_seqno_t    seqno() const
             {
-                assert (pa_range() > 0);
                 return seqno_priv();
             }
 

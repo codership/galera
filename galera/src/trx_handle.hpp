@@ -439,9 +439,12 @@ namespace galera
                         assert(!local_);
 
                         global_seqno_  = write_set_.seqno();
-                        depends_seqno_ = global_seqno_ - write_set_.pa_range();
+                        if (gu_likely(!(nbo_end())))
+                        {
+                            depends_seqno_ = global_seqno_-write_set_.pa_range();
+                            assert(depends_seqno_ >= 0);
+                        }
                         assert(depends_seqno_ < global_seqno_);
-                        assert(depends_seqno_ >= 0);
                         certified_ = true;
                     }
 

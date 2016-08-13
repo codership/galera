@@ -787,6 +787,7 @@ galera::Certification::TestResult galera::Certification::do_test_nbo(
     }
     else
     {
+        assert(ts->nbo_end());
         // End of non-blocking operation
         log_debug << "NBO end: " << *ts;
         ineffective = true;
@@ -826,12 +827,15 @@ galera::Certification::TestResult galera::Certification::do_test_nbo(
         }
     }
 
-    if (TEST_OK == ret)
+    if (gu_likely(TEST_OK == ret))
     {
-        if (ineffective)
+        ts->set_depends_seqno(ts->global_seqno() - 1);
+        if (gu_unlikely(ineffective))
+        {
+            assert(ts->nbo_end());
+            assert(ts->ends_nbo() == WSREP_SEQNO_UNDEFINED);
             ret = TEST_FAILED;
-        else
-            ts->set_depends_seqno(ts->global_seqno() - 1);
+        }
     }
 
     assert(TEST_FAILED == ret || ts->depends_seqno() >= 0);
