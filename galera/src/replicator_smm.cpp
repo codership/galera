@@ -1221,6 +1221,8 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     assert (rcode == 0 || state_id.seqno == WSREP_SEQNO_UNDEFINED);
     assert (rcode != 0 || state_id.seqno >= 0);
 
+    GU_DBUG_SYNC_WAIT("sst_sent");
+
     if (state_() != S_DONOR)
     {
         log_error << "sst sent called when not SST donor, state " << state_();
