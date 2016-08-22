@@ -78,7 +78,7 @@ namespace galera
         virtual wsrep_status_t release_rollback(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandleMaster* trx,
                                           void*            replay_ctx) = 0;
-        virtual void abort_trx(TrxHandleMaster* trx) = 0;
+        virtual void abort_trx(TrxHandleMaster* trx, wsrep_seqno_t bf_seqno) = 0;
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;

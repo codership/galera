@@ -363,7 +363,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     try
     {
         TrxHandleLock lock(*trx);
-        repl->abort_trx(trx.get());
+        repl->abort_trx(trx.get(), bf_seqno);
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -609,11 +609,36 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     {
         TrxHandleLock lock(*trx);
 
+        if (trx->state() == TrxHandle::S_MUST_ABORT)
+        {
+            // This is possible in case of ALG due to a race: BF applier BF
+            // aborts trx that has already grabbed commit monitor and is
+            // committing. This is possible only if aborter is ordered after
+            // the victim, and since for regular committing transactions such
+            // abort is unnecessary, this should be possible only for ongoing
+            // streaming transactions.
+
+            galera::TrxHandleSlavePtr ts(trx->ts());
+
+            if (ts && ts->flags() & TrxHandle::F_COMMIT)
+            {
+                log_warn << "trx was BF aborted during commit: " << *ts;
+                assert(0);
+                // manipulate state to avoid crash
+                trx->set_state(TrxHandle::S_MUST_REPLAY);
+                trx->set_state(TrxHandle::S_REPLAYING);
+            }
+            else
+            {
+                // Streaming replication, not in commit phase. Must abort.
+                log_debug << "SR trx was BF aborted during commit: " << *trx;
+                trx->set_state(TrxHandle::S_ABORTING);
+            }
+        }
+
         /* S_EXECUTING:  BF'ed / rolled back in local state
-         * S_MUST_ABORT: BF'ed before replication
-         * S_ABORTING:   BF'ed after  replication */
+         * S_ABORTING:   BF'ed after replication */
         bool const commit(TrxHandle::S_EXECUTING  != trx->state() &&
-                          TrxHandle::S_MUST_ABORT != trx->state() &&
                           TrxHandle::S_ABORTING   != trx->state());
 
         if (gu_likely(commit))
