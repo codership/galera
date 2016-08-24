@@ -727,7 +727,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     // notify about the first data modification). On the other hand,
     // in cases where the full SST is not required and we want to
     // use IST, we need to save the current state - to prevent
-    // unnecessary SST after node restart (if IST will be failed).
+    // unnecessary SST after node restart (if IST fails before it
+    // starts applying transaction).
     // Therefore, we need to check whether the full state transfer
     // (SST) is required or not, before marking state as unsafe:
 
@@ -735,6 +736,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     if (unsafe)
     {
+        /* Marking state = unsafe from safe. If SST fails
+        state = unsafe is persisted and restart will demand full SST */
         st_.mark_unsafe();
     }
 
@@ -804,6 +807,9 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
+            /* Update the proper seq-no so if there is need for IST (post SST)
+            and if IST fails before starting to apply transaction next restart
+            will not do a complete SST one more time. */
             update_state_uuid (sst_uuid_, sst_seqno_);
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
@@ -824,6 +830,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     if (unsafe)
     {
+        /* Reaching here means 2 things:
+        * SST completed in which case req->ist_len = 0.
+        * SST is not needed and there is need for IST. req->ist_len > 0.
+        Before starting IST we should restore the state = safe and let
+        IST take a call when to mark it unsafe. */
         st_.mark_safe();
     }
 
@@ -870,11 +881,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             }
         }
     }
-    else
+
+    // SST/IST completed successfully. Reset the state to undefined (-1)
+    // in grastate that is default operating state of node to protect from
+    // random failure during normal operation.
     {
-        // We should mark the position as undefined
-        // (if position is not marked as undefined before),
-        // to prevent data loss if the server crashes.
         wsrep_uuid_t  uuid;
         wsrep_seqno_t seqno;
         st_.get (uuid, seqno);
@@ -899,6 +910,13 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
         {
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
+                // Loop below will recieve and apply IST write-set(s). If apply
+                // fails then we should mark leave the state of server = unsafe
+                // in-order to initiate full SST on restart.
+                // This is important as failed apply may leave server data-dir
+                // in an inconsistent state and so incremental IST is not safe
+                // option.
+
                 // If the current position is defined (for example, when
                 // there were no SST before IST), then we need to change
                 // it to an undefined position before applying the first
@@ -943,19 +961,10 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             else
             {
-                // If the current position is defined, then we need
-                // to change it to an undefined position, to prevent
-                // data loss if the server crashes:
-                if (first)
-                {
-                    wsrep_uuid_t  uuid;
-                    wsrep_seqno_t seqno;
-                    st_.get (uuid, seqno);
-                    if (seqno != WSREP_SEQNO_UNDEFINED)
-                    {
-                       st_.set (uuid, WSREP_SEQNO_UNDEFINED);
-                    }
-                }
+                // IST completed after applying n transactions where n can be 0.
+                // if recv_IST is called from async_recv then recv_IST may have
+                // return with 0 transaction applied.
+		// If n > 0 then state is marked as unsafe in if loop above.
                 return;
             }
             trx->unref();
