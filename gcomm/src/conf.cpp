@@ -6,6 +6,8 @@
 #include "defaults.hpp"
 #include "common.h"
 
+#include <limits>
+
 static std::string const Delim = ".";
 
 // Protonet
@@ -18,6 +20,8 @@ std::string const gcomm::Conf::TcpNonBlocking =
     SocketPrefix + "non_blocking";
 std::string const gcomm::Conf::SocketChecksum =
     SocketPrefix + "checksum";
+std::string const gcomm::Conf::SocketRecvBufSize =
+    SocketPrefix + "recv_buf_size";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
@@ -125,6 +129,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
 
     GCOMM_CONF_ADD        (TcpNonBlocking);
     GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
+    GCOMM_CONF_ADD_DEFAULT(SocketRecvBufSize);
 
     GCOMM_CONF_ADD_DEFAULT(GMCastVersion);
     GCOMM_CONF_ADD        (GMCastGroup);
@@ -176,4 +181,16 @@ gcomm::Conf::register_params(gu::Config& cnf)
 
 #undef GCOMM_CONF_ADD
 #undef GCOMM_CONF_ADD_DEFAULT
+}
+
+void gcomm::Conf::check_params(const gu::Config& conf)
+{
+    check_recv_buf_size(conf.get(SocketRecvBufSize));
+}
+
+size_t gcomm::Conf::check_recv_buf_size(const std::string& str)
+{
+    // signed type to check for negative values
+    return check_range<long long>(SocketRecvBufSize, str,
+                                  0, std::numeric_limits<long long>::max());
 }

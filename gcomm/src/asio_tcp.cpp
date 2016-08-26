@@ -113,12 +113,10 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
         {
             assign_local_addr();
             assign_remote_addr();
+            set_socket_options();
 #ifdef HAVE_ASIO_SSL_HPP
             if (ssl_socket_ != 0)
             {
-                ssl_socket_->lowest_layer().set_option(
-                    asio::ip::tcp::no_delay(true));
-                gu::set_fd_options(ssl_socket_->lowest_layer());
                 log_debug << "socket " << id() << " connected, remote endpoint "
                           << remote_addr() << " local endpoint "
                           << local_addr();
@@ -132,8 +130,6 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
             else
             {
 #endif /* HAVE_ASIO_SSL_HPP */
-                socket_.set_option(asio::ip::tcp::no_delay(true));
-                gu::set_fd_options(socket_);
                 log_debug << "socket " << id() << " connected, remote endpoint "
                           << remote_addr() << " local endpoint "
                           << local_addr();
@@ -293,6 +289,20 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     }
 }
 
+void gcomm::AsioTcpSocket::set_option(const std::string& key,
+                                      const std::string& val)
+{
+    if (key == Conf::SocketRecvBufSize)
+    {
+        size_t llval;
+        gu_trace(llval = Conf::check_recv_buf_size(val));
+        socket().set_option(asio::socket_base::receive_buffer_size(llval));
+#if GCOMM_CHECK_RECV_BUF_SIZE
+        check_socket_option<asio::socket_base::receive_buffer_size>
+            (key, llval);
+#endif
+    }
+}
 
 int gcomm::AsioTcpSocket::send(const Datagram& dg)
 {
@@ -505,6 +515,33 @@ std::string gcomm::AsioTcpSocket::remote_addr() const
 }
 
 
+void gcomm::AsioTcpSocket::set_socket_options()
+{
+    basic_socket_t& sock(socket());
+
+    gu::set_fd_options(sock);
+    sock.set_option(asio::ip::tcp::no_delay(true));
+
+    size_t const recv_buf_size
+        (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
+    assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
+    sock.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
+
+#if GCOMM_CHECK_RECV_BUF_SIZE
+    size_t new_val(check_socket_option<asio::socket_base::receive_buffer_size>
+                   (gcomm::Conf::SocketRecvBufSize, recv_buf_size));
+    if (new_val < recv_buf_size)
+    {
+        // apparently there's a limit
+        net_.conf().set(gcomm::Conf::SocketRecvBufSize, new_val);
+    }
+#else
+    asio::socket_base::receive_buffer_size option;
+    sock.get_option(option);
+    log_debug << "socket recv buf size " << option.value();
+#endif
+}
+
 void gcomm::AsioTcpSocket::read_one(boost::array<asio::mutable_buffer, 1>& mbs)
 {
 #ifdef HAVE_ASIO_SSL_HPP
@@ -668,12 +705,10 @@ void gcomm::AsioTcpAcceptor::accept_handler(
         {
             s->assign_local_addr();
             s->assign_remote_addr();
+            s->set_socket_options();
 #ifdef HAVE_ASIO_SSL_HPP
             if (s->ssl_socket_ != 0)
             {
-                s->ssl_socket_->lowest_layer().set_option(
-                    asio::ip::tcp::no_delay(true));
-                gu::set_fd_options(s->ssl_socket_->lowest_layer());
                 log_debug << "socket "
                           << s->id() << " connected, remote endpoint "
                           << s->remote_addr() << " local endpoint "
@@ -688,8 +723,6 @@ void gcomm::AsioTcpAcceptor::accept_handler(
             else
             {
 #endif /* HAVE_ASIO_SSL_HP */
-                s->socket_.set_option(asio::ip::tcp::no_delay(true));
-                gu::set_fd_options(s->socket_);
                 s->state_ = Socket::S_CONNECTED;
 #ifdef HAVE_ASIO_SSL_HPP
             }

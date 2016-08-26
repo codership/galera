@@ -150,4 +150,9 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
                                << "' for SSL parameter '" << param
                                << "': " << extra_error_info(ec.code());
     }
+    catch (gu::NotSet& ec)
+    {
+        gu_throw_error(EINVAL) << "Missing required value for SSL parameter '"
+                               << param << "'";
+    }
 }

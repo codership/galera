@@ -65,12 +65,6 @@ typedef struct gcs_group
     gcs_state_quorum_t quorum;
     int last_applied_proto_ver;
 
-    // Mutex to protect from reading the current node index (my_idx)
-    // by SHOW STATUS helper function (gcs_group_get_status) while it
-    // is temporarily in an undefined state (-1):
-
-    gu_mutex_t index_lock;
-
     gcs_group() : gcs_proto_ver(0), repl_proto_ver(0), appl_proto_ver(0) { }
 
 }

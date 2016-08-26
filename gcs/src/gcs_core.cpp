@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -719,6 +719,7 @@ core_handle_comp_msg (gcs_core_t*          core,
         return 0;
     }
 
+    if (gu_mutex_lock (&core->send_lock)) abort();
     ret = gcs_group_handle_comp_msg (group, (const gcs_comp_msg_t*)msg->buf);
 
     switch (ret) {
@@ -727,12 +728,8 @@ core_handle_comp_msg (gcs_core_t*          core,
          * - this is first node in group OR
          * - some nodes disappeared no new nodes appeared
          * No need for state exchange, return new conf_act right away */
-        if (gu_mutex_lock (&core->send_lock)) abort();
-        {
-            assert (CORE_EXCHANGE != core->state);
-            if (CORE_NON_PRIMARY == core->state) core->state = CORE_PRIMARY;
-        }
-        gu_mutex_unlock (&core->send_lock);
+        assert (CORE_EXCHANGE != core->state);
+        if (CORE_NON_PRIMARY == core->state) core->state = CORE_PRIMARY;
 
         ret = gcs_group_act_conf (group, act, &core->proto_ver);
         if (ret < 0) {
@@ -745,77 +742,69 @@ core_handle_comp_msg (gcs_core_t*          core,
         break;
     case GCS_GROUP_WAIT_STATE_UUID:
         /* New members, need state exchange. If representative, send UUID */
-        if (gu_mutex_lock (&core->send_lock)) abort();
-        {
-            // if state is CLOSED or DESTROYED we don't do anything
-            if (CORE_CLOSED > core->state) {
-                if (0 == gcs_group_my_idx(group)) { // I'm representative
-                    gu_uuid_t uuid;
-                    gu_uuid_generate (&uuid, NULL, 0);
+        // if state is CLOSED or DESTROYED we don't do anything
+        if (CORE_CLOSED > core->state) {
+            if (0 == gcs_group_my_idx(group)) { // I'm representative
+                gu_uuid_t uuid;
+                gu_uuid_generate (&uuid, NULL, 0);
 #ifdef GCS_CORE_TESTING
-                    if (gu_uuid_compare(&core->state_uuid, &GU_UUID_NIL)) {
-                        uuid = core->state_uuid;
-                    }
+                if (gu_uuid_compare(&core->state_uuid, &GU_UUID_NIL)) {
+                    uuid = core->state_uuid;
+                }
 #endif
-                    ret = core->backend.send (&core->backend,
-                                              &uuid,
-                                              sizeof(uuid),
-                                              GCS_MSG_STATE_UUID);
-                    if (ret < 0) {
-                        // if send() failed, it means new configuration change
-                        // is on the way. Probably should ignore.
-                        gu_warn ("Failed to send state UUID: %d (%s)",
-                                 ret, strerror (-ret));
-                    }
-                    else {
-                        gu_info ("STATE_EXCHANGE: sent state UUID: "
-                                 GU_UUID_FORMAT, GU_UUID_ARGS(&uuid));
-                    }
+                ret = core->backend.send (&core->backend,
+                                          &uuid,
+                                          sizeof(uuid),
+                                          GCS_MSG_STATE_UUID);
+                if (ret < 0) {
+                    // if send() failed, it means new configuration change
+                    // is on the way. Probably should ignore.
+                    gu_warn ("Failed to send state UUID: %d (%s)",
+                             ret, strerror (-ret));
                 }
                 else {
-                    gu_info ("STATE EXCHANGE: Waiting for state UUID.");
+                    gu_info ("STATE_EXCHANGE: sent state UUID: "
+                             GU_UUID_FORMAT, GU_UUID_ARGS(&uuid));
                 }
-                core->state = CORE_EXCHANGE;
             }
-            ret = 0; // no action to return, continue
+            else {
+                gu_info ("STATE EXCHANGE: Waiting for state UUID.");
+            }
+            core->state = CORE_EXCHANGE;
         }
-        gu_mutex_unlock (&core->send_lock);
+        ret = 0; // no action to return, continue
         break;
     case GCS_GROUP_NON_PRIMARY:
         /* Lost primary component */
-        if (gu_mutex_lock (&core->send_lock)) abort();
-        {
-            if (core->state < CORE_CLOSED) {
-                ret = gcs_group_act_conf (group, act, &core->proto_ver);
-                if (ret < 0) {
-                    gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
-                              ret, strerror (-ret));
-                    assert (0);
-                    ret = -ENOTRECOVERABLE;
-                }
+        if (core->state < CORE_CLOSED) {
+            ret = gcs_group_act_conf (group, act, &core->proto_ver);
+            if (ret < 0) {
+                gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
+                          ret, strerror (-ret));
+                assert (0);
+                ret = -ENOTRECOVERABLE;
+            }
 
-                if (gcs_group_my_idx(group) == -1) { // self-leave
-                    gcs_fifo_lite_close (core->fifo);
-                    core->state = CORE_CLOSED;
-                    if (gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf)) {
-                        ret = -gcs_comp_msg_error(
-                            (const gcs_comp_msg_t*)msg->buf);
-                        free(const_cast<void*>(act->buf));
-                        act->buf = NULL;
-                        act->buf_len = 0;
-                        act->type = GCS_ACT_ERROR;
-                        gu_info("comp msg error in core %d", -ret);
-                    }
-                }
-                else {                               // regular non-prim
-                    core->state = CORE_NON_PRIMARY;
+            if (gcs_group_my_idx(group) == -1) { // self-leave
+                gcs_fifo_lite_close (core->fifo);
+                core->state = CORE_CLOSED;
+                if (gcs_comp_msg_error((const gcs_comp_msg_t*)msg->buf)) {
+                    ret = -gcs_comp_msg_error(
+                        (const gcs_comp_msg_t*)msg->buf);
+                    free(const_cast<void*>(act->buf));
+                    act->buf = NULL;
+                    act->buf_len = 0;
+                    act->type = GCS_ACT_ERROR;
+                    gu_info("comp msg error in core %d", -ret);
                 }
             }
-            else { // ignore in production?
-                assert(0);
+            else {                               // regular non-prim
+                core->state = CORE_NON_PRIMARY;
             }
         }
-        gu_mutex_unlock (&core->send_lock);
+        else { // ignore in production?
+            assert(0);
+        }
         assert (ret == act->buf_len || ret < 0);
         break;
     case GCS_GROUP_WAIT_STATE_MSG:
@@ -828,6 +817,7 @@ core_handle_comp_msg (gcs_core_t*          core,
                   ret, strerror (-ret));
         assert(0);
     }
+    gu_mutex_unlock (&core->send_lock);
 
     return ret;
 }
@@ -873,7 +863,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
                     else {
                         // This may happen if new configuraiton chage goes on.
                         // What shall we do in this case? Is it unrecoverable?
-                        gu_error ("STATE EXCHANGE: failed for: "GU_UUID_FORMAT
+                        gu_error ("STATE EXCHANGE: failed for: " GU_UUID_FORMAT
                                  ": %d (%s)",
                                  GU_UUID_ARGS(state_uuid), ret, strerror(-ret));
                     }
@@ -913,32 +903,29 @@ core_handle_state_msg (gcs_core_t*          core,
 
     assert (GCS_MSG_STATE_MSG == msg->type);
 
-    if (GCS_GROUP_WAIT_STATE_MSG == gcs_group_state (group)) {
-
+    if (GCS_GROUP_WAIT_STATE_MSG == gcs_group_state (group))
+    {
+        if (gu_mutex_lock (&core->send_lock)) abort();
         ret = gcs_group_handle_state_msg (group, msg);
 
         switch (ret) {
         case GCS_GROUP_PRIMARY:
         case GCS_GROUP_NON_PRIMARY:
             // state exchange is over, create configuration action
-            if (gu_mutex_lock (&core->send_lock)) abort();
-            {
-                // if core is closing we do nothing
-                if (CORE_CLOSED > core->state) {
-                    assert (CORE_EXCHANGE == core->state);
-                    switch (ret) {
-                    case GCS_GROUP_PRIMARY:
-                        core->state = CORE_PRIMARY;
-                        break;
-                    case GCS_GROUP_NON_PRIMARY:
-                        core->state = CORE_NON_PRIMARY;
-                        break;
-                    default:
-                        assert (0);
-                    }
+            // if core is closing we do nothing
+            if (CORE_CLOSED > core->state) {
+                assert (CORE_EXCHANGE == core->state);
+                switch (ret) {
+                case GCS_GROUP_PRIMARY:
+                    core->state = CORE_PRIMARY;
+                    break;
+                case GCS_GROUP_NON_PRIMARY:
+                    core->state = CORE_NON_PRIMARY;
+                    break;
+                default:
+                    assert (0);
                 }
             }
-            gu_mutex_unlock (&core->send_lock);
 
             ret = gcs_group_act_conf (group, act, &core->proto_ver);
             if (ret < 0) {
@@ -958,7 +945,9 @@ core_handle_state_msg (gcs_core_t*          core,
             gu_error ("Failed to handle state message: %d (%s)",
                       ret, strerror (-ret));
         }
+        gu_mutex_unlock (&core->send_lock);
     }
+
     return ret;
 }
 
@@ -1244,49 +1233,48 @@ gcs_core_group_protocol_version (const gcs_core_t* conn)
     return conn->proto_ver;
 }
 
-long
-gcs_core_set_pkt_size (gcs_core_t* core, long pkt_size)
+int
+gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
 {
-    long     hdr_size, msg_size;
-    uint8_t* new_send_buf = NULL;
-    long     ret = 0;
-
     if (core->state >= CORE_CLOSED) {
         gu_error ("Attempt to set packet size on a closed connection.");
         return -EBADFD;
     }
 
-    hdr_size = gcs_act_proto_hdr_size (core->proto_ver);
+    int const hdr_size(gcs_act_proto_hdr_size(core->proto_ver));
     if (hdr_size < 0) return hdr_size;
 
-    msg_size = core->backend.msg_size (&core->backend, pkt_size);
-    if (msg_size <= hdr_size) {
+    int const min_msg_size(hdr_size + 1);
+
+    int msg_size(core->backend.msg_size(&core->backend, pkt_size));
+    if (msg_size < min_msg_size) {
         gu_warn ("Requested packet size %d is too small, "
                  "using smallest possible: %d",
-                 pkt_size, pkt_size + (hdr_size - msg_size + 1));
-        msg_size = hdr_size + 1;
+                 pkt_size, pkt_size + (min_msg_size - msg_size));
+        msg_size = min_msg_size;
     }
 
     /* even if backend may not support limiting packet size force max message
      * size at this level */
-    msg_size = std::min(pkt_size, msg_size);
+    msg_size = std::min(std::max(min_msg_size, pkt_size), msg_size);
 
-    gu_info ("Changing maximum packet size to %ld, resulting msg size: %ld",
-              pkt_size, msg_size);
+    gu_info ("Changing maximum packet size to %d, resulting msg size: %d",
+             pkt_size, msg_size);
 
-    ret = msg_size - hdr_size; // message payload
+    int ret(msg_size - hdr_size); // message payload
+    assert(ret > 0);
 
     if (core->send_buf_len == (size_t)msg_size) return ret;
 
     if (gu_mutex_lock (&core->send_lock)) abort();
     {
         if (core->state != CORE_DESTROYED) {
-            new_send_buf = (uint8_t*)gu_realloc (core->send_buf, msg_size);
+            void* new_send_buf(gu_realloc(core->send_buf, msg_size));
             if (new_send_buf) {
                 core->send_buf     = new_send_buf;
                 core->send_buf_len = msg_size;
                 memset (core->send_buf, 0, hdr_size); // to pacify valgrind
-                gu_debug ("Message payload (action fragment size): %ld", ret);
+                gu_debug ("Message payload (action fragment size): %d", ret);
             }
             else {
                 ret = -ENOMEM;
