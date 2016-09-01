@@ -751,6 +751,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
     if (gu_unlikely(trx->flags() & TrxHandle::F_ROLLBACK))
     {
         assert(ts->depends_seqno() > 0); // must be set at unserialization
+        ts->cert_bypass(true);
         ts->mark_certified();
         gcache_.seqno_assign(ts->action().first, ts->global_seqno(),
                              GCS_ACT_WRITESET, false);

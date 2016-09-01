@@ -735,9 +735,10 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
 
         // certified trx with local seqno WSREP_SEQNO_UNDEFINED originates from
         // IST so deps set tracking should not be done
+        // Local explicit rollback events bypassed certificaiton
         if (trx.certified()   == true &&
             trx.local_seqno() != WSREP_SEQNO_UNDEFINED &&
-            trx.is_dummy()    == false) // explicit rollbacks don't pass cert.
+            !trx.cert_bypass())
         {
             assert(trx.last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
             DepsSet::iterator i(deps_set_.find(trx.last_seen_seqno()));

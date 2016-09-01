@@ -132,7 +132,6 @@ namespace galera
                                wsrep_seqno_t donor_seq);
         void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l);
         void process_sync(wsrep_seqno_t seqno_l);
-        void process_vote(wsrep_seqno_t seq, int64_t code,wsrep_seqno_t seqno_l);
 
         const struct wsrep_stats_var* stats_get()  const;
         void                          stats_reset();

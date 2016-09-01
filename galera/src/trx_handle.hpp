@@ -68,9 +68,12 @@ namespace galera
             F_NATIVE      = 1 << 5,
             F_BEGIN       = 1 << 6,
             /*
-             * reserved for extension
+             * reserved for API extension
              */
-            F_PREORDERED  = 1 << 15 // flag specific to TrxHandle
+            F_PREORDERED  = 1 << 15 // flag specific to WriteSet
+            /*
+             * reserved for internal use
+             */
         };
 
         static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 7) - 1);
@@ -558,6 +561,14 @@ namespace galera
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
 
+        void cert_bypass(bool const val)
+        {
+            assert(true  == val);
+            assert(false == cert_bypass_);
+            cert_bypass_ = val;
+        }
+        bool cert_bypass() const { return cert_bypass_; }
+
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
@@ -573,7 +584,8 @@ namespace galera
             refcnt_            (1),
             certified_         (false),
             committed_         (false),
-            exit_loop_         (false)
+            exit_loop_         (false),
+            cert_bypass_       (false)
         {}
 
         friend class TrxHandleMaster;
@@ -595,6 +607,7 @@ namespace galera
         bool                   certified_;
         bool                   committed_;
         bool                   exit_loop_;
+        bool                   cert_bypass_;
 
         TrxHandleSlave(const TrxHandleSlave&);
         void operator=(const TrxHandleSlave& other);
