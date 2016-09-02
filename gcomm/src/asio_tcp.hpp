@@ -49,6 +49,7 @@ public:
     void close();
     void write_handler(const asio::error_code& ec,
                        size_t bytes_transferred);
+    void set_option(const std::string& key, const std::string& val);
     int send(const Datagram& dg);
     size_t read_completion_condition(
         const asio::error_code& ec,
@@ -67,6 +68,7 @@ private:
     AsioTcpSocket(const AsioTcpSocket&);
     void operator=(const AsioTcpSocket&);
 
+    void set_socket_options();
     void read_one(boost::array<asio::mutable_buffer, 1>& mbs);
     void write_one(const boost::array<asio::const_buffer, 2>& cbs);
     void close_socket();
@@ -75,6 +77,13 @@ private:
     // is known that underlying socket is live
     void assign_local_addr();
     void assign_remote_addr();
+
+    // returns real socket to use
+    typedef asio::basic_socket<asio::ip::tcp,
+                               asio::stream_socket_service<asio::ip::tcp> >
+    basic_socket_t;
+    basic_socket_t&
+    socket() { return (ssl_socket_ ? ssl_socket_->lowest_layer() : socket_); }
 
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
@@ -89,6 +98,19 @@ private:
     // so need to maintain copy for diagnostics logging
     std::string                               local_addr_;
     std::string                               remote_addr_;
+
+    template <typename T> unsigned long long
+    check_socket_option(const std::string& key, unsigned long long val)
+    {
+        T option;
+        socket().get_option(option);
+        if (val != static_cast<unsigned long long>(option.value()))
+        {
+            log_info << "Setting '" << key << "' to " << val
+                     << " failed. Resulting value is " << option.value();
+        }
+        return option.value();
+    }
 };
 
 

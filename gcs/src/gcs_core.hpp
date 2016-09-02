@@ -136,8 +136,8 @@ gcs_core_group_protocol_version (const gcs_core_t* conn);
 /* Sets maximum message size to achieve requested network packet size.
  * In case of failure returns negative error code, in case of success -
  * resulting message payload size (size of action fragment) */
-extern long
-gcs_core_set_pkt_size (gcs_core_t* conn, long pkt_size);
+extern int
+gcs_core_set_pkt_size (gcs_core_t* conn, int pkt_size);
 
 /* sends this node's last applied value to group */
 extern long
