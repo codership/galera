@@ -1434,8 +1434,6 @@ wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
 {
     boost::shared_ptr<NBOCtx> nbo_ctx(cert_.nbo_ctx(meta->gtid.seqno));
 
-    meta->gtid = WSREP_GTID_UNDEFINED;
-
     // Send end message
     trx->set_state(TrxHandle::S_REPLICATING);
 
@@ -1462,8 +1460,8 @@ wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
     {
         // Send was either interrupted due to states excahnge (EAGAIN),
         // due to non-prim (ENOTCONN) or due to timeout in send monitor
-        // (EINTR). Will retry.
-        goto resend;
+        // (EINTR).
+        return WSREP_CONN_FAIL;
     }
     else if (err < 0)
     {
