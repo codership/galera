@@ -287,18 +287,18 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
             log_debug << "deliver_view = ";
             log_debug << v;
 
-            if (rst_view_ -> id().seq() == max_view_seqno &&
+            if (rst_view_->id().seq() == max_view_seqno &&
+                v.members().size() == rst_view_->members().size() &&
                 std::equal(v.members().begin(), v.members().end(),
                            rst_view_->members().begin(), UUID_fixed_part_pred))
             {
                 log_info << "promote to primary component";
-                // since all of them are non-primary component
-                // we need to bootstrap.
+                // All of the nodes are in non-primary so we need to bootstrap.
                 send_install(true);
-                // clear rst_view after pc is formed, otherwise
-                // there would be network partition when sending
-                // install message. and if rst_view is cleared here,
-                // then pc recovery will never happen again.
+                // Rst_view will be cleared after primary component is formed.
+                // If the rst_view would be cleared here and there would be
+                // network partitioning before install message was delivered,
+                // bootstrapping the primary component would never happen again.
             }
         }
     }
