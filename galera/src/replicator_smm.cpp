@@ -142,6 +142,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
                              config_.get(Param::commit_order))),
     state_file_         (config_.get(BASE_DIR)+'/'+GALERA_STATE_FILE),
     st_                 (state_file_),
+    safe_to_bootstrap_  (true),
     trx_params_         (config_.get(BASE_DIR), -1,
                          KeySet::version(config_.get(Param::key_format)),
                          gu::from_string<int>(config_.get(
@@ -233,7 +234,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     wsrep_uuid_t  uuid;
     wsrep_seqno_t seqno;
 
-    st_.get (uuid, seqno);
+    st_.get (uuid, seqno, safe_to_bootstrap_);
 
     if (0 != args->state_id &&
         args->state_id->uuid != WSREP_UUID_UNDEFINED &&
@@ -297,7 +298,17 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
 
-    if ((err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
+    if (bootstrap == true && safe_to_bootstrap_ == false)
+    {
+        log_error << "This node is not safe to bootstrap the cluster. "
+                  << "It was not the last one to leave the cluster and may "
+                  << "not contain all the updates. To force cluster bootstrap "
+                  << "with this node remove grastate.dat file manually.";
+        ret = WSREP_NODE_FAIL;
+    }
+
+    if (ret == WSREP_OK &&
+        (err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
@@ -1363,6 +1374,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     wsrep_seqno_t const upto(cert_.position());
 
+    if (view_info.status == WSREP_VIEW_PRIMARY)
+    {
+        safe_to_bootstrap_ = (view_info.memb_num == 1);
+    }
+
     apply_monitor_.drain(upto);
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
@@ -1472,7 +1488,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 }
             }
 
-            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         }
 
         if (state_() == S_JOINING && sst_state_ != SST_NONE)
@@ -1496,7 +1512,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // Non-primary configuration
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            st_.set (state_uuid_, STATE_SEQNO());
+            st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         }
 
         if (next_state != S_CONNECTED && next_state != S_CLOSING)
@@ -1588,7 +1604,7 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
     }
 
     wsrep_seqno_t const ret(STATE_SEQNO());
-    st_.set(state_uuid_, ret);
+    st_.set(state_uuid_, ret, safe_to_bootstrap_);
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret
              << " (" << pause_seqno_ << ")";
@@ -1604,7 +1620,7 @@ void galera::ReplicatorSMM::resume()
         gu_throw_error(EALREADY) << "tried to resume unpaused provider";
     }
 
-    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
     log_info << "resuming provider at " << pause_seqno_;
     LocalOrder lo(pause_seqno_);
     pause_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -1839,7 +1855,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
                 sizeof(state_uuid_str_));
     }
 
-    st_.set(uuid, WSREP_SEQNO_UNDEFINED);
+    st_.set(uuid, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
 }
 
 void

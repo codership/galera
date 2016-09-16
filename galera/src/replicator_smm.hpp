@@ -514,6 +514,10 @@ namespace galera
         std::string           state_file_;
         SavedState            st_;
 
+        // boolean telling if the node is safe to use for bootstrapping
+        // a new primary component
+        bool safe_to_bootstrap_;
+
         // currently installed trx parameters
         TrxHandle::Params     trx_params_;
 
