@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_SAVED_STATE_HPP
@@ -24,12 +24,13 @@ public:
     SavedState  (const std::string& file);
     ~SavedState ();
 
-    void get (wsrep_uuid_t& u, wsrep_seqno_t& s);
-    void set (const wsrep_uuid_t& u, wsrep_seqno_t s = WSREP_SEQNO_UNDEFINED);
+    void get (wsrep_uuid_t& u, wsrep_seqno_t& s, bool& safe_to_bootstrap);
+    void set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap);
 
     void mark_unsafe();
     void mark_safe();
     void mark_corrupt();
+    void mark_uncorrupt(const wsrep_uuid_t& u, wsrep_seqno_t s);
 
     bool corrupt() const { return corrupt_; }
 
@@ -45,6 +46,7 @@ private:
     FILE*            fs_;
     wsrep_uuid_t     uuid_;
     wsrep_seqno_t    seqno_;
+    bool             safe_to_bootstrap_;
     gu::Atomic<long> unsafe_;
     bool             corrupt_;
 
@@ -57,7 +59,8 @@ private:
     long             total_locks_;
     long             total_writes_;
 
-    void write_and_flush (const wsrep_uuid_t& u, const wsrep_seqno_t s);
+    void write_and_flush (const wsrep_uuid_t& u, const wsrep_seqno_t s,
+                          bool safe_to_bootstrap);
 
     SavedState (const SavedState&);
     SavedState& operator=(const SavedState&);
