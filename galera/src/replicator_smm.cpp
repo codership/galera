@@ -586,6 +586,7 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
         assert((trx->flags() & TrxHandle::F_BEGIN) == 0);
         TrxHandleSlavePtr ts(TrxHandleSlave::New(true, slave_pool_),
                              TrxHandleSlaveDeleter());
+        ts->set_global_seqno(0);
         trx->add_replicated(ts);
     }
 
