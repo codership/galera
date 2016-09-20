@@ -75,13 +75,14 @@ START_TEST(service_thd2)
     TestEnv env;
     DummyGcs& conn(env.gcs());
     ServiceThd* thd = new ServiceThd(conn, env.gcache());
+    gu::UUID const state_uuid(NULL, 0);
     fail_if (thd == 0);
 
-    conn.set_last_applied(0);
+    conn.set_last_applied(gu::GTID(state_uuid, 0));
 
     gcs_seqno_t seqno = 1;
     thd->report_last_committed (seqno);
-    thd->flush();
+    thd->flush(state_uuid);
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
@@ -89,14 +90,14 @@ START_TEST(service_thd2)
 
     seqno = 5;
     thd->report_last_committed (seqno);
-    thd->flush();
+    thd->flush(state_uuid);
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
              seqno);
 
     thd->report_last_committed (3);
-    thd->flush();
+    thd->flush(state_uuid);
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),
@@ -106,7 +107,7 @@ START_TEST(service_thd2)
 
     seqno = 3;
     thd->report_last_committed (seqno);
-    thd->flush();
+    thd->flush(state_uuid);
     WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %" PRId64 ", expected %" PRId64, conn.last_applied(),

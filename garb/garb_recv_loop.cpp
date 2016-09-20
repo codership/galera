@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2014 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2015 Codership Oy <info@codership.com> */
 
 #include "garb_recv_loop.hpp"
 
@@ -24,7 +24,9 @@ RecvLoop::RecvLoop (const Config& config)
     gconf_ (),
     params_(gconf_),
     parse_ (gconf_, config_.options()),
-    gcs_   (gconf_, config_.name(), config_.address(), config_.group())
+    gcs_   (gconf_, config_.name(), config_.address(), config_.group()),
+    uuid_  (GU_UUID_NIL),
+    seqno_ (GCS_SEQNO_ILL)
 {
     /* set up signal handlers */
     global_gcs = &gcs_;
@@ -61,16 +63,18 @@ RecvLoop::loop()
         switch (act.type)
         {
         case GCS_ACT_TORDERED:
-            if (gu_unlikely(!(act.seqno_g & 127)))
+            seqno_ = act.seqno_g;
+            if (gu_unlikely(!(seqno_ & 127)))
                 /* == report_interval_ of 128 */
             {
-                gcs_.set_last_applied (act.seqno_g);
+                gcs_.set_last_applied (gu::GTID(uuid_, seqno_));
             }
             break;
         case GCS_ACT_COMMIT_CUT:
             break;
         case GCS_ACT_STATE_REQ:
-            gcs_.join (-ENOSYS); /* we can't donate state */
+            /* we can't donate state */
+            gcs_.join (gu::GTID(uuid_, seqno_),-ENOSYS);
             break;
         case GCS_ACT_CONF:
         {
@@ -81,14 +85,23 @@ RecvLoop::loop()
             {
                 if (GCS_NODE_STATE_PRIM == cc->my_state)
                 {
+                    gu_uuid_t uuid;
+                    ::memcpy(uuid.data, cc->uuid, sizeof(uuid.data));
+                    uuid_  = uuid;
+                    seqno_ = cc->seqno;
                     gcs_.request_state_transfer (config_.sst(),config_.donor());
-                    gcs_.join(cc->seqno);
+                    gcs_.join(gu::GTID(uuid_, seqno_), 0);
                 }
             }
-            else if (cc->memb_num == 0) // SELF-LEAVE after closing connection
+            else
             {
-                log_info << "Exiting main loop";
-                return;
+                if (cc->memb_num == 0) // SELF-LEAVE after closing connection
+                {
+                    log_info << "Exiting main loop";
+                    return;
+                }
+                uuid_  = GU_UUID_NIL;
+                seqno_ = GCS_SEQNO_ILL;
             }
 
             if (config_.sst() != Config::DEFAULT_SST)
@@ -110,7 +123,7 @@ RecvLoop::loop()
 
         if (act.buf)
         {
-            free (const_cast<void*>(act.buf));
+            ::free(const_cast<void*>(act.buf));
         }
     }
 }

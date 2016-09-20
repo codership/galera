@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -7,16 +7,17 @@
 #include "../gcs_group.hpp"
 #include "../gcs_comp_msg.hpp"
 
-#include <gu_uuid.h>
-#include <stdbool.h>
+#include "gu_uuid.h"
 
-#include <check.h>
-#include "gcs_memb_test.hpp"
+#include "gcs_test_utils.hpp"
+#include "gcs_memb_test.hpp" // must be included last
+
+using namespace gcs_test;
 
 struct node
 {
-    gcs_group_t group;
-    char id[GCS_COMP_MEMB_ID_MAX_LEN + 1]; /// ID assigned by the backend
+    GcsGroup group;
+    char     id[GCS_COMP_MEMB_ID_MAX_LEN + 1]; /// ID assigned by the backend
 };
 
 #define MAX_NODES 10
@@ -28,7 +29,7 @@ struct group
 };
 
 /* delivers new component message to all memebers */
-static long
+static int
 deliver_component_msg (struct group* group, bool prim)
 {
     int i;
@@ -55,15 +56,16 @@ deliver_component_msg (struct group* group, bool prim)
                 fail_if (strcmp(src_id, dst_id),
                          "%d node id %s, recorded in comp msg as %s",
                          j, src_id, dst_id);
-//                gcs_segment_t const src_seg = group->nodes[j]->segment;
-                gcs_segment_t const dst_seg = gcs_comp_msg_member(msg, j)->segment;
+                gcs_segment_t const dst_seg(gcs_comp_msg_member(msg,j)->segment);
                 fail_if (j != dst_seg,
                          "%d node segment %d, recorded in comp msg as %d",
                          j, j, (int)dst_seg);
             }
 
+            mark_point();
+
             gcs_group_state_t ret =
-                gcs_group_handle_comp_msg (&(group->nodes[i]->group), msg);
+                gcs_group_handle_comp_msg (group->nodes[i]->group(), msg);
 
             fail_if (ret != GCS_GROUP_WAIT_STATE_UUID);
 
@@ -72,7 +74,7 @@ deliver_component_msg (struct group* group, bool prim)
             /* check that uuids are properly recorded in internal structures */
             for (j = 0; j < group->nodes_num; j++) {
                 const char* src_id = group->nodes[j]->id;
-                const char* dst_id = group->nodes[i]->group.nodes[j].id;
+                const char* dst_id = group->nodes[i]->group->nodes[j].id;
                 fail_if (strcmp(src_id, dst_id),
                          "%d node id %s, recorded at node %d as %s",
                          j, src_id, i, dst_id);
@@ -86,14 +88,6 @@ deliver_component_msg (struct group* group, bool prim)
     return 0;
 }
 
-#if 0
-static long
-group_send_msg (struct group* group, gcs_group_t* node,
-                const void* msg, ssize_t msg_len)
-{
-    return 0;
-}
-#endif
 
 static long
 perform_state_exchange (struct group* group)
@@ -111,7 +105,7 @@ perform_state_exchange (struct group* group)
     gcs_group_state_t state;
     int i;
     for (i = 0; i < group->nodes_num; i++) {
-        state = gcs_group_handle_uuid_msg (&(group->nodes[i]->group),&uuid_msg);
+        state = gcs_group_handle_uuid_msg (group->nodes[i]->group(),&uuid_msg);
         fail_if (state != GCS_GROUP_WAIT_STATE_MSG,
                  "Wrong group state after STATE_UUID message. "
                  "Expected: %d, got: %d", GCS_GROUP_WAIT_STATE_MSG, state);
@@ -121,8 +115,7 @@ perform_state_exchange (struct group* group)
     for (i = 0; i < group->nodes_num; i++)
     {
         /* create state message from node i */
-        gcs_state_msg_t* state =
-            gcs_group_get_state (&(group->nodes[i]->group));
+        gcs_state_msg_t* state = gcs_group_get_state(group->nodes[i]->group());
         fail_if (NULL == state);
 
         ssize_t state_len = gcs_state_msg_len (state);
@@ -139,8 +132,7 @@ perform_state_exchange (struct group* group)
         int j;
         for (j = 0; j < group->nodes_num; j++) {
             gcs_group_state_t ret =
-                gcs_group_handle_state_msg (&(group->nodes[j]->group),
-                                            &state_msg);
+                gcs_group_handle_state_msg(group->nodes[j]->group(), &state_msg);
 
             if (group->nodes_num - 1 == i) { // a message from the last node
                 fail_if (ret != GCS_GROUP_PRIMARY,
@@ -160,7 +152,7 @@ perform_state_exchange (struct group* group)
     return 0;
 }
 
-static long
+static int
 group_add_node (struct group* group, struct node* node, bool new_id)
 {
     if (new_id) {
@@ -221,7 +213,7 @@ group_drop_node (struct group* group, int idx)
 static gcs_node_state_t
 get_node_state (struct node* node)
 {
-    return node->group.nodes[node->group.my_idx].status;
+    return node->group->nodes[node->group->my_idx].status;
 }
 
 /* for delivery of GCS_MSG_SYNC or GCS_MSG_JOIN msg*/
@@ -229,18 +221,17 @@ static long
 deliver_join_sync_msg (struct group* const group, int const src,
                        gcs_msg_type_t type)
 {
-    gcs_seqno_t    seqno = group->nodes[src]->group.act_id_;
+    gcs_seqno_t    seqno = group->nodes[src]->group->act_id_;
     gcs_recv_msg_t msg(&seqno,
                        sizeof (seqno),
                        sizeof (seqno),
                        src,
                        type);
 
-
     long ret = -1;
     int i;
     for (i = 0; i < group->nodes_num; i++) {
-        gcs_group_t* const gr = &group->nodes[i]->group;
+        gcs_group_t* const gr(group->nodes[i]->group());
         switch (type) {
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg(gr, &msg);
@@ -271,7 +262,7 @@ deliver_join_sync_msg (struct group* const group, int const src,
             }
             break;
         default:
-            fail ("wrong message type: %d", type);
+            fail_if (true, "wrong message type: %d", type);
         }
     }
 
@@ -286,7 +277,7 @@ verify_node_state_across_group (struct group* group, int const idx,
     int i;
     for (i = 0; i < group->nodes_num; i++)
     {
-        gcs_node_state_t state = group->nodes[i]->group.nodes[idx].status;
+        gcs_node_state_t state = group->nodes[i]->group->nodes[idx].status;
         if (check != state) {
             gu_error("At node %d node's %d status is not %d, but %d",
                      i, idx, check, state);
@@ -308,8 +299,7 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
     int i;
     for (i = 0; i < group->nodes_num; i++)
     {
-        // sst request is expected to be dynamically allocated
-        char* req_buf = (char*)malloc (req_len);
+        char* req_buf = (char*)group->nodes[i]->group.gcache()->malloc(req_len);
         fail_if (NULL == req_buf);
         sprintf (req_buf, "%s", donor);
 
@@ -321,7 +311,7 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
 
         long ret;
 
-        ret = gcs_group_handle_state_request (&group->nodes[i]->group, &req);
+        ret = gcs_group_handle_state_request(group->nodes[i]->group(), &req);
 
         if (ret < 0) { // don't fail here, we may want to test negatives
             gu_error (ret < 0, "Handling state request to '%s' failed: %d (%s)",
@@ -331,18 +321,20 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
 
         if (i == src_idx) {
             fail_if (ret != req_len);
-            free (req_buf); // passed to joiner
+            group->nodes[i]->group.gcache()->free(req_buf); // passed to joiner
         }
         else {
             if (ret > 0) {
                 if (donor_idx < 0) {
                     fail_if (req.id != i);
                     donor_idx = i;
-                    free (req_buf); // passed to donor
+                    group->nodes[i]->group.gcache()->free(req_buf);
+                    // passed to donor
                 }
                 else {
-                    fail ("More than one donor selected: %d, first donor: %d",
-                          i, donor_idx);
+                    fail_if(true,
+                            "More than one donor selected: %d, first donor: %d",
+                            i, donor_idx);
                 }
             }
         }
@@ -351,9 +343,10 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
     fail_if (donor_idx < 0, "Failed to select donor");
 
     for (i = 0; i < group->nodes_num; i++) {
-        gcs_group_t* const gr = &group->nodes[i]->group;
-        gcs_node_t* const donor = &gr->nodes[donor_idx];
-        gcs_node_state_t state = donor->status;
+        gcs_group_t* const gr(group->nodes[i]->group());
+        gcs_node_t* const donor(&gr->nodes[donor_idx]);
+        gcs_node_state_t state(donor->status);
+
         fail_if (state != GCS_NODE_STATE_DONOR, "%d is not donor at %d",
                  donor_idx, i);
         int dc = donor->desync_count;
@@ -399,14 +392,14 @@ START_TEST(gcs_memb_test_465)
 
         sprintf(name_str, "node%d", i);
         sprintf(addr_str, "addr%d", i);
-        gcs_group_init (&nodes[i].group, NULL, name_str, addr_str, 0, 0, 0);
+        nodes[i].group.init(name_str, addr_str, 1, 0, 0);
     }
 
     gcs_node_state_t node_state;
 
     // bootstrap the cluster
     group_add_node (&group, &nodes[0], true);
-    fail_if (nodes[0].group.state != GCS_GROUP_PRIMARY);
+    fail_if (nodes[0].group->state != GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[0]);
     fail_if (node_state != GCS_NODE_STATE_JOINED);
 
@@ -415,18 +408,18 @@ START_TEST(gcs_memb_test_465)
     fail_if (node_state != GCS_NODE_STATE_SYNCED);
 
     group_add_node (&group, &nodes[1], true);
-    fail_if (nodes[1].group.state != GCS_GROUP_PRIMARY);
+    fail_if (nodes[1].group->state != GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[1]);
     fail_if (node_state != GCS_NODE_STATE_PRIM); // need sst
 
     group_add_node (&group, &nodes[2], true);
-    fail_if (nodes[2].group.state != GCS_GROUP_PRIMARY);
+    fail_if (nodes[2].group->state != GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[2]);
     fail_if (node_state != GCS_NODE_STATE_PRIM); // need sst
 
     fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
 
-    group_sst_start (&group, 2, nodes[0].group.nodes[0].name);
+    group_sst_start (&group, 2, nodes[0].group()->nodes[0].name);
     mark_point();
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
@@ -439,7 +432,7 @@ START_TEST(gcs_memb_test_465)
     fail_if (verify_node_state_across_group (&group, 1, GCS_NODE_STATE_PRIM));
     fail_if (verify_node_state_across_group (&group, 2, GCS_NODE_STATE_SYNCED));
 
-    group_sst_start (&group, 1, nodes[0].group.nodes[0].name);
+    group_sst_start (&group, 1, nodes[0].group->nodes[0].name);
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
     deliver_join_sync_msg (&group, 1, GCS_MSG_JOIN); // end of joiner SST
 
@@ -449,14 +442,15 @@ START_TEST(gcs_memb_test_465)
     /* After that, according to #465, node 1 shifted from SYNCED to PRIMARY */
 
     fail_if (verify_node_state_across_group (&group, 1, GCS_NODE_STATE_SYNCED));
-    struct gcs_act act;
-    int            proto_ver = -1;
-    ret = gcs_group_act_conf (&group.nodes[1]->group, &act, &proto_ver);
+    struct gcs_act_rcvd rcvd;
+    int                 proto_ver = -1;
+    ret = gcs_group_act_conf(group.nodes[1]->group(), &rcvd.act, &proto_ver);
+    struct gcs_act* const act(&rcvd.act);
     fail_if (ret <= 0, "gcs_group_act_cnf() retruned %zd (%s)",
              ret, strerror (-ret));
-    fail_if (ret != act.buf_len);
-    fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
-    const gcs_act_conf_t* conf = (const gcs_act_conf_t*)act.buf;
+    fail_if (ret != act->buf_len);
+    fail_if (proto_ver != 1 /* current version */, "proto_ver = %d", proto_ver);
+    const gcs_act_conf_t* conf = (const gcs_act_conf_t*)act->buf;
     fail_if (NULL == conf);
     fail_if (conf->my_idx != 1);
     /* according to #465 this was GCS_NODE_STATE_PRIM */

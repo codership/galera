@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2015 Codership Oy <info@codership.com>
  */
 
 #include "garb_gcs.hpp"
@@ -109,9 +109,9 @@ Gcs::request_state_transfer (const std::string& request,
         gu_uuid_t ist_uuid = {{0, }};
         gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
         // for garb we use the lowest str_version.
-        ret = gcs_request_state_transfer (gcs_, 0, req_str, req_len, donor.c_str(),
-                                          &ist_uuid, ist_seqno,
-                                          &order);
+        ret = gcs_request_state_transfer (gcs_, 0, req_str, req_len,
+                                          donor.c_str(),
+                                          gu::GTID(ist_uuid, ist_seqno), order);
     }
     while (-EAGAIN == ret && (usleep(1000000), true));
 
@@ -126,9 +126,9 @@ Gcs::request_state_transfer (const std::string& request,
 }
 
 void
-Gcs::join (gcs_seqno_t seqno)
+Gcs::join (const gu::GTID& gtid, int const code)
 {
-    ssize_t ret = gcs_join (gcs_, seqno);
+    ssize_t const ret(gcs_join (gcs_, gtid, code));
 
     if (ret < 0)
     {
@@ -139,9 +139,9 @@ Gcs::join (gcs_seqno_t seqno)
 }
 
 void
-Gcs::set_last_applied (gcs_seqno_t seqno)
+Gcs::set_last_applied (const gu::GTID& gtid)
 {
-    (void) gcs_set_last_applied(gcs_, seqno);
+    (void) gcs_set_last_applied(gcs_, gtid);
 }
 
 void

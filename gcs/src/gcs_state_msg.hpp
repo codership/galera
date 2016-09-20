@@ -33,6 +33,7 @@ typedef struct gcs_state_msg
     gcs_seqno_t      prim_seqno;    // last PC state seqno
     gcs_seqno_t      received;      // last action seqno (received up to)
     gcs_seqno_t      cached;        // earliest action cached
+    gcs_seqno_t      last_applied;  // last applied action reported by node
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
     int              version;       // version of state message
@@ -79,6 +80,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_seqno_t      prim_seqno,
                       gcs_seqno_t      received,
                       gcs_seqno_t      cached,
+                      gcs_seqno_t      last_applied,
                       int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
@@ -140,6 +142,10 @@ gcs_state_msg_name (const gcs_state_msg_t* state);
 /* Get node incoming address */
 extern const char*
 gcs_state_msg_inc_addr (const gcs_state_msg_t* state);
+
+/* Get last applied action seqno */
+gcs_seqno_t
+gcs_state_msg_last_applied (const gcs_state_msg_t* state);
 
 /* Get supported protocols */
 extern void

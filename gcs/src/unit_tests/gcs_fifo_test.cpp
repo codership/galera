@@ -2,9 +2,8 @@
 
 // $Id$
 
-#include <check.h>
-#include "gcs_fifo_test.hpp"
 #include "../gcs_fifo_lite.hpp"
+#include "gcs_fifo_test.hpp"
 
 #define FIFO_LENGTH 10
 

@@ -387,6 +387,44 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     return retval;
 }
 
+extern "C"
+wsrep_status_t galera_rollback(wsrep_t*                 gh,
+                               wsrep_trx_id_t           trx_id,
+                               const wsrep_buf_t* const data)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    galera::TrxHandlePtr victim(repl->get_local_trx(trx_id));
+
+    if (!victim)
+    {
+        log_warn << "trx to rollback " << trx_id << " not found";
+        return WSREP_OK;
+    }
+
+    /* Send the rollback fragment from a different context */
+    galera::TrxHandlePtr trx(repl->new_local_trx(trx_id));
+
+    TrxHandleLock lock(*trx);
+    if (data)
+    {
+        gu_trace(trx->append_data(data->ptr, data->len,
+                                  WSREP_DATA_ORDERED, true));
+    }
+    wsrep_trx_meta_t meta;
+    meta.gtid       = WSREP_GTID_UNDEFINED;
+    meta.depends_on = WSREP_SEQNO_UNDEFINED;
+    meta.stid.node  = repl->source_id();
+    meta.stid.trx   = trx_id;
+
+    trx->set_flags(TrxHandle::F_ROLLBACK);
+    trx->set_state(TrxHandle::S_MUST_ABORT);
+    trx->set_state(TrxHandle::S_ABORTING);
+    return repl->send(trx.get(), &meta);
+}
+
 static inline void
 discard_local_trx(REPL_CLASS*        repl,
                   wsrep_ws_handle_t* ws_handle,
@@ -933,9 +971,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
 
 extern "C"
-wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
-                                     wsrep_conn_id_t const conn_id,
-                                     int             const err)
+wsrep_status_t galera_to_execute_end(wsrep_t*           const gh,
+                                     wsrep_conn_id_t    const conn_id,
+                                     const wsrep_buf_t* const err)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -945,6 +983,14 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     wsrep_status_t retval;
     TrxHandlePtr txp(repl->local_conn_trx(conn_id, false));
     TrxHandle* trx(txp.get());
+
+    assert(trx != 0);
+    if (trx == 0)
+    {
+        log_warn << "No trx handle for connection " << conn_id
+                 << " in galera_to_execute_end()";
+        return WSREP_CONN_FAIL;
+    }
 
     try
     {
@@ -1054,8 +1100,7 @@ wsrep_status_t galera_sst_sent (wsrep_t*            const gh,
 extern "C"
 wsrep_status_t galera_sst_received (wsrep_t*            const gh,
                                     const wsrep_gtid_t* const state_id,
-                                    const void*         const state,
-                                    size_t              const state_len,
+                                    const wsrep_buf_t*  const state,
                                     int                 const rcode)
 {
     assert(gh       != 0);
@@ -1067,15 +1112,14 @@ wsrep_status_t galera_sst_received (wsrep_t*            const gh,
 
     if (rcode < 0) { assert(state_id->seqno == WSREP_SEQNO_UNDEFINED); }
 
-    return repl->sst_received(*state_id, state, state_len, rcode);
+    return repl->sst_received(*state_id, state, rcode);
 }
 
 
 extern "C"
-wsrep_status_t galera_snapshot(wsrep_t*    wsrep,
-                               const void* msg,
-                               size_t      msg_len,
-                               const char* donor_spec)
+wsrep_status_t galera_snapshot(wsrep_t*           const wsrep,
+                               const wsrep_buf_t* const msg,
+                               const char*        const donor_spec)
 {
     return WSREP_NOT_IMPLEMENTED;
 }
@@ -1251,6 +1295,7 @@ static wsrep_t galera_str = {
     &galera_release,
     &galera_replay_trx,
     &galera_abort_pre_commit,
+    &galera_rollback,
     &galera_append_key,
     &galera_append_data,
     &galera_sync_wait,

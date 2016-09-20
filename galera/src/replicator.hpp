@@ -86,7 +86,7 @@ namespace galera
         virtual wsrep_status_t to_isolation_begin(TrxHandlePtr& trx,
                                                   wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandlePtr& trx,
-                                                int           err) = 0;
+                                                const wsrep_buf_t* err) = 0;
         virtual wsrep_status_t preordered_collect(wsrep_po_handle_t& handle,
                                                   const struct wsrep_buf* data,
                                                   size_t                  count,
@@ -99,8 +99,7 @@ namespace galera
         virtual wsrep_status_t sst_sent(const wsrep_gtid_t& state_id,
                                         int                 rcode) = 0;
         virtual wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
-                                            const void*         state,
-                                            size_t              state_len,
+                                            const wsrep_buf_t*  state,
                                             int                 rcode) = 0;
 
         // action source interface

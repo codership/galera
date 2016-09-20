@@ -35,8 +35,6 @@ static const size_t PROTO_DATA_OFFSET     = 20;
 // static const unsigned int  PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
 // static const unsigned char PROTO_AT_MAX       = 0xFF;
 
-static const int PROTO_VERSION = GCS_ACT_PROTO_MAX;
-
 #define PROTO_MAX_HDR_SIZE PROTO_DATA_OFFSET // for now
 
 /*! Writes header data into actual header of the message.
@@ -58,8 +56,8 @@ gcs_act_proto_write (gcs_act_frag_t* frag, void* buf, size_t buf_len)
                   frag->act_type, PROTO_AT_MAX);
         return -EOVERFLOW;
     }
-    if (frag->proto_ver != PROTO_VERSION) return -EPROTO;
-    if (buf_len      < PROTO_DATA_OFFSET) return -EMSGSIZE;
+    if (frag->proto_ver > GCS_PROTO_MAX) return -EPROTO;
+    if (buf_len     < PROTO_DATA_OFFSET) return -EMSGSIZE;
 #endif
 
     // assert (frag->act_size <= PROTO_ACT_SIZE_MAX);
@@ -92,9 +90,9 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
         return -EBADMSG;
     }
 
-    if (gu_unlikely(frag->proto_ver > PROTO_VERSION)) {
-        gu_error ("Bad protocol version %d, expected %d",
-                  frag->proto_ver, PROTO_VERSION);
+    if (gu_unlikely(frag->proto_ver > GCS_PROTO_MAX)) {
+        gu_error ("Bad protocol version %d, maximum supported %d",
+                  frag->proto_ver, GCS_PROTO_MAX);
         return -EPROTO; // this fragment should be dropped
     }
 
@@ -115,7 +113,7 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
 long
 gcs_act_proto_hdr_size (long version)
 {
-    if (gu_unlikely(GCS_ACT_PROTO_MAX < version)) return -EPROTONOSUPPORT;
+    if (gu_unlikely(GCS_PROTO_MAX < version)) return -EPROTONOSUPPORT;
 
     if (gu_unlikely(version < 0)) return PROTO_MAX_HDR_SIZE; // safe
 

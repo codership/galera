@@ -331,31 +331,6 @@ static void store_trx(gcache::GCache* const gcache,
     gcache->seqno_assign(ptr, i, GCS_ACT_TORDERED, (i - pa_range) <= 0);
 }
 
-#if 0
-static void store_cc(gcache::GCache* const gcache,
-                      const wsrep_uuid_t& uuid,
-                     int const i)
-{
-    static int conf_id(0);
-
-    gcs_act_cchange cc;
-
-    ::memcpy(&cc.uuid, &uuid, sizeof(uuid));
-
-    cc.seqno = i;
-    cc.conf_id = conf_id++;
-
-    void* tmp;
-    int   const cc_size(cc.write(&tmp));
-    void* const cc_ptr(gcache->malloc(cc_size));
-
-    fail_if(NULL == cc_ptr);
-    memcpy(cc_ptr, tmp, cc_size);
-
-    gcache->seqno_assign(cc_ptr, i, GCS_ACT_CCHANGE, i > 0);
-}
-#endif
-
 static void test_ist_common(int const version)
 {
     using galera::KeyData;

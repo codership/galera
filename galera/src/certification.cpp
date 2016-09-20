@@ -563,13 +563,14 @@ galera::Certification::~Certification()
     gu::Lock lock(mutex_);
 
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+    trx_map_.clear();
     service_thd_.release_seqno(position_);
-    service_thd_.flush();
+    service_thd_.flush(gu::UUID());
 }
 
 
-void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
-                                                    int           version)
+void galera::Certification::assign_initial_position(const gu::GTID& gtid,
+                                                    int const       version)
 {
     switch (version)
     {
@@ -584,6 +585,8 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
         gu_throw_fatal << "certification/trx version "
                        << version << " not supported";
     }
+
+    wsrep_seqno_t const seqno(gtid.seqno());
 
     gu::Lock lock(mutex_);
 
@@ -603,10 +606,13 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     }
 
     trx_map_.clear();
-    service_thd_.release_seqno(position_);
-    service_thd_.flush();
+    assert(cert_index_.empty());
+    assert(cert_index_ng_.empty());
 
-    log_info << "Assign initial position for certification: " << seqno
+    service_thd_.release_seqno(position_);
+    service_thd_.flush(gtid.uuid());
+
+    log_info << "Assign initial position for certification: " << gtid
              << ", protocol version: " << version;
 
     initial_position_      = seqno;

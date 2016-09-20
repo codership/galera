@@ -1,9 +1,11 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2015 Codership Oy <info@codership.com>
 
 // $Id$
 
 #ifndef __gcs_state_msg_test__
 #define __gcs_state_msg_test__
+
+#include <check.h>
 
 Suite *gcs_state_msg_suite(void);
 

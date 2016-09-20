@@ -4,13 +4,12 @@
  * $Id$
  */
 
-#include <check.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 
-#include "gcs_defrag_test.hpp"
 #include "../gcs_defrag.hpp"
+#include "gcs_defrag_test.hpp"
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)

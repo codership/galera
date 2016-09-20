@@ -7,8 +7,19 @@
 #include "gcs_group.hpp"
 #include "gcs_gcache.hpp"
 #include "gcs_priv.hpp"
+#include "gcs_code_msg.hpp"
+
+#include <gu_logger.hpp>
+#include <gu_macros.hpp>
+#include <gu_unordered.hpp>
 
 #include <errno.h>
+
+#include <limits>
+
+void gcs_group_register(gu::Config* cnf)
+{
+}
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 {
@@ -18,8 +29,9 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
     "PRIMARY"
 };
 
+
 int
-gcs_group_init (gcs_group_t* group, gcache_t* const cache,
+gcs_group_init (gcs_group_t* group, gu::Config* const cnf, gcache_t* const cache,
                 const char* node_name, const char* inc_addr,
                 gcs_proto_t const gcs_proto_ver, int const repl_proto_ver,
                 int const appl_proto_ver)
@@ -30,27 +42,19 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
-    group->num          = 1; // this must be removed (#474)
-    group->my_idx       = 0; // this must be -1 (#474)
+    group->num          = 0;
+    group->my_idx       = -1;
     group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
     group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
-    group->nodes        = GU_CALLOC(group->num, gcs_node_t); // this must be removed (#474)
-
-    if (!group->nodes) return -ENOMEM; // this should be removed (#474)
-
-    /// this should be removed (#474)
-    gcs_node_init (&group->nodes[group->my_idx], group->cache, NODE_NO_ID,
-                   group->my_name, group->my_address, gcs_proto_ver,
-                   repl_proto_ver, appl_proto_ver, 0);
-
-    group->prim_uuid  = GU_UUID_NIL;
-    group->prim_seqno = GCS_SEQNO_ILL;
-    group->prim_num   = 0;
-    group->prim_state = GCS_NODE_STATE_NON_PRIM;
+    group->nodes        = NULL;
+    group->prim_uuid    = GU_UUID_NIL;
+    group->prim_seqno   = GCS_SEQNO_ILL;
+    group->prim_num     = 0;
+    group->prim_state   = GCS_NODE_STATE_NON_PRIM;
 
     *(gcs_proto_t*)&group->gcs_proto_ver = gcs_proto_ver;
     *(int*)&group->repl_proto_ver = repl_proto_ver;
@@ -64,25 +68,25 @@ gcs_group_init (gcs_group_t* group, gcache_t* const cache,
 }
 
 int
-gcs_group_init_history (gcs_group_t*     group,
-                        gcs_seqno_t      seqno,
-                        const gu_uuid_t* uuid)
+gcs_group_init_history (gcs_group_t*    group,
+                        const gu::GTID& gtid)
 {
-    bool const negative_seqno(seqno < 0);
-    bool const nil_uuid(!gu_uuid_compare (uuid, &GU_UUID_NIL));
+    bool const negative_seqno(gtid.seqno() < 0);
+    bool const nil_uuid(gtid.uuid() == GU_UUID_NIL);
 
     if (negative_seqno && !nil_uuid) {
-        gu_error ("Non-nil history UUID with negative seqno (%lld) makes "
-                  "no sense.", (long long) seqno);
+        log_error << "Non-nil history UUID with negative seqno makes no sense: "
+                  << gtid;
         return -EINVAL;
     }
     else if (!negative_seqno && nil_uuid) {
-        gu_error ("Non-negative state seqno requires non-nil history UUID.");
+        log_error <<"Non-negative state seqno requires non-nil history UUID: "
+                  << gtid;
         return -EINVAL;
     }
 
-    group->act_id_    = seqno;
-    group->group_uuid = *uuid;
+    group->act_id_    = gtid.seqno();
+    group->group_uuid = gtid.uuid()();
     return 0;
 }
 
@@ -167,22 +171,18 @@ group_nodes_reset (gcs_group_t* group)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
-    long       n;
-    long       last_node    = -1;
     gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    int        last_node    = -1;
+    int        n;
 
     for (n = 0; n < group->num; n++) {
         const gcs_node_t* const node = &group->nodes[n];
         gcs_seqno_t const seqno = node->last_applied;
-        bool count = node->count_last_applied;
 
-        if (gu_unlikely (0 == group->last_applied_proto_ver)) {
-            /* @note: this may be removed after quorum v1 is phased out */
-            count = (GCS_NODE_STATE_SYNCED == node->status ||
-                     GCS_NODE_STATE_DONOR  == node->status);
-        }
+        assert( 0  < group->last_applied_proto_ver ||
+               -1 == group->last_applied_proto_ver /* for unit tests */);
 
-//        gu_debug ("last_applied[%ld]: %lld", n, seqno);
+//        gu_debug ("last_applied[%d]: %lld", n, seqno);
 
         /* NOTE: It is crucial for consistency that last_applied algorithm
          *       is absolutely identical on all nodes. Therefore for the
@@ -190,12 +190,12 @@ group_redo_last_applied (gcs_group_t* group)
          *       non-blocking donor.
          *       GCS_BLOCKING_DONOR should never be defined unless in some
          *       very custom builds. Commenting it out for safety sake. */
-//#ifndef GCS_BLOCKING_DONOR
-        if (count
-//#else
-//        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
-//#endif
-            && (seqno < last_applied)) {
+#ifndef GCS_BLOCKING_DONOR
+        if (node->count_last_applied
+#else
+        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
+#endif
+            && (seqno <= last_applied)) {
             assert (seqno >= 0);
             last_applied = seqno;
             last_node    = n;
@@ -287,6 +287,7 @@ group_post_state_exchange (gcs_group_t* group)
               GU_UUID_ARGS(&group->state_uuid));
 
     gcs_state_msg_get_quorum (states, group->num, quorum);
+    assert(quorum->version >= 2);
 
     if (quorum->version >= 0) {
         if (quorum->version < 2) {
@@ -319,6 +320,7 @@ group_post_state_exchange (gcs_group_t* group)
                          "Data loss is possible. Aborting.",
                          (long long)group->act_id_, (long long)quorum->act_id,
                          (long long)(group->act_id_ - quorum->act_id));
+                assert(0);
                 gu_abort();
             }
             group->state      = GCS_GROUP_PRIMARY;
@@ -342,6 +344,8 @@ group_post_state_exchange (gcs_group_t* group)
         }
 
         assert (group->prim_num > 0);
+
+        group_redo_last_applied(group);
     }
     else {
         // non-primary configuration
@@ -431,30 +435,35 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (!prim_comp);
     }
 
+    bool my_bootstrap(bootstrap);
+
     if (prim_comp) {
         /* Got PRIMARY COMPONENT - Hooray! */
         assert (new_my_idx >= 0);
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
+            assert(group->my_idx >= 0);
+            my_bootstrap = group->nodes[group->my_idx].bootstrap;
         }
-        else if (bootstrap)
+        else if (bootstrap && gu_uuid_compare(&group->group_uuid,
+                                              &GU_UUID_NIL))
         {
             /* Is there need to initialize something else in this case? */
-            group->nodes[group->my_idx].bootstrap = true;
+            my_bootstrap = true;
         }
         else {
             const bool first_component =
 #ifndef GCS_CORE_TESTING
-            (1 == group->num) && !strcmp (NODE_NO_ID, group->nodes[0].id);
+                (0 == group->num) || bootstrap;
 #else
-            (1 == group->num);
+                (0 == group->num);
 #endif
-
             if (1 == new_nodes_num && first_component) {
                 /* bootstrap new configuration */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
-                assert (1 == group->num);
-                assert (0 == group->my_idx);
+                assert ((0 == group->num && -1 == group->my_idx) ||
+                        /* if first comp was non prim due to group expulsion */
+                        (1 == group->num &&  0 == group->my_idx));
 
                 // This bootstraps initial primary component for state exchange
                 gu_uuid_generate (&group->prim_uuid, NULL, 0);
@@ -469,14 +478,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                     gu_info ("Starting new group from scratch: " GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
                 }
-// the following should be removed under #474
-                group->nodes[0].status = GCS_NODE_STATE_JOINED;
-                /* initialize node ID to the one given by the backend - this way
-                 * we'll be recognized as coming from prev. conf. in node array
-                 * remap below */
-                strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
-                         sizeof (new_nodes[0].id) - 1);
-                group->nodes[0].segment = new_nodes[0].segment;
+
+                new_nodes[0].status = GCS_NODE_STATE_JOINED;
             }
         }
     }
@@ -507,6 +510,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->my_idx = new_my_idx;
     group->num    = new_nodes_num;
     group->nodes  = new_nodes;
+
+    assert(group->num > 0 || group->my_idx < 0);
+    assert(group->my_idx >= 0 || group->num == 0);
+
+    if (group->my_idx >= 0) group->nodes[group->my_idx].bootstrap = my_bootstrap;
 
     if (gcs_comp_msg_primary(comp) || bootstrap) {
         /* TODO: for now pretend that we always have new nodes and perform
@@ -608,25 +616,73 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return group->state;
 }
 
+/* this is a helper function that takes care of preper interpretation of the
+ * code message depending on the protocol version used.
+ * @return 0 - success, -EMSGSIZE - wrong message size, -EINVAL - wrong group */
+int
+group_unserialize_code_msg(gcs_group_t* group, const gcs_recv_msg_t* msg,
+                           gu::GTID& gtid, int64_t& code)
+{
+    if (gu_likely(group->gcs_proto_ver >= 1 &&
+                  msg->size == gcs::core::CodeMsg::serial_size()))
+    {
+        const gcs::core::CodeMsg* const cm
+            (static_cast<const gcs::core::CodeMsg*>(msg->buf));
+
+        cm->unserialize(gtid, code);
+
+        if (gu_unlikely(gtid.uuid() != group->group_uuid))
+        {
+            log_info << gcs_msg_type_string[msg->type] << " message " << *cm
+                     << " from another galaxy. Bye-bye.";
+            return -EINVAL;
+        }
+    }
+    else // gcs_seqno_t
+    {
+        if (gu_likely(msg->size == sizeof(gcs_seqno_t)))
+        {
+            gtid.set(gu::gtoh(*(static_cast<const gcs_seqno_t*>(msg->buf))));
+            code = 0;
+        }
+        else
+        {
+            log_warn << "Bogus size for " << gcs_msg_type_string[msg->type]
+                     << " message: " << msg->size << " bytes. Dropping message.";
+            return -EMSGSIZE;
+        }
+    }
+
+    return 0;
+}
+
 /*! Returns new last applied value if it has changes, 0 otherwise */
 gcs_seqno_t
 gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
-    gcs_seqno_t seqno;
+    assert (GCS_MSG_LAST == msg->type);
 
-    assert (GCS_MSG_LAST        == msg->type);
-    assert (sizeof(gcs_seqno_t) == msg->size);
+    gu::GTID gtid;
+    int64_t  code;
 
-    seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(msg->buf));
+    if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
+    if (gu_unlikely(0 != code))
+    {
+        log_warn << "Bogus " << gcs_msg_type_string[msg->type]
+                 << " message code: " << code <<". Ignored.";
+        assert(0);
+        return 0;
+    }
 
     // This assert is too restrictive. It requires application to send
     // last applied messages while holding TO, otherwise there's a race
     // between threads.
     // assert (seqno >= group->last_applied);
 
-    gcs_node_set_last_applied (&group->nodes[msg->sender_idx], seqno);
+    gcs_node_set_last_applied (&group->nodes[msg->sender_idx], gtid.seqno());
 
-    if (msg->sender_idx == group->last_node && seqno > group->last_applied) {
+    if (msg->sender_idx == group->last_node   &&
+        gtid.seqno()    >  group->last_applied) {
         /* node that was responsible for the last value, has changed it.
          * need to recompute it */
         gcs_seqno_t old_val = group->last_applied;
@@ -636,13 +692,14 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         if (old_val < group->last_applied) {
             gu_debug ("New COMMIT CUT %lld after %lld from %d",
                       (long long)group->last_applied,
-                      (long long)seqno, msg->sender_idx);
+                      (long long)gtid.seqno(), msg->sender_idx);
             return group->last_applied;
         }
     }
 
     return 0;
 }
+
 
 /*! return true if this node is the sender to notify the calling thread of
  * success */
@@ -654,13 +711,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     assert (GCS_MSG_JOIN == msg->type);
 
-    // TODO: define an explicit type for the join message, like gcs_join_msg_t
-    assert (msg->size == sizeof(gcs_seqno_t));
+    gu::GTID gtid;
+    int64_t  code;
+
+    if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
 
     if (GCS_NODE_STATE_DONOR  == sender->status ||
         GCS_NODE_STATE_JOINER == sender->status) {
         int j;
-        gcs_seqno_t seqno     = gcs_seqno_gtoh(*(gcs_seqno_t*)msg->buf);
         gcs_node_t* peer      = NULL;
         const char* peer_id   = NULL;
         const char* peer_name = "left the group";
@@ -697,7 +755,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 group->prim_num++;
             }
             else {
-                if (seqno >= 0) {
+                if (code >= 0) {
                     sender->status = GCS_NODE_STATE_JOINED;
                     group->prim_num++;
                 }
@@ -723,11 +781,11 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_warn ("Could not find peer: %s", peer_id);
         }
 
-        if (seqno < 0) {
+        if (code < 0) {
             gu_warn ("%d.%d (%s): State transfer %s %d.%d (%s) failed: %d (%s)",
                      sender_idx, sender->segment, sender->name, st_dir,
                      peer_idx, peer ? peer->segment : -1, peer_name,
-                     (int)seqno, strerror((int)-seqno));
+                     (int)code, strerror((int)-code));
 
             if (from_donor && peer_idx == group->my_idx &&
                 GCS_NODE_STATE_JOINER == group->nodes[peer_idx].status) {
@@ -738,10 +796,11 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 return -ENOTRECOVERABLE;
             }
 
+            assert(group->quorum.version >= 2);
             if (group->quorum.version < 2 && !from_donor && // #591
                 sender_idx == group->my_idx) {
                 // remove after quorum v1 is phased out
-                gu_fatal ("Faield to receive state. Need to abort.");
+                gu_fatal ("Failed to receive state. Need to abort.");
                 return -ENOTRECOVERABLE;
             }
         }
@@ -781,6 +840,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return (sender_idx == group->my_idx);
 }
 
+/* @return true if this node is sender, false otherwise */
 int
 gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
@@ -788,6 +848,11 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     gcs_node_t* sender     = &group->nodes[sender_idx];
 
     assert (GCS_MSG_SYNC == msg->type);
+
+    gu::GTID gtid;
+    int64_t  code;
+
+    if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
 
     if (GCS_NODE_STATE_JOINED == sender->status ||
         /* #454 - at this layer we jump directly from DONOR to SYNCED */
@@ -797,7 +862,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         sender->status = GCS_NODE_STATE_SYNCED;
         sender->count_last_applied = true;
 
-        group_redo_last_applied (group);//from now on this node must be counted
+        group_redo_last_applied (group); //from now on this node must be counted
 
         gu_info ("Member %d.%d (%s) synced with group.",
                  sender_idx, sender->segment, sender->name);
@@ -829,9 +894,9 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
 }
 
 static int
-group_find_node_by_state (const gcs_group_t*     const group,
-                          int              const joiner_idx,
-                          gcs_node_state_t const status)
+group_find_node_by_state (const gcs_group_t* const group,
+                          int                const joiner_idx,
+                          gcs_node_state_t   const status)
 {
     gcs_segment_t const segment = group->nodes[joiner_idx].segment;
     int  idx;
@@ -845,12 +910,14 @@ group_find_node_by_state (const gcs_group_t*     const group,
         gcs_node_t* node = &group->nodes[idx];
 
         if (node->status >= status && group_node_is_stateful (group, node))
+        {
             donor = idx; /* potential donor */
+        }
 
         if (segment == node->segment) {
             if (donor == idx) return donor; /* found suitable donor in the
                                              * same segment */
-            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;;
+            if (node->status >= GCS_NODE_STATE_JOINER) hnss = true;
         }
     }
 
@@ -1164,33 +1231,38 @@ gcs_group_find_donor(const gcs_group_t* group,
                      int const str_version,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,
-                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno)
+                     const gu::GTID& ist_gtid)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
 
     /* try to find ist donor first.
        if it fails, fallbacks to find sst donor*/
     int donor_idx = -1;
+
     if (str_version >= 2 &&
-        gu_uuid_compare(&group->group_uuid, ist_uuid) == 0)
+        ist_gtid.uuid() == group->group_uuid &&
+        ist_gtid.seqno() != GCS_SEQNO_ILL)
     {
-        assert (ist_seqno != GCS_SEQNO_ILL);
+        // FIXME: check if disabling the assertion and allowing ist_seqno to
+        // equal to GCS_SEQNO_ILL requires protocol upgrade
+        // assert(ist_seqno != GCS_SEQNO_ILL);
+
         donor_idx = group_find_ist_donor(group,
                                          str_version,
                                          joiner_idx,
                                          donor_string, donor_len,
-                                         ist_seqno,
+                                         ist_gtid.seqno(),
                                          min_donor_state);
     }
+
     if (donor_idx < 0)
     {
-        /* if donor_string is empty,
-           it will fallback to find_node_by_state() */
-        donor_idx = group_for_each_donor_in_string
-                (group, str_version, joiner_idx,
-                 donor_string, donor_len,
-                 min_donor_state);
+        /* if donor_string is empty, it will fallback to find_node_by_state() */
+        donor_idx = group_for_each_donor_in_string (group, str_version,
+                                                    joiner_idx, donor_string,
+                                                    donor_len, min_donor_state);
     }
+
     return donor_idx;
 }
 
@@ -1209,7 +1281,7 @@ group_select_donor (gcs_group_t* group,
                     int const str_version,
                     int const joiner_idx,
                     const char* const donor_string,
-                    const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno,
+                    const gu::GTID& ist_gtid,
                     bool const desync)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
@@ -1232,11 +1304,8 @@ group_select_donor (gcs_group_t* group,
             donor_idx = -EAGAIN;
     }
     else {
-        donor_idx = gcs_group_find_donor(group,
-                                         str_version,
-                                         joiner_idx,
-                                         donor_string, donor_len,
-                                         ist_uuid, ist_seqno);
+        donor_idx = gcs_group_find_donor(group, str_version, joiner_idx,
+                                         donor_string, donor_len, ist_gtid);
     }
 
     if (donor_idx >= 0) {
@@ -1313,35 +1382,42 @@ gcs_group_handle_state_request (gcs_group_t*         group,
                                 struct gcs_act_rcvd* act)
 {
     // pass only to sender and to one potential donor
-    const char*      donor_name     = (const char*)act->act.buf;
-    size_t           donor_name_len = strlen(donor_name);
+    const char* const donor_name    = (const char*)act->act.buf;
+    size_t const     donor_name_len = strlen(donor_name) + 1;
     int              donor_idx      = -1;
     int const        joiner_idx     = act->sender_idx;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
     gcs_node_state_t joiner_status  = group->nodes[joiner_idx].status;
     bool const       desync         = group_desync_request (donor_name);
 
-    gu_uuid_t ist_uuid = {{0, }};
-    gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
+    gu::GTID ist_gtid;
     int str_version = 1; // actually it's 0 or 1.
 
-    if (act->act.buf_len != (ssize_t)(donor_name_len + 1) &&
-        donor_name[donor_name_len + 1] == 'V') {
-        str_version = (int)donor_name[donor_name_len + 2];
+    if (act->act.buf_len > (ssize_t)donor_name_len &&
+        donor_name[donor_name_len + 0] == 'V') {
+        str_version = (int)donor_name[donor_name_len + 1];
     }
 
     if (str_version >= 2) {
-        const char* ist_buf = donor_name + donor_name_len + 3;
-        memcpy(&ist_uuid, ist_buf, sizeof(ist_uuid));
-        ist_seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(ist_buf + sizeof(ist_uuid)));
+        size_t offset(donor_name_len + 2);
+
+        try
+        {
+            offset = ist_gtid.unserialize(act->act.buf, act->act.buf_len,offset);
+        }
+        catch (gu::Exception& e) {
+            log_warn << "Malformed state transfer request: " << e.what()
+                     << " Ignoring";
+            gcs_group_ignore_action(group, act);
+            return 0;
+        }
 
         // change act.buf's content to original version.
         // and it's safe to change act.buf_len
-        size_t head = donor_name_len + 3 + sizeof(ist_uuid) + sizeof(ist_seqno);
-        memmove((char*)act->act.buf + donor_name_len + 1,
-                (char*)act->act.buf + head,
-                act->act.buf_len - head);
-        act->act.buf_len -= sizeof(ist_uuid) + sizeof(ist_seqno) + 2;
+        ::memmove((char*)act->act.buf + donor_name_len,
+                  (char*)act->act.buf + offset,
+                  act->act.buf_len - offset);
+        act->act.buf_len -= offset - donor_name_len;
     }
 
     assert (GCS_ACT_STATE_REQ == act->act.type);
@@ -1366,10 +1442,8 @@ gcs_group_handle_state_request (gcs_group_t*         group,
         }
     }
 
-    donor_idx = group_select_donor(group,
-                                   str_version,
-                                   joiner_idx, donor_name,
-                                   &ist_uuid, ist_seqno, desync);
+    donor_idx = group_select_donor(group, str_version, joiner_idx, donor_name,
+                                   ist_gtid, desync);
 
     assert (donor_idx != joiner_idx || desync  || donor_idx < 0);
     assert (donor_idx == joiner_idx || !desync || donor_idx < 0);
@@ -1380,9 +1454,9 @@ gcs_group_handle_state_request (gcs_group_t*         group,
         return 0;
     }
     else if (group->my_idx == donor_idx) {
-        act->act.buf_len -= donor_name_len + 1;
+        act->act.buf_len -= donor_name_len;
         memmove (*(void**)&act->act.buf,
-                 ((char*)act->act.buf) + donor_name_len + 1,
+                 ((char*)act->act.buf) + donor_name_len,
                  act->act.buf_len);
         // now action starts with request, like it was supplied by application,
         // see gcs_request_state_transfer()
@@ -1511,6 +1585,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         group->prim_seqno,
         group->act_id_,
         cached,
+        node->last_applied,
         group->prim_num,
         group->prim_state,
         node->status,
@@ -1531,6 +1606,13 @@ gcs_group_get_state (const gcs_group_t* group)
     return group_get_node_state (group, group->my_idx);
 }
 
+int
+gcs_group_param_set(gcs_group_t& group,
+                    const std::string& key, const std::string& val)
+{
+    return 1;
+}
+
 void
 gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
 {
@@ -1549,5 +1631,8 @@ gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
 
     status.insert("desync_count", gu::to_string(desync_count));
 }
+
+
+
 
 

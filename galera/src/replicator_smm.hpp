@@ -67,6 +67,11 @@ namespace galera
             return wsdb_.get_trx(trx_params_, uuid_, trx_id, create);
         }
 
+        TrxHandlePtr new_local_trx(wsrep_trx_id_t trx_id)
+        {
+            return wsdb_.new_trx(trx_params_, uuid_, trx_id);
+        }
+
         void discard_local_trx(TrxHandle* trx)
         {
             trx->release_write_set_out();
@@ -105,7 +110,7 @@ namespace galera
         wsrep_status_t last_committed_id(wsrep_gtid_t* gtid);
 
         wsrep_status_t to_isolation_begin(TrxHandlePtr& trx, wsrep_trx_meta_t*);
-        wsrep_status_t to_isolation_end(TrxHandlePtr& trx, int err);
+        wsrep_status_t to_isolation_end(TrxHandlePtr& trx, const wsrep_buf_t* err);
         wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
                                           const struct wsrep_buf* data,
                                           size_t                  count,
@@ -117,8 +122,7 @@ namespace galera
                                          bool                    commit);
         wsrep_status_t sst_sent(const wsrep_gtid_t& state_id, int rcode);
         wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
-                                    const void*         state,
-                                    size_t              state_len,
+                                    const wsrep_buf_t*  state,
                                     int                 rcode);
 
         void process_trx(void* recv_ctx, const TrxHandlePtr& trx);

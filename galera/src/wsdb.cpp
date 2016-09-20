@@ -61,12 +61,9 @@ galera::Wsdb::create_trx(const TrxHandle::Params& params,
                          const wsrep_uuid_t&  source_id,
                          wsrep_trx_id_t const trx_id)
 {
-    TrxHandle* trx(TrxHandle::New(trx_pool_, params, source_id, -1, trx_id));
+    TrxHandlePtr trx(new_trx(params, source_id, trx_id));
 
-    std::pair<TrxMap::iterator, bool> i
-        (trx_map_.insert(std::make_pair
-                         (trx_id, TrxHandlePtr(trx, TrxHandleDeleter()))));
-
+    std::pair<TrxMap::iterator, bool> i(trx_map_.insert(std::make_pair(trx_id, trx)));
     if (gu_unlikely(i.second == false)) gu_throw_fatal;
 
     return i.first->second;

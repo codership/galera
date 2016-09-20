@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2012 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2015 Codership Oy <info@codership.com>
 //
 
 #include "galera_gcs.hpp"
@@ -19,7 +19,7 @@ namespace galera
         cond_          (),
         global_seqno_  (0),
         local_seqno_   (0),
-        uuid_          (),
+        uuid_          (NULL, 0),
         last_applied_  (GCS_SEQNO_ILL),
         state_         (S_OPEN),
         schedule_      (0),
@@ -30,9 +30,7 @@ namespace galera
         repl_proto_ver_(repl_proto_ver),
         appl_proto_ver_(appl_proto_ver),
         report_last_applied_(false)
-    {
-        gu_uuid_generate (&uuid_, 0, 0);
-    }
+    {}
 
     DummyGcs::DummyGcs()
         :
@@ -42,7 +40,7 @@ namespace galera
         cond_          (),
         global_seqno_  (0),
         local_seqno_   (0),
-        uuid_          (),
+        uuid_          (NULL, 0),
         last_applied_  (GCS_SEQNO_ILL),
         state_         (S_OPEN),
         schedule_      (0),
@@ -53,9 +51,7 @@ namespace galera
         repl_proto_ver_(1),
         appl_proto_ver_(1),
         report_last_applied_(false)
-    {
-        gu_uuid_generate (&uuid_, 0, 0);
-    }
+    {}
 
     DummyGcs::~DummyGcs()
     {
@@ -99,7 +95,7 @@ namespace galera
 
             char* const str(cc->data);
             ssize_t offt(0);
-            offt += gu_uuid_print (&uuid_, str, GU_UUID_STR_LEN+1) + 1;
+            offt += gu_uuid_print (uuid_.ptr(), str, GU_UUID_STR_LEN+1) + 1;
             offt += sprintf (str + offt, "%s", my_name_.c_str()) + 1;
             sprintf (str + offt, "%s", incoming_.c_str());
         }
@@ -126,7 +122,6 @@ namespace galera
 
         if (ret > 0)
         {
-            //          state_ = S_CONNECTED;
             cond_.signal();
             ret = 0;
         }
@@ -135,17 +130,16 @@ namespace galera
     }
 
     ssize_t
-    DummyGcs::set_initial_position(const wsrep_uuid_t& uuid,
-                                   gcs_seqno_t seqno)
+    DummyGcs::set_initial_position(const gu::GTID& gtid)
     {
         gu::Lock lock(mtx_);
 
-        if (memcmp(&uuid, &GU_UUID_NIL, sizeof(wsrep_uuid_t)) &&
-            seqno >= 0)
+        if (gtid.uuid() != GU_UUID_NIL && gtid.seqno() >= 0)
         {
-            uuid_ = *(reinterpret_cast<const gu_uuid_t*>(&uuid));
-            global_seqno_ = seqno;
+            uuid_ = gtid.uuid();
+            global_seqno_ = gtid.seqno();
         }
+
         return 0;
     }
 
@@ -166,9 +160,8 @@ namespace galera
     ssize_t
     DummyGcs::generate_seqno_action (gcs_action& act, gcs_act_type_t type)
     {
-        gcs_seqno_t* const seqno(
-            reinterpret_cast<gcs_seqno_t*>(
-                ::malloc(sizeof(gcs_seqno_t))));
+        gcs_seqno_t* const seqno
+            (static_cast<gcs_seqno_t*>(::malloc(sizeof(gcs_seqno_t))));
 
         if (!seqno) return -ENOMEM;
 
@@ -176,7 +169,7 @@ namespace galera
         ++local_seqno_;
 
         act.buf     = seqno;
-        act.size    = sizeof(gcs_seqno_t);
+        act.size    = sizeof(*seqno);
         act.seqno_l = local_seqno_;
         act.type    = type;
 

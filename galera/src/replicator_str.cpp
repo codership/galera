@@ -51,9 +51,8 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
 
 wsrep_status_t
 ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
-                            const void*         state,
-                            size_t              state_len,
-                            int                 rcode)
+                            const wsrep_buf_t* const state,
+                            int                const rcode)
 {
     log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
 
@@ -313,20 +312,13 @@ ReplicatorSMM::donate_sst(void* const         recv_ctx,
                           const wsrep_gtid_t& state_id,
                           bool const          bypass)
 {
-    wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx,
-                                             streq.sst_req(), streq.sst_len(),
-                                             &state_id, 0, 0, bypass));
+    wsrep_buf_t const str = { streq.sst_req(), size_t(streq.sst_len()) };
 
-    /* The fix to codership/galera#284 may break backward comatibility due to
-     * different (now correct) interpretation of retrun value. Default to old
-     * interpretation which is forward compatible with the new one. */
-#if NO_BACKWARD_COMPATIBILITY
+    wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx, &str,
+                                             &state_id, NULL, bypass));
+
     wsrep_seqno_t const ret
         (WSREP_CB_SUCCESS == err ? state_id.seqno : -ECANCELED);
-#else
-    wsrep_seqno_t const ret
-        (int(err) >= 0 ? state_id.seqno : int(err));
-#endif /* NO_BACKWARD_COMPATIBILITY */
 
     if (ret < 0)
     {
@@ -470,7 +462,7 @@ out:
 
     if (join_now || rcode < 0)
     {
-        gcs_.join(rcode < 0 ? rcode : donor_seq);
+        gcs_.join(gu::GTID(state_uuid_, donor_seq), rcode);
     }
 }
 
@@ -602,7 +594,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
         ret = gcs_.request_state_transfer(str_proto_ver_,
                                           req->req(), req->len(), sst_donor_,
-                                          ist_uuid, ist_seqno, &seqno_l);
+                                          gu::GTID(ist_uuid, ist_seqno),seqno_l);
         if (ret < 0)
         {
             if (!retry_str(ret))

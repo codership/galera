@@ -294,6 +294,7 @@ test_log_in_to (gu_to_t* to, gcs_seqno_t seqno, const char* msg)
 }
 
 static gcs_seqno_t group_seqno = 0;
+static gu::UUID    group_uuid;
 
 static inline long
 test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
@@ -303,14 +304,14 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 #define SEND_LAST_MASK ((1 << 14) - 1) // every 16K seqno
 
     if (!(my_seqno & SEND_LAST_MASK)) {
-            ret = gcs_set_last_applied (gcs, my_seqno);
-            if (ret) {
-                fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
-                         (long long)my_seqno, ret);
-            }
+        ret = gcs_set_last_applied (gcs, gu::GTID(group_uuid, my_seqno));
+        if (ret) {
+            fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
+                     (long long)my_seqno, ret);
+        }
 //            if (!throughput) {
-                fprintf (stdout, "Last applied: my = %lld, group = %lld\n",
-                         (long long)my_seqno, (long long)group_seqno);
+        fprintf (stdout, "Last applied: my = %lld, group = %lld\n",
+                 (long long)my_seqno, (long long)group_seqno);
 //            }
     }
     return ret;
@@ -454,12 +455,14 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                      (long long)conf_id, (long long)conf->conf_id);
             fflush (stdout);
 
+            int err(gcs_request_state_transfer(gcs, 0, &conf->seqno,
+                                               sizeof(conf->seqno),"",
+                                               gu::GTID(ist_uuid, ist_seqno),
+                                               seqno));
+
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
                      (long long)conf->seqno, // this is global seqno
-                     strerror (-gcs_request_state_transfer (gcs, 0, &conf->seqno,
-                                                            sizeof(conf->seqno),
-                                                            "", &ist_uuid, ist_seqno,
-                                                            &seqno)));
+                     strerror (-err));
 
             // pretend that state transfer is complete, cancel every action up
             // to seqno
@@ -467,7 +470,8 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                 gu_to_self_cancel (to, s); // this is local seqno
             }
 
-            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fprintf (stdout, "Sending JOIN: %s\n",
+                     strerror(-gcs_join(gcs, gu::GTID(group_uuid, seqno), 0)));
             fflush (stdout);
         }
 
@@ -524,7 +528,9 @@ void *gcs_test_recv (void *arg)
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
             gu_to_grab (to, thread->act.seqno_l);
-            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fprintf (stdout, "Sending JOIN: %s\n",
+                     strerror(-gcs_join(gcs, gu::GTID(group_uuid, group_seqno),
+                                        0)));
             fflush (stdout);
             gu_to_release (to, thread->act.seqno_l);
             break;

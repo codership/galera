@@ -1,15 +1,12 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
-#include <check.h>
-#include <errno.h>
-#include <string.h>
-#include <stdio.h>
-#include "gcs_node_test.hpp"
 #include "../gcs_node.hpp"
+
+#include "gcs_node_test.hpp" // must be included last
 
 #define NODE_ID "owpiefd[woie"
 #define NODE_NAME "strange name"

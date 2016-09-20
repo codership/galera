@@ -235,8 +235,12 @@ galera::TrxHandle::apply (void*                   recv_ctx,
 
     for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
     {
-        gu::Buf buf = ws.next();
-        err = apply_cb (recv_ctx, buf.ptr, buf.size, wsrep_flags, &meta);
+        void*   err_msg;
+        size_t  err_len;
+        gu::Buf buf(ws.next());
+        wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
+
+        err = apply_cb(recv_ctx, wsrep_flags, &wb, &meta, &err_msg, &err_len);
     }
 
     if (gu_unlikely(err > 0))
@@ -266,8 +270,9 @@ galera::TrxHandle::unordered(void*                recv_ctx,
         const DataSetIn& unrd(write_set_in_.unrdset());
         for (int i(0); i < unrd.count(); ++i)
         {
-            const gu::Buf data = unrd.next();
-            cb(recv_ctx, data.ptr, data.size);
+            const gu::Buf& data(unrd.next());
+            wsrep_buf_t const wb = { data.ptr, size_t(data.size) };
+            cb(recv_ctx, &wb);
         }
     }
 }

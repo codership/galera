@@ -75,6 +75,15 @@ namespace galera
                              wsrep_trx_id_t           trx_id,
                              bool                     create = false);
 
+        TrxHandlePtr new_trx(const TrxHandle::Params& params,
+                             const wsrep_uuid_t&      source_id,
+                             wsrep_trx_id_t           trx_id)
+        {
+            return TrxHandlePtr(TrxHandle::New(trx_pool_, params,
+                                               source_id, -1, trx_id),
+                                TrxHandleDeleter());
+        }
+
         void discard_trx(wsrep_trx_id_t trx_id);
 
         TrxHandlePtr get_conn_query(const TrxHandle::Params&,

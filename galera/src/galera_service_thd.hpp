@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
  */
 
 #ifndef GALERA_SERVICE_THD_HPP
@@ -20,8 +20,9 @@ namespace galera
 
         ~ServiceThd ();
 
-        /*! flush all ongoing operations (before processing CC) */
-        void flush ();
+        /*! flush all ongoing operations (before processing CC)
+         *  and install new group UUID */
+        void flush (const gu::UUID& uuid);
 
         /*! reset to initial state before gcs (re)connect */
         void reset();
@@ -33,7 +34,8 @@ namespace galera
          * !!! */
 
         /*! schedule seqno to be reported as last committed */
-        void report_last_committed (gcs_seqno_t seqno);
+        /* report = false is to disable sending duplicate in some cases */
+        void report_last_committed (gcs_seqno_t seqno, bool const report = true);
 
         /*! release write sets up to and including seqno */
         void release_seqno (gcs_seqno_t seqno);
@@ -44,12 +46,12 @@ namespace galera
 
         struct Data
         {
-            gcs_seqno_t last_committed_;
+            gu::GTID    last_committed_;
             gcs_seqno_t release_seqno_;
             uint32_t    act_;
 
             Data() :
-                last_committed_(0),
+                last_committed_(),
                 release_seqno_ (0),
                 act_           (A_NONE)
             {}

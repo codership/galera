@@ -30,8 +30,7 @@ namespace galera
         virtual ssize_t connect(const std::string& cluster_name,
                                 const std::string& cluster_url,
                                 bool               bootstrap) = 0;
-        virtual ssize_t set_initial_position(const wsrep_uuid_t& uuid,
-                                             gcs_seqno_t seqno) = 0;
+        virtual ssize_t set_initial_position(const gu::GTID& gtid) = 0;
         virtual void    close() = 0;
         virtual ssize_t recv(gcs_action& act) = 0;
 
@@ -43,20 +42,19 @@ namespace galera
         virtual ssize_t replv(const WriteSetVector&,
                               gcs_action& act, bool) = 0;
         virtual ssize_t repl (gcs_action& act, bool) = 0;
-        virtual gcs_seqno_t caused() = 0;
+        virtual long    caused(gu::GTID& gtid) = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
         virtual ssize_t resume_recv() = 0;
-        virtual ssize_t set_last_applied(gcs_seqno_t) = 0;
         virtual ssize_t request_state_transfer(int version,
                                                const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
-                                               const gu_uuid_t& ist_uuid,
-                                               gcs_seqno_t ist_seqno,
-                                               gcs_seqno_t* seqno_l) = 0;
-        virtual ssize_t desync(gcs_seqno_t* seqno_l) = 0;
-        virtual void    join(gcs_seqno_t seqno) = 0;
+                                               const gu::GTID& ist_gtid,
+                                               gcs_seqno_t& order) = 0;
+        virtual ssize_t desync(gcs_seqno_t& seqno_l) = 0;
+        virtual void    join(const gu::GTID&, int code) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
+        virtual ssize_t set_last_applied(const gu::GTID&) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
         virtual void    flush_stats() = 0;
         virtual void    get_status(gu::Status&) const = 0;
@@ -102,10 +100,9 @@ namespace galera
                             bootstrap);
         }
 
-        ssize_t set_initial_position(const wsrep_uuid_t& uuid,
-                                     gcs_seqno_t seqno)
+        ssize_t set_initial_position(const gu::GTID& gtid)
         {
-            return gcs_init(conn_, seqno, uuid.data);
+            return gcs_init(conn_, gtid);
         }
 
         void close()
@@ -141,7 +138,7 @@ namespace galera
             return gcs_repl(conn_, &act, scheduled);
         }
 
-        gcs_seqno_t caused() { return gcs_caused(conn_);   }
+        long caused(gu::GTID& gtid) { return gcs_caused(conn_, gtid); }
 
         ssize_t schedule()   { return gcs_schedule(conn_); }
 
@@ -155,38 +152,40 @@ namespace galera
             return gcs_resume_recv(conn_);
         }
 
-        ssize_t set_last_applied(gcs_seqno_t last_applied)
+        ssize_t set_last_applied(const gu::GTID& gtid)
         {
-            return gcs_set_last_applied(conn_, last_applied);
+            assert(gtid.uuid()  != GU_UUID_NIL);
+            assert(gtid.seqno() >= 0);
+
+            return gcs_set_last_applied(conn_, gtid);
         }
 
         ssize_t request_state_transfer(int version,
                                        const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
-                                       const gu_uuid_t& ist_uuid,
-                                       gcs_seqno_t ist_seqno,
-                                       gcs_seqno_t* seqno_l)
+                                       const gu::GTID& ist_gtid,
+                                       gcs_seqno_t& seqno_l)
         {
             return gcs_request_state_transfer(conn_,
                                               version,
                                               req, req_len,
                                               sst_donor.c_str(),
-                                              &ist_uuid, ist_seqno,
+                                              ist_gtid,
                                               seqno_l);
         }
 
-        ssize_t desync (gcs_seqno_t* seqno_l)
+        ssize_t desync (gcs_seqno_t& seqno_l)
         {
             return gcs_desync(conn_, seqno_l);
         }
 
-        void join (gcs_seqno_t seqno)
+        void join (const gu::GTID& gtid, int const code)
         {
-            long const err(gcs_join(conn_, seqno));
+            long const err(gcs_join(conn_, gtid, code));
 
             if (err < 0)
             {
-                gu_throw_error (-err) << "gcs_join(" << seqno << ") failed";
+                gu_throw_error (-err) << "gcs_join(" << gtid << ") failed";
             }
         }
 
@@ -260,8 +259,7 @@ namespace galera
                         const std::string& cluster_url,
                         bool               bootstrap);
 
-        ssize_t set_initial_position(const wsrep_uuid_t& uuid,
-                                     gcs_seqno_t seqno);
+        ssize_t set_initial_position(const gu::GTID& gtid);
 
         void close();
 
@@ -303,15 +301,20 @@ namespace galera
             if (gu_likely(0 != gcache_ && ret > 0))
             {
                 assert (ret == act.size);
-                void* ptr(gcache_->malloc(act.size));
+                void* const ptr(gcache_->malloc(act.size));
                 memcpy (ptr, act.buf, act.size);
                 act.buf = ptr;
+                // no freeing here - initial act.buf belongs to the caller
             }
 
             return ret;
         }
 
-        gcs_seqno_t caused() { return global_seqno_; }
+        long caused(gu::GTID& gtid)
+        {
+            gtid.set(uuid_, global_seqno_);
+            return 0;
+        }
 
         ssize_t schedule()
         {
@@ -322,11 +325,11 @@ namespace galera
 
         ssize_t resume_recv() { return 0; }
 
-        ssize_t set_last_applied(gcs_seqno_t last_applied)
+        ssize_t set_last_applied(const gu::GTID& gtid)
         {
             gu::Lock lock(mtx_);
 
-            last_applied_ = last_applied;
+            last_applied_ = gtid.seqno();
             report_last_applied_ = true;
 
             cond_.signal();
@@ -339,21 +342,20 @@ namespace galera
         ssize_t request_state_transfer(int version,
                                        const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
-                                       const gu_uuid_t& ist_uuid,
-                                       gcs_seqno_t ist_seqno,
-                                       gcs_seqno_t* seqno_l)
+                                       const gu::GTID& ist_gtid,
+                                       gcs_seqno_t& seqno_l)
         {
-            *seqno_l = GCS_SEQNO_ILL;
+            seqno_l = GCS_SEQNO_ILL;
             return -ENOSYS;
         }
 
-        ssize_t desync (gcs_seqno_t* seqno_l)
+        ssize_t desync (gcs_seqno_t& seqno_l)
         {
-            *seqno_l = GCS_SEQNO_ILL;
+            seqno_l = GCS_SEQNO_ILL;
             return -ENOTCONN;
         }
 
-        void join(gcs_seqno_t seqno)
+        void join(const gu::GTID& gtid, int const code)
         {
             gu_throw_error(ENOTCONN);
         }
@@ -374,12 +376,12 @@ namespace galera
         void get_status(gu::Status& status) const
         {}
 
-        void  param_set (const std::string& key, const std::string& value)
+        void param_set (const std::string& key, const std::string& value)
         {}
 
         char* param_get (const std::string& key) const { return 0; }
 
-        size_t  max_action_size() const { return 0x7FFFFFFF; }
+        size_t max_action_size() const { return 0x7FFFFFFF; }
 
     private:
 
@@ -400,7 +402,7 @@ namespace galera
         gu::Cond     cond_;
         gcs_seqno_t  global_seqno_;
         gcs_seqno_t  local_seqno_;
-        gu_uuid_t    uuid_;
+        gu::UUID     uuid_;
         gcs_seqno_t  last_applied_;
         conn_state_t state_;
         gu::Lock*    schedule_;

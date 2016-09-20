@@ -51,7 +51,7 @@ namespace galera
         Certification(gu::Config& conf, ServiceThd& thd);
         ~Certification();
 
-        void assign_initial_position(wsrep_seqno_t seqno, int versiono);
+        void assign_initial_position(const gu::GTID& gtid, int version);
         TestResult append_trx(const TrxHandlePtr&);
         TestResult test(const TrxHandlePtr&, bool = true);
         wsrep_seqno_t position() const { return position_; }

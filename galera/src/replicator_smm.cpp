@@ -284,7 +284,8 @@ void galera::ReplicatorSMM::shift_to_CLOSED()
 
         // this should erase the memory of a pre-existing state.
         set_initial_position(WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED);
-        cert_.assign_initial_position(WSREP_SEQNO_UNDEFINED, trx_params_.version_);
+        cert_.assign_initial_position(gu::GTID(GU_UUID_NIL, -1),
+                                      trx_params_.version_);
         sst_uuid_            = WSREP_UUID_UNDEFINED;
         sst_seqno_           = WSREP_SEQNO_UNDEFINED;
         cc_seqno_            = WSREP_SEQNO_UNDEFINED;
@@ -355,7 +356,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     }
 
     if (ret == WSREP_OK &&
-        (err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
+        (err = gcs_.set_initial_position(gu::GTID(gcs_uuid, seqno))) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
@@ -558,6 +559,61 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
     }
 
     trx.set_exit_loop(exit_loop);
+}
+
+
+wsrep_status_t galera::ReplicatorSMM::send(TrxHandle*        trx,
+                                           wsrep_trx_meta_t* meta)
+{
+    assert(trx->locked());
+
+    if (state_() < S_JOINED) return WSREP_TRX_FAIL;
+
+    const bool rollback(trx->flags() & TrxHandle::F_ROLLBACK);
+
+    if (rollback)
+    {
+        assert(trx->state() == TrxHandle::S_ABORTING);
+    }
+
+    WriteSetNG::GatherVector actv;
+
+    size_t act_size = trx->write_set_out().gather(trx->source_id(),
+                                                  trx->conn_id(),
+                                                  trx->trx_id(),
+                                                  actv);
+    ssize_t rcode(0);
+    do
+    {
+        const ssize_t gcs_handle(gcs_.schedule());
+
+        if (gu_unlikely(gcs_handle < 0))
+        {
+            log_debug << "gcs schedule " << strerror(-gcs_handle);
+            rcode = gcs_handle;
+            goto out;
+        }
+        trx->set_gcs_handle(gcs_handle);
+
+        trx->finalize(last_committed());
+        trx->unlock();
+        rcode = gcs_.sendv(actv, act_size, GCS_ACT_TORDERED, true);
+        GU_DBUG_SYNC_WAIT("after_send_sync");
+        trx->lock();
+    }
+    // TODO: Break loop after some timeout
+    while (rcode == -EAGAIN && (usleep(1000), true));
+
+    trx->set_gcs_handle(-1);
+
+out:
+
+    if (rcode <= 0)
+    {
+        log_debug << "ReplicatorSMM::send failed: " << -rcode;
+    }
+
+    return (rcode > 0 ? WSREP_OK : WSREP_TRX_FAIL);
 }
 
 
@@ -872,7 +928,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandlePtr&     trx,
     else if ((trx->flags() & TrxHandle::F_COMMIT) != 0)
     {
         assert(apply_monitor_.entered(ao));
-//gcf788        ts->set_state(TrxHandle::S_APPLYING);
         // this is a departure from the convention that ts state is set to
         // APPLYING as soon as apply_monitor_ is entered. But I'd hate to add
         // APPLYING->ABORTING transition that we need in one case below as we
@@ -1138,15 +1193,13 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
 
     if (upto == 0)
     {
-        gcs_seqno_t ret(gcs_.caused());
+        long ret = gcs_.caused(wait_gtid);
         if (ret < 0)
         {
             log_warn << "gcs_caused() returned " << ret
                      << " ("  << strerror(-ret) << ')';
             return WSREP_TRX_FAIL;
         }
-
-        wait_gtid.set(state_uuid_, ret);
     }
     else
     {
@@ -1269,13 +1322,14 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandlePtr&     txp,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandlePtr& txp,
-                                                       int const err)
+wsrep_status_t
+galera::ReplicatorSMM::to_isolation_end(TrxHandlePtr& txp,
+                                        const wsrep_buf_t* const err)
 {
     TrxHandle& trx(*txp);
 
     log_debug << "Done executing TO isolated action: " << trx
-              << ", code: "<< err;
+              << ", error message: " << gu::Hexdump(err->ptr, err->len, true);
 
     assert(trx.state() == TrxHandle::S_COMMITTING ||
            trx.state() == TrxHandle::S_ABORTING);
@@ -1394,6 +1448,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
     }
 
     delete ws;
+
     handle.opaque = NULL;
 
     return WSREP_OK;
@@ -1423,7 +1478,12 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     }
 
     try {
-        gcs_.join(seqno);
+        if (rcode == 0)
+            gcs_.join(gu::GTID(state_id.uuid, state_id.seqno), rcode);
+        else
+            /* stamp error message with the current state */
+            gcs_.join(gu::GTID(state_uuid_, commit_monitor_.last_left()), rcode);
+
         return WSREP_OK;
     }
     catch (gu::Exception& e)
@@ -1665,7 +1725,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     const gcs_act_conf_t& conf(*static_cast<const gcs_act_conf_t*>(act.buf));
 
-    log_info << "Received CC action: seqno_g: " << act.seqno_g
+    log_debug << "Received CC action: seqno_g: " << act.seqno_g
               << ", seqno_l: " << act.seqno_l << ", conf(id: " << conf.conf_id
               << ", memb_num: " << conf.memb_num << ", my_idx: " << conf.my_idx
               << ", my_state: " << conf.my_state << ", seqno: " << conf.seqno
@@ -1750,11 +1810,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_params_.version_);
+        cert_.assign_initial_position(gu::GTID(group_uuid, group_seqno),
+                                      trx_params_.version_);
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
-
-        service_thd_.flush();             // make sure service thd is idle
 
         if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
         // make sure all gcache buffers are released
@@ -1815,7 +1874,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
              * 2) we failed here previously (probably due to partition).
              */
             try {
-                gcs_.join(sst_seqno_);
+                gcs_.join(gu::GTID(state_uuid_, sst_seqno_), 0);
                 sst_state_ = SST_NONE;
             }
             catch (gu::Exception& e)
@@ -1974,7 +2033,7 @@ void galera::ReplicatorSMM::desync()
 {
     wsrep_seqno_t seqno_l;
 
-    ssize_t const ret(gcs_.desync(&seqno_l));
+    ssize_t const ret(gcs_.desync(seqno_l));
 
     if (seqno_l > 0)
     {
@@ -2010,7 +2069,7 @@ void galera::ReplicatorSMM::desync()
 
 void galera::ReplicatorSMM::resync()
 {
-    gcs_.join(commit_monitor_.last_left());
+    gcs_.join(gu::GTID(state_uuid_, commit_monitor_.last_left()), 0);
 }
 
 

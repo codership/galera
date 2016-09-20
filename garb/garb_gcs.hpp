@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2015 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_GCS_HPP_
 #define _GARB_GCS_HPP_
@@ -25,9 +25,9 @@ public:
     void request_state_transfer (const std::string& request,
                                  const std::string& donor);
 
-    void join (gcs_seqno_t);
+    void join (const gu::GTID&, int code);
 
-    void set_last_applied(gcs_seqno_t);
+    void set_last_applied(const gu::GTID&);
 
     void close ();
 

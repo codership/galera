@@ -6,10 +6,8 @@
 
 #include <unistd.h>
 #include <string.h>
-#include <check.h>
 
 #include "../gcs_act_proto.hpp"
-
 #include "gcs_proto_test.hpp"
 
 static long
