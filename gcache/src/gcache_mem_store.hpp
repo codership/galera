@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2016 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -9,19 +9,16 @@
 
 #include "gcache_memops.hpp"
 #include "gcache_bh.hpp"
+#include "gcache_types.hpp"
 #include "gcache_limits.hpp"
 
 #include <string>
 #include <set>
-#include <map>
 
 namespace gcache
 {
     class MemStore : public MemOps
     {
-        typedef std::map<int64_t, const void*> seqno2ptr_t;
-        typedef seqno2ptr_t::iterator          seqno2ptr_iter_t;
-
     public:
 
         MemStore (size_t max_size, seqno2ptr_t& seqno2ptr)

@@ -689,7 +689,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     sst_state_ = SST_WAIT;
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may involve some IO too */
-    gcache_.seqno_reset();
+    gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
 
     if (sst_req_len != 0)
     {

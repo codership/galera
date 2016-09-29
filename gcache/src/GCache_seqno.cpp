@@ -2,7 +2,6 @@
  * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
  */
 
-#include "SeqnoNone.hpp"
 #include "gcache_bh.hpp"
 #include "GCache.hpp"
 
@@ -18,11 +17,14 @@ namespace gcache
      * Clears seqno->ptr map // and sets seqno_min to seqno.
      */
     void
-    GCache::seqno_reset ()
+    GCache::seqno_reset (const gu::UUID& g, seqno_t const s)
     {
         gu::Lock lock(mtx);
 
+        if (g == gid && s == seqno_max) return;
+
         seqno_released = SEQNO_NONE;
+        gid = g;
 
         if (gu_unlikely(seqno2ptr.empty())) return;
 

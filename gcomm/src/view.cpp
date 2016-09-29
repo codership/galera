@@ -189,7 +189,8 @@ std::ostream& gcomm::View::write_stream(std::ostream& os) const
         const UUID& uuid(it -> first);
         const Node& node(it -> second);
         os << "member: ";
-        uuid.write_stream(os) << " ";
+        uuid.write_stream(os);
+        os << " ";
         node.write_stream(os) << std::endl;
     }
     os << "#vwend" << std::endl;
@@ -224,7 +225,8 @@ std::istream& gcomm::View::read_stream(std::istream& is)
 std::ostream& gcomm::ViewState::write_stream(std::ostream& os) const
 {
     os << "my_uuid: ";
-    my_uuid_.write_stream(os) << std::endl;
+    my_uuid_.write_stream(os);
+    os << std::endl;
     view_.write_stream(os);
     return os;
 }
