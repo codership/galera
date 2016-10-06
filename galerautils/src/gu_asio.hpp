@@ -20,9 +20,13 @@
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #  pragma GCC diagnostic push
 # endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+// Ignore possibly unknown warning flags
+# pragma GCC diagnostic ignored "-Wpragmas"
 # pragma GCC diagnostic ignored "-Weffc++"
 # pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
+# pragma GCC diagnostic ignored "-Wunused-local-typedef"
+# pragma GCC diagnostic ignored "-Wunused-variable"
+#endif // __GNUG__
 #endif // ! HAVE_SYSTEM_ASIO
 
 #include "asio.hpp"

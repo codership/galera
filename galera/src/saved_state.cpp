@@ -22,6 +22,7 @@ SavedState::SavedState  (const std::string& file) :
     fs_           (0),
     uuid_         (WSREP_UUID_UNDEFINED),
     seqno_        (WSREP_SEQNO_UNDEFINED),
+    safe_to_bootstrap_(true),
     unsafe_       (0),
     corrupt_      (false),
     mtx_          (),
@@ -96,14 +97,15 @@ SavedState::SavedState  (const std::string& file) :
             istr >> seqno_;
             log_debug << "read saved state seqno: " << seqno_;
         }
-        else if (param == "cert_index:")
+        else if (param == "safe_to_bootstrap:")
         {
-            // @todo
-            log_debug << "cert index restore not implemented yet";
+            istr >> safe_to_bootstrap_;
+            log_debug << "read safe_to_bootstrap: " << safe_to_bootstrap_;
         }
     }
 
-    log_info << "Found saved state: " << uuid_ << ':' << seqno_;
+    log_info << "Found saved state: " << uuid_ << ':' << seqno_
+             << ", safe_to_bootsrap: " << safe_to_bootstrap_;
 
 #if 0 // we'll probably have it legal
     if (seqno_ < 0 && uuid_ != WSREP_UUID_UNDEFINED)
@@ -126,7 +128,7 @@ SavedState::SavedState  (const std::string& file) :
     {
         fs_ = freopen (file.c_str(), "w+", fs_); // truncate
         current_len_ = 0;
-        set (uuid_, seqno_);
+        set (uuid_, seqno_, safe_to_bootstrap_);
     }
 }
 
@@ -143,16 +145,17 @@ SavedState::~SavedState ()
 }
 
 void
-SavedState::get (wsrep_uuid_t& u, wsrep_seqno_t& s)
+SavedState::get (wsrep_uuid_t& u, wsrep_seqno_t& s, bool& safe_to_bootstrap)
 {
     gu::Lock lock(mtx_);
 
     u = uuid_;
     s = seqno_;
+    safe_to_bootstrap = safe_to_bootstrap_;
 }
 
 void
-SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s)
+SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap)
 {
     gu::Lock lock(mtx_); ++total_locks_;
 
@@ -160,9 +163,10 @@ SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s)
 
     uuid_ = u;
     seqno_ = s;
+    safe_to_bootstrap_ = safe_to_bootstrap;
 
     if (0 == unsafe_())
-        write_and_flush (u, s);
+        write_and_flush (u, s, safe_to_bootstrap);
     else
         log_debug << "Not writing state: unsafe counter is " << unsafe_();
 }
@@ -185,7 +189,8 @@ SavedState::mark_unsafe()
 
         if (written_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED);
+            write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
+                             safe_to_bootstrap_);
         }
     }
 }
@@ -207,7 +212,7 @@ SavedState::mark_safe()
             assert(false == corrupt_);
             /* this will write down proper seqno if set() was called too early
              * (in unsafe state) */
-            write_and_flush (uuid_, seqno_);
+            write_and_flush (uuid_, seqno_, safe_to_bootstrap_);
         }
     }
 }
@@ -227,11 +232,13 @@ SavedState::mark_corrupt()
     seqno_ = WSREP_SEQNO_UNDEFINED;
     corrupt_ = true;
 
-    write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED);
+    write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
+                     safe_to_bootstrap_);
 }
 
 void
-SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s)
+SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s,
+                            bool safe_to_bootstrap)
 {
     assert (current_len_ <= MAX_SIZE);
 
@@ -245,8 +252,9 @@ SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s)
                                   "# GALERA saved state"
                                   "\nversion: " VERSION
                                   "\nuuid:    " GU_UUID_FORMAT
-                                  "\nseqno:   %" PRId64 "\ncert_index:\n",
-                                  GU_UUID_ARGS(uu), s);
+                                  "\nseqno:   %" PRId64
+                                  "\nsafe_to_bootstrap: %d\n",
+                                  GU_UUID_ARGS(uu), s, safe_to_bootstrap);
 
         int write_size;
         for (write_size = state_len; write_size < current_len_; ++write_size)
