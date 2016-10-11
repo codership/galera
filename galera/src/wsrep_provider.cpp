@@ -642,6 +642,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     }
 
     wsrep_status_t retval;
+    bool discard_trx(true);
 
     try
     {
@@ -683,6 +684,21 @@ wsrep_status_t galera_release(wsrep_t*            gh,
             retval = repl->release_commit(trx);
         else
             retval = repl->release_rollback(trx);
+
+        switch(trx->state())
+        {
+        case TrxHandle::S_COMMITTED:
+        case TrxHandle::S_ROLLED_BACK:
+            break;
+        case TrxHandle::S_EXECUTING:
+            // trx ready for new fragment
+        case TrxHandle::S_ABORTING:
+            // SR trx was BF aborted between pre_commit() and post_commit()
+            if (retval == WSREP_OK) discard_trx = false;
+            break;
+        default:
+            assert(0);
+        }
     }
     catch (std::exception& e)
     {
@@ -695,19 +711,9 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    switch(trx->state())
+    if (discard_trx)
     {
-    case TrxHandle::S_COMMITTED:
-    case TrxHandle::S_ROLLED_BACK:
         discard_local_trx(repl, ws_handle, trx);
-    case TrxHandle::S_EXECUTING:
-        /* trx ready for new fragment */
-        break;
-    case TrxHandle::S_ABORTING:
-        // SR trx was BF aborted between pre_commit() and post_commit()
-        break;
-    default:
-        assert(0);
     }
 
     return retval;
