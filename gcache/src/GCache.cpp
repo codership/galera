@@ -33,9 +33,6 @@ namespace gcache
 #endif
     }
 
-    void
-    GCache::constructor_common() {}
-
     GCache::GCache (gu::Config& cfg, const std::string& data_dir)
         :
         config    (cfg),
@@ -56,14 +53,13 @@ namespace gcache
         reallocs  (0),
         frees     (0),
         seqno_locked(SEQNO_NONE),
-        seqno_max   (SEQNO_NONE),
-        seqno_released(0)
+        seqno_max   (seqno2ptr.empty() ?
+                     SEQNO_NONE : seqno2ptr.rbegin()->first),
+        seqno_released(seqno_max)
 #ifndef NDEBUG
         ,buf_tracker()
 #endif
-    {
-        constructor_common ();
-    }
+    {}
 
     GCache::~GCache ()
     {

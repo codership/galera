@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -23,10 +23,11 @@ namespace gcache
 
         if (g == gid && s == seqno_max) return;
 
+        log_info << "GCache history reset: old(" << gid << ':' << seqno_max
+                 << ") -> new(" << g << ':' << s << ")";
+
         seqno_released = SEQNO_NONE;
         gid = g;
-
-        if (gu_unlikely(seqno2ptr.empty())) return;
 
         /* order is significant here */
         rb.seqno_reset();

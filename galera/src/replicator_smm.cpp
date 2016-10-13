@@ -1460,6 +1460,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 apply_monitor_.set_initial_position(group_seqno);
                 if (co_mode_ != CommitOrder::BYPASS)
                     commit_monitor_.set_initial_position(group_seqno);
+                gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
             }
 
             if (state_() == S_CONNECTED || state_() == S_DONOR)

@@ -545,11 +545,12 @@ namespace gcache
         }
 
         os << PR_KEY_SYNCED << ' ' << synced << '\n';
+        os << '\n';
 
         ::memset(preamble_, '\0', PREAMBLE_LEN);
 
-        size_t const copy_len(os.str().length() < PREAMBLE_LEN - 1 ?
-                              os.str().length() : PREAMBLE_LEN - 1);
+        size_t copy_len(os.str().length());
+        if (copy_len >= PREAMBLE_LEN) copy_len = PREAMBLE_LEN - 1;
 
         ::memcpy(preamble_, os.str().c_str(), copy_len);
 
@@ -592,31 +593,40 @@ namespace gcache
 
         if (version < 0 || version > 16)
         {
-           log_warn << "Bogus version in GCache ring buffer preample: "
+           log_warn << "Bogus version in GCache ring buffer preamble: "
                     << version << ". Assuming 0.";
            version = 0;
         }
 
         if (offset < -1 || (preamble + offset + sizeof(BufferHeader)) > end_)
         {
-           log_warn << "Bogus offset in GCache ring buffer preample: "
+           log_warn << "Bogus offset in GCache ring buffer preamble: "
                     << offset << ". Assuming unknown.";
            offset = -1;
         }
 
-        if (do_recover && gid_ != gu::UUID())
+        if (do_recover)
         {
-            log_info << "Recovering GCache ring buffer: " "version: " << version
-                     << ", UUID: " << gid_ << ", offset: " << offset;
+            if (gid_ != gu::UUID())
+            {
+                log_info << "Recovering GCache ring buffer: version: " << version
+                         << ", UUID: " << gid_ << ", offset: " << offset;
 
-            try
-            {
-                recover(offset - (start_ - preamble));
+                try
+                {
+                    recover(offset - (start_ - preamble));
+                }
+                catch (gu::Exception& e)
+                {
+                    log_warn << "Failed to recover GCache ring buffer: "
+                             << e.what();
+                    reset();
+                }
             }
-            catch (gu::Exception& e)
+            else
             {
-                log_warn << "Failed to recover GCache ring buffer: " << e.what();
-                reset();
+                log_warn << "Skipped GCache ring buffer recovery: could not "
+                    "determine history UUID.";
             }
         }
 
