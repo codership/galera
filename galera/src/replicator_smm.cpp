@@ -491,7 +491,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     {
         assert(ts.trx_id() != uint64_t(-1) || ts.is_toi());
         assert(ts.certified() /*Repl*/ || ts.preordered() /*IST*/);
-        assert(ts.local() == false);
+        assert(ts.local() == false ||
+               (ts.flags() & TrxHandle::F_ROLLBACK));
     }
 
     ApplyOrder ao(ts);
@@ -1223,7 +1224,10 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
     {
         assert(ts->global_seqno() > 0); // BF'ed
         assert(trx->state() == TrxHandle::S_ABORTING);
-        assert(ts->state()  == TrxHandle::S_ABORTING);
+        // We shold not care about ts state here, ts may have
+        // been replicated succesfully and the transaction
+        // has been BF aborted after ts has been applied.
+        // assert(ts->state()  == TrxHandle::S_ABORTING);
         assert((ts->flags() & TrxHandle::F_ROLLBACK) != 0);
 
         if (ts->pa_unsafe())
@@ -1293,12 +1297,19 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster* trx)
 
     TrxHandleSlavePtr ts(trx->ts());
 
-    if (ts)
+    // Release monitors if ts was not committed. We may enter here
+    // with ts->state() == TrxHandle::S_COMMITTED if transaction
+    // replicated a fragment succesfully and then voluntarily rolled
+    // back by sending async rollback event via ReplicatorSMM::send()
+    if (ts && ts->state() != TrxHandle::S_COMMITTED)
     {
         log_debug << "release_rollback() trx: " << *trx << ", ts: " << *ts;
         assert(ts->global_seqno() > 0); // BF'ed
         assert(trx->state() == TrxHandle::S_ABORTING);
-        assert(ts->state()  == TrxHandle::S_ABORTING);
+        // We shold not care about ts state here, ts may have
+        // been replicated succesfully and the transaction
+        // has been BF aborted after ts has been applied.
+        // assert(ts->state()  == TrxHandle::S_ABORTING);
 
         log_debug << "Master rolled back " << ts->global_seqno();
 

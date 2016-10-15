@@ -399,6 +399,8 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
         return WSREP_OK;
     }
 
+    TrxHandleLock victim_lock(*victim);
+
     /* Send the rollback fragment from a different context */
     galera::TrxHandleMasterPtr trx(repl->new_local_trx(trx_id));
 
@@ -414,9 +416,18 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     meta.stid.node  = repl->source_id();
     meta.stid.trx   = trx_id;
 
-    trx->set_flags(TrxHandle::F_ROLLBACK);
+    trx->set_flags(TrxHandle::F_ROLLBACK | TrxHandle::F_PA_UNSAFE);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
+
+    // Victim may already be in S_ABORTING state if it was BF aborted
+    // in pre commit.
+    if (victim->state() != TrxHandle::S_ABORTING)
+    {
+        victim->set_state(TrxHandle::S_MUST_ABORT);
+        victim->set_state(TrxHandle::S_ABORTING);
+    }
+
     return repl->send(trx.get(), &meta);
 }
 
