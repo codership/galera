@@ -592,8 +592,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
 
 ReplicatorSMM::StateRequest*
-ReplicatorSMM::prepare_state_request (const void* const   sst_req,
-                                      ssize_t     const   sst_req_len,
+ReplicatorSMM::prepare_state_request (const void*         sst_req,
+                                      ssize_t             sst_req_len,
                                       const wsrep_uuid_t& group_uuid,
                                       wsrep_seqno_t const last_needed_seqno)
 {
@@ -602,6 +602,8 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
         switch (str_proto_ver_)
         {
         case 0:
+            if (0 == sst_req_len)
+                gu_throw_error(EPERM) << "SST is not possible.";
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
         case 2:
@@ -614,12 +616,17 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             {
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
                                           group_uuid, last_needed_seqno));
+                assert(ist_req_len > 0);
+                assert(NULL != ist_req);
             }
             catch (gu::Exception& e)
             {
                 log_warn
                     << "Failed to prepare for incremental state transfer: "
                     << e.what() << ". IST will be unavailable.";
+
+                if (0 == sst_req_len)
+                    gu_throw_error(EPERM) << "neither SST nor IST is possible.";
             }
 
             StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
@@ -633,12 +640,13 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
     }
     catch (std::exception& e)
     {
-        log_fatal << "State request preparation failed, aborting: " << e.what();
+        log_fatal << "State Transfer Request preparation failed: " << e.what()
+                  << " Can't continue, aborting.";
     }
     catch (...)
     {
-        log_fatal << "State request preparation failed, aborting: unknown exception";
-        throw;
+        log_fatal << "State Transfer Request preparation failed: "
+            "unknown exception. Can't continue, aborting.";
     }
     abort();
 }
@@ -931,7 +939,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert(sst_seqno_ >= cc_seqno);
     }
 
-    assert(sst_seqno_ >= cc_seqno);
+#ifndef NDEBUG
+    {
+        gu::Lock lock(closing_mutex_);
+        assert(sst_seqno_ >= cc_seqno || closing_ || state_() == S_CLOSED);
+    }
+#endif /* NDEBUG */
 
     delete req;
 }
