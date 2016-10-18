@@ -21,6 +21,8 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
+        assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
+
         if (g == gid && s == seqno_max) return;
 
         log_info << "GCache history reset: old(" << gid << ':' << seqno_max
@@ -34,6 +36,7 @@ namespace gcache
         mem.seqno_reset();
 
         seqno2ptr.clear();
+        seqno_max = SEQNO_NONE;
     }
 
     /*!

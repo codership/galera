@@ -554,7 +554,7 @@ namespace gcache
 
         ::memcpy(preamble_, os.str().c_str(), copy_len);
 
-        fd_.flush();
+        mmap_.sync();
     }
 
     void

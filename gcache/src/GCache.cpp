@@ -25,6 +25,7 @@ namespace gcache
         seqno_locked   = SEQNO_NONE;
         seqno_max      = SEQNO_NONE;
         seqno_released = SEQNO_NONE;
+        gid            = gu::UUID();
 
         seqno2ptr.clear();
 

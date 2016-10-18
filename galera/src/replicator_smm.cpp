@@ -314,8 +314,6 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
         ret = WSREP_NODE_FAIL;
     }
 
-    gcache_.reset();
-
     if (ret == WSREP_OK &&
         (err = gcs_.connect(cluster_name, cluster_url, bootstrap)) != 0)
     {
