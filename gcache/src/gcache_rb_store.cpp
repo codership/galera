@@ -23,6 +23,8 @@ namespace gcache
     void
     RingBuffer::reset()
     {
+        write_preamble(false);
+
         first_ = start_;
         next_  = start_;
 
@@ -73,15 +75,26 @@ namespace gcache
         close_preamble();
         open_ = false;
         mmap_.sync();
-        mmap_.unmap();
+    }
+
+    static inline void
+    empty_buffer(BufferHeader* const bh) //mark buffer as empty
+    {
+        bh->seqno_g = gcache::SEQNO_ILL;
+    }
+
+    bool
+    buffer_is_empty(const BufferHeader* const bh)
+    {
+        return (SEQNO_ILL == bh->seqno_g);
     }
 
     /* discard all seqnos preceeding and including seqno */
     bool
-    RingBuffer::discard_seqno (int64_t seqno)
+    RingBuffer::discard_seqnos(seqno2ptr_t::iterator const i_begin,
+                               seqno2ptr_t::iterator const i_end)
     {
-        for (seqno2ptr_t::iterator i = seqno2ptr_.begin();
-             i != seqno2ptr_.end() && i->first <= seqno;)
+        for (seqno2ptr_t::iterator i(i_begin); i != i_end;)
         {
             seqno2ptr_t::iterator j(i); ++i;
             BufferHeader* const bh (ptr2BH (j->second));
@@ -89,7 +102,7 @@ namespace gcache
             if (gu_likely (BH_is_released(bh)))
             {
                 seqno2ptr_.erase (j);
-                bh->seqno_g = SEQNO_ILL;  // will never be accessed by seqno
+                empty_buffer(bh);
 
                 switch (bh->store)
                 {
@@ -272,7 +285,7 @@ namespace gcache
 
         if (SEQNO_NONE == bh->seqno_g)
         {
-            bh->seqno_g = SEQNO_ILL;
+            empty_buffer(bh);
             discard (bh);
         }
     }
@@ -400,7 +413,7 @@ namespace gcache
             }
         }
 
-        if (!bh) return;
+        if (!bh) return; /* no seqno'd buffers in RB */
 
         assert(bh->size > 0);
         assert(BH_is_released(bh));
@@ -471,7 +484,7 @@ namespace gcache
                 {
                     // either released or already discarded buffer
                     assert (BH_is_released(bh));
-                    bh->seqno_g = SEQNO_ILL;
+                    empty_buffer(bh);
                     discard (bh);
                     locked++;
                 }
@@ -493,6 +506,9 @@ namespace gcache
                  << locked << '/' << total << " locked buffers";
 
         assert_sizes();
+
+        if (next_ > first_ && first_ > start_) BH_clear(BH_cast(start_));
+        /* this is needed to avoid rescanning from start_ on recovery */
     }
 
     void
@@ -554,7 +570,7 @@ namespace gcache
 
         ::memcpy(preamble_, os.str().c_str(), copy_len);
 
-        mmap_.sync();
+        mmap_.sync(preamble_, copy_len);
     }
 
     void
@@ -639,13 +655,6 @@ namespace gcache
         write_preamble(true);
     }
 
-    static inline void
-    empty_buffer(BufferHeader* const bh) //mark buffer as empty
-    {
-        bh->seqno_g = gcache::SEQNO_ILL;
-        bh->seqno_d = gcache::SEQNO_ILL;
-    }
-
     int64_t
     RingBuffer::scan(off_t const offset)
     {
@@ -709,9 +718,8 @@ namespace gcache
                         collision_count++;
 
                         log_info <<"Attempt to reuse the same seqno: " << seqno_g
-                                 << ". New ptr = " << bh+1
+                                 << ". New ptr = " << static_cast<void*>(bh+1)
                                  << ", previous ptr = " << res.first->second;
-
                         empty_buffer(bh); // this buffer is unusable
                         assert(BH_is_released(bh));
 
@@ -894,7 +902,6 @@ namespace gcache
             assert(bh->size > sizeof(BufferHeader));
             while (bh->seqno_g == SEQNO_ILL)
             {
-                assert(bh->seqno_d == SEQNO_ILL);
                 assert(bh->size > sizeof(BufferHeader));
 
                 bh = BH_next(bh);
