@@ -290,6 +290,18 @@ namespace galera
             }
         }
 
+        /* obtain global and depends seqno from the writeset (IST) */
+        void set_received_from_ws()
+        {
+            wsrep_seqno_t const seqno_g(write_set_in_.seqno());
+            set_received(0, -1, seqno_g);
+            wsrep_seqno_t const seqno_d
+                (std::max<wsrep_seqno_t>
+                    (global_seqno_ - write_set_in_.pa_range(),
+                     WSREP_SEQNO_UNDEFINED));
+            set_depends_seqno(seqno_d);
+        }
+
         void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);

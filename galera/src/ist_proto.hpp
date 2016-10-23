@@ -549,8 +549,18 @@ namespace galera
                         trx->unserialize(&wbuf[0], wbuf.size(), 0);
                     }
 
-                    trx->set_received(0, -1, seqno_g);
-                    trx->set_depends_seqno(seqno_d);
+                    if (seqno_d == WSREP_SEQNO_UNDEFINED ||
+                        trx->version() < 3)
+                    {
+                        trx->set_received(0, -1, seqno_g);
+                        trx->set_depends_seqno(seqno_d);
+                    }
+                    else
+                    {
+                        trx->set_received_from_ws();
+                        assert(trx->global_seqno() == seqno_g);
+                        assert(trx->depends_seqno() >= seqno_d);
+                    }
                     trx->mark_certified();
 
                     log_debug << "received trx body: " << *trx;
