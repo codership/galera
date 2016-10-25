@@ -29,6 +29,7 @@ namespace gcomm
 {
     class AsioTcpSocket;
     class AsioTcpAcceptor;
+    class AsioPostForSendHandler;
 }
 
 // TCP Socket implementation
@@ -64,6 +65,7 @@ public:
     SocketId id() const { return &socket_; }
 private:
     friend class gcomm::AsioTcpAcceptor;
+    friend class gcomm::AsioPostForSendHandler;
 
     AsioTcpSocket(const AsioTcpSocket&);
     void operator=(const AsioTcpSocket&);
@@ -112,7 +114,6 @@ private:
         return option.value();
     }
 };
-
 
 class gcomm::AsioTcpAcceptor : public gcomm::Acceptor
 {
