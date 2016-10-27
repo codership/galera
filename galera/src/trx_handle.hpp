@@ -197,6 +197,7 @@ namespace galera
         void  set_state(State state)
         {
             state_.shift_to(state);
+            if (state == S_EXECUTING) state_.reset_history();
         }
 
         /* slave trx ctor */
@@ -792,7 +793,6 @@ namespace galera
                 assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno);
-                reset_ts();
             }
             else
             {
@@ -803,8 +803,6 @@ namespace galera
 
             write_set_out().set_flags(write_set_flags_);
             write_set_out().finalize(last_seen_seqno, pa_range);
-
-            assert(ts_ == 0);
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */
