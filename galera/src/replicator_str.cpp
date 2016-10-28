@@ -414,12 +414,40 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 try
                 {
                     gcache_.seqno_lock(istr.last_applied() + 1);
+
+                    // We can use Galera debugging facility to simulate
+                    // unexpected shift of the donor seqno:
+#ifdef GU_DBUG_ON
+                    GU_DBUG_EXECUTE("simulate_seqno_shift",
+                                    throw gu::NotFound(););
+#endif
                 }
                 catch(gu::NotFound& nf)
                 {
                     log_info << "IST first seqno " << istr.last_applied() + 1
                              << " not found from cache, falling back to SST";
                     // @todo: close IST channel explicitly
+
+                    // When new node joining the cluster, it may trying to avoid
+                    // unnecessary SST request. However, the heuristic algorithm,
+                    // which selects the donor node, does not give us a 100%
+                    // guarantee that seqno will not move forward while new
+                    // node sending its request (to joining the cluster).
+                    // Therefore, if seqno had gone forward, and if we have only
+                    // the IST request (without the SST part), then we need to
+                    // inform new node that it should prepare to receive full
+                    // state and re-send the SST request (if the server supports
+                    // it):
+
+                    if (streq->sst_len() == 0)
+                    {
+                        log_info << "IST canceled because the donor seqno had "
+                                    "moved forward, but the SST request was not "
+                                    "prepared by the joiner node.";
+                        rcode = -ENODATA;
+                        goto out;
+                    }
+
                     goto full_sst;
                 }
 
@@ -621,7 +649,27 @@ ReplicatorSMM::send_state_request (const StateRequest* const req, const bool uns
                                           ist_uuid, ist_seqno, &seqno_l);
         if (ret < 0)
         {
-            if (!retry_str(ret))
+            if (ret == -ENODATA)
+            {
+                // Although the current state has lagged behind state
+                // of the group, we can save it for the next attempt
+                // of the joining cluster, because we do not know how
+                // other nodes will finish their work:
+
+                if (unsafe)
+                {
+                   st_.mark_safe();
+                }
+
+                log_fatal << "State transfer request failed unrecoverably "
+                             "because the donor seqno had gone forward "
+                             "during IST, but SST request was not prepared "
+                             "from our side due to selected state transfer "
+                             "method (which do not supports SST during "
+                             "node operation). Restart required.";
+                abort();
+            }
+            else if (!retry_str(ret))
             {
                 log_error << "Requesting state transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
@@ -677,7 +725,15 @@ ReplicatorSMM::send_state_request (const StateRequest* const req, const bool uns
 
         st_.set(state_uuid_, STATE_SEQNO());
 
-        if (state_() > S_CLOSING)
+        // If in the future someone will change the code above (and
+        // the error handling at the GCS level), then the ENODATA error
+        // will no longer be fatal. Therefore, we will need here
+        // additional test for "ret != ENODATA". Since it is rare event
+        // associated with error handling, then the presence here
+        // of one additional comparison is not an issue for system
+        // performance:
+
+        if (ret != -ENODATA && state_() > S_CLOSING)
         {
             if (!unsafe)
             {
@@ -703,7 +759,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req, const bool uns
 }
 
 
-void
+long
 ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                        const wsrep_uuid_t& group_uuid,
                                        wsrep_seqno_t const group_seqno,
@@ -750,10 +806,18 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     // We should not wait for completion of the SST or to handle it
     // results if an error has occurred when sending the request:
 
-    if (send_state_request(req, unsafe) < 0)
+    long ret = send_state_request(req, unsafe);
+    if (ret < 0)
     {
+        // If the state transfer request failed, then
+        // we need to close the IST receiver:
+        if (ist_prepared_)
+        {
+            ist_prepared_ = false;
+            (void)ist_receiver_.finished();
+        }
         delete req;
-        return;
+        return ret;
     }
 
     GU_DBUG_SYNC_WAIT("after_send_state_request");
@@ -786,7 +850,9 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             }
 
             close();
-            return;
+
+            delete req;
+            return -ECANCELED;
         }
         else if (sst_uuid_ != group_uuid)
         {
@@ -856,7 +922,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             ist_receiver_.ready();
             recv_IST(recv_ctx);
 
-            // IST process could already be interrupted if Galera
+            // We must close the IST receiver if the node
             // is in the process of shutting down:
             if (ist_prepared_)
             {
@@ -872,7 +938,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
-            // IST process could already be interrupted if Galera
+            // We must close the IST receiver if the node
             // is in the process of shutting down:
             if (ist_prepared_)
             {
@@ -896,6 +962,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     }
 
     delete req;
+    return 0;
 }
 
 
