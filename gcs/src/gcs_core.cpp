@@ -685,8 +685,9 @@ core_handle_last_msg (gcs_core_t*          core,
                       struct gcs_recv_msg* msg,
                       struct gcs_act*      act)
 {
-    assert (GCS_MSG_LAST == msg->type);
-    assert (CodeMsg::serial_size() == msg->size);
+    assert(GCS_MSG_LAST == msg->type);
+    assert(CodeMsg::serial_size() >= msg->size);
+    assert(int(sizeof(uint64_t)) <= msg->size);
 
     if (gu_likely(gcs_group_is_primary(&core->group))) {
 
