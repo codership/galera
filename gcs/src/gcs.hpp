@@ -440,6 +440,8 @@ struct gcs_stats
     int       send_q_len;     //! current send queue length
     int       send_q_len_max; //! maximum send queue length
     int       send_q_len_min; //! minimum send queue length
+    long      fc_lower_limit; //! Flow-control interval lower limit
+    long      fc_upper_limit; //! Flow-control interval upper limit
     gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
