@@ -487,7 +487,7 @@ namespace galera
 
         long send_state_request (const StateRequest* req, const bool unsafe);
 
-        void request_state_transfer (void* recv_ctx,
+        long request_state_transfer (void* recv_ctx,
                                      const wsrep_uuid_t& group_uuid,
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
@@ -571,6 +571,7 @@ namespace galera
         wsrep_unordered_cb_t  unordered_cb_;
         wsrep_sst_donate_cb_t sst_donate_cb_;
         wsrep_synced_cb_t     synced_cb_;
+        wsrep_abort_cb_t      abort_cb_;
 
         // SST
         std::string   sst_donor_;
