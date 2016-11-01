@@ -454,6 +454,18 @@ typedef void (*wsrep_synced_cb_t) (void* app_ctx);
 
 
 /*!
+ * @brief a callback to signal application that wsrep provider was
+ * terminated abnormally. In this case, the application can perform
+ * the critical steps to clean its state, for example, it can terminate
+ * the child processes associated with the SST.
+ *
+ * This callback is called after wsrep library was terminated
+ * abnormally using abort() call.
+ */
+typedef void (*wsrep_abort_cb_t) (void);
+
+
+/*!
  * Initialization parameters for wsrep provider.
  */
 struct wsrep_init_args
@@ -485,6 +497,10 @@ struct wsrep_init_args
     /* State Snapshot Transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
     wsrep_synced_cb_t     synced_cb;       //!< synced with group
+
+    /* Abnormal termination callback: */
+    wsrep_abort_cb_t      abort_cb;        //!< wsrep provider terminated
+                                           //!< abnormally
 };
 
 

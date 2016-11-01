@@ -549,38 +549,38 @@ START_TEST(test_gcs_group_find_donor)
 #define SARGS(s) s, strlen(s)
     //========== sst ==========
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 &empty_uuid, GCS_SEQNO_ILL, false);
     fail_if(donor != -EHOSTDOWN);
 
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 &empty_uuid, GCS_SEQNO_ILL, false);
     fail_if(donor != 1);
 
     nodes[1].status = GCS_NODE_STATE_JOINER;
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home1,home2"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 &empty_uuid, GCS_SEQNO_ILL, false);
     fail_if(donor != 2);
     nodes[1].status = GCS_NODE_STATE_SYNCED;
 
     // handle dangling comma.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3,"),
-                                 &empty_uuid, GCS_SEQNO_ILL);
+                                 &empty_uuid, GCS_SEQNO_ILL, false);
     fail_if(donor != 0);
 
     // ========== ist ==========
     // by name.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home0,home1,home2"),
-                                 group_uuid, ist_seqno);
+                                 group_uuid, ist_seqno, false);
     fail_if(donor != 1);
 
     group.quorum.act_id = 1498; // not in safe range.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_uuid, ist_seqno, false);
     fail_if(donor != 2);
 
     group.quorum.act_id = 1497; // in safe range. in segment.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_uuid, ist_seqno, false);
     fail_if(donor != 1);
 
     group.quorum.act_id = 1497; // in safe range. cross segment.
@@ -588,7 +588,7 @@ START_TEST(test_gcs_group_find_donor)
     nodes[1].status = GCS_NODE_STATE_JOINER;
     nodes[2].status = GCS_NODE_STATE_JOINER;
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home2"),
-                                 group_uuid, ist_seqno);
+                                 group_uuid, ist_seqno, false);
     fail_if(donor != 5);
     nodes[0].status = GCS_NODE_STATE_SYNCED;
     nodes[1].status = GCS_NODE_STATE_SYNCED;
