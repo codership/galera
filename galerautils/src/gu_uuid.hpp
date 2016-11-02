@@ -9,6 +9,8 @@
 #include "gu_uuid.h"
 #include "gu_assert.hpp"
 #include "gu_buffer.hpp"
+#include "gu_throw.hpp"
+
 #include <iostream>
 
 inline bool operator==(const gu_uuid_t& a, const gu_uuid_t& b)
@@ -95,6 +97,7 @@ public:
     UUID(gu_uuid_t uuid) : uuid_(uuid) {}
 
     virtual ~UUID() {}
+
     size_t unserialize(const gu::byte_t* buf,
                        const size_t buflen, const size_t offset)
     {
@@ -127,37 +130,43 @@ public:
         return (gu_uuid_compare(&uuid_, &cmp.uuid_) == 0);
     }
 
+    bool operator!=(const UUID& cmp) const
+    {
+        return !(*this == cmp);
+    }
+
     bool older(const UUID& cmp) const
     {
         return (gu_uuid_older(&uuid_, &cmp.uuid_) > 0);
     }
 
-    std::ostream& write_stream(std::ostream& os) const
+    void write_stream(std::ostream& os) const
     {
-        char uuid_buf[GU_UUID_STR_LEN + 1];
-        ssize_t ret(gu_uuid_print(&uuid_, uuid_buf, sizeof(uuid_buf)));
-        (void)ret;
-
-        assert(ret == GU_UUID_STR_LEN);
-        uuid_buf[GU_UUID_STR_LEN] = '\0';
-
-        return (os << uuid_buf);
+        os << uuid_;
     }
 
-    std::istream& read_stream(std::istream& is)
+    void read_stream(std::istream& is)
     {
-        char str[GU_UUID_STR_LEN + 1];
-        is.width(GU_UUID_STR_LEN + 1);
-        is >> str;
-        ssize_t ret(gu_uuid_scan(str, GU_UUID_STR_LEN, &uuid_));
-        if (ret == -1)
-            gu_throw_error(EINVAL) << "could not parse UUID from '" << str
-                                   << '\'' ;
-        return is;
+        is >> uuid_;
     }
 
 protected:
     gu_uuid_t         uuid_;
 }; // class UUID
+
+namespace gu
+{
+inline std::ostream& operator<<(std::ostream& os, const gu::UUID& uuid)
+{
+    uuid.write_stream(os);
+    return os;
+}
+
+inline std::istream& operator>>(std::istream& is, gu::UUID& uuid)
+{
+    uuid.read_stream(is);
+    return is;
+}
+} // namespace gu
 
 #endif // _gu_uuid_hpp_

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2016 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -9,13 +9,13 @@
 
 #include "gcache_memops.hpp"
 #include "gcache_bh.hpp"
+#include "gcache_types.hpp"
 
 #include <gu_fdesc.hpp>
 #include <gu_mmap.hpp>
+#include <gu_uuid.hpp>
 
 #include <string>
-#include <map>
-#include <stdint.h>
 
 namespace gcache
 {
@@ -23,8 +23,11 @@ namespace gcache
     {
     public:
 
-        RingBuffer (const std::string& name, size_t size,
-                    std::map<int64_t, const void*>& seqno2ptr);
+        RingBuffer (const std::string& name,
+                    size_t             size,
+                    seqno2ptr_t&       seqno2ptr,
+                    gu::UUID&          gid,
+                    bool               recover);
 
         ~RingBuffer ();
 
@@ -52,8 +55,15 @@ namespace gcache
 
         void  seqno_reset();
 
+        /* returns true when successfully discards all seqnos in range */
+        bool  discard_seqnos(seqno2ptr_t::iterator i_begin,
+                             seqno2ptr_t::iterator i_end);
+
         /* returns true when successfully discards all seqnos up to s */
-        bool  discard_seqno  (int64_t s);
+        bool  discard_seqno(seqno_t s)
+        {
+            return discard_seqnos(seqno2ptr_.begin(), seqno2ptr_.find(s + 1));
+        }
 
         void print (std::ostream& os) const;
 
@@ -108,7 +118,6 @@ namespace gcache
 
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
-        bool               open_;
         char*        const preamble_; // ASCII text preamble
         int64_t*     const header_;   // cache binary header
         uint8_t*     const start_;    // start of cache area
@@ -116,21 +125,45 @@ namespace gcache
         uint8_t*           first_;    // pointer to the first (oldest) buffer
         uint8_t*           next_;     // pointer to the next free space
 
+        seqno2ptr_t&       seqno2ptr_;
+        gu::UUID&          gid_;
+
         size_t       const size_cache_;
         size_t             size_free_;
         size_t             size_used_;
         size_t             size_trail_;
 
-        typedef std::map<int64_t, const void*> seqno2ptr_t;
+        bool               open_;
 
-        seqno2ptr_t&    seqno2ptr_;
+        BufferHeader* get_new_buffer (size_type size);
 
-        BufferHeader*   get_new_buffer (size_type size);
+        void          constructor_common();
 
-        void            constructor_common();
+        /* preamble fields */
+        static std::string const PR_KEY_VERSION;
+        static std::string const PR_KEY_GID;
+        static std::string const PR_KEY_SEQNO_MAX;
+        static std::string const PR_KEY_SEQNO_MIN;
+        static std::string const PR_KEY_OFFSET;
+        static std::string const PR_KEY_SYNCED;
+
+        void          write_preamble(bool synced);
+        void          open_preamble(bool recover);
+        void          close_preamble();
+
+        // returns lower bound (not inclusive) of valid seqno range
+        int64_t       scan(off_t offset);
+        void          recover(off_t offset);
+
+        void          estimate_space();
 
         RingBuffer(const gcache::RingBuffer&);
         RingBuffer& operator=(const gcache::RingBuffer&);
+
+#ifdef GCACHE_RB_UNIT_TEST
+    public:
+        uint8_t* start() const { return start_; }
+#endif
     };
 
     inline std::ostream& operator<< (std::ostream& os, const RingBuffer& rb)

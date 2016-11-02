@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -8,6 +8,7 @@
 #include "gcache_mem_store.hpp"
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
+#include "gcache_types.hpp"
 
 #include <gu_types.hpp>
 #include <gu_lock.hpp> // for gu::Mutex and gu::Cond
@@ -15,7 +16,6 @@
 
 #include <string>
 #include <iostream>
-#include <map>
 #ifndef NDEBUG
 #include <set>
 #endif
@@ -58,7 +58,7 @@ namespace gcache
          * Reinitialize seqno sequence (after SST or such)
          * Clears seqno->ptr map // and sets seqno_min to seqno.
          */
-        void  seqno_reset (/*int64_t seqno*/);
+        void  seqno_reset (const gu::UUID& gid, seqno_t seqno);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
@@ -192,6 +192,7 @@ namespace gcache
             size_t rb_size()             const { return rb_size_;         }
             size_t page_size()           const { return page_size_;       }
             size_t keep_pages_size()     const { return keep_pages_size_; }
+            bool   recover()             const { return recover_;         }
 
             void mem_size        (size_t s) { mem_size_        = s; }
             void page_size       (size_t s) { page_size_       = s; }
@@ -205,16 +206,15 @@ namespace gcache
             size_t      const rb_size_;
             size_t            page_size_;
             size_t            keep_pages_size_;
+            bool        const recover_;
         }
             params;
 
         gu::Mutex       mtx;
         gu::Cond        cond;
 
-        typedef std::map<int64_t, const void*>  seqno2ptr_t;
-        typedef seqno2ptr_t::iterator           seqno2ptr_iter_t;
-        typedef std::pair<int64_t, const void*> seqno2ptr_pair_t;
         seqno2ptr_t     seqno2ptr;
+        gu::UUID        gid;
 
         MemStore        mem;
         RingBuffer      rb;
@@ -228,12 +228,9 @@ namespace gcache
         int64_t         seqno_max;
         int64_t         seqno_released;
 
-
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;
 #endif
-
-        void constructor_common();
 
         /* returns true when successfully discards all seqnos up to s */
         bool discard_seqno (int64_t s);

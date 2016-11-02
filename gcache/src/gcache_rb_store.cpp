@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2016 Codership Oy <info@codership.com>
  */
 
 #include "gcache_rb_store.hpp"
@@ -9,6 +9,7 @@
 
 #include <gu_logger.hpp>
 #include <gu_throw.hpp>
+#include <gu_progress.hpp>
 
 #include <cassert>
 
@@ -22,6 +23,8 @@ namespace gcache
     void
     RingBuffer::reset()
     {
+        write_preamble(false);
+
         first_ = start_;
         next_  = start_;
 
@@ -38,43 +41,60 @@ namespace gcache
     void
     RingBuffer::constructor_common() {}
 
-    RingBuffer::RingBuffer (const std::string& name, size_t size,
-                            std::map<int64_t, const void*> & seqno2ptr)
+    RingBuffer::RingBuffer (const std::string& name,
+                            size_t             size,
+                            seqno2ptr_t&       seqno2ptr,
+                            gu::UUID&          gid,
+                            bool const         recover)
     :
         fd_        (name, check_size(size)),
         mmap_      (fd_),
-        open_      (true),
         preamble_  (static_cast<char*>(mmap_.ptr)),
         header_    (reinterpret_cast<int64_t*>(preamble_ + PREAMBLE_LEN)),
         start_     (reinterpret_cast<uint8_t*>(header_   + HEADER_LEN)),
         end_       (reinterpret_cast<uint8_t*>(preamble_ + mmap_.size)),
         first_     (start_),
         next_      (first_),
+        seqno2ptr_ (seqno2ptr),
+        gid_       (gid),
         size_cache_(end_ - start_ - sizeof(BufferHeader)),
         size_free_ (size_cache_),
         size_used_ (0),
         size_trail_(0),
 //        mallocs_   (0),
 //        reallocs_  (0),
-        seqno2ptr_ (seqno2ptr)
+        open_      (true)
     {
         constructor_common ();
+        open_preamble(recover);
         BH_clear (BH_cast(next_));
     }
 
     RingBuffer::~RingBuffer ()
     {
+        close_preamble();
         open_ = false;
         mmap_.sync();
-        mmap_.unmap();
+    }
+
+    static inline void
+    empty_buffer(BufferHeader* const bh) //mark buffer as empty
+    {
+        bh->seqno_g = gcache::SEQNO_ILL;
+    }
+
+    bool
+    buffer_is_empty(const BufferHeader* const bh)
+    {
+        return (SEQNO_ILL == bh->seqno_g);
     }
 
     /* discard all seqnos preceeding and including seqno */
     bool
-    RingBuffer::discard_seqno (int64_t seqno)
+    RingBuffer::discard_seqnos(seqno2ptr_t::iterator const i_begin,
+                               seqno2ptr_t::iterator const i_end)
     {
-        for (seqno2ptr_t::iterator i = seqno2ptr_.begin();
-             i != seqno2ptr_.end() && i->first <= seqno;)
+        for (seqno2ptr_t::iterator i(i_begin); i != i_end;)
         {
             seqno2ptr_t::iterator j(i); ++i;
             BufferHeader* const bh (ptr2BH (j->second));
@@ -82,7 +102,7 @@ namespace gcache
             if (gu_likely (BH_is_released(bh)))
             {
                 seqno2ptr_.erase (j);
-                bh->seqno_g = SEQNO_ILL;  // will never be accessed by seqno
+                empty_buffer(bh);
 
                 switch (bh->store)
                 {
@@ -265,7 +285,7 @@ namespace gcache
 
         if (SEQNO_NONE == bh->seqno_g)
         {
-            bh->seqno_g = SEQNO_ILL;
+            empty_buffer(bh);
             discard (bh);
         }
     }
@@ -335,8 +355,37 @@ namespace gcache
     }
 
     void
+    RingBuffer::estimate_space()
+    {
+        /* Estimate how much space remains */
+        if (first_ < next_)
+        {
+            /* start_  first_      next_    end_
+             *   |       |###########|       |
+             */
+            size_used_ = next_ - first_;
+            size_free_ = size_cache_ - size_used_;
+            size_trail_ = 0;
+        }
+        else
+        {
+            /* start_  next_       first_   end_
+             *   |#######|           |#####| |
+             *                              ^size_trail_ */
+            assert(size_trail_ > 0);
+            size_free_ = first_ - next_ + size_trail_ - sizeof(BufferHeader);
+            size_used_ = size_cache_ - size_free_;
+        }
+
+        assert_sizes();
+        assert(size_free_ < size_cache_);
+    }
+
+    void
     RingBuffer::seqno_reset()
     {
+        write_preamble(false);
+
         if (size_cache_ == size_free_) return;
 
         /* Find the last seqno'd RB buffer. It is likely to be close to the
@@ -364,7 +413,7 @@ namespace gcache
             }
         }
 
-        if (!bh) return;
+        if (!bh) return; /* no seqno'd buffers in RB */
 
         assert(bh->size > 0);
         assert(BH_is_released(bh));
@@ -408,28 +457,7 @@ namespace gcache
         assert ((BH_cast(first_))->seqno_g == SEQNO_NONE);
         assert (!BH_is_released(BH_cast(first_)));
 
-        /* Estimate how much space remains */
-        if (first_ < next_)
-        {
-            /* start_  first_      next_    end_
-             *   |       |###########|       |
-             */
-            size_used_ = next_ - first_;
-            size_free_ = size_cache_ - size_used_;
-            size_trail_ = 0;
-        }
-        else
-        {
-            /* start_  next_       first_   end_
-             *   |#######|           |#####| |
-             *                              ^size_trail_ */
-            assert(size_trail_ > 0);
-            size_free_ = first_ - next_ + size_trail_ - sizeof(BufferHeader);
-            size_used_ = size_cache_ - size_free_;
-        }
-
-        assert_sizes();
-        assert(size_free_ < size_cache_);
+        estimate_space();
 
         log_info << "GCache DEBUG: RingBuffer::seqno_reset(): discarded "
                  << (size_free_ - old) << " bytes";
@@ -456,7 +484,7 @@ namespace gcache
                 {
                     // either released or already discarded buffer
                     assert (BH_is_released(bh));
-                    bh->seqno_g = SEQNO_ILL;
+                    empty_buffer(bh);
                     discard (bh);
                     locked++;
                 }
@@ -478,9 +506,13 @@ namespace gcache
                  << locked << '/' << total << " locked buffers";
 
         assert_sizes();
+
+        if (next_ > first_ && first_ > start_) BH_clear(BH_cast(start_));
+        /* this is needed to avoid rescanning from start_ on recovery */
     }
 
-    void RingBuffer::print (std::ostream& os) const
+    void
+    RingBuffer::print (std::ostream& os) const
     {
         os  << "\nstart_ : " << reinterpret_cast<void*>(start_)
             << "\nend_   : " << reinterpret_cast<void*>(end_)
@@ -490,4 +522,473 @@ namespace gcache
             << "\nfree   : " << size_free_
             << "\nused   : " << size_used_;
     }
-}
+
+    std::string const RingBuffer::PR_KEY_VERSION   = "Version:";
+    std::string const RingBuffer::PR_KEY_GID       = "GID:";
+    std::string const RingBuffer::PR_KEY_SEQNO_MAX = "seqno_max:";
+    std::string const RingBuffer::PR_KEY_SEQNO_MIN = "seqno_min:";
+    std::string const RingBuffer::PR_KEY_OFFSET    = "offset:";
+    std::string const RingBuffer::PR_KEY_SYNCED    = "synced:";
+
+    void
+    RingBuffer::write_preamble(bool const synced)
+    {
+        static int const VERSION(1);
+        uint8_t* const preamble(reinterpret_cast<uint8_t*>(preamble_));
+
+        std::ostringstream os;
+
+        os << PR_KEY_VERSION << ' ' << VERSION << '\n';
+        os << PR_KEY_GID << ' ' << gid_ << '\n';
+
+        if (synced)
+        {
+            if (!seqno2ptr_.empty())
+            {
+                os << PR_KEY_SEQNO_MIN << ' '
+                   << seqno2ptr_.begin()->first << '\n';
+
+                os << PR_KEY_SEQNO_MAX << ' '
+                   << seqno2ptr_.rbegin()->first << '\n';
+
+                os << PR_KEY_OFFSET << ' ' << first_ - preamble << '\n';
+            }
+            else
+            {
+                os << PR_KEY_SEQNO_MIN << ' ' << SEQNO_ILL << '\n';
+                os << PR_KEY_SEQNO_MAX << ' ' << SEQNO_ILL << '\n';
+            }
+        }
+
+        os << PR_KEY_SYNCED << ' ' << synced << '\n';
+        os << '\n';
+
+        ::memset(preamble_, '\0', PREAMBLE_LEN);
+
+        size_t copy_len(os.str().length());
+        if (copy_len >= PREAMBLE_LEN) copy_len = PREAMBLE_LEN - 1;
+
+        ::memcpy(preamble_, os.str().c_str(), copy_len);
+
+        mmap_.sync(preamble_, copy_len);
+    }
+
+    void
+    RingBuffer::open_preamble(bool const do_recover)
+    {
+        uint8_t* const preamble(reinterpret_cast<uint8_t*>(preamble_));
+        int version(0);
+        long long seqno_max(SEQNO_ILL);
+        long long seqno_min(SEQNO_ILL);
+        off_t offset(-1);
+        bool  synced(false);
+
+        {
+            std::istringstream iss(preamble_);
+
+            if (iss.fail())
+                gu_throw_error(EINVAL) << "Failed to open preamble.";
+
+            std::string line;
+            while (getline(iss, line), iss.good())
+            {
+                std::istringstream istr(line);
+                std::string key;
+
+                istr >> key;
+
+                if ('#' == key[0]) { /* comment line */ }
+                else if (PR_KEY_VERSION   == key) istr >> version;
+                else if (PR_KEY_GID       == key) istr >> gid_;
+                else if (PR_KEY_SEQNO_MAX == key) istr >> seqno_max;
+                else if (PR_KEY_SEQNO_MIN == key) istr >> seqno_min;
+                else if (PR_KEY_OFFSET    == key) istr >> offset;
+                else if (PR_KEY_SYNCED    == key) istr >> synced;
+            }
+        }
+
+        if (version < 0 || version > 16)
+        {
+           log_warn << "Bogus version in GCache ring buffer preamble: "
+                    << version << ". Assuming 0.";
+           version = 0;
+        }
+
+        if (offset < -1 || (preamble + offset + sizeof(BufferHeader)) > end_)
+        {
+           log_warn << "Bogus offset in GCache ring buffer preamble: "
+                    << offset << ". Assuming unknown.";
+           offset = -1;
+        }
+
+        if (do_recover)
+        {
+            if (gid_ != gu::UUID())
+            {
+                log_info << "Recovering GCache ring buffer: version: " << version
+                         << ", UUID: " << gid_ << ", offset: " << offset;
+
+                try
+                {
+                    recover(offset - (start_ - preamble));
+                }
+                catch (gu::Exception& e)
+                {
+                    log_warn << "Failed to recover GCache ring buffer: "
+                             << e.what();
+                    reset();
+                }
+            }
+            else
+            {
+                log_warn << "Skipped GCache ring buffer recovery: could not "
+                    "determine history UUID.";
+            }
+        }
+
+        write_preamble(false);
+    }
+
+    void
+    RingBuffer::close_preamble()
+    {
+        write_preamble(true);
+    }
+
+    int64_t
+    RingBuffer::scan(off_t const offset)
+    {
+        int segment_scans(0);
+        int64_t seqno_max(-1);
+        uint8_t* ptr;
+        BufferHeader* bh;
+        size_t collision_count(0);
+        int64_t erase_up_to(-1);
+        uint8_t* segment_start(start_);
+
+        /* start at offset (first segment) if we know it and it is valid */
+        if (offset >= 0)
+        {
+            if (start_ + offset + 2*sizeof(BufferHeader) < end_)
+                /* we know exaclty where the first segment starts */
+                segment_start = start_ + offset;
+            else
+                /* first segment is completely missing, advance scan count */
+                segment_scans = 1;
+        }
+
+        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan ",
+                                         " bytes",
+                                         "PT5S", /* 5 sec */
+                                         1<<22,  /* 4Mb */
+                                         end_ - start_);
+
+        while (segment_scans < 2)
+        {
+            segment_scans++;
+
+            ptr = segment_start;
+            bh = BH_cast(ptr);
+
+#define GCACHE_SCAN_BUFFER_TEST                                 \
+            (BH_test(bh) && bh->size > 0 &&                     \
+             ptr + bh->size + sizeof(BufferHeader) <= end_ &&   \
+             BH_test(BH_cast(ptr + bh->size)))
+
+            while (GCACHE_SCAN_BUFFER_TEST)
+            {
+                bh->flags |= BUFFER_RELEASED;
+                bh->ctx    = this;
+
+                int64_t const seqno_g(bh->seqno_g);
+
+                if (gu_likely(seqno_g > 0))
+                {
+                    const std::pair<seqno2ptr_iter_t, bool>& res(
+                        seqno_g > seqno_max ? seqno_max = seqno_g,
+                        std::pair<seqno2ptr_iter_t, bool>(
+                            seqno2ptr_.insert(seqno2ptr_.end(),
+                                              seqno2ptr_pair_t(seqno_g, bh + 1)),
+                            true) :
+                        seqno2ptr_.insert(seqno2ptr_pair_t(seqno_g, bh + 1))
+                        );
+
+                    if (gu_unlikely (false == res.second))
+                    {
+                        collision_count++;
+
+                        log_info <<"Attempt to reuse the same seqno: " << seqno_g
+                                 << ". New ptr = " << static_cast<void*>(bh+1)
+                                 << ", previous ptr = " << res.first->second;
+                        empty_buffer(bh); // this buffer is unusable
+                        assert(BH_is_released(bh));
+
+                        if (res.first->second != NULL)
+                        {
+                            BufferHeader* b(ptr2BH(res.first->second));
+                            empty_buffer(b);
+                            assert(BH_is_released(b));
+                            res.first->second = NULL; // mark entry as invalid
+                            // but don't remove from the map to block this seqno
+                        }
+
+                        if (erase_up_to < seqno_g) erase_up_to = seqno_g;
+                    }
+                }
+
+                progress.update(bh->size);
+                ptr += bh->size;
+                bh = BH_cast(ptr);
+            }
+
+            if (!BH_is_clear(bh))
+            {
+                if (start_ == segment_start)
+                {
+                    log_warn << "Failed to scan the last segment to the end. "
+                            "Last events may be missing. Last recovered event: "
+                             << gid_ << ':' << seqno_max;
+                }
+
+                /* do best effort */
+                BH_clear(bh);
+            }
+
+            if (offset > 0 && segment_start == start_ + offset)
+            {
+                /* started with the first segment, jump to the second one */
+                assert(1 == segment_scans);
+                first_ = segment_start;
+                size_trail_ = end_ - ptr;
+                segment_start = start_;
+            }
+            else if (offset < 0 && segment_start == start_)
+            {
+                /* started with the second segment, try to find the first one */
+                assert(1 == segment_scans);
+                next_ = ptr;
+
+                while (!GCACHE_SCAN_BUFFER_TEST &&
+                       ptr + sizeof(BufferHeader) < end_)
+                {
+                    progress.update(1);
+                    ptr += 1;
+                    bh = BH_cast(ptr);
+                    /* it would have been nice to use alignment of 8 or so */
+                }
+
+                if (GCACHE_SCAN_BUFFER_TEST)
+                {
+                    segment_start = ptr;
+                    first_ = segment_start;
+                }
+                else if (ptr + sizeof(BufferHeader) == end_)
+                {
+                    /* perhaps it was a single segment starting at start_ */
+                    first_ = start_;
+                    break;
+                }
+                else
+                {
+                    assert(0);
+                }
+            }
+            else if (offset == 0 && segment_start == start_)
+            {
+                /* single segment case */
+                assert(1 == segment_scans);
+                first_ = segment_start;
+                next_ = ptr;
+                break;
+            }
+            else
+            {
+                assert(2 == segment_scans);
+                assert(offset != 0);
+
+                if (offset >= 0) next_ = ptr; /* end of the second segment */
+
+                assert(first_ >= start_ && first_ < end_);
+                assert(next_  >= start_ && next_  < end_);
+
+                if (offset < 0 && segment_start > start_)
+                {
+                    /* first (end) segment was scanned last, estimate trail */
+                    size_trail_ = end_ - ptr;
+                }
+                else if (offset > 0 && next_ >= first_)
+                {
+                    size_trail_ = 0;
+                }
+            }
+#undef GCACHE_SCAN_BUFFER_TEST
+        } // while (segment_scans < 2)
+
+        progress.finish();
+
+        return erase_up_to;
+    }
+
+    void
+    RingBuffer::recover(off_t const offset)
+    {
+        static const char* const diag_prefix = "Recovering GCache ring buffer: ";
+
+        /* scan the buffer and populate seqno2ptr map */
+        int64_t const lower(scan(offset));
+
+        if (!seqno2ptr_.empty())
+        {
+            assert(first_ != next_);
+            assert(next_ < first_ || size_trail_ == 0);
+            assert(next_ > first_ || size_trail_ >  0);
+
+            /* find the last gapless seqno sequence */
+            seqno2ptr_t::reverse_iterator r(seqno2ptr_.rbegin());
+            seqno_t const seqno_max(r->first);
+            seqno_t       seqno_min(seqno2ptr_.begin()->first);
+
+            if (lower > 0
+                /* collisions detected */ ||
+                seqno2ptr_t::size_type(seqno_max - seqno_min + 1) >
+                seqno2ptr_.size()
+                /* not all seqnos present */)
+            {
+                /* need to search for seqno gaps */
+                assert(seqno_max >= lower);
+                if (lower == seqno_max)
+                {
+                    seqno2ptr_.clear();
+                    goto full_reset;
+                }
+
+                seqno_min = seqno_max;
+                ++r;
+                for (; r != seqno2ptr_.rend() && r->first > lower; ++r)
+                {
+                    assert(r->second != NULL);
+
+                    if (r->first + 1 == seqno_min)
+                        seqno_min = r->first;
+                    else
+                        break;
+                }
+            }
+            else
+            {
+                r = seqno2ptr_.rend();
+            }
+
+            log_info << diag_prefix << "found gapless sequence " << seqno_min
+                     << '-' << seqno_max;
+
+            if (r != seqno2ptr_.rend())
+            {
+                log_info << diag_prefix << "discarding seqnos "
+                         << seqno2ptr_.begin()->first << '-' << r->first;
+
+                /* clear up seqno2ptr map */
+                for (; r != seqno2ptr_.rend(); ++r)
+                {
+                    empty_buffer(ptr2BH(r->second));
+                }
+                seqno2ptr_.erase(seqno2ptr_.begin(), seqno2ptr_.find(seqno_min));
+            }
+            assert(seqno2ptr_.size() > 0);
+
+            /* trim first_: start with the current first_ and scan forward to
+             * the first non-empty buffer. */
+            BufferHeader* bh(BH_cast(first_));
+            assert(bh->size > sizeof(BufferHeader));
+            while (bh->seqno_g == SEQNO_ILL)
+            {
+                assert(bh->size > sizeof(BufferHeader));
+
+                bh = BH_next(bh);
+
+                if (gu_unlikely(0 == bh->size)) bh = BH_cast(start_); // rollover
+            }
+            first_ = reinterpret_cast<uint8_t*>(bh);
+
+            /* trim next_: start with the last seqno and scan forward up to the
+             * current next_. Update to the end of the last non-empty buffer. */
+            BufferHeader* last_bh(NULL);
+            bh = ptr2BH(seqno2ptr_[seqno_max]);
+            while (bh != BH_cast(next_))
+            {
+                if (gu_likely(bh->size) > 0)
+                {
+                    assert(bh->seqno_d >= SEQNO_ILL);
+                    assert(bh->size > sizeof(BufferHeader));
+
+                    if (bh->seqno_g > 0) last_bh = bh;
+
+                    bh = BH_next(bh);
+                }
+                else
+                {
+                    bh = BH_cast(start_); // rollover
+                }
+            }
+            assert(last_bh);
+            next_ = reinterpret_cast<uint8_t*>(BH_next(last_bh));
+
+            /* at this point we must have at least one seqno'd buffer */
+            assert(next_ != first_);
+
+            /* as a result of trimming, trailing space may be gone */
+            if (first_ < next_) size_trail_ = 0;
+            else assert(size_trail_ >= sizeof(BufferHeader));
+
+            estimate_space();
+
+            /* now discard all the locked-in buffers (see seqno_reset()) */
+            gu::Progress<size_t> progress(
+                "GCache::RingBuffer unused buffers scan ",
+                " bytes",
+                "PT5S", /* 5 sec */
+                1<<22,  /* 4Mb   */
+                size_used_);
+
+            size_t total(0);
+            size_t locked(0);
+            bh = BH_cast(first_);
+            while (bh != BH_cast(next_))
+            {
+                if (gu_likely(bh->size > 0))
+                {
+                    total++;
+                    if (gu_unlikely(SEQNO_ILL == bh->seqno_g))
+                    {
+                        locked++;
+                        discard(bh);
+                    }
+
+                    bh = BH_next(bh);
+                }
+                else
+                {
+                     bh = BH_cast(start_); // rollover
+                }
+
+                progress.update(bh->size);
+            }
+
+            progress.finish();
+
+            log_info << "GCache DEBUG: RingBuffer::recover(): found "
+                     << locked << '/' << total << " locked buffers";
+            log_info << "GCache DEBUG: RingBuffer::recover(): used space: "
+                     << size_used_ << '/' << size_cache_;
+
+            assert_sizes();
+        }
+        else
+        {
+        full_reset:
+            log_info << diag_prefix << "didn't recover any events.";
+            reset();
+        }
+    }
+
+} /* namespace gcache */
