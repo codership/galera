@@ -355,7 +355,8 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     log_info << "Setting GCS initial position to " << inpos;
 
-    if (bootstrap == true && safe_to_bootstrap_ == false)
+    if ((bootstrap == true || cluster_url == "gcomm://")
+        && safe_to_bootstrap_ == false)
     {
         log_error << "This node is not safe to bootstrap the cluster. "
                   << "It was not the last one to leave the cluster and may "
