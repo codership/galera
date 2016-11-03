@@ -184,6 +184,8 @@ namespace gcache
 
             assert (first_ != next_);
             /* buffer is either discarded already, or it must have seqno */
+            if (SEQNO_ILL != bh->seqno_g)
+            { log_info << "SEQNO_ILL != bh->seqno_g, bh: " << bh; }
             assert (SEQNO_ILL == bh->seqno_g);
 
             first_ += bh->size;
@@ -702,6 +704,7 @@ namespace gcache
 
                 if (gu_likely(seqno_g > 0))
                 {
+                    log_info << "Found seqno: " << seqno_g;
                     const std::pair<seqno2ptr_iter_t, bool>& res(
                         seqno_g > seqno_max ? seqno_max = seqno_g,
                         std::pair<seqno2ptr_iter_t, bool>(
@@ -834,6 +837,15 @@ namespace gcache
 
         /* scan the buffer and populate seqno2ptr map */
         int64_t const lower(scan(offset));
+        log_info << "scan() returned " << lower;
+        if (seqno2ptr_.empty())
+        {
+            log_info << "seqno2ptr is empty";
+        }
+        else
+        {
+        log_info << "seqno2ptr map has " << seqno2ptr_.begin()->first << " - " << seqno2ptr_.rbegin()->first;
+        }
 
         if (!seqno2ptr_.empty())
         {
