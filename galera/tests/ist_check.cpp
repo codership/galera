@@ -245,7 +245,7 @@ static void test_ist_common(int const version)
     using galera::TrxHandle;
     using galera::KeyOS;
 
-    TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE, 4, "ist_common");
+    TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE(), 4, "ist_common");
     TrxHandle::SlavePool sp(sizeof(TrxHandle), 4, "ist_common");
 
     int const trx_version(select_trx_version(version));
