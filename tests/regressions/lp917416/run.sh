@@ -184,7 +184,7 @@ echo
 ########################
 $MYSQL --port=$port_0 -e 'DROP TABLE t917416'	;
 
-../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1
+../../scripts/command.sh stop_node 0
 
 exit $success

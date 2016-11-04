@@ -132,8 +132,8 @@ echo
 echo "Done!"
 echo
 
-../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1
+../../scripts/command.sh stop_node 0
 
 exit 0
 
