@@ -539,6 +539,16 @@ namespace galera
              * I'll be damned if this+1 is not sufficiently well aligned. */
             assert(new_version());
             assert(wso_);
+            
+            /* Check for memory alignment, if it is not aligned, adjust it
+            */
+             uintptr_t alignment = reinterpret_cast<uintptr_t>(this + 1); 
+	         if(alignment % 8uL) { 
+	            std::cout << "Fixing misalignment\n";
+	
+	            alignment += 8uL - alignment % 8uL;	     
+	    }
+
             return *reinterpret_cast<WriteSetOut*>(this + 1);
         }
         const WriteSetOut& write_set_out() const
