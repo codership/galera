@@ -184,7 +184,7 @@ echo
 $MYSQL --host=$host_0 --port=$port_0 -e 'DROP TABLE test.lp922757child'
 $MYSQL --host=$host_0 --port=$port_0 -e 'DROP TABLE test.lp922757parent'
 
-../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1
+../../scripts/command.sh stop_node 0
 
 exit $success
