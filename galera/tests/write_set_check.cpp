@@ -341,7 +341,7 @@ START_TEST(test_mapped_buffer)
 END_TEST
 
 static TrxHandle::LocalPool
-lp(TrxHandle::LOCAL_STORAGE_SIZE, 4, "ws_local_pool");
+lp(TrxHandle::LOCAL_STORAGE_SIZE(), 4, "ws_local_pool");
 
 static TrxHandle::SlavePool
 sp(sizeof(TrxHandle), 4, "ws_slave_pool");
