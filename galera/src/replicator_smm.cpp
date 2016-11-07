@@ -358,10 +358,11 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     if ((bootstrap == true || cluster_url == "gcomm://")
         && safe_to_bootstrap_ == false)
     {
-        log_error << "This node is not safe to bootstrap the cluster. "
+        log_error << "It may not be safe to bootstrap the cluster from this node. "
                   << "It was not the last one to leave the cluster and may "
                   << "not contain all the updates. To force cluster bootstrap "
-                  << "with this node remove grastate.dat file manually.";
+                  << "with this node, edit the grastate.dat file manually and "
+                  << "set safe_to_bootstrap to 1 .";
         ret = WSREP_NODE_FAIL;
     }
 
