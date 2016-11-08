@@ -130,6 +130,7 @@ boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
+deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
@@ -543,6 +544,13 @@ else:
 check_env.Append(BUILDERS = {'Test' :  bld})
 
 Export('check_env')
+
+#
+# If deterministic_tests is given, export GALERA_TEST_DETERMINISTIC
+# so that the non-deterministic tests can be filtered out.
+#
+if deterministic_tests:
+   os.environ['GALERA_TEST_DETERMINISTIC'] = '1'
 
 #
 # Run root SConscript with variant_dir
