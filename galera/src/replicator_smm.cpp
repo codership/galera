@@ -1432,16 +1432,17 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     {
         establish_protocol_versions (repl_proto);
 
+        // we have to reset cert initial position here, SST does not contain
+        // cert index yet (see #197).
+        // Also this must be done before releasing GCache buffers.
+        cert_.assign_initial_position(group_seqno, trx_params_.version_);
+
+        if (STATE_SEQNO() > 0) service_thd_.release_seqno(STATE_SEQNO());
+        // make sure all gcache buffers are released
+
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
         service_thd_.flush();             // make sure service thd is idle
-
-        // we have to reset cert initial position here, SST does not contain
-        // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno, trx_params_.version_);
-
-        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-        // make sure all gcache buffers are released
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
