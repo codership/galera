@@ -21,6 +21,29 @@
 #include <cstdlib>
 #include <vector>
 
+//
+// run_all_tests is set tuo true by default. To disable pc tests
+// which use real TCP transport, set GALERA_TEST_DETERMINISTIC env
+// variable before running pc test suite.
+//
+static bool run_all_tests(true);
+
+static struct run_all_pc_tests
+{
+public:
+    run_all_pc_tests()
+    {
+        if (::getenv("GALERA_TEST_DETERMINISTIC"))
+        {
+            run_all_tests = false;
+        }
+        else
+        {
+            run_all_tests = true;
+        }
+    }
+} run_all_pc_tests;
+
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu::datetime;
@@ -3910,10 +3933,13 @@ Suite* pc_suite()
         tcase_set_timeout(tc, 25);
         suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_transport");
-        tcase_add_test(tc, test_pc_transport);
-        tcase_set_timeout(tc, 35);
-        suite_add_tcase(s, tc);
+        if (run_all_tests == true)
+        {
+            tc = tcase_create("test_pc_transport");
+            tcase_add_test(tc, test_pc_transport);
+            tcase_set_timeout(tc, 35);
+            suite_add_tcase(s, tc);
+        }
 
         tc = tcase_create("test_trac_191");
         tcase_add_test(tc, test_trac_191);
@@ -3935,9 +3961,12 @@ Suite* pc_suite()
         tcase_add_test(tc, test_set_param);
         suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_trac_599");
-        tcase_add_test(tc, test_trac_599);
-        suite_add_tcase(s, tc);
+        if (run_all_tests == true)
+        {
+            tc = tcase_create("test_trac_599");
+            tcase_add_test(tc, test_trac_599);
+            suite_add_tcase(s, tc);
+        }
 
         tc = tcase_create("test_trac_620");
         tcase_add_test(tc, test_trac_620);
