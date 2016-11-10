@@ -7,8 +7,6 @@
 #ifndef _gcache_memops_hpp_
 #define _gcache_memops_hpp_
 
-#include <limits>
-
 namespace gcache
 {
     struct BufferHeader;

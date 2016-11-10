@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -26,6 +26,7 @@ namespace gcache
         seqno_locked   = SEQNO_NONE;
         seqno_max      = SEQNO_NONE;
         seqno_released = SEQNO_NONE;
+        gid            = gu::UUID();
 
         seqno2ptr.clear();
 
@@ -34,9 +35,6 @@ namespace gcache
 #endif
     }
 
-    void
-    GCache::constructor_common() {}
-
     GCache::GCache (gu::Config& cfg, const std::string& data_dir)
         :
         config    (cfg),
@@ -44,8 +42,10 @@ namespace gcache
         mtx       (),
         cond      (),
         seqno2ptr (),
+        gid       (),
         mem       (params.mem_size(), seqno2ptr),
-        rb        (params.rb_name(), params.rb_size(), seqno2ptr),
+        rb        (params.rb_name(), params.rb_size(), seqno2ptr, gid,
+                   params.recover()),
         ps        (params.dir_name(),
                    params.keep_pages_size(),
                    params.page_size(),
@@ -57,14 +57,13 @@ namespace gcache
         reallocs  (0),
         frees     (0),
         seqno_locked(SEQNO_NONE),
-        seqno_max   (SEQNO_NONE),
-        seqno_released(0)
+        seqno_max   (seqno2ptr.empty() ?
+                     SEQNO_NONE : seqno2ptr.rbegin()->first),
+        seqno_released(seqno_max)
 #ifndef NDEBUG
         ,buf_tracker()
 #endif
-    {
-        constructor_common ();
-    }
+    {}
 
     GCache::~GCache ()
     {

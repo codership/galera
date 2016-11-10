@@ -2,7 +2,7 @@
 // detail/null_event.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2015 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -17,7 +17,7 @@
 
 #include "asio/detail/config.hpp"
 
-#if !defined(BOOST_HAS_THREADS) || defined(ASIO_DISABLE_THREADS)
+#if !defined(ASIO_HAS_THREADS)
 
 #include "asio/detail/noncopyable.hpp"
 
@@ -40,16 +40,29 @@ public:
   {
   }
 
-  // Signal the event.
+  // Signal the event. (Retained for backward compatibility.)
   template <typename Lock>
   void signal(Lock&)
   {
   }
 
-  // Signal the event and unlock the mutex.
+  // Signal all waiters.
   template <typename Lock>
-  void signal_and_unlock(Lock&)
+  void signal_all(Lock&)
   {
+  }
+
+  // Unlock the mutex and signal one waiter.
+  template <typename Lock>
+  void unlock_and_signal_one(Lock&)
+  {
+  }
+
+  // If there's a waiter, unlock the mutex and signal it.
+  template <typename Lock>
+  bool maybe_unlock_and_signal_one(Lock&)
+  {
+    return false;
   }
 
   // Reset the event.
@@ -70,6 +83,6 @@ public:
 
 #include "asio/detail/pop_options.hpp"
 
-#endif // !defined(BOOST_HAS_THREADS) || defined(ASIO_DISABLE_THREADS)
+#endif // !defined(ASIO_HAS_THREADS)
 
 #endif // ASIO_DETAIL_NULL_EVENT_HPP

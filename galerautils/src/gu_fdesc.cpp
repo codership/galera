@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -154,11 +154,9 @@ namespace gu
 
     FileDescriptor::~FileDescriptor ()
     {
-        if (sync_ && fsync(fd_) != 0)
+        if (sync_)
         {
-            int const err(errno);
-            log_error << "Failed to flush file '" << name_ << "': "
-                      << err << " (" << strerror(err) << '\'';
+            try { sync(); } catch (Exception& e) { log_error << e.what(); }
         }
 
         if (close(fd_) != 0)
@@ -174,7 +172,7 @@ namespace gu
     }
 
     void
-    FileDescriptor::flush () const
+    FileDescriptor::sync () const
     {
         log_debug << "Flushing file '" << name_ << "'";
 
@@ -215,8 +213,9 @@ namespace gu
             offset += GU_PAGE_SIZE;
         }
 
-        if (offset >= size_ && write_byte (size_ - 1) && fsync (fd_) == 0)
+        if (offset >= size_ && write_byte (size_ - 1))
         {
+            sync();
             return;
         }
 

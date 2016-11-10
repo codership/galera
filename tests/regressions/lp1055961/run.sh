@@ -179,8 +179,8 @@ echo
 echo "Done!"
 echo
 
-stop_node 0
 stop_node 1
+stop_node 0
 
 exit $SUCCESS
 
