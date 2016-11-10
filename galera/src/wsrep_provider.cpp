@@ -424,7 +424,8 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     // in pre commit.
     if (victim->state() != TrxHandle::S_ABORTING)
     {
-        victim->set_state(TrxHandle::S_MUST_ABORT);
+        if (victim->state() != TrxHandle::S_MUST_ABORT)
+            victim->set_state(TrxHandle::S_MUST_ABORT);
         victim->set_state(TrxHandle::S_ABORTING);
     }
 
