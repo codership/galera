@@ -14,6 +14,9 @@
 #include "common.h"    //
 
 #ifndef HAVE_SYSTEM_ASIO
+// Make GCC to treat this as the system header to suppress compiler
+// warnings from embedded asio.hpp
+#pragma GCC system_header
 // Using embedded copy of ASIO requires turning off some
 // compiler warnings.
 #if defined(__GNUG__)
