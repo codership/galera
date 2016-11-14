@@ -150,12 +150,15 @@ namespace gu
     {
         switch (ERR_GET_REASON(ec.value()))
         {
+#ifdef SSL_R_SHORT_READ
         case SSL_R_SHORT_READ:
             // Short read error seems to be generated quite frequently
             // by SSL library, probably because broken connections.
             return true;
+#endif /* SSL_R_SHORT_READ */
+        default:
+            return false;
         }
-        return false;
     }
 
     // Return low level error info for asio::error_code if available.
