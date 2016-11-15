@@ -9,7 +9,7 @@
 
 #include "gu_exception.hpp"
 #include "gu_types.hpp" // for off_t, byte_t
-#include "../common/wsrep_api.h"
+#include "../../common/wsrep_api.h"
 
 #include <string>
 

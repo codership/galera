@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 // To the get declaration of pfs callback.
-#include "../common/wsrep_api.h"
+#include "../../common/wsrep_api.h"
 
 struct gu_mutex
 {

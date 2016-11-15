@@ -11,7 +11,7 @@
 #include "galerautils.h"
 
 // To the get declaration of pfs callback.
-#include "../common/wsrep_api.h"
+#include "../../common/wsrep_api.h"
 
 gu_pfs_instr_cb_t pfs_instr_callback = NULL;
 
