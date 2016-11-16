@@ -1944,13 +1944,12 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
     return ret;
 }
 
-#if 0
-static int
-proto_ver(gcs_conn_t* conn)
+int
+gcs_proto_ver(gcs_conn_t* conn)
 {
     return gcs_core_proto_ver(conn->core);
 }
-#endif
+
 
 long
 gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)

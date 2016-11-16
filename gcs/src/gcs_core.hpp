@@ -199,9 +199,6 @@ gcs_core_get_group (const gcs_core_t* core);
 extern gcs_fifo_lite_t*
 gcs_core_get_fifo (gcs_core_t* core);
 
-extern int
-gcs_core_get_proto(gcs_core_t* core);
-
 #endif /* GCS_CORE_TESTING */
 
 #endif /* _gcs_core_h_ */
