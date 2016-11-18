@@ -141,29 +141,30 @@ extern int
 gcs_core_set_pkt_size (gcs_core_t* conn, int pkt_size);
 
 /* sends this node's last applied value to group */
-extern long
+extern int
 gcs_core_set_last_applied (gcs_core_t* core, const gu::GTID& gtid);
 
 /* sends status of the ended snapshot (snapshot gtid or error code) */
-extern long
+extern int
 gcs_core_send_join (gcs_core_t* core, const gu::GTID& gtid, int code);
 
 /* sends SYNC notice, gtid currently has no meaning */
-extern long
+extern int
 gcs_core_send_sync (gcs_core_t* core, const gu::GTID& gtid);
 
 /* sends vote on GTID outcome */
-extern long
-gcs_core_send_vote (gcs_core_t* core, const gu::GTID& gtid, int64_t code);
+extern int
+gcs_core_send_vote (gcs_core_t* core, const gu::GTID& gtid, int64_t code,
+                    const void* msg, size_t msg_len);
 
 /* sends flow control message */
-extern long
+extern ssize_t
 gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
 
-extern long
+extern ssize_t
 gcs_core_caused(gcs_core_t* core, gu::GTID& gtid);
 
-extern long
+extern int
 gcs_core_param_set (gcs_core_t* core, const char* key, const char* value);
 
 extern const char*
