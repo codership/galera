@@ -444,7 +444,10 @@ if strict_build_flags == 1:
     if 'clang' not in conf.env['CXX']:
         conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
     else:
-        conf.env.Append(CCFLAGS = ' -Wno-self-assign')
+        conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
+        conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
+        conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
+        conf.env.Append(CXXFLAGS = ' -Wno-gnu-zero-variadic-macro-arguments')
         if 'ccache' in conf.env['CXX']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
