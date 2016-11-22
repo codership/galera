@@ -15,6 +15,11 @@
 #include <cerrno>
 #include <sys/mman.h>
 
+#if defined(__FreeBSD__) && defined(MAP_NORESERVE)
+/* FreeBSD has never implemented this flags and will deprecate it. */
+#undef MAP_NORESERVE
+#endif
+
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
 #endif
