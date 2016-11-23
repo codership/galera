@@ -587,7 +587,6 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
     long const      key_count(key_set.count());
     long            processed(0);
 
-    assert(key_count > 0);
 
     key_set.rewind();
 
