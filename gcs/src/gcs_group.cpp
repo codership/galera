@@ -169,7 +169,7 @@ group_redo_last_applied (gcs_group_t* group)
 {
     long       n;
     long       last_node    = -1;
-    gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    gu_seqno_t last_applied = GU_LLONG_MAX;
 
     for (n = 0; n < group->num; n++) {
         const gcs_node_t* const node = &group->nodes[n];

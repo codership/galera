@@ -80,7 +80,11 @@ gu::ThreadSchedparam gu::thread_get_schedparam(pthread_t thd)
 
 void gu::thread_set_schedparam(pthread_t thd, const gu::ThreadSchedparam& sp)
 {
+#if defined(__sun__)
+    struct sched_param spstr = { sp.prio(), { 0, } /* sched_pad array */};
+#else
     struct sched_param spstr = { sp.prio() };
+#endif
     int err;
     if ((err = pthread_setschedparam(thd, sp.policy(), &spstr)) != 0)
     {
