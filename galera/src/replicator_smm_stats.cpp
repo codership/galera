@@ -101,6 +101,7 @@ typedef enum status_vars
     STATS_FC_PAUSED_AVG,
     STATS_FC_SENT,
     STATS_FC_RECEIVED,
+    STATS_FC_INTERVAL,
     STATS_CERT_DEPS_DISTANCE,
     STATS_APPLY_OOOE,
     STATS_APPLY_OOOL,
@@ -148,6 +149,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "flow_control_paused",      WSREP_VAR_DOUBLE, { 0 }  },
     { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_recv",        WSREP_VAR_INT64,  { 0 }  },
+    { "flow_control_interval",    WSREP_VAR_STRING, { 0 }  },
     { "cert_deps_distance",       WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oool",               WSREP_VAR_DOUBLE, { 0 }  },
@@ -206,6 +208,9 @@ galera::ReplicatorSMM::stats_get()
     gcs_.get_stats (&stats);
 
     int64_t seqno_min = gcache_.seqno_min();
+    char    interval[64];
+    snprintf(interval, sizeof(interval), "[ %ld, %ld ]",
+             stats.fc_lower_limit, stats.fc_upper_limit);
 
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
     sv[STATS_LOCAL_SEND_QUEUE_MAX].value._int64  = stats.send_q_len_max;
@@ -221,6 +226,8 @@ galera::ReplicatorSMM::stats_get()
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
+    sv[STATS_FC_INTERVAL         ].value._string = interval;
+
 
 
     double avg_cert_interval(0);

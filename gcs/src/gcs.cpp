@@ -2001,6 +2001,9 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;
     stats->fc_received = conn->stats_fc_received;
+
+    stats->fc_lower_limit = conn->lower_limit;
+    stats->fc_upper_limit = conn->upper_limit;
 }
 
 void
