@@ -162,7 +162,7 @@ SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap)
     if (corrupt_) return;
 
     // Write new state if uuid or seqno was changed:
-    if (uuid_ != u || seqno_ != s)
+    if (uuid_ != u || seqno_ != s || safe_to_bootstrap_ != safe_to_bootstrap)
     {
        uuid_ = u;
        seqno_ = s;
