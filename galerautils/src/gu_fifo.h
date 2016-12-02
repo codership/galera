@@ -62,4 +62,8 @@ extern int gu_fifo_cancel_gets (gu_fifo_t* q);
 /*! Resume get operations */
 extern int gu_fifo_resume_gets (gu_fifo_t* q);
 
+#ifndef NDEBUG
+extern bool gu_fifo_locked (gu_fifo_t* q);
+#endif
+
 #endif // _gu_fifo_h_

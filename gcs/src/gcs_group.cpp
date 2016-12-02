@@ -819,7 +819,9 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                      sender_idx, sender->segment, sender->name,
                      gcs_node_state_to_str(sender->status));
         }
-        return 0;
+
+        /* signal sender that it didn't work */
+        return -ERESTART * (sender_idx == group->my_idx);
     }
 }
 
