@@ -2,7 +2,7 @@
 // detail/service_registry.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2015 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -21,41 +21,33 @@
 #include "asio/detail/noncopyable.hpp"
 #include "asio/io_service.hpp"
 
-#if defined(BOOST_NO_TYPEID)
-# if !defined(ASIO_NO_TYPEID)
-#  define ASIO_NO_TYPEID
-# endif // !defined(ASIO_NO_TYPEID)
-#endif // defined(BOOST_NO_TYPEID)
-
 #include "asio/detail/push_options.hpp"
 
 namespace asio {
 namespace detail {
 
-#if defined(__GNUC__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 1) || (__GNUC__ > 4)
-#  pragma GCC visibility push (default)
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 1) || (__GNUC__ > 4)
-#endif // defined(__GNUC__)
-
 template <typename T>
 class typeid_wrapper {};
-
-#if defined(__GNUC__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 1) || (__GNUC__ > 4)
-#  pragma GCC visibility pop
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 1) || (__GNUC__ > 4)
-#endif // defined(__GNUC__)
 
 class service_registry
   : private noncopyable
 {
 public:
-  // Constructor.
-  ASIO_DECL service_registry(asio::io_service& o);
+  // Constructor. Adds the initial service.
+  template <typename Service, typename Arg>
+  service_registry(asio::io_service& o,
+      Service* initial_service, Arg arg);
 
   // Destructor.
   ASIO_DECL ~service_registry();
+
+  // Notify all services of a fork event.
+  ASIO_DECL void notify_fork(asio::io_service::fork_event fork_ev);
+
+  // Get the first service object cast to the specified type. Called during
+  // io_service construction and so performs no locking or type checking.
+  template <typename Service>
+  Service& first_service();
 
   // Get the service object corresponding to the specified service type. Will
   // create a new service object automatically if no such object already
@@ -119,8 +111,8 @@ private:
       const asio::io_service::service::key& key,
       factory_type factory);
 
-  // Add a service object. Returns false on error, in which case ownership of
-  // the object is retained by the caller.
+  // Add a service object. Throws on error, in which case ownership of the
+  // object is retained by the caller.
   ASIO_DECL void do_add_service(
       const asio::io_service::service::key& key,
       asio::io_service::service* new_service);

@@ -20,7 +20,6 @@
 
 #include <vector>
 #include <ostream>
-//#include <new> // std::bad_alloc
 
 namespace gu
 {
@@ -43,8 +42,7 @@ namespace gu
               buf_size_ (buf_size),
               reserve_  (reserve)
         {
-            assert(buf_size >  0);
-            assert(reserve  >= 0);
+            assert(buf_size_ >  0);
             pool_.reserve(reserve_);
         }
 

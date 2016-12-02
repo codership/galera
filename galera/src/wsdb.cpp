@@ -32,7 +32,7 @@ void galera::Wsdb::print(std::ostream& os) const
 
 galera::Wsdb::Wsdb()
     :
-    trx_pool_    (TrxHandle::LOCAL_STORAGE_SIZE, 512, "LocalTrxHandle"),
+    trx_pool_  (TrxHandle::LOCAL_STORAGE_SIZE(), 512, "LocalTrxHandle"),
     trx_map_     (),
     conn_trx_map_(),
 #ifdef HAVE_PSI_INTERFACE

@@ -2,8 +2,6 @@
  * Copyright (C) 2015 Codership Oy <info@codership.com>
  */
 
-/*! @file memory operations interface */
-
 #ifndef _gcache_limits_hpp_
 #define _gcache_limits_hpp_
 

@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GCACHE_BUFHEAD__
 #define __GCACHE_BUFHEAD__
 
-#include "SeqnoNone.hpp"
 #include "gcache_memops.hpp"
+#include "gcache_seqno.hpp"
 #include <gu_assert.h>
 #include <gu_macros.hpp>
 
@@ -18,6 +18,7 @@
 namespace gcache
 {
     static uint32_t const BUFFER_RELEASED  = 1 << 0;
+    static uint32_t const BUFFER_FLAGS_MAX = BUFFER_RELEASED;
 
     enum StorageType
     {
@@ -50,7 +51,14 @@ namespace gcache
     static inline void
     BH_clear (BufferHeader* const bh)
     {
-        memset (bh, 0, sizeof(BufferHeader));
+        ::memset(bh, 0, sizeof(BufferHeader));
+    }
+
+    static inline bool
+    BH_is_clear (const BufferHeader* const bh)
+    {
+        static const uint8_t clear_bh[sizeof(BufferHeader)] = { 0, };
+        return (0 == ::memcmp(bh, clear_bh, sizeof(BufferHeader)));
     }
 
     static inline void
@@ -93,6 +101,28 @@ namespace gcache
            << ". store: "   << bh->store;
         return os;
     }
-}
+
+    /* return true if ptr may point at BufferHeader */
+    static inline bool
+    BH_test(const void* const ptr)
+    {
+        const BufferHeader* const bh(static_cast<const BufferHeader*>(ptr));
+
+        if (gu_likely(!BH_is_clear(bh)))
+        {
+            return (
+                bh->seqno_g >= SEQNO_ILL &&
+                bh->seqno_d >= SEQNO_ILL &&
+                (bh->seqno_d < bh->seqno_g || bh->seqno_g == SEQNO_ILL) &&
+                int64_t(bh->size) >= int(sizeof(BufferHeader)) &&
+                // ^^^ compare signed values for better certainty ^^^
+                bh->flags   <= BUFFER_FLAGS_MAX &&
+                bh->store   == BUFFER_IN_RB
+            );
+        }
+
+        return true;
+    }
+} /* namespace gcache */
 
 #endif /* __GCACHE_BUFHEAD__ */

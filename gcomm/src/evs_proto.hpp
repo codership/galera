@@ -468,6 +468,9 @@ private:
     uint32_t max_view_id_seq_;
     // Install attempt counter
     uint32_t attempt_seq_;
+    // Boolean to suppress logging when new view has been
+    // detected
+    bool new_view_logged_;
     // Install timeout counting
     int max_install_timeouts_;
     int install_timeout_count_;

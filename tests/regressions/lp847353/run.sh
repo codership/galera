@@ -85,8 +85,8 @@ echo "waiting for nodes to process all transactions"
 ../../scripts/command.sh wait_sync 0 1
 
 echo "Done!"
-../../scripts/command.sh stop_node 0
 ../../scripts/command.sh stop_node 1
+../../scripts/command.sh stop_node 0
 
 exit
 

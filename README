@@ -3,9 +3,9 @@ http://www.codership.com
 <info@codership.com>
 
 This is Galera replication - Codership's implementation of the write set 
-replication (wsrep) interface (https://launchpad.net/wsrep/). The software and 
-other files in this directory unless otherwise noted are distributed under 
-GPLv2, see COPYING for details.
+replication (wsrep) interface (https://github.com/codership/wsrep-API).
+The software and  other files in this directory unless otherwise noted
+are distributed under GPLv2, see COPYING for details.
 
 
 BUILDING - general
@@ -16,6 +16,9 @@ Build Requirements:
 * Boost devel package http://www.boost.org/
 * OpenSSL devel package
 
+Optional:
+* Asio C++ library devel package (http://think-async.com/)
+
 To compile, in Galera root directory do either:
  $ scons
 (default optimized build)
@@ -23,17 +26,24 @@ or
  $ ./scripts/build.sh
 (see ./scripts/build.sh --help for information on options)
 
-To build MySQL/Galera demo distribution, branch lp:codership-mysql into
-some directory (hereafter <MYSQL_DIR>) and run build script from this
-directory (hereafter <GALERA_DIR>):
+To build MySQL/Galera demo distribution, clone
+https://github.com/codership/mysql-wsrep into some directory (hereafter 
+<MYSQL_DIR>) and run build script from this directory (hereafter <GALERA_DIR>):
 
  $ cd <MYSQL_DIR>
- $ bzr branch lp:codership-mysql
+ $ git clone --single-branch --branch 5.6 \
+       https://github.com/codership/mysql-wsrep.git
  $ cd <GALERA_DIR>
- $ MYSQL_SRC=<MYSQL_DIR>/codership-mysql ./scripts/mysql/build.sh -b -s -o -t
+ $ MYSQL_SRC=<MYSQL_DIR>/mysql-wsrep ./scripts/mysql/build.sh -b -s -o -t
 
 After successful build, demo package can be found under scripts/mysql.
 
+BUILDING on Ubuntu 16.04
+
+ 1) apt-get install libasio-dev check scons libboost-program-options-dev \
+       libboost-dev  libssl-dev
+
+Then proceed as described above.
 
 BUILDING on CentOS/RHEL 5
 
@@ -55,11 +65,11 @@ CentOS/RHEL one needs to:
  5) Install scons check-devel openssl-devel
     # yum install scons check-devel openssl-devel
 
-Then proceeed as described above.
+Then proceed as described above.
 
 
 For more information, see:
 * Codership mailing list: http://groups.google.com/group/codership-team
-* https://launchpad.net/galera/
+* http://galeracluster.com/
 * Codership home page: http://www.codership.com
 

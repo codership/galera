@@ -18,6 +18,8 @@ static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size")
 static const std::string GCACHE_PARAMS_KEEP_PAGES_COUNT("gcache.keep_pages_count");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_COUNT("0");
+static const std::string GCACHE_PARAMS_RECOVER    ("gcache.recover");
+static const std::string GCACHE_DEFAULT_RECOVER   ("no");
 
 void
 gcache::GCache::Params::register_params(gu::Config& cfg)
@@ -29,6 +31,7 @@ gcache::GCache::Params::register_params(gu::Config& cfg)
     cfg.add(GCACHE_PARAMS_PAGE_SIZE,        GCACHE_DEFAULT_PAGE_SIZE);
     cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE,  GCACHE_DEFAULT_KEEP_PAGES_SIZE);
     cfg.add(GCACHE_PARAMS_KEEP_PAGES_COUNT, GCACHE_DEFAULT_KEEP_PAGES_COUNT);
+    cfg.add(GCACHE_PARAMS_RECOVER,          GCACHE_DEFAULT_RECOVER);
 }
 
 static const std::string&
@@ -64,15 +67,9 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     rb_size_  (cfg.get<size_t>(GCACHE_PARAMS_RB_SIZE)),
     page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
     keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE)),
-    keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_COUNT))
-{
-    if (mem_size_)
-    {
-        log_warn << GCACHE_PARAMS_MEM_SIZE
-                 << " parameter is buggy and DEPRECATED,"
-                 << " use it with care.";
-    }
-}
+    keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_COUNT)),
+    recover_  (cfg.get<bool>(GCACHE_PARAMS_RECOVER))
+{}
 
 void
 gcache::GCache::param_set (const std::string& key, const std::string& val)
@@ -146,9 +143,14 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
         ps.set_keep_count(params.keep_pages_count() ?
                           params.keep_pages_count() :
                           !((params.mem_size() + params.rb_size()) > 0));
-    }
-    else
-    {
-        throw gu::NotFound();
-    }
+   }
+   else if (key == GCACHE_PARAMS_RECOVER)
+   {
+       gu_throw_error(EINVAL) << "'" << key
+                              << "' has a meaning only on startup.";
+   }
+   else
+   {
+       throw gu::NotFound();
+   }
 }

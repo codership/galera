@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com> */
+/* Copyright (C) 2013-2016 Codership Oy <info@codership.com> */
 /*!
  * @file allocator main functions
  *
@@ -8,13 +8,14 @@
 #include "gu_alloc.hpp"
 #include "gu_throw.hpp"
 #include "gu_assert.hpp"
+#include "gu_limits.h"
 
 #include <sstream>
 #include <iomanip> // for std::setfill() and std::setw()
 
 
 gu::Allocator::HeapPage::HeapPage (page_size_type const size) :
-    Page (reinterpret_cast<byte_t*>(::malloc(size)), size)
+    Page (static_cast<byte_t*>(::malloc(size)), size)
 {
     if (0 == base_ptr_) gu_throw_error (ENOMEM);
 }
@@ -25,11 +26,11 @@ gu::Allocator::HeapStore::my_new_page (page_size_type const size)
 {
     if (gu_likely(size <= left_))
     {
-        page_size_type const page_size(
-            std::min(std::max(size, page_size_type(PAGE_SIZE)), left_));
-        /*                          ^^^^^^ this is to make GCC with -O0 flag
-         *  to understand that PAGE_SIZE participates in a constant expression:
-         *  otherwise it will complain about undefined reference to PAGE_SIZE.*/
+        /* to avoid too frequent allocation, make it (at least) 64K */
+        static page_size_type const PAGE_SIZE(gu_page_size_multiple(1 << 16));
+
+        page_size_type const page_size
+            (std::min(std::max(size, PAGE_SIZE), left_));
 
         Page* ret = new HeapPage (page_size);
 
