@@ -84,14 +84,10 @@ void gcomm::PC::connect(bool start_prim)
         start_prim = true;
     }
 
-    bool wait_prim(
-        gu::from_string<bool>(
-            uri_.get_option(Conf::PcWaitPrim, Defaults::PcWaitPrim)));
-
+    bool wait_prim(param<bool>(conf_, uri_, Conf::PcWaitPrim, Defaults::PcWaitPrim));
     const gu::datetime::Period wait_prim_timeout(
-        gu::from_string<gu::datetime::Period>(
-            uri_.get_option(Conf::PcWaitPrimTimeout,
-                            Defaults::PcWaitPrimTimeout)));
+        param<gu::datetime::Period>(conf_, uri_, Conf::PcWaitPrimTimeout,
+                                    Defaults::PcWaitPrimTimeout));
 
     // --wsrep-new-cluster specified in command line
     // or cluster address as gcomm://0.0.0.0 or gcomm://

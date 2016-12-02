@@ -161,6 +161,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     install_message_(0),
     max_view_id_seq_(0),
     attempt_seq_(1),
+    new_view_logged_(false),
     max_install_timeouts_(
         check_range(Conf::EvsMaxInstallTimeouts,
                     param<int>(conf, uri, Conf::EvsMaxInstallTimeouts,
@@ -2373,10 +2374,14 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             is_msg_from_previous_view(msg) == false     &&
             state()                    != S_LEAVING)
         {
-            evs_log_info(I_STATE)
-                << " detected new view from operational source "
-                << msg.source() << ": "
-                << msg.source_view_id();
+            if (new_view_logged_ == false)
+            {
+                evs_log_info(I_STATE)
+                    << " detected new view from operational source "
+                    << msg.source() << ": "
+                    << msg.source_view_id();
+                new_view_logged_ = true;
+            }
             // Note: Commented out, this causes problems with
             // attempt_seq. Newly (remotely?) generated install message
             // followed by commit gap may cause undesired
@@ -2908,6 +2913,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         reset_timer(T_INACTIVITY);
         reset_timer(T_RETRANS);
         cancel_timer(T_INSTALL);
+        new_view_logged_ = false;
         break;
     }
     default:

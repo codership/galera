@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -25,6 +25,7 @@ public:
     ~MMap ();
 
     void dont_need() const;
+    void sync(void *addr, size_t length) const;
     void sync() const;
     void unmap();
 

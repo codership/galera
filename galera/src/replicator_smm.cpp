@@ -143,6 +143,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
                              config_.get(Param::commit_order))),
     state_file_         (config_.get(BASE_DIR)+'/'+GALERA_STATE_FILE),
     st_                 (state_file_),
+    safe_to_bootstrap_  (true),
     trx_params_         (config_.get(BASE_DIR), -1,
                          KeySet::version(config_.get(Param::key_format)),
                          gu::from_string<int>(config_.get(
@@ -264,7 +265,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     wsrep_uuid_t  uuid;
     wsrep_seqno_t seqno;
 
-    st_.get (uuid, seqno);
+    st_.get (uuid, seqno, safe_to_bootstrap_);
 
     if (0 != args->state_id &&
         args->state_id->uuid != WSREP_UUID_UNDEFINED &&
@@ -283,13 +284,16 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     // information provided on startup:
 
     update_state_uuid (uuid, seqno);
+    gcache_.seqno_reset(to_gu_uuid(uuid), seqno);
+    // update gcache position to one supplied by app.
 
     cc_seqno_ = seqno; // is it needed here?
-    apply_monitor_.set_initial_position(seqno);
 
+    // the following initialization is needed only to pass seqno to
+    // connect() call. Ideally this should be done only on receving conf change.
+    apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(seqno);
-
     cert_.assign_initial_position(seqno, trx_proto_ver());
 
     build_stats_vars(wsrep_stats_);
@@ -327,18 +331,28 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
-    wsrep_seqno_t const seqno(cert_.position());
+    wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
 
     log_info << "Setting initial position to " << gcs_uuid << ':' << seqno;
 
-    if ((err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
+    if ((bootstrap == true || cluster_url == "gcomm://")
+        && safe_to_bootstrap_ == false)
+    {
+        log_error << "It may not be safe to bootstrap the cluster from this node. "
+                  << "It was not the last one to leave the cluster and may "
+                  << "not contain all the updates. To force cluster bootstrap "
+                  << "with this node, edit the grastate.dat file manually and "
+                  << "set safe_to_bootstrap to 1 .";
+        ret = WSREP_NODE_FAIL;
+    }
+
+    if (ret == WSREP_OK &&
+        (err = gcs_.set_initial_position(gcs_uuid, seqno)) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
     }
-
-    gcache_.reset();
 
     if (ret == WSREP_OK &&
         (err = gcs_.connect(cluster_name, cluster_url, bootstrap)) != 0)
@@ -1429,6 +1443,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     wsrep_seqno_t const upto(cert_.position());
 
+    if (view_info.status == WSREP_VIEW_PRIMARY)
+    {
+        safe_to_bootstrap_ = (view_info.memb_num == 1);
+    }
+
     apply_monitor_.drain(upto);
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
@@ -1483,14 +1502,15 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
+        // Also this must be done before releasing GCache buffers.
         cert_.assign_initial_position(group_seqno, trx_params_.version_);
+
+        if (STATE_SEQNO() > 0) service_thd_.release_seqno(STATE_SEQNO());
+        // make sure all gcache buffers are released
+
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
-
         service_thd_.flush();             // make sure service thd is idle
-
-        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-        // make sure all gcache buffers are released
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
@@ -1528,6 +1548,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             if (view_info.view == 1 || !app_wants_st)
             {
                 update_state_uuid (group_uuid, group_seqno);
+                gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
                 apply_monitor_.set_initial_position(group_seqno);
                 if (co_mode_ != CommitOrder::BYPASS)
                     commit_monitor_.set_initial_position(group_seqno);
@@ -1559,7 +1580,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 }
             }
 
-            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         }
 
         // We should not try to joining the cluster at the GCS level,
@@ -1589,7 +1610,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // Non-primary configuration
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            st_.set (state_uuid_, STATE_SEQNO());
+            st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         }
 
         if (next_state != S_CONNECTED && next_state != S_CLOSING)
@@ -1682,7 +1703,7 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
     }
 
     wsrep_seqno_t const ret(STATE_SEQNO());
-    st_.set(state_uuid_, ret);
+    st_.set(state_uuid_, ret, safe_to_bootstrap_);
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret
              << " (" << pause_seqno_ << ")";
@@ -1698,7 +1719,7 @@ void galera::ReplicatorSMM::resume()
         gu_throw_error(EALREADY) << "tried to resume unpaused provider";
     }
 
-    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
     log_info << "resuming provider at " << pause_seqno_;
     LocalOrder lo(pause_seqno_);
     pause_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -1949,7 +1970,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid,
                 sizeof(state_uuid_str_));
     }
 
-    st_.set(uuid, seqno);
+    st_.set(uuid, seqno, safe_to_bootstrap_);
 }
 
 void

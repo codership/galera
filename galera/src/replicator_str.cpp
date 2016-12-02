@@ -723,7 +723,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req, const bool uns
     {
         sst_state_ = SST_REQ_FAILED;
 
-        st_.set(state_uuid_, STATE_SEQNO());
+        st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
 
         // If in the future someone will change the code above (and
         // the error handling at the GCS level), then the ENODATA error
@@ -825,7 +825,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     state_.shift_to(S_JOINING);
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may involve some IO too */
-    gcache_.seqno_reset();
+    gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
 
     if (sst_req_len != 0)
     {
@@ -863,7 +863,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             log_fatal << "Application state transfer failed. This is "
                       << "unrecoverable condition, restart required.";
 
-            st_.set(sst_uuid_, sst_seqno_);
+            st_.set(sst_uuid_, sst_seqno_, safe_to_bootstrap_);
             if (unsafe)
             {
                 st_.mark_safe();
@@ -954,10 +954,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     {
         wsrep_uuid_t  uuid;
         wsrep_seqno_t seqno;
-        st_.get (uuid, seqno);
+        bool safe_to_boostrap;
+        st_.get (uuid, seqno, safe_to_boostrap);
         if (seqno != WSREP_SEQNO_UNDEFINED)
         {
-           st_.set (uuid, WSREP_SEQNO_UNDEFINED);
+           st_.set (uuid, WSREP_SEQNO_UNDEFINED, safe_to_boostrap);
         }
     }
 
@@ -994,10 +995,11 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     first = false;
                     wsrep_uuid_t  uuid;
                     wsrep_seqno_t seqno;
-                    st_.get (uuid, seqno);
+                    bool safe_to_boostrap;
+                    st_.get (uuid, seqno, safe_to_boostrap);
                     if (seqno != WSREP_SEQNO_UNDEFINED)
                     {
-                       st_.set (uuid, WSREP_SEQNO_UNDEFINED);
+                       st_.set (uuid, WSREP_SEQNO_UNDEFINED, safe_to_boostrap);
                     }
                 }
 
