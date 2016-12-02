@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "26"
+#define WSREP_INTERFACE_VERSION "27"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
