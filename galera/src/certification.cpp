@@ -910,8 +910,6 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
     }
 
     trx_map_.clear();
-    service_thd_.release_seqno(position_);
-    service_thd_.flush();
 
     log_info << "Assign initial position for certification: " << seqno
              << ", protocol version: " << version;

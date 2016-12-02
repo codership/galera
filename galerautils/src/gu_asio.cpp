@@ -143,6 +143,9 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
         ctx.load_verify_file(conf.get(param, conf.get(conf::ssl_cert)));
         param = conf::ssl_cipher;
         SSL_CTX_set_cipher_list(ctx.impl(), conf.get(param).c_str());
+        ctx.set_options(asio::ssl::context::no_sslv2 |
+                        asio::ssl::context::no_sslv3 |
+                        asio::ssl::context::no_tlsv1);
     }
     catch (asio::system_error& ec)
     {

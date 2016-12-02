@@ -619,7 +619,7 @@ void gcomm::GMCast::handle_established(Proto* est)
         i = remote_addrs_.insert_unique(
             make_pair(est->remote_addr(),
                       AddrEntry(gu::datetime::Date::now(),
-                                gu::datetime::Date::max(),
+                                gu::datetime::Date::now(),
                                 est->remote_uuid())));
     }
 
@@ -982,7 +982,6 @@ void gcomm::GMCast::reconnect()
             }
         }
     }
-
 
     for (i = remote_addrs_.begin(); i != remote_addrs_.end(); i = i_next)
     {
