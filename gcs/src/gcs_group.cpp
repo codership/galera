@@ -877,13 +877,10 @@ group_recount_votes (gcs_group_t& group)
     group.vote_result.res   = win_vote;
 
     const gcs_node_t& this_node(group.nodes[group.my_idx]);
-    if (this_node.vote_seqno != voting_seqno)
+    if (this_node.vote_seqno < voting_seqno)
     {
         // record voting result in the history for later
-        assert(this_node.last_applied <= voting_seqno);
-        assert(this_node.vote_seqno   <= voting_seqno);
-        gu::GTID const voting_gtid(group.group_uuid, voting_seqno);
-        std::pair<gu::GTID,int64_t> const val(voting_gtid, win_vote);
+        std::pair<gu::GTID,int64_t> const val(vote_gtid, win_vote);
         std::pair<VoteHistory::iterator, bool> const res
                     (group.vote_history->insert(val));
         if (false == res.second)
@@ -971,7 +968,7 @@ gcs_group_handle_vote_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         log_info << msg.str();
 
         VoteResult const ret = { gtid.seqno(), result };
-        return ret; // this should wake up voting thread
+        return ret; // this should wake up the thread that voted
     }
     else if (gtid.seqno() > group->vote_result.seqno)
     {
