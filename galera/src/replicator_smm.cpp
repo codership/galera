@@ -1032,7 +1032,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                 apply_monitor_.self_cancel(ao);
             }
 
-            ts->mark_dummy();
+            ts->set_state(TrxHandle::S_ABORTING);
             trx->set_state(TrxHandle::S_ABORTING);
             retval = WSREP_TRX_FAIL;
         }
@@ -1083,7 +1083,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                 {
                     apply_monitor_.leave(ao);
 
-                    ts->mark_dummy();
+                    ts->set_state(TrxHandle::S_ABORTING);
                     trx->set_state(TrxHandle::S_ABORTING);
                     retval = WSREP_TRX_FAIL;
                 }
@@ -1247,7 +1247,13 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
         // been replicated succesfully and the transaction
         // has been BF aborted after ts has been applied.
         // assert(ts->state()  == TrxHandle::S_ABORTING);
-        assert((ts->flags() & TrxHandle::F_ROLLBACK) != 0);
+
+        // There are two ways we can end up here:
+        // 1) writeset must be skipped/trx rolled back
+        // 2) trx passed certification and must commit,
+        //    but was BF aborted and must replay
+        assert((ts->flags() & TrxHandle::F_ROLLBACK) ||
+               (ts->depends_seqno() >= 0));
 
         if (ts->pa_unsafe())
         {
