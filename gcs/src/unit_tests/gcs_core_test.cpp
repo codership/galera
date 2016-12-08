@@ -169,7 +169,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
     if (act->type == GCS_ACT_STATE_REQ) return false;
 
     // action is ordered only if it is of type GCS_ACT_TORDERED and not an error
-    if (act->seqno >= GCS_SEQNO_NIL) {
+    if (act->seqno > 0) {
         FAIL_IF (GCS_ACT_TORDERED != act->type,
                  "GCS_ACT_TORDERED != act->type (%d), while act->seqno: %lld",
                  act->type, (long long)act->seqno);
