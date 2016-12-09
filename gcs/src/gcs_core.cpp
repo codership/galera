@@ -977,6 +977,15 @@ core_msg_to_action (gcs_core_t*          core,
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg (group, msg);
             assert (gcs_group_my_idx(group) == msg->sender_idx || 0 >= ret);
+            if (-ENOTRECOVERABLE == ret) {
+                core->backend.close(&core->backend);
+                // See #165.
+                // There is nobody to pass this error to for graceful shutdown:
+                // application thread is blocked waiting for SST.
+                // Also note that original ret value is not preserved on return
+                // so this must be done here.
+                gu_abort();
+            }
             act_type = GCS_ACT_JOIN;
             break;
         case GCS_MSG_SYNC:
@@ -984,7 +993,7 @@ core_msg_to_action (gcs_core_t*          core,
             act_type = GCS_ACT_SYNC;
             break;
         default:
-            gu_error ("Iternal error. Unexpected message type %s from ld%",
+            gu_error ("Iternal error. Unexpected message type %s from %ld",
                       gcs_msg_type_string[msg->type], msg->sender_idx);
             assert (0);
             ret = -EPROTO;
