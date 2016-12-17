@@ -169,6 +169,7 @@ do
             ;;
         -r|--release)
             RELEASE="$2"    # Compile without debug
+            CONFIGURE="yes"
             shift
             ;;
         -t|--tar)
@@ -444,9 +445,20 @@ then
             && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
             || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
-            [ "$MYSQL_MAJOR_VER$MYSQL_MINOR_VER" -ge "56" ] \
+            MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
+
+            [ "$MYSQL_MM_VER" -ge "56" ] \
             && MEMCACHED_OPT="-DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON" \
             || MEMCACHED_OPT=""
+
+            if [ "$MYSQL_MM_VER" -ge "57" ]
+            then
+                BOOST_OPT="-DWITH_BOOST=boost_$MYSQL_MM_VER"
+                [ "yes" = "$BOOTSTRAP" ] && \
+                    BOOST_OPT="$BOOST_OPT -DDOWNLOAD_BOOST=1"
+            else
+                BOOST_OPT=""
+            fi
 
             if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
             then
@@ -472,7 +484,9 @@ then
                   -DWITH_EXTRA_CHARSETS=all \
                   -DWITH_SSL=yes \
                   -DWITH_ZLIB=system \
+                  -DMYSQL_MAINTAINER_MODE=0 \
                   $MEMCACHED_OPT \
+                  $BOOST_OPT \
                   $MYSQL_SRC \
             && make -j $JOBS -S && popd || exit 1
         fi
