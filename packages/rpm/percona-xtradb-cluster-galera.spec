@@ -65,9 +65,6 @@ Prefix: %{_prefix}
   %endif
 %endif
 
-%define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define distribution  rhel%{redhatversion}
-
 %if "%rhel" == "7"
     %define distro_requires           chkconfig nmap
 %else
@@ -77,7 +74,7 @@ Prefix: %{_prefix}
 
 Name:		Percona-XtraDB-Cluster-galera-3
 Version:	%{galera_version}
-Release:	%{pxcg_revision}.%{?distribution}
+Release:	%{pxcg_revision}%{?dist}
 Summary:	Galera libraries of Percona XtraDB Cluster
 Group:		Applications/Databases
 License:	GPLv3
@@ -223,6 +220,9 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Thu May 19 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+- Fix distribution if dis is defined(BLD-384).
+
 * Thu May 15 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 - Split the packaging for garbd.
 - Library is now installed in /usr/lib/galera2 with a symlink to /usr/lib/ for compatibility.
