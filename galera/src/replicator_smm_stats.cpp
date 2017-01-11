@@ -308,6 +308,15 @@ galera::ReplicatorSMM::stats_get()
         tail_size += i->first.size() + 1 + i->second.size() + 1;
     }
 
+    // Compute the size for strings within the wsrep_stats_ array (sv)
+    // These will be copied after the stats array but before the status strings
+    for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it != sv.end(); ++it)
+    {
+        // This does NOT include the incoming_addresses list (it hasn't been set yet)
+        if (it->type == WSREP_VAR_STRING && it->value._string)
+            tail_size += strlen(it->value._string) + 1;
+    }
+
     gu::Lock lock_inc(incoming_mutex_);
     tail_size += incoming_list_.size() + 1;
 
@@ -328,6 +337,18 @@ galera::ReplicatorSMM::stats_get()
 
         // Initial tail_buf position
         char* tail_buf(reinterpret_cast<char*>(buf + sv.size()));
+
+        // Assign dynamical strings from the original sv (so stop at STATS_MAX)
+        for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it < sv.begin() + STATS_MAX; ++it)
+        {
+            // This does NOT include the incoming_addresses list (it hasn't been set yet)
+            if (it->type == WSREP_VAR_STRING && it->value._string)
+            {
+                strncpy(tail_buf, it->value._string, strlen(it->value._string)+1);
+                it->value._string = tail_buf;
+                tail_buf += strlen(tail_buf) + 1;
+            }
+        }
 
         // Assign incoming list
         strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);

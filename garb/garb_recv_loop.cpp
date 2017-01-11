@@ -32,17 +32,18 @@ RecvLoop::RecvLoop (const Config& config)
     struct sigaction sa;
 
     memset (&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
     sa.sa_handler = signal_handler;
 
     if (sigaction (SIGTERM, &sa, NULL))
     {
-        gu_throw_error(errno) << "Falied to install signal hadler for signal "
+        gu_throw_error(errno) << "Failed to install signal handler for "
                               << "SIGTERM";
     }
 
     if (sigaction (SIGINT, &sa, NULL))
     {
-        gu_throw_error(errno) << "Falied to install signal hadler for signal "
+        gu_throw_error(errno) << "Failed to install signal handler for "
                               << "SIGINT";
     }
 
