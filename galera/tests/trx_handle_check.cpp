@@ -69,8 +69,6 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_REPLICATING);
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-        trx->set_state(TrxHandle::S_CERTIFYING);
-        trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_ABORTING);
         trx->set_state(TrxHandle::S_ROLLED_BACK);
     }
@@ -82,8 +80,6 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_REPLICATING);
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-        trx->set_state(TrxHandle::S_CERTIFYING);
-        trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
         trx->set_state(TrxHandle::S_MUST_REPLAY);
@@ -99,8 +95,6 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_CERTIFYING);
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
-        trx->set_state(TrxHandle::S_CERTIFYING);
-        trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
         trx->set_state(TrxHandle::S_MUST_REPLAY);
@@ -136,6 +130,18 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_MUST_REPLAY);
         trx->set_state(TrxHandle::S_REPLAYING);
         trx->set_state(TrxHandle::S_COMMITTED);
+    }
+
+    // failed certification
+    {
+        TrxHandlePtr trx(TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1),
+                         TrxHandleDeleter());
+        trx->set_state(TrxHandle::S_REPLICATING);
+        trx->set_state(TrxHandle::S_CERTIFYING);
+        trx->set_state(TrxHandle::S_ABORTING);
+        trx->set_state(TrxHandle::S_APPLYING);
+        trx->set_state(TrxHandle::S_COMMITTING);
+        trx->set_state(TrxHandle::S_ROLLED_BACK);
     }
 
     // smooth operation

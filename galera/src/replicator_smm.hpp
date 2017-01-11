@@ -165,19 +165,19 @@ namespace galera
         void ist_trx(const TrxHandlePtr& ts, bool must_apply);
         void ist_end(int error);
 
-        // Cancel local and apply monitors for TrxHandleSlave
+        // Cancel local and apply monitors for TrxHandle
         template<bool local>
-        void cancel_monitors(const TrxHandle& ts)
+        void cancel_monitors(const TrxHandle& trx)
         {
             if (local)
             {
-                LocalOrder  lo(ts);
+                LocalOrder  lo(trx);
                 local_monitor_.self_cancel(lo);
             }
 
-            if (ts.pa_unsafe() == false)
+            if (trx.pa_unsafe() == false)
             {
-                ApplyOrder  ao(ts);
+                ApplyOrder  ao(trx);
                 apply_monitor_.self_cancel(ao);
             }
         }

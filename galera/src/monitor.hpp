@@ -230,6 +230,8 @@ namespace galera
                 lock.wait(cond_);
             }
 
+            state_debug_print("interrupt", obj.seqno());
+
             if ((process_[idx].state_ == Process::S_IDLE &&
                  obj.seqno()          >  last_left_ ) ||
                 process_[idx].state_ == Process::S_WAITING )
@@ -248,10 +250,16 @@ namespace galera
             }
         }
 
-        wsrep_seqno_t last_left()   const
+        wsrep_seqno_t last_left() const
         {
             gu::Lock lock(mutex_);
             return last_left_;
+        }
+
+        wsrep_seqno_t last_entered() const
+        {
+            gu::Lock lock(mutex_);
+            return last_entered_;
         }
 
         void last_left_gtid(wsrep_gtid_t& gtid) const
@@ -272,6 +280,8 @@ namespace galera
         void drain(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
+
+            state_debug_print("drain", seqno);
 
             while (drain_seqno_ != GU_LLONG_MAX)
             {

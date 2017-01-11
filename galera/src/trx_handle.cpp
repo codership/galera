@@ -147,7 +147,7 @@ public:
         add(TrxHandle::S_COMMITTING, TrxHandle::S_ROLLED_BACK);
 
         add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
-        add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_CERTIFYING);
+        add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
 
         add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
         add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);

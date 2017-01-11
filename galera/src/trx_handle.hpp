@@ -420,9 +420,10 @@ namespace galera
         {
             set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
-            assert(state() == S_CERTIFYING  ||
-                   state() == S_REPLICATING ||
-                   state() == S_MUST_ABORT);
+            assert(state() == S_REPLICATING          ||
+                   state() == S_MUST_ABORT           ||
+                   state() == S_MUST_CERT_AND_REPLAY ||
+                   state() == S_CERTIFYING);
             if (state() == S_REPLICATING) set_state(S_MUST_ABORT);
             set_state(S_ABORTING);
             // must be set to S_ROLLED_BACK after commit_cb()

@@ -337,7 +337,6 @@ static void test_ist_common(int const version)
     using galera::TrxHandle;
     using galera::KeyOS;
 
-//remove    TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE,4,"ist_common");
     TrxHandle::LocalPool lp(TrxHandle::LOCAL_STORAGE_SIZE(), 4, "ist_common");
     TrxHandle::SlavePool sp(sizeof(TrxHandle), 4, "ist_common");
 
