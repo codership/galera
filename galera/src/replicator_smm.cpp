@@ -1005,6 +1005,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         trx->unlock();
         GU_DBUG_SYNC_WAIT("before_pre_commit_apply_monitor_enter");
         gu_trace(apply_monitor_.enter(ao));
+        GU_DBUG_SYNC_WAIT("after_pre_commit_apply_monitor_enter");
         trx->lock();
         assert(trx->state() == TrxHandle::S_APPLYING ||
                trx->state() == TrxHandle::S_MUST_ABORT);
@@ -1025,7 +1026,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
         if (ts->flags() & TrxHandle::F_COMMIT)
         {
             trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-            retval = WSREP_BF_ABORT;
         }
         else
         {
@@ -1033,11 +1033,15 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             {
                 apply_monitor_.self_cancel(ao);
             }
+            else if (apply_monitor_.entered(ao))
+            {
+                apply_monitor_.leave(ao);
+            }
 
             ts->set_state(TrxHandle::S_ABORTING);
             trx->set_state(TrxHandle::S_ABORTING);
-            retval = WSREP_TRX_FAIL;
         }
+        retval = WSREP_BF_ABORT;
     }
     else
     {
@@ -1104,7 +1108,8 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
            ||
            (retval == WSREP_BF_ABORT && (
                trx->state() == TrxHandle::S_MUST_REPLAY_AM ||
-               trx->state() == TrxHandle::S_MUST_REPLAY_CM))
+               trx->state() == TrxHandle::S_MUST_REPLAY_CM ||
+               trx->state() == TrxHandle::S_ABORTING))
            ||
            (retval == WSREP_TRX_FAIL && trx->state() == TrxHandle::S_ABORTING)
         );
@@ -1340,11 +1345,15 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster* trx)
 
         log_debug << "Master rolled back " << ts->global_seqno();
 
+        ApplyOrder ao(*ts);
         if (ts->pa_unsafe()) /* apply_monitor_ was entered */
         {
-            ApplyOrder ao(*ts);
             assert(apply_monitor_.entered(ao));
             apply_monitor_.leave(ao);
+        }
+        else
+        {
+            assert(!apply_monitor_.entered(ao));
         }
 
         if (co_mode_ != CommitOrder::BYPASS)
