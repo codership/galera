@@ -590,19 +590,28 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandle*        trx,
     ssize_t rcode(0);
     do
     {
-        const ssize_t gcs_handle(gcs_.schedule());
+        const bool scheduled(!rollback);
 
-        if (gu_unlikely(gcs_handle < 0))
+        if (scheduled)
         {
-            log_debug << "gcs schedule " << strerror(-gcs_handle);
-            rcode = gcs_handle;
-            goto out;
+            const ssize_t gcs_handle(gcs_.schedule());
+
+            if (gu_unlikely(gcs_handle < 0))
+            {
+                log_debug << "gcs schedule " << strerror(-gcs_handle);
+                rcode = gcs_handle;
+                goto out;
+            }
+            trx->set_gcs_handle(gcs_handle);
         }
-        trx->set_gcs_handle(gcs_handle);
 
         trx->finalize(last_committed());
         trx->unlock();
-        rcode = gcs_.sendv(actv, act_size, GCS_ACT_TORDERED, true);
+        // rollbacks must be sent bypassing SM monitor to avoid deadlocks
+        const bool grab(rollback);
+        rcode = gcs_.sendv(actv, act_size,
+                           GCS_ACT_TORDERED,
+                           scheduled, grab);
         GU_DBUG_SYNC_WAIT("after_send_sync");
         trx->lock();
     }
@@ -1464,7 +1473,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&            handle,
         int rcode;
         do
         {
-            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false);
+            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_TORDERED, false, false);
         }
         while (rcode == -EAGAIN && (usleep(1000), true));
 
