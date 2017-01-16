@@ -587,9 +587,11 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
     // SR rollback
-    if (trx->state() == TrxHandle::S_ABORTING &&
-        (trx->flags() & TrxHandle::F_ROLLBACK))
+    const bool rollback(trx->flags() & TrxHandle::F_ROLLBACK);
+
+    if (rollback)
     {
+        assert(trx->state() == TrxHandle::S_ABORTING);
         assert((trx->flags() & TrxHandle::F_BEGIN) == 0);
         TrxHandleSlavePtr ts(TrxHandleSlave::New(true, slave_pool_),
                              TrxHandleSlaveDeleter());
@@ -607,21 +609,34 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
     ssize_t rcode(0);
     do
     {
-        const ssize_t gcs_handle(gcs_.schedule());
+        const bool scheduled(!rollback);
 
-        if (gu_unlikely(gcs_handle < 0))
+        if (scheduled)
         {
-            log_debug << "gcs schedule " << strerror(-gcs_handle);
-            rcode = gcs_handle;
-            goto out;
-        }
+            const ssize_t gcs_handle(gcs_.schedule());
 
-        trx->set_gcs_handle(gcs_handle);
+            if (gu_unlikely(gcs_handle < 0))
+            {
+                log_debug << "gcs schedule " << strerror(-gcs_handle);
+                rcode = gcs_handle;
+                goto out;
+            }
+            trx->set_gcs_handle(gcs_handle);
+        }
 
         assert(trx->version() >= WS_NG_VERSION);
         trx->finalize(last_committed());
         trx->unlock();
-        rcode = gcs_.sendv(actv, act_size, GCS_ACT_WRITESET, true);
+        // On rollback fragment, we instruct sendv to use gcs_sm_grab()
+        // to avoid the scenario where trx is BF aborted but can't send
+        // ROLLBACK fragment due to flow control, which results in
+        // deadlock.
+        // Otherwise sendv call was scheduled above, and we instruct
+        // the call to use regular gcs_sm_enter()
+        const bool grab(rollback);
+        rcode = gcs_.sendv(actv, act_size,
+                           GCS_ACT_WRITESET,
+                           scheduled, grab);
         GU_DBUG_SYNC_WAIT("after_send_sync");
         trx->lock();
     }
@@ -1655,7 +1670,7 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
         int rcode;
         do
         {
-            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false);
+            rcode = gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false, false);
         }
         while (rcode == -EAGAIN && (usleep(1000), true));
 

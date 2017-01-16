@@ -1531,25 +1531,37 @@ long gcs_sendv (gcs_conn_t*          const conn,
                 const struct gu_buf* const act_bufs,
                 size_t               const act_size,
                 gcs_act_type_t       const act_type,
-                bool                 const scheduled)
+                bool                 const scheduled,
+                bool                 const grab)
 {
+    assert (!(scheduled && grab));
+
     if (gu_unlikely(act_size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
 
     long ret = -ENOTCONN;
 
-    /*! locking connection here to avoid race with gcs_close()
-     *  @note: gcs_repl() and gcs_recv() cannot lock connection
-     *         because they block indefinitely waiting for actions */
-    gu_cond_t tmp_cond;
-    gu_cond_init (&tmp_cond, NULL);
+    if (gu_unlikely(grab)) {
+        if (!(ret = gcs_sm_grab (conn->sm))) {
+            while ((GCS_CONN_OPEN >= conn->state) &&
+                   (ret = gcs_core_send (conn->core, act_bufs,
+                                         act_size, act_type)) == -ERESTART);
+            gcs_sm_release (conn->sm);
+        }
+    }
+    else {
+        /*! locking connection here to avoid race with gcs_close()
+         *  @note: gcs_repl() and gcs_recv() cannot lock connection
+         *         because they block indefinitely waiting for actions */
+        gu_cond_t tmp_cond;
+        gu_cond_init (&tmp_cond, NULL);
 
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled, true)))
-    {
-        while ((GCS_CONN_OPEN >= conn->state) &&
-               (ret = gcs_core_send (conn->core, act_bufs,
-                                     act_size, act_type)) == -ERESTART);
-        gcs_sm_leave (conn->sm);
-        gu_cond_destroy (&tmp_cond);
+        if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled, true))) {
+            while ((GCS_CONN_OPEN >= conn->state) &&
+                   (ret = gcs_core_send (conn->core, act_bufs,
+                                         act_size, act_type)) == -ERESTART);
+            gcs_sm_leave (conn->sm);
+            gu_cond_destroy (&tmp_cond);
+        }
     }
 
     return ret;
