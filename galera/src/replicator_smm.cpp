@@ -177,7 +177,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     ist_prepared_       (false),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
-    cert_               (config_, service_thd_),
+    cert_               (config_, service_thd_, gcache_),
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
