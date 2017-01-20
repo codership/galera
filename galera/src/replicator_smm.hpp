@@ -101,8 +101,38 @@ namespace galera
         wsrep_status_t pre_commit(TrxHandle*  trx, wsrep_trx_meta_t*);
         wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
+        wsrep_status_t interim_commit(TrxHandle* trx);
         wsrep_status_t post_commit(TrxHandle* trx);
         wsrep_status_t post_rollback(TrxHandle* trx);
+
+        wsrep_status_t applier_pre_commit(void* trx_handle)
+        {
+            TrxHandle* trx = reinterpret_cast<TrxHandle*>(trx_handle);
+            CommitOrder co(*trx, co_mode_);
+            commit_monitor_.enter(co);
+            return WSREP_OK;
+        }
+
+        wsrep_status_t applier_interim_commit(void* trx_handle)
+        {
+            TrxHandle* trx = reinterpret_cast<TrxHandle*>(trx_handle);
+            CommitOrder co(*trx, co_mode_);
+            commit_monitor_.leave(co);
+            trx->mark_interim_committed(true);
+            return WSREP_OK;
+        }
+
+        wsrep_status_t applier_post_commit(void* trx_handle)
+        {
+            TrxHandle* trx = reinterpret_cast<TrxHandle*>(trx_handle);
+            if (!(trx->is_interim_committed()))
+            {
+                CommitOrder co(*trx, co_mode_);
+                commit_monitor_.leave(co);
+            }
+            trx->mark_interim_committed(false);
+            return WSREP_OK;
+        }
 
         wsrep_status_t causal_read(wsrep_gtid_t*);
         wsrep_status_t to_isolation_begin(TrxHandle* trx, wsrep_trx_meta_t*);

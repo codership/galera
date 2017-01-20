@@ -271,6 +271,9 @@ namespace galera
         bool is_committed() const { return committed_; }
         void mark_committed() { committed_ = true; }
 
+        bool is_interim_committed() const { return interim_committed_; }
+        void mark_interim_committed(bool val) { interim_committed_ = val; }
+
         void set_received (const void*   action,
                            wsrep_seqno_t seqno_l,
                            wsrep_seqno_t seqno_g)
@@ -665,6 +668,7 @@ namespace galera
             local_             (false),
             certified_         (false),
             committed_         (false),
+            interim_committed_ (false),
             exit_loop_         (false),
             wso_               (false),
             mac_               ()
@@ -708,6 +712,7 @@ namespace galera
             local_             (true),
             certified_         (false),
             committed_         (false),
+            interim_committed_ (false),
             exit_loop_         (false),
             wso_               (new_version()),
             mac_               ()
@@ -777,6 +782,7 @@ namespace galera
         bool                   local_;
         bool                   certified_;
         bool                   committed_;
+        bool                   interim_committed_;
         bool                   exit_loop_;
         bool                   wso_;
         Mac                    mac_;
