@@ -22,26 +22,31 @@
 #include <vector>
 
 //
-// run_all_tests is set tuo true by default. To disable pc tests
-// which use real TCP transport, set GALERA_TEST_DETERMINISTIC env
+// run_all_pc_tests is set to true by default. To disable pc tests
+// which use real TCP transport or depend on wall clock,
+// set GALERA_TEST_DETERMINISTIC env
 // variable before running pc test suite.
 //
-static bool run_all_tests(true);
-
-static struct run_all_pc_tests
+static class run_all_pc_tests
 {
 public:
     run_all_pc_tests()
+        : run_all_tests_()
     {
         if (::getenv("GALERA_TEST_DETERMINISTIC"))
         {
-            run_all_tests = false;
+            run_all_tests_ = false;
         }
         else
         {
-            run_all_tests = true;
+            run_all_tests_ = true;
         }
     }
+
+    bool operator()() const { return run_all_tests_; }
+
+private:
+    bool run_all_tests_;
 } run_all_pc_tests;
 
 using namespace std;
@@ -3913,28 +3918,28 @@ Suite* pc_suite()
         tcase_add_test(tc, test_pc_conflicting_prims_npvo);
         suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_split_merge");
-        tcase_add_test(tc, test_pc_split_merge);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_pc_split_merge_w_user_msg");
-        tcase_add_test(tc, test_pc_split_merge_w_user_msg);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_pc_complete_split_merge");
-        tcase_add_test(tc, test_pc_complete_split_merge);
-        tcase_set_timeout(tc, 25);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_pc_protocol_upgrade");
-        tcase_add_test(tc, test_pc_protocol_upgrade);
-        tcase_set_timeout(tc, 25);
-        suite_add_tcase(s, tc);
-
-        if (run_all_tests == true)
+        if (run_all_pc_tests() == true)
         {
+            tc = tcase_create("test_pc_split_merge");
+            tcase_add_test(tc, test_pc_split_merge);
+            tcase_set_timeout(tc, 15);
+            suite_add_tcase(s, tc);
+
+            tc = tcase_create("test_pc_split_merge_w_user_msg");
+            tcase_add_test(tc, test_pc_split_merge_w_user_msg);
+            tcase_set_timeout(tc, 15);
+            suite_add_tcase(s, tc);
+
+            tc = tcase_create("test_pc_complete_split_merge");
+            tcase_add_test(tc, test_pc_complete_split_merge);
+            tcase_set_timeout(tc, 25);
+            suite_add_tcase(s, tc);
+
+            tc = tcase_create("test_pc_protocol_upgrade");
+            tcase_add_test(tc, test_pc_protocol_upgrade);
+            tcase_set_timeout(tc, 25);
+            suite_add_tcase(s, tc);
+
             tc = tcase_create("test_pc_transport");
             tcase_add_test(tc, test_pc_transport);
             tcase_set_timeout(tc, 35);
@@ -3961,7 +3966,7 @@ Suite* pc_suite()
         tcase_add_test(tc, test_set_param);
         suite_add_tcase(s, tc);
 
-        if (run_all_tests == true)
+        if (run_all_pc_tests() == true)
         {
             tc = tcase_create("test_trac_599");
             tcase_add_test(tc, test_trac_599);
@@ -3972,17 +3977,20 @@ Suite* pc_suite()
         tcase_add_test(tc, test_trac_620);
         suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_trac_277");
-        tcase_add_test(tc, test_trac_277);
-        suite_add_tcase(s, tc);
+        if (run_all_pc_tests() == true)
+        {
+            tc = tcase_create("test_trac_277");
+            tcase_add_test(tc, test_trac_277);
+            suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_trac_622_638");
-        tcase_add_test(tc, test_trac_622_638);
-        suite_add_tcase(s, tc);
+            tc = tcase_create("test_trac_622_638");
+            tcase_add_test(tc, test_trac_622_638);
+            suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_weighted_quorum");
-        tcase_add_test(tc, test_weighted_quorum);
-        suite_add_tcase(s, tc);
+            tc = tcase_create("test_weighted_quorum");
+            tcase_add_test(tc, test_weighted_quorum);
+            suite_add_tcase(s, tc);
+        }
 
         tc = tcase_create("test_weighted_partitioning_1");
         tcase_add_test(tc, test_weighted_partitioning_1);
@@ -4009,10 +4017,13 @@ Suite* pc_suite()
         tcase_add_test(tc, test_weight_change_leaving);
         suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_trac_762");
-        tcase_add_test(tc, test_trac_762);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
+        if (run_all_pc_tests() == true)
+        {
+            tc = tcase_create("test_trac_762");
+            tcase_add_test(tc, test_trac_762);
+            tcase_set_timeout(tc, 15);
+            suite_add_tcase(s, tc);
+        }
 
         tc = tcase_create("test_join_split_cluster");
         tcase_add_test(tc, test_join_split_cluster);
