@@ -45,10 +45,8 @@ typedef struct gcs_sm
 {
     gcs_sm_stats_t stats;
     gu_mutex_t    lock;
-#ifdef GCS_SM_GRAB_RELEASE
     gu_cond_t     cond;
     long          cond_wait;
-#endif /* GCS_SM_GRAB_RELEASE */
     unsigned long wait_q_len;
     unsigned long wait_q_mask;
     unsigned long wait_q_head;
@@ -108,7 +106,7 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
     while (woken < GCS_SM_CC && sm->users > 0) {
         if (gu_likely(sm->wait_q[sm->wait_q_head].wait)) {
             assert (NULL != sm->wait_q[sm->wait_q_head].cond);
-            // gu_debug ("Waking up: %lu", sm->wait_q_head);
+            // gu_debug ("Waking up %lu", sm->wait_q_head);
             gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
             woken++;
         }
@@ -131,14 +129,12 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
 static inline void
 _gcs_sm_wake_up_waiters (gcs_sm_t* sm)
 {
-#ifdef GCS_SM_GRAB_RELEASE
     if (gu_unlikely(sm->cond_wait)) {
         assert (sm->cond_wait > 0);
         sm->cond_wait--;
         gu_cond_signal (&sm->cond);
-    } else
-#endif /* GCS_SM_GRAB_RELEASE */
-    if (!sm->pause) {
+    }
+    else if (!sm->pause) {
         _gcs_sm_wake_up_next(sm);
     }
     else {
@@ -164,10 +160,8 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
 }
 
 static inline bool
-_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block)
+_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block, unsigned long tail)
 {
-    unsigned long tail = sm->wait_q_tail;
-
     sm->wait_q[tail].cond = cond;
     sm->wait_q[tail].wait = true;
     bool ret;
@@ -227,7 +221,7 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block)
 #define GCS_SM_HAS_TO_WAIT                                              \
     (sm->users > (sm->entered + 1) || sm->entered >= GCS_SM_CC || sm->pause)
 #else
-#define GCS_SM_HAS_TO_WAIT (sm->users > 1 || sm->pause)
+#define GCS_SM_HAS_TO_WAIT (sm->users > 1 || sm->entered >= GCS_SM_CC || sm->pause)
 #endif /* GCS_SM_CONCURRENCY */
 
 /*!
@@ -295,10 +289,18 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
     long ret = 0; /* if scheduled and no queue */
 
     if (gu_likely (scheduled || (ret = gcs_sm_schedule(sm)) >= 0)) {
+        const unsigned long tail(sm->wait_q_tail);
 
-        if (GCS_SM_HAS_TO_WAIT) {
-            if (gu_likely(_gcs_sm_enqueue_common (sm, cond, block))) {
+        /* we want to enqueue at least once, if gcs_sm_schedule()
+           did create a waiter handle (i.e. if GCS_SM_HAS_TO_WAIT
+           was true) */
+        bool wait = GCS_SM_HAS_TO_WAIT;
+        while (wait && ret >= 0) {
+            if (gu_likely(_gcs_sm_enqueue_common (sm, cond, block, tail))) {
                 ret = sm->ret;
+                /* weaken the condition, so that we do enter if there
+                   is room for one more thread */
+                wait = sm->entered >= GCS_SM_CC;
             }
             else {
                 ret = -EINTR;
@@ -446,7 +448,6 @@ gcs_sm_stats_get (gcs_sm_t*  sm,
 extern void
 gcs_sm_stats_flush(gcs_sm_t* sm);
 
-#ifdef GCS_SM_GRAB_RELEASE
 /*! Grabs sm object for out-of-order access
  * @return 0 or negative error code */
 static inline long
@@ -482,10 +483,10 @@ gcs_sm_release (gcs_sm_t* sm)
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
     sm->entered--;
+    assert(sm->entered >= 0);
     _gcs_sm_wake_up_waiters (sm);
 
     gu_mutex_unlock (&sm->lock);
 }
-#endif /* GCS_SM_GRAB_RELEASE */
 
 #endif /* _gcs_sm_h_ */
