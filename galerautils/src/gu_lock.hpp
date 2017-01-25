@@ -1,13 +1,10 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GU_LOCK__
 #define __GU_LOCK__
-
-#include <pthread.h>
-#include <cerrno>
 
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
@@ -15,21 +12,24 @@
 #include "gu_cond.hpp"
 #include "gu_datetime.hpp"
 
+#include <cerrno>
+#include <cassert>
+
 namespace gu
 {
     class Lock
     {
-        pthread_mutex_t* const value;
+        const Mutex& mtx_;
 
         Lock (const Lock&);
         Lock& operator=(const Lock&);
 
     public:
 
-        Lock (const Mutex& mtx) : value(&mtx.value)
+        Lock (const Mutex& mtx) : mtx_(mtx)
         {
 
-            int err = pthread_mutex_lock (value);
+            int const err(mtx_.lock());
             if (gu_unlikely(err))
             {
                 std::string msg = "Mutex lock failed: ";
@@ -40,7 +40,10 @@ namespace gu
 
         virtual ~Lock ()
         {
-            int err = pthread_mutex_unlock (value);
+#ifdef GU_DEBUG_MUTEX
+            assert(mtx_.owned());
+#endif
+            int const err(mtx_.unlock());
             if (gu_unlikely(err))
             {
                 log_fatal << "Mutex unlock failed: " << err << " ("
@@ -53,7 +56,7 @@ namespace gu
         inline void wait (const Cond& cond)
         {
             cond.ref_count++;
-            pthread_cond_wait (&(cond.cond), value);
+            gu_cond_wait (&(cond.cond), &mtx_.impl());
             cond.ref_count--;
         }
 
@@ -63,7 +66,7 @@ namespace gu
 
             date._timespec(ts);
             cond.ref_count++;
-            int ret = pthread_cond_timedwait (&(cond.cond), value, &ts);
+            int ret = gu_cond_timedwait (&(cond.cond), &mtx_.impl(), &ts);
             cond.ref_count--;
 
             if (gu_unlikely(ret)) gu_throw_error(ret);

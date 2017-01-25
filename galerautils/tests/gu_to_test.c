@@ -18,7 +18,7 @@
 
 struct thread_ctx
 {
-    pthread_t thread;
+    gu_thread_t thread;
     long thread_id;
     long stat_grabs;  // how many times gcs_to_grab() was successful
     long stat_cancels;// how many times gcs_to_cancel() was called
@@ -71,7 +71,7 @@ static ulong      thread_max  = 16;    // default number of threads
 static gu_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
 
 /* mutex to synchronize threads start */
-static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
+static gu_mutex_t start  = GU_MUTEX_INITIALIZER;
 
 static const unsigned int t = 10; // optimal sleep time
 static const struct timespec tsleep = { 0, 10000000 }; // 10 ms
@@ -80,11 +80,11 @@ void* run_thread(void* ctx)
 {
     struct thread_ctx* thd = ctx;
     gu_seqno_t seqno = thd->thread_id; // each thread starts with own offset
-                                        // to guarantee uniqueness of seqnos
-					// without having to lock mutex
+                                       // to guarantee uniqueness of seqnos
+                                       // without having to lock mutex
 
-    pthread_mutex_lock   (&start); // wait for start signal
-    pthread_mutex_unlock (&start);
+    gu_mutex_lock   (&start); // wait for start signal
+    gu_mutex_unlock (&start);
 
     while (seqno < seqno_max) {
         long  ret;
@@ -195,9 +195,9 @@ int main (int argc, char* argv[])
         double time_spent;
         struct thread_ctx thread[thread_max];
 
-        pthread_mutex_lock (&start); {
+        gu_mutex_lock (&start); {
             /* initialize threads */
-            for (i = 0; i < thread_max; i++) {
+            for (i = 0; (ulong)i < thread_max; i++) {
                 thread[i].thread_id    = i;
                 thread[i].stat_grabs   = 0;
                 thread[i].stat_cancels = 0;
@@ -212,11 +212,11 @@ int main (int argc, char* argv[])
                 }
             }
             start_clock = clock();
-        } pthread_mutex_unlock (&start); // release threads
+        } gu_mutex_unlock (&start); // release threads
 
         /* wait for threads to complete and accumulate statistics */
-        pthread_join (thread[0].thread, NULL);
-        for (i = 1; i < thread_max; i++) {
+        gu_thread_join (thread[0].thread, NULL);
+        for (i = 1; (ulong)i < thread_max; i++) {
             pthread_join (thread[i].thread, NULL);
             thread[0].stat_grabs   += thread[i].stat_grabs;
             thread[0].stat_cancels += thread[i].stat_cancels;

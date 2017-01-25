@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"
@@ -50,7 +50,7 @@ namespace galera
             wsrep_seqno_t      first()  { return first_;  }
             wsrep_seqno_t      last()   { return last_;   }
             AsyncSenderMap&    asmap()  { return asmap_;  }
-            pthread_t          thread() { return thread_; }
+            gu_thread_t          thread() { return thread_; }
 
         private:
 
@@ -60,7 +60,7 @@ namespace galera
             wsrep_seqno_t      first_;
             wsrep_seqno_t      last_;
             AsyncSenderMap&    asmap_;
-            pthread_t          thread_;
+            gu_thread_t        thread_;
 
             // GCC 4.8.5 on FreeBSD wants it
             AsyncSender(const AsyncSender&);
@@ -335,7 +335,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     current_seqno_ = first_seqno;
     last_seqno_    = last_seqno;
     int err;
-    if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
+    if ((err = gu_thread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
         recv_addr_ = "";
         gu_throw_error(err) << "Unable to create receiver thread";
@@ -526,7 +526,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         interrupt();
 
         int err;
-        if ((err = pthread_join(thread_, 0)) != 0)
+        if ((err = gu_thread_join(thread_, 0)) != 0)
         {
             log_warn << "Failed to join IST receiver thread: " << err;
         }
@@ -805,7 +805,7 @@ void* run_async_sender(void* arg)
     try
     {
         as->asmap().remove(as, join_seqno);
-        pthread_detach(as->thread());
+        gu_thread_detach(as->thread());
         delete as;
     }
     catch (gu::NotFound& nf)
@@ -826,7 +826,7 @@ void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
 {
     gu::Critical crit(monitor_);
     AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
-    int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
+    int err(gu_thread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {
         delete as;
@@ -858,9 +858,9 @@ void galera::ist::AsyncSenderMap::cancel()
         int err;
         as->cancel();
         monitor_.leave();
-        if ((err = pthread_join(as->thread_, 0)) != 0)
+        if ((err = gu_thread_join(as->thread_, 0)) != 0)
         {
-            log_warn << "pthread_join() failed: " << err;
+            log_warn << "thread_join() failed: " << err;
         }
         monitor_.enter();
         delete as;
