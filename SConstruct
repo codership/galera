@@ -128,7 +128,7 @@ deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.19')
+GALERA_VER = ARGUMENTS.get('version', '3.20')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 
 # Attempt to read from file if not given
