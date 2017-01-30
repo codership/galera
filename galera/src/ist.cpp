@@ -61,6 +61,10 @@ namespace galera
             wsrep_seqno_t      last_;
             AsyncSenderMap&    asmap_;
             pthread_t          thread_;
+
+            // GCC 4.8.5 on FreeBSD wants it
+            AsyncSender(const AsyncSender&);
+            AsyncSender& operator=(const AsyncSender&);
         };
     }
 }

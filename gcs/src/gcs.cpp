@@ -153,7 +153,17 @@ struct gcs_conn
     gcs_seqno_t volatile join_seqno;
 
     /* sync control */
-    bool         sync_sent;
+    bool         sync_sent_;
+    bool         sync_sent() const
+    {
+        assert(gu_fifo_locked(recv_q));
+        return sync_sent_;
+    }
+    void         sync_sent(bool const val)
+    {
+        assert(gu_fifo_locked(recv_q));
+        sync_sent_ = val;
+    }
 
     /* gcs_core object */
     gcs_core_t*  core; // the context that is returned by
@@ -474,9 +484,15 @@ static inline bool
 gcs_send_sync_begin (gcs_conn_t* conn)
 {
     if (gu_unlikely(GCS_CONN_JOINED == conn->state)) {
-        if (conn->lower_limit >= conn->queue_len && !conn->sync_sent) {
+        if (conn->lower_limit >= conn->queue_len && !conn->sync_sent()) {
             // tripped lower slave queue limit, send SYNC message
-            conn->sync_sent = true;
+            conn->sync_sent(true);
+#if 0
+            gu_info ("Sending SYNC: state = %s, queue_len = %ld, "
+                     "lower_limit = %ld, sync_sent = %s",
+                     gcs_conn_state_str[conn->state], conn->queue_len,
+                     conn->lower_limit, conn->sync_sent() ? "true" : "false");
+#endif
             return true;
         }
 #if 0
@@ -484,7 +500,7 @@ gcs_send_sync_begin (gcs_conn_t* conn)
             gu_info ("Not sending SYNC: state = %s, queue_len = %ld, "
                      "lower_limit = %ld, sync_sent = %s",
                      gcs_conn_state_str[conn->state], conn->queue_len,
-                     conn->lower_limit, conn->sync_sent ? "true" : "false");
+                     conn->lower_limit, conn->sync_sent() ? "true" : "false");
         }
 #endif
     }
@@ -505,7 +521,9 @@ gcs_send_sync_end (gcs_conn_t* conn)
         ret = 0;
     }
     else {
-        conn->sync_sent = false;
+        gu_fifo_lock(conn->recv_q);
+        conn->sync_sent(false);
+        gu_fifo_release(conn->recv_q);
     }
 
     ret = gcs_check_error (ret, "Failed to send SYNC signal");
@@ -516,7 +534,11 @@ gcs_send_sync_end (gcs_conn_t* conn)
 static inline long
 gcs_send_sync (gcs_conn_t* conn)
 {
-    if (gcs_send_sync_begin (conn)) {
+    gu_fifo_lock(conn->recv_q);
+    bool const send_sync(gcs_send_sync_begin (conn));
+    gu_fifo_release(conn->recv_q);
+
+    if (send_sync) {
         return gcs_send_sync_end (conn);
     }
     else {
@@ -734,8 +756,12 @@ gcs_become_joined (gcs_conn_t* conn)
 static void
 gcs_become_synced (gcs_conn_t* conn)
 {
-    gcs_shift_state (conn, GCS_CONN_SYNCED);
-    conn->sync_sent = false;
+    gu_fifo_lock(conn->recv_q);
+    {
+        gcs_shift_state (conn, GCS_CONN_SYNCED);
+        conn->sync_sent(false);
+    }
+    gu_fifo_release(conn->recv_q);
     gu_debug("Become synced, FC offset %ld", conn->fc_offset);
     conn->fc_offset = 0;
 }
@@ -848,7 +874,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
             abort();
         }
 
-        conn->sync_sent = false;
+        conn->sync_sent(false);
 
         // need to wake up send monitor if it was paused during CC
         gcs_sm_continue(conn->sm);
@@ -922,19 +948,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     switch (conn->state) {
     case GCS_CONN_JOINED:
         /* One of the cases when the node can become SYNCED */
-    {
-        bool send_sync = false;
-
-        gu_fifo_lock(conn->recv_q);
-        {
-            send_sync = gcs_send_sync_begin(conn);
-        }
-        gu_fifo_release (conn->recv_q);
-
-        if (send_sync && (ret = gcs_send_sync_end (conn))) {
+        if ((ret = gcs_send_sync(conn)) < 0) {
             gu_warn ("CC: sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
-    }
     break;
     case GCS_CONN_JOINER:
     case GCS_CONN_DONOR:
@@ -981,8 +997,9 @@ gcs_handle_state_change (gcs_conn_t*     conn,
 
     if (buf) {
         memcpy (buf, act->buf, act->buf_len);
-        /* initially act->buf points to internal static recv buffer. No leak here */
-        act->buf = buf;
+        /* Initially act->buf points to internal static recv buffer.
+         * No leak here. */
+        ((struct gcs_act*)act)->buf = buf;
         return 1;
     }
     else {
@@ -1025,8 +1042,15 @@ gcs_handle_actions (gcs_conn_t*          conn,
             gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
-        ret = gcs_handle_state_change (conn, &rcvd->act);
-        gcs_become_synced (conn);
+        if (rcvd->id < 0) {
+            gu_fifo_lock(conn->recv_q);
+            conn->sync_sent(false);
+            gu_fifo_release(conn->recv_q);
+            gcs_send_sync(conn);
+        } else {
+            ret = gcs_handle_state_change (conn, &rcvd->act);
+            gcs_become_synced (conn);
+        }
         break;
     default:
         break;
@@ -1194,9 +1218,7 @@ static void *gcs_recv_thread (void *arg)
         struct gcs_repl_act** repl_act_ptr;
         struct gcs_act_rcvd   rcvd;
 
-        bool* sync_sent = (conn->state == GCS_CONN_DONOR
-                           ? &conn->sync_sent : NULL);
-        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout, sync_sent);
+        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout);
 
         if (gu_unlikely(ret <= 0)) {
 

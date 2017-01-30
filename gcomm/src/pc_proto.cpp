@@ -335,7 +335,7 @@ void gcomm::pc::Proto::shift_to(const State s)
 
     if (allowed[state()][s] == false)
     {
-        gu_throw_fatal << "Forbidden state transtion: "
+        gu_throw_fatal << "Forbidden state transition: "
                        << to_string(state()) << " -> " << to_string(s);
     }
 

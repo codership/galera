@@ -587,16 +587,6 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
     long const      key_count(key_set.count());
     long            processed(0);
 
-    // This check if the keys are appended.
-    // Generally almost all cases keys are appeneded before certification
-    // except in case of CTAS which is executed non-TOI fashion due to
-    // involvement of SELECT. If the source table is empty then no key
-    // is appended and so key_count == 0.
-    // Unfortunately there is no way to check if the original SQL statement
-    // is of type CTAS type but leaving this assert can cause random failure
-    // so we will disable it for now.
-    // assert(key_count > 0);
-
     key_set.rewind();
 
     for (; processed < key_count; ++processed)
