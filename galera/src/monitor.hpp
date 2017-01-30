@@ -7,6 +7,7 @@
 
 #include "trx_handle.hpp"
 #include <gu_lock.hpp> // for gu::Mutex and gu::Cond
+#include <gu_limits.h>
 
 #include <vector>
 
@@ -58,7 +59,7 @@ namespace galera
 #endif /* HAVE_PSI_INTERFACE */
             last_entered_(-1),
             last_left_(-1),
-            drain_seqno_(LLONG_MAX),
+            drain_seqno_(GU_LLONG_MAX),
             process_(new Process[process_size_]),
             entered_(0),
             oooe_(0),
@@ -94,7 +95,7 @@ namespace galera
                 // drain monitor up to seqno but don't reset last_entered_
                 // or last_left_
                 drain_common(seqno, lock);
-                drain_seqno_ = LLONG_MAX;
+                drain_seqno_ = GU_LLONG_MAX;
             }
             if (seqno != -1)
             {
@@ -250,7 +251,7 @@ namespace galera
         {
             gu::Lock lock(mutex_);
 
-            while (drain_seqno_ != LLONG_MAX)
+            while (drain_seqno_ != GU_LLONG_MAX)
             {
                 lock.wait(cond_);
             }
@@ -260,7 +261,7 @@ namespace galera
             // there can be some stale canceled entries
             update_last_left();
 
-            drain_seqno_ = LLONG_MAX;
+            drain_seqno_ = GU_LLONG_MAX;
             cond_.broadcast();
         }
 

@@ -543,7 +543,7 @@ void gcomm::GMCast::handle_connected(Proto* rp)
     log_debug << "transport " << tp << " connected";
     if (rp->state() == Proto::S_INIT)
     {
-        log_debug << "sending hanshake";
+        log_debug << "sending handshake";
         // accepted socket was waiting for underlying transport
         // handshake to finish
         rp->send_handshake();

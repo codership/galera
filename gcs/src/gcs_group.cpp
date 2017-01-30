@@ -170,7 +170,7 @@ group_redo_last_applied (gcs_group_t* group)
 {
     long       n;
     long       last_node    = -1;
-    gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    gu_seqno_t last_applied = GU_LLONG_MAX;
 
     for (n = 0; n < group->num; n++) {
         const gcs_node_t* const node = &group->nodes[n];
@@ -840,24 +840,23 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        int ret = 0;
-
-        if (GCS_NODE_STATE_DONOR == sender->status) {
-            gu_info ("SYNC message ignored as node %d.%d (%s) was"
-                     " re-transitioned to DONOR mode before it synced.",
-                     sender_idx, sender->segment, sender->name);
-            ret = -1;
-        }
-        else if (GCS_NODE_STATE_SYNCED != sender->status) {
-            gu_warn ("SYNC message sender from non-JOINED %d.%d (%s). Ignored.",
-                     sender_idx, sender->segment, sender->name);
-        }
-        else {
+        if (GCS_NODE_STATE_SYNCED == sender->status) {
             gu_debug ("Redundant SYNC message from %d.%d (%s).",
                       sender_idx, sender->segment, sender->name);
         }
+        else if (GCS_NODE_STATE_DONOR == sender->status) {
+            // this is possible with quick succession of desync()/resync() calls
+            gu_debug ("SYNC message from %d.%d (%s, DONOR). Ignored.",
+                      sender_idx, sender->segment, sender->name);
+        }
+        else {
+            gu_warn ("SYNC message from non-JOINED %d.%d (%s, %s). Ignored.",
+                     sender_idx, sender->segment, sender->name,
+                     gcs_node_state_to_str(sender->status));
+        }
 
-        return ret;
+        /* signal sender that it didn't work */
+        return -ERESTART * (sender_idx == group->my_idx);
     }
 }
 

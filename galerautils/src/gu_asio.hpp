@@ -14,6 +14,9 @@
 #include "common.h"    //
 
 #ifndef HAVE_SYSTEM_ASIO
+// Make GCC to treat this as the system header to suppress compiler
+// warnings from embedded asio.hpp
+#pragma GCC system_header
 // Using embedded copy of ASIO requires turning off some
 // compiler warnings.
 #if defined(__GNUG__)
@@ -148,12 +151,15 @@ extern "C" {
     {
         switch (ERR_GET_REASON(ec.value()))
         {
+#ifdef SSL_R_SHORT_READ
         case SSL_R_SHORT_READ:
             // Short read error seems to be generated quite frequently
             // by SSL library, probably because broken connections.
             return true;
+#endif /* SSL_R_SHORT_READ */
+        default:
+            return false;
         }
-        return false;
     }
 }
 

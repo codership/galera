@@ -41,14 +41,17 @@ struct gu_fifo
     ulong alloc;
     long  get_wait;
     long  put_wait;
-    long long  q_len;
-    long long  q_len_samples;
+    long long q_len;
+    long long q_len_samples;
     uint  item_size;
     uint  used;
     uint  used_max;
     uint  used_min;
     int   get_err;
     bool  closed;
+#ifndef NDEBUG
+    bool  locked;
+#endif
 
     gu_mutex_t   lock;
     gu_cond_t    get_cond;
@@ -147,18 +150,39 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 }
 
 // defined as macro for proper line reporting
+#ifdef NDEBUG
 #define fifo_lock(q)                                    \
     if (gu_likely (0 == gu_mutex_lock (&q->lock))) {}   \
     else {                                              \
         gu_fatal ("Failed to lock queue");              \
         abort();                                        \
     }
+#else  /* NDEBUG */
+#define fifo_lock(q)                                    \
+    if (gu_likely (0 == gu_mutex_lock (&q->lock))) {    \
+        q->locked = true;                               \
+    }                                                   \
+    else {                                              \
+        gu_fatal ("Failed to lock queue");              \
+        abort();                                        \
+    }
+#endif /* NDEBUG */
 
 static inline int
 fifo_unlock (gu_fifo_t* q)
 {
+#ifndef NDEBUG
+    q->locked = false;
+#endif
     return -gu_mutex_unlock (&q->lock);
 }
+
+#ifndef NDEBUG
+bool gu_fifo_locked (gu_fifo_t* q)
+{
+    return q->locked;
+}
+#endif
 
 /* lock the queue */
 void gu_fifo_lock    (gu_fifo_t *q)
@@ -229,10 +253,15 @@ static inline int fifo_lock_get (gu_fifo_t *q)
     int ret = 0;
 
     fifo_lock(q);
-
     while (0 == ret && !(ret = q->get_err) && 0 == q->used) {
+#ifndef NDEBUG
+        q->locked = false;
+#endif
         q->get_wait++;
         ret = -gu_cond_wait (&q->get_cond, &q->lock);
+#ifndef NDEBUG
+        q->locked = true;
+#endif
     }
 
     return ret;
@@ -258,8 +287,14 @@ static inline int fifo_lock_put (gu_fifo_t *q)
 
     fifo_lock(q);
     while (0 == ret && q->used == q->length && !q->closed) {
+#ifndef NDEBUG
+        q->locked = false;
+#endif
         q->put_wait++;
         ret = -gu_cond_wait (&q->put_cond, &q->lock);
+#ifndef NDEBUG
+        q->locked = true;
+#endif
     }
 
     return ret;

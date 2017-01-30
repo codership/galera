@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2016 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -13,6 +13,7 @@
 # Set CXXFLAGS to supply C++ compiler options
 # Set LDFLAGS  to *override* linking flags
 # Set LIBPATH  to add non-standard linker paths
+# Set RPATH    to add rpaths
 #
 # Script structure:
 # - Help message
@@ -33,7 +34,7 @@ machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
 print 'Host: ' + sysname + ' ' + machine + ' ' + bits
 
-x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386' ])
+x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386', 'i86pc' ])
 
 if bits == '32bit':
     bits = 32
@@ -54,6 +55,7 @@ Commandline Options:
     debug=n             debug build with optimization level n
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
+    system_asio=[0|1]   use system asio library, if available
     boost_pool=[0|1]    use or not use boost pool allocator
     revno=XXXX          source code revision number
     bpostatic=path      a path to static libboost_program_options.a
@@ -126,8 +128,10 @@ elif machine == 's390x':
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 static_ssl = int(ARGUMENTS.get('static_ssl', 0))
+system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
+deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 # parse psi flag option
@@ -135,7 +139,7 @@ psi        = int(ARGUMENTS.get('psi', 0))
 if psi:
     opt_flags = opt_flags + ' -DHAVE_PSI_INTERFACE'
 
-GALERA_VER = ARGUMENTS.get('version', '3.19')
+GALERA_VER = ARGUMENTS.get('version', '3.20')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -171,12 +175,13 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
-env.Replace(CPPFLAGS = os.getenv('CPPFLAGS', ''))
-env.Replace(CCFLAGS = os.getenv('CCFLAGS', ''))
-env.Replace(CFLAGS = os.getenv('CFLAGS', ''))
-env.Replace(CXXFLAGS = os.getenv('CXXFLAGS', ''))
-env.Replace(LINKFLAGS = os.getenv('LDFLAGS', ''))
-env.Replace(LIBPATH = [os.getenv('LIBPATH', '')])
+env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
+env.Replace(CCFLAGS   = os.getenv('CCFLAGS',  opt_flags + compile_arch))
+env.Replace(CFLAGS    = os.getenv('CFLAGS',   ''))
+env.Replace(CXXFLAGS  = os.getenv('CXXFLAGS', ''))
+env.Replace(LINKFLAGS = os.getenv('LDFLAGS',  link_arch))
+env.Replace(LIBPATH   = [os.getenv('LIBPATH', '')])
+env.Replace(RPATH     = [os.getenv('RPATH',   '')])
 
 # Set -pthread flag explicitly to make sure that pthreads are
 # enabled on all platforms.
@@ -214,25 +219,24 @@ env.Append(CPPFLAGS = ' -DHAVE_COMMON_H')
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Append(CCFLAGS = opt_flags + compile_arch +
-                      ' -Wall -Wextra -Wno-unused-parameter')
+env.Append(CCFLAGS = ' -fPIC -Wall -Wextra -Wno-unused-parameter')
 
 # C-specific flags
-env.Append(CFLAGS = ' -std=c99 -fno-strict-aliasing -pipe')
+env.Prepend(CFLAGS = '-std=c99 -fno-strict-aliasing -pipe ')
 
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Append(CXXFLAGS = ' -Wno-long-long -Wno-deprecated -ansi')
+env.Prepend(CXXFLAGS = '-Wno-long-long -Wno-deprecated -ansi ')
 if sysname != 'sunos':
-    env.Append(CXXFLAGS = ' -pipe')
+    env.Prepend(CXXFLAGS = '-pipe ')
 
 
 # Linker flags
 # TODO: enable ' -Wl,--warn-common -Wl,--fatal-warnings' after warnings from
 # static linking have beed addressed
 #
-#env.Append(LINKFLAGS = ' -Wl,--warn-common -Wl,--fatal-warnings')
+#env.Prepend(LINKFLAGS = '-Wl,--warn-common -Wl,--fatal-warnings ')
 
 #
 # Check required headers and libraries (autoconf functionality)
@@ -412,14 +416,13 @@ else:
     print 'Not using boost'
 
 # asio
-use_system_asio = False
-if conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
-    use_system_asio = True
+if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYSTEM_ASIO -DHAVE_ASIO_HPP')
 else:
+    system_asio = False
     print "Falling back to bundled asio"
 
-if not use_system_asio:
+if not system_asio:
     # Fall back to embedded asio
     conf.env.Append(CPPPATH = [ '#/asio' ])
     if conf.CheckCXXHeader('asio.hpp'):
@@ -460,9 +463,11 @@ if ssl == 1:
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS  = ' -pedantic -Werror')
     if 'clang' not in conf.env['CXX']:
-        conf.env.Append(CXXFLAGS = ' -Weffc++ -Wold-style-cast')
+        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
     else:
-        conf.env.Append(CCFLAGS = ' -Wno-self-assign')
+        conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
+        conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
+        conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
         if 'ccache' in conf.env['CXX']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
@@ -532,6 +537,13 @@ else:
 check_env.Append(BUILDERS = {'Test' :  bld})
 
 Export('check_env')
+
+#
+# If deterministic_tests is given, export GALERA_TEST_DETERMINISTIC
+# so that the non-deterministic tests can be filtered out.
+#
+if deterministic_tests:
+   os.environ['GALERA_TEST_DETERMINISTIC'] = '1'
 
 #
 # Run root SConscript with variant_dir

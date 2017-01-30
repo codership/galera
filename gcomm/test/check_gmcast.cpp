@@ -20,9 +20,28 @@ using gu::Buffer;
 
 #include <check.h>
 
-// Note: Not all tests are run by default as they require default port to be
-// used or listen port to be known beforehand.
-static bool run_all_tests(false);
+//
+// run_all_tests is set tuo true by default. To disable gmcast tests
+// which use real TCP transport, set GALERA_TEST_DETERMINISTIC env
+// variable before running gmcast test suite.
+//
+static bool run_all_tests(true);
+
+static struct run_all_gmcast_tests
+{
+public:
+    run_all_gmcast_tests()
+    {
+        if (::getenv("GALERA_TEST_DETERMINISTIC"))
+        {
+            run_all_tests = false;
+        }
+        else
+        {
+            run_all_tests = true;
+        }
+    }
+} run_all_gmcast_tests;
 // Note: Multicast test(s) not run by default.
 static bool test_multicast(false);
 string mcast_param("gmcast.mcast_addr=239.192.0.11&gmcast.mcast_port=4567");
@@ -423,43 +442,39 @@ Suite* gmcast_suite()
     Suite* s = suite_create("gmcast");
     TCase* tc;
 
-    if (test_multicast == true)
-    {
-        tc = tcase_create("test_gmcast_multicast");
-        tcase_add_test(tc, test_gmcast_multicast);
-        suite_add_tcase(s, tc);
-    }
-
-    tc = tcase_create("test_gmcast_w_user_messages");
-    tcase_add_test(tc, test_gmcast_w_user_messages);
-    tcase_set_timeout(tc, 30);
-    suite_add_tcase(s, tc);
-
     if (run_all_tests == true)
     {
+        if (test_multicast == true)
+        {
+            tc = tcase_create("test_gmcast_multicast");
+            tcase_add_test(tc, test_gmcast_multicast);
+            suite_add_tcase(s, tc);
+        }
+
+        tc = tcase_create("test_gmcast_w_user_messages");
+        tcase_add_test(tc, test_gmcast_w_user_messages);
+        tcase_set_timeout(tc, 30);
+        suite_add_tcase(s, tc);
+
         // not run by default, hard coded port
         tc = tcase_create("test_gmcast_auto_addr");
         tcase_add_test(tc, test_gmcast_auto_addr);
         suite_add_tcase(s, tc);
-    }
 
-    tc = tcase_create("test_gmcast_forget");
-    tcase_add_test(tc, test_gmcast_forget);
-    tcase_set_timeout(tc, 20);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_gmcast_forget");
+        tcase_add_test(tc, test_gmcast_forget);
+        tcase_set_timeout(tc, 20);
+        suite_add_tcase(s, tc);
 
-    if (run_all_tests == true)
-    {
         // not run by default, hard coded port
         tc = tcase_create("test_trac_380");
         tcase_add_test(tc, test_trac_380);
         suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_trac_828");
+        tcase_add_test(tc, test_trac_828);
+        suite_add_tcase(s, tc);
     }
-
-
-    tc = tcase_create("test_trac_828");
-    tcase_add_test(tc, test_trac_828);
-    suite_add_tcase(s, tc);
 
     return s;
 

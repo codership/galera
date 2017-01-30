@@ -113,6 +113,10 @@ namespace galera
             bool                  running_;
             bool                  interrupted_;
             bool                  ready_;
+
+            // GCC 4.8.5 on FreeBSD wants this
+            Receiver(const Receiver&);
+            Receiver& operator=(const Receiver&);
         };
 
         class Sender

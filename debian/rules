@@ -20,7 +20,7 @@ endif
 
 # Run tests by default
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	SCONS_ARGS += tests=1
+	SCONS_ARGS += tests=1 deterministic_tests=1
 endif
 
 

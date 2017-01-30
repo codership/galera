@@ -21,6 +21,7 @@
 #include "gu_utils.hpp"
 #include "gu_macros.hpp"
 #include "gu_mem_pool.hpp"
+#include "gu_limits.h" // page size stuff
 
 #include <set>
 
