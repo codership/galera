@@ -2278,6 +2278,12 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     else if (!strcmp (key, GCS_PARAMS_MAX_THROTTLE)) {
         return _set_max_throttle (conn, value);
     }
+#ifdef GCS_SM_DEBUG
+    else if (!strcmp (key, GCS_PARAMS_SM_DUMP)) {
+        gcs_sm_dump_state(conn->sm, stderr);
+        return 0;
+    }
+#endif /* GCS_SM_DEBUG */
     else {
         return gcs_core_param_set (conn->core, key, value);
     }
