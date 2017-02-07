@@ -722,6 +722,9 @@ _release_sst_flow_control (gcs_conn_t* conn)
         if (conn->stop_sent > 0) {
             ret = gcs_send_fc_event (conn, GCS_FC_CONT);
             conn->stop_sent -= (ret >= 0);
+
+            if (ret >= 0)
+                gu_info("SST leaving flow control");
         }
     }
     while (ret < 0 && -EAGAIN == ret); // we need to send CONT here at all costs
@@ -1112,6 +1115,8 @@ _check_recv_queue_growth (gcs_conn_t* conn, ssize_t size)
             if ((ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0) {
                 conn->stop_sent++;
                 ret = 0;
+
+                gu_info("SST entering flow control");
             }
             else {
                 ret = gcs_check_error (ret, "Failed to send SST FC_STOP.");
@@ -2034,6 +2039,8 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_lower_limit = conn->lower_limit;
     stats->fc_upper_limit = conn->upper_limit;
+
+    stats->fc_status = conn->stop_sent > 0 ? 1 : 0;
 }
 
 void
