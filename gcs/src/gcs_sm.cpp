@@ -217,10 +217,8 @@ gcs_sm_stats_flush(gcs_sm_t* sm)
 
 #ifdef GCS_SM_DEBUG
 void
-gcs_sm_dump_state(gcs_sm_t* sm, FILE* file)
+_gcs_sm_dump_state_common(gcs_sm_t* sm, FILE* file)
 {
-    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
-
     fprintf(
         file,
         "\nSend monitor state:"
@@ -273,7 +271,13 @@ gcs_sm_dump_state(gcs_sm_t* sm, FILE* file)
     while (line != sm->history_line);
 
     fputs("-----------------------------\n", file);
+}
 
+void
+gcs_sm_dump_state(gcs_sm_t* sm, FILE* file)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+    _gcs_sm_dump_state_common(sm, file);
     gu_mutex_unlock (&sm->lock);
 }
 #endif /* GCS_SM_DEBUG */

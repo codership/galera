@@ -89,14 +89,17 @@ gcs_sm_t;
  * Dumps SM state and history to file
  */
 extern void
-gcs_sm_dump_state(gcs_sm_t* sm, FILE* file);
+_gcs_sm_dump_state_common(gcs_sm_t* sm, FILE* file); // unprotected
 
 #define GCS_SM_ASSERT(expr)                            \
     if (!(expr)) {                                     \
         GCS_SM_HIST_LOG("assertion %s failed", #expr); \
-        gcs_sm_dump_state(sm, stderr);                 \
+        _gcs_sm_dump_state_common(sm, stderr);         \
         assert(expr);                                  \
     }
+
+extern void
+gcs_sm_dump_state(gcs_sm_t* sm, FILE* file);
 
 #else
 #define GCS_SM_HIST_LOG(fmt, ...) {}
@@ -188,15 +191,14 @@ _gcs_sm_wake_up_waiters (gcs_sm_t* sm)
 static inline void
 _gcs_sm_leave_common (gcs_sm_t* sm)
 {
-    GCS_SM_ASSERT(sm->entered < GCS_SM_CC);
     GCS_SM_ASSERT(sm->users > 0);
     sm->users--;
 
     if (gu_unlikely(sm->users < sm->users_min)) {
         sm->users_min = sm->users;
     }
-    assert (false == sm->wait_q[sm->wait_q_head].wait);
-    assert (NULL  == sm->wait_q[sm->wait_q_head].cond);
+    GCS_SM_ASSERT(false == sm->wait_q[sm->wait_q_head].wait);
+    GCS_SM_ASSERT(NULL  == sm->wait_q[sm->wait_q_head].cond);
     GCS_SM_INCREMENT(sm->wait_q_head);
 
     _gcs_sm_wake_up_waiters (sm);
@@ -392,7 +394,8 @@ gcs_sm_leave (gcs_sm_t* sm)
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
     sm->entered--;
-    assert(sm->entered >= 0);
+    GCS_SM_ASSERT(sm->entered >= 0);
+    GCS_SM_ASSERT(sm->entered < GCS_SM_CC);
 
     _gcs_sm_leave_common(sm);
 
