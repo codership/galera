@@ -91,11 +91,11 @@ gcs_sm_t;
 extern void
 _gcs_sm_dump_state_common(gcs_sm_t* sm, FILE* file); // unprotected
 
-#define GCS_SM_ASSERT(expr)                            \
-    if (!(expr)) {                                     \
-        GCS_SM_HIST_LOG("assertion %s failed", #expr); \
-        _gcs_sm_dump_state_common(sm, stderr);         \
-        assert(expr);                                  \
+#define GCS_SM_ASSERT(expr)                              \
+    if (!(expr)) {                                       \
+        GCS_SM_HIST_LOG("assertion %s failed\n", #expr); \
+        _gcs_sm_dump_state_common(sm, stderr);           \
+        assert(expr);                                    \
     }
 
 extern void
@@ -197,13 +197,16 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
     if (gu_unlikely(sm->users < sm->users_min)) {
         sm->users_min = sm->users;
     }
+
     GCS_SM_ASSERT(false == sm->wait_q[sm->wait_q_head].wait);
     GCS_SM_ASSERT(NULL  == sm->wait_q[sm->wait_q_head].cond);
     GCS_SM_INCREMENT(sm->wait_q_head);
-
     _gcs_sm_wake_up_waiters (sm);
+
     GCS_SM_HIST_LOG("leaving");
 }
+
+//#define GCS_SM_SIMULATE_TIMEOUTS
 
 static inline int
 _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block,
@@ -224,6 +227,9 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block,
     else
     {
         gu::datetime::Date abstime(gu::datetime::Date::calendar());
+#ifdef GCS_SM_SIMULATE_TIMEOUTS
+        if (tail & 1)
+#endif
         abstime = abstime + sm->wait_time;
         struct timespec ts;
         abstime._timespec(ts);
@@ -249,6 +255,9 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block,
                 gu_warn("send monitor wait timed out, waited for %s",
                         to_string(sm->wait_time).c_str());
             }
+#ifndef GCS_SM_SIMULATE_TIMEOUTS
+            if (tail & 1)
+#endif
             sm->wait_time = sm->wait_time + gu::datetime::Sec;
         }
         else
@@ -335,6 +344,7 @@ gcs_sm_schedule (gcs_sm_t* sm)
  * @retval -EAGAIN - out of space
  * @retval -EBADFD - monitor closed
  * @retval -EINTR  - was interrupted by another thread
+ * @retval -ETIMEDOUT - timedout waiting for its turn
  * @retval 0 - successfully entered
  */
 static inline long
@@ -365,14 +375,18 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
             assert(sm->users   > 0);
             assert(sm->entered < GCS_SM_CC);
             sm->entered++;
+#ifdef GCS_SM_SIMULATE_TIMEOUTS
+            if (tail & 1) usleep(1000);
+#endif
         }
         else {
-            if (gu_likely(-EINTR == ret)) {
-                /* was interrupted, will be handled by someone else */
+            if (tail != sm->wait_q_head) {
+                /* was interrupted in the middle,
+                 * will be handled by someone else (with tail == head) */
             }
             else {
-                /* monitor is closed, wake up others */
-                assert(sm->users > 0);
+                GCS_SM_ASSERT(-EINTR != ret || sm->pause);
+                /* update head, wake up next */
                 _gcs_sm_leave_common(sm);
             }
         }
@@ -380,9 +394,9 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
         GCS_SM_HIST_LOG("%lu entered: %ld", tail, ret);
         gu_mutex_unlock (&sm->lock);
     }
-    else if (ret != -EBADF){
-        gu_warn("thread %ld failed to schedule for monitor: %ld",
-                gu_thread_self(), ret);
+    else if (ret != -EBADFD){
+        gu_warn("thread %ld failed to schedule for monitor: %ld (%s)",
+                gu_thread_self(), ret, strerror(-ret));
     }
 
     return ret;
@@ -393,8 +407,8 @@ gcs_sm_leave (gcs_sm_t* sm)
 {
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
+    GCS_SM_ASSERT(sm->entered > 0);
     sm->entered--;
-    GCS_SM_ASSERT(sm->entered >= 0);
     GCS_SM_ASSERT(sm->entered < GCS_SM_CC);
 
     _gcs_sm_leave_common(sm);
