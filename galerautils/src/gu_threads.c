@@ -54,7 +54,7 @@ int gu_mutex_lock_DBG(gu_mutex_t_DBG *m,
         while (m->locked)
         {
             if (gu_thread_equal_SYS(self, m->thread)) {
-                gu_fatal("Second mutex lock attempt by the same thread, %lu, "
+                gu_fatal("Second mutex lock attempt by the same thread, %lx, "
                          "at %s:%d, first locked at %s:%d",
                          self, file, line, m->file, m->line);
                 abort();
@@ -85,8 +85,8 @@ int gu_mutex_unlock_DBG (gu_mutex_t_DBG *m,
     {
         if (m->locked && !gu_thread_equal_SYS(self, m->thread)) {
             /** last time pthread_t was unsigned long int */
-            gu_fatal ("%lu attempts to unlock mutex at %s:%d "
-                      "locked by %lu at %s:%d",
+            gu_fatal ("%lx attempts to unlock mutex at %s:%d "
+                      "locked by %lx at %s:%d",
                       self, file, line,
                       m->thread, m->file, m->line);
             assert(0);
@@ -97,7 +97,7 @@ int gu_mutex_unlock_DBG (gu_mutex_t_DBG *m,
          *  Then holder_count would still be 0 (see gu_cond_wait()),
          *  but cond_waiter - not */
         else if (!m->locked && m->cond_waiter_count == 0) {
-            gu_error ("%lu attempts to unlock unlocked mutex at %s:%d. "
+            gu_error ("%lx attempts to unlock unlocked mutex at %s:%d. "
                       "Last use at %s:%d",
                       self, file, line, m->file ? m->file : "" , m->line);
             assert(0 == m->waiter_count);
@@ -128,18 +128,18 @@ int gu_mutex_destroy_DBG (gu_mutex_t_DBG *m,
     if (gu_likely(0 == err))
     {
         if (!m->file) {
-            gu_fatal("%lu attempts to destroy uninitialized mutex at %s:%d",
+            gu_fatal("%lx attempts to destroy uninitialized mutex at %s:%d",
                      self, file, line);
             assert(0);
         }
         else if (m->locked) {
             if (gu_thread_equal_SYS(self, m->thread)) {
-                gu_error ("%lu attempts to destroy mutex locked by "
+                gu_error ("%lx attempts to destroy mutex locked by "
                           "itself at %s:%d",
                           self, m->file, m->line);
             }
             else {
-                gu_error ("%lu attempts to destroy a mutex at %s:%d "
+                gu_error ("%lx attempts to destroy a mutex at %s:%d "
                           "locked by %lu at %s:%d (not error)",
                           self, file, line, m->thread, m->file, m->line);
             }
@@ -148,7 +148,7 @@ int gu_mutex_destroy_DBG (gu_mutex_t_DBG *m,
             err = EBUSY;
         }
         else if (m->cond_waiter_count != 0) {
-            gu_error ("%lu attempts to destroy a mutex at %s:%d "
+            gu_error ("%lx attempts to destroy a mutex at %s:%d "
                       "that is waited by %d thread(s)",
                       self, file, line, m->cond_waiter_count);
             assert (m->cond_waiter_count > 0);
@@ -192,14 +192,14 @@ int gu_cond_twait_DBG (gu_cond_t_SYS *cond, gu_mutex_t_DBG *m,
 
     if (gu_likely(!err))
     {
-        if (gu_unlikely(!m->locked)) {
-            gu_fatal ("%lu tries to wait for condition on unlocked mutex "
+        if (gu_unlikely(!m->locked && 0 == m->cond_waiter_count)) {
+            gu_fatal ("%lx tries to wait for condition on unlocked mutex "
                       "at %s %d", self, file, line);
             assert (0);
         }
         else if (!gu_thread_equal_SYS(self, m->thread)) {
-            gu_fatal ("%lu tries to wait for condition on the mutex locked "
-                      "by %lu at %s %d", self, m->thread, file, line);
+            gu_fatal ("%lx tries to wait for condition on the mutex locked "
+                      "by %lx at %s %d", self, m->thread, file, line);
             assert (0);
         }
 
