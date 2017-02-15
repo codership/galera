@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
@@ -24,7 +24,7 @@ namespace
             GCache_setup(gu::Config& conf) : name_("write_set_test.gcache")
             {
                 conf.set("gcache.name", name_);
-                conf.set("gcache.size", "4M");
+                conf.set("gcache.size", "1M");
                 log_info << "conf for gcache: " << conf;
             }
 
