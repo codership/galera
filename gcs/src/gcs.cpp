@@ -277,9 +277,17 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
 
     {
         size_t recv_q_len = gu_avphys_bytes() / sizeof(struct gcs_recv_act) / 4;
-
-        gu_debug ("Requesting recv queue len: %zu", recv_q_len);
-        conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
+        if (recv_q_len == 0)
+        {
+            gu_error ("Requesting recv queue len: %zu", recv_q_len);
+            gu_error ("Available system memory is running low: %zu",
+                      gu_avphys_bytes());
+        }
+        else
+        {
+            gu_debug ("Requesting recv queue len: %zu", recv_q_len);
+            conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
+        }
     }
     if (!conn->recv_q) {
         gu_error ("Failed to create recv_q.");
