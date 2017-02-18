@@ -56,6 +56,13 @@ namespace gu
             log_warn << "Failed to set " MMAP_INHERIT_OPTION " on " << fd.name()
                      << ": " << err << " (" << strerror(err) << ")";
         }
+#elif defined(__FreeBSD__)
+		if (minherit (ptr, size, INHERIT_NONE))
+		{
+			int const err(errno);
+			log_warn << "Failed to set INHERIT_NONE on " << fd.name()
+			<< ": " << err << " (" << strerror(err) << ")";
+		}
 #endif
 
         /* benefits are questionable */
