@@ -5,6 +5,7 @@
  */
 
 #include "gcs_params.hpp"
+#include "gcs_fc.hpp"
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
@@ -200,7 +201,7 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
     int64_t tmp;
     if ((ret = params_init_int64 (config, GCS_PARAMS_RECV_Q_HARD_LIMIT, 0, 0,
                                   &tmp))) return ret;
-    params->recv_q_hard_limit = tmp * 0.9; // allow for some meta overhead
+    params->recv_q_hard_limit = tmp * gcs_fc_hard_limit_fix; // allow for some meta overhead
 
     if ((ret = params_init_bool (config, GCS_PARAMS_FC_MASTER_SLAVE,
                                  &params->fc_master_slave))) return ret;
