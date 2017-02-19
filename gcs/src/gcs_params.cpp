@@ -20,6 +20,8 @@ const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT = "gcs.recv_q_hard_limit";
 const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT = "gcs.recv_q_soft_limit";
 const char* const GCS_PARAMS_MAX_THROTTLE      = "gcs.max_throttle";
 
+const double GCS_FC_HARD_LIMIT_FIX = 0.9; //! allow for some overhead
+
 static const char* const GCS_PARAMS_FC_FACTOR_DEFAULT         = "1.0";
 static const char* const GCS_PARAMS_FC_LIMIT_DEFAULT          = "16";
 static const char* const GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT   = "no";
@@ -200,7 +202,8 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
     int64_t tmp;
     if ((ret = params_init_int64 (config, GCS_PARAMS_RECV_Q_HARD_LIMIT, 0, 0,
                                   &tmp))) return ret;
-    params->recv_q_hard_limit = tmp * 0.9; // allow for some meta overhead
+    // Allow for some meta overhead
+    params->recv_q_hard_limit = tmp * GCS_FC_HARD_LIMIT_FIX;
 
     if ((ret = params_init_bool (config, GCS_PARAMS_FC_MASTER_SLAVE,
                                  &params->fc_master_slave))) return ret;

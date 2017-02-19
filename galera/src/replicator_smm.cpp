@@ -25,6 +25,7 @@ apply_trx_ws(void*                    recv_ctx,
 {
     using galera::TrxHandle;
     static const size_t max_apply_attempts(4);
+    const char *ordinals[] = {"st", "nd", "rd", "th"};
     size_t attempts(1);
 
     do
@@ -76,7 +77,10 @@ apply_trx_ws(void*                    recv_ctx,
                     if (attempts <= max_apply_attempts)
                     {
                         log_warn << e.what()
-                                 << "\nRetrying " << attempts << "th time";
+                                 << "\nRetrying "
+                                 << attempts
+                                 << ordinals[(attempts < 4) ? attempts - 1 : 3]
+                                 << " time";
                     }
                 }
                 else

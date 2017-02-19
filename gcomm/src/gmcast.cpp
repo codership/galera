@@ -576,12 +576,13 @@ void gcomm::GMCast::handle_established(Proto* est)
                 log_warn << self_string()
                          << " address '" << est->remote_addr()
                          << "' points to own listening address, blacklisting";
+
+                addr_blacklist_.insert(make_pair(est->remote_addr(),
+                                                 AddrEntry(gu::datetime::Date::now(),
+                                                           gu::datetime::Date::now(),
+                                                           est->remote_uuid())));
             }
             pending_addrs_.erase(i);
-            addr_blacklist_.insert(make_pair(est->remote_addr(),
-                                             AddrEntry(gu::datetime::Date::now(),
-                                                       gu::datetime::Date::now(),
-                                                       est->remote_uuid())));
         }
         erase_proto(proto_map_->find_checked(est->socket()->id()));
         update_addresses();

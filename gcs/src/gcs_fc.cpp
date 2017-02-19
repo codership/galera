@@ -12,8 +12,6 @@
 #include <galerautils.h>
 #include <string.h>
 
-double const gcs_fc_hard_limit_fix = 0.9; //! allow for some overhead
-
 static double const min_sleep = 0.001; //! minimum sleep period (s)
 
 /*! Initializes operational constants before opening connection to group
