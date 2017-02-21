@@ -101,6 +101,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
 #endif /* HAVE_PSI_INTERFACE */
     consumers_    (),
     current_seqno_(-1),
+    first_seqno_  (-1),
     last_seqno_   (-1),
     conf_         (conf),
     trx_pool_     (sp),
@@ -353,6 +354,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
     }
 
     current_seqno_ = first_seqno;
+    first_seqno_   = first_seqno;
     last_seqno_    = last_seqno;
     int err;
     if ((err = gu_thread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
