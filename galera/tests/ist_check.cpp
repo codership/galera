@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -255,6 +255,7 @@ static void test_ist_common(int const version)
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     std::string gcache_file("ist_check.cache");
     conf.set("gcache.name", gcache_file);
+    conf.set("gcache.size", "1M");
     std::string dir(".");
     std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;

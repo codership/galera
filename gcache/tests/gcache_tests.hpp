@@ -8,8 +8,6 @@
 #ifndef __gcache_tests_hpp__
 #define __gcache_tests_hpp__
 
-#define LOG_FILE "gcache_tests.log"
-
 #include "gcache_mem_test.hpp"
 #include "gcache_rb_test.hpp"
 #include "gcache_page_test.hpp"

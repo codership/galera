@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -397,6 +397,8 @@ START_TEST(recovery)
         seqno_min = ctx.s2p.begin()->first;
         seqno_max = ctx.s2p.rbegin()->first;
     }
+
+    ::unlink(RB_NAME.c_str());
 }
 END_TEST
 
