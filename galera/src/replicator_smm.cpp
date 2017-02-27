@@ -183,7 +183,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     ist_prepared_       (false),
     ist_senders_        (gcs_, gcache_),
     wsdb_               (),
-    cert_               (config_, service_thd_),
+    cert_               (config_, service_thd_, gcache_),
 #ifdef HAVE_PSI_INTERFACE
     local_monitor_      (WSREP_PFS_INSTR_TAG_LOCAL_MONITOR_MUTEX,
                          WSREP_PFS_INSTR_TAG_LOCAL_MONITOR_CONDVAR),

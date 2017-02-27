@@ -807,7 +807,7 @@ galera::Certification::do_test_preordered(TrxHandle* trx)
 }
 
 
-galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
+galera::Certification::Certification(gu::Config& conf, ServiceThd& thd, gcache::GCache& gcache)
     :
     version_               (-1),
     trx_map_               (),
@@ -815,6 +815,7 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     cert_index_ng_         (),
     deps_set_              (),
     service_thd_           (thd),
+    gcache_                (gcache),
 #ifdef HAVE_PSI_INTERFACE
     mutex_                 (WSREP_PFS_INSTR_TAG_CERT_MUTEX),
 #else
@@ -1073,7 +1074,7 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandle* trx)
             deps_set_.erase(i);
         }
 
-        if (gu_unlikely(index_purge_required()))
+        if (gu_unlikely(gcache_.cleanup_required() || index_purge_required()))
         {
             ret = get_safe_to_discard_seqno_();
         }
