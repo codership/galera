@@ -48,7 +48,7 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(gu::Config& conf, ServiceThd& thd);
+        Certification(gu::Config& conf, ServiceThd& thd, gcache::GCache& gcache);
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno, int versiono);
@@ -189,6 +189,7 @@ namespace galera
         CertIndexNG   cert_index_ng_;
         DepsSet       deps_set_;
         ServiceThd&   service_thd_;
+        gcache::GCache& gcache_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t initial_position_;

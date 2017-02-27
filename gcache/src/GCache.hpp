@@ -104,6 +104,17 @@ namespace gcache
          */
         size_t allocated_pool_size ();
 
+
+        /*!
+         * Implements the cleanup policy test.
+         */
+        bool cleanup_required()
+        {
+            return (params.keep_pages_size() && ps.total_size() > params.keep_pages_size()) ||
+                   (params.keep_pages_count() && ps.total_pages() > params.keep_pages_count());
+        }
+
+
         class Buffer
         {
         public:

@@ -76,9 +76,16 @@ remove_file (void* __restrict__ arg)
     pthread_exit(NULL);
 }
 
+/*
+ * Returns false if there are no more pages to be deleted (either
+ * the queue is empty or if the first page is in use).
+ * Otherwise, returns true.
+*/
 bool
 gcache::PageStore::delete_page ()
 {
+    if (pages_.empty()) return false;
+
     Page* const page = pages_.front();
 
     if (page->used() > 0) return false;
@@ -120,41 +127,18 @@ gcache::PageStore::cleanup ()
     size_t counter = 0;
 #endif
 /*
- * 1. We must release the page if we have exceeded the limit on the
+ * 1. We must release the page if the size (keep_size_ = gcache.keep_pages_size)
+ *    and count (keep_page_ = gcache.keep_pages_count) are NOT set (they are both 0).
+ * 2. We must release the page if we have exceeded the limit on the
  *    overall size of the page pool (which is set by the user explicitly,
- *    keep_size_ = gcache.keep_pages_size) and if the quantity of pages
+ *    keep_size_ = gcache.keep_pages_size) OR if the quantity of pages
  *    more that we should to keep in memory even if they are free (parameter
  *    keep_page_ = gcache.keep_pages_count).
- * 2. We shall release the pages, if the number of pages exceeds keep_page_
- *    (gcache.keep_pages_count) and total size of the pool is not explicitly
- *    specified (keep_size_ = gcache.keep_pages_size = 0).
- * 3. We should not release the first page when the total limit is not
- *    specified explicitly (keep_size_ = gcache.keep_pages_size = 0) and
- *    the number of pages, which must be retained in memory, is greater
- *    than one: keep_page_ (gcache.keep_pages_count) >= 1.
- * 4. If the user changes the page size, then we should get rid of the pages
- *    with old size at the earliest opportunity. The fact that the user can
- *    specify the desired total memory not only through gcache.keep_pages_size
- *    (keep_size_) parameter, but alternatively by specifying the total number
- *    of retained pages (gcache.keep_pages_count = keep_page_) and the size
- *    of one page (gcache.page_size = page_size_).
- * 5. We must get rid of the non-standard page size, even if not exceeded
- *    the total number of pages. Otherwise, the user will not be able to
- *    reduce the effective size of the page pool by changing the page size
- *    (gcache.page_size = page_size_).
- * 6. We note that gcache.keep_pages_size (keep_size_) parameter is zero,
- *    if we do not set it explicitly. Therefore, the first condition
- *    "total_size_ > keep_size_" is not interfere with the third condition
- *    "pages_.front()->size() != page_size_" in scenarios where the user
- *    has decided to limit the volume of the pool by specifying the size
- *    of one page (gcache.page_size = page_size_) and the total number
- *    of retained pages (gcache.keep_pages_count  = keep_page_), rather
- *    than through a clear indication of the total amount of memory
- *    (keep_size_ = gcache.keep_pages_size).
+ * 3. 
  */
-    while (total_size_   > keep_size_ &&
-          (pages_.size() > keep_page_ ||
-           pages_.front()->size() != page_size_) &&
+    while (((!keep_size_ && !keep_page_) ||
+            (keep_size_ && total_size_ > keep_size_) ||
+            (keep_page_ && pages_.size() > keep_page_)) &&
            delete_page())
     {
 #ifndef NDEBUG

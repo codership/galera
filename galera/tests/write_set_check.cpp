@@ -51,6 +51,7 @@ namespace
 
         gu::Config&         conf() { return conf_; }
         galera::ServiceThd& thd()  { return thd_;  }
+        gcache::GCache&     gcache() { return gcache_; }
 
     private:
 
@@ -408,7 +409,7 @@ START_TEST(test_cert_hierarchical_v1)
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
     TestEnv env;
-    galera::Certification cert(env.conf(), env.thd());
+    galera::Certification cert(env.conf(), env.thd(), env.gcache());
     int const version(1);
     cert.assign_initial_position(0, version);
     galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
@@ -530,7 +531,7 @@ START_TEST(test_cert_hierarchical_v2)
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
     TestEnv env;
-    galera::Certification cert(env.conf(), env.thd());
+    galera::Certification cert(env.conf(), env.thd(), env.gcache());
 
     cert.assign_initial_position(0, version);
     galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
@@ -580,7 +581,7 @@ START_TEST(test_trac_726)
 
     const int version(2);
     TestEnv env;
-    galera::Certification cert(env.conf(), env.thd());
+    galera::Certification cert(env.conf(), env.thd(), env.gcache());
     galera::TrxHandle::Params const trx_params("", version,KeySet::MAX_VERSION);
     wsrep_uuid_t uuid1 = {{1, }};
     wsrep_uuid_t uuid2 = {{2, }};
