@@ -13,12 +13,11 @@
 #include "gu_macros.h" // gu_likely()
 #include "common.h"    //
 
-#ifndef HAVE_SYSTEM_ASIO
 // Make GCC to treat this as the system header to suppress compiler
-// warnings from embedded asio.hpp
+// warnings
 #pragma GCC system_header
-// Using embedded copy of ASIO requires turning off some
-// compiler warnings.
+// Turn off some compiler warnings which are known to break the
+// build.
 #if defined(__GNUG__)
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #  pragma GCC diagnostic push
@@ -30,7 +29,6 @@
 # pragma GCC diagnostic ignored "-Wunused-local-typedef"
 # pragma GCC diagnostic ignored "-Wunused-variable"
 #endif // __GNUG__
-#endif // ! HAVE_SYSTEM_ASIO
 
 #include "asio.hpp"
 #include "asio/ssl.hpp"
@@ -190,12 +188,10 @@ namespace gu
     }
 }
 
-#ifndef HAVE_SYSTEM_ASIO
 #if defined(__GNUG__)
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #  pragma GCC diagnostic pop
 # endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #endif
-#endif // ! HAVE_SYSTEM_ASIO
 
 #endif // GU_ASIO_HPP
