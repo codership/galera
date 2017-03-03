@@ -160,23 +160,24 @@ bool gcomm::operator==(const gcomm::View& a, const gcomm::View& b)
 
 std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::View& view)
 {
-    os << "view(";
+    os << "Current view of cluster as seen by this node\n";
+    os << "view (";
     if (view.is_empty() == true)
     {
         os << "(empty)";
     }
     else
     {
-        os << view.id();
-        os << " memb {\n";
+        os << view.id() << "\n";
+        os << "memb {\n";
         os << view.members();
-        os << "} joined {\n";
+        os << "\t}\njoined {\n";
         os << view.joined();
-        os << "} left {\n";
+        os << "\t}\nleft {\n";
         os << view.left();
-        os << "} partitioned {\n";
+        os << "\t}\npartitioned {\n";
         os << view.partitioned();
-        os << "}";
+        os << "\t}\n";
     }
     os << ")";
     return os;
@@ -381,8 +382,10 @@ void gcomm::ViewState::write_file() const
 bool gcomm::ViewState::read_file()
 {
     if (access(file_name_.c_str(), R_OK) != 0) {
-        log_warn << "access file(" << file_name_ << ") failed("
-                 << strerror(errno) << ")";
+        log_warn << "Fail to access the file (" << file_name_ << ") error ("
+                 << strerror(errno) << "). It is possible if node is booting"
+                 << " for first time or re-booting after a graceful shutdown";
+
         return false;
     }
     try {

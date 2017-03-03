@@ -1421,7 +1421,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url,
                 gcs_fifo_lite_open(conn->repl_q);
                 gu_fifo_open(conn->recv_q);
                 gcs_shift_state (conn, GCS_CONN_OPEN);
-                gu_info ("Opened channel '%s'", channel);
+                gu_debug ("Opened channel '%s'", channel);
                 conn->inner_close_count = 0;
                 conn->outer_close_count = 0;
                 goto out;

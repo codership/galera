@@ -793,7 +793,7 @@ bool gcomm::pc::Proto::is_prim() const
 
         if (state.prim() == true)
         {
-            log_info << "Node " << SMMap::key(i) << " state prim";
+            log_info << "Node " << SMMap::key(i) << " state primary";
             prim      = true;
             last_prim = state.last_prim();
             to_seq    = state.to_seq();

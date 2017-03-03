@@ -353,7 +353,7 @@ group_post_state_exchange (gcs_group_t* group)
              "\n\tversion    = %u,"
              "\n\tcomponent  = %s,"
              "\n\tconf_id    = %lld,"
-             "\n\tmembers    = %d/%d (joined/total),"
+             "\n\tmembers    = %d/%d (primary/total),"
              "\n\tact_id     = %lld,"
              "\n\tlast_appl. = %lld,"
              "\n\tprotocols  = %d/%d/%d (gcs/repl/appl),"

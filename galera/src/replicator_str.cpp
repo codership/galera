@@ -532,6 +532,9 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 {
     if (state_uuid_ != group_uuid)
     {
+        log_info << "Local UUID: " << state_uuid_
+                 << " != Group UUID: " << group_uuid;
+
         gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
                                << ") does not match group state UUID ("
                                << group_uuid << ')';
@@ -541,6 +544,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
     if (local_seqno < 0)
     {
+        log_info << "Local state seqno is undefined (-1)";
+
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
 
@@ -557,7 +562,12 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     char* str = strdup (os.str().c_str());
 
     // cppcheck-suppress nullPointer
-    if (!str) gu_throw_error (ENOMEM) << "Failed to allocate IST buffer.";
+    if (!str)
+    {
+        log_info << "Fail to allocate memory for IST buffer";
+
+        gu_throw_error (ENOMEM) << "Failed to allocate IST buffer.";
+    }
 
     len = strlen(str) + 1;
 
@@ -585,14 +595,23 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
 
             try
             {
+                log_info << "Check if state gap can be serviced using IST";
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
                                           group_uuid, group_seqno));
             }
             catch (gu::Exception& e)
             {
-                log_warn
+                log_info << "State gap can't be serviced using IST."
+                            " Switching to SST";
+                log_debug
                     << "Failed to prepare for incremental state transfer: "
                     << e.what() << ". IST will be unavailable.";
+            }
+
+            if (ist_req_len)
+            {
+                log_info << "State gap can be likely serviced using IST."
+                         << " SST request though present would be void.";
             }
 
             StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
