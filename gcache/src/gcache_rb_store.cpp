@@ -667,11 +667,12 @@ namespace gcache
         size_t collision_count(0);
         int64_t erase_up_to(-1);
         uint8_t* segment_start(start_);
+        uint8_t* segment_end(end_ - sizeof(BufferHeader));
 
         /* start at offset (first segment) if we know it and it is valid */
         if (offset >= 0)
         {
-            if (start_ + offset + 2*sizeof(BufferHeader) < end_)
+            if (start_ + offset + sizeof(BufferHeader) < segment_end)
                 /* we know exaclty where the first segment starts */
                 segment_start = start_ + offset;
             else
@@ -679,11 +680,8 @@ namespace gcache
                 segment_scans = 1;
         }
 
-        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan ",
-                                         " bytes",
-                                         "PT5S", /* 5 sec */
-                                         1<<22,  /* 4Mb */
-                                         end_ - start_);
+        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan",
+                                         " bytes", end_ - start_, 1<<22 /*4Mb*/);
 
         while (segment_scans < 2)
         {
@@ -694,7 +692,7 @@ namespace gcache
 
 #define GCACHE_SCAN_BUFFER_TEST                                 \
             (BH_test(bh) && bh->size > 0 &&                     \
-             ptr + bh->size + sizeof(BufferHeader) <= end_ &&   \
+             ptr + bh->size <= segment_end &&                   \
              BH_test(BH_cast(ptr + bh->size)))
 
             while (GCACHE_SCAN_BUFFER_TEST)
@@ -792,15 +790,15 @@ namespace gcache
 
             if (!BH_is_clear(bh))
             {
-                if (start_ == segment_start)
+                if (start_ == segment_start && ptr != first_)
                 {
                     log_warn << "Failed to scan the last segment to the end. "
                             "Last events may be missing. Last recovered event: "
                              << gid_ << ':' << seqno_max;
                 }
 
-                /* do best effort */
-                BH_clear(bh);
+                /* end of file, do best effort */
+                if (end_ - sizeof(BufferHeader) == segment_end) BH_clear(bh);
             }
 
             if (offset > 0 && segment_start == start_ + offset)
@@ -809,6 +807,7 @@ namespace gcache
                 assert(1 == segment_scans);
                 first_ = segment_start;
                 size_trail_ = end_ - ptr;
+                segment_end = segment_start;
                 segment_start = start_;
             }
             else if (offset < 0 && segment_start == start_)
@@ -865,7 +864,7 @@ namespace gcache
                     /* first (end) segment was scanned last, estimate trail */
                     size_trail_ = end_ - ptr;
                 }
-                else if (offset > 0 && next_ >= first_)
+                else if (offset > 0 && next_ > first_)
                 {
                     size_trail_ = 0;
                 }
@@ -888,9 +887,8 @@ namespace gcache
 
         if (!seqno2ptr_.empty())
         {
-            assert(first_ != next_);
-            assert(next_ < first_ || size_trail_ == 0);
-            assert(next_ > first_ || size_trail_ >  0);
+            assert(next_ <= first_ || size_trail_ == 0);
+            assert(next_ >  first_ || size_trail_ >  0);
 
             /* find the last gapless seqno sequence */
             seqno2ptr_t::reverse_iterator r(seqno2ptr_.rbegin());
@@ -961,8 +959,8 @@ namespace gcache
 
             /* trim next_: start with the last seqno and scan forward up to the
              * current next_. Update to the end of the last non-empty buffer. */
-            BufferHeader* last_bh(NULL);
             bh = ptr2BH(seqno2ptr_[seqno_max]);
+            BufferHeader* last_bh(bh);
             while (bh != BH_cast(next_))
             {
                 if (gu_likely(bh->size) > 0)
@@ -979,7 +977,6 @@ namespace gcache
                     bh = BH_cast(start_); // rollover
                 }
             }
-            assert(last_bh);
             next_ = reinterpret_cast<uint8_t*>(BH_next(last_bh));
 
             /* at this point we must have at least one seqno'd buffer */
@@ -993,11 +990,8 @@ namespace gcache
 
             /* now discard all the locked-in buffers (see seqno_reset()) */
             gu::Progress<size_t> progress(
-                "GCache::RingBuffer unused buffers scan ",
-                " bytes",
-                "PT5S", /* 5 sec */
-                1<<22,  /* 4Mb   */
-                size_used_);
+                "GCache::RingBuffer unused buffers scan",
+                " bytes", size_used_, 1<<22 /* 4Mb */);
 
             size_t total(0);
             size_t locked(0);
