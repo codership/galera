@@ -41,6 +41,7 @@ namespace gcomm
         typedef std::vector<InputMapNode> InputMapNodeIndex;
         std::ostream& operator<<(std::ostream&, const InputMapNodeIndex&);
         class InputMap;
+        std::ostream& operator<<(std::ostream&, const InputMap&);
     }
 }
 
