@@ -1708,7 +1708,9 @@ long gcs_request_state_transfer (gcs_conn_t*    conn,
          *       for the receiver part. */
 
         if (version < 2) {
-            assert(0); // this branch should not be exercised any more
+#ifndef GCS_FOR_GARB
+            assert(0); // this branch is for SST request by garbd only
+#endif /* GCS_FOR_GARB */
             memcpy (rst + offset, donor, donor_len);
             offset += donor_len;
             memcpy (rst + offset, req, size);

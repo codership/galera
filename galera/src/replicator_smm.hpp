@@ -393,6 +393,7 @@ namespace galera
         class StateRequest
         {
         public:
+            virtual int         version () const = 0;
             virtual const void* req     () const = 0;
             virtual ssize_t     len     () const = 0;
             virtual const void* sst_req () const = 0;

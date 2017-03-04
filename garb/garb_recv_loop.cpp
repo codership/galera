@@ -125,7 +125,7 @@ RecvLoop::loop()
 
         if (act.buf)
         {
-            free (const_cast<void*>(act.buf));
+            ::free(const_cast<void*>(act.buf));
         }
     }
 }

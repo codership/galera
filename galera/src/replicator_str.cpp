@@ -90,6 +90,7 @@ public:
         : req_(sst_req), len_(sst_req_len)
     {}
     ~StateRequest_v0 () {}
+    virtual int         version () const { return 0;    }
     virtual const void* req     () const { return req_; }
     virtual ssize_t     len     () const { return len_; }
     virtual const void* sst_req () const { return req_; }
@@ -112,6 +113,7 @@ public:
                      const void* ist_req, ssize_t ist_req_len);
     StateRequest_v1 (const void* str, ssize_t str_len);
     ~StateRequest_v1 () { if (own_ && req_) free (req_); }
+    virtual int         version () const { return 1;    }
     virtual const void* req     () const { return req_; }
     virtual ssize_t     len     () const { return len_; }
     virtual const void* sst_req () const { return req(sst_offset()); }
@@ -240,7 +242,7 @@ read_state_request (const void* const req, size_t const req_len)
                   !strncmp(str, StateRequest_v1::MAGIC.c_str(),
                            StateRequest_v1::MAGIC.length()));
 
-    log_info << "           detected STR version: " << int(v1) << ", req_len: "
+    log_info << "Detected STR version: " << int(v1) << ", req_len: "
              << req_len << ", req: " << str;
     if (v1)
     {
@@ -452,45 +454,53 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             if (protocol_version_ >= 8)
             {
-                if (streq->ist_len() <= 0)
+                if (streq->version() > 0)
                 {
-                    log_warn << "Joiner didn't provide IST connection info -"
-                        " cert. index preload impossible, bailing out.";
-                    rcode = -EHOSTUNREACH;
-                    goto out;
-                }
-
-                wsrep_seqno_t preload_start(cc_lowest_trx_seqno_);
-
-                try
-                {
-                    if (preload_start <= 0)
+                    if (streq->ist_len() <= 0)
                     {
-                        preload_start = cc_seqno_;
+                        log_warn << "Joiner didn't provide IST connection info -"
+                            " cert. index preload impossible, bailing out.";
+                        rcode = -ENOMSG;
+                        goto out;
                     }
 
-                    gcache_.seqno_lock(preload_start);
+                    wsrep_seqno_t preload_start(cc_lowest_trx_seqno_);
+
+                    try
+                    {
+                        if (preload_start <= 0)
+                        {
+                            preload_start = cc_seqno_;
+                        }
+
+                        gcache_.seqno_lock(preload_start);
+                    }
+                    catch (gu::NotFound& nf)
+                    {
+                        log_warn << "Cert index preload first seqno "
+                                 << preload_start << " not found from gcache";
+                        rcode = -ENOMSG;
+                        goto out;
+                    }
+
+                    log_info << "Cert index preload: " << preload_start
+                             << " -> " << cc_seqno_;
+
+                    IST_request istr;
+                    get_ist_request(streq, &istr);
+                    // Send trxs to rebuild cert index.
+                    ist_senders_.run(config_,
+                                     istr.peer(),
+                                     preload_start,
+                                     cc_seqno_,
+                                     preload_start,
+                                     protocol_version_);
                 }
-                catch (gu::NotFound& nf)
+                else /* streq->version() == 0 */
                 {
-                    log_warn << "Cert index preload first seqno "
-                             << preload_start << " not found from gcache";
-                    rcode = -ENOMSG;
-                    goto out;
+                    log_info << "STR v0: assuming backup request, skipping "
+                        "cert. index preload.";
                 }
-
-                log_info << "Cert index preload: " << preload_start
-                         << " -> " << cc_seqno_;
-
-                IST_request istr;
-                get_ist_request(streq, &istr);
-                // Send trxs to rebuild cert index.
-                ist_senders_.run(config_,
-                                 istr.peer(),
-                                 preload_start,
-                                 cc_seqno_,
-                                 preload_start,
-                                 protocol_version_);
             }
 
             rcode = donate_sst(recv_ctx, *streq, state_id, false);

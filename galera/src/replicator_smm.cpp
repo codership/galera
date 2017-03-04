@@ -1488,7 +1488,12 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
     }
 
     try {
-        gcs_.join(gu::GTID(state_id.uuid, state_id.seqno), rcode);
+        if (rcode == 0)
+            gcs_.join(gu::GTID(state_id.uuid, state_id.seqno), rcode);
+        else
+            /* stamp error message with the current state */
+            gcs_.join(gu::GTID(state_uuid_, commit_monitor_.last_left()), rcode);
+
         return WSREP_OK;
     }
     catch (gu::Exception& e)

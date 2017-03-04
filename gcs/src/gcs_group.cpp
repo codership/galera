@@ -1510,6 +1510,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     }
     free(tmp);
 #else
+    rcvd->act.buf = tmp;
     rcvd->id = group->my_idx;
 #endif /* GCS_FOR_GARB */
 
