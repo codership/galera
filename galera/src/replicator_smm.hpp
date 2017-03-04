@@ -22,7 +22,7 @@
 #include "write_set.hpp"
 #include "galera_service_thd.hpp"
 #include "fsm.hpp"
-#include "gcs_action_source.hpp"
+#include "action_source.hpp"
 #include "ist.hpp"
 #include "gu_atomic.hpp"
 #include "saved_state.hpp"
@@ -129,7 +129,7 @@ namespace galera
 
         const struct wsrep_stats_var* stats_get()  const;
         void                          stats_reset();
-        void                   stats_free(struct wsrep_stats_var*);
+        void                          stats_free(struct wsrep_stats_var*);
 
         /*! @throws NotFound */
         void           set_param (const std::string& key,
@@ -156,7 +156,18 @@ namespace galera
 
         void preload_index(const gcs_action&);
         void wait(wsrep_seqno_t);
-        void drain_monitors(wsrep_seqno_t);
+        void cancel_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g);
+        void drain_monitors(wsrep_seqno_t seqno_g);
+
+        void mark_corrupt_and_close()
+        /* mark state as corrupt and try to leave cleanly */
+        {
+            st_.mark_corrupt();
+            gu::Lock lock(closing_mutex_);
+            start_closing();
+        }
+
+        bool corrupt() const { return st_.corrupt(); }
 
         struct InitConfig
         {
@@ -582,7 +593,6 @@ namespace galera
         // action sources
         TrxHandleSlave::Pool slave_pool_;
         ActionSource*        as_;
-        GcsActionSource      gcs_as_;
         ist::Receiver        ist_receiver_;
         ist::AsyncSenderMap  ist_senders_;
 

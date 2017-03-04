@@ -190,8 +190,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_KEYS_BYTES         ].value._int64  = keys_bytes_();
     sv[STATS_DATA_BYTES         ].value._int64  = data_bytes_();
     sv[STATS_UNRD_BYTES         ].value._int64  = unrd_bytes_();
-    sv[STATS_RECEIVED           ].value._int64  = gcs_as_.received();
-    sv[STATS_RECEIVED_BYTES     ].value._int64  = gcs_as_.received_bytes();
+    sv[STATS_RECEIVED           ].value._int64  = as_->received();
+    sv[STATS_RECEIVED_BYTES     ].value._int64  = as_->received_bytes();
     sv[STATS_LOCAL_COMMITS      ].value._int64  = local_commits_();
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
     sv[STATS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
@@ -226,8 +226,7 @@ galera::ReplicatorSMM::stats_get() const
     double oooe;
     double oool;
     double win;
-    const_cast<Monitor<ApplyOrder>&>(apply_monitor_).
-        get_stats(&oooe, &oool, &win);
+    apply_monitor_.get_stats(&oooe, &oool, &win);
 
     sv[STATS_APPLY_OOOE          ].value._double = oooe;
     sv[STATS_APPLY_OOOL          ].value._double = oool;

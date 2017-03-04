@@ -60,7 +60,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     {
         assert(act.seqno_g > 0);
         assert(act.seqno_l != GCS_SEQNO_ILL);
-        assert(act.seqno_g != GCS_SEQNO_ILL);
+
         TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
                               TrxHandleSlaveDeleter());
         gu_trace(tsp->unserialize<true>(act));
@@ -106,12 +106,30 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
     struct gcs_action act;
 
     ssize_t rc(gcs_.recv(act));
-    if (rc > 0)
+
+    /* Potentially we want to do corrupt() check inside commit_monitor_ as well
+     * but by the time inconsistency is detected an arbitrary number of
+     * transactions may be already committed, so no reason to try that hard
+     * in a critical section */
+    bool const skip(replicator_.corrupt()       &&
+                    GCS_ACT_CCHANGE != act.type);
+
+    if (gu_likely(rc > 0 && !skip))
     {
         Release release(act, gcache_);
         ++received_;
         received_bytes_ += rc;
         gu_trace(dispatch(recv_ctx, act, exit_loop));
     }
+    else if (rc > 0 && skip)
+    {
+        replicator_.cancel_seqnos(act.seqno_l, act.seqno_g);
+    }
+    else
+    {
+        assert(act.seqno_l < 0);
+        assert(act.seqno_g < 0);
+    }
+
     return rc;
 }

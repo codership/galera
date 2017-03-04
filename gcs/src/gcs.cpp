@@ -1469,7 +1469,6 @@ long gcs_destroy (gcs_conn_t *conn)
         gu_fifo_destroy (conn->recv_q);
 
         gcs_shift_state (conn, GCS_CONN_DESTROYED);
-//DELETE        conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
          * to acquire the lock and give up gracefully */
     }

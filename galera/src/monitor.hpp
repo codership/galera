@@ -310,7 +310,7 @@ namespace galera
         }
 
 
-        void get_stats(double* oooe, double* oool, double* win_size)
+        void get_stats(double* oooe, double* oool, double* win_size) const
         {
             gu::Lock lock(mutex_);
 
@@ -469,6 +469,7 @@ namespace galera
         Monitor(const Monitor&);
         void operator=(const Monitor&);
 
+        mutable
         gu::Mutex mutex_;
         gu::Cond  cond_;
         wsrep_seqno_t last_entered_;

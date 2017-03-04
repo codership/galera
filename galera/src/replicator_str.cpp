@@ -1111,10 +1111,4 @@ void ReplicatorSMM::wait(wsrep_seqno_t const upto)
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.wait(upto);
 }
 
-void ReplicatorSMM::drain_monitors(wsrep_seqno_t const upto)
-{
-    apply_monitor_.drain(upto);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
-}
-
 } /* namespace galera */

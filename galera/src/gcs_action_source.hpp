@@ -7,7 +7,13 @@
 
 #include "action_source.hpp"
 #include "galera_gcs.hpp"
+#ifndef NDEBUG
 #include "replicator.hpp"
+#define REPL_IMPL Replicator
+#else
+#include "replicator_smm.hpp"
+#define REPL_IMPL ReplicatorSMM
+#endif
 #include "trx_handle.hpp"
 
 #include "GCache.hpp"
@@ -22,7 +28,7 @@ namespace galera
 
         GcsActionSource(TrxHandleSlave::Pool& sp,
                         GCS_IMPL&             gcs,
-                        Replicator&           replicator,
+                        REPL_IMPL&            replicator,
                         gcache::GCache&       gcache)
             :
             trx_pool_      (sp        ),
@@ -48,7 +54,7 @@ namespace galera
 
         TrxHandleSlave::Pool& trx_pool_;
         GCS_IMPL&             gcs_;
-        Replicator&           replicator_;
+        REPL_IMPL&            replicator_;
         gcache::GCache&       gcache_;
         gu::Atomic<long long> received_;
         gu::Atomic<long long> received_bytes_;

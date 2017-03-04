@@ -4,6 +4,7 @@
 
 #include "galera_common.hpp"
 #include "replicator_smm.hpp"
+#include "gcs_action_source.hpp"
 #include "galera_exception.hpp"
 
 #include "galera_info.hpp"
@@ -173,8 +174,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
                          args->node_name, args->node_incoming),
     service_thd_        (gcs_, gcache_),
     slave_pool_         (sizeof(TrxHandleSlave), 1024, "TrxHandleSlave"),
-    as_                 (0),
-    gcs_as_             (slave_pool_, gcs_, *this, gcache_),
+    as_                 (new GcsActionSource(slave_pool_, gcs_, *this, gcache_)),
     ist_receiver_       (config_, gcache_, *this, args->node_address),
     ist_senders_        (gcache_),
     wsdb_               (),
@@ -312,6 +312,8 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_DESTROYED:
         break;
     }
+
+    delete as_;
 }
 
 
@@ -381,7 +383,6 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     }
 
     ++receivers_;
-    as_ = &gcs_as_;
 
     bool exit_loop(false);
     wsrep_status_t retval(WSREP_OK);
@@ -1530,8 +1531,9 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx,
 
             log_fatal << "Failed to apply trx: " << *ts;
             log_fatal << e.what();
-            log_fatal << "Node consistency compromized, aborting...";
-            abort();
+            log_fatal << "Node consistency compromized, leaving cluster...";
+            mark_corrupt_and_close();
+            // keep processing events from the queue until provider is closed
         }
         break;
     case WSREP_TRX_FAIL:
@@ -1561,6 +1563,26 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
         cert_.purge_trxs_upto(seq, true);
     log_debug << "Got commit cut from GCS: " << seq;
     local_monitor_.leave(lo);
+}
+
+
+void galera::ReplicatorSMM::cancel_seqnos(wsrep_seqno_t const seqno_l,
+                                          wsrep_seqno_t const seqno_g)
+{
+    if (seqno_l > 0)
+    {
+        LocalOrder lo(seqno_l);
+        local_monitor_.self_cancel(lo);
+    }
+
+    if (seqno_g > 0) cancel_seqno(seqno_g);
+}
+
+
+void galera::ReplicatorSMM::drain_monitors(wsrep_seqno_t const upto)
+{
+    apply_monitor_.drain(upto);
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 }
 
 

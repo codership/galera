@@ -21,7 +21,7 @@ public:
     ApplyException (const std::string& msg, int err)
         : gu::Exception (msg, err)
     {
-        if (err < 0) // sanity check
+        if (err == 0) // sanity check
         {
             log_fatal
                 << "Attempt to throw exception with a " << err << " code";
