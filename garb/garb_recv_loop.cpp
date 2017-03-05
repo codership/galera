@@ -117,6 +117,10 @@ RecvLoop::loop()
         case GCS_ACT_JOIN:
         case GCS_ACT_SYNC:
         case GCS_ACT_FLOW:
+            break;
+        case GCS_ACT_VOTE:
+            gcs_.vote(gu::GTID(uuid_, seqno_));
+            break;
         case GCS_ACT_SERVICE:
         case GCS_ACT_ERROR:
         case GCS_ACT_UNKNOWN:

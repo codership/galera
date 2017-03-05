@@ -582,6 +582,9 @@ namespace galera
         /* local state seqno for internal use (macro mock up) */
         wsrep_seqno_t STATE_SEQNO(void) { return commit_monitor_.last_left(); }
 
+        /* Wait until NBO end criteria is met */
+        wsrep_status_t wait_nbo_end(TrxHandleMaster*, wsrep_trx_meta_t*);
+
         class InitLib /* Library initialization routines */
         {
         public:

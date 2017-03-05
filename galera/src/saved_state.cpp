@@ -202,9 +202,8 @@ SavedState::mark_safe()
     {
         gu::Lock lock(mtx_); ++total_locks_;
 
-        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0))
+        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0) && !corrupt_)
         {
-            assert(false == corrupt_);
             /* this will write down proper seqno if set() was called too early
              * (in unsafe state) */
             write_and_flush (uuid_, seqno_);
@@ -215,11 +214,6 @@ SavedState::mark_safe()
 void
 SavedState::mark_corrupt()
 {
-    /* Half LONG_MAX keeps us equally and sufficiently far from unsafe_
-       overflow/underflow by mark_unsafe()/mark_safe() calls */
-    static const long magic(std::numeric_limits<long>::max() >> 1);
-    unsafe_ = magic;
-
     gu::Lock lock(mtx_); ++total_locks_;
 
     if (corrupt_) return;
@@ -229,6 +223,21 @@ SavedState::mark_corrupt()
     corrupt_ = true;
 
     write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED);
+}
+
+void
+SavedState::mark_uncorrupt(const wsrep_uuid_t& u, wsrep_seqno_t s)
+{
+    gu::Lock lock(mtx_); ++total_locks_;
+
+    if (!corrupt_) return;
+
+    uuid_    = u;
+    seqno_   = s;
+    unsafe_  = 0;
+    corrupt_ = false;
+
+    write_and_flush (u, s);
 }
 
 void

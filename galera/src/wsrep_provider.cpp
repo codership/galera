@@ -3,6 +3,7 @@
 //
 
 #include "key_data.hpp"
+#include "gu_serialize.hpp"
 
 #if defined(GALERA_MULTIMASTER)
 #include "replicator_smm.hpp"
@@ -82,11 +83,14 @@ uint64_t galera_capabilities(wsrep_t* gh)
                                   WSREP_CAP_UNORDERED            |
                                   WSREP_CAP_PREORDERED);
 
+    static uint64_t const v8_caps(WSREP_CAP_NBO);
+
     uint64_t caps(v4_caps);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     if (repl->repl_proto_ver() >= 5) caps |= v5_caps;
+    if (repl->repl_proto_ver() >= 8) caps |= v8_caps;
 
     return caps;
 }
@@ -200,7 +204,7 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
-#endif // ! NDEBUG
+#endif /* NDEBUG */
 }
 
 
@@ -266,9 +270,9 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
     {
         log_fatal << "non-standard exception";
     }
-#endif // NDEBUG
 
     return WSREP_FATAL;
+#endif /* NDEBUG */
 }
 
 static TrxHandleMaster*
@@ -838,23 +842,72 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
+    // Non-blocking operations "certification" depends on
+    // TRX_START and TRX_END flags, not having those flags may cause
+    // undefined behavior so check them here.
+    assert(flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_TRX_END));
+
+    if ((flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_TRX_END)) == 0)
+    {
+        log_warn << "to_execute_start(): either WSREP_FLAG_TRX_START "
+                 << "or WSREP_FLAG_TRX_END flag is required";
+        return WSREP_CONN_FAIL;
+    }
+
+    // Simultaneous use of TRX_END AND ROLLBACK is not allowed
+    assert(!((flags & WSREP_FLAG_TRX_END) && (flags & WSREP_FLAG_ROLLBACK)));
+
+    if ((flags & WSREP_FLAG_TRX_END) && (flags & WSREP_FLAG_ROLLBACK))
+    {
+        log_warn << "to_execute_start(): simultaneous use of "
+                 << "WSREP_FLAG_TRX_END and WSREP_FLAG_ROLLBACK "
+                 << "is not allowed";
+        return WSREP_CONN_FAIL;
+    }
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    TrxHandleMaster* trx(repl->local_conn_trx(conn_id, true).get());
+    galera::TrxHandleMasterPtr trx_sp(repl->local_conn_trx(conn_id, true));
+    galera::TrxHandleMaster* trx(trx_sp.get());
+
     assert(trx != 0);
     assert(trx->state() == TrxHandle::S_EXECUTING);
 
+    trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(
+                       flags | WSREP_FLAG_ISOLATION));
+
+
+    // NBO-end event. Application should have provided the ongoing
+    // operation start event source node id and connection id in
+    // meta->stid.node and meta->stid.conn respectively
+    if (trx->nbo_end() == true)
+    {
+        galera::NBOKey key(meta->gtid.seqno);
+        gu::Buffer buf(galera::NBOKey::serial_size());
+        (void)key.serialize(&buf[0], buf.size(), 0);
+        struct wsrep_buf data_buf = {&buf[0], buf.size()};
+        append_data_array(trx, &data_buf, 1, WSREP_DATA_ORDERED, true);
+    }
+
     if (meta != 0)
     {
-        meta->gtid       = WSREP_GTID_UNDEFINED;
+        // Don't override trx meta gtid for NBO end yet, gtid is used in
+        // replicator wait_nbo_end() to locate correct nbo context
+        if (trx->nbo_end() == false)
+        {
+            meta->gtid       = WSREP_GTID_UNDEFINED;
+        }
         meta->depends_on = WSREP_SEQNO_UNDEFINED;
         meta->stid.node  = trx->source_id();
         meta->stid.trx   = trx->trx_id();
+        meta->stid.conn  = trx->conn_id();
     }
 
     wsrep_status_t retval;
 
+#ifdef NDEBUG
     try
+#endif // NDEBUG
     {
         TrxHandleLock lock(*trx);
         for (size_t i(0); i < keys_num; ++i)
@@ -867,6 +920,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
         append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
 
+        if (trx->nbo_end() == false)
         {
             retval = repl->replicate(trx, meta);
             assert((retval == WSREP_OK && trx->ts() != 0 &&
@@ -888,12 +942,18 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
                 }
             }
         }
+        else
+        {
+            // NBO-end events are broadcasted separately in to_isolation_begin()
+            retval = WSREP_OK;
+        }
 
         if (retval == WSREP_OK)
         {
             retval = repl->to_isolation_begin(*trx, meta);
         }
     }
+#ifdef NDEBUG
     catch (gu::Exception& e)
     {
         log_error << e.what();
@@ -913,6 +973,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
+#endif // NDEBUG
 
     if (trx->ts() == NULL || trx->ts()->global_seqno() < 0)
     {
@@ -935,12 +996,20 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     wsrep_status_t retval;
-    TrxHandleMaster* trx(repl->local_conn_trx(conn_id, false).get());
+    galera::TrxHandleMasterPtr trx(repl->local_conn_trx(conn_id, false));
+
+    assert(trx != 0);
+    if (trx == 0)
+    {
+        log_warn << "No trx handle for connection " << conn_id
+                 << " in galera_to_execute_end()";
+        return WSREP_CONN_FAIL;
+    }
 
     try
     {
         TrxHandleLock lock(*trx);
-        gu_trace(repl->to_isolation_end(*trx, err));
+        repl->to_isolation_end(*trx, err);
         retval =  WSREP_OK;
     }
     catch (std::exception& e)
@@ -953,7 +1022,6 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
-
     gu_trace(repl->discard_local_conn_trx(conn_id));
 
     return retval;

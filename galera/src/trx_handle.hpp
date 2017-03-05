@@ -29,6 +29,9 @@
 
 namespace galera
 {
+
+    class NBOCtx; // forward decl
+
     static std::string const working_dir = "/tmp";
 
     static int const WS_NG_VERSION = WriteSetNG::VER3;
@@ -102,6 +105,20 @@ namespace galera
         bool preordered() const
         {
             return ((write_set_flags_ & F_PREORDERED) != 0);
+        }
+
+        bool nbo_start() const
+        {
+            return (is_toi() &&
+                    (write_set_flags_ & F_BEGIN) != 0 &&
+                    (write_set_flags_ & F_COMMIT) == 0);
+        }
+
+        bool nbo_end() const
+        {
+            return (is_toi() &&
+                    (write_set_flags_ & F_BEGIN) == 0 &&
+                    (write_set_flags_ & F_COMMIT) != 0);
         }
 
         typedef enum
@@ -547,6 +564,9 @@ namespace galera
 
         size_t   size()         const { return write_set_.size(); }
 
+        void set_ends_nbo(wsrep_seqno_t seqno) { ends_nbo_ = seqno; }
+        wsrep_seqno_t ends_nbo() const { return ends_nbo_; }
+
         void mark_dummy()
         {
             set_depends_seqno(WSREP_SEQNO_UNDEFINED);
@@ -573,7 +593,8 @@ namespace galera
             refcnt_            (1),
             certified_         (false),
             committed_         (false),
-            exit_loop_         (false)
+            exit_loop_         (false),
+            ends_nbo_          (WSREP_SEQNO_UNDEFINED)
         {}
 
         friend class TrxHandleMaster;
@@ -595,6 +616,7 @@ namespace galera
         bool                   certified_;
         bool                   committed_;
         bool                   exit_loop_;
+        wsrep_seqno_t          ends_nbo_;
 
         TrxHandleSlave(const TrxHandleSlave&);
         void operator=(const TrxHandleSlave& other);

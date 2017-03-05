@@ -64,17 +64,17 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
                               TrxHandleSlaveDeleter());
         gu_trace(tsp->unserialize<true>(act));
-
+        tsp->set_local(replicator_.source_id() == tsp->source_id());
         gu_trace(replicator_.process_trx(recv_ctx, tsp));
         exit_loop = tsp->exit_loop(); // this is the end of trx lifespan
         break;
     }
     case GCS_ACT_COMMIT_CUT:
     {
-        wsrep_seqno_t seq;
-        gu::unserialize8(static_cast<const gu::byte_t*>(act.buf), act.size, 0,
-                         seq);
-        gu_trace(replicator_.process_commit_cut(seq, act.seqno_l));
+        wsrep_seqno_t seqno;
+        gu::unserialize8(act.buf, act.size, 0, seqno);
+        assert(seqno >= 0);
+        gu_trace(replicator_.process_commit_cut(seqno, act.seqno_l));
         break;
     }
     case GCS_ACT_CCHANGE:
@@ -95,6 +95,16 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
     case GCS_ACT_SYNC:
         gu_trace(replicator_.process_sync(act.seqno_l));
         break;
+    case GCS_ACT_VOTE:
+    {
+        int64_t seqno;
+        size_t const off(gu::unserialize8(act.buf, act.size, 0, seqno));
+        int64_t code;
+        gu::unserialize8(act.buf, act.size, off, code);
+        assert(seqno >= 0);
+        gu_trace(replicator_.process_vote(seqno, act.seqno_l, code));
+        break;
+    }
     default:
         gu_throw_fatal << "unrecognized action type: " << act.type;
     }
@@ -112,14 +122,16 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
      * transactions may be already committed, so no reason to try that hard
      * in a critical section */
     bool const skip(replicator_.corrupt()       &&
-                    GCS_ACT_CCHANGE != act.type);
+                    GCS_ACT_CCHANGE != act.type &&
+                    GCS_ACT_VOTE    != act.type);
 
     if (gu_likely(rc > 0 && !skip))
     {
         Release release(act, gcache_);
         ++received_;
         received_bytes_ += rc;
-        gu_trace(dispatch(recv_ctx, act, exit_loop));
+        try { gu_trace(dispatch(recv_ctx, act, exit_loop)); }
+        catch (gu::Exception& e) { rc = -e.get_errno(); }
     }
     else if (rc > 0 && skip)
     {

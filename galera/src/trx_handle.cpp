@@ -73,7 +73,6 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " trx_id: "  << int64_t(trx_id())  // for readability
        << " tstamp: "  << timestamp();
 
-
 }
 
 std::ostream&
@@ -277,6 +276,8 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
     assert(version() >= WS_NG_VERSION || skip_event());
 
     const DataSetIn& ws(write_set_.dataset());
+    void* err_msg(NULL); // for future use with updated apply_cb
+    size_t err_msg_len(0);
 
     ws.rewind(); // make sure we always start from the beginning
 
@@ -307,7 +308,7 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
         os << "Failed to apply app buffer: seqno: " << global_seqno()
            << ", code: " << err;
 
-        galera::ApplyException ae(os.str(), err);
+        galera::ApplyException ae(os.str(), err, err_msg, err_msg_len);
 
         GU_TRACE(ae);
 

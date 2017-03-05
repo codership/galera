@@ -155,11 +155,14 @@ typedef enum gcs_act_type
     GCS_ACT_JOIN,       //! joined group (received all state data)
     GCS_ACT_SYNC,       //! synchronized with group
     GCS_ACT_FLOW,       //! flow control
+    GCS_ACT_VOTE,       //! vote on GTID outcome
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
     GCS_ACT_UNKNOWN     //! undefined/unknown action type
 }
 gcs_act_type_t;
+
+#define GCS_VOTE_REQUEST 1 /* vote request indicator */
 
 /*! String representations of action types */
 extern const char* gcs_act_type_to_str(gcs_act_type_t);
@@ -352,6 +355,20 @@ extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
 extern long
 gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid);
 
+/*! @brief Vote on the error code that resulted from processing the gtid action.
+ *
+ * Blocks until consensus is reached or call fails.
+ *
+ * @param msg optional error message (should not be node-specific)
+ * @param msg_len message length
+ *
+ * @return 0 for majority agrees on error, 1 for majority disagrees with error,
+ *         negative errno for technical call failure.
+ */
+extern int
+gcs_vote (gcs_conn_t* conn, const gu::GTID& gtid, uint64_t code,
+          const void* msg, size_t msg_len);
+
 /* GCS Configuration */
 
 /*! Registers configurable parameters with conf object
@@ -432,6 +449,8 @@ struct gcs_act_cchange
     gu_uuid_t           uuid;     //! group UUID
     gcs_seqno_t         seqno;    //! last global seqno applied by this group
     gcs_seqno_t         conf_id;  //! configuration ID (-1 if non-primary)
+    gcs_seqno_t         vote_seqno;
+    int64_t             vote_res;
     int                 repl_proto_ver; //! replicator  protocol version to use
     int                 appl_proto_ver; //! application protocol version to use
 };

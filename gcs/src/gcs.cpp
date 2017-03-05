@@ -52,7 +52,7 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
     static const char* str[GCS_ACT_UNKNOWN + 1] =
     {
         "TORDERED", "COMMIT_CUT", "STATE_REQUEST", "CONFIGURATION",
-        "JOIN", "SYNC", "FLOW", "SERVICE", "ERROR", "UNKNOWN"
+        "JOIN", "SYNC", "FLOW", "VOTE", "SERVICE", "ERROR", "UNKNOWN"
     };
 
     if (type < GCS_ACT_UNKNOWN) return str[type];
@@ -172,6 +172,14 @@ struct gcs_conn
     /* gcs_core object */
     gcs_core_t*  core; // the context that is returned by
                        // the core group communication system
+
+    /* error vote */
+    gu_mutex_t vote_lock_;
+    gu_cond_t  vote_cond_;
+    gu::GTID   vote_gtid_;
+    int64_t    vote_res_;
+    bool       vote_wait_;
+    int        vote_err_;
 
     int inner_close_count; // how many times _close has been called.
     int outer_close_count; // how many times gcs_close has been called.
@@ -310,6 +318,8 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
         GCS_CONN_DONOR : GCS_CONN_JOINED;
 
     gu_mutex_init (&conn->fc_lock, NULL);
+    gu_mutex_init (&conn->vote_lock_, NULL);
+    gu_cond_init  (&conn->vote_cond_, NULL);
 
     return conn; // success
 
@@ -839,9 +849,40 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
     gcs_act_cchange const conf(act.buf, act.buf_len);
 
     assert(rcvd.id >= 0 || 0 == conf.memb.size());
+    assert(conf.vote_res <= 0);
+
+    gu_mutex_lock(&conn->vote_lock_);
+    if (conn->vote_wait_)
+    {
+        assert(0 == conn->vote_err_);
+
+        if (conn->vote_gtid_.uuid() == conf.uuid)
+        {
+            if (conf.vote_seqno >= conn->vote_gtid_.seqno())
+            {
+                /* vote end by membership change */
+                conn->vote_res_ = conf.vote_res;
+                gu_cond_signal(&conn->vote_cond_);
+            }
+            /* else vote for this seqno has not been finalized */
+        }
+        else
+        {
+            /* vote end by group change */
+            conn->vote_err_ = -EREMCHG; gu_cond_signal(&conn->vote_cond_);
+        }
+
+        if (0 == conn->memb_num)
+        {
+            /* vote end by connection close */
+            conn->vote_err_ = -EBADFD; gu_cond_signal(&conn->vote_cond_);
+        }
+    }
 
     conn->group_uuid = conf.uuid;
     conn->my_idx = rcvd.id;
+
+    gu_mutex_unlock(&conn->vote_lock_);
 
     long ret;
 
@@ -1013,6 +1054,68 @@ gcs_handle_state_change (gcs_conn_t*           conn,
     }
 }
 
+static int
+_handle_vote (gcs_conn_t& conn, const struct gcs_act& act)
+{
+    assert(act.type == GCS_ACT_VOTE);
+    assert(act.buf_len >= ssize_t(2 * sizeof(int64_t)));
+
+    int64_t seqno, res;
+    gu::unserialize8(act.buf, act.buf_len, 0, seqno);
+    gu::unserialize8(act.buf, act.buf_len, 8, res);
+
+    if (GCS_VOTE_REQUEST == res)
+    {
+        log_debug << "Got vote request for " << seqno;
+        return 1; /* pass request straight to slave q */
+    }
+    assert(res <= 0);
+
+    gu_mutex_lock(&conn.vote_lock_);
+
+    log_debug << "Got vote action: " << seqno << ',' << res;
+    assert(conn.vote_gtid_.seqno() != GCS_SEQNO_ILL);
+    int ret(1); /* by default pass action to slave queue as usual */
+
+    if (conn.vote_wait_)
+    {
+        log_debug << "Error voting thread is waiting for: "
+                  << conn.vote_gtid_.seqno() << ',' << conn.vote_res_;
+        assert(conn.group_uuid == conn.vote_gtid_.uuid());
+
+        if (conn.vote_res_ != 0 || seqno >= conn.vote_gtid_.seqno())
+        {
+            /* any non-zero vote on past seqno or end vote on future seqno
+             * must wake up voting thread:
+             * - negative vote on past seqno means this node is inconsistent
+             *   since it did not detect any problems with it.
+             * - any vote on a future seqno effectively means 0 vote on the
+             *   current vote_seqno. It also means that the current voter votes
+             *   otherwise (and too late), so is inconsistent.
+             * In any case vote_res mismatch will show that. */
+            if (seqno > conn.vote_gtid_.seqno())
+            {
+                conn.vote_res_ = 0; ret = 1; /* still pass to slave q */
+            }
+            else
+            {
+                conn.vote_res_ = res; ret = 0; /* consumed by voter */
+            }
+            gu_cond_signal(&conn.vote_cond_);
+        }
+    }
+    else
+    {
+        log_debug << "No error voting thread, returning " << ret;
+    }
+
+    gu_mutex_unlock(&conn.vote_lock_);
+
+    if (0 == ret) ::free(const_cast<void*>(act.buf)); /* consumed here */
+
+    return ret;
+}
+
 /*!
  * Performs work requred by action in current context.
  * @return negative error code, 0 if action should be discarded, 1 if should be
@@ -1046,6 +1149,9 @@ gcs_handle_actions (gcs_conn_t* conn, struct gcs_act_rcvd& rcvd)
     case GCS_ACT_SYNC:
         ret = gcs_handle_state_change (conn, &rcvd.act);
         gcs_become_synced (conn);
+        break;
+    case GCS_ACT_VOTE:
+        ret = _handle_vote (*conn, rcvd.act);
         break;
     default:
         break;
@@ -1242,7 +1348,8 @@ static void *gcs_recv_thread (void *arg)
         assert (rcvd.act.type < GCS_ACT_ERROR);
         assert (ret == rcvd.act.buf_len);
 
-        if (gu_unlikely(rcvd.act.type >= GCS_ACT_STATE_REQ))
+        if (gu_unlikely(rcvd.act.type >= GCS_ACT_STATE_REQ ||
+                        (conn->vote_wait_ && GCS_ACT_COMMIT_CUT==rcvd.act.type)))
         {
             ret = gcs_handle_actions (conn, rcvd);
 
@@ -1944,13 +2051,104 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
     return ret;
 }
 
-#if 0
 static int
 proto_ver(gcs_conn_t* conn)
 {
     return gcs_core_proto_ver(conn->core);
 }
-#endif
+
+int
+gcs_vote (gcs_conn_t* const conn, const gu::GTID& gtid, uint64_t const code,
+          const void* const msg, size_t const msg_len)
+{
+    if (proto_ver(conn) < 1)
+    {
+        assert(code != 0); // should be here only our own initiative
+        log_error << "Not all group members support inconsistency voting. "
+                  << "Reverting to old behavior: abort on error.";
+        return 1; /* no voting with old protocol */
+    }
+
+    int const err(gu_mutex_lock(&conn->vote_lock_));
+    if (gu_unlikely(0 != err))
+    {
+        assert(0);
+        return -err;
+    }
+
+    while (conn->vote_wait_) /* only one at a time */
+    {
+        gu_mutex_unlock(&conn->vote_lock_);
+        usleep(10000);
+        gu_mutex_lock(&conn->vote_lock_);
+    }
+
+    if (gtid.uuid()  == conn->vote_gtid_.uuid() &&  /* seqno was voted already */
+        gtid.seqno() <= conn->vote_gtid_.seqno())   /* - ensure monotonicity   */
+    {
+        assert(0 == code); /* we can be here only by voting request */
+        gu_mutex_unlock(&conn->vote_lock_);
+        return -EALREADY;
+    }
+
+
+    gu::GTID const old_gtid(conn->vote_gtid_);
+    conn->vote_gtid_ = gtid;
+    conn->vote_err_  = 0;
+
+    /* We can reach this point for two reasons:
+     * 1. either we want to report an error
+     * 2. or we are voting by request (in which case code == 0) */
+
+    int64_t my_vote;
+    if (0 != code)
+    {
+        size_t const buf_len(gtid.serial_size() + sizeof(code));
+        char* const buf(new char[buf_len]);
+        size_t offset(0);
+
+        offset = gtid.serialize(buf, buf_len, offset);
+        offset = gu::serialize8(code, buf, buf_len, offset);
+        assert(buf_len == offset);
+
+        gu::MMH3 hash;
+        hash.append(buf, buf_len);
+        hash.append(msg, msg_len);
+
+        my_vote = (hash.gather8() | (1ULL << 63));
+        // make sure it is never 0 (and always negative) in case of error
+    }
+    else
+    {
+        my_vote = 0;
+    }
+
+    int ret(gcs_core_send_vote(conn->core, gtid, my_vote));
+    if (ret < 0)
+    {
+        assert(ret != -EAGAIN); /* EAGAIN should be taken care of at core level*/
+        conn->vote_gtid_ = old_gtid; /* failed to send vote */
+        goto cleanup;
+    }
+
+    /* wait for voting results */
+    conn->vote_wait_ = true;
+    gu_cond_wait(&conn->vote_cond_, &conn->vote_lock_);
+    ret = conn->vote_err_; assert(ret <= 0);
+    if (0 == ret)
+    {
+        ret = my_vote != conn->vote_res_; // 0 for agreement, 1 for disagreement
+    }
+    conn->vote_wait_ = false;
+
+cleanup:
+    log_debug << "Error voting thread wating on " << gtid.seqno() << ','
+              << my_vote << ", got " << conn->vote_res_ << ", returning "
+              << ret;
+    conn->vote_res_  = 0;
+    gu_mutex_unlock(&conn->vote_lock_);
+    return ret;
+}
 
 long
 gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)

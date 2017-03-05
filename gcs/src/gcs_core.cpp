@@ -723,6 +723,46 @@ core_handle_last_msg (gcs_core_t*          core,
 }
 
 /*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_LAST.
+ *
+ * @return action size, negative error code or 0 to continue.
+ */
+static int
+core_handle_vote_msg (gcs_core_t*          core,
+                      struct gcs_recv_msg* msg,
+                      struct gcs_act*      act)
+{
+    assert (GCS_MSG_VOTE == msg->type);
+    assert (CodeMsg::serial_size() == msg->size);
+
+    VoteResult const res(gcs_group_handle_vote_msg(&core->group, msg));
+
+    if (res.seqno != GCS_SEQNO_ILL)
+    {
+        assert(res.seqno > 0);
+        /* voting complete or vote request */
+        int   const buf_len(2 * sizeof(uint64_t));
+        void* const buf(malloc(buf_len));
+
+        if (gu_likely(NULL != (buf))) {
+            gu::serialize8(res.seqno, buf, buf_len, 0);
+            gu::serialize8(res.res,   buf, buf_len, 8);
+            assert(NULL == act->buf);
+            act->buf     = buf;
+            act->buf_len = buf_len;
+            act->type    = GCS_ACT_VOTE;
+            return act->buf_len;
+        }
+        else {
+            gu_fatal ("Out of memory for GCS_ACT_VOTE");
+            return -ENOMEM;
+        }
+    }
+
+    return 0;
+}
+
+/*!
  * Helper for gcs_core_recv(). Handles GCS_MSG_COMPONENT.
  *
  * @return action size, negative error code or 0 to continue.
@@ -1168,6 +1208,11 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
             ret = core_msg_to_action (conn, recv_msg, &recv_act->act);
             assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
+        case GCS_MSG_VOTE:
+            ret = core_handle_vote_msg(conn, recv_msg, &recv_act->act);
+            assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len);
+            break;
         case GCS_MSG_CAUSAL:
             ret = core_msg_causal(conn, recv_msg);
             assert(recv_msg->sender_idx == gcs_group_my_idx(&conn->group));
@@ -1392,6 +1437,12 @@ long
 gcs_core_send_sync (gcs_core_t* const core, const gu::GTID& gtid)
 {
     return core_send_code (core, gtid, 0, GCS_MSG_SYNC);
+}
+
+long
+gcs_core_send_vote (gcs_core_t* const core, const gu::GTID& gtid, int64_t code)
+{
+    return core_send_code (core, gtid, code, GCS_MSG_VOTE);
 }
 
 long

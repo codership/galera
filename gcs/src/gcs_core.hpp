@@ -152,6 +152,10 @@ gcs_core_send_join (gcs_core_t* core, const gu::GTID& gtid, int code);
 extern long
 gcs_core_send_sync (gcs_core_t* core, const gu::GTID& gtid);
 
+/* sends vote on GTID outcome */
+extern long
+gcs_core_send_vote (gcs_core_t* core, const gu::GTID& gtid, int64_t code);
+
 /* sends flow control message */
 extern long
 gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);

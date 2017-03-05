@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -16,5 +16,6 @@ const char* gcs_msg_type_string[GCS_MSG_MAX] = {
     "JOIN",
     "SYNC",
     "FLOW",
+    "VOTE",
     "CAUSAL"
 };

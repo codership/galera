@@ -5,6 +5,8 @@
 #ifndef GALERA_CERTIFICATION_HPP
 #define GALERA_CERTIFICATION_HPP
 
+
+#include "nbo.hpp"
 #include "trx_handle.hpp"
 #include "key_entry_ng.hpp"
 #include "galera_service_thd.hpp"
@@ -14,6 +16,8 @@
 #include <gu_lock.hpp>
 #include <gu_config.hpp>
 #include <gu_gtid.hpp>
+
+#include <boost/shared_ptr.hpp>
 
 #include <map>
 #include <list>
@@ -34,6 +38,10 @@ namespace galera
         typedef gu::UnorderedSet<KeyEntryNG*,
                                  KeyEntryPtrHashNG, KeyEntryPtrEqualNG>
         CertIndexNG;
+
+        typedef gu::UnorderedMultiset<KeyEntryNG*,
+                                      KeyEntryPtrHashNG, KeyEntryPtrEqualNG>
+        CertIndexNBO;
 
     private:
 
@@ -115,6 +123,18 @@ namespace galera
             return (trx_map_.empty() ? position_ : trx_map_.begin()->first);
         }
 
+        //
+        // NBO context lifecycle:
+        // * Context is created when NBO-start event is received
+        // * Context stays in nbo_ctx_map_ until client calls erase_nbo_ctx()
+        //
+
+        // Get NBO context matching to global seqno
+        boost::shared_ptr<NBOCtx> nbo_ctx(wsrep_seqno_t);
+        // Erase NBO context entry
+        void erase_nbo_ctx(wsrep_seqno_t);
+        size_t nbo_size() const { return nbo_map_.size(); }
+
     private:
 
         // Non-copyable
@@ -124,11 +144,14 @@ namespace galera
         TestResult do_test(const TrxHandleSlavePtr&, bool store_keys);
         TestResult do_test_v3(TrxHandleSlave*, bool);
         TestResult do_test_preordered(TrxHandleSlave*);
+        TestResult do_test_nbo(const TrxHandleSlavePtr&);
         void purge_for_trx(TrxHandleSlave*);
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
         wsrep_seqno_t purge_trxs_upto_(wsrep_seqno_t, bool sync);
+
+        boost::shared_ptr<NBOCtx> nbo_ctx_unlocked(wsrep_seqno_t);
 
         bool index_purge_required()
         {
@@ -173,7 +196,10 @@ namespace galera
                     // write set certification has passed and keys have been
                     // inserted into index and purge is needed.
                     // TOI write sets will always pass regular certification
-                    // and keys will be inserted..
+                    // and keys will be inserted, however if they fail
+                    // NBO certification depends seqno is set to
+                    // WSREP_SEQNO_UNDEFINED. Therefore purge should always
+                    // be done for TOI write sets.
                     if (trx->depends_seqno() >= 0 || trx->is_toi() == true)
                     {
                         cert_.purge_for_trx(trx);
@@ -194,12 +220,17 @@ namespace galera
         TrxMap        trx_map_;
         CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
+        NBOMap        nbo_map_;
+        NBOCtxMap     nbo_ctx_map_;
+        CertIndexNBO  nbo_index_;
+        TrxHandleSlave::Pool nbo_pool_;
         DepsSet       deps_set_;
         ServiceThd*   service_thd_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t initial_position_;
         wsrep_seqno_t position_;
+        wsrep_seqno_t nbo_position_;
         wsrep_seqno_t safe_to_discard_seqno_;
         wsrep_seqno_t last_pa_unsafe_;
         wsrep_seqno_t last_preordered_seqno_;

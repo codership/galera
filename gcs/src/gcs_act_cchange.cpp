@@ -18,6 +18,8 @@ gcs_act_cchange::gcs_act_cchange()
     uuid          (GU_UUID_NIL),
     seqno         (GCS_SEQNO_ILL),
     conf_id       (-1),
+    vote_seqno    (GCS_SEQNO_ILL),
+    vote_res      (0),
     repl_proto_ver(-1),
     appl_proto_ver(-1)
 {}
@@ -87,6 +89,8 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
     uuid          (),
     seqno         (),
     conf_id       (),
+    vote_seqno    (),
+    vote_res      (),
     repl_proto_ver(),
     appl_proto_ver()
 {
@@ -115,14 +119,13 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
     char c;
     int msg_ver;
     int memb_num;
-    uint64_t unused;
     is >> msg_ver >> c
        >> repl_proto_ver >> c
        >> appl_proto_ver >> c
        >> uuid >> c >> seqno >> c
        >> conf_id >> c
-       >> unused >> c
-       >> unused >> c
+       >> vote_seqno >> c
+       >> vote_res >> c
        >> memb_num;
 
     assert(cc_ver == msg_ver);
@@ -193,8 +196,8 @@ gcs_act_cchange::write(void** buf) const
        << appl_proto_ver << ','
        << uuid << ':' << seqno << ','
        << conf_id << ','
-       << GCS_SEQNO_ILL << ','
-       <<  0 << ','
+       << vote_seqno << ','
+       << vote_res << ','
        << memb.size();
 
     std::string const str(os.str());

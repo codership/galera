@@ -17,8 +17,12 @@
 
 #include <limits>
 
+std::string const GCS_VOTE_POLICY_KEY("gcs.vote_policy");
+uint8_t     const GCS_VOTE_POLICY_DEFAULT(0);
+
 void gcs_group_register(gu::Config* cnf)
 {
+    cnf->add(GCS_VOTE_POLICY_KEY);
 }
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
@@ -29,6 +33,20 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
     "PRIMARY"
 };
 
+
+uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf)
+{
+    int64_t i(cnf.get(GCS_VOTE_POLICY_KEY, int64_t(GCS_VOTE_POLICY_DEFAULT)));
+
+    if (i < 0 || i >= std::numeric_limits<uint8_t>::max())
+    {
+        log_warn << "Bogus '" << GCS_VOTE_POLICY_KEY << "' from config: " << i
+                 << ". Reverting to default."; // or throw?
+        return GCS_VOTE_POLICY_DEFAULT;
+    }
+
+    return i;
+}
 
 int
 gcs_group_init (gcs_group_t* group, gu::Config* const cnf, gcache_t* const cache,
@@ -49,6 +67,10 @@ gcs_group_init (gcs_group_t* group, gu::Config* const cnf, gcache_t* const cache
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
+    group->vote_request_seqno = GCS_NO_VOTE_SEQNO;
+    group->vote_result  = (VoteResult){ GCS_NO_VOTE_SEQNO, 0 };
+    group->vote_history = new VoteHistory;
+    group->vote_policy  = gcs_group_conf_to_vote_policy(*cnf);
     group->frag_reset   = true; // just in case
     group->nodes        = NULL;
     group->prim_uuid    = GU_UUID_NIL;
@@ -147,6 +169,7 @@ gcs_group_free (gcs_group_t* group)
     if (group->my_name)    free ((char*)group->my_name);
     if (group->my_address) free ((char*)group->my_address);
     group_nodes_free (group);
+    delete group->vote_history;
 }
 
 /* Reset nodes array without breaking the statistics */
@@ -346,6 +369,7 @@ group_post_state_exchange (gcs_group_t* group)
         assert (group->prim_num > 0);
 
         group_redo_last_applied(group);
+        // votes will be recounted on CC action creation
     }
     else {
         // non-primary configuration
@@ -360,6 +384,7 @@ group_post_state_exchange (gcs_group_t* group)
              "\n\tact_id     = %lld,"
              "\n\tlast_appl. = %lld,"
              "\n\tprotocols  = %d/%d/%d (gcs/repl/appl),"
+             "\n\tvote policy= %d,"
              "\n\tgroup UUID = " GU_UUID_FORMAT,
              quorum->version,
              quorum->primary ? "PRIMARY" : "NON-PRIMARY",
@@ -369,6 +394,7 @@ group_post_state_exchange (gcs_group_t* group)
              group->last_applied,
              quorum->gcs_proto_ver, quorum->repl_proto_ver,
              quorum->appl_proto_ver,
+             int(quorum->vote_policy),
              GU_UUID_ARGS(&quorum->group_uuid));
 
     group_check_donor(group);
@@ -700,6 +726,243 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return 0;
 }
 
+
+/* true if last vote was updated, false if not */
+static bool
+group_recount_votes (gcs_group_t& group)
+{
+    typedef std::pair<uint64_t, int> VoteEntry;
+    typedef std::map<uint64_t, int>  VoteCounts; //we want it consistently sorted
+    typedef VoteCounts::const_iterator VoteCountsIt;
+
+    bool voting(false);
+    gcs_seqno_t voting_seqno(group.act_id_);
+
+    for (int n(0); n < group.num; ++n)
+    {
+        const gcs_node_t& node(group.nodes[n]);
+
+        if (node.count_last_applied &&
+            node.vote_seqno > group.vote_result.seqno)
+        {
+            voting = true;
+            if (node.vote_seqno < voting_seqno) voting_seqno = node.vote_seqno;
+        }
+    }
+
+    if (!voting) return false; /* this can happen on config. change */
+
+    VoteCounts vc;
+    int n_votes(0);
+    int voters(0);
+
+    for (int n(0); n < group.num; ++n)
+    {
+        gcs_node_t& node(group.nodes[n]);
+
+        if (node.count_last_applied || node.last_applied >= voting_seqno)
+        {
+            ++voters;
+
+            if (node.vote_seqno   >= voting_seqno ||
+                node.last_applied >= voting_seqno)
+            {
+                ++n_votes;
+
+                /* If a node has voted on seqno > voting_seqno or
+                 * reported last appied on a seqno >= voting_seqno,
+                 * then its vote for the voting_seqno is 0 (success) */
+                uint64_t const vote
+                    (node.vote_seqno == voting_seqno ? node.vote_res : 0);
+
+                vc.insert(VoteEntry(vote, 0)).first->second++;
+            }
+        }
+        else
+        {
+            log_debug << "Excluding node from voters: " << node;
+        }
+    }
+
+    assert(n_votes > 0);
+
+    gu::GTID const vote_gtid(group.group_uuid, voting_seqno);
+    std::ostringstream diag;
+    diag << "Votes over " << vote_gtid << ":\n";
+
+    int max_count(0);
+    int second_max(0);
+    int zero_count(0);
+    uint64_t max_vote(0);
+#ifndef NDEBUG
+    int counts(0);
+#endif
+    for (VoteCountsIt it(vc.begin()); it != vc.end(); ++it)
+    {
+        assert(it->second > 0);
+
+        if (0 == it->first) zero_count = it->second;
+
+        if (it->second >= max_count)
+        {
+            second_max = max_count;
+            max_vote   = it->first;
+            max_count  = it->second;
+        }
+#ifndef NDEBUG
+        counts += it->second;
+#endif
+        diag << "   " << gu::PrintBase<>(it->first) << ": "
+             << std::setfill(' ') << std::setw(3) << it->second << '/'
+             << std::setw(0) << voters << "\n";
+    }
+    assert(counts == n_votes);
+    assert(zero_count <= max_count);
+
+    int const missing(voters - n_votes);
+
+    uint64_t win_vote;
+    if (group.quorum.vote_policy > 0 &&
+        zero_count >= int(group.quorum.vote_policy))
+    {
+        win_vote = 0;
+    }
+    else if ((0 == group.quorum.vote_policy ||
+              (zero_count + missing < int(group.quorum.vote_policy))) &&
+             /* what is happening here: for zero vote to win it must be >=
+              * than any other vote. Which requires any other vote to be
+              * STRICTLY > in case zero count is the second runner up. Yet
+              * it is sufficient to be >= otherwise. */
+             (zero_count >= second_max + missing /* zero_count == max_count */||
+              max_count  >= second_max + missing + (zero_count == second_max)))
+    {
+        /* even if received, missing votes won't win over current max */
+        win_vote = (zero_count >= max_count ? 0 : max_vote);
+    }
+    else
+    {
+        diag << "Waiting for more votes.";
+        log_info << diag.str();
+        assert(missing > 0);
+        return false;;
+    }
+
+    diag << "Winner: " << gu::PrintBase<>(win_vote);
+    log_info << diag.str();
+
+    group.vote_result.seqno = voting_seqno;
+    group.vote_result.res   = win_vote;
+
+    const gcs_node_t& this_node(group.nodes[group.my_idx]);
+    if (this_node.vote_seqno != voting_seqno)
+    {
+        // record voting result in the history for later
+        assert(this_node.last_applied <= voting_seqno);
+        assert(this_node.vote_seqno   <= voting_seqno);
+        gu::GTID const voting_gtid(group.group_uuid, voting_seqno);
+        std::pair<gu::GTID,int64_t> const val(voting_gtid, win_vote);
+        std::pair<VoteHistory::iterator, bool> const res
+                    (group.vote_history->insert(val));
+        if (false == res.second)
+        {
+            assert(0);
+            res.first->second = group.vote_result.res;
+        }
+    }
+
+    return true;
+}
+
+VoteResult
+gcs_group_handle_vote_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
+{
+    assert (GCS_MSG_VOTE == msg->type);
+
+    gu::GTID gtid;
+    int64_t  code;
+
+    gcs_node_t& sender(group->nodes[msg->sender_idx]);
+
+    if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid, code)))
+    {
+        log_warn << "Failed to deserialize vote msg from " << msg->sender_idx
+                 << " (" << sender.name << ")";
+        VoteResult const ret = { GCS_NO_VOTE_SEQNO, 0 };
+        return ret;
+    }
+
+    if (gtid.uuid() == group->group_uuid &&
+        gtid.seqno() > group->vote_result.seqno)
+    {
+        /* voting on this seqno has not completed yet */
+        log_info << "Member " << msg->sender_idx << '(' << sender.name << ") "
+                 << (code ? "initiates" : "responds to") << " vote on "
+                 << gtid << ',' << gu::PrintBase<>(code);
+        gcs_node_set_vote (&sender, gtid.seqno(), code);
+
+        if (group_recount_votes(*group))
+        {
+            /* What if group->vote_result.seqno < gtid.seqno()?
+             * - that means that there is inconsistency between the sender and
+             * the member who initiated voting on vote_result.seqno. This in turn
+             * means that there will be a configuration change that will trigger
+             * another votes recount, and then another configuration change
+             * - until we reach gtid.senqo() */
+            if (group->nodes[group->my_idx].vote_seqno >=
+                group->vote_result.seqno)
+            {
+                return group->vote_result;
+            }
+        }
+        else if (gtid.seqno() > group->vote_request_seqno)
+        {
+            group->vote_request_seqno = gtid.seqno();
+            if (msg->sender_idx != group->my_idx)
+            {
+                VoteResult const ret = { gtid.seqno(), GCS_VOTE_REQUEST };
+                return ret;
+            }
+        }
+    }
+    else if (msg->sender_idx == group->my_idx)
+    {
+        std::ostringstream msg;
+        msg << "Recovering vote result from history: " << gtid;
+
+        int64_t result(0);
+        VoteHistory::iterator it(group->vote_history->find(gtid));
+        if (group->vote_history->end() != it)
+        {
+            result = it->second;
+            group->vote_history->erase(it);
+            msg << ',' << gu::PrintBase<>(result);
+        }
+        else
+        {
+            msg << ": not found";
+            assert(code < 0);
+            /* by default result is 0, which means success/no voting happened,
+             * and this node is the only inconsistent one. */
+        }
+
+        log_info << msg.str();
+
+        VoteResult const ret = { gtid.seqno(), result };
+        return ret; // this should wake up voting thread
+    }
+    else if (gtid.seqno() > group->vote_result.seqno)
+    {
+        /* outdated vote from another member, ignore */
+        log_info << "Outdated vote "
+                 << gu::PrintBase<>(code) << " for " << gtid;
+        log_info << "(last group vote was on: "
+                 << group->group_uuid << ':' << group->vote_result.seqno << ','
+                 << gu::PrintBase<>(group->vote_result.res) << ')';
+    }
+
+    VoteResult const ret = { GCS_NO_VOTE_SEQNO, 0 };  // no action required
+    return ret;
+}
 
 /*! return true if this node is the sender to notify the calling thread of
  * success */
@@ -1503,6 +1766,12 @@ gcs_group_act_conf (gcs_group_t*         group,
 
     conf.conf_id        = group->conf_id;
 
+    if (group_recount_votes(*group))
+    {
+        conf.vote_seqno = group->vote_result.seqno;
+        conf.vote_res   = group->vote_result.res;
+    }
+
     conf.repl_proto_ver = group->quorum.repl_proto_ver;
     conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
@@ -1585,6 +1854,9 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         group->act_id_,
         cached,
         node->last_applied,
+        node->vote_seqno,
+        node->vote_res,
+        group->vote_policy,
         group->prim_num,
         group->prim_state,
         node->status,
@@ -1609,6 +1881,14 @@ int
 gcs_group_param_set(gcs_group_t& group,
                     const std::string& key, const std::string& val)
 {
+    if (GCS_VOTE_POLICY_KEY == key)
+    {
+        gu_throw_error(ENOTSUP) << "Setting '" << key << "' in runtime may "
+            "have unintended consequences and is currently not supported. "
+            "Cluster voting policy should be decided on before starting the "
+            "cluster.";
+    }
+
     return 1;
 }
 
@@ -1619,8 +1899,4 @@ gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
         (gu::to_string(group->nodes[group->my_idx].desync_count));
     status.insert("desync_count", desync_count_val);
 }
-
-
-
-
 

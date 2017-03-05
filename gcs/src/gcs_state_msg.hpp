@@ -34,6 +34,8 @@ typedef struct gcs_state_msg
     gcs_seqno_t      received;      // last action seqno (received up to)
     gcs_seqno_t      cached;        // earliest action cached
     gcs_seqno_t      last_applied;  // last applied action reported by node
+    gcs_seqno_t      vote_seqno;    // last seqno node voted on
+    int64_t          vote_res;      // the vote reported by node
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
     int              version;       // version of state message
@@ -42,6 +44,7 @@ typedef struct gcs_state_msg
     int              appl_proto_ver;
     int              prim_joined;   // number of joined nodes in its last PC
     int              desync_count;
+    uint8_t          vote_policy;   // voting policy the node is using
     gcs_node_state_t prim_state;    // state of the node in its last PC
     gcs_node_state_t current_state; // current state of the node
     uint8_t          flags;
@@ -62,15 +65,18 @@ typedef struct gcs_state_quorum
     int         gcs_proto_ver;
     int         repl_proto_ver;
     int         appl_proto_ver;
+    uint8_t     vote_policy;
 }
 gcs_state_quorum_t;
+
+#define GCS_VOTE_ZERO_WINS 1
 
 #define GCS_QUORUM_NON_PRIMARY (gcs_state_quorum_t){    \
         GU_UUID_NIL,                                    \
         GCS_SEQNO_ILL,                                  \
         GCS_SEQNO_ILL,                                  \
         false,                                          \
-        -1, -1, -1, -1                                  \
+        -1, -1, -1, -1, GCS_VOTE_ZERO_WINS              \
     }
 
 extern gcs_state_msg_t*
@@ -81,6 +87,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_seqno_t      received,
                       gcs_seqno_t      cached,
                       gcs_seqno_t      last_applied,
+                      gcs_seqno_t      vote_seqno,
+                      int64_t          vote_res,
+                      uint8_t          vote_policy,
                       int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
@@ -146,6 +155,15 @@ gcs_state_msg_inc_addr (const gcs_state_msg_t* state);
 /* Get last applied action seqno */
 gcs_seqno_t
 gcs_state_msg_last_applied (const gcs_state_msg_t* state);
+
+/* Get last vote */
+void
+gcs_state_msg_last_vote (const gcs_state_msg_t* state,
+                         gcs_seqno_t& seqno, int64_t& res);
+
+/* Get vote policy */
+uint8_t
+gcs_state_msg_vote_policy (const gcs_state_msg_t* state);
 
 /* Get supported protocols */
 extern void

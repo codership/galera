@@ -24,6 +24,9 @@ START_TEST (gcs_state_msg_test_basic)
     gcs_seqno_t const received(3456);
     gcs_seqno_t const cached(2345);
     gcs_seqno_t const last_applied(3450);
+    gcs_seqno_t const vote_seqno(3449);
+    uint64_t    const vote_res(12445678790123445);
+    int         const vote_policy(0);
     int         const prim_joined(5);
     gcs_node_state_t const prim_state(GCS_NODE_STATE_JOINED);
     gcs_node_state_t const current_state(GCS_NODE_STATE_NON_PRIM);
@@ -42,6 +45,9 @@ START_TEST (gcs_state_msg_test_basic)
                                        received,      // last received seqno
                                        cached,        // last cached seqno
                                        last_applied,  // last applied
+                                       vote_seqno,    // last vote seqno
+                                       vote_res,      // last vote result
+                                       vote_policy,   // voting protocol
                                        prim_joined,   // prim_joined
                                        prim_state,    // prim_state
                                        current_state,  // current_state
@@ -90,6 +96,9 @@ START_TEST (gcs_state_msg_test_basic)
     fail_if (send_state->desync_count   != desync_count);
     //v5
     fail_if (send_state->last_applied   != last_applied);
+    fail_if (send_state->vote_seqno     != vote_seqno);
+    fail_if (send_state->vote_res       != vote_res);
+    fail_if (send_state->vote_policy    != vote_policy);
 
     send_len = gcs_state_msg_len (send_state);
     fail_if (send_len < 0, "gcs_state_msg_len() returned %zd (%s)",
@@ -139,6 +148,9 @@ START_TEST (gcs_state_msg_test_basic)
     fail_if (send_state->desync_count   != recv_state->desync_count);
     //v5
     fail_if (send_state->last_applied   != recv_state->last_applied);
+    fail_if (send_state->vote_seqno     != recv_state->vote_seqno);
+    fail_if (send_state->vote_res       != recv_state->vote_res);
+    fail_if (send_state->vote_policy    != recv_state->vote_policy);
 
     gcs_state_msg_destroy (send_state);
     gcs_state_msg_destroy (recv_state);
@@ -174,24 +186,27 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     /* First just nodes from different groups and configurations, none JOINED */
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno - 1, act2_seqno - 1, act2_seqno -1,
-                                  act2_seqno - 1,
-                                  5, GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
+                                  GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node0", "",
                                   0, 1, 1, 0, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 1,
-                                  act1_seqno - 1,
-                                  3, GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
+                                  act1_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
+                                  GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 2,
-                                  act2_seqno - 1,
-                                  5, GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
+                                  GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node2", "",
                                   0, 1, 1, 0, 1);
     fail_if(NULL == st[2]);
@@ -214,8 +229,9 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 3,
-                                  act1_seqno - 2,
-                                  3, GCS_NODE_STATE_JOINED, GCS_NODE_STATE_DONOR,
+                                  act1_seqno - 2, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
+                                  GCS_NODE_STATE_JOINED, GCS_NODE_STATE_DONOR,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
@@ -238,8 +254,9 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     gcs_state_msg_destroy (st[0]);
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno - 1, act2_seqno - 1, -1,
-                                  act2_seqno - 1,
-                                  5, GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_SYNCED,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
+                                  GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node0", "",
                                   0, 1, 1, 0, 0);
     fail_if(NULL == st[0]);
@@ -262,8 +279,9 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno -3,
-                                  act1_seqno - 1,
-                                  3, GCS_NODE_STATE_JOINED, GCS_NODE_STATE_PRIM,
+                                  act1_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
+                                  GCS_NODE_STATE_JOINED, GCS_NODE_STATE_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
     fail_if(NULL == st[1]);
@@ -286,8 +304,9 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
     gcs_state_msg_destroy (st[2]);
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 2,
-                                  act2_seqno - 1,
-                                  5, GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_SYNCED,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
+                                  GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node2", "",
                                   0, 1, 1, 0, 0);
     fail_if(NULL == st[2]);
@@ -340,8 +359,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     /* First just nodes from different groups and configurations, none JOINED */
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim0_uuid,
                                   prim2_seqno - 1, act2_seqno - 1,act2_seqno -2,
-                                  act2_seqno - 1,
-                                  5,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
                                   0, 1, 1, 0, 0);
@@ -349,8 +368,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 3,
-                                  act1_seqno - 2,
-                                  3,
+                                  act1_seqno - 2, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
@@ -358,8 +377,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, -1,
-                                  act2_seqno - 1,
-                                  5,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
                                   0, 1, 1, 0, 1);
@@ -383,8 +402,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     gcs_state_msg_destroy (st[0]);
     st[0] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim0_uuid,
                                   prim2_seqno - 1, act2_seqno - 1, -1,
-                                  act2_seqno - 1,
-                                  5,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
                                   GCS_NODE_STATE_DONOR, GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
                                   0, 1, 1, 3, 0);
@@ -409,8 +428,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     gcs_state_msg_destroy (st[2]);
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 3,
-                                  act2_seqno - 1,
-                                  5,
+                                  act2_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 5,
                                   GCS_NODE_STATE_JOINED,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
                                   0, 1, 1, 0, 1);
@@ -434,8 +453,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno,
-                                  act1_seqno - 1,
-                                  3,
+                                  act1_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
                                   GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
@@ -459,8 +478,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
     gcs_state_msg_destroy (st[1]);
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 2,
-                                  act1_seqno - 1,
-                                  3,
+                                  act1_seqno - 1, GCS_SEQNO_ILL, 0,
+                                  GCS_VOTE_ZERO_WINS, 3,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_JOINER,
                                   "node1", "",
                                   0, 1, 0, 0, 0);
@@ -498,8 +517,10 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
 
     gcs_seqno_t const prim_seqno1 = 37;
     int const prim_joined1 = 3;
+    uint8_t const vp1(0);
     gcs_seqno_t const prim_seqno2 = 35;
     int const prim_joined2 = 6;
+    uint8_t const vp2(2);
     gcs_seqno_t const received = 0;
     gcs_seqno_t const cached = 0;
 
@@ -507,16 +528,17 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     // first three are 35.
     st[0] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached,
-                                 received - 7,
+                                 received - 7, GCS_SEQNO_ILL, 0, vp2,
                                  prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home0", "",
                                  gcs_proto_ver, 4, 2, 0, 2);
     fail_unless(st[0] != 0);
+    fail_unless(gcs_state_msg_vote_policy(st[0]) == vp2);
     st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached,
-                                 received - 11,
+                                 received - 11, GCS_SEQNO_ILL, 0, vp2,
                                  prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
@@ -525,7 +547,7 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     fail_unless(st[1] != 0);
     st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached,
-                                 received - 5,
+                                 received - 5, GCS_SEQNO_ILL, 0, vp2,
                                  prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
@@ -536,16 +558,17 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     // last four are 37.
     st[3] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached,
-                                 received - 8,
+                                 received - 8, GCS_SEQNO_ILL, 0, vp1,
                                  prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home3", "",
                                  gcs_proto_ver, 4, 2, 0, 3);
     fail_unless(st[3] != 0);
+    fail_unless(gcs_state_msg_vote_policy(st[3]) == vp1);
     st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached,
-                                 received - 3,
+                                 received - 3, GCS_SEQNO_ILL, 0, vp1,
                                  prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
@@ -554,7 +577,7 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     fail_unless(st[4] != 0);
     st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached,
-                                 received - 10,
+                                 received - 10, GCS_SEQNO_ILL, 0, vp1,
                                  prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
@@ -563,7 +586,7 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     fail_unless(st[5] != 0);
     st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached,
-                                 received - 13,
+                                 received - 13, GCS_SEQNO_ILL, 0, vp1,
                                  prim_joined1,
                                  GCS_NODE_STATE_PRIM,
                                  GCS_NODE_STATE_NON_PRIM,
@@ -578,8 +601,13 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     switch (gcs_proto_ver)
     {
     case 0:
+        fail_unless(quorum.vote_policy == GCS_VOTE_ZERO_WINS,
+                    "found policy %d, expected %d", quorum.vote_policy,
+                    GCS_VOTE_ZERO_WINS);
         break;
     case 1:
+        fail_unless(quorum.vote_policy == vp1,
+                    "found policy %d, expected %d", quorum.vote_policy, vp1);
         break;
     default:
         fail("unsupported GCS protocol: %d", gcs_proto_ver);
@@ -588,13 +616,13 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     for(int i=0;i<7;i++) gcs_state_msg_destroy(st[i]);
 }
 
-START_TEST(gcs_state_msg_test_gh24_0)
+START_TEST(gcs_state_msg_test_gh24_0) // also tests vote policy switch
 {
     gcs_state_msg_test_gh24(0);
 }
 END_TEST
 
-START_TEST(gcs_state_msg_test_gh24_1)
+START_TEST(gcs_state_msg_test_gh24_1) // also tests vote policy switch
 {
     gcs_state_msg_test_gh24(1);
 }

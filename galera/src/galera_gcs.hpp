@@ -55,6 +55,10 @@ namespace galera
         virtual void    join(const gu::GTID&, int code) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
         virtual ssize_t set_last_applied(const gu::GTID&) = 0;
+        virtual int     vote(const gu::GTID& gtid,
+                             uint64_t        code,
+                             const void*     data,
+                             size_t          data_len) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
         virtual void    flush_stats() = 0;
         virtual void    get_status(gu::Status&) const = 0;
@@ -158,6 +162,15 @@ namespace galera
             assert(gtid.seqno() >= 0);
 
             return gcs_set_last_applied(conn_, gtid);
+        }
+
+        int vote(const gu::GTID& gtid, uint64_t const code,
+                 const void* const msg, size_t const msg_len)
+        {
+            assert(gtid.uuid()  != GU_UUID_NIL);
+            assert(gtid.seqno() >= 0);
+
+            return gcs_vote(conn_, gtid, code, msg, msg_len);
         }
 
         ssize_t request_state_transfer(int version,
@@ -338,6 +351,12 @@ namespace galera
         }
 
         gcs_seqno_t last_applied() const { return last_applied_; }
+
+        int vote(const gu::GTID& gtid, uint64_t const code,
+                 const void* const msg, size_t const msg_len)
+        {
+            return 0; // we always agree with ourselves
+        }
 
         ssize_t request_state_transfer(int version,
                                        const void* req, ssize_t req_len,

@@ -29,6 +29,8 @@ public:
 
     void set_last_applied(const gu::GTID&);
 
+    void vote (const gu::GTID&);
+
     void close ();
 
 private:

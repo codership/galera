@@ -145,6 +145,24 @@ Gcs::set_last_applied (const gu::GTID& gtid)
 }
 
 void
+Gcs::vote (const gu::GTID& gtid)
+{
+    /* since garbd doesn't carry any state, the vote is always 0 and
+     * it never fails. */
+
+    int const ret(gcs_vote(gcs_, gtid, 0, NULL, 0));
+
+    if (ret < 0)
+    {
+        assert(ret != -EAGAIN); // GCS should take care of it
+
+        log_fatal << "Sending vote failed: " << ret
+                  << " (" << strerror(-ret) << ")";
+        gu_throw_error(-ret) << "Sending vote failed";
+    }
+}
+
+void
 Gcs::close ()
 {
     if (!closed_)

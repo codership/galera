@@ -29,6 +29,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_seqno_t      received,
                       gcs_seqno_t      cached,
                       gcs_seqno_t      last_applied,
+                      gcs_seqno_t      vote_seqno,
+                      int64_t          vote_res,
+                      uint8_t          vote_policy,
                       int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
@@ -65,6 +68,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->received      = received;
         ret->cached        = cached;
         ret->last_applied  = last_applied;
+        ret->vote_seqno    = vote_seqno;
+        ret->vote_res      = vote_res;
+        ret->vote_policy   = vote_policy;
         ret->prim_state    = prim_state;
         ret->current_state = current_state;
         ret->version       = GCS_STATE_MSG_VER;
@@ -93,8 +99,6 @@ gcs_state_msg_destroy (gcs_state_msg_t* state)
     gu_free (state);
 }
 
-#define PROTO5_RESERVED_SIZE 17
-
 /* Returns length needed to serialize gcs_state_msg_t for sending */
 size_t
 gcs_state_msg_len (gcs_state_msg_t* state)
@@ -122,7 +126,9 @@ gcs_state_msg_len (gcs_state_msg_t* state)
         sizeof (int32_t)     +   // desync count
 // V5 stuff
         sizeof (int64_t)     +   // last_applied
-        PROTO5_RESERVED_SIZE
+        sizeof (int64_t)     +   // vote_seqno
+        sizeof (int64_t)     +   // vote_res
+        sizeof (uint8_t)         // vote_policy
         );
 }
 
@@ -168,6 +174,9 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     int64_t* cached         = (int64_t*)(appl_proto_ver + 1);
     int32_t* desync_count   = (int32_t*)(cached + 1);
     int64_t* last_applied   = (int64_t*)(desync_count + 1);
+    int64_t* vote_seqno     = last_applied + 1;
+    int64_t* vote_res       = vote_seqno   + 1;
+    uint8_t* vote_policy    = (uint8_t*)(vote_res + 1);
 
     *version        = GCS_STATE_MSG_VER;
     *flags          = state->flags;
@@ -187,9 +196,11 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *cached         = htog64(state->cached);
     *desync_count   = htog32(state->desync_count);
     *last_applied   = htog64(state->last_applied);
-    memset(last_applied + 1, 0, PROTO5_RESERVED_SIZE);
+    *vote_seqno     = htog64(state->vote_seqno);
+    *vote_res       = htog64(state->vote_res);
+    *vote_policy    = state->vote_policy;
 
-    return ((uint8_t*)(last_applied + 1) + PROTO5_RESERVED_SIZE - (uint8_t*)buf);
+    return ((uint8_t*)(vote_policy + 1) - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
@@ -224,10 +235,17 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
     }
 // v5 stuff
     int64_t last_applied = 0;
+    int64_t vote_seqno   = 0;
+    int64_t vote_res     = 0;
+    uint8_t vote_policy  = GCS_VOTE_ZERO_WINS; // backward compatibility
     if (*version >= 5) {
         int64_t* last_applied_ptr = (int64_t*)(desync_count_ptr + 1);
         assert(buf_len > (uint8_t*)(last_applied_ptr + 3) - (uint8_t*)buf);
         last_applied = gtoh64(*last_applied_ptr);
+        vote_seqno   = gtoh64(*(last_applied_ptr + 1));
+        vote_res     = gtoh64(*(last_applied_ptr + 2));
+
+        vote_policy  = *((uint8_t*)(last_applied_ptr + 3));
     }
 
     gcs_state_msg_t* ret = gcs_state_msg_create (
@@ -238,6 +256,9 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         gtoh64(*received),
         cached,
         last_applied,
+        vote_seqno,
+        vote_res,
+        vote_policy,
         gtoh16(*prim_joined),
         (gcs_node_state_t)*prim_state,
         (gcs_node_state_t)*curr_state,
@@ -272,6 +293,8 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tFirst seqno  : %lld"
                      "\n\tLast  seqno  : %lld"
                      "\n\tCommit cut   : %lld"
+                     "\n\tLast vote    : %lld.%0llx"
+                     "\n\tVote policy  : %d"
                      "\n\tPrim JOINED  : %d"
                      "\n\tState UUID   : " GU_UUID_FORMAT
                      "\n\tGroup UUID   : " GU_UUID_FORMAT
@@ -289,6 +312,8 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      (long long)state->cached,
                      (long long)state->received,
                      (long long)state->last_applied,
+                     (long long)state->vote_seqno,(long long)state->vote_res,
+                     state->vote_policy,
                      state->prim_joined,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
@@ -330,6 +355,21 @@ gcs_seqno_t
 gcs_state_msg_last_applied (const gcs_state_msg_t* state)
 {
     return state->last_applied;
+}
+
+/* Get last applied action vote */
+void
+gcs_state_msg_last_vote (const gcs_state_msg_t* state,
+                         gcs_seqno_t& seqno, int64_t& res)
+{
+    seqno = state->vote_seqno;
+    res   = state->vote_res;
+}
+
+uint8_t
+gcs_state_msg_vote_policy (const gcs_state_msg_t* state)
+{
+    return state->vote_policy;
 }
 
 /* Get current node state */
@@ -868,6 +908,15 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
             CHECK_MIN_PROTO_VER(appl_proto_ver);
 //        }
 #undef CHECK_MIN_PROTO_VER
+    }
+
+    if (quorum->gcs_proto_ver < 1)
+    {
+        quorum->vote_policy = GCS_VOTE_ZERO_WINS;
+    }
+    else
+    {
+        quorum->vote_policy = rep->vote_policy;
     }
 
     if (quorum->version < 2) {;} // for future generations

@@ -287,6 +287,8 @@ namespace galera
         {
             gu::Lock lock(mutex_);
 
+            state_debug_print("drain", seqno);
+
             while (drain_seqno_ != LLONG_MAX)
             {
                 lock.wait(cond_);
@@ -352,6 +354,7 @@ namespace galera
         void state_debug_print(const std::string& method,
                                wsrep_seqno_t obj_seqno)
         {
+// #define GALERA_MONITOR_DEBUG_PRINT
 #ifdef GALERA_MONITOR_DEBUG_PRINT
             log_info << typeid(C).name() << ": " << method
                      << "(" << obj_seqno << "): "

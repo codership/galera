@@ -15,93 +15,6 @@
 #include <sstream>
 #include <iostream>
 
-
-static void
-apply_trx_ws(void*                    recv_ctx,
-             wsrep_apply_cb_t         apply_cb,
-             wsrep_commit_cb_t        commit_cb,
-             const galera::TrxHandleSlave& trx,
-             const wsrep_trx_meta_t&  meta)
-{
-    using galera::TrxHandle;
-    static const size_t max_apply_attempts(4);
-    size_t attempts(1);
-
-    do
-    {
-        try
-        {
-            if (trx.is_toi())
-            {
-                log_debug << "Executing TO isolated action: " << trx;
-            }
-
-            gu_trace(trx.apply(recv_ctx, apply_cb, meta));
-
-            if (trx.is_toi())
-            {
-                log_debug << "Done executing TO isolated action: "
-                         << trx.global_seqno();
-            }
-            break;
-        }
-        catch (galera::ApplyException& e)
-        {
-            if (trx.is_toi())
-            {
-                log_warn << "Ignoring error for TO isolated action: " << trx;
-                break;
-            }
-            else
-            {
-                int const err(e.status());
-
-                if (err > 0)
-                {
-                    uint32_t const flags
-                        (TrxHandle::trx_flags_to_wsrep_flags(trx.flags()) |
-                         WSREP_FLAG_ROLLBACK);
-                    wsrep_bool_t unused(false);
-                    wsrep_cb_status const rcode
-                        (commit_cb(recv_ctx, flags, &meta, &unused));
-
-                    if (WSREP_CB_SUCCESS != rcode)
-                    {
-                        gu_throw_fatal << "Rollback failed. Trx: " << trx;
-                    }
-
-                    ++attempts;
-
-                    if (attempts <= max_apply_attempts)
-                    {
-                        log_warn << e.what()
-                                 << "\nRetrying " << attempts << "th time";
-                    }
-                }
-                else
-                {
-                    GU_TRACE(e);
-                    throw;
-                }
-            }
-        }
-    }
-    while (attempts <= max_apply_attempts);
-
-    if (gu_unlikely(attempts > max_apply_attempts))
-    {
-        std::ostringstream msg;
-
-        msg << "Failed to apply trx " << trx.global_seqno() << " "
-            << max_apply_attempts << " times";
-
-        throw galera::ApplyException(msg.str(), WSREP_CB_FAILURE);
-    }
-
-    return;
-}
-
-
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
@@ -472,6 +385,44 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     return retval;
 }
 
+void galera::ReplicatorSMM::process_apply_exception(TrxHandleSlave& trx,
+                                                    const ApplyException& ae)
+{
+    int res;
+    if (trx.local_seqno() != -1 || trx.nbo_end())
+    {
+        /* this must be done IN ORDER to avoid multiple elections, hence
+         * anything else but LOCAL_OOOC and NO_OOOC is potentially broken */
+        res = gcs_.vote(gu::GTID(state_uuid_, trx.global_seqno()), ae.status(),
+                        ae.data(), ae.data_len());
+    }
+    else res = 2;
+
+    if (res != 0)
+    {
+        switch (res)
+        {
+        case 2:
+            log_error << "Failed on preordered: inconsistency.";
+            break;
+        case 1:
+            log_error << "Inconsistent by consensus.";
+            break;
+        default:
+            log_error
+                << "Could not reach consensus, assuming inconsistency.";
+        }
+
+        GU_TRACE(ae);
+        throw ae;
+    }
+    else
+    {
+        /* mark action as invalid (skip seqno) and return normally */
+        gcache_.seqno_skip(trx.action().first,
+                           trx.global_seqno(), GCS_ACT_WRITESET);
+    }
+}
 
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 {
@@ -480,8 +431,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         assert(ts.trx_id() != uint64_t(-1) || ts.is_toi());
         assert(ts.global_seqno() > 0);
         assert(ts.certified() /*Repl*/ || ts.preordered() /*IST*/);
-        assert(ts.local() == false);
+        assert(ts.local() == false || ts.nbo_end());
+        assert(ts.nbo_end() == false || ts.is_dummy());
     }
+
+    ApplyException ae;
+    bool inconsistency(false);
 
     ApplyOrder ao(ts);
     CommitOrder co(ts, co_mode_);
@@ -495,13 +450,26 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         gu_trace(apply_monitor_.enter(ao));
     }
 
+    if (gu_unlikely(ts.nbo_start() == true))
+    {
+        // Non-blocking operation start, mark state unsafe.
+        st_.mark_unsafe();
+    }
+
     ts.set_state(TrxHandle::S_APPLYING);
 
     wsrep_trx_meta_t meta = { { state_uuid_,    ts.global_seqno() },
                               { ts.source_id(), ts.trx_id(), ts.conn_id() },
                               ts.depends_seqno() };
 
-    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, ts, meta));
+    try { gu_trace(ts.apply(recv_ctx, apply_cb_, meta)); }
+    catch (ApplyException& e)
+    {
+        ae = e;
+        assert(0 != ae.status());
+        assert(NULL != ae.data() || 0 == ae.data_len());
+        assert(0 != ae.data_len() || NULL == ae.data());
+    }
     /* at this point any exception in apply_trx_ws() is fatal, not
      * catching anything. */
 
@@ -516,6 +484,39 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 
     TrxHandle::State end_state(aborting ?
                                TrxHandle::S_ROLLED_BACK :TrxHandle::S_COMMITTED);
+
+    if (gu_likely(0 == ae.status()))
+    {
+        assert(NULL == ae.data());
+        assert(0    == ae.data_len());
+    }
+    else
+    {
+        assert(NULL == ae.data() || ae.data_len() > 0);
+        commit_flags |= WSREP_FLAG_ROLLBACK;
+        end_state = TrxHandle::S_ROLLED_BACK;
+        try
+        {
+            gu_trace(process_apply_exception(ts, ae));
+        }
+        catch (ApplyException& e)
+        {
+            inconsistency = true;
+        }
+        catch (gu::Exception& e)
+        {
+            log_error << "Unexpected exception: " << e.what();
+            assert(0);
+            abort();
+        }
+        catch (...)
+        {
+            log_error << "Unknown exception";
+            assert(0);
+            abort();
+        }
+        ae.free();
+    }
 
     wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, commit_flags,
                                              &meta, &exit_loop));
@@ -542,7 +543,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     }
 
     wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
-    if (gu_likely(ts.local_seqno() != -1))
+    if (gu_likely(ts.local_seqno() != -1 && 0 == ae.status()))
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
         report_last_committed(safe_to_discard);
@@ -559,6 +560,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         apply_monitor_.leave(ao);
     }
 
+    if (gu_unlikely(inconsistency)) throw ae;
+
     ts.set_exit_loop(exit_loop);
 }
 
@@ -566,6 +569,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
                                            wsrep_trx_meta_t* meta)
 {
+    assert(0);
     assert(trx->locked());
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
@@ -725,6 +729,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
                          TrxHandleSlaveDeleter());
 
     gu_trace(ts->unserialize<true>(act));
+    ts->set_local(true);
 
     ts->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
 
@@ -1423,10 +1428,105 @@ wsrep_status_t galera::ReplicatorSMM::last_committed_id(wsrep_gtid_t* gtid)
 
 
 
+wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
+                                                   wsrep_trx_meta_t* meta)
+{
+    boost::shared_ptr<NBOCtx> nbo_ctx(cert_.nbo_ctx(meta->gtid.seqno));
+
+    meta->gtid = WSREP_GTID_UNDEFINED;
+
+    // Send end message
+    trx->set_state(TrxHandle::S_REPLICATING);
+
+    WriteSetNG::GatherVector actv;
+    size_t const actv_size(
+        trx->write_set_out().gather(trx->source_id(),
+                                    trx->conn_id(),
+                                    trx->trx_id(),
+                                    actv));
+  resend:
+    wsrep_seqno_t lc(last_committed());
+    if (lc == WSREP_SEQNO_UNDEFINED)
+    {
+        // Provider has been closed
+        return WSREP_NODE_FAIL;
+    }
+    trx->finalize(lc);
+
+    trx->unlock();
+    int err(gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false));
+    trx->lock();
+
+    if (err == -EAGAIN || err == -ENOTCONN || err == -EINTR)
+    {
+        // Send was either interrupted due to states excahnge (EAGAIN),
+        // due to non-prim (ENOTCONN) or due to timeout in send monitor
+        // (EINTR). Will retry.
+        goto resend;
+    }
+    else if (err < 0)
+    {
+        log_error << "Failed to send NBO-end: " << err << ": "
+                  << ::strerror(-err);
+        return WSREP_NODE_FAIL;
+    }
+
+    TrxHandleSlavePtr end_ts;
+    while ((end_ts = nbo_ctx->wait_ts()) == 0)
+    {
+        if (closing_ || state_() == S_CLOSED)
+        {
+            log_error << "Closing during nonblocking operation. Node will be left in inconsistent state and must be re-initialized either by full SST or from backup.";
+            return WSREP_FATAL;
+        }
+
+        if (nbo_ctx->aborted())
+        {
+            log_debug << "NBO wait aborted, retrying send";
+            // Wait was aborted by view change, resend message
+            goto resend;
+        }
+    }
+
+    assert(end_ts->ends_nbo() != WSREP_SEQNO_UNDEFINED);
+
+    trx->add_replicated(end_ts);
+
+    meta->gtid.uuid  = state_uuid_;
+    meta->gtid.seqno = end_ts->global_seqno();
+    meta->depends_on = end_ts->depends_seqno();
+
+    ApplyOrder ao(*end_ts);
+    apply_monitor_.enter(ao);
+
+    CommitOrder co(*end_ts, co_mode_);
+    if (co_mode_ != CommitOrder::BYPASS)
+    {
+        commit_monitor_.enter(co);
+    }
+    end_ts->set_state(TrxHandle::S_APPLYING);
+    end_ts->set_state(TrxHandle::S_COMMITTING);
+
+    trx->set_state(TrxHandle::S_CERTIFYING);
+    trx->set_state(TrxHandle::S_APPLYING);
+    trx->set_state(TrxHandle::S_COMMITTING);
+
+    // Unref
+    cert_.erase_nbo_ctx(end_ts->ends_nbo());
+
+    return WSREP_OK;
+}
+
+
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
                                                          wsrep_trx_meta_t* meta)
 {
     assert(trx.locked());
+
+    if (trx.nbo_end())
+    {
+        return wait_nbo_end(&trx, meta);
+    }
 
     TrxHandleSlavePtr ts_ptr(trx.ts());
     TrxHandleSlave& ts(*ts_ptr);
@@ -1507,6 +1607,45 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
     assert(ts.state() == TrxHandle::S_COMMITTING ||
            ts.state() == TrxHandle::S_ABORTING);
 
+    bool inconsistency(false);
+    ApplyException ae;
+
+    if (0 != err)
+    {
+        void*  err_msg(NULL); // for future use with updated API
+        size_t err_msg_len(0);
+        std::ostringstream os;
+
+        os << "Failed to execute TOI action: seqno: " << ts.global_seqno()
+           << ", code: " << err;
+
+        galera::ApplyException tmp(os.str(), err, err_msg, err_msg_len);
+
+        GU_TRACE(tmp);
+        try { gu_trace(process_apply_exception(ts, tmp)); }
+        catch (ApplyException& e)
+        {
+            mark_corrupt_and_close();
+            inconsistency = true;
+        }
+        catch (gu::Exception& e)
+        {
+            log_error << "Unexpected exception: " << e.what();
+            assert(0);
+            abort();
+        }
+        catch (...)
+        {
+            log_error << "Unknown exception";
+            assert(0);
+            abort();
+        }
+        tmp.free();
+        ae = tmp;
+    }
+
+    if (inconsistency) throw ae;
+
     CommitOrder co(ts, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
     ApplyOrder ao(ts);
@@ -1518,6 +1657,11 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
         assert(trx.state() == TrxHandle::S_COMMITTING);
         trx.set_state(TrxHandle::S_COMMITTED);
         ts.set_state(TrxHandle::S_COMMITTED);
+
+        if (trx.nbo_start() == false)
+        {
+            st_.mark_safe();
+        }
     }
     else
     {
@@ -1530,6 +1674,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
 
     return WSREP_OK;
 }
+
+
 
 namespace galera
 {
@@ -1696,12 +1842,35 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx,
     case WSREP_OK:
         try
         {
-            gu_trace(apply_trx(recv_ctx, *ts));
+            if (ts->nbo_end() == true && WSREP_OK == retval)
+            {
+                // NBO-end events are for internal operation only, not to be
+                // consumed by application. If the NBO end happens with
+                // different seqno than the current event's global seqno,
+                // release monitors. In other case monitors will be grabbed
+                // by local NBO handler threads.
+                if (ts->ends_nbo() == WSREP_SEQNO_UNDEFINED)
+                {
+                    cancel_monitors(*ts, true);
+                    report_last_committed(cert_.set_trx_committed(*ts));
+                }
+                else
+                {
+                    // Signal NBO waiter here after leaving local ordering
+                    // critical section.
+                    boost::shared_ptr<NBOCtx> nbo_ctx(
+                        cert_.nbo_ctx(ts->ends_nbo()));
+                    assert(nbo_ctx != 0);
+                    nbo_ctx->set_ts(ts);
+                }
+            }
+            else
+            {
+                gu_trace(apply_trx(recv_ctx, *ts));
+            }
         }
         catch (std::exception& e)
         {
-            st_.mark_corrupt();
-
             log_fatal << "Failed to apply trx: " << *ts;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, leaving cluster...";
@@ -1794,6 +1963,65 @@ void galera::ReplicatorSMM::drain_monitors(wsrep_seqno_t const upto)
 {
     apply_monitor_.drain(upto);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+}
+
+
+void galera::ReplicatorSMM::process_vote(wsrep_seqno_t const seqno_g,
+                                         wsrep_seqno_t const seqno_l,
+                                         int64_t       const code)
+{
+    assert(seqno_g > 0);
+    assert(seqno_l > 0);
+
+    std::ostringstream msg;
+
+    LocalOrder lo(seqno_l);
+
+    gu_trace(local_monitor_.enter(lo));
+
+    if (code > 0)  /* vote request */
+    {
+        assert(GCS_VOTE_REQUEST == code);
+        log_info << "Got vote request for seqno " << seqno_g; //remove
+        /* make sure WS was either successfully applied or already voted */
+        drain_monitors(seqno_g);
+
+        int const ret(gcs_.vote(gu::GTID(state_uuid_, seqno_g), 0, NULL, 0));
+
+        switch (ret)
+        {
+        case 0:         /* majority agrees */
+            log_info << "Vote 0 (success) on seqno " << seqno_g
+                     << " is consistent with group. Continue.";
+            goto out;
+        case -EALREADY: /* already voted */
+            log_info << "Seqno " << seqno_g << " already voted on. Continue.";
+            goto out;
+        case 1:         /* majority disagrees */
+            msg << "Vote 0 (success) on seqno " << seqno_g
+                << " is inconsistent with group. Leaving cluster.";
+            goto fail;
+        default:        /* general error */
+            assert(ret < 0);
+            msg << "Failed to vote on request for seqno " << seqno_g << ": "
+                << -ret << " (" << ::strerror(-ret) << "). "
+                "Assuming inconsistency";
+            goto fail;
+        }
+    }
+    else if (code < 0)
+    {
+        msg << "Got negative vote on successfully applied seqno " << seqno_g;
+    fail:
+        log_error << msg.str();
+        mark_corrupt_and_close();
+    }
+    else
+    {
+        /* seems we are in majority */
+    }
+out:
+    local_monitor_.leave(lo);
 }
 
 
@@ -2578,13 +2806,18 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             }
             break;
         case Certification::TEST_FAILED:
-            if (gu_unlikely(ts->is_toi() && applicable)) // small sanity check
-            {
-                // may happen on configuration change
-                log_warn << "Certification failed for TO isolated action: "
-                         << *trx;
-                assert(0);
-            }
+            assert(ts->state() == TrxHandle::S_ABORTING);
+            // This check is not valid anymore. NBO may reserve resource
+            // access for longer period, which must cause certification
+            // to fail for all operations until the operation is over.
+            // if (gu_unlikely(trx->is_toi() && applicable)) //small sanity check
+            // {
+            // may happen on configuration change
+            //     log_warn << "Certification failed for TO isolated action: "
+            //<< *trx;
+            // assert(0);
+            // }
+
             local_cert_failures_ += ts->local();
             if (trx != 0) trx->set_state(TrxHandle::S_ABORTING);
             retval = applicable ? WSREP_TRX_FAIL : WSREP_TRX_MISSING;
@@ -2667,7 +2900,7 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
         return WSREP_BF_ABORT;
 
     case Certification::TEST_FAILED:
-        // Mext step will be monitors release. Make sure that ws was not
+        // Next step will be monitors release. Make sure that ws was not
         // corrupted and cert failure is real before proceeding with that.
  //gcf788 - this must be moved to cert(), the caller method
         assert(ts->is_dummy());
@@ -2703,6 +2936,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 void
 galera::ReplicatorSMM::abort()
 {
+    log_info << "ReplicatorSMM::abort()";
     gcs_.close();
     gu_abort();
 }

@@ -447,7 +447,12 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
     full_sst:
 
-        if (streq->sst_len())
+        if (cert_.nbo_size() > 0)
+        {
+            log_warn << "Non-blocking operation in progress, cannot donate SST";
+            rcode = -EAGAIN;
+        }
+        else if (streq->sst_len())
         {
             assert(0 == rcode);
 
@@ -620,8 +625,20 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
                     << e.what() << ". IST will be unavailable.";
             }
 
-            StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
-                                                     ist_req, ist_req_len);
+            // IF there are ongoing NBO, SST might not be possible because
+            // ongoing NBO is blocking and waiting for NBO end events.
+            // Therefore in precense of ongoing NBOs we set SST request
+            // string to zero and hope that donor can serve IST.
+
+            size_t const nbo_size(cert_.nbo_size());
+            if (nbo_size)
+            {
+                log_info << "Non-blocking operation is ongoing. Node can receive IST only.";
+            }
+            StateRequest* ret = new StateRequest_v1 (
+                nbo_size ? 0 : sst_req,
+                nbo_size ? 0 : sst_req_len,
+                ist_req, ist_req_len);
             free (ist_req);
             return ret;
         }
@@ -857,7 +874,23 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
-    st_.mark_safe();
+    if (st_.corrupt())
+    {
+        if (sst_req_len != 0 && !sst_is_trivial(sst_req, sst_req_len))
+        {
+            st_.mark_uncorrupt(sst_uuid_, sst_seqno_);
+        }
+        else
+        {
+            log_fatal << "Application state is corrupt and cannot "
+                      << "be recorvered. Restart required.";
+            abort();
+        }
+    }
+    else
+    {
+        st_.mark_safe();
+    }
 
     if (req->ist_len() > 0)
     {
@@ -1021,6 +1054,56 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
     TrxHandleSlave& ts(*tsp);
     assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING);
 
+    if (ts.nbo_start() == true || ts.nbo_end() == true)
+    {
+        if (must_apply == true)
+        {
+            ts.verify_checksum();
+            ts.set_state(TrxHandle::S_CERTIFYING);
+            Certification::TestResult result(cert_.append_trx(tsp));
+            switch (result)
+            {
+            case Certification::TEST_OK:
+                if (ts.nbo_end())
+                {
+                    // This is the same as in  process_trx()
+                    if (ts.ends_nbo() == WSREP_SEQNO_UNDEFINED)
+                    {
+                        cancel_monitors(ts, true);
+                        assert(ts.is_dummy());
+                    }
+                    else
+                    {
+                        // Signal NBO waiter
+                        boost::shared_ptr<NBOCtx> nbo_ctx(
+                            cert_.nbo_ctx(ts.ends_nbo()));
+                        assert(nbo_ctx != 0);
+                        nbo_ctx->set_ts(tsp);
+                        return; // not pushing to queue below
+                    }
+                }
+                break;
+            case Certification::TEST_FAILED:
+            {
+                assert(ts.nbo_end()); // non-effective nbo_end
+                assert(ts.is_dummy());
+                cancel_monitors(ts, true);
+                break;
+            }
+            }
+            /* regardless of certification outcome, event must be passed to
+             * apply_trx() as it carries global seqno */
+        }
+        else
+        {
+            // Skipping NBO events in preload is fine since joiner either
+            // have all events applied in case of pure IST and donor refuses to
+            // donate SST from the position there are NBOs going on.
+            assert(preload == true);
+            log_debug << "Skipping NBO event: " << ts;
+        }
+    }
+    else
     {
         if (gu_unlikely(preload == true && !ts.is_dummy()))
         {
@@ -1079,7 +1162,7 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
                               trx_params_.version_);
         free(view_info);
     }
-    
+
     if (must_apply == true)
     {
         drain_monitors(act.seqno_g - 1);

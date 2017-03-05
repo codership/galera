@@ -226,7 +226,7 @@ START_TEST(test_streaming)
     gu_uuid_generate(&uuid, 0, 0);
     TrxHandleMasterPtr trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910),
                            TrxHandleMasterDeleter());
-    
+
     galera::TrxHandleLock lock(*trx);
 
     std::vector<char> src(3); // initial wirteset
@@ -259,6 +259,7 @@ START_TEST(test_streaming)
 
         ts->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
+
     {
         // 1. middle fragment B
         trx->append_data(&src[1], 1, WSREP_DATA_ORDERED, false);

@@ -524,6 +524,7 @@ START_TEST(test_gcs_group_find_donor)
 
     for(int i = 0; i < number; i++)
     {
+        uint8_t const vp(gcs_group_conf_to_vote_policy(cnf));
         char name[32];
         snprintf(name, sizeof(name), "home%d", i);
         gcs_node_init(&nodes[i], NULL, name, name,
@@ -532,6 +533,7 @@ START_TEST(test_gcs_group_find_donor)
         nodes[i].state_msg = gcs_state_msg_create(
             &GU_UUID_NIL, &GU_UUID_NIL, &GU_UUID_NIL,
             0, 0, seqnos[i], 0,
+            GCS_SEQNO_ILL, 0, vp,
             0, GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
             "", "", 0, 0, 0, 0, 0);
     }

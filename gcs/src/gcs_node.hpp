@@ -11,16 +11,17 @@
 #ifndef _gcs_node_h_
 #define _gcs_node_h_
 
-#include <errno.h>
-
 #include "gcs.hpp"
 #include "gcs_defrag.hpp"
 #include "gcs_comp_msg.hpp"
 #include "gcs_state_msg.hpp"
 
+#include <ostream>
+
 #define NODE_NO_ID   "undefined"
 #define NODE_NO_NAME "unspecified"
 #define NODE_NO_ADDR "unspecified"
+#define GCS_NO_VOTE_SEQNO GCS_SEQNO_ILL
 
 struct gcs_node
 {
@@ -39,6 +40,8 @@ struct gcs_node
     const gcs_state_msg_t* state_msg;// state message
 
     gcs_seqno_t      last_applied; // last applied action on that node
+    gcs_seqno_t      vote_seqno;
+    int64_t          vote_res;
     int              gcs_proto_ver;// supported protocol versions
     int              repl_proto_ver;
     int              appl_proto_ver;
@@ -105,14 +108,18 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
 static inline void
 gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
-    if (gu_unlikely(seqno < node->last_applied)) {
-        gu_warn ("Received bogus LAST message: %lld, from node %s, "
+    if (gu_unlikely(seqno <= node->last_applied)) {
+        gu_warn ("Received bogus LAST message: %lld from node %s, "
                  "expected >= %lld. Ignoring.",
-                 seqno, node->id, node->last_applied);
-    } else {
+                 (long long)seqno, node->id, (long long)node->last_applied);
+    }
+    else {
         node->last_applied = seqno;
     }
 }
+
+extern void
+gcs_node_set_vote (gcs_node_t* node, gcs_seqno_t seqno, int64_t vote);
 
 static inline gcs_seqno_t
 gcs_node_get_last_applied (gcs_node_t* node)
@@ -155,6 +162,15 @@ static inline bool
 gcs_node_is_joined (const gcs_node_state_t st)
 {
     return (st >= GCS_NODE_STATE_DONOR);
+}
+
+extern void
+gcs_node_print(std::ostream& os, const gcs_node_t& node);
+
+static inline std::ostream&
+operator << (std::ostream& os, const gcs_node_t& node)
+{
+    gcs_node_print(os, node); return os;
 }
 
 #endif /* _gcs_node_h_ */

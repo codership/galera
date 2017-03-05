@@ -4,9 +4,11 @@
  * $Id$
  */
 
+#include "gcs_node.hpp"
+#include "gcs_state_msg.hpp"
 #include <stdlib.h>
 
-#include "gcs_node.hpp"
+#include <gu_utils.hpp> // gu::PrintBase
 
 /*! Initialize node context */
 void
@@ -29,6 +31,7 @@ gcs_node_init (gcs_node_t* const node,
     node->status    = GCS_NODE_STATE_NON_PRIM;
     node->name      = strdup (name     ? name     : NODE_NO_NAME);
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
+    node->vote_seqno= GCS_NO_VOTE_SEQNO;
     gcs_defrag_init (&node->app, cache); // GCS_ACT_WRITESET goes only here
     gcs_defrag_init (&node->oob, NULL);
 
@@ -106,6 +109,10 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
     // copy relevant stuff from state msg into node
     node->status = gcs_state_msg_current_state (state_msg);
 
+    node->last_applied = gcs_state_msg_last_applied(state_msg);
+
+    gcs_state_msg_last_vote(state_msg, node->vote_seqno, node->vote_res);
+
     gcs_state_msg_get_proto_ver (state_msg,
                                  &node->gcs_proto_ver,
                                  &node->repl_proto_ver,
@@ -116,6 +123,28 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
 
     if (node->inc_addr) free ((char*)node->inc_addr);
     node->inc_addr = strdup (gcs_state_msg_inc_addr (state_msg));
+}
+
+void
+gcs_node_set_vote (gcs_node_t* const node,
+                   gcs_seqno_t const seqno,
+                   int64_t     const vote)
+{
+    assert(0 == vote || seqno >= node->last_applied);
+    assert(seqno > node->vote_seqno);
+
+    gcs_seqno_t const min_seqno(std::max(node->last_applied, node->vote_seqno));
+
+    if (gu_unlikely(seqno <= min_seqno)) {
+        gu_warn ("Received bogus VOTE message: %lld.%0llx, from node %s, "
+                 "expected >= %lld. Ignoring.",
+                 (long long)seqno, (long long)vote, node->id,
+                 (long long)min_seqno);
+    }
+    else {
+        node->vote_seqno = seqno;
+        node->vote_res   = vote;
+    }
 }
 
 /*! Update node status according to quorum decisions */
@@ -133,7 +162,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             // node was a part of this group
             gcs_seqno_t node_act_id = gcs_state_msg_received (node->state_msg);
 
-             if (node_act_id == quorum->act_id) {
+            if (node_act_id == quorum->act_id) {
                 const gcs_node_state_t last_prim_state =
                     gcs_state_msg_prim_state (node->state_msg);
 
@@ -160,6 +189,10 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 }
                 node->status = GCS_NODE_STATE_PRIM;
             }
+
+            node->last_applied = gcs_state_msg_last_applied(node->state_msg);
+            gcs_state_msg_last_vote(node->state_msg,
+                                    node->vote_seqno, node->vote_res);
         }
         else {
             // node joins completely different group, clear all status
@@ -188,8 +221,11 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             node->count_last_applied =(gcs_state_msg_flags (node->state_msg) &
                                        GCS_STATE_FCLA);
             break;
-        case GCS_NODE_STATE_JOINER:
         case GCS_NODE_STATE_PRIM:
+            node->last_applied = 0;
+            node->vote_seqno   = GCS_NO_VOTE_SEQNO;
+            node->vote_res     = 0;
+        case GCS_NODE_STATE_JOINER:
             node->count_last_applied = false;
             break;
         case GCS_NODE_STATE_NON_PRIM:
@@ -217,4 +253,24 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
     assert(GCS_NODE_STATE_DONOR == node->status || 0 == node->desync_count);
     /* node in DONOR/desync state must have desync count > 0 */
     assert(GCS_NODE_STATE_DONOR != node->status || 0 <  node->desync_count);
+}
+
+void
+gcs_node_print(std::ostream& os, const gcs_node_t& node)
+{
+    os << "ID:\t '"    << node.id     << "'\n"
+       << "joiner:\t'" << node.joiner << "'\n"
+       << "donor:\t '" << node.donor  << "'\n"
+       << "name:\t '"  << node.name   << "'\n"
+       << "incoming: " << node.inc_addr << '\n'
+       << "last_app: " << node.last_applied << '\n'
+       << "count_la: " << (node.count_last_applied ? "YES" : "NO") << '\n'
+       << "vote_seq: " << node.vote_seqno << '\n'
+       << "vote_res: " << gu::PrintBase<>(node.vote_res) << '\n'
+       << "proto(g/r/a): " << node.gcs_proto_ver << '/'
+                           << node.repl_proto_ver << '/'
+                           << node.appl_proto_ver << '\n'
+       << "status:\t " << gcs_node_state_to_str(node.status) << '\n'
+       << "segment:  " << node.segment << '\n'
+       << "bootstrp: " << (node.bootstrap ? "YES" : "NO");
 }

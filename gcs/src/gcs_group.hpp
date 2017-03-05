@@ -22,7 +22,9 @@
 
 #include "gu_config.hpp"
 
+extern std::string const GCS_VOTE_POLICY_KEY;
 extern void gcs_group_register(gu::Config* cnf); // register parameters
+extern uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf);
 
 #include "gu_status.hpp"
 #include "gu_utils.hpp"
@@ -39,6 +41,10 @@ gcs_group_state_t;
 
 extern const char* gcs_group_state_str[];
 
+typedef gu::UnorderedMap<gu::GTID, int64_t, gu::GTID::TableHash> VoteHistory;
+
+struct VoteResult { gcs_seqno_t seqno; int64_t res; };
+
 typedef struct gcs_group
 {
     gcache_t*     cache;
@@ -54,6 +60,10 @@ typedef struct gcs_group
     gcs_group_state_t state;    // group state: PRIMARY | NON_PRIMARY
     gcs_seqno_t   last_applied; // last_applied action group-wide
     long          last_node;    // node that last reported commit_cut
+    gcs_seqno_t   vote_request_seqno; // last vote request was passed for it
+    VoteResult    vote_result;  // last vote result
+    VoteHistory*  vote_history; // history of group votes
+    uint8_t       vote_policy;
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
 
@@ -124,6 +134,9 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 extern gcs_seqno_t
 gcs_group_handle_last_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
+
+extern VoteResult
+gcs_group_handle_vote_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 /*! @return 0 for success, 1 for (success && i_am_sender)
  * or negative error code */
