@@ -831,7 +831,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
         if (retval == WSREP_OK)
         {
-            retval = repl->to_isolation_begin(trx, meta);
+            retval = repl->to_isolation_begin(*trx, meta);
         }
     }
     catch (gu::Exception& e)
@@ -879,7 +879,7 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     try
     {
         TrxHandleLock lock(*trx);
-        gu_trace(repl->to_isolation_end(trx, err));
+        gu_trace(repl->to_isolation_end(*trx, err));
         retval =  WSREP_OK;
     }
     catch (std::exception& e)

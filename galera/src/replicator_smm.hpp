@@ -30,10 +30,11 @@
 
 
 #include <map>
+#include <queue>
 
 namespace galera
 {
-    class ReplicatorSMM : public Replicator, public ist::ActionHandler
+    class ReplicatorSMM : public Replicator, public ist::EventObserver
     {
     public:
 
@@ -88,6 +89,7 @@ namespace galera
         }
 
         void apply_trx(void* recv_ctx, TrxHandleSlave& trx);
+        void process_apply_exception(TrxHandleSlave&, const ApplyException&);
 
         wsrep_status_t send(TrxHandleMaster* trx, wsrep_trx_meta_t*);
         wsrep_status_t replicate(TrxHandleMaster* trx, wsrep_trx_meta_t*);
@@ -103,9 +105,9 @@ namespace galera
                                  wsrep_gtid_t* gtid);
         wsrep_status_t last_committed_id(wsrep_gtid_t* gtid);
 
-        wsrep_status_t to_isolation_begin(TrxHandleMaster* trx,
+        wsrep_status_t to_isolation_begin(TrxHandleMaster& trx,
                                           wsrep_trx_meta_t*);
-        wsrep_status_t to_isolation_end(TrxHandleMaster* trx,
+        wsrep_status_t to_isolation_end(TrxHandleMaster& trx,
                                         int              err);
         wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
                                           const struct wsrep_buf* data,
@@ -130,6 +132,7 @@ namespace galera
                                wsrep_seqno_t donor_seq);
         void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l);
         void process_sync(wsrep_seqno_t seqno_l);
+        void process_vote(wsrep_seqno_t seq, int64_t code,wsrep_seqno_t seqno_l);
 
         const struct wsrep_stats_var* stats_get()  const;
         void                          stats_reset();
@@ -158,11 +161,93 @@ namespace galera
             return uuid_;
         }
 
-        void preload_index(const gcs_action&);
-        void wait(wsrep_seqno_t);
-        void cancel_monitors(const TrxHandleSlave& ts);
+        // IST Action handler interface
+        void ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
+                     bool preload);
+        void ist_cc(const gcs_action&, bool must_apply, bool preload);
+        void ist_end(int error);
+
+        // Cancel monitors for TrxHandleSlave
+        void cancel_monitors(const TrxHandleSlave& ts, bool nolocal);
+        // Cancel monitors for given seqnos
         void cancel_monitors(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g=0);
-        void drain_monitors(wsrep_seqno_t seqno_g);
+
+        // Drain apply and commit monitors up to seqno
+        void drain_monitors(wsrep_seqno_t seqno);
+
+        // Helper class to synchronize between IST receiver thread
+        // applier threads.
+        class ISTEventQueue
+        {
+        public:
+            ISTEventQueue()
+                :
+                mutex_(),
+                cond_(),
+                eof_(false),
+                error_(0),
+                ts_queue_()
+            { }
+            void reset() { eof_ = false; error_ = 0; }
+            void eof(int error)
+            {
+                gu::Lock lock(mutex_);
+                eof_ = true;
+                error_ = error;
+                cond_.broadcast();
+            }
+
+            // Push back
+            void push_back(const TrxHandleSlavePtr& ts)
+            {
+                gu::Lock lock(mutex_);
+                ts_queue_.push(ts);
+                cond_.signal();
+            }
+
+            // Pop front
+            //
+            // Throws gu::Exception() in case of error for the first
+            // caller which will detect the error.
+            // Returns null in case of EOF
+            TrxHandleSlavePtr pop_front()
+            {
+                gu::Lock lock(mutex_);
+                while (eof_ == false && ts_queue_.empty() == true)
+                {
+                    lock.wait(cond_);
+                }
+
+                TrxHandleSlavePtr ret;
+                if (ts_queue_.empty() == false)
+                {
+                    ret = ts_queue_.front();
+                    ts_queue_.pop();
+                }
+                else
+                {
+                    if (error_)
+                    {
+                        int err(error_);
+                        error_ = 0; // Make just one thread to detect the failure
+                        gu_throw_error(err)
+                            << "IST receiver reported failure";
+                    }
+                }
+
+                return ret;
+            }
+
+        private:
+            gu::Mutex mutex_;
+            gu::Cond  cond_;
+            bool eof_;
+            int error_;
+            std::queue<TrxHandleSlavePtr> ts_queue_;
+        };
+
+
+        ISTEventQueue ist_event_queue_;
 
         void mark_corrupt_and_close()
         /* mark state as corrupt and try to leave cleanly */
@@ -176,7 +261,7 @@ namespace galera
 
         struct InitConfig
         {
-            InitConfig(gu::Config&, const char* node_address, const char *base_dir);
+            InitConfig(gu::Config&, const char* node_addr,const char* base_dir);
         };
 
     private:
@@ -454,7 +539,6 @@ namespace galera
             State to_;
         };
 
-
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
 
         void cancel_seqno(wsrep_seqno_t);
@@ -471,7 +555,7 @@ namespace galera
                               wsrep_seqno_t       group_seqno);
 
         void recv_IST(void* recv_ctx);
-        bool process_IST_writeset(void* recv_ctx, const gcs_action& act);
+        void process_IST_writeset(void* recv_ctx, const TrxHandleSlavePtr& ts);
 
         StateRequest* prepare_state_request (const void* sst_req,
                                              ssize_t     sst_req_len,
@@ -485,9 +569,6 @@ namespace galera
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
                                      ssize_t             sst_req_len);
-
-        void preload_index_trx(const gcs_action& act);
-        void preload_index_cc(const gcs_action& act);
 
         /* These methods facilitate closing procedure.
          * They must be called under closing_mutex_ lock */

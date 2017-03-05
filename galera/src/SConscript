@@ -6,7 +6,6 @@ libgaleraxx_env = env.Clone()
 # Include paths
 libgaleraxx_env.Append(CPPPATH = Split('''
                                           #
-                                          #/asio
                                           #/common
                                           #/galerautils/src
                                           #/gcache/src
@@ -32,7 +31,8 @@ libgaleraxx_srcs = [
     'ist_proto.cpp',
     'ist.cpp',
     'gcs_dummy.cpp',
-    'saved_state.cpp' ]
+    'saved_state.cpp',
+    'galera_view.cpp' ]
 
 libgaleraxx_env.StaticLibrary('galera++', libgaleraxx_srcs)
 

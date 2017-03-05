@@ -7,7 +7,6 @@ env = check_env.Clone()
 env.Append(CPPPATH = Split('''
                               #
                               #common
-                              #/asio
                               #/galerautils/src
                            '''))
 

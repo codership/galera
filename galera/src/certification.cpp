@@ -65,38 +65,32 @@ length_check(const gu::Config& conf)
         return gu::Config::from_config<int>(CERT_PARAM_LENGTH_CHECK_DEFAULT);
 }
 
-void
-galera::Certification::purge_for_trx_v3(TrxHandleSlave* trx)
+// Purge key set from given index
+static void purge_key_set(galera::Certification::CertIndexNG& cert_index,
+                          galera::TrxHandleSlave*             ts,
+                          const galera::KeySetIn&             key_set,
+                          const long                          count)
 {
-    const KeySetIn& keys(trx->write_set().keyset());
-    keys.rewind();
-
-    // Unref all referenced and remove if was referenced only by us
-    for (long i = 0; i < keys.count(); ++i)
+    for (long i(0); i < count; ++i)
     {
-        const KeySet::KeyPart& kp(keys.next());
-        KeySet::Key::Prefix const p(kp.prefix());
-
-        KeyEntryNG ke(kp);
-        CertIndexNG::iterator const ci(cert_index_ng_.find(&ke));
-
-//        assert(ci != cert_index_ng_.end());
-        if (gu_unlikely(cert_index_ng_.end() == ci))
+        galera::KeyEntryNG ke(key_set.next());
+        galera::Certification::CertIndexNG::iterator ci(cert_index.find(&ke));
+        assert(ci != cert_index.end());
+        if (ci == cert_index.end())
         {
-            log_warn << "Missing key";
+            log_warn << "Could not find key from index";
             continue;
         }
+        galera::KeyEntryNG* const kep(*ci);
+        KeySet::Key::Prefix const p(ke.key().prefix());
+        assert(kep->referenced() == true);
 
-        KeyEntryNG* const kep(*ci);
-        assert(kep->referenced());
-
-        if (kep->ref_trx(p) == trx)
+        if (kep->ref_trx(p) == ts)
         {
-            kep->unref(p, trx);
-
+            kep->unref(p, ts);
             if (kep->referenced() == false)
             {
-                cert_index_ng_.erase(ci);
+                cert_index.erase(ci);
                 delete kep;
             }
         }
@@ -106,8 +100,11 @@ galera::Certification::purge_for_trx_v3(TrxHandleSlave* trx)
 void
 galera::Certification::purge_for_trx(TrxHandleSlave* trx)
 {
+    assert(mutex_.owned());
     assert(trx->version() == 3 || trx->version() == 4);
-    purge_for_trx_v3(trx);
+    const KeySetIn& keys(trx->write_set().keyset());
+    keys.rewind();
+    purge_key_set(cert_index_ng_, trx, keys, keys.count());
 }
 
 /*! for convenience returns true if conflict and false if not */
@@ -139,7 +136,7 @@ certify_and_depend_v3(const galera::KeyEntryNG*   const found,
         // 3) Trx has not been certified yet. Already certified trxs show up
         //    here during index rebuild.
         if ((trx->source_id() != ref_trx->source_id() || ref_trx->is_toi()) &&
-            ref_seqno >  trx->last_seen_seqno() && trx->certified() == false)
+            ref_seqno > trx->last_seen_seqno() && trx->certified() == false)
         {
             if (gu_unlikely(log_conflict == true))
             {
@@ -321,7 +318,7 @@ cert_fail:
 }
 
 galera::Certification::TestResult
-galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
+galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
 {
     assert(trx->source_id() != WSREP_UUID_UNDEFINED);
 
@@ -384,7 +381,7 @@ galera::Certification::do_test(TrxHandleSlave* trx, bool store_keys)
         break;
     case 3:
     case 4:
-        res = do_test_v3(trx, store_keys);
+        res = do_test_v3(trx.get(), store_keys);
         break;
     default:
         gu_throw_fatal << "certification test for version "
@@ -448,7 +445,7 @@ galera::Certification::do_test_preordered(TrxHandleSlave* trx)
 }
 
 
-galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
+galera::Certification::Certification(gu::Config& conf, ServiceThd* thd)
     :
     version_               (-1),
     trx_map_               (),
@@ -475,7 +472,8 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
 
     max_length_            (max_length(conf)),
     max_length_check_      (length_check(conf)),
-    log_conflicts_         (conf.get<bool>(CERT_PARAM_LOG_CONFLICTS))
+    log_conflicts_         (conf.get<bool>(CERT_PARAM_LOG_CONFLICTS)),
+    current_view_          ()
 {}
 
 
@@ -497,8 +495,11 @@ galera::Certification::~Certification()
 
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
     trx_map_.clear();
-    service_thd_.release_seqno(position_);
-    service_thd_.flush(gu::UUID());
+    if (service_thd_)
+    {
+        service_thd_->release_seqno(position_);
+        service_thd_->flush(gu::UUID());
+    }
 }
 
 
@@ -527,8 +528,11 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     assert(cert_index_.empty());
     assert(cert_index_ng_.empty());
 
-    service_thd_.release_seqno(position_);
-    service_thd_.flush(gtid.uuid());
+    if (service_thd_)
+    {
+        service_thd_->release_seqno(position_);
+        service_thd_->flush(gtid.uuid());
+    }
 
     log_info << "####### Assign initial position for certification: " << gtid
              << ", protocol version: " << version;
@@ -545,7 +549,9 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
 
 
 void
-galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
+galera::Certification::adjust_position(const View&         view,
+                                       const gu::GTID&     gtid,
+                                       int           const version)
 {
     assert(gtid.uuid()  != GU_UUID_NIL);
     assert(gtid.seqno() >= 0);
@@ -564,24 +570,29 @@ galera::Certification::adjust_position(const gu::GTID& gtid, int const version)
         trx_map_.clear();
         assert(cert_index_.empty());
         assert(cert_index_ng_.empty());
-
-        service_thd_.release_seqno(position_);
+        if (service_thd_)
+        {
+            service_thd_->release_seqno(position_);
+        }
     }
 
-    /* update group UUID */
-    service_thd_.flush(gtid.uuid());
+    if (service_thd_)
+    {
+        service_thd_->flush(gtid.uuid());
+    }
 
-    position_       = gtid.seqno();
-    version_        = version;
+    position_     = gtid.seqno();
+    version_      = version;
+    current_view_ = view;
 }
 
 galera::Certification::TestResult
-galera::Certification::test(TrxHandleSlave* trx, bool store_keys)
+galera::Certification::test(const TrxHandleSlavePtr& trx, bool store_keys)
 {
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
 
     const TestResult ret
-        (trx->preordered() ? do_test_preordered(trx) : do_test(trx, store_keys));
+        (trx->preordered() ? do_test_preordered(trx.get()) : do_test(trx, store_keys));
 
     if (gu_unlikely(ret != TEST_OK))
     {
@@ -622,7 +633,7 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
     for_each(trx_map_.begin(), purge_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), purge_bound);
 
-    if (handle_gcache) service_thd_.release_seqno(seqno);
+    if (handle_gcache && service_thd_) service_thd_->release_seqno(seqno);
 
     if (0 == ((trx_map_.size() + 1) % 10000))
     {
@@ -686,7 +697,7 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
         }
     }
 
-    const TestResult retval(test(trx.get(), true));
+    const TestResult retval(test(trx, true));
 
     {
         gu::Lock lock(mutex_);

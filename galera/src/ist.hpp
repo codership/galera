@@ -30,17 +30,21 @@ namespace galera
     {
         void register_params(gu::Config& conf);
 
-        // Interface to handle cert index preload events.
-        // These include trxs and configuration changes received
-        // from donor that have global seqno below IST start.
-        class ActionHandler
+
+        // IST event observer interface
+        class EventObserver
         {
         public:
-            virtual void preload_index(const gcs_action&) = 0;
-            virtual void wait(wsrep_seqno_t) = 0;
-            virtual void drain_monitors(wsrep_seqno_t) = 0;
+            // Process transaction from IST
+            virtual void ist_trx(const TrxHandleSlavePtr&, bool must_apply,
+                                 bool preload) = 0;
+            // Process conf change from IST
+            virtual void ist_cc(const gcs_action&, bool must_apply,
+                                bool preload) = 0;
+            // Report IST end
+            virtual void ist_end(int error) = 0;
         protected:
-            ~ActionHandler() {}
+            virtual ~EventObserver() {}
         };
 
         class Receiver
@@ -49,16 +53,19 @@ namespace galera
             static std::string const RECV_ADDR;
 
             Receiver(gu::Config& conf, gcache::GCache&,
-                     ActionHandler&, const char* addr);
+                     TrxHandleSlave::Pool& slave_pool,
+                     EventObserver&, const char* addr);
             ~Receiver();
 
-            std::string   prepare(wsrep_seqno_t, wsrep_seqno_t, int);
+            std::string   prepare(wsrep_seqno_t       first_seqno,
+                                  wsrep_seqno_t       last_seqno,
+                                  int                 protocol_version,
+                                  const wsrep_uuid_t& source_id);
 
             // this must be called AFTER SST is processed and we know
             // the starting point.
             void          ready(wsrep_seqno_t first);
 
-            int           recv(gcs_action& act);
             wsrep_seqno_t finished();
             void          run();
 
@@ -75,30 +82,14 @@ namespace galera
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
 
-            class Consumer
-            {
-            public:
-
-                Consumer() : cond_(), act_() { }
-                ~Consumer() { }
-
-                gu::Cond&         cond()                     { return cond_; }
-                void              act(const gcs_action& act) { act_ = act;   }
-                const gcs_action& act() const                { return act_;  }
-
-            private:
-
-                gu::Cond        cond_;
-                gcs_action      act_;
-            };
-
-            std::stack<Consumer*> consumers_;
             wsrep_seqno_t         first_seqno_;
             wsrep_seqno_t         last_seqno_;
             wsrep_seqno_t         current_seqno_;
             gu::Config&           conf_;
             gcache::GCache&       gcache_;
-            ActionHandler&        act_handler_;
+            TrxHandleSlave::Pool& slave_pool_;
+            wsrep_uuid_t          source_id_;
+            EventObserver&        observer_;
             pthread_t             thread_;
             int                   error_code_;
             int                   version_;
@@ -115,7 +106,7 @@ namespace galera
                    gcache::GCache& gcache,
                    const std::string& peer,
                    int version);
-            ~Sender();
+            virtual ~Sender();
 
             // first - first trx seqno
             // last  - last trx seqno

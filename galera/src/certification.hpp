@@ -8,6 +8,7 @@
 #include "trx_handle.hpp"
 #include "key_entry_ng.hpp"
 #include "galera_service_thd.hpp"
+#include "galera_view.hpp"
 
 #include <gu_unordered.hpp>
 #include <gu_lock.hpp>
@@ -15,7 +16,6 @@
 #include <gu_gtid.hpp>
 
 #include <map>
-#include <set>
 #include <list>
 
 namespace galera
@@ -49,17 +49,17 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(gu::Config& conf, ServiceThd& thd);
+        Certification(gu::Config& conf, ServiceThd* thd);
         ~Certification();
 
         void assign_initial_position(const gu::GTID& gtid, int version);
         TestResult append_trx(const TrxHandleSlavePtr&);
-        TestResult test(TrxHandleSlave*, bool store_keys);
+        TestResult test(const TrxHandleSlavePtr&, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
         /* this is for configuration change use */
-        void
-        adjust_position(const gu::GTID& gtid, int version);
+        void adjust_position(const View&, const gu::GTID& gtid,
+                             int version);
 
         wsrep_seqno_t
         get_safe_to_discard_seqno() const
@@ -118,11 +118,14 @@ namespace galera
 
     private:
 
-        TestResult do_test(TrxHandleSlave*, bool store_keys);
+        // Non-copyable
+        Certification(const Certification&);
+        Certification& operator=(const Certification&);
+
+        TestResult do_test(const TrxHandleSlavePtr&, bool store_keys);
         TestResult do_test_v3(TrxHandleSlave*, bool);
         TestResult do_test_preordered(TrxHandleSlave*);
         void purge_for_trx(TrxHandleSlave*);
-        void purge_for_trx_v3(TrxHandleSlave*);
 
         // unprotected variants for internal use
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
@@ -167,7 +170,12 @@ namespace galera
                                  << *trx;
                     }
 
-                    if (trx->depends_seqno() > -1)
+                    // If depends seqno is not WSREP_SEQNO_UNDEFINED
+                    // write set certification has passed and keys have been
+                    // inserted into index and purge is needed.
+                    // TOI write sets will always pass regular certification
+                    // and keys will be inserted..
+                    if (trx->depends_seqno() >= 0 || trx->is_toi() == true)
                     {
                         cert_.purge_for_trx(trx);
                     }
@@ -188,7 +196,7 @@ namespace galera
         CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
         DepsSet       deps_set_;
-        ServiceThd&   service_thd_;
+        ServiceThd*   service_thd_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t initial_position_;
@@ -217,6 +225,7 @@ namespace galera
         unsigned int const max_length_check_; /* Mask how often to check */
 
         bool               log_conflicts_;
+        View               current_view_;
     };
 }
 

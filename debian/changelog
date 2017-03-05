@@ -1,4 +1,11 @@
-galera-3 (25.3.6-1) UNRELEASED; urgency=medium
+galera-3 (25.3.14-1) UNRELEASED; urgency=low
+
+  * Sync Debian packaging from downstream to include improvements developed at
+    http://anonscm.debian.org/cgit/pkg-mysql/galera-3.git
+
+ -- Codership Oy <info@codership.com>  Fri, 01 Jan 2016 16:02:54 +0200
+
+galera-3 (25.3.6-1) UNRELEASED; urgency=low
 
   * First deb release.
 

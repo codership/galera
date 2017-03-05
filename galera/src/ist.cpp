@@ -81,21 +81,24 @@ galera::ist::register_params(gu::Config& conf)
 
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 gcache::GCache&       gc,
-                                ActionHandler&        ah,
+                                TrxHandleSlave::Pool& slave_pool,
+                                EventObserver&        ob,
                                 const char*           addr)
     :
+    recv_addr_    (),
     io_service_   (),
     acceptor_     (io_service_),
     ssl_ctx_      (io_service_, asio::ssl::context::sslv23),
     mutex_        (),
     cond_         (),
-    consumers_    (),
     first_seqno_  (WSREP_SEQNO_UNDEFINED),
     last_seqno_   (WSREP_SEQNO_UNDEFINED),
     current_seqno_(WSREP_SEQNO_UNDEFINED),
     conf_         (conf),
     gcache_       (gc),
-    act_handler_  (ah),
+    slave_pool_   (slave_pool),
+    source_id_    (WSREP_UUID_UNDEFINED),
+    observer_  (ob),
     thread_       (),
     error_code_   (0),
     version_      (-1),
@@ -211,10 +214,12 @@ IST_determine_recv_addr (gu::Config& conf)
 std::string
 galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
                                wsrep_seqno_t const last_seqno,
-                               int           const version)
+                               int           const version,
+                               const wsrep_uuid_t& source_id)
 {
     ready_ = false;
     version_ = version;
+    source_id_ = source_id;
     recv_addr_ = IST_determine_recv_addr(conf_);
     gu::URI     const uri(recv_addr_);
     try
@@ -356,37 +361,8 @@ void galera::ist::Receiver::run()
 
             gcs_action& act(ret.first);
 
-            if (gu_likely(act.type != GCS_ACT_UNKNOWN))
-            {
-                assert(act.seqno_g > 0);
-
-                if (gu_unlikely(WSREP_SEQNO_UNDEFINED == current_seqno_))
-                {
-                    if (act.seqno_g > first_seqno_)
-                    {
-                        log_error
-                            << "IST started with wrong seqno: " << act.seqno_g
-                            << ", expected <= " << first_seqno_;
-                        ec = EINVAL;
-                        goto err;
-                    }
-                    log_info << "####### IST current seqno initialized to " << act.seqno_g;
-                    current_seqno_ = act.seqno_g;
-                }
-                else
-                {
-                    ++current_seqno_;
-                }
-
-                if (act.seqno_g != current_seqno_)
-                {
-                    log_error << "Unexpected action seqno: " << act.seqno_g
-                              << " expected: " << current_seqno_;
-                    ec = EINVAL;
-                    goto err;
-                }
-            }
-            else
+            // act type GCS_ACT_UNKNOWN denotes EOF
+            if (gu_unlikely(act.type == GCS_ACT_UNKNOWN))
             {
                 assert(0    == act.seqno_g);
                 assert(NULL == act.buf);
@@ -395,56 +371,82 @@ void galera::ist::Receiver::run()
                 break;
             }
 
+            assert(act.seqno_g > 0);
+
+            if (gu_unlikely(WSREP_SEQNO_UNDEFINED == current_seqno_))
+            {
+                if (act.seqno_g > first_seqno_)
+                {
+                    log_error
+                        << "IST started with wrong seqno: " << act.seqno_g
+                        << ", expected <= " << first_seqno_;
+                    ec = EINVAL;
+                    goto err;
+                }
+                log_info << "####### IST current seqno initialized to " << act.seqno_g;
+                current_seqno_ = act.seqno_g;
+            }
+            else
+            {
+                ++current_seqno_;
+            }
+
+            if (act.seqno_g != current_seqno_)
+            {
+                log_error << "Unexpected action seqno: " << act.seqno_g
+                          << " expected: " << current_seqno_;
+                ec = EINVAL;
+                goto err;
+            }
+
             assert(current_seqno_ > 0);
             assert(current_seqno_ == act.seqno_g);
             assert(act.type != GCS_ACT_UNKNOWN);
 
             bool const must_apply(current_seqno_ >= first_seqno_);
+            bool const preload(ret.second);
 
-            if (ret.second == true)
+            if (gu_unlikely(preload == true && preload_started == false))
             {
-                // Action was received with index preload flag on
-                if (gu_unlikely(preload_started == false))
-                {
-                    log_info << "IST cert index preload starting at "
-                             << act.seqno_g;
-                    preload_started = true;
-                }
-
-                assert(GCS_ACT_WRITESET == act.type ||
-                       GCS_ACT_CCHANGE == act.type);
-
-                // if must apply, then CC will be processed in isolation below
-                if (!(GCS_ACT_CCHANGE == act.type && must_apply))
-                    act_handler_.preload_index(act);
+                log_info << "IST preload starting at " << current_seqno_;
+                preload_started = true;
             }
-            else assert(!preload_started);
 
-            if (must_apply)
+            switch (act.type)
             {
-                if (GCS_ACT_CCHANGE == act.type)
+            case GCS_ACT_WRITESET:
+            {
+                TrxHandleSlavePtr ts(
+                    TrxHandleSlavePtr(TrxHandleSlave::New(false,
+                                                          slave_pool_),
+                                      TrxHandleSlaveDeleter()));
+                if (act.size > 0)
                 {
-                    log_info << "####### Passing CC " << act.seqno_g;
-                    act_handler_.drain_monitors(act.seqno_g - 1);
+                    gu_trace(ts->unserialize<false>(act));
+                    ts->set_local(false);
+                    assert(ts->global_seqno() == act.seqno_g);
+                    assert(ts->depends_seqno() >= 0);
+                    assert(ts->action().first && ts->action().second);
+                    // Checksum is verified later on
+                }
+                else
+                {
+                    // Assign global seqno and set state to ROLLED_BACK
+                    // to indicate that monitors must be cancelled
+                    // and event must be discarded.
+                    ts->set_global_seqno(act.seqno_g);
+                    ts->set_state(TrxHandle::S_ROLLED_BACK);
                 }
 
-                {
-                    gu::Lock lock(mutex_);
-                    while (consumers_.empty()) { lock.wait(cond_); }
-
-                    assert(ready_);
-
-                    Consumer* cons(consumers_.top());
-                    consumers_.pop();
-                    cons->act(act);
-                    cons->cond().signal();
-                }
-
-                if (GCS_ACT_CCHANGE == act.type)
-                {
-                    act_handler_.wait(act.seqno_g);
-                    log_info << "####### Waited CC " << act.seqno_g;
-                }
+                observer_.ist_trx(ts, must_apply, preload);
+                break;
+            }
+            case GCS_ACT_CCHANGE:
+                log_info << "####### Passing CC " << act.seqno_g;
+                observer_.ist_cc(act, must_apply, preload);
+                break;
+            default:
+                assert(0);
             }
         }
     }
@@ -486,11 +488,7 @@ err:
     {
         error_code_ = ec;
     }
-    while (consumers_.empty() == false)
-    {
-        consumers_.top()->cond().signal();
-        consumers_.pop();
-    }
+    observer_.ist_end(ec);
 }
 
 
@@ -506,38 +504,6 @@ void galera::ist::Receiver::ready(wsrep_seqno_t const first)
 }
 
 
-int galera::ist::Receiver::recv(gcs_action& act)
-{
-    Consumer cons;
-    gu::Lock lock(mutex_);
-
-    if (running_ == false)
-    {
-        if (error_code_ != 0)
-        {
-            gu_throw_error(error_code_) << "IST receiver reported error";
-        }
-        return EINTR;
-    }
-
-    consumers_.push(&cons);
-    cond_.signal();
-    lock.wait(cons.cond());
-
-    act = cons.act();
-
-    if (act.buf == NULL)
-    {
-        if (error_code_ != 0)
-        {
-            gu_throw_error(error_code_) << "IST receiver reported error";
-        }
-
-        if (gu_unlikely(act.seqno_g <= 0)) return EINTR; // else skip seqno
-    }
-
-    return 0;
-}
 
 
 wsrep_seqno_t galera::ist::Receiver::finished()
@@ -561,12 +527,6 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         gu::Lock lock(mutex_);
 
         running_ = false;
-
-        while (consumers_.empty() == false)
-        {
-            consumers_.top()->cond().signal();
-            consumers_.pop();
-        }
 
         recv_addr_ = "";
     }

@@ -17,7 +17,6 @@ using namespace galera;
 
 // Message tests
 
-
 START_TEST(test_ist_message)
 {
 
@@ -113,39 +112,24 @@ struct receiver_args
     std::string   listen_addr_;
     wsrep_seqno_t first_;
     wsrep_seqno_t last_;
-    size_t        n_receivers_;
     TrxHandleSlave::Pool& trx_pool_;
     gcache::GCache& gcache_;
     int           version_;
 
     receiver_args(const std::string listen_addr,
                   wsrep_seqno_t first, wsrep_seqno_t last,
-                  size_t n_receivers, TrxHandleSlave::Pool& sp,
+                  TrxHandleSlave::Pool& sp,
                   gcache::GCache& gc, int version)
         :
         listen_addr_(listen_addr),
         first_      (first),
         last_       (last),
-        n_receivers_(n_receivers),
         trx_pool_   (sp),
         gcache_     (gc),
         version_    (version)
     { }
 };
 
-struct trx_thread_args
-{
-    galera::ist::Receiver& receiver_;
-    galera::TrxHandleSlave::Pool& pool_;
-    galera::Monitor<TestOrder> monitor_;
-    trx_thread_args(galera::ist::Receiver& receiver,
-                    galera::TrxHandleSlave::Pool& pool)
-        :
-        receiver_(receiver),
-        pool_(pool),
-        monitor_()
-    { }
-};
 
 extern "C" void* sender_thd(void* arg)
 {
@@ -164,75 +148,92 @@ extern "C" void* sender_thd(void* arg)
     return 0;
 }
 
-extern "C" void* trx_thread(void* arg)
+
+
+namespace
 {
-    trx_thread_args* targs(reinterpret_cast<trx_thread_args*>(arg));
-    pthread_barrier_wait(&start_barrier);
-    targs->receiver_.ready(targs->receiver_.first_seqno());
-
-    while (true)
+    class ISTObserver : public galera::ist::EventObserver
     {
-        gcs_action act;
-        int err;
+    public:
+        ISTObserver() :
+            mutex_(),
+            cond_(),
+            seqno_(0),
+            eof_(false),
+            error_(0)
+        { }
 
-        if ((err = targs->receiver_.recv(act)) != 0 ||
-            GCS_ACT_UNKNOWN == act.type /* EOF */)
+        ~ISTObserver() {}
+
+        void ist_trx(const TrxHandleSlavePtr& ts, bool must_apply, bool preload)
         {
-            assert(act.buf == NULL);
-            assert(act.size == 0);
-            log_info << "terminated with " << err;
-            return 0;
-        }
+            assert(ts != 0);
+            ts->verify_checksum();
 
-        galera::TrxHandleSlavePtr trx(TrxHandleSlave::New(false, targs->pool_),
-                                      TrxHandleSlaveDeleter());
-
-        if (GCS_ACT_WRITESET == act.type)
-        {
-            if (act.size > 0)
+            if (ts->state() == TrxHandle::S_ROLLED_BACK)
             {
-                assert(act.buf != NULL);
-
-                gu_trace(trx->unserialize<false>(act));
-
-                trx->verify_checksum();
-                trx->set_state(TrxHandle::S_CERTIFYING);
+                log_info << "ist_trx: rolled back: " << ts->global_seqno();
             }
             else
             {
-                assert(act.buf == NULL);
-
-                trx->set_global_seqno(act.seqno_g);
+                log_info << "ist_trx: " << *ts;
+                ts->set_state(TrxHandle::S_CERTIFYING);
             }
+
+            if (preload == false)
+            {
+                assert(seqno_ + 1 == ts->global_seqno());
+            }
+            else
+            {
+                assert(seqno_ < ts->global_seqno());
+            }
+            seqno_ = ts->global_seqno();
         }
-        else
+
+        void ist_cc(const gcs_action& act, bool must_apply, bool preload)
         {
-            assert(act.type == GCS_ACT_CCHANGE);
-
             gcs_act_cchange const cc(act.buf, act.size);
-
             assert(act.seqno_g == cc.seqno);
 
-            trx->set_global_seqno(cc.seqno);
+            log_info << "ist_cc" << cc.seqno;
+            if (preload == false)
+            {
+                assert(seqno_ + 1 == cc.seqno);
+            }
+            else
+            {
+                assert(seqno_ < cc.seqno);
+            }
         }
 
-        TestOrder to(*trx);
-        targs->monitor_.enter(to);
-        targs->monitor_.leave(to);
-    }
-    return 0;
+        void ist_end(int error)
+        {
+            log_info << "IST ended with status: " << error;
+            gu::Lock lock(mutex_);
+            error_ = error;
+            eof_ = true;
+            cond_.signal();
+        }
+
+        int wait()
+        {
+            gu::Lock lock(mutex_);
+            while (eof_ == false)
+            {
+                lock.wait(cond_);
+            }
+            return error_;
+        }
+
+    private:
+        gu::Mutex mutex_;
+        gu::Cond  cond_;
+        wsrep_seqno_t seqno_;
+        bool eof_;
+        int error_;
+    };
 }
-
-class PreIST : public galera::ist::ActionHandler
-{
-public:
-    void preload_index(const gcs_action& act) { }
-    void wait(wsrep_seqno_t const upto) { }
-    void drain_monitors(wsrep_seqno_t const upto) { }
-    virtual ~PreIST() {}
-};
-
-static gu::UUID UUID(NULL, 0);
 
 extern "C" void* receiver_thd(void* arg)
 {
@@ -241,38 +242,28 @@ extern "C" void* receiver_thd(void* arg)
     receiver_args* rargs(reinterpret_cast<receiver_args*>(arg));
 
     gu::Config conf;
+    TrxHandleSlave::Pool slave_pool(sizeof(TrxHandleSlave), 1024,
+                                    "TrxHandleSlave");
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
 
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    PreIST pre_ist;
-    galera::ist::Receiver receiver(conf, rargs->gcache_, pre_ist, 0);
+    ISTObserver isto;
+    galera::ist::Receiver receiver(conf, rargs->gcache_, slave_pool,
+                                   isto, 0);
+
+    // Prepare starts IST receiver thread
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
-                                           rargs->version_);
+                                           rargs->version_,
+                                           WSREP_UUID_UNDEFINED);
 
-    mark_point();
-
-    std::vector<pthread_t> threads(rargs->n_receivers_);
-    trx_thread_args trx_thd_args(receiver, rargs->trx_pool_);
-    for (size_t i(0); i < threads.size(); ++i)
-    {
-        log_info << "starting trx thread " << i;
-        pthread_create(&threads[0] + i, 0, &trx_thread, &trx_thd_args);
-    }
-
-    mark_point();
-
-    trx_thd_args.monitor_.set_initial_position(
-        *reinterpret_cast<wsrep_uuid_t*>(&UUID), rargs->first_ - 1);
     pthread_barrier_wait(&start_barrier);
-    trx_thd_args.monitor_.wait(rargs->last_);
+    mark_point();
 
-    for (size_t i(0); i < threads.size(); ++i)
-    {
-        log_info << "joining trx thread " << i;
-        pthread_join(threads[i], 0);
-    }
+    receiver.ready(rargs->first_);
+
+    log_info << "IST wait finished with status: " << isto.wait();
 
     receiver.finished();
     return 0;
@@ -313,12 +304,13 @@ static void store_trx(gcache::GCache* const gcache,
                                                 5678+i),
                            TrxHandleMasterDeleter());
 
-    const wsrep_buf_t key[2] = {
+    const wsrep_buf_t key[3] = {
         {"key1", 4},
-        {"key2", 4}
+        {"key2", 4},
+        {"key3", 4}
     };
 
-    trx->append_key(KeyData(trx_params.version_, key, 2, WSREP_KEY_EXCLUSIVE,
+    trx->append_key(KeyData(trx_params.version_, key, 3, WSREP_KEY_EXCLUSIVE,
                             true));
     trx->append_data("bar", 3, WSREP_DATA_ORDERED, true);
     assert (i > 0);
@@ -436,10 +428,10 @@ static void test_ist_common(int const version)
 
     mark_point();
 
-    receiver_args rargs(receiver_addr, 1, 10, 1, sp, *gcache_receiver, version);
+    receiver_args rargs(receiver_addr, 1, 10, sp, *gcache_receiver, version);
     sender_args sargs(*gcache_sender, rargs.listen_addr_, 1, 10, version);
 
-    pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
+    pthread_barrier_init(&start_barrier, 0, 2);
 
     pthread_t sender_thread, receiver_thread;
 

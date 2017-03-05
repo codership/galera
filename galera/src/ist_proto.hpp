@@ -18,6 +18,18 @@
 #include <string>
 
 //
+// Message class must have non-virtual destructor until
+// support up to version 3 is removed as serialization/deserialization
+// depends on the size of the class.
+//
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic push
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+# pragma GCC diagnostic ignored "-Weffc++"
+#endif
+
+//
 // Sender                            Receiver
 // connect()                 ----->  accept()
 //                          <-----   send_handshake()
@@ -87,6 +99,8 @@ namespace galera
             {
                 type_ = t; seqno_ = s;
             }
+
+            ~Message() { }
 
             size_t serial_size() const
             {
@@ -771,5 +785,12 @@ namespace galera
         };
     }
 }
+
+#if defined(__GNUG__)
+# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
+#endif
+
 
 #endif // GALERA_IST_PROTO_HPP

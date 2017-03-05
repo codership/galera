@@ -3,6 +3,7 @@
 //
 
 #include "replicator_smm.hpp"
+#include "galera_info.hpp"
 
 #include <gu_abort.h>
 
@@ -537,7 +538,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     // some transactions to rebuild cert index, so IST receiver must be
     // prepared regardless of the group.
     wsrep_seqno_t last_applied(STATE_SEQNO());
-
+    ist_event_queue_.reset();
     if (state_uuid_ != group_uuid)
     {
         if (protocol_version_ < 8)
@@ -567,7 +568,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
              << ", l: " << last_needed << ", p: " << protocol_version_; //remove
 
     std::string recv_addr (ist_receiver_.prepare(first_needed, last_needed,
-                                                 protocol_version_));
+                                                 protocol_version_, source_id()));
 
     std::ostringstream os;
 
@@ -933,48 +934,34 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     delete req;
 }
 
-bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
+void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
+                                         const TrxHandleSlavePtr& ts_ptr)
 {
-    assert(GCS_ACT_WRITESET == act.type);
 
-    TrxHandleSlavePtr ts(TrxHandleSlave::New(false, slave_pool_),
-                         TrxHandleSlaveDeleter());
-    bool exit_loop(false);
+    TrxHandleSlave& ts(*ts_ptr);
 
-    bool const skip(0 == act.size);
+    assert(ts.global_seqno() > 0);
+
+    bool const skip(ts.state() == TrxHandle::S_ROLLED_BACK);
 
     if (gu_likely(!skip))
     {
-        assert(act.buf != NULL);
+        ts.verify_checksum();
 
-        gu_trace(ts->unserialize<false>(act));
+        assert(ts.certified());
+        assert(ts.depends_seqno() >= 0);
 
-        ts->verify_checksum();
-
-        assert(ts->certified());
-
-        // replicating and certifying stages have been
-        // processed on donor, just adjust states here
-        ts->set_state(TrxHandle::S_CERTIFYING);
-
-        assert(ts->global_seqno() == act.seqno_g);
-        assert(ts->depends_seqno() >= 0);
-
-        gu_trace(apply_trx(recv_ctx, *ts));
+        gu_trace(apply_trx(recv_ctx, *ts_ptr));
         GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
-
-        exit_loop = ts->exit_loop();
     }
     else
     {
-        ts->set_global_seqno(act.seqno_g);
-
-        ApplyOrder ao(*ts);
+        ApplyOrder ao(ts);
         apply_monitor_.self_cancel(ao);
 
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
-            CommitOrder co(*ts, co_mode_);
+            CommitOrder co(ts, co_mode_);
             commit_monitor_.self_cancel(co);
         }
     }
@@ -985,46 +972,33 @@ bool ReplicatorSMM::process_IST_writeset(void* recv_ctx, const gcs_action& act)
         std::ostringstream os;
 
         if (gu_likely(!skip))
-            os << "IST received trx body: " << *ts;
+            os << "IST received trx body: " << ts;
         else
-            os << "IST skipping trx " << act.seqno_g;
+            os << "IST skipping trx " << ts.global_seqno();
 
         log_debug << os;
     }
-
-    return exit_loop;
 }
 
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
-    gcs_action act;
-
+    TrxHandleSlavePtr ts;
     try
     {
         bool exit_loop(false);
 
-        while (!exit_loop)
+        while (exit_loop == false)
         {
-            int err;
-
-            if (gu_likely((err = ist_receiver_.recv(act)) == 0))
+            ts = ist_event_queue_.pop_front();
+            if (gu_likely(ts != 0))
             {
-                if (gu_likely(GCS_ACT_WRITESET == act.type))
-                {
-                    exit_loop = process_IST_writeset(recv_ctx, act);
-                }
-                else
-                {
-                    assert(GCS_ACT_CCHANGE == act.type);
-                    process_conf_change(recv_ctx, act);
-                    GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
-                }
+                process_IST_writeset(recv_ctx, ts);
+                exit_loop = ts->exit_loop();
             }
             else
             {
-                assert(EINTR == err);
-                return;
+                break;
             }
         }
     }
@@ -1032,83 +1006,92 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
-        log_fatal << "failed action: " << act;
+        if (ts != 0)
+            log_fatal << "failed action: " << *ts;
+        else
+            log_fatal << "null action";
         st_.mark_corrupt();
         gcs_.close();
         gu_abort();
+
+        gu::Lock lock(closing_mutex_);
+        mark_corrupt_and_close();
     }
 }
 
 
-void ReplicatorSMM::preload_index_trx(const gcs_action& act)
+void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
+                            bool preload)
 {
-    assert(GCS_ACT_WRITESET == act.type);
+    assert(ts != 0);
+    assert(ts->depends_seqno() >= 0 || ts->state() == TrxHandle::S_ROLLED_BACK);
 
-
-    TrxHandleSlavePtr ts(TrxHandleSlave::New(false, slave_pool_),
-                         TrxHandleSlaveDeleter());
-
-    if (gu_likely(0 != act.size))
     {
-        assert(act.buf != NULL);
-
-        gu_trace(ts->unserialize<false>(act));
-
-        assert(ts->global_seqno() == act.seqno_g);
-        assert(ts->depends_seqno() >= 0);
-
-        ts->verify_checksum();
-
-        if (gu_unlikely(cert_.position() == 0))
+        if (gu_unlikely(preload == true &&
+                        ts->state() != TrxHandle::S_ROLLED_BACK))
         {
-            // This is the first pre IST trx for rebuilding cert index
-            cert_.assign_initial_position(
-                /* proper UUID will be installed by CC */
-                gu::GTID(gu::UUID(), ts->global_seqno() - 1),
-                ts->version());
+            ts->verify_checksum();
+            if (gu_unlikely(cert_.position() == 0))
+            {
+                // This is the first pre IST trx for rebuilding cert index
+                cert_.assign_initial_position(
+                    /* proper UUID will be installed by CC */
+                    gu::GTID(gu::UUID(), ts->global_seqno() - 1),
+                    ts->version());
+            }
+            ts->set_state(TrxHandle::S_CERTIFYING);
+            Certification::TestResult result(cert_.append_trx(ts));
+            if (result != Certification::TEST_OK)
+            {
+                gu_throw_fatal << "Pre IST trx append returned unexpected "
+                               << "certification result " << result
+                               << ", expected " << Certification::TEST_OK
+                               << "must abort to maintain consistency";
+            }
+            // Mark trx committed for certification bookkeeping here
+            // if it won't pass to applying stage
+            if (!must_apply) cert_.set_trx_committed(*ts);
         }
 
-        Certification::TestResult result(cert_.append_trx(ts));
-
-        if (result != Certification::TEST_OK)
+        if (gu_likely(must_apply == true))
         {
-            gu_throw_fatal << "Pre IST trx append returned unexpected "
-                           << "certification result " << result
-                           << ", expected " << Certification::TEST_OK
-                           << "must abort to maintain consistency";
+            ist_event_queue_.push_back(ts);
         }
-        cert_.set_trx_committed(*ts);
     }
 }
 
+void ReplicatorSMM::ist_end(int error)
+{
+    ist_event_queue_.eof(error);
+}
 
-void ReplicatorSMM::preload_index_cc(const gcs_action& act)
+void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
+                               bool preload)
 {
     assert(GCS_ACT_CCHANGE == act.type);
     assert(act.seqno_g > 0);
-
-    gcs_act_cchange const conf(act.buf, act.size);
-
-    establish_protocol_versions(conf.repl_proto_ver);
-    cert_.adjust_position(gu::GTID(conf.uuid, act.seqno_g),trx_params_.version_);
-}
-
-
-void ReplicatorSMM::preload_index(const gcs_action& act)
-{
-    switch(act.type)
+    if (preload == true && must_apply == false)
     {
-    case GCS_ACT_WRITESET: preload_index_trx(act); break;
-    case GCS_ACT_CCHANGE:  preload_index_cc(act);  break;
-    default: assert(0);
-    };
-}
+        // CC is part of index preload and won't be processed
+        // by process_conf_change()
+        gcs_act_cchange const conf(act.buf, act.size);
 
+        establish_protocol_versions(conf.repl_proto_ver);
 
-void ReplicatorSMM::wait(wsrep_seqno_t const upto)
-{
-    apply_monitor_.wait(upto);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.wait(upto);
+        wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
+        wsrep_view_info_t* const view_info(
+            galera_view_info_create(conf, -1, uuid_undefined));
+        cert_.adjust_position(*view_info, gu::GTID(conf.uuid, act.seqno_g),
+                              trx_params_.version_);
+        free(view_info);
+    }
+    
+    if (must_apply == true)
+    {
+        drain_monitors(act.seqno_g - 1);
+        process_conf_change(app_ctx_, act);
+        GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
+    }
 }
 
 } /* namespace galera */

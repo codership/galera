@@ -25,8 +25,16 @@ endif
 
 
 override_dh_auto_build:
+	# Print build env info to help debug builds on different platforms
+	dpkg-architecture
 	@echo $(SCONS_ARGS)
-	scons $(SCONS_ARGS)
+	scons $(SCONS_ARGS) || touch FAIL # Print config.log if build fails
+	@echo '*****************************************'
+	@echo '**  config.log contents for debugging  **'
+	@echo '*****************************************'
+	@cat config.log
+	@echo '*****************************************'
+	if [ -f FAIL ]; then exit 1; fi
 
 # Start earlier than MySQL which has value 19
 override_dh_installinit-arch:

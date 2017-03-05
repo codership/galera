@@ -3,6 +3,7 @@
 #include "galera_info.hpp"
 
 #include <gu_uuid.hpp>
+#include <gu_throw.hpp>
 
 #include <string.h>
 #include <vector>
@@ -63,7 +64,10 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_cchange& conf,
             my_uuid = ret->members[ret->my_idx].id;
         }
     }
-
+    else
+    {
+        gu_throw_error(ENOMEM) << "Failed to allocate galera view info";
+    }
     return ret;
 }
 

@@ -65,23 +65,26 @@ namespace galera
         virtual void discard_local_trx(TrxHandleMaster* trx_id) = 0;
 
         virtual TrxHandleMasterPtr local_conn_trx(wsrep_conn_id_t conn_id,
-                                          bool create) = 0;
+                                                  bool            create) = 0;
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 
-        virtual wsrep_status_t replicate(TrxHandleMaster* trx, wsrep_trx_meta_t*) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandleMaster* trx, wsrep_trx_meta_t*) =0;
+        virtual wsrep_status_t replicate(TrxHandleMaster*  trx,
+                                         wsrep_trx_meta_t* meta) = 0;
+        virtual wsrep_status_t pre_commit(TrxHandleMaster*  trx,
+                                          wsrep_trx_meta_t* meta) =0;
         virtual wsrep_status_t post_commit(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t post_rollback(TrxHandleMaster* trx) = 0;
-        virtual wsrep_status_t replay_trx(TrxHandleMaster* trx, void* replay_ctx) = 0;
+        virtual wsrep_status_t replay_trx(TrxHandleMaster* trx,
+                                          void*            replay_ctx) = 0;
         virtual void abort_trx(TrxHandleMaster* trx) = 0;
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;
         virtual wsrep_status_t last_committed_id(wsrep_gtid_t* gtid) = 0;
-        virtual wsrep_status_t to_isolation_begin(TrxHandleMaster* trx,
+        virtual wsrep_status_t to_isolation_begin(TrxHandleMaster& trx,
                                                   wsrep_trx_meta_t*) = 0;
-        virtual wsrep_status_t to_isolation_end(TrxHandleMaster* trx,
+        virtual wsrep_status_t to_isolation_end(TrxHandleMaster& trx,
                                                 int              err) = 0;
         virtual wsrep_status_t preordered_collect(wsrep_po_handle_t& handle,
                                                   const struct wsrep_buf* data,
@@ -135,7 +138,7 @@ namespace galera
 
         virtual const wsrep_uuid_t& source_id() const = 0;
 
-        virtual void cancel_monitors(const TrxHandleSlave& ts) = 0;
+        virtual void cancel_monitors(const TrxHandleSlave& ts, bool) = 0;
         virtual void cancel_monitors(wsrep_seqno_t seqno_g,
                                      wsrep_seqno_t seqno_l) = 0;
         virtual bool corrupt() const = 0;

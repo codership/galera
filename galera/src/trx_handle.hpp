@@ -163,7 +163,9 @@ namespace galera
 
         const wsrep_uuid_t& source_id() const { return source_id_; }
         wsrep_trx_id_t      trx_id()    const { return trx_id_;    }
-        bool                local()     const { return local_; }
+
+        void set_local(bool local) { local_ = local; }
+        bool local() const { return local_; }
 
         wsrep_conn_id_t conn_id() const { return conn_id_;   }
         void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
@@ -351,7 +353,7 @@ namespace galera
             try
             {
                 version_ = WriteSetNG::version(act.buf, act.size);
-                action_  = act.buf;
+                action_  = std::make_pair(act.buf, act.size);
 
                 switch (version_)
                 {
@@ -513,7 +515,10 @@ namespace galera
         void unordered(void*                recv_ctx,
                        wsrep_unordered_cb_t apply_cb) const;
 
-        const void*   action()          const { return action_; }
+        std::pair<const void*, size_t> action() const
+        {
+            return action_;
+        }
 
         wsrep_seqno_t local_seqno()     const { return local_seqno_; }
 
@@ -554,7 +559,7 @@ namespace galera
             mem_pool_          (mp),
             write_set_         (),
             buf_               (buf),
-            action_            (0),
+            action_            (0, 0),
             refcnt_            (1),
             certified_         (false),
             committed_         (false),
@@ -575,7 +580,7 @@ namespace galera
         gu::MemPool<true>&     mem_pool_;
         WriteSetIn             write_set_;
         void* const            buf_;
-        const void*            action_;
+        std::pair<const void*, size_t> action_;
         gu::Atomic<int>        refcnt_;
         bool                   certified_;
         bool                   committed_;

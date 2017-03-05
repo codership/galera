@@ -68,7 +68,6 @@ libgalerautilsxx_env = env.Clone()
 # Include paths
 libgalerautilsxx_env.Append(CPPPATH = Split('''
                                                #
-                                               #/asio
                                                #/common
                                             '''))
 

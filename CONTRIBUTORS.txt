@@ -1,0 +1,29 @@
+All contributors are required to add their name and [Github username/email]
+to this file in connection with their first contribution. If you are making
+a contribution on behalf of a company, you should add the said company name.
+
+By adding your name and [Github username/email] to this file you agree that
+your contribution is a contribution under a contributior agreement between
+you and Codership Oy. To the extent that you are an employee of a company and
+contribute in that role, you confirm that your contribution is a contribution
+under the contribution license agreement between your employer and Codership
+Oy; and that you have the authorization to give such confirmation. You confirm
+that you have read, understood and signed the contributor license agreement
+applicable to you.
+
+For the individual contributor agreement see file CONTRIBUTOR_AGREEMENT.txt
+in the same directory as this file.
+
+Authors from Codership Oy:
+
+ * Alexey Yurchenko <alexey.yurchenko@galeracluster.com>, Codership Oy
+ * Seppo Jaakola <seppo.jaakola@galeracluster.com>, Codership Oy
+ * Teemu Ollakka <teemu.ollakka@galeracluster.com>, Codership Oy
+ * Daniele Sciascia <daniele.sciascia@galeracluster.com>, Codership Oy
+ * Philip Stoev <philip.stoev@galeracluster.com>, Codership Oy
+ [Codership employees, add name and email/username above this line, but leave this line intact]
+
+Other contributors:
+
+ [add name and email/username above this line, but leave this line intact]
+
