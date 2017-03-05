@@ -34,7 +34,9 @@ namespace galera
          * !!! */
 
         /*! schedule seqno to be reported as last committed */
-        void report_last_committed (gcs_seqno_t seqno);
+        /* report = false is to disable sending duplicate in case of error voting
+         * that is done through a different, blocking channel */
+        void report_last_committed (gcs_seqno_t seqno, bool const report = true);
 
         /*! release write sets up to and including seqno */
         void release_seqno (gcs_seqno_t seqno);

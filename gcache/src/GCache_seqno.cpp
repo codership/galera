@@ -76,6 +76,60 @@ namespace gcache
 
     }
 
+    /*!
+     * Mark buffer to be skipped
+     */
+    void
+    GCache::seqno_skip (const void* const ptr,
+                        int64_t     const seqno_g,
+                        uint8_t     const type)
+    {
+        gu::Lock lock(mtx);
+
+        BufferHeader* const bh(ptr2BH(ptr));
+        seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
+
+        /* sanity checks */
+        int reason(0);
+        std::ostringstream msg;
+
+        if (seqno_g <= 0) {
+            msg << "invalid seqno: " << seqno_g;
+            reason = 1;
+        }
+        else if (seqno_g != bh->seqno_g) {
+            msg << "seqno " << seqno_g << " does not match ptr seqno "
+                << bh->seqno_g;
+            reason = 2;
+        }
+        else if (type != bh->type) {
+             msg << "type " << type << " does not match ptr type "
+                 << bh->type;
+            reason = 3;
+        }
+        else if (p == seqno2ptr.end()) {
+            msg << "seqno " << seqno_g << " not found in the map";
+            reason = 4;
+        }
+        else if (ptr != p->second) {
+             msg << "ptr " << seqno_g << " does not match mapped ptr "
+                 << p->second;
+            reason = 5;
+        }
+
+        assert(0 == reason);
+        if (0 != reason)
+        {
+            gu_throw_fatal << "Skipping seqno sanity check failed: " << msg.str()
+                           << " (reason " << reason << ")";
+        }
+
+        assert (!BH_is_released(bh));
+        assert (!BH_is_skipped(bh));
+
+        bh->flags |= BUFFER_SKIPPED;
+    }
+
     void
     GCache::seqno_release (int64_t const seqno)
     {

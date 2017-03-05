@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,6 +18,14 @@
 #include "gcs_recv_msg.hpp"
 #include "gcs_seqno.hpp"
 #include "gcs_state_msg.hpp"
+#include "gu_unordered.hpp"
+
+#include "gu_config.hpp"
+
+extern void gcs_group_register(gu::Config* cnf); // register parameters
+
+#include "gu_status.hpp"
+#include "gu_utils.hpp"
 
 typedef enum gcs_group_state
 {
@@ -34,6 +42,7 @@ extern const char* gcs_group_state_str[];
 typedef struct gcs_group
 {
     gcache_t*     cache;
+    gu::Config*   cnf;
     gcs_seqno_t   act_id_;      // current(last) action seqno
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
@@ -44,7 +53,7 @@ typedef struct gcs_group
     const char*   my_address;
     gcs_group_state_t state;    // group state: PRIMARY | NON_PRIMARY
     gcs_seqno_t   last_applied; // last_applied action group-wide
-    long          last_node;    // node that reported last_applied
+    long          last_node;    // node that last reported commit_cut
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
 
@@ -63,7 +72,6 @@ typedef struct gcs_group
     int last_applied_proto_ver;
 
     gcs_group() : gcs_proto_ver(0), repl_proto_ver(0), appl_proto_ver(0) { }
-
 }
 gcs_group_t;
 
@@ -72,6 +80,7 @@ gcs_group_t;
  */
 extern int
 gcs_group_init (gcs_group_t* group,
+                gu::Config*  cnf,
                 gcache_t*    cache,
                 const char*  node_name, ///< can be null
                 const char*  inc_addr,  ///< can be null
@@ -246,5 +255,8 @@ gcs_group_find_donor(const gcs_group_t* group,
 extern int
 gcs_group_param_set(gcs_group_t& group,
                     const std::string& key, const std::string& val);
+
+extern void
+gcs_group_get_status(const gcs_group_t* group, gu::Status& status);
 
 #endif /* _gcs_group_h_ */

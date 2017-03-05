@@ -71,6 +71,13 @@ namespace gcache
                            bool        skip);
 
         /*!
+         * Mark buffer to be skipped
+         */
+        void seqno_skip (const void* ptr,
+                         int64_t     seqno_g,
+                         uint8_t     type);
+
+        /*!
          * Release (free) buffers up to seqno
          */
         void seqno_release (int64_t seqno);

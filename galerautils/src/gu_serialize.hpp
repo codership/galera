@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -65,14 +65,14 @@ namespace gu
     {
         GU_COMPILE_ASSERT(std::numeric_limits<TO>::is_integer, not_integer1);
         GU_COMPILE_ASSERT(std::numeric_limits<FROM>::is_integer, not_integer2);
-        GU_COMPILE_ASSERT(sizeof(FROM) == sizeof(TO), size_differs);
-        size_t const ret = offset + sizeof(TO);
+        GU_COMPILE_ASSERT(sizeof(FROM) >= sizeof(TO), size_differs);
+        size_t const ret(offset + sizeof(TO));
         if (gu_unlikely(ret > buflen))
         {
             gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
         }
-        void* const pos(reinterpret_cast<byte_t*>(buf) + offset);
-        *reinterpret_cast<TO*>(pos) = htog<TO>(f);
+        void* const pos(static_cast<byte_t*>(buf) + offset);
+        *static_cast<TO*>(pos) = htog<TO>(f);
         return ret;
     }
 
@@ -84,14 +84,14 @@ namespace gu
     {
         GU_COMPILE_ASSERT(std::numeric_limits<TO>::is_integer, not_integer1);
         GU_COMPILE_ASSERT(std::numeric_limits<FROM>::is_integer, not_integer2);
-        GU_COMPILE_ASSERT(sizeof(FROM) == sizeof(TO), size_differs);
-        size_t const ret = offset + sizeof(t);
+        GU_COMPILE_ASSERT(sizeof(FROM) >= sizeof(TO), size_differs);
+        size_t const ret(offset + sizeof(t));
         if (gu_unlikely(ret > buflen))
         {
             gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
         }
-        const void* const pos(reinterpret_cast<const byte_t*>(buf) + offset);
-        t = gtoh<FROM>(*reinterpret_cast<const FROM*>(pos));
+        const void* const pos(static_cast<const byte_t*>(buf) + offset);
+        t = gtoh<FROM>(*static_cast<const FROM*>(pos));
         return ret;
     }
 
@@ -150,7 +150,7 @@ namespace gu
     }
 
     template <typename T>
-    GU_FORCE_INLINE size_t serialize8(const T&     t,
+    GU_FORCE_INLINE size_t serialize8(T   const t,
                                       void*  const buf,
                                       size_t const buflen,
                                       size_t const offset)
@@ -212,7 +212,7 @@ namespace gu
 
         offset = __private_serialize<ST>(static_cast<ST>(b.size()),
                                          buf, buflen, offset);
-        copy(b.begin(), b.end(), reinterpret_cast<byte_t*>(buf) + offset);
+        copy(b.begin(), b.end(), static_cast<byte_t*>(buf) + offset);
         return ret;
     }
 
@@ -234,7 +234,7 @@ namespace gu
         if (ret > buflen) gu_throw_error(EMSGSIZE) << ret << " > " << buflen;
 
         b.resize(len);
-        const byte_t* const ptr(reinterpret_cast<const byte_t*>(buf));
+        const byte_t* const ptr(static_cast<const byte_t*>(buf));
         copy(ptr + offset, ptr + ret, b.begin());
 
         return ret;

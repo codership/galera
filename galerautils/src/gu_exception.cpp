@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
  *
  */
 
@@ -10,14 +10,14 @@
 
 namespace gu
 {
-    void Exception::trace (const char* file, const char* func, int line)
+    void Exception::trace (const char* file, const char* func, int line) const
     {
-        msg.reserve (msg.length() + ::strlen(file) + ::strlen(func) + 15);
-        msg += "\n\t at ";
-        msg += file;
-        msg += ':';
-        msg += func;
-        msg += "():";
-        msg += to_string(line);
+        msg_.reserve (msg_.length() + ::strlen(file) + ::strlen(func) + 15);
+        msg_ += "\n\t at ";
+        msg_ += file;
+        msg_ += ':';
+        msg_ += func;
+        msg_ += "():";
+        msg_ += to_string(line);
     }
 }

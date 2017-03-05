@@ -305,7 +305,7 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 #define SEND_LAST_MASK ((1 << 14) - 1) // every 16K seqno
 
     if (!(my_seqno & SEND_LAST_MASK)) {
-        ret = gcs_set_last_applied (gcs, gu::GTID(group_uuid, my_seqno), 0);
+        ret = gcs_set_last_applied (gcs, gu::GTID(group_uuid, my_seqno));
         if (ret) {
             fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
                      (long long)my_seqno, ret);

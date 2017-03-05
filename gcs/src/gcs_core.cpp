@@ -21,6 +21,7 @@
 
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
+#include <gu_serialize.hpp>
 #include "gu_debug_sync.hpp"
 
 #include <string.h> // for mempcpy
@@ -31,7 +32,8 @@ using namespace gcs::core;
 bool
 gcs_core_register (gu_config_t* conf)
 {
-    return gcs_backend_register(conf);
+    gcs_group_register(reinterpret_cast<gu::Config*>(conf));
+    return (gcs_backend_register(conf));
 }
 
 const size_t CORE_FIFO_LEN = (1 << 10); // 1024 elements (no need to have more)
@@ -139,10 +141,15 @@ gcs_core_create (gu_config_t* const conf,
                                                    sizeof (core_act_t));
                 if (core->fifo) {
                     gu_mutex_init  (&core->send_lock, NULL);
-                    core->proto_ver = -1; // shall be bumped in gcs_group_act_conf()
-                    gcs_group_init (&core->group, cache, node_name, inc_addr,
-                                    gcs_proto_ver, repl_proto_ver,
-                                    appl_proto_ver);
+                    core->proto_ver = -1;
+                    // ^^^ shall be bumped in gcs_group_act_conf()
+
+                    gcs_group_init (&core->group,
+                                    reinterpret_cast<gu::Config*>(conf), cache,
+                                    node_name, inc_addr,
+                                    gcs_proto_ver, repl_proto_ver,appl_proto_ver
+                        );
+
                     core->state = CORE_CLOSED;
                     core->send_act_no = 1; // 0 == no actions sent
 #ifdef GCS_CORE_TESTING
@@ -681,18 +688,24 @@ core_handle_last_msg (gcs_core_t*          core,
     assert (GCS_MSG_LAST == msg->type);
     assert (CodeMsg::serial_size() == msg->size);
 
-    if (gcs_group_is_primary(&core->group)) {
+    if (gu_likely(gcs_group_is_primary(&core->group))) {
 
-        gcs_seqno_t const commit_cut(gcs_group_handle_last_msg(&core->group,
-                                                               msg));
-        if (commit_cut) {
+        gcs_seqno_t const commit_cut
+            (gcs_group_handle_last_msg(&core->group, msg));
+
+        if (0 != commit_cut) {
             /* commit cut changed */
-            if ((act->buf = malloc (sizeof (commit_cut)))) {
-                act->type                 = GCS_ACT_COMMIT_CUT;
+            int   const buf_len(sizeof(uint64_t));
+            void* const buf(malloc(buf_len));
+
+            if (gu_likely(NULL != (buf))) {
                 /* #701 - everything that goes into the action buffer
                  *        is expected to be serialized. */
-                *((gcs_seqno_t*)act->buf) = gcs_seqno_htog(commit_cut);
-                act->buf_len              = sizeof(gcs_seqno_t);
+                gu::serialize8(commit_cut, buf, buf_len, 0);
+                assert(NULL == act->buf);
+                act->buf     = buf;
+                act->buf_len = buf_len;
+                act->type    = GCS_ACT_COMMIT_CUT;
                 return act->buf_len;
             }
             else {
@@ -1364,10 +1377,9 @@ core_send_code (gcs_core_t* const core, const gu::GTID& gtid, int64_t code,
 }
 
 long
-gcs_core_set_last_applied (gcs_core_t* const core, const gu::GTID& gtid,
-                           uint64_t const code)
+gcs_core_set_last_applied (gcs_core_t* const core, const gu::GTID& gtid)
 {
-    return core_send_code (core, gtid, code, GCS_MSG_LAST);
+    return core_send_code (core, gtid, 0, GCS_MSG_LAST);
 }
 
 long
@@ -1457,6 +1469,7 @@ void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
         gu_throw_fatal << "could not lock mutex";
     if (core->state < CORE_CLOSED)
     {
+        gcs_group_get_status(&core->group, status);
         core->backend.status_get(&core->backend, status);
     }
     gu_mutex_unlock(&core->send_lock);

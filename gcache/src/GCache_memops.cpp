@@ -11,6 +11,7 @@ namespace gcache
     bool
     GCache::discard_seqno (int64_t seqno)
     {
+        assert(mtx.locked() && mtx.owned());
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {

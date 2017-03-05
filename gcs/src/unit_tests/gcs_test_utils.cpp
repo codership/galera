@@ -48,7 +48,8 @@ GcsGroup::common_ctor(const char*  node_name,
     conf_.set("gcache.name", std::string(node_name) + ".cache");
     gcache_ = new gcache::GCache(conf_, ".");
 
-    int const err(gcs_group_init(&group_, reinterpret_cast<gcache_t*>(gcache_),
+    int const err(gcs_group_init(&group_, &conf_,
+                                 reinterpret_cast<gcache_t*>(gcache_),
                                  node_name, inc_addr, gver, rver, aver));
     if (err)
     {

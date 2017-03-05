@@ -5,12 +5,10 @@
 
 #include "../gcs_sm.hpp"
 
-#include "gcs_sm_test.hpp" // must be included last
-
-#include <check.h>
 #include <math.h> // fabs
 #include <string.h>
 
+#include "gcs_sm_test.hpp" // must be included last
 
 #define TEST_USLEEP 10000
 

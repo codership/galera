@@ -142,7 +142,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, long pkt_size);
 
 /* sends this node's last applied value to group */
 extern long
-gcs_core_set_last_applied (gcs_core_t* core, const gu::GTID& gtid,uint64_t code);
+gcs_core_set_last_applied (gcs_core_t* core, const gu::GTID& gtid);
 
 /* sends status of the ended snapshot (snapshot gtid or error code) */
 extern long

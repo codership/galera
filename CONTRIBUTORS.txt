@@ -25,5 +25,6 @@ Authors from Codership Oy:
 
 Other contributors:
 
+ * Stefan Langenmaier <stefan.langenmaier@gmail.com>
  [add name and email/username above this line, but leave this line intact]
 

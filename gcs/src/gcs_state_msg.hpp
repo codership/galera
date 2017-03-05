@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -33,6 +33,7 @@ typedef struct gcs_state_msg
     gcs_seqno_t      prim_seqno;    // last PC state seqno
     gcs_seqno_t      received;      // last action seqno (received up to)
     gcs_seqno_t      cached;        // earliest action cached
+    gcs_seqno_t      last_applied;  // last applied action reported by node
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
     int              version;       // version of state message
@@ -40,6 +41,7 @@ typedef struct gcs_state_msg
     int              repl_proto_ver;
     int              appl_proto_ver;
     int              prim_joined;   // number of joined nodes in its last PC
+    int              desync_count;
     gcs_node_state_t prim_state;    // state of the node in its last PC
     gcs_node_state_t current_state; // current state of the node
     uint8_t          flags;
@@ -78,6 +80,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_seqno_t      prim_seqno,
                       gcs_seqno_t      received,
                       gcs_seqno_t      cached,
+                      gcs_seqno_t      last_applied,
                       int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
@@ -86,6 +89,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       int              gcs_proto_ver,
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              desync_count,
                       uint8_t          flags);
 
 extern void
@@ -139,12 +143,20 @@ gcs_state_msg_name (const gcs_state_msg_t* state);
 extern const char*
 gcs_state_msg_inc_addr (const gcs_state_msg_t* state);
 
+/* Get last applied action seqno */
+gcs_seqno_t
+gcs_state_msg_last_applied (const gcs_state_msg_t* state);
+
 /* Get supported protocols */
 extern void
 gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
                              int* gcs_proto_ver,
                              int* repl_proto_ver,
                              int* appl_proto_ver);
+
+/* Get desync count */
+extern int
+gcs_state_msg_get_desync_count(const gcs_state_msg_t* state);
 
 /* Get state message flags */
 extern uint8_t

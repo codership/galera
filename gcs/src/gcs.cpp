@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -19,6 +19,8 @@
 
 #include <galerautils.h>
 #include <gu_logger.hpp>
+#include <gu_serialize.hpp>
+#include <gu_digest.hpp>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,11 +116,11 @@ __attribute__((__packed__));
 struct gcs_conn
 {
     gu::UUID group_uuid;
-    long  my_idx;
-    long  memb_num;
     char* my_name;
     char* channel;
     char* socket;
+    int   my_idx;
+    int   memb_num;
 
     gcs_conn_state_t  state;
 
@@ -147,17 +149,17 @@ struct gcs_conn
 
     /* Flow Control */
     gu_mutex_t   fc_lock;
-    uint32_t     conf_id;             // configuration ID
+    gcs_fc_t     stfc;                // state transfer FC object
     long         stop_sent;           // how many STOPs - CONTs were sent
     long         stop_count;          // counts stop requests received
     long         queue_len;           // slave queue length
     long         upper_limit;         // upper slave queue limit
     long         lower_limit;         // lower slave queue limit
     long         fc_offset;           // offset for catchup phase
-    gcs_conn_state_t max_fc_state;    // maximum state when FC is enabled
     long         stats_fc_sent;       // FC stats counters
     long         stats_fc_received;   //
-    gcs_fc_t     stfc; // state transfer FC object
+    uint32_t     conf_id;             // configuration ID
+    gcs_conn_state_t max_fc_state;    // maximum state when FC is enabled
 
     /* #603, #606 join control */
     bool         need_to_join;
@@ -545,14 +547,14 @@ gcs_send_sync (gcs_conn_t* conn)
  */
 
 static bool
-gcs_shift_state (gcs_conn_t*      conn,
-                 gcs_conn_state_t new_state)
+gcs_shift_state (gcs_conn_t*      const conn,
+                 gcs_conn_state_t const new_state)
 {
     static const bool allowed [GCS_CONN_STATE_MAX][GCS_CONN_STATE_MAX] = {
        // SYNCED JOINED DONOR  JOINER PRIM   OPEN   CLOSED DESTR
         { false, true,  false, false, false, false, false, false }, // SYNCED
         { false, false, true,  true,  false, false, false, false }, // JOINED
-        { true,  true,  false, false, false, false, false, false }, // DONOR
+        { true,  true,  true,  false, false, false, false, false }, // DONOR
         { false, false, false, false, true,  false, false, false }, // JOINER
         { true,  true,  true,  true,  true,  true,  false, false }, // PRIMARY
         { true,  true,  true,  true,  true,  false, true,  false }, // OPEN
@@ -560,7 +562,7 @@ gcs_shift_state (gcs_conn_t*      conn,
         { false, false, false, false, false, false, true,  false }  // DESTROYED
     };
 
-    gcs_conn_state_t old_state = conn->state;
+    gcs_conn_state_t const old_state = conn->state;
 
     if (!allowed[new_state][old_state]) {
         if (old_state != new_state) {
@@ -571,10 +573,11 @@ gcs_shift_state (gcs_conn_t*      conn,
         return false;
     }
 
-    gu_info ("GCS: Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
-             gcs_conn_state_str[new_state], conn->global_seqno);
-
-    conn->state = new_state;
+    if (old_state != new_state) {
+        gu_info ("Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
+                 gcs_conn_state_str[new_state], conn->global_seqno);
+        conn->state = new_state;
+    }
 
     return true;
 }
@@ -830,15 +833,15 @@ _join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
 static void
-gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd* rcvd)
+gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
 {
-    const gcs_act& act(rcvd->act);
+    const gcs_act& act(rcvd.act);
     gcs_act_cchange const conf(act.buf, act.buf_len);
 
-    assert(rcvd->id >= 0 || 0 == conf.memb.size());
+    assert(rcvd.id >= 0 || 0 == conf.memb.size());
 
     conn->group_uuid = conf.uuid;
-    conn->my_idx = rcvd->id;
+    conn->my_idx = rcvd.id;
 
     long ret;
 
@@ -967,18 +970,18 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd* rcvd)
 
 static long
 gcs_handle_act_state_req (gcs_conn_t*          conn,
-                          struct gcs_act_rcvd* rcvd)
+                          struct gcs_act_rcvd& rcvd)
 {
-    if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
-        int const donor_idx = (int)rcvd->id; // to pacify valgrind
+    if ((gcs_seqno_t)conn->my_idx == rcvd.id) {
+        int const donor_idx = (int)rcvd.id; // to pacify valgrind
         gu_debug("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
                  donor_idx, conn->my_idx);
         // rewrite to pass global seqno for application
-        rcvd->id = conn->global_seqno;
+        rcvd.id = conn->global_seqno;
         return gcs_become_donor (conn);
     }
     else {
-        if (rcvd->id >= 0) {
+        if (rcvd.id >= 0) {
             gcs_become_joiner (conn);
         }
         return 1; // pass to gcs_request_state_transfer() caller.
@@ -997,7 +1000,8 @@ gcs_handle_state_change (gcs_conn_t*           conn,
 
     if (buf) {
         memcpy (buf, act->buf, act->buf_len);
-        /* initially act->buf points to internal static recv buffer. No leak here */
+        /* Initially act->buf points to internal static recv buffer.
+         * No leak here */
         ((struct gcs_act*)act)->buf = buf;
         return 1;
     }
@@ -1015,15 +1019,14 @@ gcs_handle_state_change (gcs_conn_t*           conn,
  *         passed to application.
  */
 static int
-gcs_handle_actions (gcs_conn_t*          conn,
-                    struct gcs_act_rcvd* rcvd)
+gcs_handle_actions (gcs_conn_t* conn, struct gcs_act_rcvd& rcvd)
 {
-    int ret = 0;
+    int ret(0);
 
-    switch (rcvd->act.type) {
+    switch (rcvd.act.type) {
     case GCS_ACT_FLOW:
-        assert (sizeof(struct gcs_fc_event) == rcvd->act.buf_len);
-        gcs_handle_flow_control (conn, (const gcs_fc_event*)rcvd->act.buf);
+        assert (sizeof(struct gcs_fc_event) == rcvd.act.buf_len);
+        gcs_handle_flow_control (conn, (const gcs_fc_event*)rcvd.act.buf);
         break;
     case GCS_ACT_CCHANGE:
         gcs_handle_act_conf (conn, rcvd);
@@ -1033,15 +1036,15 @@ gcs_handle_actions (gcs_conn_t*          conn,
         ret = gcs_handle_act_state_req (conn, rcvd);
         break;
     case GCS_ACT_JOIN:
-        ret = gcs_handle_state_change (conn, &rcvd->act);
-        if (gcs_seqno_gtoh(*(gcs_seqno_t*)rcvd->act.buf) < 0 &&
+        ret = gcs_handle_state_change (conn, &rcvd.act);
+        if (gcs_seqno_gtoh(*(gcs_seqno_t*)rcvd.act.buf) < 0 &&
             GCS_CONN_JOINER == conn->state)
             gcs_become_primary (conn);
         else
             gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
-        ret = gcs_handle_state_change (conn, &rcvd->act);
+        ret = gcs_handle_state_change (conn, &rcvd.act);
         gcs_become_synced (conn);
         break;
     default:
@@ -1239,8 +1242,9 @@ static void *gcs_recv_thread (void *arg)
         assert (rcvd.act.type < GCS_ACT_ERROR);
         assert (ret == rcvd.act.buf_len);
 
-        if (gu_unlikely(rcvd.act.type >= GCS_ACT_STATE_REQ)) {
-            ret = gcs_handle_actions (conn, &rcvd);
+        if (gu_unlikely(rcvd.act.type >= GCS_ACT_STATE_REQ))
+        {
+            ret = gcs_handle_actions (conn, rcvd);
 
             if (gu_unlikely(ret < 0)) {         // error
                 gu_debug ("gcs_handle_actions returned %d: %s",
@@ -1323,14 +1327,11 @@ static void *gcs_recv_thread (void *arg)
         }
         else if (conn->my_idx == rcvd.sender_idx)
         {
-            gu_fatal("Protocol violation: unordered local action not in repl_q:"
-                     " { {%p, %zd, %s}, %ld, %lld }.",
+            gu_debug("Discarding: unordered local action not in repl_q: "
+                     "{ {%p, %zd, %s}, %ld, %lld }.",
                      rcvd.act.buf, rcvd.act.buf_len,
                      gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
                      rcvd.id);
-            assert(0);
-            ret = -ENOTRECOVERABLE;
-            break;
         }
         else
         {
@@ -1732,6 +1733,7 @@ long gcs_request_state_transfer (gcs_conn_t*    conn,
             offset = ist_gtid.serialize(rst, rst_size, offset);
             memcpy (rst + offset, req, size);
             assert(offset + size == rst_size);
+            log_debug << "SST sending: " << (char*)req << ", " << rst_size;
         }
 
         struct gcs_action action;
@@ -1922,7 +1924,7 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 }
 
 long
-gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid,uint64_t const code)
+gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
 {
     assert(gtid.uuid()  != GU_UUID_NIL);
     assert(gtid.seqno() >= 0);
@@ -1933,7 +1935,7 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid,uint64_t const code
     long ret = gcs_sm_enter (conn->sm, &cond, false, false);
 
     if (!ret) {
-        ret = gcs_core_set_last_applied (conn->core, gtid, code);
+        ret = gcs_core_set_last_applied (conn->core, gtid);
         gcs_sm_leave (conn->sm);
     }
 
@@ -1941,6 +1943,14 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid,uint64_t const code
 
     return ret;
 }
+
+#if 0
+static int
+proto_ver(gcs_conn_t* conn)
+{
+    return gcs_core_proto_ver(conn->core);
+}
+#endif
 
 long
 gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
@@ -2195,7 +2205,7 @@ _set_max_throttle (gcs_conn_t* conn, const char* value)
 
 bool gcs_register_params (gu_config_t* const conf)
 {
-    return (gcs_params_register (conf) | gcs_core_register (conf));
+    return (gcs_params_register (conf) || gcs_core_register (conf));
 }
 
 long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)

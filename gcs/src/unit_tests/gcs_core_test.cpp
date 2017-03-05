@@ -36,8 +36,6 @@
  *
  */
 
-#include "gcs_test_utils.hpp"
-
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_core.hpp"
 #include "../gcs_dummy.hpp"
@@ -47,6 +45,7 @@
 
 #include <galerautils.h>
 
+#include "gcs_test_utils.hpp"
 #include "gcs_core_test.hpp" // must be included last
 
 START_TEST(gcs_code_msg)
@@ -528,7 +527,7 @@ START_TEST (gcs_core_test_api)
         fail_if (CORE_SEND_END (&act_s, act_size));
         fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
 
-        ret = gcs_core_set_last_applied (Core, gu::GTID(Uuid, Seqno), 0);
+        ret = gcs_core_set_last_applied (Core, gu::GTID(Uuid, Seqno));
         fail_if (ret < 0, "gcs_core_set_last_applied(): %ld (%s)",
                  ret, strerror(-ret));
         /* commit cut action size should be 8 */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -11,9 +11,15 @@
 
 #include <gu_logger.hpp>
 #include <gu_macros.hpp>
-#include <gu_throw.hpp>
+#include <gu_unordered.hpp>
 
 #include <errno.h>
+
+#include <limits>
+
+void gcs_group_register(gu::Config* cnf)
+{
+}
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 {
@@ -23,8 +29,9 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
     "PRIMARY"
 };
 
+
 int
-gcs_group_init (gcs_group_t* group, gcache_t* const cache,
+gcs_group_init (gcs_group_t* group, gu::Config* const cnf, gcache_t* const cache,
                 const char* node_name, const char* inc_addr,
                 gcs_proto_t const gcs_proto_ver, int const repl_proto_ver,
                 int const appl_proto_ver)
@@ -164,22 +171,18 @@ group_nodes_reset (gcs_group_t* group)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
-    long       n;
-    long       last_node    = -1;
     gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    int        last_node    = -1;
+    int        n;
 
     for (n = 0; n < group->num; n++) {
         const gcs_node_t* const node = &group->nodes[n];
         gcs_seqno_t const seqno = node->last_applied;
-        bool count = node->count_last_applied;
 
-        if (gu_unlikely (0 == group->last_applied_proto_ver)) {
-            /* @note: this may be removed after quorum v1 is phased out */
-            count = (GCS_NODE_STATE_SYNCED == node->status ||
-                     GCS_NODE_STATE_DONOR  == node->status);
-        }
+        assert( 0  < group->last_applied_proto_ver ||
+               -1 == group->last_applied_proto_ver /* for unit tests */);
 
-//        gu_debug ("last_applied[%ld]: %lld", n, seqno);
+//        gu_debug ("last_applied[%d]: %lld", n, seqno);
 
         /* NOTE: It is crucial for consistency that last_applied algorithm
          *       is absolutely identical on all nodes. Therefore for the
@@ -187,12 +190,12 @@ group_redo_last_applied (gcs_group_t* group)
          *       non-blocking donor.
          *       GCS_BLOCKING_DONOR should never be defined unless in some
          *       very custom builds. Commenting it out for safety sake. */
-//#ifndef GCS_BLOCKING_DONOR
-        if (count
-//#else
-//        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
-//#endif
-            && (seqno < last_applied)) {
+#ifndef GCS_BLOCKING_DONOR
+        if (node->count_last_applied
+#else
+        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
+#endif
+            && (seqno <= last_applied)) {
             assert (seqno >= 0);
             last_applied = seqno;
             last_node    = n;
@@ -284,6 +287,7 @@ group_post_state_exchange (gcs_group_t* group)
               GU_UUID_ARGS(&group->state_uuid));
 
     gcs_state_msg_get_quorum (states, group->num, quorum);
+    assert(quorum->version >= 2);
 
     if (quorum->version >= 0) {
         if (quorum->version < 2) {
@@ -340,6 +344,8 @@ group_post_state_exchange (gcs_group_t* group)
         }
 
         assert (group->prim_num > 0);
+
+        group_redo_last_applied(group);
     }
     else {
         // non-primary configuration
@@ -654,12 +660,19 @@ group_unserialize_code_msg(gcs_group_t* group, const gcs_recv_msg_t* msg,
 gcs_seqno_t
 gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
-    assert (GCS_MSG_LAST        == msg->type);
+    assert (GCS_MSG_LAST == msg->type);
 
     gu::GTID gtid;
     int64_t  code;
 
     if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
+    if (gu_unlikely(0 != code))
+    {
+        log_warn << "Bogus " << gcs_msg_type_string[msg->type]
+                 << " message code: " << code <<". Ignored.";
+        assert(0);
+        return 0;
+    }
 
     // This assert is too restrictive. It requires application to send
     // last applied messages while holding TO, otherwise there's a race
@@ -686,6 +699,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     return 0;
 }
+
 
 /*! return true if this node is the sender to notify the calling thread of
  * success */
@@ -725,7 +739,10 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             }
             else {
                 assert(sender->count_last_applied);
-                sender->status = GCS_NODE_STATE_JOINED;
+                assert(sender->desync_count > 0);
+                sender->desync_count -= 1;
+                if (0 == sender->desync_count)
+                    sender->status = GCS_NODE_STATE_JOINED;
             }
         }
         else {
@@ -789,8 +806,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         else {
             if (sender_idx == peer_idx) {
-                gu_info ("Member %d.%d (%s) resyncs itself to group",
-                         sender_idx, sender->segment, sender->name);
+                if (GCS_NODE_STATE_JOINED == sender->status) {
+                    gu_info ("Member %d.%d (%s) resyncs itself to group",
+                             sender_idx, sender->segment, sender->name);
+                }
+                else {
+                    assert(sender->desync_count > 0);
+                    return 0; // don't deliver up
+                }
             }
             else {
                 gu_info ("%d.%d (%s): State transfer %s %d.%d (%s) complete.",
@@ -831,8 +854,6 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
 
-    assert(0 == code);
-
     if (GCS_NODE_STATE_JOINED == sender->status ||
         /* #454 - at this layer we jump directly from DONOR to SYNCED */
         (0 == group->last_applied_proto_ver &&
@@ -841,7 +862,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         sender->status = GCS_NODE_STATE_SYNCED;
         sender->count_last_applied = true;
 
-        group_redo_last_applied (group);//from now on this node must be counted
+        group_redo_last_applied (group); //from now on this node must be counted
 
         gu_info ("Member %d.%d (%s) synced with group.",
                  sender_idx, sender->segment, sender->name);
@@ -1270,9 +1291,15 @@ group_select_donor (gcs_group_t* group,
 
     if (desync) { /* sender wants to become "donor" itself */
         assert(donor_len > 0);
-        gcs_node_state_t const st = group->nodes[joiner_idx].status;
-        if (st >= min_donor_state)
+        gcs_node_state_t const st(group->nodes[joiner_idx].status);
+        if (st >= min_donor_state ||
+            (st >= GCS_NODE_STATE_DONOR && group->quorum.version >= 4)) {
             donor_idx = joiner_idx;
+            gcs_node_t& donor(group->nodes[donor_idx]);
+            assert(donor.desync_count == 0 || group->quorum.version >= 4);
+            assert(donor.desync_count == 0 || st == GCS_NODE_STATE_DONOR);
+            (void)donor; // keep optimised build happy
+        }
         else
             donor_idx = -EAGAIN;
     }
@@ -1287,11 +1314,13 @@ group_select_donor (gcs_group_t* group,
         gcs_node_t* const joiner = &group->nodes[joiner_idx];
         gcs_node_t* const donor  = &group->nodes[donor_idx];
 
-        if (desync) {
+        donor->desync_count += 1;
+
+        if (desync && 1 == donor->desync_count) {
             gu_info ("Member %d.%d (%s) desyncs itself from group",
                      donor_idx, donor->segment, donor->name);
         }
-        else {
+        else if (!desync) {
             gu_info ("Member %d.%d (%s) requested state transfer from '%s'. "
                      "Selected %d.%d (%s)(%s) as donor.",
                      joiner_idx, joiner->segment, joiner->name,
@@ -1303,8 +1332,15 @@ group_select_donor (gcs_group_t* group,
         // reserve donor, confirm joiner (! assignment order is significant !)
         joiner->status = GCS_NODE_STATE_JOINER;
         donor->status  = GCS_NODE_STATE_DONOR;
-        memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
-        memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
+
+        if (1 == donor->desync_count) {
+            /* SST or first desync */
+            memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
+            memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
+        }
+        else {
+            assert(true == desync);
+        }
     }
     else {
         gu_warn ("Member %d.%d (%s) requested state transfer from '%s', "
@@ -1466,6 +1502,7 @@ gcs_group_act_conf (gcs_group_t*         group,
     }
 
     conf.conf_id        = group->conf_id;
+
     conf.repl_proto_ver = group->quorum.repl_proto_ver;
     conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
@@ -1547,6 +1584,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         group->prim_seqno,
         group->act_id_,
         cached,
+        node->last_applied,
         group->prim_num,
         group->prim_state,
         node->status,
@@ -1555,6 +1593,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         node->gcs_proto_ver,
         node->repl_proto_ver,
         node->appl_proto_ver,
+        node->desync_count,
         flags
         );
 }
@@ -1572,4 +1611,16 @@ gcs_group_param_set(gcs_group_t& group,
 {
     return 1;
 }
+
+void
+gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
+{
+    std::string const desync_count_val
+        (gu::to_string(group->nodes[group->my_idx].desync_count));
+    status.insert("desync_count", desync_count_val);
+}
+
+
+
+
 

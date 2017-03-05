@@ -128,7 +128,7 @@ Gcs::request_state_transfer (const std::string& request,
 void
 Gcs::join (const gu::GTID& gtid, int const code)
 {
-    ssize_t ret = gcs_join (gcs_, gtid, code);
+    ssize_t const ret(gcs_join (gcs_, gtid, code));
 
     if (ret < 0)
     {
@@ -141,7 +141,7 @@ Gcs::join (const gu::GTID& gtid, int const code)
 void
 Gcs::set_last_applied (const gu::GTID& gtid)
 {
-    (void) gcs_set_last_applied(gcs_, gtid, 0);
+    (void) gcs_set_last_applied(gcs_, gtid);
 }
 
 void

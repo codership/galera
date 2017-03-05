@@ -56,6 +56,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_datetime_test.cpp
                               gu_histogram_test.cpp
                               gu_stats_test.cpp
+                              gu_thread_test.cpp
                               gu_shared_ptr_test.cpp
                               gu_tests++.cpp
                            '''))

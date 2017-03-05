@@ -2280,7 +2280,7 @@ void galera::ReplicatorSMM::desync()
             }
 */
             local_monitor_.enter(lo);
-            state_.shift_to(S_DONOR);
+            if (state_() != S_DONOR) state_.shift_to(S_DONOR);
             local_monitor_.leave(lo);
         }
         else

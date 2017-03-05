@@ -53,7 +53,7 @@ galera::ServiceThd::thd_func (void* arg)
             if (data.act_ & A_LAST_COMMITTED)
             {
                 ssize_t const ret
-                    (st->gcs_.set_last_applied(data.last_committed_, 0));
+                    (st->gcs_.set_last_applied(data.last_committed_));
 
                 if (gu_unlikely(ret < 0))
                 {
@@ -135,17 +135,21 @@ galera::ServiceThd::reset()
 }
 
 void
-galera::ServiceThd::report_last_committed(gcs_seqno_t const seqno)
+galera::ServiceThd::report_last_committed(gcs_seqno_t const seqno,
+                                          bool        const report)
 {
     gu::Lock lock(mtx_);
 
-    if (data_.last_committed_.seqno() < seqno)
+    if (gu_likely(data_.last_committed_.seqno() < seqno))
     {
         data_.last_committed_.set(seqno);
 
-        if (data_.act_ == A_NONE) cond_.signal();
+        if (gu_likely(report))
+        {
+            if (data_.act_ == A_NONE) cond_.signal();
 
-        data_.act_ |= A_LAST_COMMITTED;
+            data_.act_ |= A_LAST_COMMITTED;
+        }
     }
 }
 

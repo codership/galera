@@ -8,6 +8,7 @@
 #include "gu_uuid.hpp"
 #include "gu_byteswap.hpp"
 
+#include "gu_hash.h"
 #include <stdint.h>
 
 namespace gu
@@ -29,7 +30,7 @@ public:
 
     GTID(const gu_uuid_t& u, seqno_t s) : uuid_(u), seqno_(s) {}
 
-    explicit GTID(const GTID& g) : uuid_(g.uuid_), seqno_(g.seqno_) {}
+    GTID(const GTID& g) : uuid_(g.uuid_), seqno_(g.seqno_) {}
 
     GTID(const void* const buf, size_t const buflen)
         :
@@ -106,11 +107,24 @@ public:
     size_t serialize  (void* buf, size_t buflen, size_t offset) const;
     size_t unserialize(const void* buf, size_t buflen, size_t offset);
 
+    class TableHash // for std::map, does not have to be endian independent
+    {
+    public:
+        size_t operator()(const GTID& gtid) const
+        {
+            // UUID is 16 bytes and seqno_t is 8 bytes so all should be
+            // properly aligned into a continuous buffer
+            return gu_table_hash(&gtid, sizeof(UUID) + sizeof(seqno_t));
+        }
+    };
+
 private:
 
     UUID    uuid_;
     seqno_t seqno_;
 
+//    GU_COMPILE_ASSERT(&(reinterpret_cast<UUID*>(0)->seqno_) == sizeof(uuid_),
+//                      unaligned_GTID);
 }; /* class GTID */
 
 namespace gu

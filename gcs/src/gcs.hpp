@@ -149,7 +149,6 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_WRITESET,   //! action representing state change, will be assigned
                         //  global seqno
-//    GCS_ACT_CCHANGE,       //! new configuration
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CCHANGE,    //! group configuration change
@@ -351,7 +350,7 @@ extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
 
 /*! Informs group about the last applied action on this node */
 extern long
-gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid, uint64_t code);
+gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid);
 
 /* GCS Configuration */
 
@@ -430,11 +429,11 @@ struct gcs_act_cchange
     };
 
     std::vector<member> memb;
-    gu_uuid_t        uuid;     //! group UUID
-    gcs_seqno_t      seqno;    //! last global seqno applied by this group
-    gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
-    int              repl_proto_ver; //! replicator  protocol version to use
-    int              appl_proto_ver; //! application protocol version to use
+    gu_uuid_t           uuid;     //! group UUID
+    gcs_seqno_t         seqno;    //! last global seqno applied by this group
+    gcs_seqno_t         conf_id;  //! configuration ID (-1 if non-primary)
+    int                 repl_proto_ver; //! replicator  protocol version to use
+    int                 appl_proto_ver; //! application protocol version to use
 };
 
 std::ostream&

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,11 +13,13 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_MSG_VER 3
+#define GCS_STATE_MSG_VER 5
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.hpp"
 #include "gcs_node.hpp"
+
+#include "gu_logger.hpp"
 
 gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
@@ -26,6 +28,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_seqno_t      prim_seqno,
                       gcs_seqno_t      received,
                       gcs_seqno_t      cached,
+                      gcs_seqno_t      last_applied,
                       int              prim_joined,
                       gcs_node_state_t prim_state,
                       gcs_node_state_t current_state,
@@ -34,6 +37,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       int              gcs_proto_ver,
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              desync_count,
                       uint8_t          flags)
 {
 #define CHECK_PROTO_RANGE(LEVEL)                                        \
@@ -60,12 +64,14 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->prim_seqno    = prim_seqno;
         ret->received      = received;
         ret->cached        = cached;
+        ret->last_applied  = last_applied;
         ret->prim_state    = prim_state;
         ret->current_state = current_state;
         ret->version       = GCS_STATE_MSG_VER;
         ret->gcs_proto_ver = gcs_proto_ver;
         ret->repl_proto_ver= repl_proto_ver;
         ret->appl_proto_ver= appl_proto_ver;
+        ret->desync_count  = desync_count;
         ret->name          = (char*)(ret + 1);
         ret->inc_addr      = ret->name + name_len;
         ret->flags         = flags;
@@ -86,6 +92,8 @@ gcs_state_msg_destroy (gcs_state_msg_t* state)
 {
     gu_free (state);
 }
+
+#define PROTO5_RESERVED_SIZE 17
 
 /* Returns length needed to serialize gcs_state_msg_t for sending */
 size_t
@@ -109,7 +117,12 @@ gcs_state_msg_len (gcs_state_msg_t* state)
 // V1-2 stuff
         sizeof (uint8_t)     +   // appl_proto_ver (in preparation for V1)
 // V3 stuff
-        sizeof (int64_t)         // cached
+        sizeof (int64_t)     +   // cached
+// V4 stuff
+        sizeof (int32_t)     +   // desync count
+// V5 stuff
+        sizeof (int64_t)     +   // last_applied
+        PROTO5_RESERVED_SIZE
         );
 }
 
@@ -150,9 +163,11 @@ ssize_t
 gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
 {
     STATE_MSG_FIELDS_V0(buf);
-    char*     inc_addr  = name + strlen (state->name) + 1;
-    uint8_t*  appl_proto_ver = (uint8_t*)(inc_addr + strlen(state->inc_addr) + 1);
-    int64_t*  cached         = (int64_t*)(appl_proto_ver + 1);
+    char*    inc_addr       = name + strlen (state->name) + 1;
+    uint8_t* appl_proto_ver = (uint8_t*)(inc_addr + strlen(state->inc_addr) + 1);
+    int64_t* cached         = (int64_t*)(appl_proto_ver + 1);
+    int32_t* desync_count   = (int32_t*)(cached + 1);
+    int64_t* last_applied   = (int64_t*)(desync_count + 1);
 
     *version        = GCS_STATE_MSG_VER;
     *flags          = state->flags;
@@ -170,8 +185,11 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
     *cached         = htog64(state->cached);
+    *desync_count   = htog32(state->desync_count);
+    *last_applied   = htog64(state->last_applied);
+    memset(last_applied + 1, 0, PROTO5_RESERVED_SIZE);
 
-    return ((uint8_t*)(cached + 1) - (uint8_t*)buf);
+    return ((uint8_t*)(last_applied + 1) + PROTO5_RESERVED_SIZE - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
@@ -197,6 +215,20 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         assert(buf_len >= (uint8_t*)(cached_ptr + 1) - (uint8_t*)buf);
         cached = gtoh64(*cached_ptr);
     }
+// v4 stuff
+    int32_t  desync_count = 0;
+    int32_t* desync_count_ptr = (int32_t*)(cached_ptr + 1);
+    if (*version >= 4) {
+        assert(buf_len >= (uint8_t*)(desync_count_ptr + 1) - (uint8_t*)buf);
+        desync_count = gtoh32(*desync_count_ptr);
+    }
+// v5 stuff
+    int64_t last_applied = 0;
+    if (*version >= 5) {
+        int64_t* last_applied_ptr = (int64_t*)(desync_count_ptr + 1);
+        assert(buf_len > (uint8_t*)(last_applied_ptr + 3) - (uint8_t*)buf);
+        last_applied = gtoh64(*last_applied_ptr);
+    }
 
     gcs_state_msg_t* ret = gcs_state_msg_create (
         state_uuid,
@@ -205,6 +237,7 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         gtoh64(*prim_seqno),
         gtoh64(*received),
         cached,
+        last_applied,
         gtoh16(*prim_joined),
         (gcs_node_state_t)*prim_state,
         (gcs_node_state_t)*curr_state,
@@ -213,6 +246,7 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         *gcs_proto_ver,
         *repl_proto_ver,
         appl_proto_ver,
+        desync_count,
         *flags
         );
 
@@ -231,11 +265,13 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tFlags        : %#02hhx"
                      "\n\tProtocols    : %d / %d / %d"
                      "\n\tState        : %s"
+                     "\n\tDesync count : %d"
                      "\n\tPrim state   : %s"
                      "\n\tPrim UUID    : " GU_UUID_FORMAT
                      "\n\tPrim  seqno  : %lld"
                      "\n\tFirst seqno  : %lld"
                      "\n\tLast  seqno  : %lld"
+                     "\n\tCommit cut   : %lld"
                      "\n\tPrim JOINED  : %d"
                      "\n\tState UUID   : " GU_UUID_FORMAT
                      "\n\tGroup UUID   : " GU_UUID_FORMAT
@@ -246,11 +282,13 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      state->gcs_proto_ver, state->repl_proto_ver,
                      state->appl_proto_ver,
                      gcs_node_state_to_str(state->current_state),
+                     state->desync_count,
                      gcs_node_state_to_str(state->prim_state),
                      GU_UUID_ARGS(&state->prim_uuid),
                      (long long)state->prim_seqno,
                      (long long)state->cached,
                      (long long)state->received,
+                     (long long)state->last_applied,
                      state->prim_joined,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
@@ -285,6 +323,13 @@ gcs_seqno_t
 gcs_state_msg_cached (const gcs_state_msg_t* state)
 {
     return state->cached;
+}
+
+/* Get last applied action seqno */
+gcs_seqno_t
+gcs_state_msg_last_applied (const gcs_state_msg_t* state)
+{
+    return state->last_applied;
 }
 
 /* Get current node state */
@@ -325,6 +370,12 @@ gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
     *gcs_proto_ver  = state->gcs_proto_ver;
     *repl_proto_ver = state->repl_proto_ver;
     *appl_proto_ver = state->appl_proto_ver;
+}
+
+int
+gcs_state_msg_get_desync_count (const gcs_state_msg_t* state)
+{
+    return state->desync_count;
 }
 
 /* Get state message flags */
@@ -802,9 +853,10 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     INIT_PROTO_VER(gcs_proto_ver);
     INIT_PROTO_VER(repl_proto_ver);
     INIT_PROTO_VER(appl_proto_ver);
+#undef INIT_PROTO_VER
 
-    for (i = 0; i < states_num; i++) {
-
+    for (i = 0; i < states_num; i++)
+    {
 #define CHECK_MIN_PROTO_VER(LEVEL)                              \
         if (states[i]->LEVEL <  quorum->LEVEL) {                \
             quorum->LEVEL = states[i]->LEVEL;                   \
@@ -815,6 +867,7 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
             CHECK_MIN_PROTO_VER(repl_proto_ver);
             CHECK_MIN_PROTO_VER(appl_proto_ver);
 //        }
+#undef CHECK_MIN_PROTO_VER
     }
 
     if (quorum->version < 2) {;} // for future generations

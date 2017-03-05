@@ -54,7 +54,7 @@ namespace galera
         virtual ssize_t desync(gcs_seqno_t& seqno_l) = 0;
         virtual void    join(const gu::GTID&, int code) = 0;
         virtual gcs_seqno_t local_sequence() = 0;
-        virtual ssize_t set_last_applied(const gu::GTID&, uint64_t) = 0;
+        virtual ssize_t set_last_applied(const gu::GTID&) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
         virtual void    flush_stats() = 0;
         virtual void    get_status(gu::Status&) const = 0;
@@ -152,12 +152,12 @@ namespace galera
             return gcs_resume_recv(conn_);
         }
 
-        ssize_t set_last_applied(const gu::GTID& gtid, uint64_t const code)
+        ssize_t set_last_applied(const gu::GTID& gtid)
         {
             assert(gtid.uuid()  != GU_UUID_NIL);
             assert(gtid.seqno() >= 0);
 
-            return gcs_set_last_applied(conn_, gtid, code);
+            return gcs_set_last_applied(conn_, gtid);
         }
 
         ssize_t request_state_transfer(int version,
@@ -325,7 +325,7 @@ namespace galera
 
         ssize_t resume_recv() { return 0; }
 
-        ssize_t set_last_applied(const gu::GTID& gtid, uint64_t const code)
+        ssize_t set_last_applied(const gu::GTID& gtid)
         {
             gu::Lock lock(mtx_);
 
