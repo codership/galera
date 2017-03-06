@@ -1048,6 +1048,7 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
 {
     assert(tsp != 0);
     TrxHandleSlave& ts(*tsp);
+    //log_info << "~~~~~ preprocessing TRX " << ts;
     assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING);
 
     if (ts.nbo_start() == true || ts.nbo_end() == true)
@@ -1065,7 +1066,7 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
                     // This is the same as in  process_trx()
                     if (ts.ends_nbo() == WSREP_SEQNO_UNDEFINED)
                     {
-                        cancel_monitors(ts, true);
+                        cancel_monitors<false>(ts);
                         assert(ts.is_dummy());
                     }
                     else
@@ -1083,7 +1084,7 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             {
                 assert(ts.nbo_end()); // non-effective nbo_end
                 assert(ts.is_dummy());
-                cancel_monitors(ts, true);
+                cancel_monitors<false>(ts);
                 break;
             }
             }
@@ -1125,6 +1126,9 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             // if it won't pass to applying stage
             if (!must_apply) cert_.set_trx_committed(ts);
         }
+
+        if (gu_unlikely(ts.skip_event() && must_apply))
+            cancel_monitors<false>(ts);
     }
 
     if (gu_likely(must_apply == true))
@@ -1143,6 +1147,7 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
 {
     assert(GCS_ACT_CCHANGE == act.type);
     assert(act.seqno_g > 0);
+    //log_info << "~~~~~ preprocessing CC " << act.seqno_g;
     if (preload == true && must_apply == false)
     {
         // CC is part of index preload and won't be processed

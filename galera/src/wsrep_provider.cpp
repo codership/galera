@@ -404,7 +404,7 @@ append_data_array (TrxHandleMaster*        const trx,
 {
     for (size_t i(0); i < count; ++i)
     {
-        trx->append_data(data[i].ptr, data[i].len, type, copy);
+        gu_trace(trx->append_data(data[i].ptr, data[i].len, type, copy));
     }
 }
 
@@ -681,9 +681,17 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
                                keys[i].key_parts_num,
                                key_type,
                                copy);
-            trx->append_key(k);
+            gu_trace(trx->append_key(k));
         }
         retval = WSREP_OK;
+    }
+    catch (gu::Exception& e)
+    {
+        log_warn << e.what();
+        if (EMSGSIZE == e.get_errno())
+            retval = WSREP_SIZE_EXCEEDED;
+        else
+            retval = WSREP_CONN_FAIL; //?
     }
     catch (std::exception& e)
     {
@@ -727,9 +735,16 @@ wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
     try
     {
         TrxHandleLock lock(*trx);
-        if (WSREP_DATA_ORDERED == type)
-            append_data_array(trx, data, count, type, copy);
+        gu_trace(append_data_array(trx, data, count, type, copy));
         retval = WSREP_OK;
+    }
+    catch (gu::Exception& e)
+    {
+        log_warn << e.what();
+        if (EMSGSIZE == e.get_errno())
+            retval = WSREP_SIZE_EXCEEDED;
+        else
+            retval = WSREP_CONN_FAIL; //?
     }
     catch (std::exception& e)
     {
@@ -886,7 +901,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         gu::Buffer buf(galera::NBOKey::serial_size());
         (void)key.serialize(&buf[0], buf.size(), 0);
         struct wsrep_buf data_buf = {&buf[0], buf.size()};
-        append_data_array(trx, &data_buf, 1, WSREP_DATA_ORDERED, true);
+        gu_trace(append_data_array(trx, &data_buf, 1, WSREP_DATA_ORDERED,true));
     }
 
     if (meta != 0)
@@ -915,10 +930,10 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
             galera::KeyData k(repl->trx_proto_ver(),
                               keys[i].key_parts,
                               keys[i].key_parts_num, WSREP_KEY_EXCLUSIVE,false);
-            trx->append_key(k);
+            gu_trace(trx->append_key(k));
         }
 
-        append_data_array(trx, data, count, WSREP_DATA_ORDERED, false);
+        gu_trace(append_data_array(trx, data, count, WSREP_DATA_ORDERED, false));
 
         if (trx->nbo_end() == false)
         {

@@ -91,13 +91,20 @@ void galera::TrxHandleSlave::print(std::ostream& os) const
        << ", d: "        << depends_seqno_
        << ")";
 
-    os << " WS pa_range: " << write_set().pa_range();
-
-    if (write_set().annotated())
+    if (!skip_event())
     {
-        os << "\nAnnotation:\n";
-        write_set().write_annotation(os);
-        os << std::endl;
+        os << " WS pa_range: " << write_set().pa_range();
+
+        if (write_set().annotated())
+        {
+            os << "\nAnnotation:\n";
+            write_set().write_annotation(os);
+            os << std::endl;
+        }
+    }
+    else
+    {
+        os << " skip event";
     }
 }
 

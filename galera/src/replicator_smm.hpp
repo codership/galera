@@ -168,7 +168,22 @@ namespace galera
         void ist_end(int error);
 
         // Cancel local and apply monitors for TrxHandleSlave
-        void cancel_monitors(const TrxHandleSlave& ts, bool nolocal);
+        template<bool local>
+        void cancel_monitors(const TrxHandleSlave& ts)
+        {
+            if (local)
+            {
+                LocalOrder  lo(ts);
+                local_monitor_.self_cancel(lo);
+            }
+
+            if (ts.pa_unsafe() == false)
+            {
+                ApplyOrder  ao(ts);
+                apply_monitor_.self_cancel(ao);
+            }
+        }
+
         // Cancel all monitors for given seqnos
         void cancel_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g);
 

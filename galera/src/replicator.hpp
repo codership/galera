@@ -113,7 +113,7 @@ namespace galera
                                        size_t req_size,
                                        wsrep_seqno_t seqno_l,
                                        wsrep_seqno_t donor_seq) = 0;
-        virtual void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l) = 0;
+        virtual void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l) =0;
         virtual void process_sync(wsrep_seqno_t seqno_l) = 0;
 
         virtual void process_vote(wsrep_seqno_t seq,
@@ -142,7 +142,6 @@ namespace galera
 
         virtual const wsrep_uuid_t& source_id() const = 0;
 
-        virtual void cancel_monitors(const TrxHandleSlave& ts, bool) = 0;
         virtual void cancel_seqnos(wsrep_seqno_t seqno_l,
                                    wsrep_seqno_t seqno_g) = 0;
         virtual bool corrupt() const = 0;
