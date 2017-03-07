@@ -262,10 +262,16 @@ namespace galera
             }
         }
 
-        wsrep_seqno_t last_left()   const
+        wsrep_seqno_t last_left() const
         {
             gu::Lock lock(mutex_);
             return last_left_;
+        }
+
+        wsrep_seqno_t last_entered() const
+        {
+            gu::Lock lock(mutex_);
+            return last_entered_;
         }
 
         void last_left_gtid(wsrep_gtid_t& gtid) const
