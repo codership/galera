@@ -1023,9 +1023,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
 
 extern "C"
-wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
-                                     wsrep_conn_id_t const conn_id,
-                                     int             const err)
+wsrep_status_t galera_to_execute_end(wsrep_t*           const gh,
+                                     wsrep_conn_id_t    const conn_id,
+                                     const wsrep_buf_t* const err)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -1033,12 +1033,20 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     wsrep_status_t retval;
-    TrxHandleMaster* trx(repl->local_conn_trx(conn_id, false).get());
+    galera::TrxHandleMasterPtr trx(repl->local_conn_trx(conn_id, false));
+
+    assert(trx != 0);
+    if (trx == 0)
+    {
+        log_warn << "No trx handle for connection " << conn_id
+                 << " in galera_to_execute_end()";
+        return WSREP_CONN_FAIL;
+    }
 
     try
     {
         TrxHandleLock lock(*trx);
-        gu_trace(repl->to_isolation_end(*trx, err));
+        repl->to_isolation_end(*trx, err);
         retval =  WSREP_OK;
     }
     catch (std::exception& e)
@@ -1051,7 +1059,6 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
-
     gu_trace(repl->discard_local_conn_trx(conn_id));
 
     return retval;
@@ -1143,8 +1150,7 @@ wsrep_status_t galera_sst_sent (wsrep_t*            const gh,
 extern "C"
 wsrep_status_t galera_sst_received (wsrep_t*            const gh,
                                     const wsrep_gtid_t* const state_id,
-                                    const void*         const state,
-                                    size_t              const state_len,
+                                    const wsrep_buf_t*  const state,
                                     int                 const rcode)
 {
     assert(gh       != 0);
@@ -1156,15 +1162,14 @@ wsrep_status_t galera_sst_received (wsrep_t*            const gh,
 
     if (rcode < 0) { assert(state_id->seqno == WSREP_SEQNO_UNDEFINED); }
 
-    return repl->sst_received(*state_id, state, state_len, rcode);
+    return repl->sst_received(*state_id, state, rcode);
 }
 
 
 extern "C"
-wsrep_status_t galera_snapshot(wsrep_t*    wsrep,
-                               const void* msg,
-                               size_t      msg_len,
-                               const char* donor_spec)
+wsrep_status_t galera_snapshot(wsrep_t*           const wsrep,
+                               const wsrep_buf_t* const msg,
+                               const char*        const donor_spec)
 {
     return WSREP_NOT_IMPLEMENTED;
 }

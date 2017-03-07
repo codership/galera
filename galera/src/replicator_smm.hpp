@@ -111,8 +111,8 @@ namespace galera
 
         wsrep_status_t to_isolation_begin(TrxHandleMaster& trx,
                                           wsrep_trx_meta_t*);
-        wsrep_status_t to_isolation_end(TrxHandleMaster& trx,
-                                        int              err);
+        wsrep_status_t to_isolation_end(TrxHandleMaster&   trx,
+                                        const wsrep_buf_t* err);
         wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
                                           const struct wsrep_buf* data,
                                           size_t                  count,
@@ -124,8 +124,7 @@ namespace galera
                                          bool                    commit);
         wsrep_status_t sst_sent(const wsrep_gtid_t& state_id, int rcode);
         wsrep_status_t sst_received(const wsrep_gtid_t& state_id,
-                                    const void*         state,
-                                    size_t              state_len,
+                                    const wsrep_buf_t*  state,
                                     int                 rcode);
 
         void process_trx(void* recv_ctx, const TrxHandleSlavePtr& trx);

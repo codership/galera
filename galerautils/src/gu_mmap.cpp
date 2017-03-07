@@ -72,10 +72,7 @@ namespace gu
     {
         /* libc msync() only accepts addresses multiple of page size,
          * rounding down */
-        GU_COMPILE_ASSERT((GU_PAGE_SIZE & 1) == 0,
-                          GU_PAGE_SIZE_is_not_multiple_of_2);
-
-        static uint64_t const PAGE_SIZE_MASK = ~(GU_PAGE_SIZE - 1);
+        static uint64_t const PAGE_SIZE_MASK(~(GU_PAGE_SIZE - 1));
 
         uint8_t* const sync_addr(reinterpret_cast<uint8_t*>
                                  (uint64_t(addr) & PAGE_SIZE_MASK));

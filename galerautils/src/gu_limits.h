@@ -1,4 +1,4 @@
-// Copyright (C) 2008 Codership Oy <info@codership.com>
+// Copyright (C) 2008-2016 Codership Oy <info@codership.com>
 
 /**
  * @file system limit macros
@@ -14,33 +14,24 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-# if defined(__APPLE__)
-long gu_darwin_phys_pages (void);
-long gu_darwin_avphys_pages (void);
-# elif defined(__FreeBSD__)
-long gu_freebsd_avphys_pages (void);
-# endif
+
+extern size_t gu_page_size(void);
+extern size_t gu_phys_pages(void);
+extern size_t gu_avphys_pages(void);
+
 #ifdef __cplusplus
-}
+} // extern "C"
 #endif
 
-#if defined(__APPLE__)
-static inline size_t gu_page_size()    { return getpagesize();             }
-static inline size_t gu_phys_pages()   { return gu_darwin_phys_pages();    }
-static inline size_t gu_avphys_pages() { return gu_darwin_avphys_pages();  }
-#elif defined(__FreeBSD__)
-static inline size_t gu_page_size()    { return sysconf(_SC_PAGESIZE);     }
-static inline size_t gu_phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
-static inline size_t gu_avphys_pages() { return gu_freebsd_avphys_pages(); }
-#else /* !__APPLE__ && !__FreeBSD__ */
-static inline size_t gu_page_size()    { return sysconf(_SC_PAGESIZE);     }
-static inline size_t gu_phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
-static inline size_t gu_avphys_pages() { return sysconf(_SC_AVPHYS_PAGES); }
-#endif /* !__APPLE__ && !__FreeBSD__ */
+#define GU_PAGE_SIZE gu_page_size()
 
-/* We need this as a compile-time constant. Runtime check is implemented
- * in gu_init.c */
-#define GU_PAGE_SIZE 4096
+/* returns multiple of page size that is no less than page size */
+static inline size_t gu_page_size_multiple(size_t const requested_size)
+{
+    size_t const sys_page_size = GU_PAGE_SIZE;
+    size_t const multiple = requested_size / sys_page_size;
+    return sys_page_size * (0 == multiple ? 1 : multiple);
+}
 
 static inline size_t gu_avphys_bytes()
 {
@@ -56,8 +47,8 @@ static inline size_t gu_avphys_bytes()
 #define GU_LONG_MAX       LONG_MAX
 #define GU_LONG_MIN       LONG_MIN
 
-#define GU_ULONG_LONG_MAX 0xffffffffffffffffULL 
-#define GU_LONG_LONG_MAX  0x7fffffffffffffffLL 
+#define GU_ULONG_LONG_MAX 0xffffffffffffffffULL
+#define GU_LONG_LONG_MAX  0x7fffffffffffffffLL
 #define GU_LONG_LONG_MIN  (-GU_LONG_LONG_MAX - 1)
 
 #endif /* _gu_limits_h_ */

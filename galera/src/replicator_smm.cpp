@@ -95,7 +95,7 @@ apply_trx_ws(void*                    recv_ctx,
         msg << "Failed to apply trx " << trx.global_seqno() << " "
             << max_apply_attempts << " times";
 
-        throw galera::ApplyException(msg.str(), WSREP_CB_FAILURE);
+        throw galera::ApplyException(msg.str(), NULL, NULL, 0);
     }
 
     return;
@@ -1494,14 +1494,15 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster& trx,
-                                                       int const err)
+wsrep_status_t
+galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
+                                        const wsrep_buf_t* const err)
 {
     TrxHandleSlavePtr ts_ptr(trx.ts());
     TrxHandleSlave& ts(*ts_ptr);
 
     log_debug << "Done executing TO isolated action: " << ts
-              << ", code: "<< err;
+              << ", error message: " << gu::Hexdump(err->ptr, err->len, true);
     assert(trx.state() == TrxHandle::S_COMMITTING ||
            trx.state() == TrxHandle::S_ABORTING);
     assert(ts.state() == TrxHandle::S_COMMITTING ||

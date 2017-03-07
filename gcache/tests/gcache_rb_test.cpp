@@ -107,7 +107,7 @@ START_TEST(recovery)
 {
     struct msg
     {
-        char msg;
+        char    msg;
         seqno_t g;
         seqno_t d;
 
@@ -129,7 +129,7 @@ START_TEST(recovery)
         { '9',         7,         4 }
     };
 
-    size_type const msg_size(ALLOC_SIZE(sizeof(msg::msg)));
+    size_type const msg_size(ALLOC_SIZE(sizeof(reinterpret_cast<msg*>(0)->msg)));
 
     struct rb_ctx
     {

@@ -73,7 +73,6 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " trx_id: "  << int64_t(trx_id())  // for readability
        << " tstamp: "  << timestamp();
 
-
 }
 
 std::ostream&
@@ -284,6 +283,8 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
     assert(version() >= WS_NG_VERSION || skip_event());
 
     const DataSetIn& ws(write_set_.dataset());
+    void*  err_msg(NULL);
+    size_t err_len(0);
 
     ws.rewind(); // make sure we always start from the beginning
 
@@ -291,10 +292,11 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
     {
         for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
         {
-            gu::Buf buf = ws.next();
+            const gu::Buf& buf(ws.next());
+            wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
 
-            err = apply_cb (recv_ctx, buf.ptr, buf.size,
-                            trx_flags_to_wsrep_flags(flags()), &meta);
+            err = apply_cb(recv_ctx, trx_flags_to_wsrep_flags(flags()), &wb,
+                           &meta, &err_msg, &err_len);
         }
     }
     else
@@ -303,8 +305,11 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
         // about transaction meta data. This is done to avoid spreading
         // logic around in apply and commit callbacks with streaming
         // replication.
-        err = apply_cb(recv_ctx, 0, 0, trx_flags_to_wsrep_flags(flags()),
-                       &meta);
+        wsrep_buf_t const wb = { NULL, 0 };
+        err = apply_cb(recv_ctx, trx_flags_to_wsrep_flags(flags()), &wb, &meta,
+                       &err_msg, &err_len);
+        assert(NULL == err_msg);
+        assert(0    == err_len);
     }
 
     if (gu_unlikely(0 != err))
@@ -314,7 +319,7 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
         os << "Failed to apply app buffer: seqno: " << global_seqno()
            << ", code: " << err;
 
-        galera::ApplyException ae(os.str(), err);
+        galera::ApplyException ae(os.str(), err_msg, NULL, err_len);
 
         GU_TRACE(ae);
 
@@ -337,8 +342,9 @@ galera::TrxHandleSlave::unordered(void*                recv_ctx,
         const DataSetIn& unrd(write_set_.unrdset());
         for (int i(0); i < unrd.count(); ++i)
         {
-            const gu::Buf data = unrd.next();
-            cb(recv_ctx, data.ptr, data.size);
+            const gu::Buf& data(unrd.next());
+            wsrep_buf_t const wb = { data.ptr, size_t(data.size) };
+            cb(recv_ctx, &wb);
         }
     }
 }

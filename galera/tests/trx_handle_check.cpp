@@ -59,9 +59,8 @@ void check_states_graph(
 START_TEST(test_states_master)
 {
     log_info << "START test_states_master";
-    TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 16,
+    TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE(), 16,
                              "test_states_master");
-
 
     wsrep_uuid_t uuid = {{1, }};
 
@@ -196,20 +195,24 @@ END_TEST
 static int
 apply_cb(
     void*                   ctx,
-    const void*             data,
-    size_t                  size,
     uint32_t                flags,
-    const wsrep_trx_meta_t* meta
+    const wsrep_buf_t*      data,
+    const wsrep_trx_meta_t* meta,
+    void**                  err_buf,
+    size_t*                 err_len
     )
 {
     std::vector<char>* const res(static_cast<std::vector<char>* >(ctx));
     fail_if(NULL == res);
 
-    const char* const c(static_cast<const char*>(data));
+    const char* const c(static_cast<const char*>(data->ptr));
     fail_if(NULL == c);
-    fail_if(1 != size);
+    fail_if(1 != data->len);
 
     res->push_back(*c);
+
+    *err_buf = NULL;
+    *err_len = 0;
 
     return 0;
 }
@@ -224,9 +227,9 @@ START_TEST(test_streaming)
                                                      KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;
     gu_uuid_generate(&uuid, 0, 0);
-    TrxHandleMasterPtr trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567, 8910),
+    TrxHandleMasterPtr trx(TrxHandleMaster::New(lp, trx_params, uuid, 4567,8910),
                            TrxHandleMasterDeleter());
-    
+
     galera::TrxHandleLock lock(*trx);
 
     std::vector<char> src(3); // initial wirteset
@@ -259,6 +262,7 @@ START_TEST(test_streaming)
 
         ts->apply(&res, apply_cb, wsrep_trx_meta_t());
     }
+
     {
         // 1. middle fragment B
         trx->append_data(&src[1], 1, WSREP_DATA_ORDERED, false);
