@@ -879,7 +879,10 @@ namespace galera
             wso_ = true;
         }
 
-        const WriteSetOut& write_set_out() const { return write_set_out(); }
+        const WriteSetOut& write_set_out() const
+        {
+            return const_cast<TrxHandleMaster*>(this)->write_set_out();
+        }
 
         TrxHandleMaster(gu::MemPool<true>&  mp,
                         const Params&       params,

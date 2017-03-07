@@ -479,7 +479,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                     catch (gu::NotFound& nf)
                     {
                         log_warn << "Cert index preload first seqno "
-                                 << preload_start << " not found from gcache";
+                                 << preload_start
+                                 << " not found from gcache (min available: "
+                                 << gcache_.seqno_min() << ')';
                         rcode = -ENOMSG;
                         goto out;
                     }
