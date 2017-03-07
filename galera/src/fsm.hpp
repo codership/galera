@@ -128,6 +128,11 @@ namespace galera
             state_ = state;
         }
 
+        void reset_history()
+        {
+            state_hist_.clear();
+        }
+
         const State& operator()() const { return state_; }
 
         void add_transition(Transition const& trans)

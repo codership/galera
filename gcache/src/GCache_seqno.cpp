@@ -1,8 +1,7 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
-#include "SeqnoNone.hpp"
 #include "gcache_bh.hpp"
 #include "GCache.hpp"
 
@@ -14,23 +13,29 @@
 namespace gcache
 {
     /*!
-     * Reinitialize seqno sequence (after SST or such)
-     * Clears seqno->ptr map // and sets seqno_min to seqno.
+     * Clears seqno->ptr map in case of history gap (after SST or such).
      */
     void
-    GCache::seqno_reset ()
+    GCache::seqno_reset (const gu::GTID& gtid)
     {
         gu::Lock lock(mtx);
 
-        seqno_released = SEQNO_NONE;
+        assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
 
-        if (gu_unlikely(seqno2ptr.empty())) return;
+        if (gtid.uuid() == gid && gtid.seqno() == seqno_max) return;
+
+        log_info << "GCache history reset: old(" << gu::GTID(gid, seqno_max)
+                 << ") -> new(" << gtid << ")";
+
+        seqno_released = SEQNO_NONE;
+        gid = gtid.uuid();
 
         /* order is significant here */
         rb.seqno_reset();
         mem.seqno_reset();
 
         seqno2ptr.clear();
+        seqno_max = SEQNO_NONE;
     }
 
     /*!
@@ -159,7 +164,7 @@ namespace gcache
                 /* This means that there are no element with
                  * seqno following seqno_released - and this should not
                  * generally happen. But it looks like stopcont test does it. */
-                if (0 != seqno_released)
+                if (SEQNO_NONE != seqno_released)
                 {
                     log_debug << "Releasing seqno " << seqno << " before "
                               << seqno_released + 1 << " was assigned.";

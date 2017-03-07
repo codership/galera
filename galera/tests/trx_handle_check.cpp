@@ -59,9 +59,8 @@ void check_states_graph(
 START_TEST(test_states_master)
 {
     log_info << "START test_states_master";
-    TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE, 16,
+    TrxHandleMaster::Pool tp(TrxHandleMaster::LOCAL_STORAGE_SIZE(), 16,
                              "test_states_master");
-
 
     wsrep_uuid_t uuid = {{1, }};
 

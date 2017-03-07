@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2014-2016 Codership Oy <info@codership.com>
  *
  */
 
@@ -8,8 +8,10 @@
 
 #include "gu_uuid.h"
 #include "gu_assert.hpp"
-#include "gu_types.hpp"
 #include "gu_macros.hpp"
+#include "gu_buffer.hpp"
+#include "gu_throw.hpp"
+
 #include <iostream>
 #include <cstring>
 #include <algorithm> // std::copy
@@ -101,7 +103,8 @@ public:
 
     UUID_base(gu_uuid_t uuid) : uuid_(uuid) {}
 
-    size_t unserialize(const void* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const void* buf,
+                       const size_t buflen, const size_t offset)
     {
         return gu_uuid_unserialize(buf, buflen, offset, uuid_);
     }
@@ -222,7 +225,6 @@ inline std::istream& operator>> (std::istream& is, gu::UUID_base& uuid)
 {
     uuid.scan(is); return is;
 }
-
 } /* namespace gu */
 
 #endif // _gu_uuid_hpp_

@@ -25,7 +25,7 @@ public:
              size_t const      size,
              bool const        alpha = false)
         :
-        buf_  (reinterpret_cast<const byte_t*>(buf)),
+        buf_  (static_cast<const byte_t*>(buf)),
         size_ (size),
         alpha_(alpha)
     {}

@@ -2,7 +2,7 @@
 // detail/task_io_service.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2015 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -19,13 +19,14 @@
 
 #if !defined(ASIO_HAS_IOCP)
 
-#include <boost/detail/atomic_count.hpp>
 #include "asio/error_code.hpp"
 #include "asio/io_service.hpp"
+#include "asio/detail/atomic_count.hpp"
+#include "asio/detail/call_stack.hpp"
+#include "asio/detail/event.hpp"
 #include "asio/detail/mutex.hpp"
 #include "asio/detail/op_queue.hpp"
 #include "asio/detail/reactor_fwd.hpp"
-#include "asio/detail/task_io_service_fwd.hpp"
 #include "asio/detail/task_io_service_operation.hpp"
 
 #include "asio/detail/push_options.hpp"
@@ -33,17 +34,18 @@
 namespace asio {
 namespace detail {
 
+struct task_io_service_thread_info;
+
 class task_io_service
   : public asio::detail::service_base<task_io_service>
 {
 public:
   typedef task_io_service_operation operation;
 
-  // Constructor.
-  ASIO_DECL task_io_service(asio::io_service& io_service);
-
-  // How many concurrent threads are likely to run the io_service.
-  ASIO_DECL void init(std::size_t concurrency_hint);
+  // Constructor. Specifies the number of concurrent threads that are likely to
+  // run the io_service. If set to 1 certain optimisation are performed.
+  ASIO_DECL task_io_service(asio::io_service& io_service,
+      std::size_t concurrency_hint = 0);
 
   // Destroy all user-defined handler objects owned by the service.
   ASIO_DECL void shutdown_service();
@@ -66,6 +68,9 @@ public:
   // Interrupt the event processing loop.
   ASIO_DECL void stop();
 
+  // Determine whether the io_service is stopped.
+  ASIO_DECL bool stopped() const;
+
   // Reset in preparation for a subsequent run invocation.
   ASIO_DECL void reset();
 
@@ -82,17 +87,24 @@ public:
       stop();
   }
 
+  // Return whether a handler can be dispatched immediately.
+  bool can_dispatch()
+  {
+    return thread_call_stack::contains(this) != 0;
+  }
+
   // Request invocation of the given handler.
   template <typename Handler>
-  void dispatch(Handler handler);
+  void dispatch(Handler& handler);
 
   // Request invocation of the given handler and return immediately.
   template <typename Handler>
-  void post(Handler handler);
+  void post(Handler& handler);
 
   // Request invocation of the given operation and return immediately. Assumes
   // that work_started() has not yet been called for the operation.
-  ASIO_DECL void post_immediate_completion(operation* op);
+  ASIO_DECL void post_immediate_completion(
+      operation* op, bool is_continuation);
 
   // Request invocation of the given operation and return immediately. Assumes
   // that work_started() was previously called for the operation.
@@ -102,22 +114,28 @@ public:
   // that work_started() was previously called for each operation.
   ASIO_DECL void post_deferred_completions(op_queue<operation>& ops);
 
-private:
-  // Structure containing information about an idle thread.
-  struct idle_thread_info;
+  // Process unfinished operations as part of a shutdown_service operation.
+  // Assumes that work_started() was previously called for the operations.
+  ASIO_DECL void abandon_operations(op_queue<operation>& ops);
 
-  // Run at most one operation. Blocks only if this_idle_thread is non-null.
-  ASIO_DECL std::size_t do_one(mutex::scoped_lock& lock,
-      idle_thread_info* this_idle_thread);
+private:
+  // Structure containing thread-specific data.
+  typedef task_io_service_thread_info thread_info;
+
+  // Enqueue the given operation following a failed attempt to dispatch the
+  // operation for immediate invocation.
+  ASIO_DECL void do_dispatch(operation* op);
+
+  // Run at most one operation. May block.
+  ASIO_DECL std::size_t do_run_one(mutex::scoped_lock& lock,
+      thread_info& this_thread, const asio::error_code& ec);
+
+  // Poll for at most one operation.
+  ASIO_DECL std::size_t do_poll_one(mutex::scoped_lock& lock,
+      thread_info& this_thread, const asio::error_code& ec);
 
   // Stop the task and all idle threads.
   ASIO_DECL void stop_all_threads(mutex::scoped_lock& lock);
-
-  // Wakes a single idle thread and unlocks the mutex. Returns true if an idle
-  // thread was found. If there is no idle thread, returns false and leaves the
-  // mutex locked.
-  ASIO_DECL bool wake_one_idle_thread_and_unlock(
-      mutex::scoped_lock& lock);
 
   // Wake a single idle thread, or the task, and always unlock the mutex.
   ASIO_DECL void wake_one_thread_and_unlock(
@@ -127,11 +145,18 @@ private:
   struct task_cleanup;
   friend struct task_cleanup;
 
-  // Helper class to call work_finished() on block exit.
-  struct work_finished_on_block_exit;
+  // Helper class to call work-related operations on block exit.
+  struct work_cleanup;
+  friend struct work_cleanup;
+
+  // Whether to optimise for single-threaded use cases.
+  const bool one_thread_;
 
   // Mutex to protect access to internal data.
-  mutex mutex_;
+  mutable mutex mutex_;
+
+  // Event to wake up blocked threads.
+  event wakeup_event_;
 
   // The task to be run by this service.
   reactor* task_;
@@ -146,7 +171,7 @@ private:
   bool task_interrupted_;
 
   // The count of unfinished work.
-  boost::detail::atomic_count outstanding_work_;
+  atomic_count outstanding_work_;
 
   // The queue of handlers that are ready to be delivered.
   op_queue<operation> op_queue_;
@@ -157,8 +182,8 @@ private:
   // Flag to indicate that the dispatcher has been shut down.
   bool shutdown_;
 
-  // The threads that are currently idle.
-  idle_thread_info* first_idle_thread_;
+  // Per-thread call stack to track the state of each thread in the io_service.
+  typedef call_stack<task_io_service, thread_info> thread_call_stack;
 };
 
 } // namespace detail

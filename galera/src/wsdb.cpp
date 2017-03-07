@@ -31,7 +31,7 @@ void galera::Wsdb::print(std::ostream& os) const
 
 galera::Wsdb::Wsdb()
     :
-    trx_pool_  (TrxHandleMaster::LOCAL_STORAGE_SIZE, 512, "LocalTrxHandle"),
+    trx_pool_  (TrxHandleMaster::LOCAL_STORAGE_SIZE(), 512, "LocalTrxHandle"),
     trx_map_   (),
     trx_mutex_ (),
     conn_map_  (),
@@ -57,13 +57,9 @@ galera::Wsdb::create_trx(const TrxHandleMaster::Params& params,
                          const wsrep_uuid_t&            source_id,
                          wsrep_trx_id_t const           trx_id)
 {
-    TrxHandleMaster* trx(TrxHandleMaster::New(trx_pool_, params, source_id, -1, trx_id));
+    TrxHandleMasterPtr trx(new_trx(params, source_id, trx_id));
 
-    std::pair<TrxMap::iterator, bool> i
-        (trx_map_.insert(std::make_pair(trx_id,
-                                        TrxHandleMasterPtr(trx,
-                                                           TrxHandleMasterDeleter()))));
-
+    std::pair<TrxMap::iterator, bool> i (trx_map_.insert(std::make_pair(trx_id, trx)));
     if (gu_unlikely(i.second == false)) gu_throw_fatal;
 
     return i.first->second;

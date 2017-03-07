@@ -849,6 +849,19 @@ struct wsrep {
                                        wsrep_trx_id_t victim_trx);
 
   /*!
+   * @brief Send a rollback fragment on behalf of trx
+   *
+   * @param wsrep  provider handle
+   * @param trx    transaction to be rolled back
+   * @param data   data to append to the fragment
+   *
+   * @retval WSREP_OK rollback fragment sent successfully
+   */
+    wsrep_status_t (*rollback)(wsrep_t*           wsrep,
+                               wsrep_trx_id_t     trx,
+                               const wsrep_buf_t* data);
+
+  /*!
    * @brief Appends a row reference to transaction writeset
    *
    * Both copy flag and key_type can be ignored by provider (key type

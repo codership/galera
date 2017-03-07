@@ -57,6 +57,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
                              config_.get(Param::commit_order))),
     state_file_         (config_.get(BASE_DIR)+'/'+GALERA_STATE_FILE),
     st_                 (state_file_),
+    safe_to_bootstrap_  (true),
     trx_params_         (config_.get(BASE_DIR), -1,
                          KeySet::version(config_.get(Param::key_format)),
                          gu::from_string<int>(config_.get(
@@ -150,7 +151,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     wsrep_uuid_t  uuid;
     wsrep_seqno_t seqno;
 
-    st_.get (uuid, seqno);
+    st_.get (uuid, seqno, safe_to_bootstrap_);
 
     if (0 != args->state_id &&
         args->state_id->uuid != WSREP_UUID_UNDEFINED &&
@@ -162,11 +163,13 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
         seqno = args->state_id->seqno;
     }
 
-    log_info << "End state: " << uuid << ':' << seqno << " #################";
+    log_debug << "End state: " << uuid << ':' << seqno << " #################";
 
     cc_seqno_ = seqno; // is it needed here?
 
     set_initial_position(uuid, seqno);
+    gcache_.seqno_reset(gu::GTID(uuid, seqno));
+    // update gcache position to one supplied by app.
 
     build_stats_vars(wsrep_stats_);
 }
@@ -267,7 +270,18 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     log_info << "Setting GCS initial position to " << inpos;
 
-    if ((err = gcs_.set_initial_position(inpos)) != 0)
+    if ((bootstrap == true || cluster_url == "gcomm://")
+        && safe_to_bootstrap_ == false)
+    {
+        log_error << "It may not be safe to bootstrap the cluster from this node. "
+                  << "It was not the last one to leave the cluster and may "
+                  << "not contain all the updates. To force cluster bootstrap "
+                  << "with this node, edit the grastate.dat file manually and "
+                  << "set safe_to_bootstrap to 1 .";
+        ret = WSREP_NODE_FAIL;
+    }
+
+    if (ret == WSREP_OK && (err = gcs_.set_initial_position(inpos)) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
@@ -434,7 +448,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     {
         assert(ts.trx_id() != uint64_t(-1) || ts.is_toi());
         assert(ts.certified() /*Repl*/ || ts.preordered() /*IST*/);
-        assert(ts.local() == false || ts.nbo_end());
+        assert(ts.local() == false || ts.nbo_end() ||
+               (ts.flags() & TrxHandle::F_ROLLBACK));
         assert(ts.nbo_end() == false || ts.is_dummy());
     }
 
@@ -570,7 +585,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
                                            wsrep_trx_meta_t* meta)
 {
-    assert(0);
     assert(trx->locked());
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
@@ -581,6 +595,7 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
         assert((trx->flags() & TrxHandle::F_BEGIN) == 0);
         TrxHandleSlavePtr ts(TrxHandleSlave::New(true, slave_pool_),
                              TrxHandleSlaveDeleter());
+        ts->set_global_seqno(0);
         trx->add_replicated(ts);
     }
 
@@ -1217,7 +1232,10 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
     {
         assert(ts->global_seqno() > 0); // BF'ed
         assert(trx->state() == TrxHandle::S_ABORTING);
-        assert(ts->state()  == TrxHandle::S_ABORTING);
+        // We shold not care about ts state here, ts may have
+        // been replicated succesfully and the transaction
+        // has been BF aborted after ts has been applied.
+        // assert(ts->state()  == TrxHandle::S_ABORTING);
         assert((ts->flags() & TrxHandle::F_ROLLBACK) != 0);
 
         if (ts->pa_unsafe())
@@ -1287,12 +1305,19 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster* trx)
 
     TrxHandleSlavePtr ts(trx->ts());
 
-    if (ts)
+    // Release monitors if ts was not committed. We may enter here
+    // with ts->state() == TrxHandle::S_COMMITTED if transaction
+    // replicated a fragment succesfully and then voluntarily rolled
+    // back by sending async rollback event via ReplicatorSMM::send()
+    if (ts && ts->state() != TrxHandle::S_COMMITTED)
     {
         log_debug << "release_rollback() trx: " << *trx << ", ts: " << *ts;
         assert(ts->global_seqno() > 0); // BF'ed
         assert(trx->state() == TrxHandle::S_ABORTING);
-        assert(ts->state()  == TrxHandle::S_ABORTING);
+        // We shold not care about ts state here, ts may have
+        // been replicated succesfully and the transaction
+        // has been BF aborted after ts has been applied.
+        // assert(ts->state()  == TrxHandle::S_ABORTING);
 
         log_debug << "Master rolled back " << ts->global_seqno();
 
@@ -1449,7 +1474,9 @@ wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
     {
         if (closing_ || state_() == S_CLOSED)
         {
-            log_error << "Closing during nonblocking operation. Node will be left in inconsistent state and must be re-initialized either by full SST or from backup.";
+            log_error << "Closing during nonblocking operation. "
+                "Node will be left in inconsistent state and must be "
+                "re-initialized either by full SST or from backup.";
             return WSREP_FATAL;
         }
 
@@ -1621,7 +1648,7 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
     TrxHandleSlave& ts(*ts_ptr);
 
     log_debug << "Done executing TO isolated action: " << ts
-              << ", code: "<< err;
+              << ", error message: " << gu::Hexdump(err->ptr, err->len, true);
     assert(trx.state() == TrxHandle::S_COMMITTING ||
            trx.state() == TrxHandle::S_ABORTING);
     assert(ts.state() == TrxHandle::S_COMMITTING ||
@@ -2187,6 +2214,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     wsrep_uuid_t new_uuid(uuid_);
     wsrep_view_info_t* const view_info
         (galera_view_info_create(conf, (!from_IST ? cc.seqno_g : -1), new_uuid));
+    if (view_info->status == WSREP_VIEW_PRIMARY)
+    {
+        safe_to_bootstrap_ = (view_info->memb_num == 1);
+    }
+
     int const my_idx(view_info->my_idx);
     gcs_node_state_t const my_state
         (my_idx >= 0 ? conf.memb[my_idx].state_ : GCS_NODE_STATE_NON_PRIM);
@@ -2330,7 +2362,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (conf.conf_id >= 0) // Primary configuration
     {
-        assert(group_seqno > 0);
+        // if protocol version >= 8, first CC already carries seqno 1,
+        // so it can't be less than 1. For older protocols it can be 0.
+        assert(group_seqno >= (protocol_version_ >= 8));
 
         //
         // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
@@ -2357,7 +2391,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
             if (protocol_version_ < 8)
             {
-                position.set(group_uuid, STATE_SEQNO());
+                position.set(group_uuid, group_seqno);
             }
             else
             {
@@ -2400,16 +2434,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         else if (conf.seqno > cert_.position())
         {
             assert(!app_waits_sst);
-            assert(group_uuid  == conf.uuid);
-            assert(group_seqno == conf.seqno);
 
             /* since CC does not pass certification, need to adjust cert
              * position explicitly (when processed in order) */
-            cert_.adjust_position(*view_info, gu::GTID(conf.uuid, conf.seqno),
+            /* flushes service thd, must be called before gcache_.seqno_reset()*/
+            cert_.adjust_position(*view_info, gu::GTID(group_uuid, group_seqno),
                                   trx_params_.version_);
 
-            log_info << "####### Setting monitor position to "
-                     << group_seqno;
+            log_info << "####### Setting monitor position to " << group_seqno;
             set_initial_position(group_uuid, group_seqno - 1);
             cancel_seqno(group_seqno); // cancel CC seqno
 
@@ -2417,6 +2449,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 /* CCs from IST already have seqno assigned and cert. position
                  * adjusted */
+
+                gcache_.seqno_reset(gu::GTID(conf.uuid, conf.seqno - 1));
+
                 if (protocol_version_ >= 8)
                 {
                     gu_trace(gcache_.seqno_assign(cc.buf, conf.seqno,
@@ -2473,7 +2508,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             assert(gcache_.seqno_min() > 0);
             assert(cc_lowest_trx_seqno_ >= gcache_.seqno_min());
 
-            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+            st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         }
         else
         {
@@ -2506,7 +2541,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (state_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            st_.set (state_uuid_, STATE_SEQNO());
+            st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         }
 
         gcache_.free(const_cast<void*>(cc.buf));
@@ -2621,7 +2656,7 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
     }
 
     wsrep_seqno_t const ret(STATE_SEQNO());
-    st_.set(state_uuid_, ret);
+    st_.set(state_uuid_, ret, safe_to_bootstrap_);
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret
              << " (" << pause_seqno_ << ")";
@@ -2637,7 +2672,7 @@ void galera::ReplicatorSMM::resume()
         gu_throw_error(EALREADY) << "tried to resume unpaused provider";
     }
 
-    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED);
+    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
     log_info << "resuming provider at " << pause_seqno_;
     LocalOrder lo(pause_seqno_);
     pause_seqno_ = WSREP_SEQNO_UNDEFINED;
@@ -2949,7 +2984,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
                 sizeof(state_uuid_str_));
     }
 
-    st_.set(uuid, WSREP_SEQNO_UNDEFINED);
+    st_.set(uuid, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
 }
 
 void

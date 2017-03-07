@@ -70,9 +70,15 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
 {
     if (ec)
     {
-        log_error << "handshake with remote endpoint "
-                  << remote_addr() << " failed: " << ec << ": '" << ec.message()
-                  << "' ( " << gu::extra_error_info(ec) << ")";
+        if (ec.category() == asio::error::get_ssl_category() &&
+            gu::exclude_ssl_error(ec) == false)
+        {
+
+            log_error << "handshake with remote endpoint "
+                      << remote_addr() << " failed: " << ec << ": '"
+                      << ec.message()
+                      << "' ( " << gu::extra_error_info(ec) << ")";
+        }
         FAILED_HANDLER(ec);
         return;
     }
@@ -235,7 +241,8 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     {
         log_debug << "write handler for " << id()
                   << " state " << state();
-        if (ec.category() == asio::error::get_ssl_category())
+        if (ec.category() == asio::error::get_ssl_category() &&
+            gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "write_handler(): " << ec.message()
                      << " (" << gu::extra_error_info(ec) << ")";
@@ -302,6 +309,36 @@ void gcomm::AsioTcpSocket::set_option(const std::string& key,
     }
 }
 
+namespace gcomm
+{
+    typedef boost::shared_ptr<gcomm::AsioTcpSocket> AsioTcpSocketPtr;
+    class AsioPostForSendHandler
+    {
+    public:
+        AsioPostForSendHandler(const AsioTcpSocketPtr& socket)
+            :
+            socket_(socket)
+        { }
+        void operator()()
+        {
+            if (socket_->state() == gcomm::Socket::S_CONNECTED &&
+                socket_->send_q_.empty() == false)
+            {
+                const gcomm::Datagram& dg(socket_->send_q_.front());
+                boost::array<asio::const_buffer, 2> cbs;
+                cbs[0] = asio::const_buffer(dg.header()
+                                            + dg.header_offset(),
+                                            dg.header_len());
+                cbs[1] = asio::const_buffer(&dg.payload()[0],
+                                            dg.payload().size());
+                socket_->write_one(cbs);
+            }
+        }
+    private:
+        AsioTcpSocketPtr socket_;
+    };
+}
+
 int gcomm::AsioTcpSocket::send(const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
@@ -330,13 +367,7 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
 
     if (send_q_.size() == 1)
     {
-        boost::array<asio::const_buffer, 2> cbs;
-        cbs[0] = asio::const_buffer(priv_dg.header()
-                                    + priv_dg.header_offset(),
-                                    priv_dg.header_len());
-        cbs[1] = asio::const_buffer(&priv_dg.payload()[0],
-                                    priv_dg.payload().size());
-        write_one(cbs);
+        net_.io_service_.post(AsioPostForSendHandler(shared_from_this()));
     }
     return 0;
 }
@@ -349,7 +380,8 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
 
     if (ec)
     {
-        if (ec.category() == asio::error::get_ssl_category())
+        if (ec.category() == asio::error::get_ssl_category() &&
+            gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "read_handler(): " << ec.message() << " ("
                      << gu::extra_error_info(ec) << ")";
@@ -439,7 +471,8 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     Critical<AsioProtonet> crit(net_);
     if (ec)
     {
-        if (ec.category() == asio::error::get_ssl_category())
+        if (ec.category() == asio::error::get_ssl_category() &&
+            gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "read_completion_condition(): " << ec.message() << " ("
                      << gu::extra_error_info(ec) << ")";

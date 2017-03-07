@@ -214,6 +214,7 @@ namespace galera
         void  set_state(State state)
         {
             state_.shift_to(state);
+            if (state == S_EXECUTING) state_.reset_history();
         }
 
         /* slave trx ctor */
@@ -664,7 +665,11 @@ namespace galera
     {
     public:
         /* signed int here is to detect SIZE < sizeof(TrxHandle) */
-        static int const LOCAL_STORAGE_SIZE = GU_PAGE_SIZE * 2; // 8K
+        static size_t LOCAL_STORAGE_SIZE()
+        {
+            static size_t const ret(gu_page_size_multiple(1 << 13 /* 8Kb */));
+            return ret;
+        }
 
         struct Params
         {
@@ -817,7 +822,6 @@ namespace galera
                 assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno);
-                reset_ts();
             }
             else
             {
@@ -828,8 +832,6 @@ namespace galera
 
             write_set_out().set_flags(write_set_flags_);
             write_set_out().finalize(last_seen_seqno, pa_range);
-
-            assert(ts_ == 0);
         }
 
         /* Serializes wiriteset into a single buffer (for unit test purposes) */
@@ -904,7 +906,10 @@ namespace galera
             wso_ = true;
         }
 
-        const WriteSetOut& write_set_out() const { return write_set_out(); }
+        const WriteSetOut& write_set_out() const
+        {
+            return const_cast<TrxHandleMaster*>(this)->write_set_out();
+        }
 
         TrxHandleMaster(gu::MemPool<true>&  mp,
                         const Params&       params,

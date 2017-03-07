@@ -386,6 +386,55 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     return retval;
 }
 
+extern "C"
+wsrep_status_t galera_rollback(wsrep_t*                 gh,
+                               wsrep_trx_id_t           trx_id,
+                               const wsrep_buf_t* const data)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    galera::TrxHandleMasterPtr victim(repl->get_local_trx(trx_id));
+
+    if (!victim)
+    {
+        log_warn << "trx to rollback " << trx_id << " not found";
+        return WSREP_OK;
+    }
+
+    TrxHandleLock victim_lock(*victim);
+
+    /* Send the rollback fragment from a different context */
+    galera::TrxHandleMasterPtr trx(repl->new_local_trx(trx_id));
+
+    TrxHandleLock lock(*trx);
+    if (data)
+    {
+        gu_trace(trx->append_data(data->ptr, data->len,
+                                  WSREP_DATA_ORDERED, true));
+    }
+    wsrep_trx_meta_t meta;
+    meta.gtid       = WSREP_GTID_UNDEFINED;
+    meta.depends_on = WSREP_SEQNO_UNDEFINED;
+    meta.stid.node  = repl->source_id();
+    meta.stid.trx   = trx_id;
+
+    trx->set_flags(TrxHandle::F_ROLLBACK | TrxHandle::F_PA_UNSAFE);
+    trx->set_state(TrxHandle::S_MUST_ABORT);
+    trx->set_state(TrxHandle::S_ABORTING);
+
+    // Victim may already be in S_ABORTING state if it was BF aborted
+    // in pre commit.
+    if (victim->state() != TrxHandle::S_ABORTING)
+    {
+        victim->set_state(TrxHandle::S_MUST_ABORT);
+        victim->set_state(TrxHandle::S_ABORTING);
+    }
+
+    return repl->send(trx.get(), &meta);
+}
+
 static inline void
 discard_local_trx(REPL_CLASS*        repl,
                   wsrep_ws_handle_t* ws_handle,
@@ -608,6 +657,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     }
 
     wsrep_status_t retval;
+    bool discard_trx(true);
 
     try
     {
@@ -649,6 +699,21 @@ wsrep_status_t galera_release(wsrep_t*            gh,
             retval = repl->release_commit(trx);
         else
             retval = repl->release_rollback(trx);
+
+        switch(trx->state())
+        {
+        case TrxHandle::S_COMMITTED:
+        case TrxHandle::S_ROLLED_BACK:
+            break;
+        case TrxHandle::S_EXECUTING:
+            // trx ready for new fragment
+        case TrxHandle::S_ABORTING:
+            // SR trx was BF aborted between pre_commit() and post_commit()
+            if (retval == WSREP_OK) discard_trx = false;
+            break;
+        default:
+            assert(0);
+        }
     }
     catch (std::exception& e)
     {
@@ -661,19 +726,9 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    switch(trx->state())
+    if (discard_trx)
     {
-    case TrxHandle::S_COMMITTED:
-    case TrxHandle::S_ROLLED_BACK:
         discard_local_trx(repl, ws_handle, trx);
-    case TrxHandle::S_EXECUTING:
-        /* trx ready for new fragment */
-        break;
-    case TrxHandle::S_ABORTING:
-        // SR trx was BF aborted between pre_commit() and post_commit()
-        break;
-    default:
-        assert(0);
     }
 
     return retval;
@@ -1348,6 +1403,7 @@ static wsrep_t galera_str = {
     &galera_release,
     &galera_replay_trx,
     &galera_abort_pre_commit,
+    &galera_rollback,
     &galera_append_key,
     &galera_append_data,
     &galera_sync_wait,

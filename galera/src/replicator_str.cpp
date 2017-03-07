@@ -484,7 +484,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                     catch (gu::NotFound& nf)
                     {
                         log_warn << "Cert index preload first seqno "
-                                 << preload_start << " not found from gcache";
+                                 << preload_start
+                                 << " not found from gcache (min available: "
+                                 << gcache_.seqno_min() << ')';
                         rcode = -ENOMSG;
                         goto out;
                     }
@@ -595,16 +597,33 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
 
 ReplicatorSMM::StateRequest*
-ReplicatorSMM::prepare_state_request (const void* const   sst_req,
-                                      ssize_t     const   sst_req_len,
+ReplicatorSMM::prepare_state_request (const void*         sst_req,
+                                      ssize_t             sst_req_len,
                                       const wsrep_uuid_t& group_uuid,
                                       wsrep_seqno_t const last_needed_seqno)
 {
     try
     {
+        // IF there are ongoing NBO, SST might not be possible because
+        // ongoing NBO is blocking and waiting for NBO end events.
+        // Therefore in precense of ongoing NBOs we set SST request
+        // string to zero and hope that donor can serve IST.
+
+        size_t const nbo_size(cert_.nbo_size());
+        if (nbo_size)
+        {
+            log_info << "Non-blocking operation is ongoing. "
+                "Node can receive IST only.";
+
+            sst_req     = NULL;
+            sst_req_len = 0;
+        }
+
         switch (str_proto_ver_)
         {
         case 0:
+            if (0 == sst_req_len)
+                gu_throw_error(EPERM) << "SST is not possible.";
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
         case 2:
@@ -617,29 +636,21 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             {
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
                                           group_uuid, last_needed_seqno));
+                assert(ist_req_len > 0);
+                assert(NULL != ist_req);
             }
             catch (gu::Exception& e)
             {
                 log_warn
                     << "Failed to prepare for incremental state transfer: "
                     << e.what() << ". IST will be unavailable.";
+
+                if (0 == sst_req_len)
+                    gu_throw_error(EPERM) << "neither SST nor IST is possible.";
             }
 
-            // IF there are ongoing NBO, SST might not be possible because
-            // ongoing NBO is blocking and waiting for NBO end events.
-            // Therefore in precense of ongoing NBOs we set SST request
-            // string to zero and hope that donor can serve IST.
-
-            size_t const nbo_size(cert_.nbo_size());
-            if (nbo_size)
-            {
-                log_info << "Non-blocking operation is ongoing. "
-                    "Node can receive IST only.";
-            }
-            StateRequest* ret = new StateRequest_v1 (
-                nbo_size ? 0 : sst_req,
-                nbo_size ? 0 : sst_req_len,
-                ist_req, ist_req_len);
+            StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
+                                                     ist_req, ist_req_len);
             free (ist_req);
             return ret;
         }
@@ -649,12 +660,13 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
     }
     catch (std::exception& e)
     {
-        log_fatal << "State request preparation failed, aborting: " << e.what();
+        log_fatal << "State Transfer Request preparation failed: " << e.what()
+                  << " Can't continue, aborting.";
     }
     catch (...)
     {
-        log_fatal << "State request preparation failed, aborting: unknown exception";
-        throw;
+        log_fatal << "State Transfer Request preparation failed: "
+            "unknown exception. Can't continue, aborting.";
     }
     abort();
 }
@@ -747,7 +759,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
     {
         sst_state_ = SST_REQ_FAILED;
 
-        st_.set(state_uuid_, STATE_SEQNO());
+        st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         st_.mark_safe();
 
         gu::Lock lock(closing_mutex_);
@@ -799,7 +811,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (first_reset)
     {
         log_info << "Resetting GCache seqno map due to different histories.";
-        gcache_.seqno_reset();
+        gcache_.seqno_reset(gu::GTID(group_uuid, cc_seqno));
     }
 
     if (sst_req_len != 0)
@@ -824,7 +836,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             log_fatal << "Application state transfer failed. This is "
                       << "unrecoverable condition, restart required.";
 
-            st_.set(sst_uuid_, sst_seqno_);
+            st_.set(sst_uuid_, sst_seqno_, safe_to_bootstrap_);
             st_.mark_safe();
 
             abort();
@@ -845,7 +857,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             {
                 log_info << "Resetting GCache seqno map due to seqno gap: "
                          << STATE_SEQNO() << ".." << sst_seqno_;
-                gcache_.seqno_reset();
+                gcache_.seqno_reset(gu::GTID(sst_uuid_, sst_seqno_));
             }
 
             update_state_uuid (sst_uuid_);
@@ -900,7 +912,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             log_fatal << "Sanity check failed: my state UUID " << state_uuid_
                       << " is different from group state UUID " << group_uuid
                       << ". Can't continue with IST. Aborting.";
-            st_.set(state_uuid_, STATE_SEQNO());
+            st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
             st_.mark_safe();
             abort();
         }
@@ -963,7 +975,12 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert(sst_seqno_ >= cc_seqno);
     }
 
-    assert(sst_seqno_ >= cc_seqno);
+#ifndef NDEBUG
+    {
+        gu::Lock lock(closing_mutex_);
+        assert(sst_seqno_ >= cc_seqno || closing_ || state_() == S_CLOSED);
+    }
+#endif /* NDEBUG */
 
     delete req;
 }
