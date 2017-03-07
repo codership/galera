@@ -2,7 +2,7 @@
 // detail/impl/socket_ops.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2015 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,15 +16,30 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
-#include <boost/assert.hpp>
-#include <boost/detail/workaround.hpp>
+
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
 #include <new>
+#include "asio/detail/assert.hpp"
 #include "asio/detail/socket_ops.hpp"
 #include "asio/error.hpp"
+
+#if defined(ASIO_WINDOWS_RUNTIME)
+# include <codecvt>
+# include <locale>
+# include <string>
+#endif // defined(ASIO_WINDOWS_RUNTIME)
+
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__) \
+  || defined(__MACH__) && defined(__APPLE__)
+# if defined(ASIO_HAS_PTHREADS)
+#  include <pthread.h>
+# endif // defined(ASIO_HAS_PTHREADS)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+       // || defined(__MACH__) && defined(__APPLE__)
 
 #include "asio/detail/push_options.hpp"
 
@@ -32,9 +47,11 @@ namespace asio {
 namespace detail {
 namespace socket_ops {
 
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if !defined(ASIO_WINDOWS_RUNTIME)
+
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 struct msghdr { int msg_namelen; };
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 
 #if defined(__hpux)
 // HP-UX doesn't declare these functions extern "C", so they are declared again
@@ -43,20 +60,24 @@ extern "C" char* if_indextoname(unsigned int, char*);
 extern "C" unsigned int if_nametoindex(const char*);
 #endif // defined(__hpux)
 
+#endif // !defined(ASIO_WINDOWS_RUNTIME)
+
 inline void clear_last_error()
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   WSASetLastError(0);
 #else
   errno = 0;
 #endif
 }
 
+#if !defined(ASIO_WINDOWS_RUNTIME)
+
 template <typename ReturnType>
 inline ReturnType error_wrapper(ReturnType return_value,
     asio::error_code& ec)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   ec = asio::error_code(WSAGetLastError(),
       asio::error::get_system_category());
 #else
@@ -147,7 +168,7 @@ socket_type sync_accept(socket_type s, state_type state,
       return invalid_socket;
 
     // Wait for socket to become ready.
-    if (socket_ops::poll_read(s, ec) < 0)
+    if (socket_ops::poll_read(s, 0, ec) < 0)
       return invalid_socket;
   }
 }
@@ -277,28 +298,9 @@ int close(socket_type s, state_type& state,
   int result = 0;
   if (s != invalid_socket)
   {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-    if ((state & non_blocking) && (state & user_set_linger))
-    {
-      ioctl_arg_type arg = 0;
-      ::ioctlsocket(s, FIONBIO, &arg);
-      state &= ~non_blocking;
-    }
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-    if (state & non_blocking)
-    {
-#if defined(__SYMBIAN32__)
-      int flags = ::fcntl(s, F_GETFL, 0);
-      if (flags >= 0)
-        ::fcntl(s, F_SETFL, flags & ~O_NONBLOCK);
-#else // defined(__SYMBIAN32__)
-      ioctl_arg_type arg = 0;
-      ::ioctl(s, FIONBIO, &arg);
-#endif // defined(__SYMBIAN32__)
-      state &= ~non_blocking;
-    }
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-
+    // We don't want the destructor to block, so set the socket to linger in
+    // the background. If the user doesn't like this behaviour then they need
+    // to explicitly close the socket.
     if (destruction && (state & user_set_linger))
     {
       ::linger opt;
@@ -310,11 +312,44 @@ int close(socket_type s, state_type& state,
     }
 
     clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
     result = error_wrapper(::closesocket(s), ec);
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
     result = error_wrapper(::close(s), ec);
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+
+    if (result != 0
+        && (ec == asio::error::would_block
+          || ec == asio::error::try_again))
+    {
+      // According to UNIX Network Programming Vol. 1, it is possible for
+      // close() to fail with EWOULDBLOCK under certain circumstances. What
+      // isn't clear is the state of the descriptor after this error. The one
+      // current OS where this behaviour is seen, Windows, says that the socket
+      // remains open. Therefore we'll put the descriptor back into blocking
+      // mode and have another attempt at closing it.
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+      ioctl_arg_type arg = 0;
+      ::ioctlsocket(s, FIONBIO, &arg);
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+# if defined(__SYMBIAN32__)
+      int flags = ::fcntl(s, F_GETFL, 0);
+      if (flags >= 0)
+        ::fcntl(s, F_SETFL, flags & ~O_NONBLOCK);
+# else // defined(__SYMBIAN32__)
+      ioctl_arg_type arg = 0;
+      ::ioctl(s, FIONBIO, &arg);
+# endif // defined(__SYMBIAN32__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+      state &= ~non_blocking;
+
+      clear_last_error();
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+      result = error_wrapper(::closesocket(s), ec);
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+      result = error_wrapper(::close(s), ec);
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+    }
   }
 
   if (result == 0)
@@ -322,8 +357,8 @@ int close(socket_type s, state_type& state,
   return result;
 }
 
-bool set_internal_non_blocking(socket_type s,
-    state_type& state, asio::error_code& ec)
+bool set_user_non_blocking(socket_type s,
+    state_type& state, bool value, asio::error_code& ec)
 {
   if (s == invalid_socket)
   {
@@ -332,25 +367,82 @@ bool set_internal_non_blocking(socket_type s,
   }
 
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-  ioctl_arg_type arg = 1;
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  ioctl_arg_type arg = (value ? 1 : 0);
   int result = error_wrapper(::ioctlsocket(s, FIONBIO, &arg), ec);
 #elif defined(__SYMBIAN32__)
   int result = error_wrapper(::fcntl(s, F_GETFL, 0), ec);
   if (result >= 0)
   {
     clear_last_error();
-    result = error_wrapper(::fcntl(s, F_SETFL, result | O_NONBLOCK), ec);
+    int flag = (value ? (result | O_NONBLOCK) : (result & ~O_NONBLOCK));
+    result = error_wrapper(::fcntl(s, F_SETFL, flag), ec);
   }
 #else
-  ioctl_arg_type arg = 1;
+  ioctl_arg_type arg = (value ? 1 : 0);
   int result = error_wrapper(::ioctl(s, FIONBIO, &arg), ec);
 #endif
 
   if (result >= 0)
   {
     ec = asio::error_code();
-    state |= internal_non_blocking;
+    if (value)
+      state |= user_set_non_blocking;
+    else
+    {
+      // Clearing the user-set non-blocking mode always overrides any
+      // internally-set non-blocking flag. Any subsequent asynchronous
+      // operations will need to re-enable non-blocking I/O.
+      state &= ~(user_set_non_blocking | internal_non_blocking);
+    }
+    return true;
+  }
+
+  return false;
+}
+
+bool set_internal_non_blocking(socket_type s,
+    state_type& state, bool value, asio::error_code& ec)
+{
+  if (s == invalid_socket)
+  {
+    ec = asio::error::bad_descriptor;
+    return false;
+  }
+
+  if (!value && (state & user_set_non_blocking))
+  {
+    // It does not make sense to clear the internal non-blocking flag if the
+    // user still wants non-blocking behaviour. Return an error and let the
+    // caller figure out whether to update the user-set non-blocking flag.
+    ec = asio::error::invalid_argument;
+    return false;
+  }
+
+  clear_last_error();
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  ioctl_arg_type arg = (value ? 1 : 0);
+  int result = error_wrapper(::ioctlsocket(s, FIONBIO, &arg), ec);
+#elif defined(__SYMBIAN32__)
+  int result = error_wrapper(::fcntl(s, F_GETFL, 0), ec);
+  if (result >= 0)
+  {
+    clear_last_error();
+    int flag = (value ? (result | O_NONBLOCK) : (result & ~O_NONBLOCK));
+    result = error_wrapper(::fcntl(s, F_SETFL, flag), ec);
+  }
+#else
+  ioctl_arg_type arg = (value ? 1 : 0);
+  int result = error_wrapper(::ioctl(s, FIONBIO, &arg), ec);
+#endif
+
+  if (result >= 0)
+  {
+    ec = asio::error_code();
+    if (value)
+      state |= internal_non_blocking;
+    else
+      state &= ~internal_non_blocking;
     return true;
   }
 
@@ -393,6 +485,10 @@ int connect(socket_type s, const socket_addr_type* addr,
         &msghdr::msg_namelen, s, addr, addrlen), ec);
   if (result == 0)
     ec = asio::error_code();
+#if defined(__linux__)
+  else if (ec == asio::error::try_again)
+    ec = asio::error::no_buffer_space;
+#endif // defined(__linux__)
   return result;
 }
 
@@ -424,11 +520,46 @@ void sync_connect(socket_type s, const socket_addr_type* addr,
       asio::error::get_system_category());
 }
 
+#if defined(ASIO_HAS_IOCP)
+
+void complete_iocp_connect(socket_type s, asio::error_code& ec)
+{
+  // Map non-portable errors to their portable counterparts.
+  switch (ec.value())
+  {
+  case ERROR_CONNECTION_REFUSED:
+    ec = asio::error::connection_refused;
+    break;
+  case ERROR_NETWORK_UNREACHABLE:
+    ec = asio::error::network_unreachable;
+    break;
+  case ERROR_HOST_UNREACHABLE:
+    ec = asio::error::host_unreachable;
+    break;
+  case ERROR_SEM_TIMEOUT:
+    ec = asio::error::timed_out;
+    break;
+  default:
+    break;
+  }
+
+  if (!ec)
+  {
+    // Need to set the SO_UPDATE_CONNECT_CONTEXT option so that getsockname
+    // and getpeername will work on the connected socket.
+    socket_ops::state_type state = 0;
+    const int so_update_connect_context = 0x7010;
+    socket_ops::setsockopt(s, state, SOL_SOCKET,
+        so_update_connect_context, 0, 0, ec);
+  }
+}
+
+#endif // defined(ASIO_HAS_IOCP)
+
 bool non_blocking_connect(socket_type s, asio::error_code& ec)
 {
   // Check if the connect operation has finished. This is required since we may
   // get spurious readiness notifications from the reactor.
-
 #if defined(ASIO_WINDOWS) \
   || defined(__CYGWIN__) \
   || defined(__SYMBIAN32__)
@@ -454,7 +585,7 @@ bool non_blocking_connect(socket_type s, asio::error_code& ec)
        // || defined(__CYGWIN__)
        // || defined(__SYMBIAN32__)
   if (ready == 0)
-  { 
+  {
     // The asynchronous connect operation is still in progress.
     return false;
   }
@@ -480,7 +611,7 @@ bool non_blocking_connect(socket_type s, asio::error_code& ec)
 int socketpair(int af, int type, int protocol,
     socket_type sv[2], asio::error_code& ec)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   (void)(af);
   (void)(type);
   (void)(protocol);
@@ -506,11 +637,11 @@ bool sockatmark(socket_type s, asio::error_code& ec)
 
 #if defined(SIOCATMARK)
   ioctl_arg_type value = 0;
-# if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+# if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   int result = error_wrapper(::ioctlsocket(s, SIOCATMARK, &value), ec);
-# else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+# else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   int result = error_wrapper(::ioctl(s, SIOCATMARK, &value), ec);
-# endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+# endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   if (result == 0)
     ec = asio::error_code();
 # if defined(ENOTTY)
@@ -535,11 +666,11 @@ size_t available(socket_type s, asio::error_code& ec)
   }
 
   ioctl_arg_type value = 0;
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   int result = error_wrapper(::ioctlsocket(s, FIONREAD, &value), ec);
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   int result = error_wrapper(::ioctl(s, FIONREAD, &value), ec);
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   if (result == 0)
     ec = asio::error_code();
 #if defined(ENOTTY)
@@ -576,32 +707,32 @@ inline void init_buf_iov_base(T& base, void* addr)
   base = static_cast<T>(addr);
 }
 
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 typedef WSABUF buf;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 typedef iovec buf;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 
 void init_buf(buf& b, void* data, size_t size)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   b.buf = static_cast<char*>(data);
   b.len = static_cast<u_long>(size);
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   init_buf_iov_base(b.iov_base, data);
   b.iov_len = size;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 void init_buf(buf& b, const void* data, size_t size)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   b.buf = static_cast<char*>(const_cast<void*>(data));
   b.len = static_cast<u_long>(size);
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   init_buf_iov_base(b.iov_base, const_cast<void*>(data));
   b.iov_len = size;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 inline void init_msghdr_msg_name(void*& name, socket_addr_type* addr)
@@ -626,11 +757,11 @@ inline void init_msghdr_msg_name(T& name, const socket_addr_type* addr)
   name = reinterpret_cast<T>(const_cast<socket_addr_type*>(addr));
 }
 
-int recv(socket_type s, buf* bufs, size_t count, int flags,
-    asio::error_code& ec)
+signed_size_type recv(socket_type s, buf* bufs, size_t count,
+    int flags, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   // Receive some data.
   DWORD recv_buf_count = static_cast<DWORD>(count);
   DWORD bytes_transferred = 0;
@@ -645,15 +776,15 @@ int recv(socket_type s, buf* bufs, size_t count, int flags,
     return socket_error_retval;
   ec = asio::error_code();
   return bytes_transferred;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   msghdr msg = msghdr();
   msg.msg_iov = bufs;
-  msg.msg_iovlen = count;
-  int result = error_wrapper(::recvmsg(s, &msg, flags), ec);
+  msg.msg_iovlen = static_cast<int>(count);
+  signed_size_type result = error_wrapper(::recvmsg(s, &msg, flags), ec);
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 size_t sync_recv(socket_type s, state_type state, buf* bufs,
@@ -676,7 +807,7 @@ size_t sync_recv(socket_type s, state_type state, buf* bufs,
   for (;;)
   {
     // Try to complete the operation without blocking.
-    int bytes = socket_ops::recv(s, bufs, count, flags, ec);
+    signed_size_type bytes = socket_ops::recv(s, bufs, count, flags, ec);
 
     // Check if operation succeeded.
     if (bytes > 0)
@@ -696,7 +827,7 @@ size_t sync_recv(socket_type s, state_type state, buf* bufs,
       return 0;
 
     // Wait for socket to become ready.
-    if (socket_ops::poll_read(s, ec) < 0)
+    if (socket_ops::poll_read(s, 0, ec) < 0)
       return 0;
   }
 }
@@ -738,7 +869,7 @@ bool non_blocking_recv(socket_type s,
   for (;;)
   {
     // Read some data.
-    int bytes = socket_ops::recv(s, bufs, count, flags, ec);
+    signed_size_type bytes = socket_ops::recv(s, bufs, count, flags, ec);
 
     // Check for end of stream.
     if (is_stream && bytes == 0)
@@ -771,12 +902,12 @@ bool non_blocking_recv(socket_type s,
 
 #endif // defined(ASIO_HAS_IOCP)
 
-int recvfrom(socket_type s, buf* bufs, size_t count, int flags,
-    socket_addr_type* addr, std::size_t* addrlen,
+signed_size_type recvfrom(socket_type s, buf* bufs, size_t count,
+    int flags, socket_addr_type* addr, std::size_t* addrlen,
     asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   // Receive some data.
   DWORD recv_buf_count = static_cast<DWORD>(count);
   DWORD bytes_transferred = 0;
@@ -793,18 +924,18 @@ int recvfrom(socket_type s, buf* bufs, size_t count, int flags,
     return socket_error_retval;
   ec = asio::error_code();
   return bytes_transferred;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   msghdr msg = msghdr();
   init_msghdr_msg_name(msg.msg_name, addr);
-  msg.msg_namelen = *addrlen;
+  msg.msg_namelen = static_cast<int>(*addrlen);
   msg.msg_iov = bufs;
-  msg.msg_iovlen = count;
-  int result = error_wrapper(::recvmsg(s, &msg, flags), ec);
+  msg.msg_iovlen = static_cast<int>(count);
+  signed_size_type result = error_wrapper(::recvmsg(s, &msg, flags), ec);
   *addrlen = msg.msg_namelen;
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 size_t sync_recvfrom(socket_type s, state_type state, buf* bufs,
@@ -821,7 +952,8 @@ size_t sync_recvfrom(socket_type s, state_type state, buf* bufs,
   for (;;)
   {
     // Try to complete the operation without blocking.
-    int bytes = socket_ops::recvfrom(s, bufs, count, flags, addr, addrlen, ec);
+    signed_size_type bytes = socket_ops::recvfrom(
+        s, bufs, count, flags, addr, addrlen, ec);
 
     // Check if operation succeeded.
     if (bytes >= 0)
@@ -834,7 +966,7 @@ size_t sync_recvfrom(socket_type s, state_type state, buf* bufs,
       return 0;
 
     // Wait for socket to become ready.
-    if (socket_ops::poll_read(s, ec) < 0)
+    if (socket_ops::poll_read(s, 0, ec) < 0)
       return 0;
   }
 }
@@ -869,7 +1001,8 @@ bool non_blocking_recvfrom(socket_type s,
   for (;;)
   {
     // Read some data.
-    int bytes = socket_ops::recvfrom(s, bufs, count, flags, addr, addrlen, ec);
+    signed_size_type bytes = socket_ops::recvfrom(
+        s, bufs, count, flags, addr, addrlen, ec);
 
     // Retry operation if interrupted by signal.
     if (ec == asio::error::interrupted)
@@ -895,11 +1028,123 @@ bool non_blocking_recvfrom(socket_type s,
 
 #endif // defined(ASIO_HAS_IOCP)
 
-int send(socket_type s, const buf* bufs, size_t count, int flags,
-    asio::error_code& ec)
+signed_size_type recvmsg(socket_type s, buf* bufs, size_t count,
+    int in_flags, int& out_flags, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  out_flags = 0;
+  return socket_ops::recv(s, bufs, count, in_flags, ec);
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  msghdr msg = msghdr();
+  msg.msg_iov = bufs;
+  msg.msg_iovlen = static_cast<int>(count);
+  signed_size_type result = error_wrapper(::recvmsg(s, &msg, in_flags), ec);
+  if (result >= 0)
+  {
+    ec = asio::error_code();
+    out_flags = msg.msg_flags;
+  }
+  else
+    out_flags = 0;
+  return result;
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+}
+
+size_t sync_recvmsg(socket_type s, state_type state,
+    buf* bufs, size_t count, int in_flags, int& out_flags,
+    asio::error_code& ec)
+{
+  if (s == invalid_socket)
+  {
+    ec = asio::error::bad_descriptor;
+    return 0;
+  }
+
+  // Read some data.
+  for (;;)
+  {
+    // Try to complete the operation without blocking.
+    signed_size_type bytes = socket_ops::recvmsg(
+        s, bufs, count, in_flags, out_flags, ec);
+
+    // Check if operation succeeded.
+    if (bytes >= 0)
+      return bytes;
+
+    // Operation failed.
+    if ((state & user_set_non_blocking)
+        || (ec != asio::error::would_block
+          && ec != asio::error::try_again))
+      return 0;
+
+    // Wait for socket to become ready.
+    if (socket_ops::poll_read(s, 0, ec) < 0)
+      return 0;
+  }
+}
+
+#if defined(ASIO_HAS_IOCP)
+
+void complete_iocp_recvmsg(
+    const weak_cancel_token_type& cancel_token,
+    asio::error_code& ec)
+{
+  // Map non-portable errors to their portable counterparts.
+  if (ec.value() == ERROR_NETNAME_DELETED)
+  {
+    if (cancel_token.expired())
+      ec = asio::error::operation_aborted;
+    else
+      ec = asio::error::connection_reset;
+  }
+  else if (ec.value() == ERROR_PORT_UNREACHABLE)
+  {
+    ec = asio::error::connection_refused;
+  }
+}
+
+#else // defined(ASIO_HAS_IOCP)
+
+bool non_blocking_recvmsg(socket_type s,
+    buf* bufs, size_t count, int in_flags, int& out_flags,
+    asio::error_code& ec, size_t& bytes_transferred)
+{
+  for (;;)
+  {
+    // Read some data.
+    signed_size_type bytes = socket_ops::recvmsg(
+        s, bufs, count, in_flags, out_flags, ec);
+
+    // Retry operation if interrupted by signal.
+    if (ec == asio::error::interrupted)
+      continue;
+
+    // Check if we need to run the operation again.
+    if (ec == asio::error::would_block
+        || ec == asio::error::try_again)
+      return false;
+
+    // Operation is complete.
+    if (bytes >= 0)
+    {
+      ec = asio::error_code();
+      bytes_transferred = bytes;
+    }
+    else
+      bytes_transferred = 0;
+
+    return true;
+  }
+}
+
+#endif // defined(ASIO_HAS_IOCP)
+
+signed_size_type send(socket_type s, const buf* bufs, size_t count,
+    int flags, asio::error_code& ec)
+{
+  clear_last_error();
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   // Send the data.
   DWORD send_buf_count = static_cast<DWORD>(count);
   DWORD bytes_transferred = 0;
@@ -914,18 +1159,18 @@ int send(socket_type s, const buf* bufs, size_t count, int flags,
     return socket_error_retval;
   ec = asio::error_code();
   return bytes_transferred;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   msghdr msg = msghdr();
   msg.msg_iov = const_cast<buf*>(bufs);
-  msg.msg_iovlen = count;
+  msg.msg_iovlen = static_cast<int>(count);
 #if defined(__linux__)
   flags |= MSG_NOSIGNAL;
 #endif // defined(__linux__)
-  int result = error_wrapper(::sendmsg(s, &msg, flags), ec);
+  signed_size_type result = error_wrapper(::sendmsg(s, &msg, flags), ec);
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 size_t sync_send(socket_type s, state_type state, const buf* bufs,
@@ -948,7 +1193,7 @@ size_t sync_send(socket_type s, state_type state, const buf* bufs,
   for (;;)
   {
     // Try to complete the operation without blocking.
-    int bytes = socket_ops::send(s, bufs, count, flags, ec);
+    signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
 
     // Check if operation succeeded.
     if (bytes >= 0)
@@ -961,7 +1206,7 @@ size_t sync_send(socket_type s, state_type state, const buf* bufs,
       return 0;
 
     // Wait for socket to become ready.
-    if (socket_ops::poll_write(s, ec) < 0)
+    if (socket_ops::poll_write(s, 0, ec) < 0)
       return 0;
   }
 }
@@ -995,7 +1240,7 @@ bool non_blocking_send(socket_type s,
   for (;;)
   {
     // Write some data.
-    int bytes = socket_ops::send(s, bufs, count, flags, ec);
+    signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
 
     // Retry operation if interrupted by signal.
     if (ec == asio::error::interrupted)
@@ -1021,12 +1266,12 @@ bool non_blocking_send(socket_type s,
 
 #endif // defined(ASIO_HAS_IOCP)
 
-int sendto(socket_type s, const buf* bufs, size_t count, int flags,
-    const socket_addr_type* addr, std::size_t addrlen,
+signed_size_type sendto(socket_type s, const buf* bufs, size_t count,
+    int flags, const socket_addr_type* addr, std::size_t addrlen,
     asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   // Send the data.
   DWORD send_buf_count = static_cast<DWORD>(count);
   DWORD bytes_transferred = 0;
@@ -1041,20 +1286,20 @@ int sendto(socket_type s, const buf* bufs, size_t count, int flags,
     return socket_error_retval;
   ec = asio::error_code();
   return bytes_transferred;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   msghdr msg = msghdr();
   init_msghdr_msg_name(msg.msg_name, addr);
-  msg.msg_namelen = addrlen;
+  msg.msg_namelen = static_cast<int>(addrlen);
   msg.msg_iov = const_cast<buf*>(bufs);
-  msg.msg_iovlen = count;
+  msg.msg_iovlen = static_cast<int>(count);
 #if defined(__linux__)
   flags |= MSG_NOSIGNAL;
 #endif // defined(__linux__)
-  int result = error_wrapper(::sendmsg(s, &msg, flags), ec);
+  signed_size_type result = error_wrapper(::sendmsg(s, &msg, flags), ec);
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 size_t sync_sendto(socket_type s, state_type state, const buf* bufs,
@@ -1071,7 +1316,8 @@ size_t sync_sendto(socket_type s, state_type state, const buf* bufs,
   for (;;)
   {
     // Try to complete the operation without blocking.
-    int bytes = socket_ops::sendto(s, bufs, count, flags, addr, addrlen, ec);
+    signed_size_type bytes = socket_ops::sendto(
+        s, bufs, count, flags, addr, addrlen, ec);
 
     // Check if operation succeeded.
     if (bytes >= 0)
@@ -1084,7 +1330,7 @@ size_t sync_sendto(socket_type s, state_type state, const buf* bufs,
       return 0;
 
     // Wait for socket to become ready.
-    if (socket_ops::poll_write(s, ec) < 0)
+    if (socket_ops::poll_write(s, 0, ec) < 0)
       return 0;
   }
 }
@@ -1099,7 +1345,8 @@ bool non_blocking_sendto(socket_type s,
   for (;;)
   {
     // Write some data.
-    int bytes = socket_ops::sendto(s, bufs, count, flags, addr, addrlen, ec);
+    signed_size_type bytes = socket_ops::sendto(
+        s, bufs, count, flags, addr, addrlen, ec);
 
     // Retry operation if interrupted by signal.
     if (ec == asio::error::interrupted)
@@ -1129,13 +1376,13 @@ socket_type socket(int af, int type, int protocol,
     asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-  socket_type s = error_wrapper(::WSASocket(af, type, protocol, 0, 0,
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  socket_type s = error_wrapper(::WSASocketW(af, type, protocol, 0, 0,
         WSA_FLAG_OVERLAPPED), ec);
   if (s == invalid_socket)
     return s;
 
-  if (af == AF_INET6)
+  if (af == ASIO_OS_DEF(AF_INET6))
   {
     // Try to enable the POSIX default behaviour of having IPV6_V6ONLY set to
     // false. This will only succeed on Windows Vista and later versions of
@@ -1327,7 +1574,7 @@ int getsockopt(socket_type s, state_type state, int level, int optname,
   }
   ec = asio::error::fault;
   return socket_error_retval;
-#elif defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#elif defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   clear_last_error();
   int result = error_wrapper(call_getsockopt(&msghdr::msg_namelen,
         s, level, optname, optval, optlen), ec);
@@ -1345,7 +1592,7 @@ int getsockopt(socket_type s, state_type state, int level, int optname,
   if (result == 0)
     ec = asio::error_code();
   return result;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   clear_last_error();
   int result = error_wrapper(call_getsockopt(&msghdr::msg_namelen,
         s, level, optname, optval, optlen), ec);
@@ -1364,7 +1611,7 @@ int getsockopt(socket_type s, state_type state, int level, int optname,
   if (result == 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 template <typename SockLenType>
@@ -1386,7 +1633,7 @@ int getpeername(socket_type s, socket_addr_type* addr,
     return socket_error_retval;
   }
 
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   if (cached)
   {
     // Check if socket is still connected.
@@ -1407,9 +1654,9 @@ int getpeername(socket_type s, socket_addr_type* addr,
     ec = asio::error_code();
     return 0;
   }
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   (void)cached;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 
   clear_last_error();
   int result = error_wrapper(call_getpeername(
@@ -1456,7 +1703,7 @@ int ioctl(socket_type s, state_type& state, int cmd,
   }
 
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   int result = error_wrapper(::ioctlsocket(s, cmd, arg), ec);
 #elif defined(__MACH__) && defined(__APPLE__) \
   || defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
@@ -1497,7 +1744,7 @@ int select(int nfds, fd_set* readfds, fd_set* writefds,
     fd_set* exceptfds, timeval* timeout, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   if (!readfds && !writefds && !exceptfds && timeout)
   {
     DWORD milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -1517,7 +1764,7 @@ int select(int nfds, fd_set* readfds, fd_set* writefds,
   if (timeout && timeout->tv_sec == 0
       && timeout->tv_usec > 0 && timeout->tv_usec < 1000)
     timeout->tv_usec = 1000;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 
 #if defined(__hpux) && defined(__SELECT)
   timespec ts;
@@ -1534,7 +1781,7 @@ int select(int nfds, fd_set* readfds, fd_set* writefds,
 #endif
 }
 
-int poll_read(socket_type s, asio::error_code& ec)
+int poll_read(socket_type s, state_type state, asio::error_code& ec)
 {
   if (s == invalid_socket)
   {
@@ -1542,35 +1789,40 @@ int poll_read(socket_type s, asio::error_code& ec)
     return socket_error_retval;
   }
 
-#if defined(BOOST_WINDOWS) \
+#if defined(ASIO_WINDOWS) \
   || defined(__CYGWIN__) \
   || defined(__SYMBIAN32__)
   fd_set fds;
   FD_ZERO(&fds);
   FD_SET(s, &fds);
+  timeval zero_timeout;
+  zero_timeout.tv_sec = 0;
+  zero_timeout.tv_usec = 0;
+  timeval* timeout = (state & user_set_non_blocking) ? &zero_timeout : 0;
   clear_last_error();
-  int result = error_wrapper(::select(s, &fds, 0, 0, 0), ec);
-  if (result >= 0)
-    ec = asio::error_code();
-  return result;
-#else // defined(BOOST_WINDOWS)
+  int result = error_wrapper(::select(s + 1, &fds, 0, 0, timeout), ec);
+#else // defined(ASIO_WINDOWS)
       // || defined(__CYGWIN__)
       // || defined(__SYMBIAN32__)
   pollfd fds;
   fds.fd = s;
   fds.events = POLLIN;
   fds.revents = 0;
+  int timeout = (state & user_set_non_blocking) ? 0 : -1;
   clear_last_error();
-  int result = error_wrapper(::poll(&fds, 1, -1), ec);
-  if (result >= 0)
-    ec = asio::error_code();
-  return result;
-#endif // defined(BOOST_WINDOWS)
+  int result = error_wrapper(::poll(&fds, 1, timeout), ec);
+#endif // defined(ASIO_WINDOWS)
        // || defined(__CYGWIN__)
        // || defined(__SYMBIAN32__)
+  if (result == 0)
+    ec = (state & user_set_non_blocking)
+      ? asio::error::would_block : asio::error_code();
+  else if (result > 0)
+    ec = asio::error_code();
+  return result;
 }
 
-int poll_write(socket_type s, asio::error_code& ec)
+int poll_write(socket_type s, state_type state, asio::error_code& ec)
 {
   if (s == invalid_socket)
   {
@@ -1578,32 +1830,37 @@ int poll_write(socket_type s, asio::error_code& ec)
     return socket_error_retval;
   }
 
-#if defined(BOOST_WINDOWS) \
+#if defined(ASIO_WINDOWS) \
   || defined(__CYGWIN__) \
   || defined(__SYMBIAN32__)
   fd_set fds;
   FD_ZERO(&fds);
   FD_SET(s, &fds);
+  timeval zero_timeout;
+  zero_timeout.tv_sec = 0;
+  zero_timeout.tv_usec = 0;
+  timeval* timeout = (state & user_set_non_blocking) ? &zero_timeout : 0;
   clear_last_error();
-  int result = error_wrapper(::select(s, 0, &fds, 0, 0), ec);
-  if (result >= 0)
-    ec = asio::error_code();
-  return result;
-#else // defined(BOOST_WINDOWS)
+  int result = error_wrapper(::select(s + 1, 0, &fds, 0, timeout), ec);
+#else // defined(ASIO_WINDOWS)
       // || defined(__CYGWIN__)
       // || defined(__SYMBIAN32__)
   pollfd fds;
   fds.fd = s;
   fds.events = POLLOUT;
   fds.revents = 0;
+  int timeout = (state & user_set_non_blocking) ? 0 : -1;
   clear_last_error();
-  int result = error_wrapper(::poll(&fds, 1, -1), ec);
-  if (result >= 0)
-    ec = asio::error_code();
-  return result;
-#endif // defined(BOOST_WINDOWS)
+  int result = error_wrapper(::poll(&fds, 1, timeout), ec);
+#endif // defined(ASIO_WINDOWS)
        // || defined(__CYGWIN__)
        // || defined(__SYMBIAN32__)
+  if (result == 0)
+    ec = (state & user_set_non_blocking)
+      ? asio::error::would_block : asio::error_code();
+  else if (result > 0)
+    ec = asio::error_code();
+  return result;
 }
 
 int poll_connect(socket_type s, asio::error_code& ec)
@@ -1614,7 +1871,7 @@ int poll_connect(socket_type s, asio::error_code& ec)
     return socket_error_retval;
   }
 
-#if defined(BOOST_WINDOWS) \
+#if defined(ASIO_WINDOWS) \
   || defined(__CYGWIN__) \
   || defined(__SYMBIAN32__)
   fd_set write_fds;
@@ -1624,11 +1881,12 @@ int poll_connect(socket_type s, asio::error_code& ec)
   FD_ZERO(&except_fds);
   FD_SET(s, &except_fds);
   clear_last_error();
-  int result = error_wrapper(::select(s, 0, &write_fds, &except_fds, 0), ec);
+  int result = error_wrapper(::select(
+        s + 1, 0, &write_fds, &except_fds, 0), ec);
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#else // defined(BOOST_WINDOWS)
+#else // defined(ASIO_WINDOWS)
       // || defined(__CYGWIN__)
       // || defined(__SYMBIAN32__)
   pollfd fds;
@@ -1640,19 +1898,56 @@ int poll_connect(socket_type s, asio::error_code& ec)
   if (result >= 0)
     ec = asio::error_code();
   return result;
-#endif // defined(BOOST_WINDOWS)
+#endif // defined(ASIO_WINDOWS)
        // || defined(__CYGWIN__)
        // || defined(__SYMBIAN32__)
 }
+
+#endif // !defined(ASIO_WINDOWS_RUNTIME)
 
 const char* inet_ntop(int af, const void* src, char* dest, size_t length,
     unsigned long scope_id, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS_RUNTIME)
+  using namespace std; // For sprintf.
+  const unsigned char* bytes = static_cast<const unsigned char*>(src);
+  if (af == ASIO_OS_DEF(AF_INET))
+  {
+    sprintf_s(dest, length, "%u.%u.%u.%u",
+        bytes[0], bytes[1], bytes[2], bytes[3]);
+    return dest;
+  }
+  else if (af == ASIO_OS_DEF(AF_INET6))
+  {
+    size_t n = 0, b = 0, z = 0;
+    while (n < length && b < 16)
+    {
+      if (bytes[b] == 0 && bytes[b + 1] == 0 && z == 0)
+      {
+        do b += 2; while (b < 16 && bytes[b] == 0 && bytes[b + 1] == 0);
+        n += sprintf_s(dest + n, length - n, ":%s", b < 16 ? "" : ":"), ++z;
+      }
+      else
+      {
+        n += sprintf_s(dest + n, length - n, "%s%x", b ? ":" : "",
+            (static_cast<u_long_type>(bytes[b]) << 8) | bytes[b + 1]);
+        b += 2;
+      }
+    }
+    if (scope_id)
+      n += sprintf_s(dest + n, length - n, "%%%lu", scope_id);
+    return dest;
+  }
+  else
+  {
+    ec = asio::error::address_family_not_supported;
+    return 0;
+  }
+#elif defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   using namespace std; // For memcpy.
 
-  if (af != AF_INET && af != AF_INET6)
+  if (af != ASIO_OS_DEF(AF_INET) && af != ASIO_OS_DEF(AF_INET6))
   {
     ec = asio::error::address_family_not_supported;
     return 0;
@@ -1666,17 +1961,17 @@ const char* inet_ntop(int af, const void* src, char* dest, size_t length,
     sockaddr_in6_type v6;
   } address;
   DWORD address_length;
-  if (af == AF_INET)
+  if (af == ASIO_OS_DEF(AF_INET))
   {
     address_length = sizeof(sockaddr_in4_type);
-    address.v4.sin_family = AF_INET;
+    address.v4.sin_family = ASIO_OS_DEF(AF_INET);
     address.v4.sin_port = 0;
     memcpy(&address.v4.sin_addr, src, sizeof(in4_addr_type));
   }
   else // AF_INET6
   {
     address_length = sizeof(sockaddr_in6_type);
-    address.v6.sin6_family = AF_INET6;
+    address.v6.sin6_family = ASIO_OS_DEF(AF_INET6);
     address.v6.sin6_port = 0;
     address.v6.sin6_flowinfo = 0;
     address.v6.sin6_scope_id = scope_id;
@@ -1684,11 +1979,12 @@ const char* inet_ntop(int af, const void* src, char* dest, size_t length,
   }
 
   DWORD string_length = static_cast<DWORD>(length);
-#if defined(BOOST_NO_ANSI_APIS)
+#if defined(BOOST_NO_ANSI_APIS) || (defined(_MSC_VER) && (_MSC_VER >= 1800))
   LPWSTR string_buffer = (LPWSTR)_alloca(length * sizeof(WCHAR));
   int result = error_wrapper(::WSAAddressToStringW(&address.base,
         address_length, 0, string_buffer, &string_length), ec);
-  ::WideCharToMultiByte(CP_ACP, 0, string_buffer, -1, dest, length, 0, 0);
+  ::WideCharToMultiByte(CP_ACP, 0, string_buffer, -1,
+      dest, static_cast<int>(length), 0, 0);
 #else
   int result = error_wrapper(::WSAAddressToStringA(
         &address.base, address_length, 0, dest, &string_length), ec);
@@ -1703,32 +1999,181 @@ const char* inet_ntop(int af, const void* src, char* dest, size_t length,
     ec = asio::error::invalid_argument;
 
   return result == socket_error_retval ? 0 : dest;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-  const char* result = error_wrapper(::inet_ntop(af, src, dest, length), ec);
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  const char* result = error_wrapper(::inet_ntop(
+        af, src, dest, static_cast<int>(length)), ec);
   if (result == 0 && !ec)
     ec = asio::error::invalid_argument;
-  if (result != 0 && af == AF_INET6 && scope_id != 0)
+  if (result != 0 && af == ASIO_OS_DEF(AF_INET6) && scope_id != 0)
   {
     using namespace std; // For strcat and sprintf.
     char if_name[IF_NAMESIZE + 1] = "%";
     const in6_addr_type* ipv6_address = static_cast<const in6_addr_type*>(src);
-    bool is_link_local = IN6_IS_ADDR_LINKLOCAL(ipv6_address);
-    if (!is_link_local || if_indextoname(scope_id, if_name + 1) == 0)
+    bool is_link_local = ((ipv6_address->s6_addr[0] == 0xfe)
+        && ((ipv6_address->s6_addr[1] & 0xc0) == 0x80));
+    bool is_multicast_link_local = ((ipv6_address->s6_addr[0] == 0xff)
+        && ((ipv6_address->s6_addr[1] & 0x0f) == 0x02));
+    if ((!is_link_local && !is_multicast_link_local)
+        || if_indextoname(static_cast<unsigned>(scope_id), if_name + 1) == 0)
       sprintf(if_name + 1, "%lu", scope_id);
     strcat(dest, if_name);
   }
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 int inet_pton(int af, const char* src, void* dest,
     unsigned long* scope_id, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS_RUNTIME)
+  using namespace std; // For sscanf.
+  unsigned char* bytes = static_cast<unsigned char*>(dest);
+  if (af == ASIO_OS_DEF(AF_INET))
+  {
+    unsigned int b0, b1, b2, b3;
+    if (sscanf_s(src, "%u.%u.%u.%u", &b0, &b1, &b2, &b3) != 4)
+    {
+      ec = asio::error::invalid_argument;
+      return -1;
+    }
+    if (b0 > 255 || b1 > 255 || b2 > 255 || b3 > 255)
+    {
+      ec = asio::error::invalid_argument;
+      return -1;
+    }
+    bytes[0] = static_cast<unsigned char>(b0);
+    bytes[1] = static_cast<unsigned char>(b1);
+    bytes[2] = static_cast<unsigned char>(b2);
+    bytes[3] = static_cast<unsigned char>(b3);
+    ec = asio::error_code();
+    return 1;
+  }
+  else if (af == ASIO_OS_DEF(AF_INET6))
+  {
+    unsigned char* bytes = static_cast<unsigned char*>(dest);
+    std::memset(bytes, 0, 16);
+    unsigned char back_bytes[16] = { 0 };
+    int num_front_bytes = 0, num_back_bytes = 0;
+    const char* p = src;
+
+    enum { fword, fcolon, bword, scope, done } state = fword;
+    unsigned long current_word = 0;
+    while (state != done)
+    {
+      if (current_word > 0xFFFF)
+      {
+        ec = asio::error::invalid_argument;
+        return -1;
+      }
+
+      switch (state)
+      {
+      case fword:
+        if (*p >= '0' && *p <= '9')
+          current_word = current_word * 16 + *p++ - '0';
+        else if (*p >= 'a' && *p <= 'f')
+          current_word = current_word * 16 + *p++ - 'a' + 10;
+        else if (*p >= 'A' && *p <= 'F')
+          current_word = current_word * 16 + *p++ - 'A' + 10;
+        else
+        {
+          if (num_front_bytes == 16)
+          {
+            ec = asio::error::invalid_argument;
+            return -1;
+          }
+
+          bytes[num_front_bytes++] = (current_word >> 8) & 0xFF;
+          bytes[num_front_bytes++] = current_word & 0xFF;
+          current_word = 0;
+
+          if (*p == ':')
+            state = fcolon, ++p;
+          else if (*p == '%')
+            state = scope, ++p;
+          else if (*p == 0)
+            state = done;
+          else
+          {
+            ec = asio::error::invalid_argument;
+            return -1;
+          }
+        }
+        break;
+
+      case fcolon:
+        if (*p == ':')
+          state = bword, ++p;
+        else
+          state = fword;
+        break;
+
+      case bword:
+        if (*p >= '0' && *p <= '9')
+          current_word = current_word * 16 + *p++ - '0';
+        else if (*p >= 'a' && *p <= 'f')
+          current_word = current_word * 16 + *p++ - 'a' + 10;
+        else if (*p >= 'A' && *p <= 'F')
+          current_word = current_word * 16 + *p++ - 'A' + 10;
+        else
+        {
+          if (num_front_bytes + num_back_bytes == 16)
+          {
+            ec = asio::error::invalid_argument;
+            return -1;
+          }
+
+          back_bytes[num_back_bytes++] = (current_word >> 8) & 0xFF;
+          back_bytes[num_back_bytes++] = current_word & 0xFF;
+          current_word = 0;
+
+          if (*p == ':')
+            state = bword, ++p;
+          else if (*p == '%')
+            state = scope, ++p;
+          else if (*p == 0)
+            state = done;
+          else
+          {
+            ec = asio::error::invalid_argument;
+            return -1;
+          }
+        }
+        break;
+
+      case scope:
+        if (*p >= '0' && *p <= '9')
+          current_word = current_word * 10 + *p++ - '0';
+        else if (*p == 0)
+          *scope_id = current_word, state = done;
+        else
+        {
+          ec = asio::error::invalid_argument;
+          return -1;
+        }
+        break;
+
+      default:
+        break;
+      }
+    }
+
+    for (int i = 0; i < num_back_bytes; ++i)
+      bytes[16 - num_back_bytes + i] = back_bytes[i];
+
+    ec = asio::error_code();
+    return 1;
+  }
+  else
+  {
+    ec = asio::error::address_family_not_supported;
+    return -1;
+  }
+#elif defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   using namespace std; // For memcpy and strcmp.
 
-  if (af != AF_INET && af != AF_INET6)
+  if (af != ASIO_OS_DEF(AF_INET) && af != ASIO_OS_DEF(AF_INET6))
   {
     ec = asio::error::address_family_not_supported;
     return -1;
@@ -1742,8 +2187,8 @@ int inet_pton(int af, const char* src, void* dest,
     sockaddr_in6_type v6;
   } address;
   int address_length = sizeof(sockaddr_storage_type);
-#if defined(BOOST_NO_ANSI_APIS)
-  int num_wide_chars = strlen(src) + 1;
+#if defined(BOOST_NO_ANSI_APIS) || (defined(_MSC_VER) && (_MSC_VER >= 1800))
+  int num_wide_chars = static_cast<int>(strlen(src)) + 1;
   LPWSTR wide_buffer = (LPWSTR)_alloca(num_wide_chars * sizeof(WCHAR));
   ::MultiByteToWideChar(CP_ACP, 0, src, -1, wide_buffer, num_wide_chars);
   int result = error_wrapper(::WSAStringToAddressW(
@@ -1753,7 +2198,7 @@ int inet_pton(int af, const char* src, void* dest,
         const_cast<char*>(src), af, 0, &address.base, &address_length), ec);
 #endif
 
-  if (af == AF_INET)
+  if (af == ASIO_OS_DEF(AF_INET))
   {
     if (result != socket_error_retval)
     {
@@ -1785,41 +2230,96 @@ int inet_pton(int af, const char* src, void* dest,
     ec = asio::error_code();
 
   return result == socket_error_retval ? -1 : 1;
-#else // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-  int result = error_wrapper(::inet_pton(af, src, dest), ec);
+#else // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+  using namespace std; // For strchr, memcpy and atoi.
+
+  // On some platforms, inet_pton fails if an address string contains a scope
+  // id. Detect and remove the scope id before passing the string to inet_pton.
+  const bool is_v6 = (af == ASIO_OS_DEF(AF_INET6));
+  const char* if_name = is_v6 ? strchr(src, '%') : 0;
+  char src_buf[max_addr_v6_str_len + 1];
+  const char* src_ptr = src;
+  if (if_name != 0)
+  {
+    if (if_name - src > max_addr_v6_str_len)
+    {
+      ec = asio::error::invalid_argument;
+      return 0;
+    }
+    memcpy(src_buf, src, if_name - src);
+    src_buf[if_name - src] = 0;
+    src_ptr = src_buf;
+  }
+
+  int result = error_wrapper(::inet_pton(af, src_ptr, dest), ec);
   if (result <= 0 && !ec)
     ec = asio::error::invalid_argument;
-  if (result > 0 && af == AF_INET6 && scope_id)
+  if (result > 0 && is_v6 && scope_id)
   {
     using namespace std; // For strchr and atoi.
     *scope_id = 0;
-    if (const char* if_name = strchr(src, '%'))
+    if (if_name != 0)
     {
       in6_addr_type* ipv6_address = static_cast<in6_addr_type*>(dest);
-      bool is_link_local = IN6_IS_ADDR_LINKLOCAL(ipv6_address);
-      if (is_link_local)
+      bool is_link_local = ((ipv6_address->s6_addr[0] == 0xfe)
+          && ((ipv6_address->s6_addr[1] & 0xc0) == 0x80));
+      bool is_multicast_link_local = ((ipv6_address->s6_addr[0] == 0xff)
+          && ((ipv6_address->s6_addr[1] & 0x0f) == 0x02));
+      if (is_link_local || is_multicast_link_local)
         *scope_id = if_nametoindex(if_name + 1);
       if (*scope_id == 0)
         *scope_id = atoi(if_name + 1);
     }
   }
   return result;
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#endif // defined(ASIO_WINDOWS) || defined(__CYGWIN__)
 }
 
 int gethostname(char* name, int namelen, asio::error_code& ec)
 {
   clear_last_error();
+#if defined(ASIO_WINDOWS_RUNTIME)
+  try
+  {
+    using namespace Windows::Foundation::Collections;
+    using namespace Windows::Networking;
+    using namespace Windows::Networking::Connectivity;
+    IVectorView<HostName^>^ hostnames = NetworkInformation::GetHostNames();
+    for (unsigned i = 0; i < hostnames->Size; ++i)
+    {
+      HostName^ hostname = hostnames->GetAt(i);
+      if (hostname->Type == HostNameType::DomainName)
+      {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        std::string raw_name = converter.to_bytes(hostname->RawName->Data());
+        if (namelen > 0 && raw_name.size() < static_cast<std::size_t>(namelen))
+        {
+          strcpy_s(name, namelen, raw_name.c_str());
+          return 0;
+        }
+      }
+    }
+    return -1;
+  }
+  catch (Platform::Exception^ e)
+  {
+    ec = asio::error_code(e->HResult,
+        asio::system_category());
+    return -1;
+  }
+#else // defined(ASIO_WINDOWS_RUNTIME)
   int result = error_wrapper(::gethostname(name, namelen), ec);
-#if defined(BOOST_WINDOWS)
+# if defined(ASIO_WINDOWS)
   if (result == 0)
     ec = asio::error_code();
-#endif
+# endif // defined(ASIO_WINDOWS)
   return result;
+#endif // defined(ASIO_WINDOWS_RUNTIME)
 }
 
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__) \
-  || defined(__MACH__) && defined(__APPLE__)
+#if !defined(ASIO_WINDOWS_RUNTIME)
+
+#if !defined(ASIO_HAS_GETADDRINFO)
 
 // The following functions are only needed for emulation of getaddrinfo and
 // getnameinfo.
@@ -1839,7 +2339,7 @@ inline asio::error_code translate_netdb_error(int error)
   case NO_DATA:
     return asio::error::no_data;
   default:
-    BOOST_ASSERT(false);
+    ASIO_ASSERT(false);
     return asio::error::invalid_argument;
   }
 }
@@ -1848,7 +2348,7 @@ inline hostent* gethostbyaddr(const char* addr, int length, int af,
     hostent* result, char* buffer, int buflength, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   (void)(buffer);
   (void)(buflength);
   hostent* retval = error_wrapper(::gethostbyaddr(addr, length, af), ec);
@@ -1891,11 +2391,11 @@ inline hostent* gethostbyname(const char* name, int af, struct hostent* result,
     char* buffer, int buflength, int ai_flags, asio::error_code& ec)
 {
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
   (void)(buffer);
   (void)(buflength);
   (void)(ai_flags);
-  if (af != AF_INET)
+  if (af != ASIO_OS_DEF(AF_INET))
   {
     ec = asio::error::address_family_not_supported;
     return 0;
@@ -1908,7 +2408,7 @@ inline hostent* gethostbyname(const char* name, int af, struct hostent* result,
   return result;
 #elif defined(__sun) || defined(__QNX__)
   (void)(ai_flags);
-  if (af != AF_INET)
+  if (af != ASIO_OS_DEF(AF_INET))
   {
     ec = asio::error::address_family_not_supported;
     return 0;
@@ -1933,7 +2433,7 @@ inline hostent* gethostbyname(const char* name, int af, struct hostent* result,
   return retval;
 #else
   (void)(ai_flags);
-  if (af != AF_INET)
+  if (af != ASIO_OS_DEF(AF_INET))
   {
     ec = asio::error::address_family_not_supported;
     return 0;
@@ -1978,22 +2478,22 @@ inline int gai_nsearch(const char* host,
       // No host and AI_PASSIVE implies wildcard bind.
       switch (hints->ai_family)
       {
-      case AF_INET:
+      case ASIO_OS_DEF(AF_INET):
         search[search_count].host = "0.0.0.0";
-        search[search_count].family = AF_INET;
+        search[search_count].family = ASIO_OS_DEF(AF_INET);
         ++search_count;
         break;
-      case AF_INET6:
+      case ASIO_OS_DEF(AF_INET6):
         search[search_count].host = "0::0";
-        search[search_count].family = AF_INET6;
+        search[search_count].family = ASIO_OS_DEF(AF_INET6);
         ++search_count;
         break;
-      case AF_UNSPEC:
+      case ASIO_OS_DEF(AF_UNSPEC):
         search[search_count].host = "0::0";
-        search[search_count].family = AF_INET6;
+        search[search_count].family = ASIO_OS_DEF(AF_INET6);
         ++search_count;
         search[search_count].host = "0.0.0.0";
-        search[search_count].family = AF_INET;
+        search[search_count].family = ASIO_OS_DEF(AF_INET);
         ++search_count;
         break;
       default:
@@ -2005,22 +2505,22 @@ inline int gai_nsearch(const char* host,
       // No host and not AI_PASSIVE means connect to local host.
       switch (hints->ai_family)
       {
-      case AF_INET:
+      case ASIO_OS_DEF(AF_INET):
         search[search_count].host = "localhost";
-        search[search_count].family = AF_INET;
+        search[search_count].family = ASIO_OS_DEF(AF_INET);
         ++search_count;
         break;
-      case AF_INET6:
+      case ASIO_OS_DEF(AF_INET6):
         search[search_count].host = "localhost";
-        search[search_count].family = AF_INET6;
+        search[search_count].family = ASIO_OS_DEF(AF_INET6);
         ++search_count;
         break;
-      case AF_UNSPEC:
+      case ASIO_OS_DEF(AF_UNSPEC):
         search[search_count].host = "localhost";
-        search[search_count].family = AF_INET6;
+        search[search_count].family = ASIO_OS_DEF(AF_INET6);
         ++search_count;
         search[search_count].host = "localhost";
-        search[search_count].family = AF_INET;
+        search[search_count].family = ASIO_OS_DEF(AF_INET);
         ++search_count;
         break;
       default:
@@ -2033,22 +2533,22 @@ inline int gai_nsearch(const char* host,
     // Host is specified.
     switch (hints->ai_family)
     {
-    case AF_INET:
+    case ASIO_OS_DEF(AF_INET):
       search[search_count].host = host;
-      search[search_count].family = AF_INET;
+      search[search_count].family = ASIO_OS_DEF(AF_INET);
       ++search_count;
       break;
-    case AF_INET6:
+    case ASIO_OS_DEF(AF_INET6):
       search[search_count].host = host;
-      search[search_count].family = AF_INET6;
+      search[search_count].family = ASIO_OS_DEF(AF_INET6);
       ++search_count;
       break;
-    case AF_UNSPEC:
+    case ASIO_OS_DEF(AF_UNSPEC):
       search[search_count].host = host;
-      search[search_count].family = AF_INET6;
+      search[search_count].family = ASIO_OS_DEF(AF_INET6);
       ++search_count;
       search[search_count].host = host;
-      search[search_count].family = AF_INET;
+      search[search_count].family = ASIO_OS_DEF(AF_INET);
       ++search_count;
       break;
     default:
@@ -2076,12 +2576,12 @@ inline void gai_free(void* p)
 inline void gai_strcpy(char* target, const char* source, std::size_t max_size)
 {
   using namespace std;
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+#if defined(ASIO_HAS_SECURE_RTL)
   strcpy_s(target, max_size, source);
-#else
+#else // defined(ASIO_HAS_SECURE_RTL)
   *target = 0;
   strncat(target, source, max_size);
-#endif
+#endif // defined(ASIO_HAS_SECURE_RTL)
 }
 
 enum { gai_clone_flag = 1 << 30 };
@@ -2108,23 +2608,23 @@ inline int gai_aistruct(addrinfo_type*** next, const addrinfo_type* hints,
 
   switch (ai->ai_family)
   {
-  case AF_INET:
+  case ASIO_OS_DEF(AF_INET):
     {
       sockaddr_in4_type* sinptr = gai_alloc<sockaddr_in4_type>();
       if (sinptr == 0)
         return EAI_MEMORY;
-      sinptr->sin_family = AF_INET;
+      sinptr->sin_family = ASIO_OS_DEF(AF_INET);
       memcpy(&sinptr->sin_addr, addr, sizeof(in4_addr_type));
       ai->ai_addr = reinterpret_cast<sockaddr*>(sinptr);
       ai->ai_addrlen = sizeof(sockaddr_in4_type);
       break;
     }
-  case AF_INET6:
+  case ASIO_OS_DEF(AF_INET6):
     {
       sockaddr_in6_type* sin6ptr = gai_alloc<sockaddr_in6_type>();
       if (sin6ptr == 0)
         return EAI_MEMORY;
-      sin6ptr->sin6_family = AF_INET6;
+      sin6ptr->sin6_family = ASIO_OS_DEF(AF_INET6);
       memcpy(&sin6ptr->sin6_addr, addr, sizeof(in6_addr_type));
       ai->ai_addr = reinterpret_cast<sockaddr*>(sin6ptr);
       ai->ai_addrlen = sizeof(sockaddr_in6_type);
@@ -2186,7 +2686,7 @@ inline int gai_port(addrinfo_type* aihead, int port, int socktype)
 
     switch (ai->ai_family)
     {
-    case AF_INET:
+    case ASIO_OS_DEF(AF_INET):
       {
         sockaddr_in4_type* sinptr =
           reinterpret_cast<sockaddr_in4_type*>(ai->ai_addr);
@@ -2194,7 +2694,7 @@ inline int gai_port(addrinfo_type* aihead, int port, int socktype)
         ++num_found;
         break;
       }
-    case AF_INET6:
+    case ASIO_OS_DEF(AF_INET6):
       {
         sockaddr_in6_type* sin6ptr =
           reinterpret_cast<sockaddr_in6_type*>(ai->ai_addr);
@@ -2303,10 +2803,10 @@ inline int gai_echeck(const char* host, const char* service,
   // Check combination of family and socket type.
   switch (family)
   {
-  case AF_UNSPEC:
+  case ASIO_OS_DEF(AF_UNSPEC):
     break;
-  case AF_INET:
-  case AF_INET6:
+  case ASIO_OS_DEF(AF_INET):
+  case ASIO_OS_DEF(AF_INET6):
     if (service != 0 && service[0] != '\0')
       if (socktype != 0 && socktype != SOCK_STREAM && socktype != SOCK_DGRAM)
         return EAI_SOCKTYPE;
@@ -2341,18 +2841,18 @@ inline int getaddrinfo_emulation(const char* host, const char* service,
 
   // Supply default hints if not specified by caller.
   addrinfo_type hints = addrinfo_type();
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = ASIO_OS_DEF(AF_UNSPEC);
   if (hintsp)
     hints = *hintsp;
 
   // If the resolution is not specifically for AF_INET6, remove the AI_V4MAPPED
   // and AI_ALL flags.
 #if defined(AI_V4MAPPED)
-  if (hints.ai_family != AF_INET6)
+  if (hints.ai_family != ASIO_OS_DEF(AF_INET6))
     hints.ai_flags &= ~AI_V4MAPPED;
 #endif
 #if defined(AI_ALL)
-  if (hints.ai_family != AF_INET6)
+  if (hints.ai_family != ASIO_OS_DEF(AF_INET6))
     hints.ai_flags &= ~AI_ALL;
 #endif
 
@@ -2372,17 +2872,19 @@ inline int getaddrinfo_emulation(const char* host, const char* service,
     // Check for IPv4 dotted decimal string.
     in4_addr_type inaddr;
     asio::error_code ec;
-    if (socket_ops::inet_pton(AF_INET, sptr->host, &inaddr, 0, ec) == 1)
+    if (socket_ops::inet_pton(ASIO_OS_DEF(AF_INET),
+          sptr->host, &inaddr, 0, ec) == 1)
     {
-      if (hints.ai_family != AF_UNSPEC && hints.ai_family != AF_INET)
+      if (hints.ai_family != ASIO_OS_DEF(AF_UNSPEC)
+          && hints.ai_family != ASIO_OS_DEF(AF_INET))
       {
         freeaddrinfo_emulation(aihead);
         gai_free(canon);
         return EAI_FAMILY;
       }
-      if (sptr->family == AF_INET)
+      if (sptr->family == ASIO_OS_DEF(AF_INET))
       {
-        rc = gai_aistruct(&ainext, &hints, &inaddr, AF_INET);
+        rc = gai_aistruct(&ainext, &hints, &inaddr, ASIO_OS_DEF(AF_INET));
         if (rc != 0)
         {
           freeaddrinfo_emulation(aihead);
@@ -2395,17 +2897,20 @@ inline int getaddrinfo_emulation(const char* host, const char* service,
 
     // Check for IPv6 hex string.
     in6_addr_type in6addr;
-    if (socket_ops::inet_pton(AF_INET6, sptr->host, &in6addr, 0, ec) == 1)
+    if (socket_ops::inet_pton(ASIO_OS_DEF(AF_INET6),
+          sptr->host, &in6addr, 0, ec) == 1)
     {
-      if (hints.ai_family != AF_UNSPEC && hints.ai_family != AF_INET6)
+      if (hints.ai_family != ASIO_OS_DEF(AF_UNSPEC)
+          && hints.ai_family != ASIO_OS_DEF(AF_INET6))
       {
         freeaddrinfo_emulation(aihead);
         gai_free(canon);
         return EAI_FAMILY;
       }
-      if (sptr->family == AF_INET6)
+      if (sptr->family == ASIO_OS_DEF(AF_INET6))
       {
-        rc = gai_aistruct(&ainext, &hints, &in6addr, AF_INET6);
+        rc = gai_aistruct(&ainext, &hints, &in6addr,
+            ASIO_OS_DEF(AF_INET6));
         if (rc != 0)
         {
           freeaddrinfo_emulation(aihead);
@@ -2442,7 +2947,8 @@ inline int getaddrinfo_emulation(const char* host, const char* service,
     }
 
     // Check for address family mismatch if one was specified.
-    if (hints.ai_family != AF_UNSPEC && hints.ai_family != hptr->h_addrtype)
+    if (hints.ai_family != ASIO_OS_DEF(AF_UNSPEC)
+        && hints.ai_family != hptr->h_addrtype)
     {
       freeaddrinfo_emulation(aihead);
       gai_free(canon);
@@ -2538,7 +3044,7 @@ inline asio::error_code getnameinfo_emulation(
   unsigned short port;
   switch (sa->sa_family)
   {
-  case AF_INET:
+  case ASIO_OS_DEF(AF_INET):
     if (salen != sizeof(sockaddr_in4_type))
     {
       return ec = asio::error::invalid_argument;
@@ -2548,7 +3054,7 @@ inline asio::error_code getnameinfo_emulation(
     addr_len = sizeof(in4_addr_type);
     port = reinterpret_cast<const sockaddr_in4_type*>(sa)->sin_port;
     break;
-  case AF_INET6:
+  case ASIO_OS_DEF(AF_INET6):
     if (salen != sizeof(sockaddr_in6_type))
     {
       return ec = asio::error::invalid_argument;
@@ -2615,20 +3121,18 @@ inline asio::error_code getnameinfo_emulation(
       {
         return ec = asio::error::no_buffer_space;
       }
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+#if defined(ASIO_HAS_SECURE_RTL)
       sprintf_s(serv, servlen, "%u", ntohs(port));
-#else
+#else // defined(ASIO_HAS_SECURE_RTL)
       sprintf(serv, "%u", ntohs(port));
-#endif
+#endif // defined(ASIO_HAS_SECURE_RTL)
     }
     else
     {
-#if defined(BOOST_HAS_THREADS) && defined(BOOST_HAS_PTHREADS) \
-      && !defined(ASIO_DISABLE_THREADS)
+#if defined(ASIO_HAS_PTHREADS)
       static ::pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
       ::pthread_mutex_lock(&mutex);
-#endif // defined(BOOST_HAS_THREADS) && defined(BOOST_HAS_PTHREADS)
-       //   && !defined(ASIO_DISABLE_THREADS)
+#endif // defined(ASIO_HAS_PTHREADS)
       servent* sptr = ::getservbyport(port, (flags & NI_DGRAM) ? "udp" : 0);
       if (sptr && sptr->s_name && sptr->s_name[0] != '\0')
       {
@@ -2640,17 +3144,15 @@ inline asio::error_code getnameinfo_emulation(
         {
           return ec = asio::error::no_buffer_space;
         }
-#if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(UNDER_CE)
+#if defined(ASIO_HAS_SECURE_RTL)
         sprintf_s(serv, servlen, "%u", ntohs(port));
-#else
+#else // defined(ASIO_HAS_SECURE_RTL)
         sprintf(serv, "%u", ntohs(port));
-#endif
+#endif // defined(ASIO_HAS_SECURE_RTL)
       }
-#if defined(BOOST_HAS_THREADS) && defined(BOOST_HAS_PTHREADS) \
-      && !defined(ASIO_DISABLE_THREADS)
+#if defined(ASIO_HAS_PTHREADS)
       ::pthread_mutex_unlock(&mutex);
-#endif // defined(BOOST_HAS_THREADS) && defined(BOOST_HAS_PTHREADS)
-       //   && !defined(ASIO_DISABLE_THREADS)
+#endif // defined(ASIO_HAS_PTHREADS)
     }
   }
 
@@ -2658,8 +3160,7 @@ inline asio::error_code getnameinfo_emulation(
   return ec;
 }
 
-#endif // defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-       //   || defined(__MACH__) && defined(__APPLE__)
+#endif // !defined(ASIO_HAS_GETADDRINFO)
 
 inline asio::error_code translate_addrinfo_error(int error)
 {
@@ -2690,7 +3191,7 @@ inline asio::error_code translate_addrinfo_error(int error)
   case EAI_SOCKTYPE:
     return asio::error::socket_type_not_supported;
   default: // Possibly the non-portable EAI_SYSTEM.
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
     return asio::error_code(
         WSAGetLastError(), asio::error::get_system_category());
 #else
@@ -2707,8 +3208,8 @@ asio::error_code getaddrinfo(const char* host,
   host = (host && *host) ? host : 0;
   service = (service && *service) ? service : 0;
   clear_last_error();
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-# if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0501) || defined(UNDER_CE)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+# if defined(ASIO_HAS_GETADDRINFO)
   // Building for Windows XP, Windows Server 2003, or later.
   int error = ::getaddrinfo(host, service, &hints, result);
   return ec = translate_addrinfo_error(error);
@@ -2727,7 +3228,7 @@ asio::error_code getaddrinfo(const char* host,
   int error = getaddrinfo_emulation(host, service, &hints, result);
   return ec = translate_addrinfo_error(error);
 # endif
-#elif defined(__MACH__) && defined(__APPLE__)
+#elif !defined(ASIO_HAS_GETADDRINFO)
   int error = getaddrinfo_emulation(host, service, &hints, result);
   return ec = translate_addrinfo_error(error);
 #else
@@ -2750,8 +3251,8 @@ asio::error_code background_getaddrinfo(
 
 void freeaddrinfo(addrinfo_type* ai)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-# if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0501) || defined(UNDER_CE)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+# if defined(ASIO_HAS_GETADDRINFO)
   // Building for Windows XP, Windows Server 2003, or later.
   ::freeaddrinfo(ai);
 # else
@@ -2767,7 +3268,7 @@ void freeaddrinfo(addrinfo_type* ai)
   }
   freeaddrinfo_emulation(ai);
 # endif
-#elif defined(__MACH__) && defined(__APPLE__)
+#elif !defined(ASIO_HAS_GETADDRINFO)
   freeaddrinfo_emulation(ai);
 #else
   ::freeaddrinfo(ai);
@@ -2778,8 +3279,8 @@ asio::error_code getnameinfo(const socket_addr_type* addr,
     std::size_t addrlen, char* host, std::size_t hostlen,
     char* serv, std::size_t servlen, int flags, asio::error_code& ec)
 {
-#if defined(BOOST_WINDOWS) || defined(__CYGWIN__)
-# if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0501) || defined(UNDER_CE)
+#if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+# if defined(ASIO_HAS_GETADDRINFO)
   // Building for Windows XP, Windows Server 2003, or later.
   clear_last_error();
   int error = ::getnameinfo(addr, static_cast<socklen_t>(addrlen),
@@ -2805,7 +3306,7 @@ asio::error_code getnameinfo(const socket_addr_type* addr,
   return getnameinfo_emulation(addr, addrlen,
       host, hostlen, serv, servlen, flags, ec);
 # endif
-#elif defined(__MACH__) && defined(__APPLE__)
+#elif !defined(ASIO_HAS_GETADDRINFO)
   using namespace std; // For memcpy.
   sockaddr_storage_type tmp_addr;
   memcpy(&tmp_addr, addr, addrlen);
@@ -2867,24 +3368,60 @@ asio::error_code background_getnameinfo(
   return ec;
 }
 
+#endif // !defined(ASIO_WINDOWS_RUNTIME)
+
 u_long_type network_to_host_long(u_long_type value)
 {
+#if defined(ASIO_WINDOWS_RUNTIME)
+  unsigned char* value_p = reinterpret_cast<unsigned char*>(&value);
+  u_long_type result = (static_cast<u_long_type>(value_p[0]) << 24)
+    | (static_cast<u_long_type>(value_p[1]) << 16)
+    | (static_cast<u_long_type>(value_p[2]) << 8)
+    | static_cast<u_long_type>(value_p[3]);
+  return result;
+#else // defined(ASIO_WINDOWS_RUNTIME)
   return ntohl(value);
+#endif // defined(ASIO_WINDOWS_RUNTIME)
 }
 
 u_long_type host_to_network_long(u_long_type value)
 {
+#if defined(ASIO_WINDOWS_RUNTIME)
+  u_long_type result;
+  unsigned char* result_p = reinterpret_cast<unsigned char*>(&result);
+  result_p[0] = static_cast<unsigned char>((value >> 24) & 0xFF);
+  result_p[1] = static_cast<unsigned char>((value >> 16) & 0xFF);
+  result_p[2] = static_cast<unsigned char>((value >> 8) & 0xFF);
+  result_p[3] = static_cast<unsigned char>(value & 0xFF);
+  return result;
+#else // defined(ASIO_WINDOWS_RUNTIME)
   return htonl(value);
+#endif // defined(ASIO_WINDOWS_RUNTIME)
 }
 
 u_short_type network_to_host_short(u_short_type value)
 {
+#if defined(ASIO_WINDOWS_RUNTIME)
+  unsigned char* value_p = reinterpret_cast<unsigned char*>(&value);
+  u_short_type result = (static_cast<u_short_type>(value_p[0]) << 8)
+    | static_cast<u_short_type>(value_p[1]);
+  return result;
+#else // defined(ASIO_WINDOWS_RUNTIME)
   return ntohs(value);
+#endif // defined(ASIO_WINDOWS_RUNTIME)
 }
 
 u_short_type host_to_network_short(u_short_type value)
 {
+#if defined(ASIO_WINDOWS_RUNTIME)
+  u_short_type result;
+  unsigned char* result_p = reinterpret_cast<unsigned char*>(&result);
+  result_p[0] = static_cast<unsigned char>((value >> 8) & 0xFF);
+  result_p[1] = static_cast<unsigned char>(value & 0xFF);
+  return result;
+#else // defined(ASIO_WINDOWS_RUNTIME)
   return htons(value);
+#endif // defined(ASIO_WINDOWS_RUNTIME)
 }
 
 } // namespace socket_ops
