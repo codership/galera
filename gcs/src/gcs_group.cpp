@@ -1757,7 +1757,16 @@ gcs_group_act_conf (gcs_group_t*         group,
     struct gcs_act_cchange conf;
 
     if (GCS_GROUP_PRIMARY == group->state) {
-        if (group->quorum.gcs_proto_ver >= 1) { ++group->act_id_; }
+        if (group->quorum.gcs_proto_ver >= 1)
+        {
+            ++group->act_id_;
+
+            if (group_recount_votes(*group))
+            {
+                conf.vote_seqno = group->vote_result.seqno;
+                conf.vote_res   = group->vote_result.res;
+            }
+        }
         conf.seqno      = group->act_id_;
     } else {
         assert(GCS_GROUP_NON_PRIMARY == group->state);
@@ -1765,13 +1774,6 @@ gcs_group_act_conf (gcs_group_t*         group,
     }
 
     conf.conf_id        = group->conf_id;
-
-    if (group_recount_votes(*group))
-    {
-        conf.vote_seqno = group->vote_result.seqno;
-        conf.vote_res   = group->vote_result.res;
-    }
-
     conf.repl_proto_ver = group->quorum.repl_proto_ver;
     conf.appl_proto_ver = group->quorum.appl_proto_ver;
 
