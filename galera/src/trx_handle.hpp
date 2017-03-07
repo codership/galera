@@ -942,7 +942,6 @@ namespace galera
         }
     };
 
-
     class TrxHandleLock
     {
     public:

@@ -199,6 +199,14 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             abort();
             break;
         }
+
+        if (GCS_NODE_STATE_DONOR != node->status) {
+            assert(0 ==node->desync_count || GCS_NODE_STATE_PRIM==node->status);
+            node->desync_count = 0;
+        }
+        else {
+            assert(node->desync_count > 0);
+        }
     }
     else {
         /* Probably don't want to change anything here, quorum was a failure
@@ -213,8 +221,4 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
     /* Clear bootstrap flag so that it does not get carried to
      * subsequent configuration changes. */
     node->bootstrap = false;
-
-    assert(GCS_NODE_STATE_DONOR == node->status || 0 == node->desync_count);
-    /* node in DONOR/desync state must have desync count > 0 */
-    assert(GCS_NODE_STATE_DONOR != node->status || 0 <  node->desync_count);
 }

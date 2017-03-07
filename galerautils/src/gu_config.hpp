@@ -155,15 +155,17 @@ public:
 
     void print (std::ostream& os, bool include_not_set = false) const;
     /*! Convert string configuration values to other types.
-     *  General template for integers, specialized templates follow below. */
+     *  General template for integers, specialized templates follow below.
+     *  @throw gu::Exception in case conversion failed */
     template <typename T> static inline T
     from_config (const std::string& value)
     {
         const char* str    = value.c_str();
         long long   ret;
+        errno = 0; // this is needed to detect overflow
         const char* endptr = gu_str2ll (str, &ret);
 
-        check_conversion (str, endptr, "integer");
+        check_conversion (str, endptr, "integer", ERANGE == errno);
 
         switch (sizeof(T))
         {
@@ -211,7 +213,8 @@ private:
     key_check (const std::string& key);
 
     static void
-    check_conversion (const char* ptr, const char* endptr, const char* type);
+    check_conversion (const char* ptr, const char* endptr, const char* type,
+                      bool range_error = false);
 
     static char
     overflow_char(long long ret);
@@ -243,9 +246,10 @@ namespace gu
     {
         const char* str    = value.c_str();
         double      ret;
+        errno = 0; // this is needed to detect over/underflow
         const char* endptr = gu_str2dbl (str, &ret);
 
-        check_conversion (str, endptr, "double");
+        check_conversion (str, endptr, "double", ERANGE == errno);
 
         return ret;
     }
