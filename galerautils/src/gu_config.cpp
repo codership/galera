@@ -146,9 +146,10 @@ gu::Config::key_check (const std::string& key)
 void
 gu::Config::check_conversion (const char* str,
                               const char* endptr,
-                              const char* type)
+                              const char* type,
+                              bool range_error)
 {
-    if (endptr == str || endptr[0] != '\0')
+    if (endptr == str || endptr[0] != '\0' || range_error)
     {
         gu_throw_error(EINVAL) << "Invalid value '" << str << "' for " << type
                                << " type.";

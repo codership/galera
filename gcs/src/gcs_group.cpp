@@ -1895,8 +1895,19 @@ gcs_group_param_set(gcs_group_t& group,
 void
 gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
 {
-    std::string const desync_count_val
-        (gu::to_string(group->nodes[group->my_idx].desync_count));
-    status.insert("desync_count", desync_count_val);
+    int desync_count; // make sure it is not initialized
+
+    if (gu_likely(group->my_idx >= 0))
+    {
+        const gcs_node_t& this_node(group->nodes[group->my_idx]);
+
+        desync_count = this_node.desync_count;
+    }
+    else
+    {
+        desync_count = 0;
+    }
+
+    status.insert("desync_count", gu::to_string(desync_count));
 }
 
