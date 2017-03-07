@@ -9,6 +9,7 @@
 
 #include "gcache_memops.hpp"
 #include "gcache_page.hpp"
+#include "gcache_seqno.hpp"
 
 #include <string>
 #include <deque>

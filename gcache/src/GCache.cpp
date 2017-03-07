@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -43,8 +43,10 @@ namespace gcache
         mtx       (),
         cond      (),
         seqno2ptr (),
+        gid       (),
         mem       (params.mem_size(), seqno2ptr),
-        rb        (params.rb_name(), params.rb_size(), seqno2ptr),
+        rb        (params.rb_name(), params.rb_size(), seqno2ptr, gid,
+                   params.recover()),
         ps        (params.dir_name(),
                    params.keep_pages_size(),
                    params.page_size(),
