@@ -250,11 +250,13 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
         seqno = args->state_id->seqno;
     }
 
-    log_info << "End state: " << uuid << ':' << seqno << " #################";
+    log_debug << "End state: " << uuid << ':' << seqno << " #################";
 
     cc_seqno_ = seqno; // is it needed here?
 
     set_initial_position(uuid, seqno);
+    gcache_.seqno_reset(gu::GTID(uuid, seqno));
+    // update gcache position to one supplied by app.
 
     build_stats_vars(wsrep_stats_);
 }
@@ -2062,7 +2064,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (conf.conf_id >= 0) // Primary configuration
     {
-        assert(group_seqno > 0);
+        // if protocol version >= 8, first CC already carries seqno 1,
+        // so it can't be less than 1. For older protocols it can be 0.
+        assert(group_seqno >= (protocol_version_ >= 8));
 
         //
         // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
@@ -2089,7 +2093,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
             if (protocol_version_ < 8)
             {
-                position.set(group_uuid, STATE_SEQNO());
+                position.set(group_uuid, group_seqno);
             }
             else
             {
@@ -2102,12 +2106,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             log_info << "Cert index reset to " << position << " (proto: "
                      << protocol_version_ << "), state transfer needed: "
                      << (st_required ? "yes" : "no");
+            /* flushes service thd, must be called before gcache_.seqno_reset()*/
             cert_.assign_initial_position(position, trx_params_.version_);
-
-            // at this point there is no ongoing master or slave transactions
-            // and no new requests to service thread should be possible
-            if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
-            // make sure all gcache buffers are released
         }
         else
         {
@@ -2132,16 +2132,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         else if (conf.seqno > cert_.position())
         {
             assert(!app_waits_sst);
-            assert(group_uuid  == conf.uuid);
-            assert(group_seqno == conf.seqno);
 
             /* since CC does not pass certification, need to adjust cert
              * position explicitly (when processed in order) */
-            cert_.adjust_position(*view_info, gu::GTID(conf.uuid, conf.seqno),
+            /* flushes service thd, must be called before gcache_.seqno_reset()*/
+            cert_.adjust_position(*view_info, gu::GTID(group_uuid, group_seqno),
                                   trx_params_.version_);
 
-            log_info << "####### Setting monitor position to "
-                     << group_seqno;
+            log_info << "####### Setting monitor position to " << group_seqno;
             set_initial_position(group_uuid, group_seqno - 1);
             cancel_seqno(group_seqno); // cancel CC seqno
 
@@ -2149,6 +2147,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 /* CCs from IST already have seqno assigned and cert. position
                  * adjusted */
+
+                gcache_.seqno_reset(gu::GTID(conf.uuid, conf.seqno - 1));
+
                 if (protocol_version_ >= 8)
                 {
                     gu_trace(gcache_.seqno_assign(cc.buf, conf.seqno,

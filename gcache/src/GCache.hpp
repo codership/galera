@@ -245,8 +245,6 @@ namespace gcache
         std::set<const void*> buf_tracker;
 #endif
 
-        void constructor_common();
-
         /* returns true when successfully discards all seqnos up to s */
         bool discard_seqno (int64_t s);
 

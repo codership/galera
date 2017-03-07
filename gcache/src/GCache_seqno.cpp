@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -164,7 +164,7 @@ namespace gcache
                 /* This means that there are no element with
                  * seqno following seqno_released - and this should not
                  * generally happen. But it looks like stopcont test does it. */
-                if (0 != seqno_released)
+                if (SEQNO_NONE != seqno_released)
                 {
                     log_debug << "Releasing seqno " << seqno << " before "
                               << seqno_released + 1 << " was assigned.";

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -35,7 +35,7 @@ public:
     const std::string& name()  const { return name_; }
     off_t              size()  const { return size_; }
 
-    void               flush() const;
+    void               sync()  const;
 
     void               unlink() const { ::unlink (name_.c_str()); }
 
