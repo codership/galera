@@ -783,7 +783,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (first_reset)
     {
         log_info << "Resetting GCache seqno map due to different histories.";
-        gcache_.seqno_reset();
+        gcache_.seqno_reset(gu::GTID(group_uuid, cc_seqno));
     }
 
     if (sst_req_len != 0)
@@ -829,7 +829,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             {
                 log_info << "Resetting GCache seqno map due to seqno gap: "
                          << STATE_SEQNO() << ".." << sst_seqno_;
-                gcache_.seqno_reset();
+                gcache_.seqno_reset(gu::GTID(sst_uuid_, sst_seqno_));
             }
 
             update_state_uuid (sst_uuid_);

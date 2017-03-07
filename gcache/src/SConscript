@@ -5,6 +5,7 @@ gcache_env = env.Clone()
 
 # Include paths
 gcache_env.Append(CPPPATH = Split('''
+                                     #/common
                                      #/galerautils/src
                                   '''))
 
