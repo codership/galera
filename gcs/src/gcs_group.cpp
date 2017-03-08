@@ -194,7 +194,7 @@ group_nodes_reset (gcs_group_t* group)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
-    gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    gu_seqno_t last_applied = GU_LLONG_MAX;
     int        last_node    = -1;
     int        n;
 

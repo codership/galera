@@ -98,6 +98,10 @@ namespace galera
             bool                  use_ssl_;
             bool                  running_;
             bool                  ready_;
+
+            // GCC 4.8.5 on FreeBSD wants this
+            Receiver(const Receiver&);
+            Receiver& operator=(const Receiver&);
         };
 
         class Sender

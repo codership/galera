@@ -60,7 +60,7 @@ static long long const increment(333333333333LL);
 static int const n_threads(8);
 
 // maximum iterations number (to guarantee no overflow)
-static int const max_iter(GU_LONG_LONG_MAX/increment/n_threads);
+static int const max_iter(GU_LLONG_MAX/increment/n_threads);
 
 // number of iterations capped at 1M, just in case
 static int const iterations(max_iter > 1000000 ? 1000000 : max_iter);
