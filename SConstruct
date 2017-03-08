@@ -53,6 +53,7 @@ Commandline Options:
     debug=n             debug build with optimization level n
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
+    system_asio=[0|1]   use system asio library, if available
     boost_pool=[0|1]    use or not use boost pool allocator
     revno=XXXX          source code revision number
     bpostatic=path      a path to static libboost_program_options.a
@@ -126,6 +127,7 @@ elif machine == 's390x':
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
+system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
@@ -419,14 +421,13 @@ else:
     print 'Not using boost'
 
 # asio
-use_system_asio = False
-if conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
-    use_system_asio = True
+if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYSTEM_ASIO -DHAVE_ASIO_HPP')
 else:
+    system_asio = False
     print "Falling back to bundled asio"
 
-if not use_system_asio:
+if not system_asio:
     # Fall back to embedded asio
     conf.env.Append(CPPPATH = [ '#/asio' ])
     if conf.CheckCXXHeader('asio.hpp'):

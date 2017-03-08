@@ -849,6 +849,20 @@ galera::ReplicatorSMM::abort_trx(TrxHandleMaster* trx, wsrep_seqno_t bf_seqno)
     if (ts)
     {
         log_debug << "aborting ts  " << *ts;
+        if (ts->global_seqno() < bf_seqno)
+        {
+            log_debug << "seqno " << bf_seqno
+                      << " trying to abort seqno " << ts->global_seqno();
+
+            if ((((ts->flags() & TrxHandle::F_BEGIN) == 0) &&
+                 ((ts->flags() & TrxHandle::F_COMMIT) != 0)) &&
+                (trx->state() == TrxHandle::S_APPLYING ||
+                 trx->state() == TrxHandle::S_COMMITTING))
+            {
+                log_debug << "ts abort skipped";
+                return;
+            }
+        }
     }
     else
     {
@@ -992,6 +1006,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
     try
     {
         trx->unlock();
+        GU_DBUG_SYNC_WAIT("before_pre_commit_apply_monitor_enter");
         gu_trace(apply_monitor_.enter(ao));
         trx->lock();
         assert(trx->state() == TrxHandle::S_APPLYING ||
@@ -1042,6 +1057,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
             try
             {
                 trx->unlock();
+                GU_DBUG_SYNC_WAIT("before_pre_commit_commit_monitor_enter");
                 gu_trace(commit_monitor_.enter(co));
                 trx->lock();
                 assert(trx->state() == TrxHandle::S_COMMITTING);
