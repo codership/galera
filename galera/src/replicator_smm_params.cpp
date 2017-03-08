@@ -113,7 +113,7 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
     gcache::GCache::register_params(conf);
     if (gcs_register_params(reinterpret_cast<gu_config_t*>(&conf)))
     {
-        gu_throw_fatal << "Error intializing GCS parameters";
+        gu_throw_fatal << "Error initializing GCS parameters";
     }
     Certification::register_params(conf);
     ist::register_params(conf);
