@@ -8,6 +8,7 @@
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
 #include "gu_debug_sync.hpp"
+#include "gu_progress.hpp"
 
 #include "galera_common.hpp"
 #include <boost/bind.hpp>
@@ -392,6 +393,9 @@ void galera::ist::Receiver::run()
     }
     acceptor_.close();
 
+    /* shall be initialized below, when we know at what seqno preload starts */
+    gu::Progress<wsrep_seqno_t>* progress(NULL);
+
     int ec(0);
 
     try
@@ -452,6 +456,7 @@ void galera::ist::Receiver::run()
 
             if (gu_unlikely(WSREP_SEQNO_UNDEFINED == current_seqno_))
             {
+                assert(!progress);
                 if (act.seqno_g > first_seqno_)
                 {
                     log_error
@@ -460,12 +465,23 @@ void galera::ist::Receiver::run()
                     ec = EINVAL;
                     goto err;
                 }
-                log_info << "####### IST current seqno initialized to " << act.seqno_g;
+                log_info << "####### IST current seqno initialized to "
+                         << act.seqno_g;
                 current_seqno_ = act.seqno_g;
+                progress = new gu::Progress<wsrep_seqno_t>(
+                    "Receiving IST", " events",
+                    last_seqno_ - current_seqno_ + 1,
+                    /* The following means reporting progress NO MORE frequently
+                     * than once per BOTH 10 seconds (default) and 16 events */
+                    16);
             }
             else
             {
+                assert(progress);
+
                 ++current_seqno_;
+
+                progress->update(1);
             }
 
             if (act.seqno_g != current_seqno_)
@@ -524,6 +540,8 @@ void galera::ist::Receiver::run()
                 assert(0);
             }
         }
+
+        progress->finish();
     }
     catch (asio::system_error& e)
     {
@@ -542,6 +560,7 @@ void galera::ist::Receiver::run()
 
 err:
     gcache_.seqno_unlock();
+    delete progress;
     gu::Lock lock(mutex_);
     if (use_ssl_ == true)
     {
