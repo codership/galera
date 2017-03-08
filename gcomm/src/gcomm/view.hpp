@@ -18,6 +18,9 @@
 
 namespace gcomm
 {
+    /*! Some utility exceptions to indicate special conditions. */
+    class ViewParseError {};
+
     typedef enum
     {
         V_NONE     = -1,
