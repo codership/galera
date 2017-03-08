@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2016 Codership Oy <info@codership.com> */
 
 #include "garb_recv_loop.hpp"
 
@@ -26,7 +26,8 @@ RecvLoop::RecvLoop (const Config& config)
     parse_ (gconf_, config_.options()),
     gcs_   (gconf_, config_.name(), config_.address(), config_.group()),
     uuid_  (GU_UUID_NIL),
-    seqno_ (GCS_SEQNO_ILL)
+    seqno_ (GCS_SEQNO_ILL),
+    proto_ (0)
 {
     /* set up signal handlers */
     global_gcs = &gcs_;
@@ -38,13 +39,13 @@ RecvLoop::RecvLoop (const Config& config)
 
     if (sigaction (SIGTERM, &sa, NULL))
     {
-        gu_throw_error(errno) << "Falied to install signal hadler for signal "
+        gu_throw_error(errno) << "Falied to install signal handler for signal "
                               << "SIGTERM";
     }
 
     if (sigaction (SIGINT, &sa, NULL))
     {
-        gu_throw_error(errno) << "Falied to install signal hadler for signal "
+        gu_throw_error(errno) << "Falied to install signal handler for signal "
                               << "SIGINT";
     }
 
@@ -64,8 +65,8 @@ RecvLoop::loop()
         {
         case GCS_ACT_WRITESET:
             seqno_ = act.seqno_g;
-            if (gu_unlikely(!(seqno_ & 127)))
-                /* == report_interval_ of 128 */
+            if (gu_unlikely(proto_ == 0 && !(seqno_ & 127)))
+                /* report_interval_ of 128 in old protocol */
             {
                 gcs_.set_last_applied (gu::GTID(uuid_, seqno_));
             }
@@ -94,6 +95,8 @@ RecvLoop::loop()
                     gcs_.request_state_transfer (config_.sst(),config_.donor());
                     gcs_.join(gu::GTID(cc.uuid, cc.seqno), 0);
                 }
+
+                proto_ = gcs_.proto_ver();
             }
             else
             {

@@ -47,6 +47,7 @@ struct gcs_node
     gcs_segment_t    segment;
     bool             count_last_applied; // should it be counted
     bool             bootstrap; // is part of prim comp bootstrap process
+    bool             arbitrator;
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -105,11 +106,12 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
 static inline void
 gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
-    if (gu_unlikely(seqno < node->last_applied)) {
-        gu_warn ("Received bogus LAST message: %lld, from node %s, "
-                 "expected >= %lld. Ignoring.",
-                 seqno, node->id, node->last_applied);
-    } else {
+    if (gu_unlikely(seqno <= node->last_applied)) {
+        gu_warn ("Received bogus LAST message: %lld from node %s, "
+                 "expected > %lld. Ignoring.",
+                 (long long)seqno, node->id, (long long)node->last_applied);
+    }
+    else {
         node->last_applied = seqno;
     }
 }
@@ -155,6 +157,15 @@ static inline bool
 gcs_node_is_joined (const gcs_node_state_t st)
 {
     return (st >= GCS_NODE_STATE_DONOR);
+}
+
+extern void
+gcs_node_print(std::ostream& os, const gcs_node_t& node);
+
+static inline std::ostream&
+operator << (std::ostream& os, const gcs_node_t& node)
+{
+    gcs_node_print(os, node); return os;
 }
 
 #endif /* _gcs_node_h_ */

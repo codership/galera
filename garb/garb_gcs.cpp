@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2016 Codership Oy <info@codership.com>
  */
 
 #include "garb_gcs.hpp"

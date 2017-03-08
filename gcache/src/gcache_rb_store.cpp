@@ -619,6 +619,13 @@ namespace gcache
            offset = -1;
         }
 
+        log_info << "GCache DEBUG: opened preamble:"
+                 << "\nVersion: " << version
+                 << "\nUUID: " << gid_
+                 << "\nSeqno: " << seqno_min << " - " << seqno_max
+                 << "\nOffset: " << offset
+                 << "\nSynced: " << synced;
+
         if (do_recover)
         {
             if (gid_ != gu::UUID())

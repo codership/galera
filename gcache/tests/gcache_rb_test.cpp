@@ -155,6 +155,7 @@ START_TEST(recovery)
 
             BufferHeader* bh(ptr2BH(ptr));
             bh->seqno_g = g;
+            if (d < 0) bh->flags |= BUFFER_SKIPPED;
         }
 
         void* add_msg(struct msg& m)

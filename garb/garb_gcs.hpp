@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2016 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_GCS_HPP_
 #define _GARB_GCS_HPP_
@@ -28,6 +28,8 @@ public:
     void join (const gu::GTID&, int code);
 
     void set_last_applied(const gu::GTID&);
+
+    int  proto_ver() const { return gcs_proto_ver(gcs_); }
 
     void close ();
 

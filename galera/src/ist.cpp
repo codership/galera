@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2016 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"

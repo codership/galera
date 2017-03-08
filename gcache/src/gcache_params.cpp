@@ -17,7 +17,7 @@ static const std::string GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
 static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
 static const std::string GCACHE_PARAMS_RECOVER    ("gcache.recover");
-static const std::string GCACHE_DEFAULT_RECOVER   ("no");
+static const std::string GCACHE_DEFAULT_RECOVER   ("yes");
 
 const std::string&
 gcache::GCache::PARAMS_DIR                 (GCACHE_PARAMS_DIR);

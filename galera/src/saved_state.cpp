@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
 //
 
 #include "saved_state.hpp"

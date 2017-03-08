@@ -167,6 +167,21 @@ group_nodes_reset (gcs_group_t* group)
     group->frag_reset = true;
 }
 
+/*! @return false
+ *  if the node is arbitrator and must not be counted in commit cut */
+static inline bool
+group_count_arbitrator(const gcs_group_t& group, const gcs_node_t& node)
+{
+    return (!(group.quorum.gcs_proto_ver > 0 && node.arbitrator));
+}
+
+/*! @return true if the node should be counted in commit cut calculations */
+static inline bool
+group_count_last_applied(const gcs_group_t& group, const gcs_node_t& node)
+{
+    return (node.count_last_applied && group_count_arbitrator(group, node));
+}
+
 /* Find node with the smallest last_applied */
 static inline void
 group_redo_last_applied (gcs_group_t* group)
@@ -191,7 +206,7 @@ group_redo_last_applied (gcs_group_t* group)
          *       GCS_BLOCKING_DONOR should never be defined unless in some
          *       very custom builds. Commenting it out for safety sake. */
 #ifndef GCS_BLOCKING_DONOR
-        if (node->count_last_applied
+        if (group_count_last_applied(*group, *node)
 #else
         if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
 #endif
@@ -634,7 +649,8 @@ group_unserialize_code_msg(gcs_group_t* group, const gcs_recv_msg_t* msg,
         if (gu_unlikely(gtid.uuid() != group->group_uuid))
         {
             log_info << gcs_msg_type_string[msg->type] << " message " << *cm
-                     << " from another galaxy. Bye-bye.";
+                     << " from another group (" << gtid.uuid()
+                     << "). Dropping message.";
             return -EINVAL;
         }
     }
@@ -666,6 +682,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     int64_t  code;
 
     if (gu_unlikely(group_unserialize_code_msg(group, msg, gtid,code))) return 0;
+
     if (gu_unlikely(0 != code))
     {
         log_warn << "Bogus " << gcs_msg_type_string[msg->type]
@@ -860,7 +877,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
          GCS_NODE_STATE_DONOR == sender->status)) {
 
         sender->status = GCS_NODE_STATE_SYNCED;
-        sender->count_last_applied = true;
+        sender->count_last_applied = group_count_arbitrator(*group, *sender);
 
         group_redo_last_applied (group); //from now on this node must be counted
 

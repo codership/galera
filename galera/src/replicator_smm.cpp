@@ -1787,8 +1787,8 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
                                                  wsrep_seqno_t const seqno)
 {
     update_state_uuid(uuid);
-    apply_monitor_.set_initial_position(uuid, seqno);
 
+    apply_monitor_.set_initial_position(uuid, seqno);
     if (co_mode_ != CommitOrder::BYPASS)
         commit_monitor_.set_initial_position(uuid, seqno);
 }
@@ -2083,7 +2083,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         assert(group_seqno >= (protocol_version_ >= 8));
 
         //
-        // Starting from protocol_version_ 8 joiner's cert index  is rebuilt
+        // Starting from protocol_version_ 8 joiner's cert index is rebuilt
         // from IST.
         //
         // The reasons to reset cert index:
@@ -2138,7 +2138,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
             gu_trace(gcache_.free(const_cast<void*>(cc.buf)));
 
-            // GCache::Seqno_reset() happens here
+            // GCache::seqno_reset() happens here
             request_state_transfer (recv_ctx,
                                     group_uuid, group_seqno, app_req,
                                     app_req_len);
