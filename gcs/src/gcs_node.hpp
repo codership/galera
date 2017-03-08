@@ -50,6 +50,7 @@ struct gcs_node
     gcs_segment_t    segment;
     bool             count_last_applied; // should it be counted
     bool             bootstrap; // is part of prim comp bootstrap process
+    bool             arbitrator;
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -110,7 +111,7 @@ gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
     if (gu_unlikely(seqno <= node->last_applied)) {
         gu_warn ("Received bogus LAST message: %lld from node %s, "
-                 "expected >= %lld. Ignoring.",
+                 "expected > %lld. Ignoring.",
                  (long long)seqno, node->id, (long long)node->last_applied);
     }
     else {

@@ -137,7 +137,7 @@ gcs_node_set_vote (gcs_node_t* const node,
 
     if (gu_unlikely(seqno <= min_seqno)) {
         gu_warn ("Received bogus VOTE message: %lld.%0llx, from node %s, "
-                 "expected >= %lld. Ignoring.",
+                 "expected > %lld. Ignoring.",
                  (long long)seqno, (long long)vote, node->id,
                  (long long)min_seqno);
     }
@@ -254,9 +254,13 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
          */
         node->status = GCS_NODE_STATE_NON_PRIM;
     }
+
     /* Clear bootstrap flag so that it does not get carried to
      * subsequent configuration changes. */
     node->bootstrap = false;
+
+    node->arbitrator = (gcs_state_msg_flags (node->state_msg) &
+                        GCS_STATE_ARBITRATOR);
 }
 
 void
@@ -276,5 +280,6 @@ gcs_node_print(std::ostream& os, const gcs_node_t& node)
                            << node.appl_proto_ver << '\n'
        << "status:\t " << gcs_node_state_to_str(node.status) << '\n'
        << "segment:  " << node.segment << '\n'
-       << "bootstrp: " << (node.bootstrap ? "YES" : "NO");
+       << "bootstrp: " << (node.bootstrap ? "YES" : "NO") << '\n'
+       << "arbitr: "   << (node.arbitrator ? "YES" : "NO");
 }
