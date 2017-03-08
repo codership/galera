@@ -1500,7 +1500,7 @@ wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
     trx->finalize(lc);
 
     trx->unlock();
-    int err(gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false));
+    int err(gcs_.sendv(actv, actv_size, GCS_ACT_WRITESET, false, false));
     trx->lock();
 
     if (err == -EAGAIN || err == -ENOTCONN || err == -EINTR)

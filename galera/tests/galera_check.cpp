@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2012-2017 Codership Oy <info@codership.com>
  */
 
 #include <cstdlib>
@@ -71,6 +71,8 @@ int main(int argc, char* argv[])
 
     if (log_file != 0) fclose(log_file);
     printf ("Total tests failed: %d\n", failed);
+
+    if (0 == failed && 0 != log_file) ::unlink(LOG_FILE);
 
     return failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

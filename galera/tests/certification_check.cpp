@@ -19,18 +19,30 @@ namespace
 
         TestEnv() :
             conf_   (),
-            init_   (conf_, NULL ,NULL),
+            init_   (conf_),
             gcache_ (conf_, ".")
         { }
 
-        ~TestEnv() {}
+        ~TestEnv() { ::unlink(GCACHE_NAME.c_str()); }
 
         gu::Config&         conf()   { return conf_  ; }
         gcache::GCache&     gcache() { return gcache_; }
     private:
 
+        static std::string const GCACHE_NAME;
+
         gu::Config                        conf_;
-        galera::ReplicatorSMM::InitConfig init_;
+
+        struct Init
+        {
+            galera::ReplicatorSMM::InitConfig init_;
+
+            Init(gu::Config& conf) : init_(conf, NULL, NULL)
+            {
+                conf.set("gcache.name", GCACHE_NAME);
+                conf.set("gcache.size", "1M");
+            }
+        }                                 init_;
         gcache::GCache                    gcache_;
     };
 
@@ -52,6 +64,8 @@ namespace
         size_t data_len;
     };
 }
+
+std::string const TestEnv::GCACHE_NAME = "cert.cache";
 
 static
 void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)

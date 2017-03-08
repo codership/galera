@@ -682,11 +682,8 @@ namespace gcache
                 segment_scans = 1;
         }
 
-        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan ",
-                                         " bytes",
-                                         "PT5S", /* 5 sec */
-                                         1<<22,  /* 4Mb */
-                                         end_ - start_);
+        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan",
+                                         " bytes", end_ - start_, 1<<22 /*4Mb*/);
 
         while (segment_scans < 2)
         {
@@ -948,11 +945,8 @@ namespace gcache
 
             /* now discard all the locked-in buffers (see seqno_reset()) */
             gu::Progress<size_t> progress(
-                "GCache::RingBuffer unused buffers scan ",
-                " bytes",
-                "PT5S", /* 5 sec */
-                1<<22,  /* 4Mb   */
-                size_used_);
+                "GCache::RingBuffer unused buffers scan",
+                " bytes", size_used_, 1<<22 /* 4Mb */);
 
             size_t total(0);
             size_t locked(0);
