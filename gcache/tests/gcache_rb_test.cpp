@@ -138,7 +138,8 @@ START_TEST(recovery)
         gu::UUID     gid;
         RingBuffer   rb;
 
-        rb_ctx(size_t s) : size(s), s2p(), gid(), rb(RB_NAME,size,s2p,gid,true){}
+        rb_ctx(size_t s, bool recover = true) :
+            size(s), s2p(), gid(GID), rb(RB_NAME, size, s2p, gid, recover) {}
 
         void seqno_assign (seqno2ptr_t& s2p, void* const ptr,
                            seqno_t const g, seqno_t const d)
@@ -228,7 +229,7 @@ START_TEST(recovery)
         seqno_max = ctx.s2p.rbegin()->first;
     }
 
-    /* What we have now is |111222***444|----| */
+    /* What we have now is |111222444***|----| */
     /* Reopening of the file should:
      * 1) discard messages 1, 2 since there is a hole at 3. Only 4 should remain
      * 2) trim the trailing unordered message
@@ -394,8 +395,96 @@ START_TEST(recovery)
         fail_if(ctx.s2p.begin()->first  != seqno_max);
         fail_if(ctx.s2p.rbegin()->first != seqno_max);
 
+        fail_if(seqno_max < 1);
+        fail_if(seqno_min != seqno_max);
+    }
+
+    ::unlink(RB_NAME.c_str());
+
+    /* test for singe segment in the middle */
+    void* third_buffer(NULL);
+    {
+        rb_ctx ctx(rb_3size, false);
+
+        fail_if (ctx.rb.size() != ctx.size,
+                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+
+        if (ctx.gid != GID)
+        {
+            std::ostringstream os;
+            os << "Expected GID: " << GID << ", got: " << ctx.gid;
+            fail(os.str().c_str());
+        }
+
+        fail_if(!ctx.s2p.empty());
+
+        void* m(ctx.add_msg(msgs[3]));
+        fail_if (NULL == m);
+        fail_if (ctx.s2p.find(msgs[3].g) != ctx.s2p.end());
+
+        m = ctx.add_msg(msgs[4]);
+        fail_if (NULL == m);
+        fail_if (ctx.s2p.find(msgs[4].g)->second != m);
+
+        m = ctx.add_msg(msgs[5]);
+        fail_if (NULL == m);
+        fail_if (ctx.s2p.find(msgs[5].g) != ctx.s2p.end());
+        third_buffer = m;
+
+        fail_if(ctx.s2p.empty());
+        fail_if(ctx.s2p.size() != 1);
         seqno_min = ctx.s2p.begin()->first;
         seqno_max = ctx.s2p.rbegin()->first;
+        fail_if(seqno_min != seqno_max);
+    }
+
+    /* now the situation should be |***444***| - only one segment, in the middle,
+     * reopen the file with a known position */
+    {
+        rb_ctx ctx(rb_3size);
+
+        fail_if (ctx.rb.size() != ctx.size,
+                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+
+        if (ctx.gid != GID)
+        {
+            std::ostringstream os;
+            os << "Expected GID: " << GID << ", got: " << ctx.gid;
+            fail(os.str().c_str());
+        }
+
+        fail_if(ctx.s2p.empty());
+        fail_if(ctx.s2p.size() != 1);
+        fail_if(seqno_min != ctx.s2p.begin()->first);
+        fail_if(seqno_max != ctx.s2p.rbegin()->first);
+        fail_if(seqno_min != seqno_max);
+    }
+
+    /* now the situation should be |---444---| - only one segment, in the middle,
+     * reopen the file a second time - to trigger a rollover bug */
+    {
+        rb_ctx ctx(rb_3size);
+
+        fail_if (ctx.rb.size() != ctx.size,
+                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+
+        if (ctx.gid != GID)
+        {
+            std::ostringstream os;
+            os << "Expected GID: " << GID << ", got: " << ctx.gid;
+            fail(os.str().c_str());
+        }
+
+        fail_if(ctx.s2p.empty());
+        fail_if(ctx.s2p.size() != 1);
+        fail_if(seqno_min != ctx.s2p.begin()->first);
+        fail_if(seqno_max != ctx.s2p.rbegin()->first);
+        fail_if(seqno_min != seqno_max);
+
+        // must be allocated right after the recovered buffer
+        void* m(ctx.add_msg(msgs[3]));
+        fail_if (NULL == m);
+        fail_if (third_buffer != m);
     }
 
     ::unlink(RB_NAME.c_str());
