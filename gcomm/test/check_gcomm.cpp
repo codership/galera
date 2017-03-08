@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  */
 
 #include "check_gcomm.hpp"
@@ -38,12 +38,14 @@ static GCommSuite suites[] = {
     {"", 0}
 };
 
+#define LOG_FILE "check_gcomm.log"
 
 int main(int argc, char* argv[])
 {
 
     SRunner* sr = srunner_create(0);
     vector<string>* suits = 0;
+    FILE* log_file(0);
 
     if (argc > 1 && !strcmp(argv[1],"nofork")) {
         srunner_set_fork_status(sr, CK_NOFORK);
@@ -51,7 +53,7 @@ int main(int argc, char* argv[])
     else if (argc > 1 && strcmp(argv[1], "nolog") == 0)
     { /* no log redirection */}
     else { // running in the background, loggin' to file
-        FILE* log_file = fopen ("check_gcomm.log", "w");
+        log_file = fopen (LOG_FILE, "w");
         if (!log_file) return EXIT_FAILURE;
         gu_conf_set_log_file (log_file);
 
@@ -90,6 +92,8 @@ int main(int argc, char* argv[])
     log_info << "check_gcomm, run all tests";
     int n_fail = srunner_ntests_failed(sr);
     srunner_free(sr);
+
+    if (0 == n_fail && 0 != log_file) ::unlink(LOG_FILE);
 
     return n_fail == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

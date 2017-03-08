@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 #define __STDC_FORMAT_MACROS
 
@@ -20,7 +20,7 @@ namespace
             GCache_setup(gu::Config& conf) : name_("service_thd_check.gcache")
             {
                 conf.set("gcache.name", name_);
-                conf.set("gcache.size", "4M");
+                conf.set("gcache.size", "1M");
                 log_info << "conf for gcache: " << conf;
             }
 
