@@ -43,12 +43,18 @@ static inline size_t gu_avphys_bytes()
 
 #include <limits.h>
 
-#define GU_ULONG_MAX      ULONG_MAX
-#define GU_LONG_MAX       LONG_MAX
-#define GU_LONG_MIN       LONG_MIN
+#define GU_ULONG_MAX  ULONG_MAX
+#define GU_LONG_MAX   LONG_MAX
+#define GU_LONG_MIN   LONG_MIN
 
-#define GU_ULONG_LONG_MAX 0xffffffffffffffffULL
-#define GU_LONG_LONG_MAX  0x7fffffffffffffffLL
-#define GU_LONG_LONG_MIN  (-GU_LONG_LONG_MAX - 1)
+#ifdef ULLONG_MAX
+#define GU_ULLONG_MAX ULLONG_MAX
+#define GU_LLONG_MAX  LLONG_MAX
+#define GU_LLONG_MIN  LLONG_MIN
+#else
+#define GU_ULLONG_MAX 0xffffffffffffffffULL
+#define GU_LLONG_MAX  0x7fffffffffffffffLL
+#define GU_LLONG_MIN  (-GU_LONG_LONG_MAX - 1)
+#endif
 
 #endif /* _gu_limits_h_ */

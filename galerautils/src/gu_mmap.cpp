@@ -15,6 +15,11 @@
 #include <cerrno>
 #include <sys/mman.h>
 
+#if defined(__FreeBSD__) && defined(MAP_NORESERVE)
+/* FreeBSD has never implemented this flags and will deprecate it. */
+#undef MAP_NORESERVE
+#endif
+
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
 #endif
@@ -40,8 +45,15 @@ namespace gu
 #if defined(MADV_DONTFORK)
         if (posix_madvise (ptr, size, MADV_DONTFORK))
         {
+#   define MMAP_INHERIT_OPTION "MADV_DONTFORK"
+#elif defined(__FreeBSD__)
+        if (minherit (ptr, size, INHERIT_NONE))
+        {
+#   define MMAP_INHERIT_OPTION "INHERIT_NONE"
+#endif
+#if defined(MMAP_INHERIT_OPTION)
             int const err(errno);
-            log_warn << "Failed to set MADV_DONTFORK on " << fd.name()
+            log_warn << "Failed to set " MMAP_INHERIT_OPTION " on " << fd.name()
                      << ": " << err << " (" << strerror(err) << ")";
         }
 #endif

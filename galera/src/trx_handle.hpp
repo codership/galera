@@ -24,6 +24,7 @@
 #include "gu_vector.hpp"
 #include "gu_shared_ptr.hpp"
 #include "gcs.hpp"
+#include "gu_limits.h" // page size stuff
 
 #include <set>
 
