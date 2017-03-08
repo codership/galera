@@ -221,6 +221,8 @@ std::istream& gcomm::View::read_stream(std::istream& is)
             uuid.read_stream(istr);
             node.read_stream(istr);
             add_member(uuid, node.segment());
+        } else {
+            throw gcomm::ViewParseError();
         }
     }
     return is;
@@ -248,6 +250,8 @@ std::istream& gcomm::ViewState::read_stream(std::istream& is)
         } else if (param == "#vwbeg") {
             // read from next line.
             view_.read_stream(is);
+        } else {
+            throw gcomm::ViewParseError();
         }
     }
     return is;
@@ -390,6 +394,10 @@ bool gcomm::ViewState::read_file()
         read_stream(ifs);
         ifs.close();
         return true;
+    } catch (gcomm::ViewParseError& e) {
+        log_warn << "error parsing file(" << file_name_ << ") "
+                 << "can't restore pc from said file";
+        return false;
     } catch (const std::exception& e) {
         log_warn << "read file(" << file_name_ << ") failed("
                  << e.what() << ")";
