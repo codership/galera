@@ -224,6 +224,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_JOINED, S_CLOSED));
     state_.add_transition(Transition(S_JOINED, S_CONNECTED));
     state_.add_transition(Transition(S_JOINED, S_SYNCED));
+    // the following is possible if one desync() immediately follows another
+    state_.add_transition(Transition(S_JOINED, S_DONOR));
 
     state_.add_transition(Transition(S_SYNCED, S_CLOSED));
     state_.add_transition(Transition(S_SYNCED, S_CONNECTED));
