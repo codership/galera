@@ -355,6 +355,10 @@ extern gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn);
 extern long
 gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid);
 
+/*! @return currently established GCS protocol */
+extern int
+gcs_proto_ver(gcs_conn_t* conn);
+
 /*! @brief Vote on the error code that resulted from processing the gtid action.
  *
  * Blocks until consensus is reached or call fails.

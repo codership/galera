@@ -1553,10 +1553,4 @@ gcs_core_get_fifo (gcs_core_t* core)
     return core->fifo;
 }
 
-int
-gcs_core_get_proto (gcs_core_t* core)
-{
-    return core->proto_ver;
-}
-
 #endif /* GCS_CORE_TESTING */

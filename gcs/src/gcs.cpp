@@ -2051,8 +2051,8 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
     return ret;
 }
 
-static int
-proto_ver(gcs_conn_t* conn)
+int
+gcs_proto_ver(gcs_conn_t* conn)
 {
     return gcs_core_proto_ver(conn->core);
 }
@@ -2061,7 +2061,7 @@ int
 gcs_vote (gcs_conn_t* const conn, const gu::GTID& gtid, uint64_t const code,
           const void* const msg, size_t const msg_len)
 {
-    if (proto_ver(conn) < 1)
+    if (gcs_proto_ver(conn) < 1)
     {
         assert(code != 0); // should be here only our own initiative
         log_error << "Not all group members support inconsistency voting. "
