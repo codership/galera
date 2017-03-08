@@ -10,6 +10,8 @@
 #include <gu_logger.hpp>
 #include <gu_throw.hpp>
 #include <gu_progress.hpp>
+#include <gu_hexdump.hpp>
+#include <gu_hash.h>
 
 #include <cassert>
 
@@ -646,7 +648,7 @@ namespace gcache
             }
             else
             {
-                log_warn << "Skipped GCache ring buffer recovery: could not "
+                log_info << "Skipped GCache ring buffer recovery: could not "
                     "determine history UUID.";
             }
         }
@@ -720,23 +722,69 @@ namespace gcache
                     {
                         collision_count++;
 
-                        log_info <<"Attempt to reuse the same seqno: " << seqno_g
-                                 << ". New ptr = " << static_cast<void*>(bh+1)
-                                 << ", previous ptr = " << res.first->second;
+                        /* compare two buffers */
+                        const void* const old_ptr(res.first->second);
+                        BufferHeader* const old_bh
+                            (old_ptr ? ptr2BH(old_ptr) : NULL);
+
+                        bool const same_meta(NULL != old_bh &&
+                            bh->seqno_g == old_bh->seqno_g  &&
+                            bh->size    == old_bh->size     &&
+                            bh->flags   == old_bh->flags);
+
+                        const void* const new_ptr(static_cast<void*>(bh+1));
+
+                        uint8_t cs_old[16] = { 0, };
+                        uint8_t cs_new[16] = { 0, };
+                        if (same_meta)
+                        {
+                            gu_fast_hash128(old_ptr,
+                                            old_bh->size - sizeof(BufferHeader),
+                                            cs_old);
+                            gu_fast_hash128(new_ptr,
+                                            bh->size - sizeof(BufferHeader),
+                                            cs_new);
+                        }
+
+                        bool const same_data(same_meta &&
+                                             !::memcmp(cs_old, cs_new,
+                                                       sizeof(cs_old)));
+                        std::ostringstream msg;
+
+                        msg << "Attempt to reuse the same seqno: " << seqno_g
+                            << ". New ptr = " << new_ptr << ", " << bh
+                            << ", cs: " << gu::Hexdump(cs_new, sizeof(cs_new))
+                            << ", previous ptr = " << res.first->second;
 
                         empty_buffer(bh); // this buffer is unusable
                         assert(BH_is_released(bh));
 
-                        if (res.first->second != NULL)
+                        if (old_bh != NULL)
                         {
-                            BufferHeader* b(ptr2BH(res.first->second));
-                            empty_buffer(b);
-                            assert(BH_is_released(b));
-                            res.first->second = NULL; // mark entry as invalid
-                            // but don't remove from the map to block this seqno
+                            msg << ", " << old_bh << ", cs: "
+                                << gu::Hexdump(cs_old,sizeof(cs_old));
+
+                            if (!same_data) // no way to choose which is correct
+                            {
+                                empty_buffer(old_bh);
+                                assert(BH_is_released(old_bh));
+                                res.first->second = NULL;
+                                /* mark entry as invalid, but don't remove from
+                                 * the map to block this seqno */
+
+                                if (erase_up_to < seqno_g) erase_up_to = seqno_g;
+                            }
                         }
 
-                        if (erase_up_to < seqno_g) erase_up_to = seqno_g;
+                        log_info << msg.str();
+
+                        if (same_data) {
+                            log_info << "Contents are the same, discarding "
+                                     << new_ptr;
+                        } else {
+                            assert(NULL == res.first->second);
+                            log_info << "Contents differ. Discarding both.";
+                        }
                     }
                 }
 
@@ -894,7 +942,7 @@ namespace gcache
                 /* clear up seqno2ptr map */
                 for (; r != seqno2ptr_.rend(); ++r)
                 {
-                    empty_buffer(ptr2BH(r->second));
+                    if (r->second) empty_buffer(ptr2BH(r->second));
                 }
                 seqno2ptr_.erase(seqno2ptr_.begin(), seqno2ptr_.find(seqno_min));
             }
