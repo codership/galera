@@ -423,7 +423,7 @@ else:
 
 # asio
 if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
-    conf.env.Append(CPPFLAGS = ' -DHAVE_SYSTEM_ASIO -DHAVE_ASIO_HPP')
+    conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     system_asio = False
     print "Falling back to bundled asio"
