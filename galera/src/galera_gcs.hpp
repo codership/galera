@@ -37,7 +37,7 @@ namespace galera
         typedef WriteSetNG::GatherVector WriteSetVector;
 
         virtual ssize_t sendv(const WriteSetVector&, size_t,
-                              gcs_act_type_t, bool) = 0;
+                              gcs_act_type_t, bool, bool) = 0;
         virtual ssize_t send (const void*, size_t, gcs_act_type_t, bool) = 0;
         virtual ssize_t replv(const WriteSetVector&,
                               gcs_action& act, bool) = 0;
@@ -120,9 +120,9 @@ namespace galera
         }
 
         ssize_t sendv(const WriteSetVector& actv, size_t act_len,
-                      gcs_act_type_t act_type, bool scheduled)
+                      gcs_act_type_t act_type, bool scheduled, bool grab)
         {
-            return gcs_sendv(conn_, &actv[0], act_len, act_type, scheduled);
+            return gcs_sendv(conn_, &actv[0], act_len, act_type, scheduled, grab);
         }
 
         ssize_t send(const void* act, size_t act_len, gcs_act_type_t act_type,
@@ -278,7 +278,7 @@ namespace galera
 
         ssize_t recv(gcs_action& act);
 
-        ssize_t sendv(const WriteSetVector&, size_t, gcs_act_type_t, bool)
+        ssize_t sendv(const WriteSetVector&, size_t, gcs_act_type_t, bool, bool)
         { return -ENOSYS; }
 
         ssize_t send(const void*, size_t, gcs_act_type_t, bool)

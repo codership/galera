@@ -46,10 +46,8 @@ gcs_sm_create (long len, long n)
     if (sm) {
         sm_init_stats (&sm->stats);
         gu_mutex_init (&sm->lock, NULL);
-#ifdef GCS_SM_GRAB_RELEASE
         gu_cond_init  (&sm->cond, NULL);
         sm->cond_wait   = 0;
-#endif /* GCS_SM_GRAB_RELEASE */
         sm->wait_q_len  = len;
         sm->wait_q_mask = sm->wait_q_len - 1;
         sm->wait_q_head = 1;
@@ -94,7 +92,7 @@ gcs_sm_close (gcs_sm_t* sm)
     while (sm->users > 0) { // wait for cleared queue
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
-        _gcs_sm_enqueue_common (sm, &cond, true);
+        _gcs_sm_enqueue_common (sm, &cond, true, sm->wait_q_tail);
         sm->users--;
         GCS_SM_INCREMENT(sm->wait_q_head);
     }

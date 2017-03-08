@@ -177,6 +177,7 @@ extern const char* gcs_act_type_to_str(gcs_act_type_t);
  * @param act_size   total action size (the sum of buffer sizes)
  * @param act_type   action type
  * @param scheduled  whether the call was scheduled by gcs_schedule()
+ * @param grab       use gcs_sm_grab() instead of gcs_sm_enter()
  * @return           negative error code, action size in case of success
  * @retval -EINTR    thread was interrupted while waiting to enter the monitor
  */
@@ -184,7 +185,8 @@ extern long gcs_sendv (gcs_conn_t*          conn,
                        const struct gu_buf* act_bufs,
                        size_t               act_size,
                        gcs_act_type_t       act_type,
-                       bool                 scheduled);
+                       bool                 scheduled,
+                       bool                 grab);
 
 /*! A wrapper for single buffer communication */
 static inline long gcs_send (gcs_conn_t*    const conn,
@@ -194,7 +196,7 @@ static inline long gcs_send (gcs_conn_t*    const conn,
                              bool           const scheduled)
 {
     struct gu_buf const buf = { act, static_cast<ssize_t>(act_size) };
-    return gcs_sendv (conn, &buf, act_size, act_type, scheduled);
+    return gcs_sendv (conn, &buf, act_size, act_type, scheduled, false);
 }
 
 /*!*/

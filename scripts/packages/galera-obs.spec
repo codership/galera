@@ -157,7 +157,7 @@ export CXX=g++-4.7
 
 NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
-scons -j$(echo $NUM_JOBS) revno=%{revision}
+scons -j$(echo $NUM_JOBS) revno=%{revision} deterministic_tests=1
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-4-4.x-44.1.x86_64

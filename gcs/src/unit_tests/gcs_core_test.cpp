@@ -189,23 +189,22 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
 
     // action is ordered only if it is of type GCS_ACT_WRITESET or
     // GCS_ACT_CCHANGE and not an error
-    if (act->seqno >= GCS_SEQNO_NIL) {
-        FAIL_IF (GCS_ACT_WRITESET != act->type && GCS_ACT_CCHANGE != act->type,
+    if (act->seqno > GCS_SEQNO_ILL) {
+        FAIL_IF (GCS_ACT_WRITESET != act->type && GCS_ACT_CCHANGE != act->type
+                 && act->seqno > 0,
                  "GCS_ACT_WRITESET != act->type (%d), while act->seqno: %lld",
                  act->type, (long long)act->seqno);
 
-        if (GCS_ACT_CCHANGE != act->type)
+        if (GCS_ACT_WRITESET == act->type)
         {
+            assert((*seqno + 1) == act->seqno);
             FAIL_IF ((*seqno + 1) != act->seqno,
                      "expected seqno %lld, got %lld",
                      (long long)(*seqno + 1), (long long)act->seqno);
-
             *seqno = *seqno + 1;
         }
-        else
+        else if (GCS_ACT_CCHANGE == act->type)
         {
-            assert(GCS_ACT_CCHANGE == act->type);
-
             FAIL_IF (act->seqno < 0, "Negative seqno: %lld",
                      (long long)act->seqno);
 

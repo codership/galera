@@ -23,7 +23,7 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/misc.sh
 
 echo "##################################################################"
-echo "##             regression test for lp:1089490"
+echo "##             regression test for lp:1206129"
 echo "##################################################################"
 
 echo "restarting cluster"
