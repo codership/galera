@@ -47,6 +47,11 @@ namespace galera
             wsrep_seqno_t finished();
             void          run();
 
+            wsrep_seqno_t current_seqno()   { return current_seqno_; }
+            wsrep_seqno_t first_seqno()     { return first_seqno_; }
+            wsrep_seqno_t last_seqno()      { return last_seqno_; }
+            bool          running()         { return running_; }
+
         private:
 
             void interrupt();
@@ -103,6 +108,7 @@ namespace galera
 
             std::stack<Consumer*> consumers_;
             wsrep_seqno_t         current_seqno_;
+            wsrep_seqno_t         first_seqno_;
             wsrep_seqno_t         last_seqno_;
             gu::Config&           conf_;
             TrxHandle::SlavePool& trx_pool_;
