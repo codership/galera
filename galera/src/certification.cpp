@@ -849,17 +849,17 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd, gcache::
 
 galera::Certification::~Certification()
 {
-    log_info << "cert index usage at exit "   << cert_index_.size();
-    log_info << "cert trx map usage at exit " << trx_map_.size();
-    log_info << "deps set usage at exit "     << deps_set_.size();
+    log_debug << "cert index usage at exit "   << cert_index_.size();
+    log_debug << "cert trx map usage at exit " << trx_map_.size();
+    log_debug << "deps set usage at exit "     << deps_set_.size();
 
     double avg_cert_interval(0);
     double avg_deps_dist(0);
     size_t index_size(0);
     stats_get(avg_cert_interval, avg_deps_dist, index_size);
-    log_info << "avg deps dist "              << avg_deps_dist;
-    log_info << "avg cert interval "          << avg_cert_interval;
-    log_info << "cert index size "            << index_size;
+    log_debug << "avg deps dist "              << avg_deps_dist;
+    log_debug << "avg cert interval "          << avg_cert_interval;
+    log_debug << "cert index size "            << index_size;
 
     gu::Lock lock(mutex_);
 

@@ -51,9 +51,9 @@ galera::Wsdb::Wsdb()
 
 galera::Wsdb::~Wsdb()
 {
-    log_info << "wsdb trx map usage " << trx_map_.size()
+    log_debug << "wsdb trx map usage " << trx_map_.size()
              << " conn query map usage " << conn_map_.size();
-    log_info << trx_pool_;
+    log_debug << trx_pool_;
 
     // With debug builds just print trx and query maps to stderr
     // and don't clean up to let valgrind etc to detect leaks.

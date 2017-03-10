@@ -302,7 +302,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
 galera::ReplicatorSMM::~ReplicatorSMM()
 {
-    log_info << "dtor state: " << state_();
+    log_debug << "dtor state: " << state_();
     switch (state_())
     {
     case S_CONNECTED:
