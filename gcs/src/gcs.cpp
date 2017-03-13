@@ -105,6 +105,7 @@ struct gcs_conn
 {
     long  my_idx;
     long  memb_num;
+    long  non_arb_memb_count;   /* count of non-arb members in cluster */
     char* my_name;
     char* channel;
     char* socket;
@@ -784,7 +785,7 @@ _set_fc_limits (gcs_conn_t* conn)
     /* Killing two birds with one stone: flat FC profile for master-slave setups
      * plus #440: giving single node some slack at some math correctness exp.*/
     double const fn
-        (conn->params.fc_master_slave ? 1.0 : sqrt(double(conn->memb_num)));
+        (conn->params.fc_master_slave ? 1.0 : sqrt(double(conn->non_arb_memb_count)));
 
     conn->upper_limit = conn->params.fc_base_limit * fn + .5;
     conn->lower_limit = conn->upper_limit * conn->params.fc_resume_factor + .5;
@@ -871,10 +872,26 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     {
         /* reset flow control as membership is most likely changed */
         if (!gu_mutex_lock (&conn->fc_lock)) {
+
             conn->stop_sent   = 0;
             conn->stop_count  = 0;
             conn->conf_id     = conf->conf_id;
             conn->memb_num    = conf->memb_num;
+
+            // Count the number of non-arb members, this will be
+            // used for the fc_limit calculations
+            long    non_arb_memb_count = 0;
+            const char *  ptr = &conf->data[0];
+            for (long i=0; i < conf->memb_num; i++)
+            {
+                ptr += strlen(ptr) + 1;     // move past the ID
+                ptr += strlen(ptr) + 1;     // move past the name
+                if (*ptr)                   // 0-length IP addr indicates an ARB
+                    non_arb_memb_count += 1;
+                ptr += strlen(ptr) + 1;     // move past the IP address
+                ptr += sizeof(gcs_seqno_t); // move past the gcs_seqno_t
+            }
+            conn->non_arb_memb_count = non_arb_memb_count;
 
             _set_fc_limits (conn);
 
