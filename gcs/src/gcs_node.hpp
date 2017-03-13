@@ -11,12 +11,12 @@
 #ifndef _gcs_node_h_
 #define _gcs_node_h_
 
-#include <errno.h>
-
 #include "gcs.hpp"
 #include "gcs_defrag.hpp"
 #include "gcs_comp_msg.hpp"
 #include "gcs_state_msg.hpp"
+
+#include <ostream>
 
 #define NODE_NO_ID   "undefined"
 #define NODE_NO_NAME "unspecified"

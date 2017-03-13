@@ -294,6 +294,8 @@ namespace galera
         {
             gu::Lock lock(mutex_);
 
+            state_debug_print("drain", seqno);
+
             while (drain_seqno_ != GU_LLONG_MAX)
             {
                 lock.wait(cond_);

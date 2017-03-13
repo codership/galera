@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 /*
- * Message types. 
+ * Message types.
  */
 
 #ifndef _gcs_msg_type_h_
@@ -30,7 +30,7 @@ gcs_msg_type_t;
 
 extern const char* gcs_msg_type_string[GCS_MSG_MAX];
 
-/* Types of private actions - should not care, 
+/* Types of private actions - should not care,
  * must be defined and used by the application */
 
 /* Types of regular configuration mesages (both PRIM/NON_PRIM) */

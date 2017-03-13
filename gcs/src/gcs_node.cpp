@@ -4,9 +4,11 @@
  * $Id$
  */
 
+#include "gcs_node.hpp"
+#include "gcs_state_msg.hpp"
 #include <stdlib.h>
 
-#include "gcs_node.hpp"
+#include <gu_utils.hpp> // gu::PrintBase
 
 /*! Initialize node context */
 void
@@ -106,6 +108,8 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
     // copy relevant stuff from state msg into node
     node->status = gcs_state_msg_current_state (state_msg);
 
+    node->last_applied = gcs_state_msg_last_applied(state_msg);
+
     gcs_state_msg_get_proto_ver (state_msg,
                                  &node->gcs_proto_ver,
                                  &node->repl_proto_ver,
@@ -133,7 +137,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             // node was a part of this group
             gcs_seqno_t node_act_id = gcs_state_msg_received (node->state_msg);
 
-             if (node_act_id == quorum->act_id) {
+            if (node_act_id == quorum->act_id) {
                 const gcs_node_state_t last_prim_state =
                     gcs_state_msg_prim_state (node->state_msg);
 
@@ -160,6 +164,8 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 }
                 node->status = GCS_NODE_STATE_PRIM;
             }
+
+            node->last_applied = gcs_state_msg_last_applied(node->state_msg);
         }
         else {
             // node joins completely different group, clear all status
@@ -188,8 +194,9 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             node->count_last_applied =(gcs_state_msg_flags (node->state_msg) &
                                        GCS_STATE_FCLA);
             break;
-        case GCS_NODE_STATE_JOINER:
         case GCS_NODE_STATE_PRIM:
+            node->last_applied = 0;
+        case GCS_NODE_STATE_JOINER:
             node->count_last_applied = false;
             break;
         case GCS_NODE_STATE_NON_PRIM:

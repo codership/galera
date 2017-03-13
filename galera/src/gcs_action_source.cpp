@@ -64,17 +64,17 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
                               TrxHandleSlaveDeleter());
         gu_trace(tsp->unserialize<true>(act));
-
+        tsp->set_local(replicator_.source_id() == tsp->source_id());
         gu_trace(replicator_.process_trx(recv_ctx, tsp));
         exit_loop = tsp->exit_loop(); // this is the end of trx lifespan
         break;
     }
     case GCS_ACT_COMMIT_CUT:
     {
-        wsrep_seqno_t seq;
-        gu::unserialize8(static_cast<const gu::byte_t*>(act.buf), act.size, 0,
-                         seq);
-        gu_trace(replicator_.process_commit_cut(seq, act.seqno_l));
+        wsrep_seqno_t seqno;
+        gu::unserialize8(act.buf, act.size, 0, seqno);
+        assert(seqno >= 0);
+        gu_trace(replicator_.process_commit_cut(seqno, act.seqno_l));
         break;
     }
     case GCS_ACT_CCHANGE:
