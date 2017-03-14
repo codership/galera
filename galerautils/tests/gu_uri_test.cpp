@@ -467,6 +467,91 @@ START_TEST(uri_test_multihost)
 }
 END_TEST
 
+START_TEST(uri_IPv6)
+{
+    std::string const ip("[2001:db8:85a3::8a2e:370:7334]");
+    std::string const ip_unescaped("2001:db8:85a3::8a2e:370:7334");
+    std::string const port("789");
+    std::string const addr(ip + ':' + port);
+    std::string const localhost("[::1]");
+    std::string const localhost_unescaped("::1");
+    std::string const default_unescaped("::");
+    std::string const invalid("[2001:db8:85a3::8a2e:370:7334[:789");
+
+    try
+    {
+        URI u(ip, false);
+        fail_unless (u.get_host() == ip);
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(ip_unescaped, false);
+        fail_unless (u.get_host() == ip_unescaped);
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(addr, false);
+        fail_unless (u.get_host() == ip);
+        fail_unless (u.get_port() == port);
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(localhost, false);
+        fail_unless (u.get_host() == localhost);
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(localhost_unescaped, false);
+        fail_unless (u.get_host() == localhost_unescaped);
+        log_info << "host: " <<  u.get_host();
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(default_unescaped, false);
+        fail_unless (u.get_host() == default_unescaped);
+    }
+    catch (gu::Exception& e)
+    {
+        fail(e.what());
+    }
+
+    try
+    {
+        URI u(invalid, false);
+        fail("invalid uri accepted");
+    }
+    catch (gu::Exception& e)
+    {
+        fail_if (e.get_errno() != EINVAL);
+    }
+}
+END_TEST
+
 Suite *gu_uri_suite(void)
 {
   Suite *s  = suite_create("galerautils++ URI");
@@ -478,6 +563,7 @@ Suite *gu_uri_suite(void)
   tcase_add_test  (tc, uri_test3);
   tcase_add_test  (tc, uri_non_strict);
   tcase_add_test  (tc, uri_test_multihost);
+  tcase_add_test  (tc, uri_IPv6);
 
   return s;
 }
