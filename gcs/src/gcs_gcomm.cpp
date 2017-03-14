@@ -212,7 +212,7 @@ public:
         current_view_(),
         prof_("gcs_gcomm")
     {
-        log_info << "backend: " << net_->type();
+        log_debug << "backend: " << net_->type();
     }
 
     ~GCommConn()

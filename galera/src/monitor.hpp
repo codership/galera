@@ -72,13 +72,13 @@ namespace galera
             delete[] process_;
             if (entered_ > 0)
             {
-                log_info << "mon: entered " << entered_
+                log_debug << "mon: entered " << entered_
                          << " oooe fraction " << double(oooe_)/entered_
                          << " oool fraction " << double(oool_)/entered_;
             }
             else
             {
-                log_info << "apply mon: entered 0";
+                log_debug << "apply mon: entered 0";
             }
         }
 

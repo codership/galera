@@ -102,6 +102,7 @@ typedef enum status_vars
     STATS_FC_SENT,
     STATS_FC_RECEIVED,
     STATS_FC_INTERVAL,
+    STATS_FC_STATUS,
     STATS_CERT_DEPS_DISTANCE,
     STATS_APPLY_OOOE,
     STATS_APPLY_OOOL,
@@ -116,6 +117,7 @@ typedef enum status_vars
     STATS_GCACHE_POOL_SIZE,
     STATS_CAUSAL_READS,
     STATS_CERT_INTERVAL,
+    STATS_IST_RECEIVE_STATUS,
     STATS_INCOMING_LIST,
     STATS_MAX
 } StatusVars;
@@ -150,6 +152,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_recv",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_interval",    WSREP_VAR_STRING, { 0 }  },
+    { "flow_control_status",      WSREP_VAR_STRING, { 0 }  },
     { "cert_deps_distance",       WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oool",               WSREP_VAR_DOUBLE, { 0 }  },
@@ -164,6 +167,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "gcache_pool_size",         WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
     { "cert_interval",            WSREP_VAR_DOUBLE, { 0 }  },
+    { "ist_receive_status",       WSREP_VAR_STRING, { 0 }  },
     { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
     { 0,                          WSREP_VAR_STRING, { 0 }  }
 };
@@ -189,6 +193,8 @@ galera::ReplicatorSMM::stats_get()
     if (S_DESTROYED == state_()) return 0;
 
     std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
+    char    interval_text[64];
+    char    ist_status_text[128];
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
@@ -208,9 +214,6 @@ galera::ReplicatorSMM::stats_get()
     gcs_.get_stats (&stats);
 
     int64_t seqno_min = gcache_.seqno_min();
-    char    interval[64];
-    snprintf(interval, sizeof(interval), "[ %ld, %ld ]",
-             stats.fc_lower_limit, stats.fc_upper_limit);
 
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
     sv[STATS_LOCAL_SEND_QUEUE_MAX].value._int64  = stats.send_q_len_max;
@@ -226,9 +229,11 @@ galera::ReplicatorSMM::stats_get()
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
-    sv[STATS_FC_INTERVAL         ].value._string = interval;
 
-
+    snprintf(interval_text, sizeof(interval_text), "[ %ld, %ld ]",
+             stats.fc_lower_limit, stats.fc_upper_limit);
+    sv[STATS_FC_INTERVAL         ].value._string = interval_text;
+    sv[STATS_FC_STATUS           ].value._string = (stats.fc_status ? "ON" : "OFF");
 
     double avg_cert_interval(0);
     double avg_deps_dist(0);
@@ -265,6 +270,29 @@ galera::ReplicatorSMM::stats_get()
                                                                    sst_state_);
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
 
+    if (ist_receiver_.running())
+    {
+        // calculate %-age complete
+        int percent_complete = 100;
+        wsrep_seqno_t   first = ist_receiver_.first_seqno();
+        wsrep_seqno_t   last = ist_receiver_.last_seqno();
+        wsrep_seqno_t   current = ist_receiver_.current_seqno() - 1;
+
+        if (last > first)
+            percent_complete = 100.0 * static_cast<float>(current - first) / static_cast<float>(last - first);
+        percent_complete = std::max(percent_complete, 0);
+        percent_complete = std::min(percent_complete, 100);
+
+        snprintf(ist_status_text, sizeof(ist_status_text),
+                 "%d%% complete, received seqno %lld of %lld-%lld",
+                 percent_complete, static_cast<long long>(current),
+                                   static_cast<long long>(first),
+                                   static_cast<long long>(last));
+        sv[STATS_IST_RECEIVE_STATUS].value._string = ist_status_text;
+    }
+    else
+        sv[STATS_IST_RECEIVE_STATUS].value._string = "";
+
     // Get gcs backend status
     gu::Status status;
     gcs_.get_status(status);
@@ -278,6 +306,15 @@ galera::ReplicatorSMM::stats_get()
     for (gu::Status::const_iterator i(status.begin()); i != status.end(); ++i)
     {
         tail_size += i->first.size() + 1 + i->second.size() + 1;
+    }
+
+    // Compute the size for strings within the wsrep_stats_ array (sv)
+    // These will be copied after the stats array but before the status strings
+    for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it != sv.end(); ++it)
+    {
+        // This does NOT include the incoming_addresses list (it hasn't been set yet)
+        if (it->type == WSREP_VAR_STRING && it->value._string)
+            tail_size += strlen(it->value._string) + 1;
     }
 
     gu::Lock lock_inc(incoming_mutex_);
@@ -300,6 +337,18 @@ galera::ReplicatorSMM::stats_get()
 
         // Initial tail_buf position
         char* tail_buf(reinterpret_cast<char*>(buf + sv.size()));
+
+        // Assign dynamical strings from the original sv (so stop at STATS_MAX)
+        for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it < sv.begin() + STATS_MAX; ++it)
+        {
+            // This does NOT include the incoming_addresses list (it hasn't been set yet)
+            if (it->type == WSREP_VAR_STRING && it->value._string)
+            {
+                strncpy(tail_buf, it->value._string, strlen(it->value._string)+1);
+                it->value._string = tail_buf;
+                tail_buf += strlen(tail_buf) + 1;
+            }
+        }
 
         // Assign incoming list
         strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);

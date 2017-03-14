@@ -1249,7 +1249,7 @@ gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
      * size at this level */
     msg_size = std::min(std::max(min_msg_size, pkt_size), msg_size);
 
-    gu_info ("Changing maximum packet size to %d, resulting msg size: %d",
+    gu_debug ("Changing maximum packet size to %d, resulting msg size: %d",
              pkt_size, msg_size);
 
     int ret(msg_size - hdr_size); // message payload

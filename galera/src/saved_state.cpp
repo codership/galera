@@ -46,6 +46,7 @@ SavedState::SavedState  (const std::string& file) :
     if (ifs.fail())
     {
         log_warn << "Could not open state file for reading: '" << file << '\'';
+        log_warn << "No persistent state found. Bootstraping with default state";
     }
 
     fs_ = fopen(file.c_str(), "a");

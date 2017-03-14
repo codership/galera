@@ -68,7 +68,7 @@ gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
         gu_throw_error(EINVAL) << "invalid protonet version: " << version;
     }
 
-    log_info << "protonet " << backend << " version " << version;
+    log_debug << "protonet " << backend << " version " << version;
 
     if (backend == "asio")
         return new AsioProtonet(conf, version);

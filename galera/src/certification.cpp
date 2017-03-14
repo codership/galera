@@ -807,7 +807,7 @@ galera::Certification::do_test_preordered(TrxHandle* trx)
 }
 
 
-galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
+galera::Certification::Certification(gu::Config& conf, ServiceThd& thd, gcache::GCache& gcache)
     :
     version_               (-1),
     trx_map_               (),
@@ -815,6 +815,7 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     cert_index_ng_         (),
     deps_set_              (),
     service_thd_           (thd),
+    gcache_                (gcache),
 #ifdef HAVE_PSI_INTERFACE
     mutex_                 (WSREP_PFS_INSTR_TAG_CERT_MUTEX),
 #else
@@ -848,17 +849,17 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
 
 galera::Certification::~Certification()
 {
-    log_info << "cert index usage at exit "   << cert_index_.size();
-    log_info << "cert trx map usage at exit " << trx_map_.size();
-    log_info << "deps set usage at exit "     << deps_set_.size();
+    log_debug << "cert index usage at exit "   << cert_index_.size();
+    log_debug << "cert trx map usage at exit " << trx_map_.size();
+    log_debug << "deps set usage at exit "     << deps_set_.size();
 
     double avg_cert_interval(0);
     double avg_deps_dist(0);
     size_t index_size(0);
     stats_get(avg_cert_interval, avg_deps_dist, index_size);
-    log_info << "avg deps dist "              << avg_deps_dist;
-    log_info << "avg cert interval "          << avg_cert_interval;
-    log_info << "cert index size "            << index_size;
+    log_debug << "avg deps dist "              << avg_deps_dist;
+    log_debug << "avg cert interval "          << avg_cert_interval;
+    log_debug << "cert index size "            << index_size;
 
     gu::Lock lock(mutex_);
 
@@ -1073,7 +1074,7 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandle* trx)
             deps_set_.erase(i);
         }
 
-        if (gu_unlikely(index_purge_required()))
+        if (gu_unlikely(gcache_.cleanup_required() || index_purge_required()))
         {
             ret = get_safe_to_discard_seqno_();
         }
