@@ -105,9 +105,11 @@ typedef enum status_vars
     STATS_APPLY_OOOE,
     STATS_APPLY_OOOL,
     STATS_APPLY_WINDOW,
+    STATS_APPLY_COUNT,
     STATS_COMMIT_OOOE,
     STATS_COMMIT_OOOL,
     STATS_COMMIT_WINDOW,
+    STATS_COMMIT_COUNT,
     STATS_LOCAL_STATE,
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
@@ -150,9 +152,11 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oool",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_window",             WSREP_VAR_DOUBLE, { 0 }  },
+    { "apply_count",              WSREP_VAR_INT64,  { 0 }  },
     { "commit_oooe",              WSREP_VAR_DOUBLE, { 0 }  },
     { "commit_oool",              WSREP_VAR_DOUBLE, { 0 }  },
     { "commit_window",            WSREP_VAR_DOUBLE, { 0 }  },
+    { "commit_count",             WSREP_VAR_INT64,  { 0 }  },
     { "local_state",              WSREP_VAR_INT64,  { 0 }  },
     { "local_state_comment",      WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",          WSREP_VAR_INT64,  { 0 }  },
@@ -228,19 +232,22 @@ galera::ReplicatorSMM::stats_get() const
     double oooe;
     double oool;
     double win;
+    size_t entered(0);
     const_cast<Monitor<ApplyOrder>&>(apply_monitor_).
-        get_stats(&oooe, &oool, &win);
+        get_stats(&oooe, &oool, &win, &entered);
 
     sv[STATS_APPLY_OOOE          ].value._double = oooe;
     sv[STATS_APPLY_OOOL          ].value._double = oool;
     sv[STATS_APPLY_WINDOW        ].value._double = win;
+    sv[STATS_APPLY_COUNT         ].value._int64 = entered;
 
     const_cast<Monitor<CommitOrder>&>(commit_monitor_).
-        get_stats(&oooe, &oool, &win);
+        get_stats(&oooe, &oool, &win, &entered);
 
     sv[STATS_COMMIT_OOOE         ].value._double = oooe;
     sv[STATS_COMMIT_OOOL         ].value._double = oool;
     sv[STATS_COMMIT_WINDOW       ].value._double = win;
+    sv[STATS_COMMIT_COUNT        ].value._int64 = entered;
 
 
     sv[STATS_LOCAL_STATE         ].value._int64  = state2stats(state_());
