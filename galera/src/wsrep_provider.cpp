@@ -82,11 +82,14 @@ uint64_t galera_capabilities(wsrep_t* gh)
                                   WSREP_CAP_UNORDERED            |
                                   WSREP_CAP_PREORDERED);
 
+    static uint64_t const v8_caps(0);
+
     uint64_t caps(v4_caps);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     if (repl->repl_proto_ver() >= 5) caps |= v5_caps;
+    if (repl->repl_proto_ver() >= 8) caps |= v8_caps;
 
     return caps;
 }
@@ -200,7 +203,7 @@ wsrep_status_t galera_connect (wsrep_t*     gh,
         log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
-#endif // ! NDEBUG
+#endif /* NDEBUG */
 }
 
 
@@ -266,9 +269,9 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
     {
         log_fatal << "non-standard exception";
     }
-#endif // NDEBUG
 
     return WSREP_FATAL;
+#endif /* NDEBUG */
 }
 
 static TrxHandleMaster*
@@ -934,6 +937,26 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
+    assert(flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_TRX_END));
+
+    if ((flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_TRX_END)) == 0)
+    {
+        log_warn << "to_execute_start(): either WSREP_FLAG_TRX_START "
+                 << "or WSREP_FLAG_TRX_END flag is required";
+        return WSREP_CONN_FAIL;
+    }
+
+    // Simultaneous use of TRX_END AND ROLLBACK is not allowed
+    assert(!((flags & WSREP_FLAG_TRX_END) && (flags & WSREP_FLAG_ROLLBACK)));
+
+    if ((flags & WSREP_FLAG_TRX_END) && (flags & WSREP_FLAG_ROLLBACK))
+    {
+        log_warn << "to_execute_start(): simultaneous use of "
+                 << "WSREP_FLAG_TRX_END and WSREP_FLAG_ROLLBACK "
+                 << "is not allowed";
+        return WSREP_CONN_FAIL;
+    }
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandleMaster* trx(repl->local_conn_trx(conn_id, true).get());
@@ -949,11 +972,14 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         meta->depends_on = WSREP_SEQNO_UNDEFINED;
         meta->stid.node  = trx->source_id();
         meta->stid.trx   = trx->trx_id();
+        meta->stid.conn  = trx->conn_id();
     }
 
     wsrep_status_t retval;
 
+#ifdef NDEBUG
     try
+#endif // NDEBUG
     {
         TrxHandleLock lock(*trx);
         for (size_t i(0); i < keys_num; ++i)
@@ -993,6 +1019,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
             retval = repl->to_isolation_begin(*trx, meta);
         }
     }
+#ifdef NDEBUG
     catch (gu::Exception& e)
     {
         log_error << e.what();
@@ -1012,6 +1039,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
         log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
+#endif // NDEBUG
 
     if (trx->ts() == NULL || trx->ts()->global_seqno() < 0)
     {

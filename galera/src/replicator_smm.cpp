@@ -15,93 +15,6 @@
 #include <sstream>
 #include <iostream>
 
-
-static void
-apply_trx_ws(void*                    recv_ctx,
-             wsrep_apply_cb_t         apply_cb,
-             wsrep_commit_cb_t        commit_cb,
-             const galera::TrxHandleSlave& trx,
-             const wsrep_trx_meta_t&  meta)
-{
-    using galera::TrxHandle;
-    static const size_t max_apply_attempts(4);
-    size_t attempts(1);
-
-    do
-    {
-        try
-        {
-            if (trx.is_toi())
-            {
-                log_debug << "Executing TO isolated action: " << trx;
-            }
-
-            gu_trace(trx.apply(recv_ctx, apply_cb, meta));
-
-            if (trx.is_toi())
-            {
-                log_debug << "Done executing TO isolated action: "
-                         << trx.global_seqno();
-            }
-            break;
-        }
-        catch (galera::ApplyException& e)
-        {
-            if (trx.is_toi())
-            {
-                log_warn << "Ignoring error for TO isolated action: " << trx;
-                break;
-            }
-            else
-            {
-                int const err(e.status());
-
-                if (err > 0)
-                {
-                    uint32_t const flags
-                        (TrxHandle::trx_flags_to_wsrep_flags(trx.flags()) |
-                         WSREP_FLAG_ROLLBACK);
-                    wsrep_bool_t unused(false);
-                    wsrep_cb_status const rcode
-                        (commit_cb(recv_ctx, flags, &meta, &unused));
-
-                    if (WSREP_CB_SUCCESS != rcode)
-                    {
-                        gu_throw_fatal << "Rollback failed. Trx: " << trx;
-                    }
-
-                    ++attempts;
-
-                    if (attempts <= max_apply_attempts)
-                    {
-                        log_warn << e.what()
-                                 << "\nRetrying " << attempts << "th time";
-                    }
-                }
-                else
-                {
-                    GU_TRACE(e);
-                    throw;
-                }
-            }
-        }
-    }
-    while (attempts <= max_apply_attempts);
-
-    if (gu_unlikely(attempts > max_apply_attempts))
-    {
-        std::ostringstream msg;
-
-        msg << "Failed to apply trx " << trx.global_seqno() << " "
-            << max_apply_attempts << " times";
-
-        throw galera::ApplyException(msg.str(), NULL, NULL, 0);
-    }
-
-    return;
-}
-
-
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
@@ -488,7 +401,6 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     return retval;
 }
 
-
 void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 {
     assert(ts.global_seqno() > 0);
@@ -499,6 +411,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         assert(ts.local() == false ||
                (ts.flags() & TrxHandle::F_ROLLBACK));
     }
+
+    ApplyException ae;
 
     ApplyOrder ao(ts);
     CommitOrder co(ts, co_mode_);
@@ -518,9 +432,24 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
                               { ts.source_id(), ts.trx_id(), ts.conn_id() },
                               ts.depends_seqno() };
 
-    gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, ts, meta));
-    /* at this point any exception in apply_trx_ws() is fatal, not
-     * catching anything. */
+    try { gu_trace(ts.apply(recv_ctx, apply_cb_, meta)); }
+    catch (ApplyException& e)
+    {
+        assert(0 != e.status());
+        assert(NULL != e.data() || 0 == e.data_len());
+        assert(0 != e.data_len() || NULL == e.data());
+
+        if (ts.is_toi())
+        {
+            log_warn << "Ignoring error for TO isolated action: " << ts;
+            e.free();
+        }
+        else
+        {
+            ae = e;
+        }
+    }
+    /* at this point any other exception is fatal, not catching anything else. */
 
     wsrep_bool_t exit_loop(false);
 
@@ -533,6 +462,22 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
 
     TrxHandle::State end_state(aborting ?
                                TrxHandle::S_ROLLED_BACK :TrxHandle::S_COMMITTED);
+
+    if (gu_likely(0 == ae.status()))
+    {
+        assert(NULL == ae.data());
+        assert(0    == ae.data_len());
+    }
+    else
+    {
+        assert(NULL == ae.data() || ae.data_len() > 0);
+        commit_flags |= WSREP_FLAG_ROLLBACK;
+        end_state = TrxHandle::S_ROLLED_BACK;
+
+        if (!st_.corrupt()) mark_corrupt_and_close();
+
+        ae.free();
+    }
 
     wsrep_cb_status_t const rcode(commit_cb_(recv_ctx, commit_flags,
                                              &meta, &exit_loop));
@@ -559,7 +504,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     }
 
     wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
-    if (gu_likely(ts.local_seqno() != -1))
+    if (gu_likely(ts.local_seqno() != -1 && 0 == ae.status()))
     {
         // trx with local seqno -1 originates from IST (or other source not gcs)
         report_last_committed(safe_to_discard);
@@ -679,7 +624,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             trx->reset_ts();
         }
 
-        return WSREP_CONN_FAIL;
+        return (st_.corrupt() ? WSREP_NODE_FAIL : WSREP_CONN_FAIL);
     }
 
     WriteSetNG::GatherVector actv;
@@ -758,6 +703,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
                          TrxHandleSlaveDeleter());
 
     gu_trace(ts->unserialize<true>(act));
+    ts->set_local(true);
 
     ts->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
 
@@ -1492,8 +1438,8 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
     assert(ts.global_seqno() > STATE_SEQNO());
 
     CommitOrder co(ts, co_mode_);
-    wsrep_status_t retval;
-    switch ((retval = cert_and_catch(&trx, ts_ptr)))
+    wsrep_status_t const retval(cert_and_catch(&trx, ts_ptr));
+    switch (retval)
     {
     case WSREP_OK:
     {
@@ -1558,15 +1504,17 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
 
     CommitOrder co(ts, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
-    ApplyOrder ao(ts);
     report_last_committed(cert_.set_trx_committed(ts));
 
     if (ts.state() == TrxHandle::S_COMMITTING)
     {
+        ApplyOrder ao(ts);
         apply_monitor_.leave(ao);
         assert(trx.state() == TrxHandle::S_COMMITTING);
         trx.set_state(TrxHandle::S_COMMITTED);
         ts.set_state(TrxHandle::S_COMMITTED);
+
+        st_.mark_safe();
     }
     else
     {
@@ -1579,6 +1527,7 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
 
     return WSREP_OK;
 }
+
 
 namespace galera
 {
@@ -1723,50 +1672,50 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
     }
 }
 
-
 void galera::ReplicatorSMM::process_trx(void* recv_ctx,
-                                        const TrxHandleSlavePtr& ts)
+                                        const TrxHandleSlavePtr& ts_ptr)
 {
     assert(recv_ctx != 0);
-    assert(ts != 0);
-    assert(ts->local_seqno() > 0);
-    assert(ts->global_seqno() > 0);
-    assert(ts->last_seen_seqno() >= 0);
-    assert(ts->depends_seqno() == -1 || ts->version() >= 4);
-    assert(ts->state() == TrxHandle::S_REPLICATING);
+    assert(ts_ptr != 0);
 
-    wsrep_status_t const retval(cert_and_catch(0, ts));
+    TrxHandleSlave& ts(*ts_ptr);
 
+    assert(ts.local_seqno() > 0);
+    assert(ts.global_seqno() > 0);
+    assert(ts.last_seen_seqno() >= 0);
+    assert(ts.depends_seqno() == -1 || ts.version() >= 4);
+    assert(ts.state() == TrxHandle::S_REPLICATING);
+
+    wsrep_status_t const retval(cert_and_catch(0, ts_ptr));
     switch (retval)
     {
     case WSREP_TRX_FAIL:
-        assert(ts->state() == TrxHandle::S_ABORTING);
+        assert(ts.state() == TrxHandle::S_ABORTING);
         /* fall through to apply_trx() */
     case WSREP_OK:
         try
         {
-            gu_trace(apply_trx(recv_ctx, *ts));
+            gu_trace(apply_trx(recv_ctx, ts));
         }
         catch (std::exception& e)
         {
-            st_.mark_corrupt();
-
-            log_fatal << "Failed to apply trx: " << *ts;
+            log_fatal << "Failed to apply trx: " << ts;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, leaving cluster...";
             mark_corrupt_and_close();
+            assert(0); // this is an unexpected exception
             // keep processing events from the queue until provider is closed
         }
         break;
     case WSREP_TRX_MISSING: // must be skipped due to SST
-        assert(ts->state() == TrxHandle::S_ABORTING);
-        report_last_committed(cert_.set_trx_committed(*ts));
+        assert(ts.state() == TrxHandle::S_ABORTING);
+        report_last_committed(cert_.set_trx_committed(ts));
         break;
     default:
         // this should not happen for remote actions
         gu_throw_error(EINVAL)
             << "unrecognized retval for remote trx certification: "
-            << retval << " trx: " << *ts;
+            << retval << " trx: " << ts;
     }
 }
 
@@ -2635,9 +2584,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
 
         // we must do it 'in order' for std::map reasons, so keeping
         // it inside the monitor
+        bool const skip(ts->depends_seqno() < 0);
         gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
-                              GCS_ACT_WRITESET, ts->depends_seqno() < 0);
-
+                              GCS_ACT_WRITESET, skip);
         local_monitor_.leave(lo);
     }
 
@@ -2705,7 +2654,7 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
         return WSREP_BF_ABORT;
 
     case Certification::TEST_FAILED:
-        // Mext step will be monitors release. Make sure that ws was not
+        // Next step will be monitors release. Make sure that ws was not
         // corrupted and cert failure is real before proceeding with that.
  //gcf788 - this must be moved to cert(), the caller method
         assert(ts->is_dummy());
@@ -2741,6 +2690,7 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 void
 galera::ReplicatorSMM::abort()
 {
+    log_info << "ReplicatorSMM::abort()";
     gcs_.close();
     gu_abort();
 }

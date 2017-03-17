@@ -179,7 +179,8 @@ static bool
 certify_v3(galera::Certification::CertIndexNG& cert_index_ng,
            const galera::KeySet::KeyPart&      key,
            galera::TrxHandleSlave*     const   trx,
-           bool const store_keys, bool const   log_conflicts)
+           bool                        const   store_keys,
+           bool                        const   log_conflicts)
 {
     galera::KeyEntryNG ke(key);
     galera::Certification::CertIndexNG::iterator ci(cert_index_ng.find(&ke));
@@ -200,10 +201,81 @@ certify_v3(galera::Certification::CertIndexNG& cert_index_ng,
         cert_debug << "found existing entry";
 
         galera::KeyEntryNG* const kep(*ci);
-        // Note: For we skip certification for isolated trxs, only
-        // cert index and key_list is populated.
         return (!trx->is_toi() &&
                 certify_and_depend_v3(kep, key, trx, log_conflicts));
+    }
+}
+
+// Add key to trx references for trx that passed certification.
+//
+// @param cert_index certification index in use
+// @param trx        certified transaction
+// @param key_set    key_set used in certification
+// @param key_count  number of keys in key set
+static void do_ref_keys(galera::Certification::CertIndexNG& cert_index,
+                        galera::TrxHandleSlave*       const trx,
+                        const galera::KeySetIn&             key_set,
+                        const long                          key_count)
+{
+    for (long i(0); i < key_count; ++i)
+    {
+        const galera::KeySet::KeyPart& k(key_set.next());
+        galera::KeyEntryNG ke(k);
+        galera::Certification::CertIndexNG::const_iterator
+            ci(cert_index.find(&ke));
+
+        if (ci == cert_index.end())
+        {
+            gu_throw_fatal << "could not find key '" << k
+                           << "' from cert index";
+        }
+        (*ci)->ref(k.prefix(), k, trx);
+    }
+}
+
+// Clean up keys from index that were added by trx that failed
+// certification.
+//
+// @param cert_index certification inde
+// @param key_set    key_set used in certification
+// @param processed  number of keys that were processed in certification
+static void do_clean_keys(galera::Certification::CertIndexNG& cert_index,
+                          const galera::KeySetIn&             key_set,
+                          const long                          processed)
+{
+    /* 'strictly less' comparison is essential in the following loop:
+     * processed key failed cert and was not added to index */
+    for (long i(0); i < processed; ++i)
+    {
+        KeyEntryNG ke(key_set.next());
+
+        // Clean up cert_index_ from entries which were added by this trx
+        galera::Certification::CertIndexNG::iterator ci(cert_index.find(&ke));
+
+        if (gu_likely(ci != cert_index.end()))
+        {
+            galera::KeyEntryNG* kep(*ci);
+
+            if (kep->referenced() == false)
+            {
+                // kel was added to cert_index_ by this trx -
+                // remove from cert_index_ and fall through to delete
+                cert_index.erase(ci);
+            }
+            else continue;
+
+            assert(kep->referenced() == false);
+
+            delete kep;
+        }
+        else if(ke.key().shared())
+        {
+            assert(0); // we actually should never be here, the key should
+            // be either added to cert_index_ or be there already
+            log_warn  << "could not find shared key '"
+                      << ke.key() << "' from cert index";
+        }
+        else { /* exclusive can duplicate shared */ }
     }
 }
 
@@ -239,25 +311,8 @@ galera::Certification::do_test_v3(TrxHandleSlave* const trx, bool store_keys)
     if (store_keys == true)
     {
         assert (key_count == processed);
-
         key_set.rewind();
-        for (long i(0); i < key_count; ++i)
-        {
-            const KeySet::KeyPart& k(key_set.next());
-            KeyEntryNG ke(k);
-            CertIndexNG::const_iterator ci(cert_index_ng_.find(&ke));
-
-            if (ci == cert_index_ng_.end())
-            {
-                gu_throw_fatal << "could not find key '" << k
-                               << "' from cert index";
-            }
-
-            KeyEntryNG* const kep(*ci);
-
-            kep->ref(k.prefix(), k, trx);
-
-        }
+        do_ref_keys(cert_index_ng_, trx, key_set, key_count);
 
         if (trx->pa_unsafe()) last_pa_unsafe_ = trx->global_seqno();
 
@@ -276,41 +331,7 @@ cert_fail:
     {
         /* Clean up key entries allocated for this trx */
         key_set.rewind();
-
-        /* 'strictly less' comparison is essential in the following loop:
-         * processed key failed cert and was not added to index */
-        for (long i(0); i < processed; ++i)
-        {
-            KeyEntryNG ke(key_set.next());
-
-            // Clean up cert_index_ from entries which were added by this trx
-            CertIndexNG::iterator ci(cert_index_ng_.find(&ke));
-
-            if (gu_likely(ci != cert_index_ng_.end()))
-            {
-                KeyEntryNG* kep(*ci);
-
-                if (kep->referenced() == false)
-                {
-                    // kel was added to cert_index_ by this trx -
-                    // remove from cert_index_ and fall through to delete
-                    cert_index_ng_.erase(ci);
-                }
-                else continue;
-
-                assert(kep->referenced() == false);
-
-                delete kep;
-            }
-            else if(ke.key().shared())
-            {
-                assert(0); // we actually should never be here, the key should
-                           // be either added to cert_index_ or be there already
-                log_warn  << "could not find shared key '"
-                          << ke.key() << "' from cert index";
-            }
-            else { /* exclusive can duplicate shared */ }
-        }
+        do_clean_keys(cert_index_ng_, key_set, processed);
         assert(cert_index_ng_.size() == prev_cert_index_size);
     }
 

@@ -569,8 +569,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     log_info << "####### IST uuid:" << state_uuid_ << " f: " << first_needed
              << ", l: " << last_needed << ", p: " << protocol_version_; //remove
 
-    std::string recv_addr (ist_receiver_.prepare(first_needed, last_needed,
-                                                 protocol_version_, source_id()));
+    std::string recv_addr(ist_receiver_.prepare(first_needed, last_needed,
+                                                protocol_version_, source_id()));
 
     std::ostringstream os;
 
@@ -867,7 +867,23 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
-    st_.mark_safe();
+    if (st_.corrupt())
+    {
+        if (sst_req_len != 0 && !sst_is_trivial(sst_req, sst_req_len))
+        {
+            st_.mark_uncorrupt(sst_uuid_, sst_seqno_);
+        }
+        else
+        {
+            log_fatal << "Application state is corrupt and cannot "
+                      << "be recorvered. Restart required.";
+            abort();
+        }
+    }
+    else
+    {
+        st_.mark_safe();
+    }
 
     if (req->ist_len() > 0)
     {
@@ -1019,11 +1035,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             log_fatal << "failed action: " << *ts;
         else
             log_fatal << "null action";
-        st_.mark_corrupt();
-        gcs_.close();
-        gu_abort();
 
-        gu::Lock lock(closing_mutex_);
         mark_corrupt_and_close();
     }
 }
@@ -1034,7 +1046,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
 {
     assert(tsp != 0);
     TrxHandleSlave& ts(*tsp);
-    //log_info << "~~~~~ preprocessing TRX " << ts;
     assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING);
 
     {
@@ -1103,7 +1114,7 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
                               trx_params_.version_);
         free(view_info);
     }
-    
+
     if (must_apply == true)
     {
         drain_monitors(act.seqno_g - 1);

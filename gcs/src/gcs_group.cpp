@@ -1658,7 +1658,3 @@ gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
     status.insert("desync_count", gu::to_string(desync_count));
 }
 
-
-
-
-
