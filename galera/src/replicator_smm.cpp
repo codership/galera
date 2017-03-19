@@ -484,13 +484,13 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     try { gu_trace(ts.apply(recv_ctx, apply_cb_, meta)); }
     catch (ApplyException& e)
     {
+        assert(0 != e.status());
+        assert(NULL != e.data() || 0 == e.data_len());
+        assert(0 != e.data_len() || NULL == e.data());
+
         ae = e;
-        assert(0 != ae.status());
-        assert(NULL != ae.data() || 0 == ae.data_len());
-        assert(0 != ae.data_len() || NULL == ae.data());
     }
-    /* at this point any exception in apply_trx_ws() is fatal, not
-     * catching anything. */
+    /* at this point any other exception is fatal, not catching anything else. */
 
     wsrep_bool_t exit_loop(false);
 
@@ -1908,7 +1908,6 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int rcode)
         return WSREP_CONN_FAIL;
     }
 }
-
 
 void galera::ReplicatorSMM::process_trx(void* recv_ctx,
                                         const TrxHandleSlavePtr& ts_ptr)
