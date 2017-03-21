@@ -8,6 +8,7 @@
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
 #include "gu_debug_sync.hpp"
+#include "gu_progress.hpp"
 
 #include "GCache.hpp"
 #include "galera_common.hpp"
@@ -397,6 +398,21 @@ void galera::ist::Receiver::run()
             p.recv_handshake_response(socket);
             p.send_ctrl(socket, Ctrl::C_OK);
         }
+
+        /* wait for ready signal from the STR thread */
+        {
+            gu::Lock lock(mutex_);
+            while (ready_ == false) lock.wait(cond_);
+        }
+
+        gu::Progress<wsrep_seqno_t> progress(
+            "Receiving IST",
+            " events",
+            last_seqno_ - current_seqno_ + 1,
+            /* The following means reporting progress NO MORE frequently than
+             * once per BOTH 10 seconds (default) and 16 events */
+            16);
+
         while (true)
         {
             TrxHandle* trx;
@@ -418,12 +434,12 @@ void galera::ist::Receiver::run()
                     goto err;
                 }
                 ++current_seqno_;
+
+                progress.update(1);
             }
             gu::Lock lock(mutex_);
-            while (ready_ == false || consumers_.empty())
-            {
-                lock.wait(cond_);
-            }
+            assert(ready_);
+            while (consumers_.empty()) lock.wait(cond_);
             Consumer* cons(consumers_.top());
             consumers_.pop();
             cons->trx(trx);
@@ -434,6 +450,8 @@ void galera::ist::Receiver::run()
                 break;
             }
         }
+
+        progress.finish();
     }
     catch (asio::system_error& e)
     {
