@@ -20,7 +20,7 @@
 #include "gu_log.h"
 #include "gu_assert.h"
 #include "gu_mem.h"
-#include "gu_mutex.h"
+#include "gu_threads.h"
 #include "gu_to.h"
 
 #define TO_USE_SIGNAL 1

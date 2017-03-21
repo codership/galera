@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -216,8 +216,8 @@ WriteSetIn::init (ssize_t const st)
         if (size_ >= st)
         {
             /* buffer too big, start checksumming in background */
-            int const err(pthread_create (&check_thr_id_, NULL,
-                                          checksum_thread, this));
+            int const err(gu_thread_create (&check_thr_id_, NULL,
+                                            checksum_thread, this));
 
             if (gu_likely(0 == err))
             {

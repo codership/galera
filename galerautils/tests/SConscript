@@ -65,3 +65,13 @@ env.Test("gu_tests++.passed", gu_testspp)
 env.Alias("test", "gu_tests++.passed")
 
 Clean(gu_testspp, '#/gu_tests++.log')
+
+gu_to_test = env.Program(target = 'gu_to_test',
+                         source = Split('''
+                             gu_to_test.c
+                         '''))
+
+avalanche = env.Program(target = 'avalanche',
+                         source = Split('''
+                             avalanche.c
+                         '''))

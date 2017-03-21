@@ -112,7 +112,7 @@ long gcs_fifo_lite_destroy (gcs_fifo_lite_t* f)
 	f->destroyed = true;
 
 	/* get rid of "put" threads waiting for lock or signal */
-	while (pthread_cond_destroy (&f->put_cond)) {
+	while (gu_cond_destroy (&f->put_cond)) {
             if (f->put_wait <= 0) {
                 gu_fatal ("Can't destroy condition while nobody's waiting");
                 abort();
@@ -134,7 +134,7 @@ long gcs_fifo_lite_destroy (gcs_fifo_lite_t* f)
 	f->length = 0;
 
 	/* now all we have - "get" threads waiting for lock or signal */
-	while (pthread_cond_destroy (&f->get_cond)) {
+	while (gu_cond_destroy (&f->get_cond)) {
             if (f->get_wait <= 0) {
                 gu_fatal ("Can't destroy condition while nobody's waiting");
                 abort();
