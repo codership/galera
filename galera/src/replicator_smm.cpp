@@ -94,6 +94,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     ist_senders_        (gcache_),
     wsdb_               (),
     cert_               (config_, &service_thd_),
+    pending_cert_queue_ (),
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
@@ -765,10 +766,11 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             }
             else
             {
-                cancel_monitors<true>(*ts);
+                pending_cert_queue_.push(ts);
 
+                cancel_monitors<true>(*ts);
+                ts->set_state(TrxHandle::S_ABORTING);
                 trx->set_state(TrxHandle::S_ABORTING);
-                ts->mark_dummy();
 
                 retval = WSREP_TRX_FAIL;
             }
@@ -942,7 +944,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandleMaster*  trx,
                    trx->state() == TrxHandle::S_MUST_REPLAY_AM);
             break;
         case WSREP_TRX_FAIL:
-            assert(ts->depends_seqno() < 0);
             assert(trx->state() == TrxHandle::S_ABORTING);
             break;
         default:
@@ -2526,6 +2527,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                 }
                 else
                 {
+                    pending_cert_queue_.push(ts);
+
                     if (interrupted == true)
                     {
                         local_monitor_.self_cancel(lo);
@@ -2535,8 +2538,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                         local_monitor_.leave(lo);
                     }
 
+                    ts->set_state(TrxHandle::S_ABORTING);
                     trx->set_state(TrxHandle::S_ABORTING);
-                    ts->mark_dummy();
+
                     retval = WSREP_TRX_FAIL;
                 }
             }
@@ -2546,6 +2550,26 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     else
     {
         ts->set_state(TrxHandle::S_CERTIFYING);
+
+        // pending_cert_queue_ contains all writesets that:
+        //   a) were BF aborted before being certified
+        //   b) are not going to be replayed even though
+        //      cert_for_aborted() returned TEST_OK for them
+        //
+        // Before certifying the current seqno, check if
+        // pending_cert_queue contains any smaller seqno.
+        // This avoids the certification index to diverge
+        // across nodes.
+        TrxHandleSlavePtr aborted_ts;
+        while (pending_cert_queue_.must_cert_next(ts->global_seqno(),
+                                                  aborted_ts))
+        {
+            log_debug << "must cert next " << ts->global_seqno() << " aborted ts "  << *aborted_ts;
+            Certification::TestResult result;
+            result = cert_.append_trx(aborted_ts);
+            log_debug << "trx in pendind cert queue certified, result: " << result;
+        }
+
         switch (cert_.append_trx(ts))
         {
         case Certification::TEST_OK:
@@ -2609,7 +2633,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     log_info << "######## certified g: " << ts->global_seqno()
              << ", s: " << ts->last_seen_seqno()
              << ", d: " << ts->depends_seqno()
-             << ", sid: " << sid;
+             << ", sid: " << sid
+             << ", retval: " << (retval == WSREP_OK);
 #endif
 
     return retval;
