@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2012-2017 Codership Oy <info@codership.com>
  */
 
 #include "../src/saved_state.hpp"
@@ -8,7 +8,7 @@
 
 #include <check.h>
 #include <errno.h>
-#include <pthread.h>
+#include <gu_threads.h>
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
@@ -33,7 +33,7 @@ thread_routine (void* arg)
 }
 
 static const int max_threads(16);
-static pthread_t threads[max_threads];
+static gu_thread_t threads[max_threads];
 
 static void
 start_threads(void* arg)
@@ -42,8 +42,8 @@ start_threads(void* arg)
 
     for (int ret = 0; ret < max_threads; ++ret)
     {
-        pthread_t t;
-        int err = pthread_create (&t, NULL, thread_routine, arg);
+        gu_thread_t t;
+        int err = gu_thread_create (&t, NULL, thread_routine, arg);
         fail_if (err, "Failed to start thread %d: %d (%s)",
                  ret, err, strerror(err));
         threads[ret] = t;
@@ -57,7 +57,7 @@ stop_threads()
 
     for (int t = 0; t < max_threads; ++t)
     {
-        pthread_join(threads[t], NULL);
+        gu_thread_join(threads[t], NULL);
     }
 }
 

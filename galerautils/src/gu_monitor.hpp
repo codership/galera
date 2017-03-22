@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -30,7 +30,7 @@ class gu::Monitor
     Cond        cond;
 
 #ifndef NDEBUG
-    pthread_t mutable holder;
+    gu_thread_t mutable holder;
 #endif
 
     // copy contstructor and operator= disabled by mutex and cond members.
@@ -53,7 +53,7 @@ public:
     {
         Lock lock(mutex);
 
-// Teemu, pthread_equal() check seems redundant, refcnt too (counted in cond)	
+// Teemu, pthread_equal() check seems redundant, refcnt too (counted in cond)
 //        while (refcnt > 0 && pthread_equal(holder, pthread_self()) == 0)
         while (refcnt)
         {
@@ -61,7 +61,7 @@ public:
         }
         refcnt++;
 #ifndef NDEBUG
-        holder = pthread_self();
+        holder = gu_thread_self();
 #endif
     }
 
@@ -70,7 +70,7 @@ public:
         Lock lock(mutex);
 
         assert(refcnt > 0);
-        assert(pthread_equal(holder, pthread_self()) != 0);
+        assert(gu_thread_equal(holder, gu_thread_self()) != 0);
 
         refcnt--;
         if (refcnt == 0)
