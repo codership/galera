@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  */
 
@@ -7,15 +7,18 @@
 #define __GU_MUTEX__
 
 #include "gu_macros.h"
-#include "gu_mutex.h"
-#include "gu_logger.hpp"
+#include "gu_threads.h"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 
-#include <pthread.h>
 #include <cerrno>
 #include <cstring>
 #include <cassert>
 #include <cstdlib> // abort()
+
+#if !defined(GU_DEBUG_MUTEX) && !defined(NDEBUG)
+#define GU_MUTEX_DEBUG
+#endif
 
 namespace gu
 {
@@ -24,10 +27,10 @@ namespace gu
     public:
 
         Mutex () : value_()
-#ifndef NDEBUG
-                 , locked_()
+#ifdef GU_MUTEX_DEBUG
                  , owned_()
-#endif /* NDEBUG*/
+                 , locked_()
+#endif /* GU_MUTEX_DEBUG */
         {
             gu_mutex_init (&value_, NULL); // always succeeds
         }
@@ -47,10 +50,10 @@ namespace gu
             int const err(gu_mutex_lock(&value_));
             if (gu_likely(0 == err))
             {
-#ifndef NDEBUG
+#ifdef GU_MUTEX_DEBUG
                 locked_ = true;
-                owned_  = pthread_self();
-#endif /* NDEBUG */
+                owned_  = gu_thread_self();
+#endif /* GU_MUTEX_DEBUG */
             }
             else
             {
@@ -60,12 +63,15 @@ namespace gu
 
         void unlock() const
         {
-#ifndef NDEBUG
             // this is not atomic, but the presumption is that unlock()
             // should never be called before preceding lock() completes
-            assert(locked_);
+#if defined(GU_DEBUG_MUTEX) || defined(GU_MUTEX_DEBUG)
+            assert(locked());
+            assert(owned());
+#if defined(GU_MUTEX_DEBUG)
             locked_ = false;
-#endif /* NDEBUG */
+#endif /* GU_MUTEX_DEBUG */
+#endif /* GU_DEBUG_MUTEX */
             int const err(gu_mutex_unlock(&value_));
             if (gu_unlikely(0 != err))
             {
@@ -75,18 +81,22 @@ namespace gu
             }
         }
 
-#ifndef NDEBUG
-        bool locked() const { return locked_; }
-        bool owned() const { return pthread_equal(owned_, pthread_self()); }
-#endif /* NDEBUG */
+        gu_mutex_t& impl() const { return value_; }
 
+#if defined(GU_DEBUG_MUTEX)
+        bool locked() const { return gu_mutex_locked(&value_); }
+        bool owned()  const { return gu_mutex_owned(&value_);  }
+#elif defined(GU_MUTEX_DEBUG)
+        bool locked() const { return locked_; }
+        bool owned()  const { return gu_thread_equal(owned_,gu_thread_self()); }
+#endif /* GU_DEBUG_MUTEX */
     protected:
 
-        gu_mutex_t mutable value_;
-#ifndef NDEBUG
-        bool       mutable locked_;
-        pthread_t  mutable owned_;
-#endif /* NDEBUG */
+        gu_mutex_t  mutable value_;
+#ifdef GU_MUTEX_DEBUG
+        gu_thread_t mutable owned_;
+        bool        mutable locked_;
+#endif /* GU_MUTEX_DEBUG */
 
     private:
 

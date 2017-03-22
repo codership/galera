@@ -1,20 +1,25 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GU_LOCK__
 #define __GU_LOCK__
 
+#include "gu_exception.hpp"
+#include "gu_logger.hpp"
 #include "gu_mutex.hpp"
 #include "gu_cond.hpp"
 #include "gu_datetime.hpp"
+
+#include <cerrno>
+#include <cassert>
 
 namespace gu
 {
     class Lock
     {
-        const gu::Mutex& mtx_;
+        const Mutex& mtx_;
 
         Lock (const Lock&);
         Lock& operator=(const Lock&);
@@ -33,12 +38,16 @@ namespace gu
 
         inline void wait (const Cond& cond)
         {
+#ifdef GU_MUTEX_DEBUG
+            mtx_.locked_ = false;
+#endif /* GU_MUTEX_DEBUG */
             cond.ref_count++;
-            gu_cond_wait (&(cond.cond), &(mtx_.value_));
+            gu_cond_wait (&(cond.cond), &mtx_.impl()); // never returns error
             cond.ref_count--;
-#ifndef NDEBUG
+#ifdef GU_MUTEX_DEBUG
             mtx_.locked_ = true;
-#endif /* NDEBUG */
+            mtx_.owned_  = gu_thread_self();
+#endif /* GU_MUTEX_DEBUG */
         }
 
         inline void wait (const Cond& cond, const datetime::Date& date)
@@ -46,12 +55,16 @@ namespace gu
             timespec ts;
 
             date._timespec(ts);
+#ifdef GU_MUTEX_DEBUG
+            mtx_.locked_ = false;
+#endif /* GU_MUTEX_DEBUG */
             cond.ref_count++;
-            int const ret(gu_cond_timedwait(&(cond.cond), &(mtx_.value_), &ts));
+            int const ret(gu_cond_timedwait (&(cond.cond), &mtx_.impl(), &ts));
             cond.ref_count--;
-#ifndef NDEBUG
+#ifdef GU_MUTEX_DEBUG
             mtx_.locked_ = true;
-#endif /* NDEBUG */
+            mtx_.owned_  = gu_thread_self();
+#endif /* GU_MUTEX_DEBUG */
 
             if (gu_unlikely(ret)) gu_throw_error(ret);
         }

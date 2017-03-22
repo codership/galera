@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,7 +13,7 @@
 #include "gu_byteswap.h"
 #include "gu_log.h"
 #include "gu_assert.h"
-#include "gu_mutex.h"
+#include "gu_threads.h"
 #include "gu_time.h"
 #include "gu_rand.h"
 

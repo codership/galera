@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2016 Codership Oy <info@codership.com>
+// Copyright (C) 2016-2017 Codership Oy <info@codership.com>
 //
 
 //
@@ -9,7 +9,7 @@
 #ifndef GU_THREAD_HPP
 #define GU_THREAD_HPP
 
-#include <pthread.h>
+#include "gu_threads.h"
 
 #include <string>
 
@@ -86,14 +86,14 @@ namespace gu
     //
     // Return current scheduling parameters for given thread
     //
-    ThreadSchedparam thread_get_schedparam(pthread_t thread);
+    ThreadSchedparam thread_get_schedparam(gu_thread_t thread);
 
     //
     // Set scheduling parameters for given thread.
     //
     // Throws gu::Exception if setting parameters fails.
     //
-    void thread_set_schedparam(pthread_t thread, const ThreadSchedparam&);
+    void thread_set_schedparam(gu_thread_t thread, const ThreadSchedparam&);
 
     //
     // Insertion operator for ThreadSchedparam

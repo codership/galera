@@ -30,6 +30,9 @@ extern const char* const GCS_PARAMS_MAX_PKT_SIZE;
 extern const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT;
 extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
 extern const char* const GCS_PARAMS_MAX_THROTTLE;
+#ifdef GCS_SM_DEBUG
+extern const char* const GCS_PARAMS_SM_DUMP;
+#endif /* GCS_SM_DEBUG */
 
 /*! Register configuration parameters */
 extern bool
