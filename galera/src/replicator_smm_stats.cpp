@@ -193,8 +193,6 @@ galera::ReplicatorSMM::stats_get()
     if (S_DESTROYED == state_()) return 0;
 
     std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
-    char    interval_text[64];
-    char    ist_status_text[128];
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
@@ -230,9 +228,10 @@ galera::ReplicatorSMM::stats_get()
     sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
 
-    snprintf(interval_text, sizeof(interval_text), "[ %ld, %ld ]",
-             stats.fc_lower_limit, stats.fc_upper_limit);
-    sv[STATS_FC_INTERVAL         ].value._string = interval_text;
+    std::ostringstream osinterval;
+    osinterval << "[ " << stats.fc_lower_limit << ", " << stats.fc_upper_limit << " ]";
+    strncpy(interval_string_, osinterval.str().c_str(), sizeof(interval_string_));
+    sv[STATS_FC_INTERVAL         ].value._string = interval_string_;
     sv[STATS_FC_STATUS           ].value._string = (stats.fc_status ? "ON" : "OFF");
 
     double avg_cert_interval(0);
@@ -283,12 +282,11 @@ galera::ReplicatorSMM::stats_get()
         percent_complete = std::max(percent_complete, 0);
         percent_complete = std::min(percent_complete, 100);
 
-        snprintf(ist_status_text, sizeof(ist_status_text),
-                 "%d%% complete, received seqno %lld of %lld-%lld",
-                 percent_complete, static_cast<long long>(current),
-                                   static_cast<long long>(first),
-                                   static_cast<long long>(last));
-        sv[STATS_IST_RECEIVE_STATUS].value._string = ist_status_text;
+        std::ostringstream   os;
+        os << percent_complete << "% complete, received seqno "
+           << current << " of " << first << "-" << last;
+        strncpy(ist_status_string_, os.str().c_str(), sizeof(ist_status_string_));
+        sv[STATS_IST_RECEIVE_STATUS].value._string = ist_status_string_;
     }
     else
         sv[STATS_IST_RECEIVE_STATUS].value._string = "";
@@ -306,15 +304,6 @@ galera::ReplicatorSMM::stats_get()
     for (gu::Status::const_iterator i(status.begin()); i != status.end(); ++i)
     {
         tail_size += i->first.size() + 1 + i->second.size() + 1;
-    }
-
-    // Compute the size for strings within the wsrep_stats_ array (sv)
-    // These will be copied after the stats array but before the status strings
-    for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it != sv.end(); ++it)
-    {
-        // This does NOT include the incoming_addresses list (it hasn't been set yet)
-        if (it->type == WSREP_VAR_STRING && it->value._string)
-            tail_size += strlen(it->value._string) + 1;
     }
 
     gu::Lock lock_inc(incoming_mutex_);
@@ -337,18 +326,6 @@ galera::ReplicatorSMM::stats_get()
 
         // Initial tail_buf position
         char* tail_buf(reinterpret_cast<char*>(buf + sv.size()));
-
-        // Assign dynamical strings from the original sv (so stop at STATS_MAX)
-        for (std::vector<struct wsrep_stats_var>::iterator it(sv.begin()); it < sv.begin() + STATS_MAX; ++it)
-        {
-            // This does NOT include the incoming_addresses list (it hasn't been set yet)
-            if (it->type == WSREP_VAR_STRING && it->value._string)
-            {
-                strncpy(tail_buf, it->value._string, strlen(it->value._string)+1);
-                it->value._string = tail_buf;
-                tail_buf += strlen(tail_buf) + 1;
-            }
-        }
 
         // Assign incoming list
         strncpy(tail_buf, incoming_list_.c_str(), incoming_list_.size() + 1);

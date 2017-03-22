@@ -638,6 +638,10 @@ namespace galera
 #endif /* HAVE_PSI_INTERFACE */
 
         mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
+
+        // Storage space for dynamic status strings
+        char                  interval_string_[64];
+        char                  ist_status_string_[128];
     };
 
     std::ostream& operator<<(std::ostream& os, ReplicatorSMM::State state);
