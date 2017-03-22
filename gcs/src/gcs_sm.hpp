@@ -61,9 +61,50 @@ typedef struct gcs_sm
 #endif /* GCS_SM_CONCURRENCY */
     bool          pause;
     gu::datetime::Period wait_time;
+
+#ifdef GCS_SM_DEBUG
+#define GCS_SM_HIST_STR_LEN 128
+#define GCS_SM_HIST_LEN     1024
+    char history[GCS_SM_HIST_LEN][GCS_SM_HIST_STR_LEN];
+    int  history_line;
+#endif /* GCS_SM_DEBUG */
+
     gcs_sm_user_t wait_q[];
 }
 gcs_sm_t;
+
+#ifdef GCS_SM_DEBUG
+#define GCS_SM_HIST_LOG(fmt, ...)                                       \
+    {                                                                   \
+        sm->history_line = (sm->history_line + 1) % GCS_SM_HIST_LEN;    \
+        char* const line(sm->history[sm->history_line]);                \
+        snprintf(line, GCS_SM_HIST_STR_LEN - 1,                         \
+                 "%8lx|%s(h:%lu,t:%lu,u:%ld,e:%ld,p:%d,r:%ld):%d: " fmt "\n", \
+                 gu_thread_self(), __func__,                            \
+                 sm->wait_q_head, sm->wait_q_tail, sm->users, sm->entered, \
+                 sm->pause, sm->ret, __LINE__, ##__VA_ARGS__);          \
+    }
+
+/*!
+ * Dumps SM state and history to file
+ */
+extern void
+_gcs_sm_dump_state_common(gcs_sm_t* sm, FILE* file); // unprotected
+
+#define GCS_SM_ASSERT(expr)                              \
+    if (!(expr)) {                                       \
+        GCS_SM_HIST_LOG("assertion %s failed\n", #expr); \
+        _gcs_sm_dump_state_common(sm, stderr);           \
+        assert(expr);                                    \
+    }
+
+extern void
+gcs_sm_dump_state(gcs_sm_t* sm, FILE* file);
+
+#else
+#define GCS_SM_HIST_LOG(fmt, ...) {}
+#define GCS_SM_ASSERT(expr) assert(expr);
+#endif /* GCS_SM_DEBUG */
 
 /*!
  * Creates send monitor
@@ -109,6 +150,8 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
             // gu_debug ("Waking up %lu", sm->wait_q_head);
             gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
             woken++;
+            GCS_SM_HIST_LOG("signaled %lu", sm->wait_q_head);
+            break;
         }
         else { /* skip interrupted */
             assert (NULL == sm->wait_q[sm->wait_q_head].cond);
@@ -117,6 +160,7 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
             if (gu_unlikely(sm->users < sm->users_min)) {
                 sm->users_min = sm->users;
             }
+            GCS_SM_HIST_LOG("skipped %lu", sm->wait_q_head);
             GCS_SM_INCREMENT(sm->wait_q_head);
         }
     }
@@ -132,6 +176,7 @@ _gcs_sm_wake_up_waiters (gcs_sm_t* sm)
     if (gu_unlikely(sm->cond_wait)) {
         assert (sm->cond_wait > 0);
         sm->cond_wait--;
+        GCS_SM_HIST_LOG("signal global cond");
         gu_cond_signal (&sm->cond);
     }
     else if (!sm->pause) {
@@ -139,59 +184,66 @@ _gcs_sm_wake_up_waiters (gcs_sm_t* sm)
     }
     else {
         /* gcs_sm_continue() will do the rest */
+        GCS_SM_HIST_LOG("skipped wake up waiters");
     }
 }
 
 static inline void
 _gcs_sm_leave_common (gcs_sm_t* sm)
 {
-    assert (sm->entered < GCS_SM_CC);
-
-    assert (sm->users > 0);
+    GCS_SM_ASSERT(sm->users > 0);
     sm->users--;
+
     if (gu_unlikely(sm->users < sm->users_min)) {
         sm->users_min = sm->users;
     }
-    assert (false == sm->wait_q[sm->wait_q_head].wait);
-    assert (NULL  == sm->wait_q[sm->wait_q_head].cond);
-    GCS_SM_INCREMENT(sm->wait_q_head);
 
+    GCS_SM_ASSERT(false == sm->wait_q[sm->wait_q_head].wait);
+    GCS_SM_ASSERT(NULL  == sm->wait_q[sm->wait_q_head].cond);
+    GCS_SM_INCREMENT(sm->wait_q_head);
     _gcs_sm_wake_up_waiters (sm);
+
+    GCS_SM_HIST_LOG("leaving");
 }
 
-static inline bool
-_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block, unsigned long tail)
+//#define GCS_SM_SIMULATE_TIMEOUTS
+
+static inline int
+_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block,
+                        unsigned long tail)
 {
     sm->wait_q[tail].cond = cond;
     sm->wait_q[tail].wait = true;
-    bool ret;
+    int ret;
+
     if (block == true)
     {
+        GCS_SM_HIST_LOG("queueing at %lu", tail);
         gu_cond_wait (cond, &sm->lock);
         assert(tail == sm->wait_q_head || false == sm->wait_q[tail].wait);
         assert(sm->wait_q[tail].cond == cond || false == sm->wait_q[tail].wait);
-        sm->wait_q[tail].cond = NULL;
-        ret = sm->wait_q[tail].wait;
-        sm->wait_q[tail].wait = false;
+        ret = sm->wait_q[tail].wait ? 0 : -EINTR;
     }
     else
     {
         gu::datetime::Date abstime(gu::datetime::Date::calendar());
+#ifdef GCS_SM_SIMULATE_TIMEOUTS
+        if (tail & 1)
+#endif
         abstime = abstime + sm->wait_time;
         struct timespec ts;
         abstime._timespec(ts);
-        int waitret = gu_cond_timedwait(cond, &sm->lock, &ts);
-        sm->wait_q[tail].cond = NULL;
-        // sm->wait_time is incremented by second each time cond wait
-        // times out, reset back to one second when cond wait
-        // succeeds.
-        if (waitret == 0)
+        GCS_SM_HIST_LOG("waiting at %lu", tail);
+        ret = -gu_cond_timedwait(cond, &sm->lock, &ts);
+        if (0 == ret)
         {
-            ret = sm->wait_q[tail].wait;
+            ret = sm->wait_q[tail].wait ? 0 : -EINTR;
+            // sm->wait_time is incremented by second each time cond wait
+            // times out, reset back to one second when cond wait succeeds.
             sm->wait_time = std::max(sm->wait_time*2/3,
                                      gu::datetime::Period(gu::datetime::Sec));
         }
-        else if (waitret == ETIMEDOUT)
+        else if (-ETIMEDOUT == ret)
         {
             if (sm->wait_time < 10 * gu::datetime::Sec)
             {
@@ -203,17 +255,25 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond, bool block, unsigned long
                 gu_warn("send monitor wait timed out, waited for %s",
                         to_string(sm->wait_time).c_str());
             }
-            ret = false;
+#ifndef GCS_SM_SIMULATE_TIMEOUTS
+            if (tail & 1)
+#endif
             sm->wait_time = sm->wait_time + gu::datetime::Sec;
         }
         else
         {
             gu_error("send monitor timedwait failed with %d: %s",
-                     waitret, strerror(waitret));
-            ret = false;
+                     ret, strerror(-ret));
         }
-        sm->wait_q[tail].wait = false;
+
+        // to reproduce GAL-495: if (0 == ret && (tail & 1)) { ret = -EINTR; }
     }
+
+    sm->wait_q[tail].cond = NULL;
+    sm->wait_q[tail].wait = false;
+
+    if (gu_unlikely(0 != ret)) GCS_SM_HIST_LOG("%ld wait failed: %d", tail, ret);
+
     return ret;
 }
 
@@ -256,6 +316,8 @@ gcs_sm_schedule (gcs_sm_t* sm)
             sm->stats.send_q_len += sm->users - 1;
         }
 
+        GCS_SM_HIST_LOG("scheduled at %lu", sm->wait_q_tail);
+
         return ret; // success
     }
     else if (0 == ret) {
@@ -265,6 +327,7 @@ gcs_sm_schedule (gcs_sm_t* sm)
 
     assert(ret < 0);
 
+    GCS_SM_HIST_LOG("return %ld", sm->wait_q_tail);
     gu_mutex_unlock (&sm->lock);
 
     return ret;
@@ -281,6 +344,7 @@ gcs_sm_schedule (gcs_sm_t* sm)
  * @retval -EAGAIN - out of space
  * @retval -EBADFD - monitor closed
  * @retval -EINTR  - was interrupted by another thread
+ * @retval -ETIMEDOUT - timedout waiting for its turn
  * @retval 0 - successfully entered
  */
 static inline long
@@ -296,14 +360,12 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
            was true) */
         bool wait = GCS_SM_HAS_TO_WAIT;
         while (wait && ret >= 0) {
-            if (gu_likely(_gcs_sm_enqueue_common (sm, cond, block, tail))) {
+            ret = _gcs_sm_enqueue_common (sm, cond, block, tail);
+            if (gu_likely((0 == ret))) {
                 ret = sm->ret;
                 /* weaken the condition, so that we do enter if there
                    is room for one more thread */
                 wait = sm->entered >= GCS_SM_CC;
-            }
-            else {
-                ret = -EINTR;
             }
         }
 
@@ -313,19 +375,28 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled, bool block)
             assert(sm->users   > 0);
             assert(sm->entered < GCS_SM_CC);
             sm->entered++;
+#ifdef GCS_SM_SIMULATE_TIMEOUTS
+            if (tail & 1) usleep(1000);
+#endif
         }
         else {
-            if (gu_likely(-EINTR == ret)) {
-                /* was interrupted, will be handled by someone else */
+            if (tail != sm->wait_q_head) {
+                /* was interrupted in the middle,
+                 * will be handled by someone else (with tail == head) */
             }
             else {
-                /* monitor is closed, wake up others */
-                assert(sm->users > 0);
+                GCS_SM_ASSERT(-EINTR != ret || sm->pause);
+                /* update head, wake up next */
                 _gcs_sm_leave_common(sm);
             }
         }
 
+        GCS_SM_HIST_LOG("%lu entered: %ld", tail, ret);
         gu_mutex_unlock (&sm->lock);
+    }
+    else if (ret != -EBADFD){
+        gu_warn("thread %ld failed to schedule for monitor: %ld (%s)",
+                gu_thread_self(), ret, strerror(-ret));
     }
 
     return ret;
@@ -336,8 +407,9 @@ gcs_sm_leave (gcs_sm_t* sm)
 {
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
+    GCS_SM_ASSERT(sm->entered > 0);
     sm->entered--;
-    assert(sm->entered >= 0);
+    GCS_SM_ASSERT(sm->entered < GCS_SM_CC);
 
     _gcs_sm_leave_common(sm);
 
@@ -354,7 +426,7 @@ gcs_sm_pause (gcs_sm_t* sm)
         sm->stats.pause_start = gu_time_monotonic();
         sm->pause = true;
     }
-
+    GCS_SM_HIST_LOG("paused");
     gu_mutex_unlock (&sm->lock);
 }
 
@@ -377,9 +449,9 @@ gcs_sm_continue (gcs_sm_t* sm)
         sm->stats.paused_ns += gu_time_monotonic() - sm->stats.pause_start;
     }
     else {
-        gu_debug ("Trying to continue unpaused monitor");
+        gu_info ("Trying to continue unpaused monitor");
     }
-
+    GCS_SM_HIST_LOG("resumed");
     gu_mutex_unlock (&sm->lock);
 }
 
@@ -405,6 +477,7 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
         assert (sm->wait_q[handle].cond != NULL);
         sm->wait_q[handle].wait = false;
         gu_cond_signal (sm->wait_q[handle].cond);
+        GCS_SM_HIST_LOG("interrupted %ld", handle);
         sm->wait_q[handle].cond = NULL;
         ret = 0;
         if (!sm->pause && handle == (long)sm->wait_q_head) {
@@ -416,6 +489,7 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
     }
     else {
         ret = -ESRCH;
+        GCS_SM_HIST_LOG("interrupted %ld: not found", handle);
     }
 
     gu_mutex_unlock (&sm->lock);
@@ -464,11 +538,13 @@ gcs_sm_grab (gcs_sm_t* sm)
 
     if (ret) {
         assert (ret < 0);
+        GCS_SM_HIST_LOG("grab failed");
         _gcs_sm_wake_up_waiters (sm);
     }
     else {
         assert (sm->entered < GCS_SM_CC);
         sm->entered++;
+        GCS_SM_HIST_LOG("grab succeeded");
     }
 
     gu_mutex_unlock (&sm->lock);
@@ -485,6 +561,7 @@ gcs_sm_release (gcs_sm_t* sm)
     sm->entered--;
     assert(sm->entered >= 0);
     _gcs_sm_wake_up_waiters (sm);
+    GCS_SM_HIST_LOG("released");
 
     gu_mutex_unlock (&sm->lock);
 }

@@ -20,7 +20,7 @@ libgalerautils_sources = [
     'gu_spooky.c',
     'gu_crc32c.c',
     'gu_rand.c',
-    'gu_mutex.c',
+    'gu_threads.c',
     'gu_hexdump.c',
     'gu_to.c',
     'gu_utils.c',

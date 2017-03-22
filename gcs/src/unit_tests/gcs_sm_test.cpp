@@ -466,9 +466,9 @@ START_TEST (gcs_sm_test_interrupt)
 
     TEST_INTERRUPT_THREAD(1, thr1);
 
-    TEST_CREATE_THREAD(&thr2, 1, 2, 2); /* test queueing after interrupted */
+    TEST_CREATE_THREAD(&thr2, 1, 2, 1); /* test queueing after interrupted */
 
-    TEST_CREATE_THREAD(&thr3, 2, 3, 3);
+    TEST_CREATE_THREAD(&thr3, 2, 3, 2);
 
     TEST_INTERRUPT_THREAD(3, thr3); /* test interrupting last waiter */
 
@@ -483,7 +483,7 @@ START_TEST (gcs_sm_test_interrupt)
     TEST_CREATE_THREAD(&thr1, 3, 4, 1);
     TEST_INTERRUPT_THREAD(4, thr1);
 
-    TEST_CREATE_THREAD(&thr1, 0, 1, 2);
+    TEST_CREATE_THREAD(&thr1, 0, 1, 1);
     TEST_INTERRUPT_THREAD(1, thr1);
 
     gcs_sm_continue (sm);

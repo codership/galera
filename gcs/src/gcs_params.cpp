@@ -19,6 +19,9 @@ const char* const GCS_PARAMS_MAX_PKT_SIZE      = "gcs.max_packet_size";
 const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT = "gcs.recv_q_hard_limit";
 const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT = "gcs.recv_q_soft_limit";
 const char* const GCS_PARAMS_MAX_THROTTLE      = "gcs.max_throttle";
+#ifdef GCS_SM_DEBUG
+const char* const GCS_PARAMS_SM_DUMP           = "gcs.sm_dump";
+#endif /* GCS_SM_DEBUG */
 
 static const char* const GCS_PARAMS_FC_FACTOR_DEFAULT         = "1.0";
 static const char* const GCS_PARAMS_FC_LIMIT_DEFAULT          = "16";
@@ -57,7 +60,9 @@ gcs_params_register(gu_config_t* conf)
                           GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT);
     ret |= gu_config_add (conf, GCS_PARAMS_MAX_THROTTLE,
                           GCS_PARAMS_MAX_THROTTLE_DEFAULT);
-
+#ifdef GCS_SM_DEBUG
+    ret |= gu_config_add (conf, GCS_PARAMS_SM_DUMP, "0");
+#endif /* GCS_SM_DEBUG */
     return ret;
 }
 

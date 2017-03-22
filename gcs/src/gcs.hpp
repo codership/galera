@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -459,7 +459,8 @@ struct gcs_stats
     double    recv_q_len_avg; //! average recv queue length per queued action
     long long fc_paused_ns;   //! total nanoseconds spent in paused state
     double    fc_paused_avg;  //! faction of time paused due to flow control
-    long long fc_sent;        //! flow control stops sent
+    long long fc_ssent;       //! flow control stops sent
+    long long fc_csent;       //! flow control conts sent
     long long fc_received;    //! flow control stops received
     size_t    recv_q_size;    //! current recv queue size
     int       recv_q_len;     //! current recv queue length

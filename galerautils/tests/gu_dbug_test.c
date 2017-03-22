@@ -1,15 +1,15 @@
-// Copyright (C) 2008 Codership Oy <info@codership.com>
+// Copyright (C) 2008-2017 Codership Oy <info@codership.com>
 
 // $Id$
 
 /* Pthread yield */
 #define _GNU_SOURCE 1
-#include <pthread.h>
 #include <sched.h>
 #include <check.h>
 #include <time.h>
 #include "gu_dbug_test.h"
 #include "../src/gu_dbug.h"
+#include "../src/gu_threads.h"
 
 static void cf()
 {
@@ -42,14 +42,14 @@ static time_t stop = 0;
 static void *dbg_thr(void *arg)
 {
     while (time(NULL) < stop) { af(); }
-    pthread_exit(NULL);
+    gu_thread_exit(NULL);
 }
 
 START_TEST(gu_dbug_test)
 {
     int i;
 #define N_THREADS 10
-    pthread_t th[N_THREADS];
+    gu_thread_t th[N_THREADS];
 
     /* Log > /dev/null */
     GU_DBUG_FILE = fopen("/dev/null", "a+");
@@ -69,9 +69,9 @@ START_TEST(gu_dbug_test)
     /* Run few threads concurrently */
     stop = time(NULL) + 2;
     for (i = 0; i < N_THREADS; i++)
-        pthread_create(&th[i], NULL, &dbg_thr, NULL);
+        gu_thread_create(&th[i], NULL, &dbg_thr, NULL);
     for (i = 0; i < N_THREADS; i++)
-        pthread_join(th[i], NULL);
+        gu_thread_join(th[i], NULL);
 }
 END_TEST
 
