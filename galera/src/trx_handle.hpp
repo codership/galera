@@ -520,6 +520,9 @@ namespace galera
         bool is_committed() const { return committed_; }
         void mark_committed()     { committed_ = true; }
 
+        bool is_pending() const { return pending_; }
+        void mark_pending()     { pending_ = true; }
+
         void unordered(void*                recv_ctx,
                        wsrep_unordered_cb_t apply_cb) const;
 
@@ -596,6 +599,7 @@ namespace galera
             refcnt_            (1),
             certified_         (false),
             committed_         (false),
+            pending_           (false),
             exit_loop_         (false),
             cert_bypass_       (false)
         {}
@@ -618,6 +622,7 @@ namespace galera
         gu::Atomic<int>        refcnt_;
         bool                   certified_;
         bool                   committed_;
+        bool                   pending_;
         bool                   exit_loop_;
         bool                   cert_bypass_;
 

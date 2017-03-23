@@ -1327,7 +1327,10 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster* trx)
 
         ts->set_state(TrxHandle::S_ROLLED_BACK);
 
-        report_last_committed(cert_.set_trx_committed(*ts));
+        if (!ts->is_pending())
+        {
+            report_last_committed(cert_.set_trx_committed(*ts));
+        }
     }
     else
     {
@@ -2561,13 +2564,18 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         // This avoids the certification index to diverge
         // across nodes.
         TrxHandleSlavePtr aborted_ts;
-        while (pending_cert_queue_.must_cert_next(ts->global_seqno(),
-                                                  aborted_ts))
+        while ((aborted_ts = pending_cert_queue_.must_cert_next(ts->global_seqno()))
+               != NULL)
         {
-            log_debug << "must cert next " << ts->global_seqno() << " aborted ts "  << *aborted_ts;
+            log_debug << "must cert next " << ts->global_seqno()
+                      << " aborted ts " << *aborted_ts;
+
             Certification::TestResult result;
             result = cert_.append_trx(aborted_ts);
-            log_debug << "trx in pendind cert queue certified, result: " << result;
+            report_last_committed(cert_.set_trx_committed(*aborted_ts));
+
+            log_debug << "trx in pending cert queue certified, result: "
+                      << result;
         }
 
         switch (cert_.append_trx(ts))

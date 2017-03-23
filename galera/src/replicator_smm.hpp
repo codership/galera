@@ -722,23 +722,24 @@ namespace galera
             {
                 gu::Lock lock(mutex_);
                 ts_queue_.push(ts);
+                ts->mark_pending();
             }
 
-            bool must_cert_next(wsrep_seqno_t seqno, TrxHandleSlavePtr& ts)
+            TrxHandleSlavePtr must_cert_next(wsrep_seqno_t seqno)
             {
                 gu::Lock lock(mutex_);
+                TrxHandleSlavePtr ret;
                 if (!ts_queue_.empty())
                 {
-                    TrxHandleSlavePtr top = ts_queue_.top();
+                    const TrxHandleSlavePtr& top(ts_queue_.top());
                     assert(top->global_seqno() != seqno);
                     if (top->global_seqno() < seqno)
                     {
-                        ts = top;
+                        ret = top;
                         ts_queue_.pop();
-                        return true;
                     }
                 }
-                return false;
+                return ret;
             }
 
         private:
