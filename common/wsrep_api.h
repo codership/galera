@@ -63,7 +63,7 @@ extern "C" {
  *                                                                        *
  **************************************************************************/
 
-#define WSREP_INTERFACE_VERSION "27"
+#define WSREP_INTERFACE_VERSION "29"
 
 /*! Empty backend spec */
 #define WSREP_NONE "none"
@@ -159,6 +159,7 @@ typedef enum wsrep_status
     WSREP_CONN_FAIL,       //!< error in client connection, must abort
     WSREP_NODE_FAIL,       //!< error in node state, wsrep must reinit
     WSREP_FATAL,           //!< fatal error, server must abort
+    WSREP_PRECOMMIT_ABORT, //!< transaction was aborted before commencing pre-commit
     WSREP_NOT_IMPLEMENTED  //!< feature not implemented
 } wsrep_status_t;
 
@@ -387,6 +388,7 @@ typedef enum wsrep_cb_status (*wsrep_apply_cb_t) (
  */
 typedef enum wsrep_cb_status (*wsrep_commit_cb_t) (
     void*                   recv_ctx,
+    const void*             trx_handle,
     uint32_t                flags,
     const wsrep_trx_meta_t* meta,
     wsrep_bool_t*           exit,
@@ -814,8 +816,35 @@ struct wsrep {
     wsrep_status_t (*recv)(wsrep_t* wsrep, void* recv_ctx);
 
   /*!
-   * @brief Replicates/logs result of transaction to other nodes and allocates
-   * required resources.
+   * @brief Replicates the given write-set on group channel.
+   * This API will not mark start of the execution. That will be done by
+   * pre_commit api below.
+   *
+   * Must be called before transaction commit. Returns success code, which
+   * caller must check.
+   * In case of WSREP_OK, starts commit critical section, transaction can
+   * commit. Otherwise transaction must rollback.
+   *
+   * @param wsrep      provider handle
+   * @param ws_handle  writeset of committing transaction
+   * @param conn_id    connection ID
+   * @param flags      fine tuning the replication WSREP_FLAG_*
+   * @param meta       transaction meta data
+   *
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   must rollback transaction
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*replicate)(wsrep_t*                wsrep,
+                                wsrep_conn_id_t         conn_id,
+                                wsrep_ws_handle_t*      ws_handle,
+                                uint32_t                flags,
+                                wsrep_trx_meta_t*       meta);
+
+  /*!
+   * @brief Execute pre-commit hook that mark start of execution by entering
+   * Apply and Commit Monitor.
    *
    * Must be called before transaction commit. Returns success code, which
    * caller must check.
@@ -840,6 +869,42 @@ struct wsrep {
                                  wsrep_trx_meta_t*       meta);
 
   /*!
+   * @brief Replicates/logs result of transaction to other nodes and allocates
+   * required resources.
+   *
+   * Must be called before transaction commit. Returns success code, which
+   * caller must check.
+   * In case of WSREP_OK, starts commit critical section, transaction can
+   * commit. Otherwise transaction must rollback.
+   *
+   * @param wsrep      provider handle
+   * @param ws_handle  writeset of committing transaction
+   * @param conn_id    connection ID
+   * @param flags      fine tuning the replication WSREP_FLAG_*
+   * @param meta       transaction meta data
+   *
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   must rollback transaction
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*replicate_pre_commit)(wsrep_t*                wsrep,
+                                           wsrep_conn_id_t         conn_id,
+                                           wsrep_ws_handle_t*      ws_handle,
+                                           uint32_t                flags,
+                                           wsrep_trx_meta_t*       meta);
+
+  /*!
+   * @brief Exit the critical section (CommitMonitor)
+   *
+   * @param wsrep      provider handle
+   * @param ws_handle  writeset of committing transaction
+   * @retval WSREP_OK  post_commit succeeded
+   */
+    wsrep_status_t (*interim_commit) (wsrep_t*            wsrep,
+                                      wsrep_ws_handle_t*  ws_handle);
+
+  /*!
    * @brief Releases resources after transaction commit.
    *
    * Ends commit critical section.
@@ -850,6 +915,49 @@ struct wsrep {
    */
     wsrep_status_t (*post_commit) (wsrep_t*            wsrep,
                                    wsrep_ws_handle_t*  ws_handle);
+
+  /*!
+   * @brief Enforce commit ordering for applier thread by entering
+   * Commit Monitor.
+   *
+   * @param wsrep      provider handle
+   * @param trx_handle  writeset of committing transaction
+   *
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   must rollback transaction
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*applier_pre_commit)(wsrep_t*    wsrep,
+                                         void*       trx_handle);
+
+  /*!
+   * @brief Mark end of commit ordering by leaving Commit Monitor.
+   *
+   * @param wsrep      provider handle
+   * @param trx_handle  writeset of committing transaction
+   *
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   must rollback transaction
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*applier_interim_commit)(wsrep_t*   wsrep,
+                                             void*      trx_handle);
+
+  /*!
+   * @brief Mark end of commit ordering by leaving Commit Monitor.
+   *
+   * @param wsrep      provider handle
+   * @param trx_handle  writeset of committing transaction
+   *
+   * @retval WSREP_OK         cluster-wide commit succeeded
+   * @retval WSREP_TRX_FAIL   must rollback transaction
+   * @retval WSREP_CONN_FAIL  must close client connection
+   * @retval WSREP_NODE_FAIL  must close all connections and reinit
+   */
+    wsrep_status_t (*applier_post_commit)(wsrep_t*   wsrep,
+                                          void*      trx_handle);
 
   /*!
    * @brief Releases resources after transaction rollback.
