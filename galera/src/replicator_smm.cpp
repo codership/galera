@@ -766,9 +766,20 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             }
             else
             {
+                trx->reset_ts();
                 pending_cert_queue_.push(ts);
-
                 cancel_monitors<true>(*ts);
+                if (ts->pa_unsafe())
+                {
+                    ApplyOrder ao(*ts);
+                    apply_monitor_.self_cancel(ao);
+                }
+                if (co_mode_ != CommitOrder::BYPASS)
+                {
+                    CommitOrder co(*ts, co_mode_);
+                    commit_monitor_.self_cancel(co);
+                }
+
                 ts->set_state(TrxHandle::S_ABORTING);
                 trx->set_state(TrxHandle::S_ABORTING);
 
@@ -1327,10 +1338,7 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster* trx)
 
         ts->set_state(TrxHandle::S_ROLLED_BACK);
 
-        if (!ts->is_pending())
-        {
-            report_last_committed(cert_.set_trx_committed(*ts));
-        }
+        report_last_committed(cert_.set_trx_committed(*ts));
     }
     else
     {
@@ -2530,6 +2538,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                 }
                 else
                 {
+                    trx->reset_ts();
                     pending_cert_queue_.push(ts);
 
                     if (interrupted == true)
@@ -2539,6 +2548,17 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                     else
                     {
                         local_monitor_.leave(lo);
+                    }
+
+                    if (ts->pa_unsafe())
+                    {
+                        ApplyOrder ao(*ts);
+                        apply_monitor_.self_cancel(ao);
+                    }
+                    if (co_mode_ != CommitOrder::BYPASS)
+                    {
+                        CommitOrder co(*ts, co_mode_);
+                        commit_monitor_.self_cancel(co);
                     }
 
                     ts->set_state(TrxHandle::S_ABORTING);
@@ -2573,6 +2593,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             Certification::TestResult result;
             result = cert_.append_trx(aborted_ts);
             report_last_committed(cert_.set_trx_committed(*aborted_ts));
+            aborted_ts->set_state(TrxHandle::S_ROLLED_BACK);
 
             log_debug << "trx in pending cert queue certified, result: "
                       << result;
