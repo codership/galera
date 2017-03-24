@@ -704,11 +704,9 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
             /* Check that we're not running out of space in monitor. */
             if (local_monitor_.would_block(seqno_l))
             {
-                long const seconds = sst_retry_sec_ * tries;
-                log_error << "We ran out of resources, seemingly because "
-                          << "we've been unsuccessfully requesting state "
-                          << "transfer for over " << seconds << " seconds. "
-                          << "Please check that there is "
+                log_error << "Slave queue grew too long while trying to "
+                          << "request state transfer " << tries << " time(s). "
+                          << "Please make sure that there is "
                           << "at least one fully synced member in the group. "
                           << "Application must be restarted.";
                 ret = -EDEADLK;
