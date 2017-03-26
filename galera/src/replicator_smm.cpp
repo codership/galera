@@ -31,18 +31,7 @@ apply_trx_ws(void*                    recv_ctx,
     {
         try
         {
-            if (trx.is_toi())
-            {
-                log_debug << "Executing TO isolated action: " << trx;
-            }
-
             gu_trace(trx.apply(recv_ctx, apply_cb, meta));
-
-            if (trx.is_toi())
-            {
-                log_debug << "Done executing TO isolated action: "
-                         << trx.global_seqno();
-            }
             break;
         }
         catch (galera::ApplyException& e)
@@ -446,6 +435,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     wsrep_trx_meta_t meta = {{state_uuid_, trx->global_seqno() },
                              trx->depends_seqno()};
 
+    if (trx->is_toi())
+    {
+        log_debug << "Executing TO isolated action: " << *trx;
+        st_.mark_unsafe();
+    }
+
     gu_trace(apply_trx_ws(recv_ctx, apply_cb_, commit_cb_, *trx, meta));
     /* at this point any exception in apply_trx_ws() is fatal, not
      * catching anything. */
@@ -487,6 +482,13 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     trx->unordered(recv_ctx, unordered_cb_);
 
     apply_monitor_.leave(ao);
+
+    if (trx->is_toi())
+    {
+        log_debug << "Done executing TO isolated action: "
+                  << trx->global_seqno();
+        st_.mark_safe();
+    }
 
     trx->set_exit_loop(exit_loop);
 }
