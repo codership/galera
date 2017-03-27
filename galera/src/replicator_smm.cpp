@@ -768,12 +768,11 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
             {
                 trx->reset_ts();
                 pending_cert_queue_.push(ts);
-                cancel_monitors<true>(*ts);
-                if (ts->pa_unsafe())
-                {
-                    ApplyOrder ao(*ts);
-                    apply_monitor_.self_cancel(ao);
-                }
+
+                LocalOrder lo(*ts);
+                local_monitor_.self_cancel(lo);
+                ApplyOrder ao(*ts);
+                apply_monitor_.self_cancel(ao);
                 if (co_mode_ != CommitOrder::BYPASS)
                 {
                     CommitOrder co(*ts, co_mode_);
@@ -2550,6 +2549,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                         local_monitor_.leave(lo);
                     }
 
+                    // If not ts->pa_unsafe(), apply_monitor_
+                    // will be canceled at the end of the method,
+                    // in cancel_monitors().
                     if (ts->pa_unsafe())
                     {
                         ApplyOrder ao(*ts);
