@@ -545,7 +545,7 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
                 assert(meta->gtid.seqno == trx->ts()->global_seqno());
                 assert(meta->depends_on == trx->ts()->depends_seqno());
             }
-            else
+            else if (retval != WSREP_TRX_FAIL)
             {
                 assert(meta->gtid.seqno == WSREP_SEQNO_UNDEFINED);
                 assert(meta->depends_on == WSREP_SEQNO_UNDEFINED);
