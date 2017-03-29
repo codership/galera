@@ -556,8 +556,18 @@ namespace galera
         {
             set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
-            assert(state() == S_CERTIFYING || state() == S_REPLICATING);
-            set_state(S_ABORTING);
+            switch(state())
+            {
+            case S_CERTIFYING:
+            case S_REPLICATING:
+                set_state(S_ABORTING);
+                break;
+            case S_ABORTING:
+            case S_ROLLED_BACK:
+                break;
+            default:
+                assert(0);
+            }
             // must be set to S_ROLLED_BACK after commit_cb()
         }
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }

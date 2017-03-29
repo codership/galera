@@ -710,6 +710,55 @@ namespace galera
         Wsdb            wsdb_;
         Certification   cert_;
 
+        class PendingCertQueue
+        {
+        public:
+            PendingCertQueue() :
+                mutex_(),
+                ts_queue_()
+            { }
+
+            void push(const TrxHandleSlavePtr& ts)
+            {
+                assert(ts->local());
+                gu::Lock lock(mutex_);
+                ts_queue_.push(ts);
+            }
+
+            TrxHandleSlavePtr must_cert_next(wsrep_seqno_t seqno)
+            {
+                gu::Lock lock(mutex_);
+                TrxHandleSlavePtr ret;
+                if (!ts_queue_.empty())
+                {
+                    const TrxHandleSlavePtr& top(ts_queue_.top());
+                    assert(top->global_seqno() != seqno);
+                    if (top->global_seqno() < seqno)
+                    {
+                        ret = top;
+                        ts_queue_.pop();
+                    }
+                }
+                return ret;
+            }
+
+        private:
+            struct TrxHandleSlavePtrCmpGlobalSeqno
+            {
+                bool operator()(const TrxHandleSlavePtr& lhs,
+                                const TrxHandleSlavePtr& rhs) const
+                {
+                    return lhs->global_seqno() > rhs->global_seqno();
+                }
+            };
+            gu::Mutex mutex_;
+            std::priority_queue<TrxHandleSlavePtr,
+                                std::vector<TrxHandleSlavePtr>,
+                                TrxHandleSlavePtrCmpGlobalSeqno> ts_queue_;
+        };
+
+        PendingCertQueue pending_cert_queue_;
+
         // concurrency control
         Monitor<LocalOrder>  local_monitor_;
         Monitor<ApplyOrder>  apply_monitor_;
