@@ -433,6 +433,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
                               { ts.source_id(), ts.trx_id(), ts.conn_id() },
                               ts.depends_seqno() };
 
+    if (ts.is_toi())
+    {
+        log_debug << "Executing TO isolated action: " << ts;
+        st_.mark_unsafe();
+    }
+
     try { gu_trace(ts.apply(recv_ctx, apply_cb_, meta)); }
     catch (ApplyException& e)
     {
@@ -520,6 +526,13 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         ts.unordered(recv_ctx, unordered_cb_);
 
         apply_monitor_.leave(ao);
+    }
+
+    if (ts.is_toi())
+    {
+        log_debug << "Done executing TO isolated action: "
+                  << ts.global_seqno();
+        st_.mark_safe();
     }
 
     ts.set_exit_loop(exit_loop);
