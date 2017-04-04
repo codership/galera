@@ -25,8 +25,6 @@
 #include <errno.h>    // for errno
 #include <stddef.h>
 
-const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
-
 #define UUID_NODE_LEN 6
 
 /** Returns 64-bit system time in 100 nanoseconds */

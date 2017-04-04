@@ -13,6 +13,9 @@
 #define _gu_uuid_h_
 
 #include "gu_types.h"
+#include "gu_macros.h"
+
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +28,7 @@ typedef struct {
     uint8_t data[GU_UUID_LEN];
 } gu_uuid_t;
 
-extern const gu_uuid_t GU_UUID_NIL;
+static gu_uuid_t const GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
 /*! length of string representation */
 #define GU_UUID_STR_LEN 36
@@ -95,6 +98,16 @@ gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen);
  */
 extern ssize_t
 gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid);
+
+/*!
+ * Copy UUID from to as ::memcpy() seems to be considerably faster than the
+ * default assignement operator for structs
+ */
+GU_FORCE_INLINE void
+gu_uuid_copy(gu_uuid_t* const to, const gu_uuid_t* const from)
+{
+    memcpy(to, from, sizeof(gu_uuid_t));
+}
 
 #ifdef __cplusplus
 }

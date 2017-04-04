@@ -10,7 +10,8 @@
 #include "gcache_bh.hpp"
 #include "gcache_rb_test.hpp"
 
-#include "gu_logger.hpp"
+#include <gu_logger.hpp>
+#include <gu_throw.hpp>
 
 using namespace gcache;
 

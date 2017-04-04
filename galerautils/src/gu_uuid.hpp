@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2014-2017 Codership Oy <info@codership.com>
  *
  */
 
@@ -7,11 +7,13 @@
 #define _gu_uuid_hpp_
 
 #include "gu_uuid.h"
+#include "gu_arch.h" // GU_ASSERT_ALIGNMENT
 #include "gu_assert.hpp"
 #include "gu_buffer.hpp"
-#include "gu_throw.hpp"
+#include "gu_exception.hpp"
 
-#include <iostream>
+#include <istream>
+#include <cstring>
 
 inline bool operator==(const gu_uuid_t& a, const gu_uuid_t& b)
 {
@@ -33,13 +35,18 @@ inline std::ostream& operator<<(std::ostream& os, const gu_uuid_t& uuid)
     return (os << uuid_buf);
 }
 
+namespace gu {
+    class UUIDScanException : public Exception
+    {
+    public:
+        UUIDScanException(const std::string& s);
+    };
+}
+
 inline ssize_t gu_uuid_from_string(const std::string& s, gu_uuid_t& uuid)
 {
     ssize_t ret(gu_uuid_scan(s.c_str(), s.size(), &uuid));
-    if (ret == -1) {
-        gu_throw_error(EINVAL) << "could not parse UUID from '" << s
-                               << '\'' ;
-    }
+    if (gu_unlikely(ret == -1)) throw gu::UUIDScanException(s);
     return ret;
 }
 
@@ -52,31 +59,43 @@ inline std::istream& operator>>(std::istream& is, gu_uuid_t& uuid)
     return is;
 }
 
-inline size_t gu_uuid_serial_size(const gu_uuid_t& uuid)
+GU_FORCE_INLINE size_t gu_uuid_serial_size(const gu_uuid_t& uuid)
 {
     return sizeof(uuid.data);
 }
 
-inline size_t gu_uuid_serialize(const gu_uuid_t& uuid, gu::byte_t* buf,
-                                size_t buflen, size_t offset)
-{
-    if (offset + gu_uuid_serial_size(uuid) > buflen)
-        gu_throw_error (EMSGSIZE) << gu_uuid_serial_size(uuid)
-                                  << " > " << (buflen - offset);
-    memcpy(buf + offset, uuid.data, gu_uuid_serial_size(uuid));
-    offset += gu_uuid_serial_size(uuid);
-    return offset;
+namespace gu {
+    class UUIDSerializeException : public Exception
+    {
+    public:
+        UUIDSerializeException(size_t need, size_t have);
+    };
 }
 
-inline size_t gu_uuid_unserialize(const gu::byte_t* buf, size_t buflen,
-                                  size_t offset, gu_uuid_t& uuid)
+inline size_t gu_uuid_serialize(const gu_uuid_t& uuid, gu::byte_t* buf,
+                                size_t const buflen, size_t const offset)
 {
-    if (offset + gu_uuid_serial_size(uuid) > buflen)
-        gu_throw_error (EMSGSIZE) << gu_uuid_serial_size(uuid)
-                                  << " > " << (buflen - offset);
-    memcpy(uuid.data, buf + offset, gu_uuid_serial_size(uuid));
-    offset += gu_uuid_serial_size(uuid);
-    return offset;
+    size_t const len(gu_uuid_serial_size(uuid));
+    size_t const end_offset(offset + len);
+
+    if (gu_unlikely(end_offset > buflen))
+        throw gu::UUIDSerializeException(len, buflen - offset);
+
+    ::memcpy(buf + offset, uuid.data, len);
+    return end_offset;
+}
+
+inline size_t gu_uuid_unserialize(const gu::byte_t* buf, size_t const buflen,
+                                  size_t const offset, gu_uuid_t& uuid)
+{
+    size_t const len(gu_uuid_serial_size(uuid));
+    size_t const end_offset(offset + len);
+
+    if (gu_unlikely(end_offset > buflen))
+        throw gu::UUIDSerializeException(len, buflen - offset);
+
+    ::memcpy(uuid.data, buf + offset, len);
+    return end_offset;
 }
 
 namespace gu {
@@ -118,6 +137,15 @@ public:
     const gu_uuid_t* uuid_ptr() const
     {
         return &uuid_;
+    }
+
+    /* ::memcpy() seems to be considerably faster than default = */
+    GU_FORCE_INLINE
+    UUID& operator=(const UUID& u)
+    {
+        GU_ASSERT_ALIGNMENT(u.uuid_);
+        ::memcpy(&uuid_, &u.uuid_, gu_uuid_serial_size(uuid_));
+        return *this;
     }
 
     bool operator<(const UUID& cmp) const

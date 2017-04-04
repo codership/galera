@@ -5,9 +5,9 @@
 
 #include "write_set_ng.hpp"
 
-#include "gu_time.h"
-
+#include <gu_time.h>
 #include <gu_macros.hpp>
+#include <gu_utils.hpp>
 
 #include <iomanip>
 
@@ -157,7 +157,10 @@ WriteSetNG::Header::Checksum::verify (Version           ver,
                                       const void* const ptr,
                                       ssize_t const     hsize)
 {
-    assert (hsize > 0);
+    GU_COMPILE_ASSERT(Header::V3_CHECKSUM_SIZE >= int(sizeof(type_t)),
+                      checksum_type_too_long);
+
+    assert (hsize > V3_CHECKSUM_SIZE);
 
     type_t check(0), hcheck(0);
 
@@ -165,9 +168,7 @@ WriteSetNG::Header::Checksum::verify (Version           ver,
 
     compute (ptr, csize, check);
 
-    hcheck = *(reinterpret_cast<const type_t*>(
-                   reinterpret_cast<const gu::byte_t*>(ptr) + csize
-                   ));
+    gu::unserialize(ptr, csize, hcheck);
 
     if (gu_likely(check == hcheck)) return;
 

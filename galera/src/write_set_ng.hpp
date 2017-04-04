@@ -175,8 +175,7 @@ namespace galera
             Header (const gu::Buf& buf)
                 :
                 local_(),
-                ptr_  (reinterpret_cast<gu::byte_t*>(
-                           const_cast<void*>(buf.ptr))),
+                ptr_  (static_cast<gu::byte_t*>(const_cast<void*>(buf.ptr))),
                 ver_  (version(buf)),
                 size_ (check_size(ver_, ptr_, buf.size)),
                 chksm_(ver_, ptr_, size_)
@@ -189,8 +188,7 @@ namespace galera
             void read_buf (const gu::Buf& buf)
             {
                 ver_ = version(buf);
-                ptr_ =
-                    reinterpret_cast<gu::byte_t*>(const_cast<void*>(buf.ptr));
+                ptr_ = static_cast<gu::byte_t*>(const_cast<void*>(buf.ptr));
                 size_ = check_size (ver_, ptr_, buf.size);
                 Checksum::verify(ver_, ptr_, size_);
             }
@@ -292,16 +290,6 @@ namespace galera
                 return ptr_ + size();
             }
 
-            uint64_t get_checksum() const
-            {
-                const void* const checksum_ptr
-                    (reinterpret_cast<const gu::byte_t*>(ptr_) + size_ -
-                     V3_CHECKSUM_SIZE);
-
-                return gu::gtoh<Checksum::type_t>(
-                    *(static_cast<const Checksum::type_t*>(checksum_ptr)));
-            }
-
             /* to set seqno and parallel applying range after certification */
             void set_seqno(const wsrep_seqno_t& seqno, uint16_t pa_range);
 
@@ -335,12 +323,10 @@ namespace galera
             public:
                 typedef uint64_t type_t;
 
-                /* produce value (corrected for endianness) */
                 static void
                 compute (const void* ptr, size_t size, type_t& value)
                 {
                     gu::FastHash::digest (ptr, size, value);
-                    value = gu::htog<type_t>(value);
                 }
 
                 static void
@@ -431,7 +417,7 @@ namespace galera
             {
                 Checksum::type_t cval;
                 Checksum::compute (ptr, size, cval);
-                *reinterpret_cast<Checksum::type_t*>(ptr + size) = cval;
+                gu::serialize(cval, ptr, size);
             }
         }; /* class Header */
 

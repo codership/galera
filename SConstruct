@@ -15,6 +15,13 @@
 # Set LIBPATH  to add non-standard linker paths
 # Set RPATH    to add rpaths
 #
+# Some useful CPPFLAGS:
+# GALERA_ALIGNED_ACCESS - disable unaligned memory access on platforms that
+#                         don't support it
+# GCS_SM_DEBUG          - enable dumping of send monitor state and history
+# GU_DEBUG_MUTEX        - enable mutex debug instrumentation
+# GU_DBUG_ON            - enable sync point macros
+#
 # Script structure:
 # - Help message
 # - Default parameters

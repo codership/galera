@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2017 Codership Oy <info@codership.com>
 
 /**
  * @file CPU architecture related functions/macros
@@ -59,7 +59,14 @@
 # error "Unsupported wordsize"
 #endif
 
+#define GU_WORDSIZE_BYTES (GU_WORDSIZE >> 3)
+
 /* I'm not aware of the platforms that don't, but still */
 #define GU_ALLOW_UNALIGNED_READS 1
+
+#include <assert.h>
+#define GU_ASSERT_ALIGNMENT(x)                                  \
+    assert((uintptr_t(&(x)) % sizeof(x))         == 0 ||        \
+           (uintptr_t(&(x)) % GU_WORDSIZE_BYTES) == 0)
 
 #endif /* _gu_arch_h_ */

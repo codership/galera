@@ -73,4 +73,14 @@
 #  define gu_unlikely(x) (x)
 #endif
 
+/*
+ * Assignment macro that checks for argument alignment
+ * to it's own size or at least GU_MIN_ALIGNMENT
+ */
+#include "gu_arch.h"
+#define GU_ASSIGN(l, r)     \
+    GU_ASSERT_ALIGNMENT(l); \
+    GU_ASSERT_ALIGNMENT(r); \
+    l = r;
+
 #endif /* _gu_macros_h_ */
