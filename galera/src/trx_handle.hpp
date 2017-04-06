@@ -742,10 +742,6 @@ namespace galera
             assert(is_toi() == false  || key.shared() == false);
             // Shared key escalation to level 1 or 2 is not allowed
             assert(key.parts_num == 3 || key.shared() == false);
-            // For key level less than 3 write set must be TOI because
-            // conflicts between different key levels are not detected
-            // correctly even if both keys are exclusive
-            assert(key.parts_num == 3 || is_toi() == true);
 
             /*! protection against protocol change during trx lifetime */
             if (key.proto_ver != version())
