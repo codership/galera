@@ -144,7 +144,6 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
         {
             cert.erase_nbo_ctx(ts->ends_nbo());
         }
-
     }
 }
 
@@ -229,11 +228,7 @@ START_TEST(test_certification_trx_v3)
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           13, 13, 10, 12, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_OK, {0}, 0},
-        // 14: depends on 13
-        // exclusive level 1 key depends on exclusive level 2 key
-        // Intuitively this should be collision, but due to lack of
-        // hierarchy information in key flattening implementation
-        // the collision is not detected, only dependency.
+        // 14: conflicts with 13
         { { {1, } }, 1, 14,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           14, 14, 12, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
@@ -242,12 +237,49 @@ START_TEST(test_certification_trx_v3)
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
-
     run_wsinfo(wsi, nws, version);
 
 }
 END_TEST
 
+START_TEST(test_certification_trx_different_level_v3)
+{
+    const int version(3);
+    using galera::Certification;
+    using galera::TrxHandle;
+    using galera::void_cast;
+
+    //
+    // Test the following cases:
+    // 1) exclusive (k1, k2, k3) <-> exclusive (k1, k2) -> dependency
+    // 2) exclusive (k1, k2) <-> exclusive (k1, k2, k3) -> conflict
+    //
+    WSInfo wsi[] = {
+        // 1)
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
+          1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_OK, {0}, 0},
+        { { {2, } }, 2, 2,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
+          2, 2, 0, 1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_OK, {0}, 0},
+        // 2)
+        { { {2, } }, 2, 2,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
+          3, 3, 2, 2, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_OK, {0}, 0},
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
+          4, 4, 2, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_FAILED, {0}, 0}
+    };
+
+    size_t nws(sizeof(wsi)/sizeof(wsi[0]));
+
+    run_wsinfo(wsi, nws, version);
+}
+END_TEST
 
 START_TEST(test_certification_toi_v3)
 {
@@ -284,7 +316,7 @@ START_TEST(test_certification_toi_v3)
           3, 3, 2, 2,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_OK, {0}, 0},
-        // Trx 4 from different source conflicts with TOI 2
+        // Trx 4 from different source conflicts with 3
         { { {3, } }, 3, 3,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           4, 4, 2, -1,
@@ -296,14 +328,15 @@ START_TEST(test_certification_toi_v3)
           5, 5, 0, 4,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_OK, {0}, 0},
-
-
-
-
+        // Trx 6 from different source conflicts with TOI 5
+        { { {3, } }, 3, 3,
+          { {void_cast("2"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
+          6, 6, 4, -1,
+          TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_FAILED, {0}, 0}
     };
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
-
 
     run_wsinfo(wsi, nws, version);
 
@@ -366,12 +399,10 @@ START_TEST(test_certification_nbo)
           { {void_cast("1"), 1}, }, 1, false,
           7, 7, 0, 6,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
-          Certification::TEST_OK, {0}, 0},
-
+          Certification::TEST_OK, {0}, 0}
     };
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
-
 
     run_wsinfo(wsi, nws, version);
 
@@ -393,10 +424,17 @@ Suite* certification_suite()
     tcase_add_test(t, test_certification_toi_v3);
     suite_add_tcase(s, t);
 
+    t = tcase_create("certification_trx_different_level_v3");
+    tcase_add_test(t, test_certification_trx_different_level_v3);
+    suite_add_tcase(s, t);
+
+    t = tcase_create("certification_toi_v3");
+    tcase_add_test(t, test_certification_toi_v3);
+    suite_add_tcase(s, t);
+
     t = tcase_create("certification_nbo");
     tcase_add_test(t, test_certification_nbo);
     suite_add_tcase(s, t);
-
 
     return s;
 }
