@@ -816,8 +816,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                 log_fatal << "failed trx: " << *trx;
             }
             st_.mark_corrupt();
-            gcs_.close();
-            gu_abort();
+            abort();
         }
     }
 }
