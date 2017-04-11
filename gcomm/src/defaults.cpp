@@ -34,9 +34,9 @@ namespace gcomm
     std::string const Defaults::EvsJoinRetransPeriod    = "PT1S";
     std::string const Defaults::EvsStatsReportPeriod    = "PT1M";
     std::string const Defaults::EvsStatsReportPeriodMin = "PT1S";
-    std::string const Defaults::EvsSendWindow           = "4";
+    std::string const Defaults::EvsSendWindow           = "10";
     std::string const Defaults::EvsSendWindowMin        = "1";
-    std::string const Defaults::EvsUserSendWindow       = "2";
+    std::string const Defaults::EvsUserSendWindow       = "4";
     std::string const Defaults::EvsUserSendWindowMin    = "1";
     std::string const Defaults::EvsMaxInstallTimeouts   = "3";
     std::string const Defaults::EvsDelayMargin          = "PT1S";
