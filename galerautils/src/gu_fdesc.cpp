@@ -45,7 +45,7 @@ namespace gu
                                     bool const         sync)
         : name_(fname),
           fd_  (open (name_.c_str(), OPEN_FLAGS)),
-          size_(lseek (fd_, 0, SEEK_END)),
+          size_(fd_ < 0 ? 0 : lseek (fd_, 0, SEEK_END)),
           sync_(sync)
     {
         constructor_common();
