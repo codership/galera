@@ -21,7 +21,10 @@ static size_t      const BH_SIZE(sizeof(gcache::BufferHeader));
 
 typedef MemOps::size_type size_type;
 
-static size_type ALLOC_SIZE(size_type s) { return (s + BH_SIZE); }
+static size_type ALLOC_SIZE(size_type s)
+{
+    return MemOps::align_size(s + BH_SIZE);
+}
 
 START_TEST(test1)
 {
@@ -42,7 +45,7 @@ START_TEST(test1)
         fail(os.str().c_str());
     }
 
-    void* buf1 = rb.malloc (ALLOC_SIZE(3));
+    void* buf1 = rb.malloc (MemOps::align_size(rb_size/2 + 1));
     fail_if (NULL != buf1); // > 1/2 size
 
     buf1 = rb.malloc (ALLOC_SIZE(1));
@@ -61,20 +64,33 @@ START_TEST(test1)
     fail_if (BH_is_released(bh2));
 
     void* tmp = rb.realloc (buf1, ALLOC_SIZE(2));
+    // anything <= MemOps::ALIGNMENT should fit into original buffer
+    fail_if(tmp != buf1 && MemOps::ALIGNMENT > 1);
+
+    tmp = rb.realloc (buf1, ALLOC_SIZE(MemOps::ALIGNMENT + 1));
+    // should require new buffer for which there's no space
     fail_if (bh2->seqno_g != SEQNO_NONE);
     fail_if (NULL != tmp);
 
     BH_release(bh2);
     rb.free (bh2);
 
-    tmp = rb.realloc (buf1, ALLOC_SIZE(2));
-    fail_if (NULL != tmp);
+    tmp = rb.realloc (buf1, ALLOC_SIZE(3));
+    if (MemOps::ALIGNMENT > 2)
+    {
+        fail_if (NULL == tmp);
+        fail_if (buf1 != tmp);
+    }
+    else
+    {
+        fail_if (NULL != tmp);
+    }
 
     BH_release(bh1);
     rb.free (bh1);
     fail_if (!BH_is_released(bh1));
 
-    buf1 = rb.malloc (1 + BH_SIZE);
+    buf1 = rb.malloc(ALLOC_SIZE(1));
     fail_if (NULL == buf1);
 
     tmp = rb.realloc (buf1, ALLOC_SIZE(2));

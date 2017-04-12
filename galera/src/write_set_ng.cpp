@@ -8,6 +8,9 @@
 #include <gu_time.h>
 #include <gu_macros.hpp>
 #include <gu_utils.hpp>
+#ifndef NDEBUG
+#include <gcache_memops.hpp> // gcache::MemOps::ALIGNMENT
+#endif
 
 #include <iomanip>
 
@@ -286,7 +289,8 @@ WriteSetIn::checksum()
             }
         }
 #ifndef NDEBUG
-        assert (psize == 0);
+        assert (psize >= 0);
+        assert (size_t(psize)  < gcache::MemOps::ALIGNMENT);
 #endif
         check_ = true;
     }

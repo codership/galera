@@ -39,6 +39,8 @@ namespace gcache
 
     GU_COMPILE_ASSERT(sizeof(BufferHeader().size) >= sizeof(MemOps::size_type),
                       buffer_header_size_check);
+    GU_COMPILE_ASSERT((sizeof(BufferHeader) % MemOps::ALIGNMENT) == 0,
+                      buffer_header_alignment_check);
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
 

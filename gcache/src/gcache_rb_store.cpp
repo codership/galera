@@ -67,6 +67,7 @@ namespace gcache
 //        reallocs_  (0),
         open_      (true)
     {
+        assert((uintptr_t(start_) % MemOps::ALIGNMENT) == 0);
         constructor_common ();
         open_preamble(recover);
         BH_clear (BH_cast(next_));
@@ -140,6 +141,7 @@ namespace gcache
     BufferHeader*
     RingBuffer::get_new_buffer (size_type const size)
     {
+        assert((size % MemOps::ALIGNMENT) == 0);
         assert_size_free();
 
         BH_assert_clear(BH_cast(next_));
@@ -232,6 +234,7 @@ namespace gcache
 #endif
 
     found_space:
+        assert((uintptr_t(ret) % MemOps::ALIGNMENT) == 0);
         size_used_ += size;
         assert (size_used_ <= size_cache_);
         assert (size_free_ >= size);
@@ -246,6 +249,7 @@ namespace gcache
         bh->ctx     = this;
 
         next_ = ret + size;
+        assert((uintptr_t(next_) % MemOps::ALIGNMENT) == 0);
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));
         assert_sizes();
@@ -535,7 +539,6 @@ namespace gcache
     void
     RingBuffer::write_preamble(bool const synced)
     {
-        static int const VERSION(1);
         uint8_t* const preamble(reinterpret_cast<uint8_t*>(preamble_));
 
         std::ostringstream os;
@@ -578,8 +581,8 @@ namespace gcache
     void
     RingBuffer::open_preamble(bool const do_recover)
     {
+        int version(0); // used only for recovery on upgrade
         uint8_t* const preamble(reinterpret_cast<uint8_t*>(preamble_));
-        int version(0);
         long long seqno_max(SEQNO_ILL);
         long long seqno_min(SEQNO_ILL);
         off_t offset(-1);
@@ -616,7 +619,9 @@ namespace gcache
            version = 0;
         }
 
-        if (offset < -1 || (preamble + offset + sizeof(BufferHeader)) > end_)
+        if (offset < -1 ||
+            (preamble + offset + sizeof(BufferHeader)) > end_ ||
+            (version >= 2 && offset >= 0 && (offset % MemOps::ALIGNMENT)))
         {
            log_warn << "Bogus offset in GCache ring buffer preamble: "
                     << offset << ". Assuming unknown.";
@@ -632,7 +637,7 @@ namespace gcache
 
                 try
                 {
-                    recover(offset - (start_ - preamble));
+                    recover(offset - (start_ - preamble), version);
                 }
                 catch (gu::Exception& e)
                 {
@@ -658,7 +663,7 @@ namespace gcache
     }
 
     int64_t
-    RingBuffer::scan(off_t const offset)
+    RingBuffer::scan(off_t const offset, int const scan_step)
     {
         int segment_scans(0);
         int64_t seqno_max(-1);
@@ -672,6 +677,8 @@ namespace gcache
         /* start at offset (first segment) if we know it and it is valid */
         if (offset >= 0)
         {
+            assert(0 == (offset % scan_step));
+
             if (start_ + offset + sizeof(BufferHeader) < segment_end)
                 /* we know exaclty where the first segment starts */
                 segment_start = start_ + offset;
@@ -697,6 +704,8 @@ namespace gcache
 
             while (GCACHE_SCAN_BUFFER_TEST)
             {
+                assert((uintptr_t(bh) % scan_step) == 0);
+
                 bh->flags |= BUFFER_RELEASED;
                 bh->ctx    = this;
 
@@ -819,10 +828,9 @@ namespace gcache
                 while (!GCACHE_SCAN_BUFFER_TEST &&
                        ptr + sizeof(BufferHeader) < end_)
                 {
-                    progress.update(1);
-                    ptr += 1;
+                    progress.update(scan_step);
+                    ptr += scan_step;
                     bh = BH_cast(ptr);
-                    /* it would have been nice to use alignment of 8 or so */
                 }
 
                 if (GCACHE_SCAN_BUFFER_TEST)
@@ -830,7 +838,7 @@ namespace gcache
                     segment_start = ptr;
                     first_ = segment_start;
                 }
-                else if (ptr + sizeof(BufferHeader) == end_)
+                else if (ptr + sizeof(BufferHeader) >= end_)
                 {
                     /* perhaps it was a single segment starting at start_ */
                     first_ = start_;
@@ -878,12 +886,12 @@ namespace gcache
     }
 
     void
-    RingBuffer::recover(off_t const offset)
+    RingBuffer::recover(off_t const offset, int version)
     {
         static const char* const diag_prefix = "Recovering GCache ring buffer: ";
 
         /* scan the buffer and populate seqno2ptr map */
-        int64_t const lower(scan(offset));
+        int64_t const lower(scan(offset, version > 0 ? MemOps::ALIGNMENT : 1));
 
         if (!seqno2ptr_.empty())
         {
@@ -978,6 +986,22 @@ namespace gcache
                 }
             }
             next_ = reinterpret_cast<uint8_t*>(BH_next(last_bh));
+
+            /* Even if previous buffers were not aligned, make sure from
+             * now on they are - adjust next_ pointer and last buffer size */
+            if (uintptr_t(next_) % MemOps::ALIGNMENT)
+            {
+                uint8_t* const n(MemOps::align_ptr(next_));
+                assert(n > next_);
+                size_type const size_diff(n - next_);
+                assert(size_diff < MemOps::ALIGNMENT);
+                assert(last_bh->size > 0);
+                last_bh->size += size_diff;
+                next_ = n;
+                assert(BH_next(last_bh) == BH_cast(next_));
+            }
+            assert((uintptr_t(next_) % MemOps::ALIGNMENT) == 0);
+            BH_clear(BH_cast(next_));
 
             /* at this point we must have at least one seqno'd buffer */
             assert(next_ != first_);
