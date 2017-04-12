@@ -2211,7 +2211,7 @@ gcs_vote (gcs_conn_t* const conn, const gu::GTID& gtid, uint64_t const code,
         my_vote = 0;
     }
 
-    int ret(gcs_core_send_vote(conn->core, gtid, my_vote));
+    int ret(gcs_core_send_vote(conn->core, gtid, my_vote, msg, msg_len));
     if (ret < 0)
     {
         assert(ret != -EAGAIN); /* EAGAIN should be taken care of at core level*/

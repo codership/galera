@@ -22,7 +22,7 @@
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
 #include <gu_serialize.hpp>
-#include "gu_debug_sync.hpp"
+#include <gu_debug_sync.hpp>
 
 #include <string.h> // for mempcpy
 #include <errno.h>
@@ -734,7 +734,7 @@ core_handle_vote_msg (gcs_core_t*          core,
                       struct gcs_act*      act)
 {
     assert (GCS_MSG_VOTE == msg->type);
-    assert (CodeMsg::serial_size() == msg->size);
+    assert (CodeMsg::serial_size() <= msg->size);
 
     VoteResult const res(gcs_group_handle_vote_msg(&core->group, msg));
 
@@ -1387,7 +1387,7 @@ gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
     return ret;
 }
 
-static inline long
+static inline ssize_t
 core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
 {
     gcs_seqno_t const htogs = gcs_seqno_htog (seqno);
@@ -1418,31 +1418,57 @@ core_send_code (gcs_core_t* const core, const gu::GTID& gtid, int64_t code,
     return ret;
 }
 
-long
+int
 gcs_core_set_last_applied (gcs_core_t* const core, const gu::GTID& gtid)
 {
     return core_send_code (core, gtid, 0, GCS_MSG_LAST);
 }
 
-long
+int
 gcs_core_send_join (gcs_core_t* const core, const gu::GTID& gtid, int code)
 {
     return core_send_code (core, gtid, code, GCS_MSG_JOIN);
 }
 
-long
+int
 gcs_core_send_sync (gcs_core_t* const core, const gu::GTID& gtid)
 {
     return core_send_code (core, gtid, 0, GCS_MSG_SYNC);
 }
 
-long
-gcs_core_send_vote (gcs_core_t* const core, const gu::GTID& gtid, int64_t code)
+int
+gcs_core_send_vote (gcs_core_t* const core, const gu::GTID& gtid, int64_t code,
+                    const void* data, size_t const data_len)
 {
+#if 0 // simple code message
     return core_send_code (core, gtid, code, GCS_MSG_VOTE);
+#else
+    CodeMsg const cmsg(gtid, code);
+    assert(cmsg.uuid() != GU_UUID_NIL);
+    int const cmsg_size(cmsg.serial_size());
+
+    char vmsg[1024] = { 0, }; // try to fit in one ethernet frame
+    assert(cmsg_size < int(sizeof(vmsg)));
+
+    ::memcpy(&vmsg[0], cmsg(), cmsg_size);
+
+    int copy_size(int(sizeof(vmsg)) - cmsg_size - 1); // allow for trailing 0
+    assert(copy_size >= 0);
+    if (size_t(copy_size) > data_len) copy_size = data_len;
+
+    ::memcpy(&vmsg[cmsg_size], data, copy_size);
+
+    int const vmsg_size(cmsg_size + copy_size + 1);
+
+    int ret(core_msg_send_retry(core, &vmsg[0], vmsg_size, GCS_MSG_VOTE));
+
+    if (ret > 0) { assert(ret >= cmsg_size); }
+
+    return ret;
+#endif
 }
 
-long
+ssize_t
 gcs_core_send_fc (gcs_core_t* core, const void* const fc, size_t const fc_size)
 {
     ssize_t ret;
@@ -1453,10 +1479,10 @@ gcs_core_send_fc (gcs_core_t* core, const void* const fc, size_t const fc_size)
     return ret;
 }
 
-long
+ssize_t
 gcs_core_caused (gcs_core_t* core, gu::GTID& gtid)
 {
-    long         ret;
+    ssize_t      ret;
     gcs_seqno_t  act_id = GCS_SEQNO_ILL;
     gu_uuid_t    act_uuid = GU_UUID_NIL;
     gu_mutex_t   mtx;
@@ -1487,7 +1513,7 @@ gcs_core_caused (gcs_core_t* core, gu::GTID& gtid)
     return ret;
 }
 
-long
+int
 gcs_core_param_set (gcs_core_t* core, const char* key, const char* value)
 {
     if (core->backend.conn) {

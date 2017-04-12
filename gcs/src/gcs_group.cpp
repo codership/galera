@@ -665,7 +665,7 @@ group_unserialize_code_msg(gcs_group_t* group, const gcs_recv_msg_t* msg,
                            gu::GTID& gtid, int64_t& code)
 {
     if (gu_likely(group->gcs_proto_ver >= 1 &&
-                  msg->size == gcs::core::CodeMsg::serial_size()))
+                  msg->size >= gcs::core::CodeMsg::serial_size()))
     {
         const gcs::core::CodeMsg* const cm
             (static_cast<const gcs::core::CodeMsg*>(msg->buf));
@@ -914,10 +914,17 @@ gcs_group_handle_vote_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     if (gtid.uuid() == group->group_uuid &&
         gtid.seqno() > group->vote_result.seqno)
     {
+        const char* const data
+            (gcs::core::CodeMsg::serial_size() < msg->size ?
+             (static_cast<char*>(msg->buf) + gcs::core::CodeMsg::serial_size()) :
+             NULL);
+
         /* voting on this seqno has not completed yet */
         log_info << "Member " << msg->sender_idx << '(' << sender.name << ") "
                  << (code ? "initiates" : "responds to") << " vote on "
-                 << gtid << ',' << gu::PrintBase<>(code);
+                 << gtid << ',' << gu::PrintBase<>(code) << ": "
+                 << (code ? (data ? data : "(null)") : "Success");
+
         gcs_node_set_vote (&sender, gtid.seqno(), code);
 
         if (group_recount_votes(*group))
@@ -976,7 +983,7 @@ gcs_group_handle_vote_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         log_info << "Outdated vote "
                  << gu::PrintBase<>(code) << " for " << gtid;
         log_info << "(last group vote was on: "
-                 << group->group_uuid << ':' << group->vote_result.seqno << ','
+                 << gu::GTID(group->group_uuid, group->vote_result.seqno) << ','
                  << gu::PrintBase<>(group->vote_result.res) << ')';
     }
 
