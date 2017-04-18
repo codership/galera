@@ -39,14 +39,17 @@ static size_t version_to_hash_size (KeySet::Version const ver)
     abort();
 }
 
-START_TEST (ver0)
+static void test_ver(gu::RecordSet::Version const rsv)
 {
+    int const alignment
+        (rsv >= gu::RecordSet::VER2 ? gu::RecordSet::VER2_ALIGNMENT : 1);
     KeySet::Version const tk_ver(KeySet::FLAT16A);
     size_t const base_size(version_to_hash_size(tk_ver));
 
-    gu::byte_t reserved[1024];
+    union { gu::byte_t buf[1024]; uint64_t align; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_MIN_ALIGNMENT) == 0);
     TestBaseName const str("key_set_test");
-    KeySetOut kso (reserved, sizeof(reserved), str, tk_ver);
+    KeySetOut kso (reserved.buf, sizeof(reserved.buf), str, tk_ver, rsv);
 
     fail_if (kso.count() != 0);
     size_t total_size(kso.size());
@@ -57,6 +60,7 @@ START_TEST (ver0)
     fail_if (kso.count() != 1);
 
     total_size += base_size + 2 + 1*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -72,7 +76,9 @@ START_TEST (ver0)
     fail_if (kso.count() != 3, "key count: expected 3, got %d", kso.count());
 
     total_size += base_size + 2 + 2*4;
+    total_size = GU_ALIGN(total_size, alignment);
     total_size += base_size + 2 + 3*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -81,6 +87,7 @@ START_TEST (ver0)
     fail_if (kso.count() != 4, "key count: expected 4, got %d", kso.count());
 
     total_size += base_size + 2 + 3*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -92,6 +99,7 @@ START_TEST (ver0)
     fail_if (kso.count() != 5, "key count: expected 5, got %d", kso.count());
 
     total_size += base_size + 2 + 2*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -125,7 +133,9 @@ START_TEST (ver0)
     fail_if (kso.count() != 7, "key count: expected 7, got %d", kso.count());
 
     total_size += base_size + 2 + 2*4;
+    total_size = GU_ALIGN(total_size, alignment);
     total_size += base_size + 2 + 3*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -136,6 +146,7 @@ START_TEST (ver0)
     fail_if (kso.count() != 8, "key count: expected 8, got %d", kso.count());
 
     total_size += base_size + 2 + 3*4;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -149,8 +160,11 @@ START_TEST (ver0)
     fail_if (kso.count() != 11, "key count: expected 11, got %d", kso.count());
 
     total_size += base_size + 2 + 1*256;
+    total_size = GU_ALIGN(total_size, alignment);
     total_size += base_size + 2 + 2*256;
+    total_size = GU_ALIGN(total_size, alignment);
     total_size += base_size + 2 + 3*256;
+    total_size = GU_ALIGN(total_size, alignment);
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
@@ -161,6 +175,8 @@ START_TEST (ver0)
     size_t const out_size(kso.gather(out));
 
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
+    fail_if(out_size % alignment, "out size not aligned by %d",
+            out_size % alignment);
 
     std::vector<gu::byte_t> in;
     in.reserve(out_size);
@@ -206,7 +222,7 @@ START_TEST (ver0)
     ksi_empty.init (kso.version(), in.data(), in.size());
 
     fail_if (ksi_empty.count() != kso.count(),
-             "Received keys: %zu, expected: %zu", ksi_empty.count(), kso.count());
+             "Received keys: %zu, expected: %zu", ksi_empty.count(),kso.count());
     fail_if (ksi_empty.size() != kso.size(),
              "Received size: %zu, expected: %zu", ksi_empty.size(), kso.size());
 
@@ -235,12 +251,24 @@ START_TEST (ver0)
 
     fail_if(0 == shared);
 }
+
+START_TEST (ver1)
+{
+    test_ver(gu::RecordSet::VER1);
+}
+END_TEST
+
+START_TEST (ver2)
+{
+    test_ver(gu::RecordSet::VER2);
+}
 END_TEST
 
 Suite* key_set_suite ()
 {
     TCase* t = tcase_create ("KeySet");
-    tcase_add_test (t, ver0);
+    tcase_add_test (t, ver1);
+    tcase_add_test (t, ver2);
     tcase_set_timeout(t, 60);
 
     Suite* s = suite_create ("KeySet");
