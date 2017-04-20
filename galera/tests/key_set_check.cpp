@@ -46,8 +46,8 @@ static void test_ver(gu::RecordSet::Version const rsv)
     KeySet::Version const tk_ver(KeySet::FLAT16A);
     size_t const base_size(version_to_hash_size(tk_ver));
 
-    union { gu::byte_t buf[1024]; uint64_t align; } reserved;
-    assert((uintptr_t(reserved.buf) % GU_MIN_ALIGNMENT) == 0);
+    union { gu::byte_t buf[1024]; gu_word_t align; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_WORD_BYTES) == 0);
     TestBaseName const str("key_set_test");
     KeySetOut kso (reserved.buf, sizeof(reserved.buf), str, tk_ver, rsv);
 

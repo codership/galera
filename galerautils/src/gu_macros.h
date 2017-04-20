@@ -76,15 +76,4 @@
 /* returns minimum multiple of A that is >= S */
 #define GU_ALIGN(S,A) ((((S) - 1)/(A) + 1)*(A))
 
-/*
- * Assignment macro that checks for argument alignment
- * to it's own size or at least GU_MIN_ALIGNMENT
- */
-#include "gu_arch.h"
-#define GU_ASSIGN(l, r)     \
-    GU_ASSERT_ALIGNMENT(l); \
-    GU_ASSERT_ALIGNMENT(r); \
-    l = r;
-
-
 #endif /* _gu_macros_h_ */

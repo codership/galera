@@ -80,7 +80,7 @@ double timing()
 
     int const loops((1 << 16));
     static int const arr_size(1024);
-    int const increment(aligned ? std::min(int(sizeof(T)), GU_WORDSIZE_BYTES) : 1);
+    int const increment(aligned ? std::min(int(sizeof(T)), GU_WORD_BYTES) : 1);
     char a1[arr_size + sizeof(T)] = { 1, }, a2[arr_size + sizeof(T)] = { 2, };
     struct timeval tv_start, tv_end;
 

@@ -97,7 +97,7 @@ namespace galera
                 ),
             version_(version)
         {
-            assert((uintptr_t(reserved) % GU_WORDSIZE_BYTES) == 0);
+            assert((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
         }
 
         size_t

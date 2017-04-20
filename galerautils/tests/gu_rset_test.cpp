@@ -152,8 +152,8 @@ test_version (gu::RecordSet::Version version)
     records.push_back (&rout5);
 
     // ensure alignment to 8
-    union { uint64_t align; gu::byte_t buf[1024]; } reserved;
-    assert((uintptr_t(reserved.buf) % gu::RecordSet::VER2_ALIGNMENT) == 0);
+    union { gu_word_t align; gu::byte_t buf[1024]; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_WORD_BYTES) == 0);
     std::ostringstream os;
     os << "gu_rset_test_ver" << version;
     TestBaseName str(os.str().c_str());
@@ -430,8 +430,8 @@ test_padding(gu::RecordSet::Version rsv)
     int const alignment(gu::RecordSet::VER2 == rsv ?
                         gu::RecordSet::VER2_ALIGNMENT : 1);
 
-    union { uint64_t align; gu::byte_t buf[1024]; } reserved;
-    assert((uintptr_t(reserved.buf) % gu::RecordSet::VER2_ALIGNMENT) == 0);
+    union { gu_word_t align; gu::byte_t buf[1024]; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_WORD_BYTES) == 0);
     std::ostringstream os;
     os << "gu_rset_padding_test_ver" << rsv;
     TestBaseName str(os.str().c_str());

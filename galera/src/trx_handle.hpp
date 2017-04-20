@@ -732,7 +732,7 @@ namespace galera
 
                 WriteSetOut* wso = &write_set_out();
                 assert(static_cast<void*>(wso) == static_cast<void*>(store));
-                assert((uintptr_t(wso) % GU_WORDSIZE_BYTES) == 0);
+                assert((uintptr_t(wso) % GU_WORD_BYTES) == 0);
 
                 new (wso) WriteSetOut (params.working_dir_,
                                        trx_id_, params.key_format_,

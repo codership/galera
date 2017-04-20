@@ -55,18 +55,23 @@
 # define GU_WORDSIZE __WORDSIZE
 #endif
 
-#if (GU_WORDSIZE != 32) && (GU_WORDSIZE != 64)
+#include <stdint.h>
+#if (GU_WORDSIZE == 32)
+typedef uint32_t gu_word_t;
+#elif (GU_WORDSIZE == 64)
+typedef uint64_t gu_word_t;
+#else
 # error "Unsupported wordsize"
 #endif
 
-#define GU_WORDSIZE_BYTES (GU_WORDSIZE >> 3)
+#define GU_WORD_BYTES sizeof(gu_word_t)
 
 /* I'm not aware of the platforms that don't, but still */
 #define GU_ALLOW_UNALIGNED_READS 1
 
 #include <assert.h>
-#define GU_ASSERT_ALIGNMENT(x)                                  \
-    assert((uintptr_t(&(x)) % sizeof(x))         == 0 ||        \
-           (uintptr_t(&(x)) % GU_WORDSIZE_BYTES) == 0)
+#define GU_ASSERT_ALIGNMENT(x)                              \
+    assert((uintptr_t(&(x)) % sizeof(x))     == 0 ||        \
+           (uintptr_t(&(x)) % GU_WORD_BYTES) == 0)
 
 #endif /* _gu_arch_h_ */

@@ -66,8 +66,8 @@ public:
         static size_t const TMP_STORE_SIZE = 4096;
         static size_t const MAX_HASH_SIZE  = 16;
 
-        struct TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; uint64_t align; };
-        union  HashData { gu::byte_t buf[MAX_HASH_SIZE];  uint64_t align; };
+        union TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; gu_word_t align; };
+        union HashData { gu::byte_t buf[MAX_HASH_SIZE];  gu_word_t align; };
 
         /* This ctor creates a serialized representation of a key in tmp store
          * from a key hash and optional annotation. */
@@ -88,8 +88,8 @@ public:
                 (8 << (static_cast<unsigned int>(ver - FLAT16) <= 1));
 
             assert((key_size % alignment) == 0);
-            assert((uintptr_t(tmp.buf)  % GU_WORDSIZE_BYTES) == 0);
-            assert((uintptr_t(hash.buf) % GU_WORDSIZE_BYTES) == 0);
+            assert((uintptr_t(tmp.buf)  % GU_WORD_BYTES) == 0);
+            assert((uintptr_t(hash.buf) % GU_WORD_BYTES) == 0);
 
             ::memcpy (tmp.buf, hash.buf, key_size);
 
@@ -646,7 +646,7 @@ public:
         version_(version)
     {
         assert (version_ != KeySet::EMPTY);
-        assert ((uintptr_t(reserved) % GU_WORDSIZE_BYTES) == 0);
+        assert ((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
         KeyPart zero(version_);
         prev_().push_back(zero);
     }

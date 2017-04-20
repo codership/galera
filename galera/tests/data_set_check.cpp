@@ -126,7 +126,7 @@ static void test_ver(gu::RecordSet::Version const rsv)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    union { gu::byte_t buf[1024]; uint64_t align; } reserved;
+    union { gu::byte_t buf[1024]; gu_word_t align; } reserved;
     TestBaseName str("data_set_test");
     DataSetOut dset_out(reserved.buf, sizeof(reserved.buf), str, DataSet::VER1,
                         rsv);

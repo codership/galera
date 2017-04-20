@@ -118,7 +118,7 @@ namespace gcache
 
         // 0 - undetermined version
         // 1 - initial version, no buffer alignment
-        // 2 - buffer alignemnt to GU_WORDSIZE_BYTES
+        // 2 - buffer alignemnt to GU_WORD_BYTES
         static int    const VERSION = 2;
 
         gu::FileDescriptor fd_;

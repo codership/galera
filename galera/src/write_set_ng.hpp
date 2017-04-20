@@ -148,7 +148,7 @@ namespace galera
             Header (Version ver)
             : local_(), ptr_(local_), ver_(ver), size_(size(ver)), chksm_()
             {
-                assert((uintptr_t(ptr_) % GU_WORDSIZE_BYTES) == 0);
+                assert((uintptr_t(ptr_) % GU_WORD_BYTES) == 0);
                 assert (size_t(size_) <= sizeof(local_));
             }
 
@@ -186,7 +186,7 @@ namespace galera
                 size_ (check_size(ver_, ptr_, buf.size)),
                 chksm_(ver_, ptr_, size_)
             {
-                assert((uintptr_t(ptr_) % GU_WORDSIZE_BYTES) == 0);
+                assert((uintptr_t(ptr_) % GU_WORD_BYTES) == 0);
             }
 
             Header () : local_(), ptr_(NULL), ver_(), size_(0), chksm_()
@@ -511,7 +511,7 @@ namespace galera
                     - header_.size()),
             flags_ (flags)
         {
-            assert ((uintptr_t(reserved) % GU_WORDSIZE_BYTES) == 0);
+            assert ((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
         }
 
         ~WriteSetOut() { delete annt_; }

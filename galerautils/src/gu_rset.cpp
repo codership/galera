@@ -26,7 +26,7 @@
 namespace gu
 {
 
-inline int
+int
 RecordSet::check_size (RecordSet::CheckType const ct)
 {
     switch (ct)
@@ -200,7 +200,7 @@ RecordSetOutBase::header_size() const
 ssize_t
 RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
 {
-    assert((uintptr_t(buf) % alignment()) == 0);
+    assert((uintptr_t(buf) % GU_WORD_BYTES) == 0);
 
     int const csize(check_size(check_type()));
     assert((csize % alignment()) == 0);
@@ -236,7 +236,8 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
             uint32_t const h((uint32_t(size_ - 1) << VER2_SIZE_OFF)  |
                              (uint32_t(count_- 1) << VER2_COUNT_OFF) |
                              (ver_byte | VER2_SHORT_FLAG));
-            *reinterpret_cast<uint32_t*>(buf + off) = gu_le32(h);
+//            *reinterpret_cast<uint32_t*>(buf + off) = gu_le32(h);
+            gu::serialize4(h, buf, off);
             assert(off + 8 == header_size_max());
             break;
         }
@@ -246,8 +247,8 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
             /* zero up potential padding bytes */
             ::memset(buf + off + 4, 0, hdr_size - 8);
 #endif
-            /* fall through to uleb encoding */
         }
+        /* fall through *//* to uleb encoding */
     case VER1:
         buf[off] = ver_byte; off += 1;
         off += uleb128_encode(size_, buf + off, size - off);
@@ -292,7 +293,7 @@ RecordSetOutBase::gather (GatherVector& out)
         if (gu_likely(VER2 == version()))
         {
             /* make sure size_ is padded to multiple of VER2_ALIGNMENT */
-            unsigned int const dangling_bytes(size_ % VER2_ALIGNMENT);
+            int const dangling_bytes(size_ % VER2_ALIGNMENT);
 
             if(dangling_bytes)
             {
@@ -369,7 +370,7 @@ RecordSetOutBase::RecordSetOutBase (byte_t*                 reserved,
 
     bool unused;
     byte_t* ptr(alloc_.alloc (size_, unused));
-    assert(0 == uintptr_t(ptr) % alignment());
+    assert(0 == uintptr_t(ptr) % GU_WORD_BYTES);
 
     Buf b = { ptr, size_ };
     bufs_->push_back (b);
@@ -590,7 +591,7 @@ RecordSetInBase::init (const byte_t* const ptr,
     case VER1:
     case VER2:
         assert(0 != alignment());
-        assert((uintptr_t(head_) % alignment()) == 0);
+        if (alignment() > 1) assert((uintptr_t(head_) % GU_WORD_BYTES) == 0);
         parse_header_v1_2(size); // should set begin_
     }
 

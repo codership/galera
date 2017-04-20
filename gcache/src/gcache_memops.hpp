@@ -46,7 +46,7 @@ namespace gcache
         reset   ()                        = 0;
 
         /* GCache 3.x is not supposed to be portable between platforms */
-        static size_type const ALIGNMENT  = GU_WORDSIZE_BYTES;
+        static size_type const ALIGNMENT  = GU_WORD_BYTES;
 
         static inline size_type align_size(size_type s)
         {
