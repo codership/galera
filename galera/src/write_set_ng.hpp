@@ -130,7 +130,12 @@ namespace galera
             {
                 switch (ver)
                 {
-                case VER3: return V3_SIZE;
+                case VER3:
+                {
+                    GU_COMPILE_ASSERT(0 == (V3_SIZE % GU_MIN_ALIGNMENT),
+                                      unaligned_header_size);
+                    return V3_SIZE;
+                }
                 }
 
                 log_fatal << "Unknown writeset version: " << ver;
@@ -143,6 +148,7 @@ namespace galera
             Header (Version ver)
             : local_(), ptr_(local_), ver_(ver), size_(size(ver)), chksm_()
             {
+                assert((uintptr_t(ptr_) % GU_WORDSIZE_BYTES) == 0);
                 assert (size_t(size_) <= sizeof(local_));
             }
 
@@ -179,7 +185,9 @@ namespace galera
                 ver_  (version(buf)),
                 size_ (check_size(ver_, ptr_, buf.size)),
                 chksm_(ver_, ptr_, size_)
-            {}
+            {
+                assert((uintptr_t(ptr_) % GU_WORDSIZE_BYTES) == 0);
+            }
 
             Header () : local_(), ptr_(NULL), ver_(), size_(0), chksm_()
             {}
@@ -477,6 +485,7 @@ namespace galera
                      gu::byte_t*             reserved,
                      size_t                  reserved_size,
                      uint16_t                flags    = 0,
+                     gu::RecordSet::Version  rsv      = gu::RecordSet::VER2,
                      WriteSetNG::Version     ver      = WriteSetNG::MAX_VERSION,
                      DataSet::Version        dver     = DataSet::MAX_VERSION,
                      DataSet::Version        uver     = DataSet::MAX_VERSION,
@@ -488,20 +497,22 @@ namespace galera
             kbn_   (base_name_),
             keys_  (reserved,
                     (reserved_size >>= 6, reserved_size <<= 3, reserved_size),
-                    kbn_, kver),
+                    kbn_, kver, rsv),
             /* 5/8 of reserved goes to data set  */
             dbn_   (base_name_),
-            data_  (reserved + reserved_size, reserved_size*5, dbn_, dver),
+            data_  (reserved + reserved_size, reserved_size*5, dbn_, dver, rsv),
             /* 2/8 of reserved goes to unordered set  */
             ubn_   (base_name_),
-            unrd_  (reserved + reserved_size*6, reserved_size*2, ubn_, uver),
+            unrd_  (reserved + reserved_size*6, reserved_size*2, ubn_, uver,rsv),
             /* annotation set is not allocated unless requested */
             abn_   (base_name_),
             annt_  (NULL),
             left_  (max_size - keys_.size() - data_.size() - unrd_.size()
                     - header_.size()),
             flags_ (flags)
-        {}
+        {
+            assert ((uintptr_t(reserved) % GU_WORDSIZE_BYTES) == 0);
+        }
 
         ~WriteSetOut() { delete annt_; }
 
@@ -524,7 +535,9 @@ namespace galera
         {
             if (NULL == annt_)
             {
-                annt_ = new DataSetOut(NULL, 0, abn_, DataSet::MAX_VERSION);
+                annt_ = new DataSetOut(NULL, 0, abn_, DataSet::MAX_VERSION,
+                                       // use the same version as the dataset
+                                       data_.gu::RecordSet::version());
                 left_ -= annt_->size();
             }
 
@@ -669,7 +682,7 @@ namespace galera
               check_thr_(false),
               check_ (false)
         {
-            init (st);
+            gu_trace(init(st));
         }
 
         WriteSetIn ()
@@ -692,7 +705,7 @@ namespace galera
 
             header_.read_buf (buf);
             size_ = buf.size;
-            init (st);
+            gu_trace(init(st));
         }
 
         void read_buf (const gu::byte_t* const ptr, ssize_t const len)
@@ -746,7 +759,7 @@ namespace galera
                 /* checksum was performed in a parallel thread */
                 gu_thread_join (check_thr_id_, NULL);
                 check_thr_ = false;
-                checksum_fin();
+                gu_trace(checksum_fin());
             }
         }
 

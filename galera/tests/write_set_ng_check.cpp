@@ -16,8 +16,9 @@
 
 using namespace galera;
 
-START_TEST (ver3_basic)
+static void ver3_basic(gu::RecordSet::Version const rsv)
 {
+    int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
     wsrep_uuid_t source;
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
@@ -26,7 +27,8 @@ START_TEST (ver3_basic)
 
     std::string const dir(".");
     wsrep_trx_id_t trx_id(1);
-    WriteSetOut wso (dir, trx_id, KeySet::FLAT8A, 0, 0, flag1,WriteSetNG::VER3);
+    WriteSetOut wso (dir, trx_id, KeySet::FLAT8A, 0, 0, flag1, rsv,
+                     WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 
@@ -53,6 +55,7 @@ START_TEST (ver3_basic)
     size_t const out_size(wso.gather(source, conn, trx, out));
 
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
+    fail_if((out_size % alignment) != 0);
 
     wsrep_seqno_t const last_seen(1);
     wsrep_seqno_t const seqno(2);
@@ -202,6 +205,7 @@ START_TEST (ver3_basic)
 
         WriteSetIn wsi;        // first - create an empty writeset
         wsi.read_buf(tmp_buf); // next  - initialize from buffer
+        mark_point();
         wsi.verify_checksum();
         fail_unless(wsi.certified());
         fail_if (wsi.pa_range()        != pa_range);
@@ -264,10 +268,22 @@ START_TEST (ver3_basic)
         fail_if (e.get_errno() != EINVAL);
     }
 }
+
+START_TEST (ver3_basic_rsv1)
+{
+    ver3_basic(gu::RecordSet::VER1);
+}
 END_TEST
 
-START_TEST (ver3_annotation)
+START_TEST (ver3_basic_rsv2)
 {
+    ver3_basic(gu::RecordSet::VER2);
+}
+END_TEST
+
+static void ver3_annotation(gu::RecordSet::Version const rsv)
+{
+    int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
     wsrep_uuid_t source;
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
@@ -277,7 +293,8 @@ START_TEST (ver3_annotation)
     std::string const dir(".");
     wsrep_trx_id_t trx_id(1);
 
-    WriteSetOut wso (dir, trx_id, KeySet::FLAT16, 0, 0, flag1,WriteSetNG::VER3);
+    WriteSetOut wso (dir, trx_id, KeySet::FLAT16, 0, 0, flag1, rsv,
+                     WriteSetNG::VER3);
 
     fail_unless (wso.is_empty());
 
@@ -298,6 +315,8 @@ START_TEST (ver3_annotation)
     size_t const out_size(wso.gather(source, conn, trx, out));
 
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
+    fail_if((out_size % alignment) != 0);
+    fail_if(out_size < (sizeof(data) + annotation.size()));
 
     wsrep_seqno_t const last_seen(1);
     wso.set_last_seen(last_seen);
@@ -326,28 +345,48 @@ START_TEST (ver3_annotation)
              ls, last_seen);
     fail_if (wsi.flags() != flags);
     fail_if (0 == wsi.timestamp());
-
-    wsi.verify_checksum();
     fail_if (!wsi.annotated());
 
     /* check that annotation has survived */
     std::ostringstream os;
     wsi.write_annotation(os);
-    std::string const res(os.str());
+    std::string const res(os.str().c_str());
 
-    fail_if(annotation.length() != res.length());
-    fail_if(annotation != res);
+    fail_if(annotation.length() != res.length(),
+            "Initial ann. length: %zu, resulting ann.length: %zu",
+            annotation.length(), res.length());
+
+    fail_if(annotation != res,
+            "Initial annotation: '%s', resulting annotation: '%s'",
+            annotation.c_str(), res.c_str());
+}
+
+START_TEST (ver3_annotation_rsv1)
+{
+    ver3_annotation(gu::RecordSet::VER1);
+}
+END_TEST
+
+START_TEST (ver3_annotation_rsv2)
+{
+    ver3_annotation(gu::RecordSet::VER2);
 }
 END_TEST
 
 Suite* write_set_ng_suite ()
 {
-    TCase* t = tcase_create ("WriteSet");
-    tcase_add_test (t, ver3_basic);
-    tcase_add_test (t, ver3_annotation);
-    tcase_set_timeout(t, 60);
-
     Suite* s = suite_create ("WriteSet");
+
+    TCase* t = tcase_create ("WriteSet basic");
+    tcase_add_test (t, ver3_basic_rsv1);
+    tcase_add_test (t, ver3_basic_rsv2);
+    tcase_set_timeout(t, 60);
+    suite_add_tcase (s, t);
+
+    t = tcase_create ("WriteSet annotation");
+    tcase_add_test (t, ver3_annotation_rsv1);
+    tcase_add_test (t, ver3_annotation_rsv2);
+    tcase_set_timeout(t, 60);
     suite_add_tcase (s, t);
 
     return s;

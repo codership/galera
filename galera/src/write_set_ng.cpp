@@ -228,7 +228,7 @@ WriteSetIn::init (ssize_t const st)
         }
 
         checksum();
-        checksum_fin();
+        gu_trace(checksum_fin());
     }
     else /* checksum skipped, pretend it's alright */
     {
@@ -250,9 +250,10 @@ WriteSetIn::checksum()
         if (keys_.size() > 0)
         {
             gu_trace(keys_.checksum());
-            psize -= keys_.size();
+            size_t const tmpsize(keys_.serial_size());
+            psize -= tmpsize;
+            pptr  += tmpsize;
             assert (psize >= 0);
-            pptr  += keys_.size();
         }
 
         DataSet::Version const dver(header_.dataset_ver());
@@ -262,7 +263,7 @@ WriteSetIn::checksum()
             assert (psize > 0);
             gu_trace(data_.init(dver, pptr, psize));
             gu_trace(data_.checksum());
-            size_t tmpsize(data_.size());
+            size_t const tmpsize(data_.serial_size());
             psize -= tmpsize;
             pptr  += tmpsize;
             assert (psize >= 0);
@@ -271,9 +272,10 @@ WriteSetIn::checksum()
             {
                 gu_trace(unrd_.init(dver, pptr, psize));
                 gu_trace(unrd_.checksum());
-                size_t tmpsize(unrd_.size());
+                size_t const tmpsize(unrd_.serial_size());
                 psize -= tmpsize;
                 pptr  += tmpsize;
+                assert (psize >= 0);
             }
 
             if (header_.has_annt())
@@ -284,13 +286,13 @@ WriteSetIn::checksum()
                 // to throw an exception and abort execution
                 // gu_trace(annt_->checksum());
 #ifndef NDEBUG
-                psize -= annt_->size();
+                psize -= annt_->serial_size();
 #endif
             }
         }
 #ifndef NDEBUG
         assert (psize >= 0);
-        assert (size_t(psize)  < gcache::MemOps::ALIGNMENT);
+        assert (size_t(psize) < gcache::MemOps::ALIGNMENT);
 #endif
         check_ = true;
     }
@@ -314,7 +316,8 @@ WriteSetIn::write_annotation(std::ostream& os) const
     for (ssize_t i = 0; os.good() && i < count; ++i)
     {
         gu::Buf abuf = annt_->next();
-        os.write(static_cast<const char*>(abuf.ptr), abuf.size);
+        const char* const astr(static_cast<const char*>(abuf.ptr));
+        if (abuf.size > 0 && astr[0] != '\0') os.write(astr, abuf.size);
     }
 }
 
