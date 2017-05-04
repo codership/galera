@@ -102,6 +102,8 @@ typedef enum status_vars
     STATS_FC_SENT,
     STATS_FC_RECEIVED,
     STATS_FC_INTERVAL,
+    STATS_FC_INTERVAL_LOW,
+    STATS_FC_INTERVAL_HIGH,
     STATS_FC_STATUS,
     STATS_CERT_DEPS_DISTANCE,
     STATS_APPLY_OOOE,
@@ -118,6 +120,9 @@ typedef enum status_vars
     STATS_CAUSAL_READS,
     STATS_CERT_INTERVAL,
     STATS_IST_RECEIVE_STATUS,
+    STATS_IST_RECEIVE_SEQNO_START,
+    STATS_IST_RECEIVE_SEQNO_CURRENT,
+    STATS_IST_RECEIVE_SEQNO_END,
     STATS_INCOMING_LIST,
     STATS_MAX
 } StatusVars;
@@ -152,6 +157,8 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_recv",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_interval",    WSREP_VAR_STRING, { 0 }  },
+    { "flow_control_interval_low",WSREP_VAR_INT64,  { 0 }  },
+    { "flow_control_interval_high",WSREP_VAR_INT64,  { 0 }, },
     { "flow_control_status",      WSREP_VAR_STRING, { 0 }  },
     { "cert_deps_distance",       WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
@@ -168,6 +175,9 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
     { "cert_interval",            WSREP_VAR_DOUBLE, { 0 }  },
     { "ist_receive_status",       WSREP_VAR_STRING, { 0 }  },
+    { "ist_receive_seqno_start",  WSREP_VAR_INT64,  { 0 }  },
+    { "ist_receive_seqno_current",WSREP_VAR_INT64,  { 0 }  },
+    { "ist_receive_seqno_end",    WSREP_VAR_INT64,  { 0 }  },
     { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
     { 0,                          WSREP_VAR_STRING, { 0 }  }
 };
@@ -232,6 +242,8 @@ galera::ReplicatorSMM::stats_get()
     osinterval << "[ " << stats.fc_lower_limit << ", " << stats.fc_upper_limit << " ]";
     strncpy(interval_string_, osinterval.str().c_str(), sizeof(interval_string_));
     sv[STATS_FC_INTERVAL         ].value._string = interval_string_;
+    sv[STATS_FC_INTERVAL_LOW     ].value._int64 = stats.fc_lower_limit;
+    sv[STATS_FC_INTERVAL_HIGH    ].value._int64 = stats.fc_upper_limit;
     sv[STATS_FC_STATUS           ].value._string = (stats.fc_status ? "ON" : "OFF");
 
     double avg_cert_interval(0);
@@ -287,9 +299,18 @@ galera::ReplicatorSMM::stats_get()
            << current << " of " << first << "-" << last;
         strncpy(ist_status_string_, os.str().c_str(), sizeof(ist_status_string_));
         sv[STATS_IST_RECEIVE_STATUS].value._string = ist_status_string_;
+
+        sv[STATS_IST_RECEIVE_SEQNO_START].value._int64 = first;
+        sv[STATS_IST_RECEIVE_SEQNO_CURRENT].value._int64 = current;
+        sv[STATS_IST_RECEIVE_SEQNO_END].value._int64 = last;
     }
     else
+    {
         sv[STATS_IST_RECEIVE_STATUS].value._string = "";
+        sv[STATS_IST_RECEIVE_SEQNO_START].value._int64 = 0;
+        sv[STATS_IST_RECEIVE_SEQNO_CURRENT].value._int64 = 0;
+        sv[STATS_IST_RECEIVE_SEQNO_END].value._int64 = 0;
+    }
 
     // Get gcs backend status
     gu::Status status;
