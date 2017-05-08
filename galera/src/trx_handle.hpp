@@ -765,8 +765,6 @@ namespace galera
             // untested, so don't allow it (and it probably does not even
             // make any sense)
             assert(is_toi() == false  || key.shared() == false);
-            // Shared key escalation to level 1 or 2 is not allowed
-            assert(key.parts_num == 3 || key.shared() == false);
 
             /*! protection against protocol change during trx lifetime */
             if (key.proto_ver != version())
