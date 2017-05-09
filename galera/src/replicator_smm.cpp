@@ -1232,6 +1232,13 @@ galera::ReplicatorSMM::sst_sent(const wsrep_gtid_t& state_id, int const rcode)
     if (state_() != S_DONOR)
     {
         log_error << "sst sent called when not SST donor, state " << state_();
+        /* If sst-sent fails node should restore itself back to joined state.
+        sst-sent can fail commonly due to n/w error where-in DONOR may loose
+        connectivity to JOINER (or existing cluster) but on re-join it should
+        restore the original state (DONOR->JOINER->JOINED->SYNCED) without
+        waiting for JOINER. sst-failure on JOINER will gracefully shutdown the
+        joiner. */
+        gcs_.join_notification();
         return WSREP_CONN_FAIL;
     }
 
