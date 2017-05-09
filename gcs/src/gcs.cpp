@@ -152,6 +152,10 @@ struct gcs_conn
     /* #603, #606 join control */
     bool        volatile need_to_join;
     gcs_seqno_t volatile join_seqno;
+    void        join_notification()
+    {
+        need_to_join = true;
+    }
 
     /* sync control */
     bool         sync_sent_;
@@ -2317,4 +2321,10 @@ const char* gcs_param_get (gcs_conn_t* conn, const char* key)
     gu_warn ("Not implemented: %s", __FUNCTION__);
 
     return NULL;
+}
+
+
+void gcs_join_notification(gcs_conn_t* conn)
+{
+     conn->need_to_join = true;
 }
