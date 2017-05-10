@@ -1683,9 +1683,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     wsrep_seqno_t const upto(cert_.position());
     gu_trace(drain_monitors(upto));
 
-    if (view_info.status == WSREP_VIEW_PRIMARY)
+    if (view_info->status == WSREP_VIEW_PRIMARY)
     {
-        safe_to_bootstrap_ = (view_info.memb_num == 1);
+        safe_to_bootstrap_ = (view_info->memb_num == 1);
     }
 
     wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
