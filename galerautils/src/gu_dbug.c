@@ -705,7 +705,7 @@ _gu_db_push_(const char *control)
 	    break;
 	case 'A':
 	case 'O':
-	    _gu_db_stack->flags |= FLUSH_ON_WRITE;
+	    _gu_db_stack->flags |= FLUSH_ON_WRITE; /* fallthrough */
 	case 'a':
 	case 'o':
 	    if (*scan++ == ',') {

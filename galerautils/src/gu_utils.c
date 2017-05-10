@@ -27,13 +27,13 @@ gu_str2ll (const char* str, long long* ll)
     {
     case 't':
     case 'T':
-        shift += 10;
+        shift += 10; // fallthrough
     case 'g':
     case 'G':
-        shift += 10;
+        shift += 10; // fallthrough
     case 'm':
     case 'M':
-        shift += 10;
+        shift += 10; // fallthrough
     case 'k':
     case 'K':
         shift += 10;
@@ -47,6 +47,7 @@ gu_str2ll (const char* str, long long* ll)
             else llret = LLONG_MIN;
             errno = ERANGE;
         }
+        // fallthrough
     default:
         *ll = llret;
     }
