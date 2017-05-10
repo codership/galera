@@ -256,7 +256,7 @@ group_check_donor (gcs_group_t* group)
         gu_warn ("Donor %s is no longer in the group. State transfer cannot "
                  "be completed, need to abort. Aborting...", donor_id);
 
-        gu_abort();
+        // gu_abort();
     }
 
     return;

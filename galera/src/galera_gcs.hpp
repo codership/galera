@@ -233,6 +233,11 @@ namespace galera
 
         size_t  max_action_size() const { return GCS_MAX_ACT_SIZE; }
 
+        void join_notification()
+        {
+            gcs_join_notification(conn_);
+        }
+
     private:
 
         Gcs(const Gcs&);
