@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -756,7 +756,7 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
             rep = NULL;
         }
         else {
-            gu_info ("Bootstrapped primary "GU_UUID_FORMAT" found: %d.",
+            gu_info ("Bootstrapped primary " GU_UUID_FORMAT " found: %d.",
                      GU_UUID_ARGS(&rc->prim_uuid), rc->found);
 
             rep = rc->rep;

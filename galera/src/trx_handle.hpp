@@ -358,7 +358,10 @@ namespace galera
             assert(wso_);
             return *reinterpret_cast<WriteSetOut*>(this + 1);
         }
-        const WriteSetOut& write_set_out() const { return write_set_out(); }
+        const WriteSetOut& write_set_out() const
+        {
+            return const_cast<TrxHandle*>(this)->write_set_out();
+        }
 
         const WriteSetIn&  write_set_in () const { return write_set_in_;  }
 
