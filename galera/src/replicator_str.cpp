@@ -659,7 +659,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
     {
         sst_state_ = SST_REQ_FAILED;
 
-        st_.set(state_uuid_, STATE_SEQNO());
+        st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         st_.mark_safe();
 
         gu::Lock lock(closing_mutex_);
@@ -737,7 +737,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             log_fatal << "Application state transfer failed. This is "
                       << "unrecoverable condition, restart required.";
 
-            st_.set(sst_uuid_, sst_seqno_);
+            st_.set(sst_uuid_, sst_seqno_, safe_to_bootstrap_);
             st_.mark_safe();
 
             abort();
