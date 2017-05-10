@@ -13,6 +13,7 @@
 #include <strings.h>
 #include <limits.h>
 #include <stdint.h>
+#include <errno.h>
 
 const char*
 gu_str2ll (const char* str, long long* ll)
@@ -44,6 +45,7 @@ gu_str2ll (const char* str, long long* ll)
         else { /* ERANGE */
             if (llret > 0) llret = LLONG_MAX;
             else llret = LLONG_MIN;
+            errno = ERANGE;
         }
     default:
         *ll = llret;
