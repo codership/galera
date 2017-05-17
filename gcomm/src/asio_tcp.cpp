@@ -771,23 +771,13 @@ void gcomm::AsioTcpAcceptor::accept_handler(
             new_socket->ssl_socket_ =
                 new asio::ssl::stream<asio::ip::tcp::socket>(
                     net_.io_service_, net_.ssl_context_);
-            acceptor_.async_accept(new_socket->ssl_socket_->lowest_layer(),
-                                   boost::bind(&AsioTcpAcceptor::accept_handler,
-                                               this,
-                                               SocketPtr(new_socket),
-                                               asio::placeholders::error));
-        }
-        else
-        {
-#endif /* HAVE_ASIO_SSL_HPP */
-            acceptor_.async_accept(new_socket->socket_,
-                                   boost::bind(&AsioTcpAcceptor::accept_handler,
-                                               this,
-                                               SocketPtr(new_socket),
-                                               asio::placeholders::error));
-#ifdef HAVE_ASIO_SSL_HPP
         }
 #endif /* HAVE_ASIO_SSL_HPP */
+        acceptor_.async_accept(new_socket->socket(),
+                               boost::bind(&AsioTcpAcceptor::accept_handler,
+                                           this,
+                                           SocketPtr(new_socket),
+                                           asio::placeholders::error));
     }
     else
     {
@@ -819,23 +809,13 @@ void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
             new_socket->ssl_socket_ =
                 new asio::ssl::stream<asio::ip::tcp::socket>(
                     net_.io_service_, net_.ssl_context_);
-            acceptor_.async_accept(new_socket->ssl_socket_->lowest_layer(),
-                                   boost::bind(&AsioTcpAcceptor::accept_handler,
-                                               this,
-                                               SocketPtr(new_socket),
-                                               asio::placeholders::error));
-        }
-        else
-        {
-#endif /* HAVE_ASIO_SSL_HPP */
-            acceptor_.async_accept(new_socket->socket_,
-                                   boost::bind(&AsioTcpAcceptor::accept_handler,
-                                               this,
-                                               SocketPtr(new_socket),
-                                               asio::placeholders::error));
-#ifdef HAVE_ASIO_SSL_HPP
         }
 #endif /* HAVE_ASIO_SSL_HPP */
+        acceptor_.async_accept(new_socket->socket(),
+                               boost::bind(&AsioTcpAcceptor::accept_handler,
+                                           this,
+                                           SocketPtr(new_socket),
+                                           asio::placeholders::error));
     }
     catch (asio::system_error& e)
     {
