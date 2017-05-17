@@ -12,7 +12,7 @@ using namespace galera;
 
 START_TEST(test_states)
 {
-    TrxHandle::LocalPool tp(TrxHandle::LOCAL_STORAGE_SIZE, 16, "test_states");
+    TrxHandle::LocalPool tp(TrxHandle::LOCAL_STORAGE_SIZE(), 16, "test_states");
     wsrep_uuid_t uuid = {{1, }};
 
     // first check basic stuff

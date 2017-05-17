@@ -222,6 +222,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_JOINED, S_CLOSED));
     state_.add_transition(Transition(S_JOINED, S_CONNECTED));
     state_.add_transition(Transition(S_JOINED, S_SYNCED));
+    // the following is possible if one desync() immediately follows another
+    state_.add_transition(Transition(S_JOINED, S_DONOR));
 
     state_.add_transition(Transition(S_SYNCED, S_CLOSED));
     state_.add_transition(Transition(S_SYNCED, S_CONNECTED));
@@ -249,7 +251,10 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     }
 
     log_debug << "End state: " << uuid << ':' << seqno << " #################";
+
     set_initial_position(uuid, seqno);
+    gcache_.seqno_reset(gu::GTID(uuid, seqno));
+    // update gcache position to one supplied by app.
 
     build_stats_vars(wsrep_stats_);
 }
@@ -346,12 +351,14 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     log_info << "Setting GCS initial position to " << gcs_uuid << ':' << seqno;
 
-    if (bootstrap == true && safe_to_bootstrap_ == false)
+    if ((bootstrap == true || cluster_url == "gcomm://")
+        && safe_to_bootstrap_ == false)
     {
-        log_error << "This node is not safe to bootstrap the cluster. "
+        log_error << "It may not be safe to bootstrap the cluster from this node. "
                   << "It was not the last one to leave the cluster and may "
                   << "not contain all the updates. To force cluster bootstrap "
-                  << "with this node remove grastate.dat file manually.";
+                  << "with this node, edit the grastate.dat file manually and "
+                  << "set safe_to_bootstrap to 1 .";
         ret = WSREP_NODE_FAIL;
     }
 
@@ -361,8 +368,6 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
         log_error << "gcs init failed:" << strerror(-err);
         ret = WSREP_NODE_FAIL;
     }
-
-    gcache_.reset();
 
     if (ret == WSREP_OK &&
         (err = gcs_.connect(cluster_name, cluster_url, bootstrap)) != 0)
@@ -1815,8 +1820,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // at this point there is no ongoing master or slave transactions
         // and no new requests to service thread should be possible
 
-        if (STATE_SEQNO() > 0) gcache_.seqno_release(STATE_SEQNO());
+        if (STATE_SEQNO() > 0) service_thd_.release_seqno(STATE_SEQNO());
         // make sure all gcache buffers are released
+
+        service_thd_.flush(group_uuid); // make sure service thd is idle
 
         // record state seqno, needed for IST on DONOR
         cc_seqno_ = group_seqno;
@@ -1835,7 +1842,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             if (view_info->view == 1 || !app_wants_st)
             {
                 set_initial_position(group_uuid, group_seqno);
-                gcache_.seqno_reset();
+                gcache_.seqno_reset(gu::GTID(group_uuid, group_seqno));
             }
 
             if (state_() == S_CONNECTED || state_() == S_DONOR)
@@ -2200,7 +2207,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(const TrxHandlePtr& trx)
     }
     else
     {
-        assert(WSREP_TRX_FAIL == retval || trx->depends_seqno() >= 0);
+        assert(WSREP_OK != retval || trx->depends_seqno() >= 0);
     }
 
     return retval;

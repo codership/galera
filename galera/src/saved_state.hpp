@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_SAVED_STATE_HPP
@@ -30,6 +30,7 @@ public:
     void mark_unsafe();
     void mark_safe();
     void mark_corrupt();
+    void mark_uncorrupt(const wsrep_uuid_t& u, wsrep_seqno_t s);
 
     bool corrupt() const { return corrupt_; }
 

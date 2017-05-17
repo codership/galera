@@ -171,7 +171,7 @@ group_nodes_reset (gcs_group_t* group)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
-    gu_seqno_t last_applied = GU_LONG_LONG_MAX;
+    gu_seqno_t last_applied = GU_LLONG_MAX;
     int        last_node    = -1;
     int        n;
 
@@ -870,15 +870,23 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        if (GCS_NODE_STATE_SYNCED != sender->status) {
-            gu_warn ("SYNC message sender from non-JOINED %d.%d (%s). Ignored.",
-                     sender_idx, sender->segment, sender->name);
-        }
-        else {
+        if (GCS_NODE_STATE_SYNCED == sender->status) {
             gu_debug ("Redundant SYNC message from %d.%d (%s).",
                       sender_idx, sender->segment, sender->name);
         }
-        return 0;
+        else if (GCS_NODE_STATE_DONOR == sender->status) {
+            // this is possible with quick succession of desync()/resync() calls
+            gu_debug ("SYNC message from %d.%d (%s, DONOR). Ignored.",
+                      sender_idx, sender->segment, sender->name);
+        }
+        else {
+            gu_warn ("SYNC message from non-JOINED %d.%d (%s, %s). Ignored.",
+                     sender_idx, sender->segment, sender->name,
+                     gcs_node_state_to_str(sender->status));
+        }
+
+        /* signal sender that it didn't work */
+        return -ERESTART * (sender_idx == group->my_idx);
     }
 }
 

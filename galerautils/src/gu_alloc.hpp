@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com> */
+/* Copyright (C) 2013-2016 Codership Oy <info@codership.com> */
 /*!
  * @file Continuous buffer allocator for RecordSet
  *
@@ -15,7 +15,6 @@
 #include "gu_vector.hpp"
 
 #include "gu_macros.h" // gu_likely()
-#include "gu_limits.h" // GU_PAGE_SIZE
 
 #include <cstdlib>     // realloc(), free()
 #include <string>
@@ -157,9 +156,6 @@ private:
         ~HeapStore () {}
 
     private:
-
-        /* to avoid too frequent allocation, make it 64K */
-        static page_size_type const PAGE_SIZE = GU_PAGE_SIZE * 16;
 
         heap_size_type left_;
 

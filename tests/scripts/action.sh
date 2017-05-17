@@ -107,11 +107,6 @@ action()
     wait_jobs
 }
 
-stop()
-{
-    action "stop_cmd" "$@"
-}
-
 dump()
 {
     action "dump_cmd" "$@"
@@ -316,10 +311,51 @@ bootstrap()
     wait_jobs
 }
 
-
 start()
 {
     _cluster_up start_node "$@"
+}
+
+_get_status_var()
+{
+    mysql_query "$1" "SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = '$2'" 2>/dev/null || echo -1
+}
+
+stop()
+{
+    SECONDS=0
+
+    local node
+
+    # stop all nodes but the first one (nearly) simultaneously
+    for node in $(seq $NODE_MAX -1 1)
+    do
+        echo "Stopping ${NODE_ID[$node]}"
+        stop_node "$@ $node" &
+        sleep 1
+    done
+
+    node=0
+
+    # Here we don't care if the node lost PC (it should not but it may)
+    # If it did there is little we can do short of bootstrapping it
+    while [ $(_get_status_var "$node" "wsrep_cluster_size") -gt 1 ]
+    do
+        sleep 0.2
+    done
+
+    if [ $(_get_status_var "$node" "wsrep_cluster_status") = "non-Primary" ]
+    then
+        mysql_query "$node" "SET GLOBAL wsrep_provider_options='pc.bootstrap=1'"
+        while [ $(_get_status_var "$node" "wsrep_cluster_status") = "non-Primary" ]
+        do
+            sleep 0.2
+        done
+    fi
+
+    echo "Stopping ${NODE_ID[$node]}"
+    stop_node "$@ $node" &
+    wait_jobs
 }
 
 restart()

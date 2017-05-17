@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
 //
 
 #include "saved_state.hpp"
@@ -11,6 +11,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <sys/file.h>
+#include <fcntl.h>
 
 namespace galera
 {
@@ -54,9 +55,16 @@ SavedState::SavedState  (const std::string& file) :
 
     // We take exclusive lock on state file in order to avoid possibility
     // of two Galera replicators sharing the same state file.
-    if (flock(fileno(fs_), LOCK_EX|LOCK_NB))
+    struct flock flck;
+    flck.l_start  = 0;
+    flck.l_len    = 0;
+    flck.l_type   = F_WRLCK;
+    flck.l_whence = SEEK_SET;
+
+    if (::fcntl(fileno(fs_), F_SETLK, &flck))
     {
-        log_warn << "Could not get exclusive lock on state file: " << file;
+        log_warn << "Could not get exclusive lock on state file: " << file
+                 << ": " << ::strerror(errno);
         return;
     }
 
@@ -136,10 +144,18 @@ SavedState::~SavedState ()
 {
     if (fs_)
     {
-        if (flock(fileno(fs_), LOCK_UN) != 0)
+        // Closing file descriptor should release the lock, but still...
+        struct flock flck;
+        flck.l_start  = 0;
+        flck.l_len    = 0;
+        flck.l_type   = F_UNLCK;
+        flck.l_whence = SEEK_SET;
+
+        if (::fcntl(fileno(fs_), F_SETLK, &flck))
         {
-            log_error << "Could not unlock saved state file.";
+            log_warn << "Could not unlock state file: " << ::strerror(errno);
         }
+
         fclose(fs_);
     }
 }
@@ -207,9 +223,9 @@ SavedState::mark_safe()
     {
         gu::Lock lock(mtx_); ++total_locks_;
 
-        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0))
+        if (0 == unsafe_() && (written_uuid_ != uuid_ || seqno_ >= 0) &&
+            !corrupt_)
         {
-            assert(false == corrupt_);
             /* this will write down proper seqno if set() was called too early
              * (in unsafe state) */
             write_and_flush (uuid_, seqno_, safe_to_bootstrap_);
@@ -220,11 +236,6 @@ SavedState::mark_safe()
 void
 SavedState::mark_corrupt()
 {
-    /* Half LONG_MAX keeps us equally and sufficiently far from unsafe_
-       overflow/underflow by mark_unsafe()/mark_safe() calls */
-    static const long magic(std::numeric_limits<long>::max() >> 1);
-    unsafe_ = magic;
-
     gu::Lock lock(mtx_); ++total_locks_;
 
     if (corrupt_) return;
@@ -235,6 +246,21 @@ SavedState::mark_corrupt()
 
     write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
                      safe_to_bootstrap_);
+}
+
+void
+SavedState::mark_uncorrupt(const wsrep_uuid_t& u, wsrep_seqno_t s)
+{
+    gu::Lock lock(mtx_); ++total_locks_;
+
+    if (!corrupt_) return;
+
+    uuid_    = u;
+    seqno_   = s;
+    unsafe_  = 0;
+    corrupt_ = false;
+
+    write_and_flush (u, s, safe_to_bootstrap_);
 }
 
 void

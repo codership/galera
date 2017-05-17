@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -8,9 +8,17 @@
 
 #include "gu_logger.hpp"
 #include "gu_throw.hpp"
+#include "gu_macros.hpp"
+
+#include "gu_limits.h" // GU_PAGE_SIZE
 
 #include <cerrno>
 #include <sys/mman.h>
+
+#if defined(__FreeBSD__) && defined(MAP_NORESERVE)
+/* FreeBSD has never implemented this flags and will deprecate it. */
+#undef MAP_NORESERVE
+#endif
 
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
@@ -37,8 +45,15 @@ namespace gu
 #if defined(MADV_DONTFORK)
         if (posix_madvise (ptr, size, MADV_DONTFORK))
         {
+#   define MMAP_INHERIT_OPTION "MADV_DONTFORK"
+#elif defined(__FreeBSD__)
+        if (minherit (ptr, size, INHERIT_NONE))
+        {
+#   define MMAP_INHERIT_OPTION "INHERIT_NONE"
+#endif
+#if defined(MMAP_INHERIT_OPTION)
             int const err(errno);
-            log_warn << "Failed to set MADV_DONTFORK on " << fd.name()
+            log_warn << "Failed to set " MMAP_INHERIT_OPTION " on " << fd.name()
                      << ": " << err << " (" << strerror(err) << ")";
         }
 #endif
@@ -65,15 +80,29 @@ namespace gu
     }
 
     void
+    MMap::sync(void* const addr, size_t const length) const
+    {
+        /* libc msync() only accepts addresses multiple of page size,
+         * rounding down */
+        static uint64_t const PAGE_SIZE_MASK(~(GU_PAGE_SIZE - 1));
+
+        uint8_t* const sync_addr(reinterpret_cast<uint8_t*>
+                                 (uint64_t(addr) & PAGE_SIZE_MASK));
+        size_t   const sync_length
+            (length + (static_cast<uint8_t*>(addr) - sync_addr));
+
+        if (::msync(sync_addr, sync_length, MS_SYNC) < 0)
+        {
+            gu_throw_error(errno) << "msync(" << sync_addr << ", "
+                                  << sync_length << ") failed";
+        }
+    }
+
+    void
     MMap::sync () const
     {
         log_info << "Flushing memory map to disk...";
-
-        if (msync (ptr, size, MS_SYNC) < 0)
-        {
-            gu_throw_error(errno) << "msync(" << ptr << ", " << size
-                                  << ") failed";
-        }
+        sync(ptr, size);
     }
 
     void
@@ -92,6 +121,9 @@ namespace gu
 
     MMap::~MMap ()
     {
-        if (mapped) unmap();
+        if (mapped)
+        {
+           try { unmap(); } catch (Exception& e) { log_error << e.what(); }
+        }
     }
 }

@@ -22,6 +22,7 @@
 #include "gu_macros.hpp"
 #include "gu_mem_pool.hpp"
 #include "gu_shared_ptr.hpp"
+#include "gu_limits.h" // page size stuff
 
 #include <set>
 
@@ -35,7 +36,11 @@ namespace galera
         typedef gu::shared_ptr<TrxHandle>::type SharedPtr;
 
         /* signed int here is to detect SIZE < sizeof(TrxHandle) */
-        static int const LOCAL_STORAGE_SIZE = GU_PAGE_SIZE * 2; // 8K
+        static size_t LOCAL_STORAGE_SIZE()
+        {
+            static size_t const ret(gu_page_size_multiple(1 << 13 /* 8Kb */));
+            return ret;
+        }
 
         struct Params
         {

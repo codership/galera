@@ -703,7 +703,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (first_reset)
     {
         log_info << "Resetting GCache seqno map due to different histories.";
-        gcache_.seqno_reset();
+        gcache_.seqno_reset(gu::GTID(group_uuid, group_seqno));
     }
 
     if (sst_req_len != 0)
@@ -750,7 +750,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             {
                 log_info << "Resetting GCache seqno map due to seqno gap: "
                          << STATE_SEQNO() << ".." << sst_seqno_;
-                gcache_.seqno_reset();
+                gcache_.seqno_reset(gu::GTID(state_uuid_, sst_seqno_));
             }
 
             update_state_uuid (sst_uuid_);
@@ -866,6 +866,12 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     }
     catch (gu::Exception& e)
     {
+        if (e.get_errno() == EINTR && STATE_SEQNO() >= cc_seqno_)
+        {
+            log_info << "Donor failed to serve IST, SST was performed instead.";
+            return;
+        }
+
         log_fatal << "receiving IST failed, node restart required: "
                   << e.what();
         if (txp != 0)

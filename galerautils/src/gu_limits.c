@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2016 Codership Oy <info@codership.com>
 
 /**
  * @file system limit macros
@@ -6,18 +6,19 @@
  * $Id:$
  */
 
+#include "gu_limits.h"
+#include "gu_log.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include "gu_limits.h"
-#include "gu_log.h"
 
 #if defined(__APPLE__)
 
 #include <sys/sysctl.h> // doesn't seem to be used directly, but jst in case
 #include <mach/mach.h>
 
-long gu_darwin_phys_pages (void)
+static long darwin_phys_pages (void)
 {
     /* Note: singleton pattern would be useful here */
     vm_statistics64_data_t vm_stat;
@@ -36,7 +37,7 @@ long gu_darwin_phys_pages (void)
     /* Note: sysctl is 60% slower compared to host_statistics64 */
 }
 
-long gu_darwin_avphys_pages (void)
+static long darwin_avphys_pages (void)
 {
     vm_statistics64_data_t vm_stat;
     unsigned int count = HOST_VM_INFO64_COUNT;
@@ -52,13 +53,17 @@ long gu_darwin_avphys_pages (void)
     return vm_stat.free_count - vm_stat.speculative_count;
 }
 
+static inline size_t page_size()    { return getpagesize();          }
+static inline size_t phys_pages()   { return darwin_phys_pages();    }
+static inline size_t avphys_pages() { return darwin_avphys_pages();  }
+
 #elif defined(__FreeBSD__)
 
 #include <vm/vm_param.h> // VM_TOTAL
 #include <sys/vmmeter.h> // struct vmtotal
 #include <sys/sysctl.h>
 
-long gu_freebsd_avphys_pages (void)
+static long freebsd_avphys_pages (void)
 {
     /* TODO: 1) sysctlnametomib may be called once */
     /*       2) vm.stats.vm.v_cache_count is potentially free memory too */
@@ -85,4 +90,26 @@ long gu_freebsd_avphys_pages (void)
     return vm_stats_vm_v_free_count;
 }
 
-#endif /* __FreeBSD__ */
+static inline size_t page_size()    { return sysconf(_SC_PAGESIZE);     }
+static inline size_t phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
+static inline size_t avphys_pages() { return freebsd_avphys_pages();    }
+
+#else /* !__APPLE__ && !__FreeBSD__ */
+
+static inline size_t page_size()    { return sysconf(_SC_PAGESIZE);     }
+static inline size_t phys_pages()   { return sysconf(_SC_PHYS_PAGES);   }
+static inline size_t avphys_pages() { return sysconf(_SC_AVPHYS_PAGES); }
+
+#endif /* !__APPLE__ && !__FreeBSD__ */
+
+#define GU_DEFINE_FUNCTION(func)                \
+    size_t gu_##func()                          \
+    {                                           \
+        static size_t ret = 0;                  \
+        if (0 == ret) ret = func();             \
+        return ret;                             \
+    }
+
+GU_DEFINE_FUNCTION(page_size)
+GU_DEFINE_FUNCTION(phys_pages)
+GU_DEFINE_FUNCTION(avphys_pages)

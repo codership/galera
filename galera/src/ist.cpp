@@ -54,12 +54,17 @@ namespace galera
         private:
 
             friend class AsyncSenderMap;
+
             const gu::Config&   conf_;
             std::string const   peer_;
             wsrep_seqno_t const first_;
             wsrep_seqno_t const last_;
             AsyncSenderMap&     asmap_;
             pthread_t           thread_;
+
+            // GCC 4.8.5 on FreeBSD wants it
+            AsyncSender(const AsyncSender&);
+            AsyncSender& operator=(const AsyncSender&);
         };
     }
 }

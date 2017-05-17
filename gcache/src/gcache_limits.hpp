@@ -2,8 +2,6 @@
  * Copyright (C) 2015 Codership Oy <info@codership.com>
  */
 
-/*! @file memory operations interface */
-
 #ifndef _gcache_limits_hpp_
 #define _gcache_limits_hpp_
 
@@ -54,7 +52,8 @@ namespace gcache
 
         typedef long long long_long;
 
-        GU_COMPILE_ASSERT(DIFF_MIN <=long_long(MIN_SIZE - MAX_SIZE), min_diff);
+        GU_COMPILE_ASSERT(DIFF_MIN < 0, diff_min);
+        GU_COMPILE_ASSERT(DIFF_MIN + MAX_SIZE <= MIN_SIZE, min_diff);
 
     }; /* class Limits */
 }

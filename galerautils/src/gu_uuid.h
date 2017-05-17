@@ -22,9 +22,7 @@ extern "C" {
 /*! UUID internally is represented as a BE integer which allows using
  *  memcmp() as comparison function and straightforward printing */
 #define GU_UUID_LEN 16
-//typedef struct {
-//    uint8_t data[GU_UUID_LEN];
-//}
+
 typedef wsrep_uuid_t gu_uuid_t;
 
 extern const gu_uuid_t GU_UUID_NIL;
