@@ -182,10 +182,10 @@ env.Replace(RPATH     = [os.getenv('RPATH',   '')])
 # enabled on all platforms.
 env.Append(CCFLAGS = ' -pthread')
 
-# Freebsd ports are installed under /usr/local
+# FreeBSD ports are usually installed under /usr/local
 if sysname == 'freebsd' or sysname == 'sunos':
-    env.Append(LIBPATH  = ['/usr/local/lib'])
-    env.Append(CPPFLAGS = ' -I/usr/local/include ')
+    env.Append(LIBPATH = ['/usr/local/lib'])
+    env.Append(CPPPATH = ['/usr/local/include'])
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
 
@@ -418,8 +418,10 @@ else:
     print "Falling back to bundled asio"
 
 if not system_asio:
-    # Fall back to embedded asio
-    conf.env.Append(CPPPATH = [ '#/asio' ])
+    # Make sure that -Iasio goes before other paths (e.g. -I/usr/local/include)
+    # that may contain a system wide installed asio. We should use the bundled
+    # asio if "scons system_asio=0" is specified. Thus use Prepend().
+    conf.env.Prepend(CPPPATH = [ '#/asio' ])
     if conf.CheckCXXHeader('asio.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
     else:
