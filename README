@@ -2,9 +2,9 @@ Codership Oy
 http://www.codership.com
 <info@codership.com>
 
-This is Galera replication - Codership's implementation of the write set 
+This is Galera replication - Codership's implementation of the write set
 replication (wsrep) interface (https://github.com/codership/wsrep-API).
-The software and  other files in this directory unless otherwise noted
+The software and other files in this directory unless otherwise noted
 are distributed under GPLv2, see COPYING for details.
 
 
@@ -27,7 +27,7 @@ or
 (see ./scripts/build.sh --help for information on options)
 
 To build MySQL/Galera demo distribution, clone
-https://github.com/codership/mysql-wsrep into some directory (hereafter 
+https://github.com/codership/mysql-wsrep into some directory (hereafter
 <MYSQL_DIR>) and run build script from this directory (hereafter <GALERA_DIR>):
 
  $ cd <MYSQL_DIR>
