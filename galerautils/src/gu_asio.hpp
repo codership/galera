@@ -30,6 +30,19 @@
 # pragma GCC diagnostic ignored "-Wunused-variable"
 #endif // __GNUG__
 
+#ifdef ASIO_HPP
+#error asio.hpp is already included before gu_asio.hpp, can't customize asio.hpp
+#endif // ASIO_HPP
+
+#include "asio/version.hpp"
+
+// ASIO does not interact well with kqueue before ASIO 1.10.5, see
+// https://readlist.com/lists/freebsd.org/freebsd-current/23/119264.html
+// http://think-async.com/Asio/asio-1.10.6/doc/asio/history.html#asio.history.asio_1_10_5
+#if ASIO_VERSION < 101005
+# define ASIO_DISABLE_KQUEUE
+#endif // ASIO_VERSION < 101005
+
 #include "asio.hpp"
 #include "asio/ssl.hpp"
 
