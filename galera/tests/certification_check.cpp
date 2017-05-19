@@ -271,8 +271,12 @@ START_TEST(test_certification_trx_different_level_v3)
           Certification::TEST_FAILED, {0}, 0}
     };
 
-}
+    size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
+    run_wsinfo(wsi, nws, version);
+
+}
+END_TEST
 
 START_TEST(test_certification_toi_v3)
 {
@@ -338,6 +342,53 @@ START_TEST(test_certification_toi_v3)
 END_TEST
 
 
+START_TEST(test_certification_commit_fragment)
+{
+    const int version(3);
+    using galera::Certification;
+    using galera::TrxHandle;
+    using galera::void_cast;
+
+    WSInfo wsi[] = {
+        // commit fragment vs commit fragment
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
+          1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          Certification::TEST_OK, {0}, 0},
+        { { {2, } }, 2, 2,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
+          2, 2, 0, 1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          Certification::TEST_OK, {0}, 0},
+
+        // TOI vs commit fragment
+        { { {2, } }, 2, 2,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
+          3, 3, 2, 2, TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_OK, {0}, 0},
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
+          4, 4, 2, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          Certification::TEST_FAILED, {0}, 0},
+
+        // commit fragment vs TOI
+        { { {2, } }, 2, 2,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
+          5, 5, 3, 4, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          Certification::TEST_OK, {0}, 0},
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
+          6, 6, 4, 5, TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          Certification::TEST_OK, {0}, 0}
+
+    };
+
+    size_t nws(sizeof(wsi)/sizeof(wsi[0]));
+
+    run_wsinfo(wsi, nws, version);
+}
+END_TEST
+
+
 Suite* certification_suite()
 {
     Suite* s(suite_create("certification"));
@@ -353,6 +404,10 @@ Suite* certification_suite()
 
     t = tcase_create("certification_toi_v3");
     tcase_add_test(t, test_certification_toi_v3);
+    suite_add_tcase(s, t);
+
+    t = tcase_create("certification_commit_fragment");
+    tcase_add_test(t, test_certification_commit_fragment);
     suite_add_tcase(s, t);
 
     return s;
