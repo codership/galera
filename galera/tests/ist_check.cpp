@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -349,14 +349,14 @@ static void test_ist_common(int const version)
     galera::ReplicatorSMM::InitConfig(conf_sender, NULL, NULL);
     std::string const gcache_sender_file("ist_sender.cache");
     conf_sender.set("gcache.name", gcache_sender_file);
-    conf_sender.set("gcache.size", "16M");
+    conf_sender.set("gcache.size", "1M");
     gcache::GCache* gcache_sender = new gcache::GCache(conf_sender, dir);
 
     gu::Config conf_receiver;
     galera::ReplicatorSMM::InitConfig(conf_receiver, NULL, NULL);
     std::string const gcache_receiver_file("ist_receiver.cache");
     conf_receiver.set("gcache.name", gcache_receiver_file);
-    conf_receiver.set("gcache.size", "16M");
+    conf_receiver.set("gcache.size", "1M");
     gcache::GCache* gcache_receiver = new gcache::GCache(conf_receiver, dir);
 
     std::string receiver_addr("tcp://127.0.0.1:0");
