@@ -28,6 +28,7 @@
 import os
 import platform
 import string
+import subprocess
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
@@ -454,28 +455,33 @@ if ssl == 1:
         print 'compile with ssl=0 or check that openssl library is usable'
         Exit(1)
 
+# get compiler name/version, CXX may be set to "c++" which may be clang or gcc
+try:
+    compiler = subprocess.check_output([conf.env['CXX'], '--version'],
+                                       stderr=subprocess.STDOUT)
+except:
+    # in case "$CXX --version" returns an error, e.g. "unknown option"
+    compiler = 'unknown'
 
-CXX = conf.env.get('CXX').split()
-from subprocess import Popen, PIPE
-p = Popen(CXX + ['-dumpversion'], shell=False, stdin=None, stdout=PIPE, stderr=None, close_fds=True)
-CXX_VERSION = p.stdout.read().strip()
-
-# these will be used only with our softaware
+# these will be used only with our software
 if strict_build_flags == 1:
-    conf.env.Prepend(CCFLAGS = ' -Werror -pedantic')
-    if 'g++' in CXX:
-        if CXX_VERSION >= "4.9.0":
-            conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
+    conf.env.Append(CCFLAGS = ' -Werror -pedantic')
+    if 'g++' in compiler:
+        gcc_version = subprocess.check_output([conf.env['CXX'], '-dumpversion'],
+                                              stderr=subprocess.STDOUT)
+        if gcc_version >= "4.9.0":
+            conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
         else:
             conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
         conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
-    elif 'clang++' in CXX:
+    elif 'clang' in compiler:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
         conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
-        if 'ccache' in CXX:
-            conf.env.Append(CPPFLAGS = ' -Qunused-arguments')
+        # CXX may be something like "ccache clang++"
+        if 'ccache' in conf.env['CXX']:
+            conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
 # Many unit tests fail conf.env.Append(CXXFLAGS = ' -std=c++11')
 
