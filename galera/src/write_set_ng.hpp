@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2017 Codership Oy <info@codership.com>
 //
 
 /*
@@ -25,7 +25,7 @@
 #include <string>
 #include <iomanip>
 
-#include <pthread.h>
+#include <gu_threads.h>
 
 namespace galera
 {
@@ -746,7 +746,7 @@ namespace galera
             if (gu_unlikely(check_thr_))
             {
                 /* checksum was performed in a parallel thread */
-                pthread_join (check_thr_id_, NULL);
+                gu_thread_join (check_thr_id_, NULL);
             }
 
             delete annt_;
@@ -783,7 +783,7 @@ namespace galera
             if (gu_unlikely(check_thr_))
             {
                 /* checksum was performed in a parallel thread */
-                pthread_join (check_thr_id_, NULL);
+                gu_thread_join (check_thr_id_, NULL);
                 check_thr_ = false;
                 checksum_fin();
             }
@@ -823,7 +823,7 @@ namespace galera
         DataSetIn          data_;
         DataSetIn          unrd_;
         DataSetIn*         annt_;
-        pthread_t          check_thr_id_;
+        gu_thread_t        check_thr_id_;
         bool mutable       check_thr_;
         bool               check_;
 

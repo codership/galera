@@ -25,7 +25,7 @@ namespace gcache
         if (gtid.uuid() == gid && gtid.seqno() == seqno_max) return;
 
         log_info << "GCache history reset: old(" << gu::GTID(gid, seqno_max)
-                 << ") -> new(" << gtid << ")";
+                 << " -> " << gtid;
 
         seqno_released = SEQNO_NONE;
         gid = gtid.uuid();

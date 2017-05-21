@@ -23,6 +23,8 @@ galerautils/tests/gu_tests
 galerautils/tests/gu_tests++
 galerautils/tests/gu_tests++.passed
 galerautils/tests/gu_tests.passed
+galerautils/tests/gu_to_test
+galerautils/tests/avalanche*
 garb/garbd
 gcache.page.*
 gcache/src/test

@@ -65,7 +65,7 @@ END_TEST
 
 // IST tests
 
-static pthread_barrier_t start_barrier;
+static gu_barrier_t start_barrier;
 
 class TestOrder
 {
@@ -139,7 +139,7 @@ extern "C" void* sender_thd(void* arg)
 
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
-    pthread_barrier_wait(&start_barrier);
+    gu_barrier_wait(&start_barrier);
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
     mark_point();
@@ -234,7 +234,7 @@ extern "C" void* receiver_thd(void* arg)
                                            rargs->version_,
                                            WSREP_UUID_UNDEFINED);
 
-    pthread_barrier_wait(&start_barrier);
+    gu_barrier_wait(&start_barrier);
     mark_point();
 
     receiver.ready(rargs->first_);
@@ -376,18 +376,18 @@ static void test_ist_common(int const version)
     receiver_args rargs(receiver_addr, 1, 10, sp, *gcache_receiver, version);
     sender_args sargs(*gcache_sender, rargs.listen_addr_, 1, 10, version);
 
-    pthread_barrier_init(&start_barrier, 0, 2);
+    gu_barrier_init(&start_barrier, 0, 2);
 
-    pthread_t sender_thread, receiver_thread;
+    gu_thread_t sender_thread, receiver_thread;
 
-    pthread_create(&sender_thread, 0, &sender_thd, &sargs);
+    gu_thread_create(&sender_thread, 0, &sender_thd, &sargs);
     mark_point();
     usleep(100000);
-    pthread_create(&receiver_thread, 0, &receiver_thd, &rargs);
+    gu_thread_create(&receiver_thread, 0, &receiver_thd, &rargs);
     mark_point();
 
-    pthread_join(sender_thread, 0);
-    pthread_join(receiver_thread, 0);
+    gu_thread_join(sender_thread, 0);
+    gu_thread_join(receiver_thread, 0);
 
     mark_point();
 

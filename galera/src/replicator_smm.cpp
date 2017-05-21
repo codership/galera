@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -30,18 +30,7 @@ apply_trx_ws(void*                    recv_ctx,
     {
         try
         {
-            if (trx.is_toi())
-            {
-                log_debug << "Executing TO isolated action: " << trx;
-            }
-
             gu_trace(trx.apply(recv_ctx, apply_cb, meta));
-
-            if (trx.is_toi())
-            {
-                log_debug << "Done executing TO isolated action: "
-                         << trx.global_seqno();
-            }
             break;
         }
         catch (galera::ApplyException& e)
@@ -2053,10 +2042,10 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
 
 void galera::ReplicatorSMM::resume()
 {
-    assert(pause_seqno_ != WSREP_SEQNO_UNDEFINED);
     if (pause_seqno_ == WSREP_SEQNO_UNDEFINED)
     {
-        gu_throw_error(EALREADY) << "tried to resume unpaused provider";
+        log_warn << "tried to resume unpaused provider";
+        return;
     }
 
     st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);

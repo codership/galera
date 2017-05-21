@@ -37,11 +37,15 @@ namespace gu
     static int const OPEN_FLAGS   = O_RDWR | O_NOATIME | O_CLOEXEC;
     static int const CREATE_FLAGS = OPEN_FLAGS | O_CREAT /*| O_TRUNC*/;
 
+    /* respect user umask by allowing all bits by default */
+    static mode_t const CREATE_MODE =
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ;
+
     FileDescriptor::FileDescriptor (const std::string& fname,
-                                    bool const          sync)
+                                    bool const         sync)
         : name_(fname),
-          fd_  (open (name_.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
-          size_(lseek (fd_, 0, SEEK_END)),
+          fd_  (open (name_.c_str(), OPEN_FLAGS)),
+          size_(fd_ < 0 ? 0 : lseek (fd_, 0, SEEK_END)),
           sync_(sync)
     {
         constructor_common();
@@ -81,7 +85,7 @@ namespace gu
                                     bool   const       allocate,
                                     bool   const       sync)
         : name_(fname),
-          fd_  (open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
+          fd_  (open (fname.c_str(), CREATE_FLAGS, CREATE_MODE)),
           size_(size),
           sync_(sync)
     {
