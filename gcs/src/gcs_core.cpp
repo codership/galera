@@ -685,8 +685,9 @@ core_handle_last_msg (gcs_core_t*          core,
                       struct gcs_recv_msg* msg,
                       struct gcs_act*      act)
 {
-    assert (GCS_MSG_LAST == msg->type);
-    assert (CodeMsg::serial_size() == msg->size);
+    assert(GCS_MSG_LAST == msg->type);
+    assert(CodeMsg::serial_size() >= msg->size);
+    assert(int(sizeof(uint64_t)) <= msg->size);
 
     if (gu_likely(gcs_group_is_primary(&core->group))) {
 
@@ -1026,14 +1027,7 @@ core_msg_to_action (gcs_core_t*          core,
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg (group, msg);
             assert (gcs_group_my_idx(group) == msg->sender_idx || 0 >= ret);
-            if (gu_likely(ret > 0))
-            {
-                core->code_msg_buf = core_msg_code(msg, core->proto_ver);
-                act->type    = GCS_ACT_JOIN;
-                act->buf     = &core->code_msg_buf;
-                act->buf_len = sizeof(core->code_msg_buf);
-            }
-            else if (-ENOTRECOVERABLE == ret) {
+            if (-ENOTRECOVERABLE == ret) {
                 core->backend.close(&core->backend);
                 // See #165.
                 // There is nobody to pass this error to for graceful shutdown:
@@ -1042,10 +1036,17 @@ core_msg_to_action (gcs_core_t*          core,
                 // so this must be done here.
                 gu_abort();
             }
+            else if (ret != 0)
+            {
+                core->code_msg_buf = core_msg_code(msg, core->proto_ver);
+                act->type    = GCS_ACT_JOIN;
+                act->buf     = &core->code_msg_buf;
+                act->buf_len = sizeof(core->code_msg_buf);
+            }
             break;
         case GCS_MSG_SYNC:
             ret = gcs_group_handle_sync_msg (group, msg);
-            if (gu_likely(ret > 0))
+            if (gu_likely(ret != 0))
             {
                 core->code_msg_buf = core_msg_code(msg, core->proto_ver);
                 act->type    = GCS_ACT_SYNC;
@@ -1505,12 +1506,6 @@ gcs_fifo_lite_t*
 gcs_core_get_fifo (gcs_core_t* core)
 {
     return core->fifo;
-}
-
-int
-gcs_core_get_proto (gcs_core_t* core)
-{
-    return core->proto_ver;
 }
 
 #endif /* GCS_CORE_TESTING */

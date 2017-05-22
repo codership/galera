@@ -422,7 +422,7 @@ core_test_init (bool bootstrap = true, int const gcs_proto_ver = 1)
 
     ret = gcs_core_send_sync (Core, gu::GTID(Uuid, Seqno));
 
-    int const proto(gcs_core_get_proto(Core));
+    int const proto(gcs_core_proto_ver(Core));
     fail_if (proto != gcs_proto_ver); // checking just in case
 
     int const expected_ret
