@@ -447,8 +447,9 @@ if ssl == 1:
 
 # get compiler name/version, CXX may be set to "c++" which may be clang or gcc
 try:
-    compiler_version = subprocess.check_output([conf.env['CXX'], '--version'],
-                                               stderr=subprocess.STDOUT)
+    compiler_version = subprocess.check_output(
+        conf.env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT)
 except:
     # in case "$CXX --version" returns an error, e.g. "unknown option"
     compiler_version = 'unknown'
@@ -461,7 +462,7 @@ if strict_build_flags == 1:
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
         # CXX may be something like "ccache clang++"
-        if 'ccache' in conf.env['CXX']:
+        if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
     else:
         conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
