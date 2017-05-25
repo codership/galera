@@ -457,8 +457,9 @@ if ssl == 1:
 
 # get compiler name/version, CXX may be set to "c++" which may be clang or gcc
 try:
-    compiler = subprocess.check_output([conf.env['CXX'], '--version'],
-                                       stderr=subprocess.STDOUT)
+    compiler = subprocess.check_output(
+        conf.env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT)
 except:
     # in case "$CXX --version" returns an error, e.g. "unknown option"
     compiler = 'unknown'
@@ -467,8 +468,9 @@ except:
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
     if 'g++' in compiler:
-        gcc_version = subprocess.check_output([conf.env['CXX'], '-dumpversion'],
-                                              stderr=subprocess.STDOUT)
+        gcc_version = subprocess.check_output(
+            conf.env['CXX'].split() + ['-dumpversion'],
+            stderr=subprocess.STDOUT)
         if gcc_version >= "4.9.0":
             conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
         else:
@@ -480,7 +482,7 @@ if strict_build_flags == 1:
         conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
         # CXX may be something like "ccache clang++"
-        if 'ccache' in conf.env['CXX']:
+        if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
 # Many unit tests fail conf.env.Append(CXXFLAGS = ' -std=c++11')
