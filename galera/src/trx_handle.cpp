@@ -225,22 +225,35 @@ galera::TrxHandle::apply (void*                   recv_ctx,
                           wsrep_apply_cb_t        apply_cb,
                           const wsrep_trx_meta_t& meta) const
 {
-    int err(0);
-
-    const DataSetIn& ws(write_set_in_.dataset());
     uint32_t const wsrep_flags
         (trx_flags_to_wsrep_flags(flags()) | WSREP_FLAG_TRX_START);
 
+    int err(0);
+
+    const DataSetIn& ws(write_set_in_.dataset());
+    void*  err_msg(NULL);
+    size_t err_len(0);
+
     ws.rewind(); // make sure we always start from the beginning
 
-    for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
+    if (ws.count() > 0)
     {
-        void*   err_msg;
-        size_t  err_len;
-        gu::Buf buf(ws.next());
-        wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
+        for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
+        {
+            gu::Buf buf(ws.next());
+            wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
 
+            err = apply_cb(recv_ctx, wsrep_flags, &wb, &meta, &err_msg,&err_len);
+        }
+    }
+    else
+    {
+        // Apply also zero sized write set to inform application side
+        // about transaction meta data.
+        wsrep_buf_t const wb = { NULL, 0 };
         err = apply_cb(recv_ctx, wsrep_flags, &wb, &meta, &err_msg, &err_len);
+        assert(NULL == err_msg);
+        assert(0    == err_len);
     }
 
     if (gu_unlikely(err > 0))
@@ -250,7 +263,7 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         os << "Failed to apply app buffer: seqno: " << global_seqno()
            << ", status: " << err;
 
-        galera::ApplyException ae(os.str(), err);
+        galera::ApplyException ae(os.str(), err_msg, NULL, err_len);
 
         GU_TRACE(ae);
 
