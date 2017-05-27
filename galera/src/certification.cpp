@@ -598,8 +598,12 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     }
     else
     {
-        log_warn << "moving position backwards: " << position_ << " -> "
-                 << seqno;
+        if (seqno != -1) // don't warn on index reset.
+        {
+            log_warn << "moving position backwards: " << position_ << " -> "
+                     << seqno;
+        }
+
         std::for_each(cert_index_ng_.begin(), cert_index_ng_.end(),
                       gu::DeleteObject());
         cert_index_ng_.clear();
