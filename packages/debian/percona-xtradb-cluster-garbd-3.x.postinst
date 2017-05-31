@@ -1,0 +1,14 @@
+#!/bin/sh
+config=/etc/default/garbd
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+    if [ -x "/etc/init.d/garbd" ]; then
+        update-rc.d garbd defaults >/dev/null
+        if grep -q -E '^# REMOVE' $config; then
+            echo  "Garbd config $config is not configured yet"
+            exit 0
+        else
+                invoke-rc.d garbd start || exit $?
+        fi
+    fi
+fi
+
