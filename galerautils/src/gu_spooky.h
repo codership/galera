@@ -245,36 +245,47 @@ static GU_INLINE void gu_spooky_short_host(
     {
     case 15:
         d += ((uint64_t)u.p8[14]) << 48;
+        __attribute__((fallthrough));
     case 14:
         d += ((uint64_t)u.p8[13]) << 40;
+        __attribute__((fallthrough));
     case 13:
         d += ((uint64_t)u.p8[12]) << 32;
+        __attribute__((fallthrough));
     case 12:
         d += gu_le32(u.p32[2]);
         c += gu_le64(u.p64[0]);
         break;
     case 11:
         d += ((uint64_t)u.p8[10]) << 16;
+        __attribute__((fallthrough));
     case 10:
         d += ((uint64_t)u.p8[9]) << 8;
+        __attribute__((fallthrough));
     case 9:
         d += (uint64_t)u.p8[8];
+        __attribute__((fallthrough));
     case 8:
         c += gu_le64(u.p64[0]);
         break;
     case 7:
         c += ((uint64_t)u.p8[6]) << 48;
+        __attribute__((fallthrough));
     case 6:
         c += ((uint64_t)u.p8[5]) << 40;
+        __attribute__((fallthrough));
     case 5:
         c += ((uint64_t)u.p8[4]) << 32;
+        __attribute__((fallthrough));
     case 4:
         c += gu_le32(u.p32[0]);
         break;
     case 3:
         c += ((uint64_t)u.p8[2]) << 16;
+        __attribute__((fallthrough));
     case 2:
         c += ((uint64_t)u.p8[1]) << 8;
+        __attribute__((fallthrough));
     case 1:
         c += (uint64_t)u.p8[0];
         break;

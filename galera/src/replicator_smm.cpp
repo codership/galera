@@ -275,6 +275,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_SYNCED:
     case S_DONOR:
         close();
+        __attribute__((fallthrough));
     case S_CLOSING:
         // @todo wait that all users have left the building
     case S_CLOSED:
@@ -846,7 +847,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
             break;
         }
         trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-        // fall through
+        __attribute__((fallthrough));
     case TrxHandle::S_MUST_REPLAY_AM:
     {
         // safety measure to make sure that all preceding trxs finish before
@@ -855,7 +856,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         ApplyOrder ao(*trx);
         gu_trace(apply_monitor_.enter(ao));
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
+        __attribute__((fallthrough));
     }
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
@@ -864,7 +865,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
             gu_trace(commit_monitor_.enter(co));
         }
         trx->set_state(TrxHandle::S_MUST_REPLAY);
-        // fall through
+        __attribute__((fallthrough));
     case TrxHandle::S_MUST_REPLAY:
         ++local_replays_;
         trx->set_state(TrxHandle::S_REPLAYING);

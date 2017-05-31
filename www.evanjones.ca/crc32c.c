@@ -715,6 +715,7 @@ uint32_t crc32cHardware32(uint32_t crc, const void* data, size_t length) {
     switch (length) {
         case 3:
             crc = __builtin_ia32_crc32qi(crc, *p_buf++);
+            __attribute__((fallthrough));
         case 2:
             crc = __builtin_ia32_crc32hi(crc, *(uint16_t*) p_buf);
             break;
@@ -756,21 +757,25 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     switch (length) {
         case 7:
             crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf++);
+            __attribute__((fallthrough));
         case 6:
             crc32bit = __builtin_ia32_crc32hi(crc32bit, *(uint16_t*) p_buf);
             p_buf += 2;
+            __attribute__((fallthrough));
         // case 5 is below: 4 + 1
         case 4:
             crc32bit = __builtin_ia32_crc32si(crc32bit, *(uint32_t*) p_buf);
             break;
         case 3:
             crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf++);
+            __attribute__((fallthrough));
         case 2:
             crc32bit = __builtin_ia32_crc32hi(crc32bit, *(uint16_t*) p_buf);
             break;
         case 5:
             crc32bit = __builtin_ia32_crc32si(crc32bit, *(uint32_t*) p_buf);
             p_buf += 4;
+            __attribute__((fallthrough));
         case 1:
             crc32bit = __builtin_ia32_crc32qi(crc32bit, *p_buf);
             break;
