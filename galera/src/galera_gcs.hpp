@@ -205,6 +205,11 @@ namespace galera
             return gcs_flush_stats(conn_);
         }
 
+        void fetch_pfs_info(wsrep_node_info_t* entries, uint32_t size)
+        {
+            return gcs_fetch_pfs_info(conn_, entries, size);
+        }
+
         void get_status(gu::Status& status) const
         {
             gcs_get_status(conn_, status);

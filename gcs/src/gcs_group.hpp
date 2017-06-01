@@ -251,4 +251,9 @@ gcs_group_find_donor(const gcs_group_t* group,
 extern void
 gcs_group_get_status(gcs_group_t* group, gu::Status& status);
 
+extern void
+gcs_group_fetch_pfs_info(const gcs_group_t* group,
+                       wsrep_node_info_t* entries,
+                       uint32_t size);
+
 #endif /* _gcs_group_h_ */
