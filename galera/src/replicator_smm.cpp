@@ -904,8 +904,9 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandlePtr&     trx,
         else             trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
         retval = WSREP_BF_ABORT;
     }
-    else if ((trx->flags() & TrxHandle::F_COMMIT) != 0)
+    else
     {
+        assert((trx->flags() & TrxHandle::F_COMMIT) != 0);
         assert(apply_monitor_.entered(ao));
 
         trx->set_state(TrxHandle::S_COMMITTING);
@@ -936,10 +937,6 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandlePtr&     trx,
                 retval = WSREP_BF_ABORT;
             }
         }
-    }
-    else
-    {
-        trx->set_state(TrxHandle::S_EXECUTING);
     }
 
     assert((retval == WSREP_OK && (trx->state() == TrxHandle::S_COMMITTING ||
