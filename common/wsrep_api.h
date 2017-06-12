@@ -652,6 +652,27 @@ struct wsrep_stats_var
     } value;                   //!< variable value
 };
 
+/*! Structure to copy-over node information exposed through PFS. */
+#define WSREP_HOSTNAME_LENGTH		128
+#define WSREP_STATUS_LENGTH		64
+
+typedef struct
+{
+    /* User assigned host-name */
+    char host_name[WSREP_HOSTNAME_LENGTH];
+
+    /* System assigned UUID */
+    char uuid[WSREP_UUID_STR_LEN + 1];
+
+    /* Status PRIMARY/NON_PRIMARY */
+    char status[WSREP_STATUS_LENGTH];
+
+    /* local index */
+    uint64_t local_index;
+
+    /* Segment of node */
+    uint32_t segment;
+} wsrep_node_info_t;
 
 /*! Abstract data buffer structure */
 typedef struct wsrep_buf
@@ -1245,6 +1266,15 @@ struct wsrep {
    * @param wsrep provider handle.
    */
     void (*stats_reset) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Get node information to expose through PFS
+   *
+   * @param wsrep     provider handle.
+   * @param var_array array of node information to populate.
+   * @param size      size of array.
+   */
+    void (*fetch_pfs_info) (wsrep_t* wsrep, wsrep_node_info_t* nodes, uint32_t size);
 
   /*!
    * @brief Pauses writeset applying/committing.

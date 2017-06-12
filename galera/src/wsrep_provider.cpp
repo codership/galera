@@ -1142,6 +1142,16 @@ void galera_stats_reset (wsrep_t* gh)
     repl->stats_reset();
 }
 
+extern "C"
+void galera_fetch_pfs_info (wsrep_t* gh, wsrep_node_info_t* nodes, uint32_t size)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS* repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    repl->fetch_pfs_info(nodes, size);
+}
 
 extern "C"
 wsrep_seqno_t galera_pause (wsrep_t* gh)
@@ -1296,6 +1306,7 @@ static wsrep_t galera_str = {
     &galera_stats_get,
     &galera_stats_free,
     &galera_stats_reset,
+    &galera_fetch_pfs_info,
     &galera_pause,
     &galera_resume,
     &galera_desync,

@@ -412,3 +412,11 @@ galera::ReplicatorSMM::stats_free(struct wsrep_stats_var* arg)
 {
     gu_free(arg);
 }
+
+void
+galera::ReplicatorSMM::fetch_pfs_info(wsrep_node_info_t* nodes, uint32_t size)
+{
+    gcs_.fetch_pfs_info(nodes, size);
+}
+
+

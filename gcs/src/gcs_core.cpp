@@ -1378,6 +1378,21 @@ gcs_core_param_get (gcs_core_t* core, const char* key)
     }
 }
 
+void
+gcs_core_fetch_pfs_info(
+    gcs_core_t*		core,
+    wsrep_node_info_t*	entries,
+    uint32_t		size)
+{
+    if (gu_mutex_lock(&core->send_lock))
+        gu_throw_fatal << "could not lock mutex";
+    if (core->state < CORE_CLOSED)
+    {
+        gcs_group_fetch_pfs_info(&core->group, entries, size);
+    }
+    gu_mutex_unlock(&core->send_lock);
+}
+
 void gcs_core_get_status(gcs_core_t* core, gu::Status& status)
 {
     if (gu_mutex_lock(&core->send_lock))

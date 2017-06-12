@@ -24,6 +24,9 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "wsrep_api.h"
+
+
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
 
@@ -454,6 +457,9 @@ extern void gcs_flush_stats(gcs_conn_t *conn);
 void gcs_get_status(gcs_conn_t* conn, gu::Status& status);
 
 extern void gcs_join_notification(gcs_conn_t *conn);
+
+extern void
+gcs_fetch_pfs_info (gcs_conn_t* conn, wsrep_node_info_t* entries, uint32_t size);
 
 /*! A node with this name will be treated as a stateless arbitrator */
 #define GCS_ARBITRATOR_NAME "garb"

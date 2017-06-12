@@ -2073,6 +2073,15 @@ gcs_flush_stats(gcs_conn_t* conn)
     conn->stats_fc_received = 0;
 }
 
+extern void
+gcs_fetch_pfs_info (gcs_conn_t* conn, wsrep_node_info_t* entries, uint32_t size)
+{
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        gcs_core_fetch_pfs_info(conn->core, entries, size);
+    }
+}
+
 void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
 {
     if (conn->state < GCS_CONN_CLOSED)

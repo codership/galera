@@ -114,6 +114,7 @@ namespace galera
 
         virtual const struct wsrep_stats_var* stats_get() = 0;
         virtual void                          stats_reset() = 0;
+        virtual void fetch_pfs_info(wsrep_node_info_t* nodes, uint32_t size) = 0;
         // static void stats_free(struct wsrep_stats_var*) must be declared in
         // the child class
 
