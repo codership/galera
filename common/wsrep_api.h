@@ -653,19 +653,19 @@ struct wsrep_stats_var
 };
 
 /*! Structure to copy-over node information exposed through PFS. */
-#define WSREP_HOSTNAME_LENGTH		128
+#define WSREP_HOSTNAME_LENGTH		64
 #define WSREP_STATUS_LENGTH		64
 
 typedef struct
 {
     /* User assigned host-name */
-    char host_name[WSREP_HOSTNAME_LENGTH];
+    char host_name[WSREP_HOSTNAME_LENGTH + 1];
 
     /* System assigned UUID */
     char uuid[WSREP_UUID_STR_LEN + 1];
 
     /* Status PRIMARY/NON_PRIMARY */
-    char status[WSREP_STATUS_LENGTH];
+    char status[WSREP_STATUS_LENGTH + 1];
 
     /* local index */
     uint64_t local_index;

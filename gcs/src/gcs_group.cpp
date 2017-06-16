@@ -1659,14 +1659,14 @@ gcs_group_fetch_pfs_info(
     {
         const gcs_node_t& node(group->nodes[i]);
 
-        strncpy(entries[i].host_name, node.name, sizeof(entries[i].host_name));
+        strncpy(entries[i].host_name, node.name, WSREP_HOSTNAME_LENGTH);
 
         strncpy(entries[i].uuid, node.id, WSREP_UUID_STR_LEN);
 
         strncpy(
             entries[i].status,
             gcs_node_state_to_str(node.status),
-            sizeof(entries[i].status));
+            WSREP_STATUS_LENGTH);
 
         entries[i].local_index = i;
         entries[i].segment = node.segment;
