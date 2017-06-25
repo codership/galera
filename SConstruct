@@ -28,6 +28,7 @@
 import os
 import platform
 import string
+import subprocess
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
@@ -444,17 +445,27 @@ if ssl == 1:
         Exit(1)
 
 
-# these will be used only with our softaware
+# get compiler name/version, CXX may be set to "c++" which may be clang or gcc
+try:
+    compiler_version = subprocess.check_output(
+        conf.env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT)
+except:
+    # in case "$CXX --version" returns an error, e.g. "unknown option"
+    compiler_version = 'unknown'
+
+# these will be used only with our software
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
-    if 'clang' not in conf.env['CXX']:
-        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
-    else:
+    if 'clang' in compiler_version:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
-        if 'ccache' in conf.env['CXX']:
+        # CXX may be something like "ccache clang++"
+        if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
+    else:
+        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
 
