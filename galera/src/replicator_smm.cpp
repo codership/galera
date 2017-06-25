@@ -2417,7 +2417,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     else
     {
         log_info << "####### ST not required";
-
+#if 0 //remove
         wsrep_cb_status_t const rcode
             (view_cb_(app_ctx_, recv_ctx, view_info, 0, 0));
 
@@ -2427,6 +2427,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                       << "restart required.";
             abort();
         }
+#endif
     }
 
     Replicator::State const next_state(state2repl(my_state, my_idx));
@@ -2631,6 +2632,20 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     }
 
     free(app_req);
+
+    if (!st_required              /* in-order processing  */ ||
+        sst_seqno_ >= group_seqno /* SST "ate" this event */)
+    {
+        wsrep_cb_status_t const rcode
+            (view_cb_(app_ctx_, recv_ctx, view_info, 0, 0));
+
+        if (WSREP_CB_SUCCESS != rcode) // is this really fatal now?
+        {
+            log_fatal << "View callback failed. This is unrecoverable, "
+                      << "restart required.";
+            abort();
+        }
+    }
     free(view_info);
 
     if (!from_IST)
