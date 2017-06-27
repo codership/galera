@@ -485,8 +485,6 @@ if strict_build_flags == 1:
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
-# Many unit tests fail conf.env.Append(CXXFLAGS = ' -std=c++11')
-
 env = conf.Finish()
 
 Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
