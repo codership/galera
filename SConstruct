@@ -447,25 +447,33 @@ if ssl == 1:
 
 # get compiler name/version, CXX may be set to "c++" which may be clang or gcc
 try:
-    compiler_version = subprocess.check_output(
+    compiler = subprocess.check_output(
         conf.env['CXX'].split() + ['--version'],
         stderr=subprocess.STDOUT)
 except:
     # in case "$CXX --version" returns an error, e.g. "unknown option"
-    compiler_version = 'unknown'
+    compiler = 'unknown'
 
 # these will be used only with our software
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
-    if 'clang' in compiler_version:
+    if 'g++' in compiler:
+        gcc_version = subprocess.check_output(
+            conf.env['CXX'].split() + ['-dumpversion'],
+            stderr=subprocess.STDOUT)
+        if gcc_version >= "4.9.0":
+            conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
+        else:
+            conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
+        conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
+    elif 'clang' in compiler:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
+        conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
         # CXX may be something like "ccache clang++"
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
-    else:
-        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
 

@@ -9,7 +9,6 @@
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
-
 void galera::Wsdb::print(std::ostream& os) const
 {
     os << "trx map:\n";
@@ -46,15 +45,12 @@ galera::Wsdb::~Wsdb()
              << " conn query map usage " << conn_map_.size();
     log_info << trx_pool_;
 
-    // With debug builds just print trx and query maps to stderr
-    // and don't clean up to let valgrind etc to detect leaks.
 #ifndef NDEBUG
     std::cerr << *this;
-#else
-    for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
+    assert(trx_map_.size() == 0);
+    assert(conn_map_.size() == 0);
 #endif // !NDEBUG
 }
-
 
 inline galera::TrxHandlePtr
 galera::Wsdb::create_trx(const TrxHandle::Params& params,
