@@ -92,6 +92,7 @@ START_TEST (gcs_group_configuration)
     gcs_recv_msg_t msg1, msg2, msg3, msg4, msg5;
     gcs_act_frag_t frg1, frg2, frg3, frg4, frg5, frg;
 
+    const struct gcs_act_rcvd r_act_empty;
     struct gcs_act_rcvd r_act;
     struct gcs_act* act = &r_act.act;
 
@@ -153,7 +154,7 @@ START_TEST (gcs_group_configuration)
     ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act, true);
 
     // 1. Try fragment that is not the first
-    memset (&r_act, 0, sizeof(r_act));
+    r_act = r_act_empty;
 //    ret = gcs_group_handle_act_msg (&group, &frg, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     fail_if (ret != -EPROTO);
@@ -205,7 +206,7 @@ START_TEST (gcs_group_configuration)
     fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
-    memset (&r_act, 0, sizeof(r_act));
+    r_act = r_act_empty;
 
     // 10. New component message
     gcs_comp_msg_delete (comp);
@@ -243,7 +244,7 @@ START_TEST (gcs_group_configuration)
     seqno++;
     // cleanup
     free ((void*)act->buf);
-    memset (&r_act, 0, sizeof(r_act));
+    r_act = r_act_empty;
 
     // 12. Try foreign action with a new node joined in the middle.
     gcs_comp_msg_delete (comp);
@@ -288,7 +289,7 @@ START_TEST (gcs_group_configuration)
     seqno++;
     // cleanup
     free ((void*)act->buf);
-    memset (&r_act, 0, sizeof(r_act));
+    r_act = r_act_empty;
 
     // 13. Try to send an action with one node disappearing in the middle
     //     and order of nodes changed
@@ -367,7 +368,7 @@ return;
     seqno++;
     // cleanup
     free ((void*)act->buf);
-    memset (&r_act, 0, sizeof(r_act));
+    r_act = r_act_empty;
 
     // Leave group
     comp = gcs_comp_msg_new (FALSE, false, -1, 0, 0);
