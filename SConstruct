@@ -28,6 +28,7 @@
 import os
 import platform
 import string
+import subprocess
 
 sysname = os.uname()[0].lower()
 machine = platform.machine()
@@ -128,7 +129,7 @@ deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.20')
+GALERA_VER = ARGUMENTS.get('version', '3.21')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 
 # Attempt to read from file if not given
@@ -182,10 +183,10 @@ env.Replace(RPATH     = [os.getenv('RPATH',   '')])
 # enabled on all platforms.
 env.Append(CCFLAGS = ' -pthread')
 
-# Freebsd ports are installed under /usr/local
+# FreeBSD ports are usually installed under /usr/local
 if sysname == 'freebsd' or sysname == 'sunos':
-    env.Append(LIBPATH  = ['/usr/local/lib'])
-    env.Append(CPPFLAGS = ' -I/usr/local/include ')
+    env.Append(LIBPATH = ['/usr/local/lib'])
+    env.Append(CPPPATH = ['/usr/local/include'])
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
 
@@ -412,14 +413,16 @@ else:
 
 # asio
 if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
-    conf.env.Append(CPPFLAGS = ' -DHAVE_SYSTEM_ASIO -DHAVE_ASIO_HPP')
+    conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     system_asio = False
     print "Falling back to bundled asio"
 
 if not system_asio:
-    # Fall back to embedded asio
-    conf.env.Append(CPPPATH = [ '#/asio' ])
+    # Make sure that -Iasio goes before other paths (e.g. -I/usr/local/include)
+    # that may contain a system wide installed asio. We should use the bundled
+    # asio if "scons system_asio=0" is specified. Thus use Prepend().
+    conf.env.Prepend(CPPPATH = [ '#/asio' ])
     if conf.CheckCXXHeader('asio.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
     else:
@@ -442,17 +445,27 @@ if ssl == 1:
         Exit(1)
 
 
-# these will be used only with our softaware
+# get compiler name/version, CXX may be set to "c++" which may be clang or gcc
+try:
+    compiler_version = subprocess.check_output(
+        conf.env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT)
+except:
+    # in case "$CXX --version" returns an error, e.g. "unknown option"
+    compiler_version = 'unknown'
+
+# these will be used only with our software
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
-    if 'clang' not in conf.env['CXX']:
-        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
-    else:
+    if 'clang' in compiler_version:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
-        if 'ccache' in conf.env['CXX']:
+        # CXX may be something like "ccache clang++"
+        if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
+    else:
+        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
 

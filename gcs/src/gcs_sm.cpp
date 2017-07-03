@@ -46,10 +46,8 @@ gcs_sm_create (long len, long n)
     if (sm) {
         sm_init_stats (&sm->stats);
         gu_mutex_init (&sm->lock, NULL);
-#ifdef GCS_SM_GRAB_RELEASE
         gu_cond_init  (&sm->cond, NULL);
         sm->cond_wait   = 0;
-#endif /* GCS_SM_GRAB_RELEASE */
         sm->wait_q_len  = len;
         sm->wait_q_mask = sm->wait_q_len - 1;
         sm->wait_q_head = 1;
@@ -64,6 +62,12 @@ gcs_sm_create (long len, long n)
 #endif /* GCS_SM_CONCURRENCY */
         sm->pause       = false;
         sm->wait_time   = gu::datetime::Sec;
+
+#ifdef GCS_SM_DEBUG
+        memset (&sm->history, 0, sizeof(sm->history));
+        sm->history_line = GCS_SM_HIST_LEN - 1; // point to the last line
+#endif
+
         memset (sm->wait_q, 0, sm->wait_q_len * sizeof(sm->wait_q[0]));
     }
 
@@ -94,7 +98,7 @@ gcs_sm_close (gcs_sm_t* sm)
     while (sm->users > 0) { // wait for cleared queue
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
-        _gcs_sm_enqueue_common (sm, &cond, true);
+        _gcs_sm_enqueue_common (sm, &cond, true, sm->wait_q_tail);
         sm->users--;
         GCS_SM_INCREMENT(sm->wait_q_head);
     }
@@ -211,3 +215,69 @@ gcs_sm_stats_flush(gcs_sm_t* sm)
     gu_mutex_unlock (&sm->lock);
 }
 
+#ifdef GCS_SM_DEBUG
+void
+_gcs_sm_dump_state_common(gcs_sm_t* sm, FILE* file)
+{
+    fprintf(
+        file,
+        "\nSend monitor state:"
+        "\n==================="
+        "\n\twait_q_len:  %lu"
+        "\n\twait_q_head: %lu"
+        "\n\twait_q_tail: %lu"
+        "\n\tusers:       %ld"
+        "\n\tentered:     %ld"
+        "\n\tpaused:      %s"
+        "\n\tstatus:      %ld\n",
+        sm->wait_q_len,
+        sm->wait_q_head,
+        sm->wait_q_tail,
+        sm->users,
+        sm->entered,
+        sm->pause ? "yes" : "no",
+        sm->ret
+        );
+
+    fprintf(
+        file,
+        "\nSend monitor queue:"
+        "\n===================\n"
+        );
+
+    unsigned long const pad(32);
+    unsigned long const q_start(sm->wait_q_head >= pad ?
+                                sm->wait_q_head - pad :
+                                sm->wait_q_len + sm->wait_q_head - pad);
+    unsigned long const q_end  ((sm->wait_q_tail + pad) % sm->wait_q_len);
+
+    for (unsigned long i(q_start); i != q_end; GCS_SM_INCREMENT(i))
+    {
+        fprintf(file, "%5lu, %d\t", i, sm->wait_q[i].wait);
+    }
+
+    fprintf(
+        file,
+        "\n\nSend monitor history:"
+        "\n=====================\n"
+        );
+
+    int line(sm->history_line);
+    do
+    {
+        line = (line + 1) % GCS_SM_HIST_LEN;
+        fputs(sm->history[line], file);
+    }
+    while (line != sm->history_line);
+
+    fputs("-----------------------------\n", file);
+}
+
+void
+gcs_sm_dump_state(gcs_sm_t* sm, FILE* file)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+    _gcs_sm_dump_state_common(sm, file);
+    gu_mutex_unlock (&sm->lock);
+}
+#endif /* GCS_SM_DEBUG */

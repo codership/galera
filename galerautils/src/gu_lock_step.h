@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -11,7 +11,7 @@
 
 #include <stdbool.h>
 
-#include "gu_mutex.h"
+#include "gu_threads.h"
 
 typedef struct gu_lock_step
 {
