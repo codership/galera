@@ -590,9 +590,10 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
 
     gu::Lock lock(mutex_);
 
+    std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+
     if (seqno >= position_)
     {
-        std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
         assert(cert_index_.size() == 0);
         assert(cert_index_ng_.size() == 0);
     }

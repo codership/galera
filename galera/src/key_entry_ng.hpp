@@ -19,7 +19,7 @@ namespace galera
         {
             std::fill(&refs_[0],
                       &refs_[KeySet::Key::P_LAST],
-                      reinterpret_cast<TrxHandle*>(NULL));
+                      static_cast<TrxHandle*>(NULL));
         }
 
         KeyEntryNG(const KeyEntryNG& other)
@@ -35,6 +35,7 @@ namespace galera
         void ref(KeySet::Key::Prefix p, const KeySet::KeyPart& k,
                  TrxHandle* trx)
         {
+            assert(trx);
             assert(0 == refs_[p] ||
                    refs_[p]->global_seqno() <= trx->global_seqno());
 
@@ -94,6 +95,9 @@ namespace galera
 
         ~KeyEntryNG()
         {
+#ifndef NDEBUG
+            if (referenced()) print_refs();
+#endif /* NDEBUG */
             assert(!referenced());
         }
 
@@ -103,8 +107,25 @@ namespace galera
         KeySet::KeyPart key_;
 
 #ifndef NDEBUG
-        void assert_ref(KeySet::Key::Prefix, TrxHandle*) const;
-        void assert_unref(KeySet::Key::Prefix, TrxHandle*) const;
+        void print_refs()
+        {
+            std::ostringstream os;
+
+            os << "Key: " << key_ << " referenced by: \n";
+            for (int i(0); i <= KeySet::Key::P_LAST; ++i)
+            {
+                os << i << ": ";
+
+                if (refs_[i])
+                    os << *refs_[i];
+                else
+                    os << "(null)";
+
+                os << "\n";
+            }
+
+            log_info << os.str();
+        }
 #endif /* NDEBUG */
     };
 
