@@ -284,9 +284,9 @@ galera::Certification::do_test_v3(TrxHandle* trx, bool store_keys)
     cert_debug << "BEGIN CERTIFICATION v3: (" << trx << ") " << *trx;
 
 #ifndef NDEBUG
-    // to check that cleanup after cert failure returns cert_index_
+    // to check that cleanup after cert failure returns cert_index
     // to original size
-    size_t prev_cert_index_size(cert_index_.size());
+    size_t prev_cert_index_size(cert_index_ng_.size());
 #endif // NDEBUG
 
     const KeySetIn& key_set(trx->write_set_in().keyset());
@@ -355,7 +355,7 @@ cert_fail:
         {
             KeyEntryNG ke(key_set.next());
 
-            // Clean up cert_index_ from entries which were added by this trx
+            // Clean up cert index from entries which were added by this trx
             CertIndexNG::iterator ci(cert_index_ng_.find(&ke));
 
             if (gu_likely(ci != cert_index_ng_.end()))
@@ -364,8 +364,8 @@ cert_fail:
 
                 if (kep->referenced() == false)
                 {
-                    // kel was added to cert_index_ by this trx -
-                    // remove from cert_index_ and fall through to delete
+                    // kel was added to cert index by this trx -
+                    // remove from cert index and fall through to delete
                     cert_index_ng_.erase(ci);
                 }
                 else continue;
@@ -378,13 +378,13 @@ cert_fail:
             else if(ke.key().shared())
             {
                 assert(0); // we actually should never be here, the key should
-                           // be either added to cert_index_ or be there already
+                           // be either added to cert index or be there already
                 log_warn  << "could not find shared key '"
                           << ke.key() << "' from cert index";
             }
             else { /* exclusive can duplicate shared */ }
         }
-        assert(cert_index_.size() == prev_cert_index_size);
+        assert(cert_index_ng_.size() == prev_cert_index_size);
     }
 
     return TEST_FAILED;
@@ -407,18 +407,6 @@ galera::Certification::do_test(const TrxHandlePtr& trx, bool store_keys)
     if (gu_unlikely(trx->last_seen_seqno() < initial_position_ ||
                     trx->global_seqno() - trx->last_seen_seqno() > max_length_))
     {
-        if (trx->last_seen_seqno() < initial_position_)
-        {
-            if (cert_index_.empty() == false)
-            {
-                log_warn << "last seen seqno below limit for trx " << *trx;
-            }
-            else
-            {
-                log_debug << "last seen seqno below limit for trx " << *trx;
-            }
-        }
-
         if (trx->global_seqno() - trx->last_seen_seqno() > max_length_)
         {
             log_warn << "certification interval for trx " << *trx
@@ -467,7 +455,7 @@ galera::Certification::do_test(const TrxHandlePtr& trx, bool store_keys)
         ++n_certified_;
         deps_dist_ += (trx->global_seqno() - trx->depends_seqno());
         cert_interval_ += (trx->global_seqno() - trx->last_seen_seqno() - 1);
-        index_size_ = (cert_index_.size() + cert_index_ng_.size());
+        index_size_ = cert_index_ng_.size();
     }
 
     byte_count_ += trx->size();
@@ -519,7 +507,6 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     :
     version_               (-1),
     trx_map_               (),
-    cert_index_            (),
     cert_index_ng_         (),
     deps_set_              (),
     service_thd_           (thd),
@@ -548,7 +535,7 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
 
 galera::Certification::~Certification()
 {
-    log_info << "cert index usage at exit "   << cert_index_.size();
+    log_info << "cert index usage at exit "   << cert_index_ng_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
     log_info << "deps set usage at exit "     << deps_set_.size();
 
@@ -594,7 +581,6 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
 
     if (seqno >= position_)
     {
-        assert(cert_index_.size() == 0);
         assert(cert_index_ng_.size() == 0);
     }
     else
@@ -611,7 +597,6 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     }
 
     trx_map_.clear();
-    assert(cert_index_.empty());
     assert(cert_index_ng_.empty());
 
     service_thd_.release_seqno(position_);
