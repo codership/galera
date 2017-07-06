@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2009 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2017 Codership Oy <info@codership.com>
 
 /**
  * @file GaleraUtils main header file
@@ -22,7 +22,7 @@ extern "C"
 #include "gu_conf.h"
 #include "gu_assert.h"
 #include "gu_mem.h"
-#include "gu_mutex.h"
+#include "gu_threads.h"
 #include "gu_dbug.h"
 #include "gu_fifo.h"
 #include "gu_uuid.h"

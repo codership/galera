@@ -1,5 +1,5 @@
 Galera replication - implementation of write set replication (wsrep) interface.
-Copyright (C) 2007-2014 Codership Oy <info@codership.com>
+Copyright (C) 2007-2017 Codership Oy <info@codership.com>
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of version 2 of the GNU General Public
@@ -31,7 +31,7 @@ and GNU Free Documentation Licenses. See docs/COPYING for details.
 Following modules have their own authors and licenses:
 
 asio/
-see asio/COPYING for details
+see asio/LICENSE_1_0.txt for details
 
 chromium/
 see chromium/AUTHORS and chromium/LICENSE for details

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2016 Codership Oy <info@codership.com>
+// Copyright (C) 2016-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -36,7 +36,7 @@ END_TEST
 START_TEST(check_thread_schedparam_system_default)
 {
 
-    gu::ThreadSchedparam sp(gu::thread_get_schedparam(pthread_self()));
+    gu::ThreadSchedparam sp(gu::thread_get_schedparam(gu_thread_self()));
     std::ostringstream sp_oss;
     sp_oss << sp;
 
