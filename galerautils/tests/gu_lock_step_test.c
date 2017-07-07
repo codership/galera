@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -114,7 +114,7 @@ START_TEST (gu_lock_step_race)
 
     for (i = 0; i < RACE_ITERATIONS; i++) {
         ret = gu_lock_step_cont (&LS, timeout);
-        fail_if (ret != 1, "No waiter at iteration: %ld", i); 
+        fail_if (ret != 1, "No waiter at iteration: %ld", i);
     }
     fail_if (LS.wait != 0); // 0 waiters remain
 
@@ -122,7 +122,7 @@ START_TEST (gu_lock_step_race)
     fail_if (ret != 0, "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (ret != 0); 
+    fail_if (ret != 0);
 }
 END_TEST
 

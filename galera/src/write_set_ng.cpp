@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2017 Codership Oy <info@codership.com>
 //
 
 

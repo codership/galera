@@ -1,13 +1,10 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GU_LOCK__
 #define __GU_LOCK__
-
-#include <pthread.h>
-#include <cerrno>
 
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
@@ -15,14 +12,17 @@
 #include "gu_cond.hpp"
 #include "gu_datetime.hpp"
 
+#include <cerrno>
+#include <cassert>
+
 namespace gu
 {
     class Lock
     {
-        pthread_mutex_t* const value;
+        const Mutex* mtx_;
 
 #ifdef HAVE_PSI_INTERFACE
-        gu::MutexWithPFS* const mutex;
+        MutexWithPFS* pfs_mtx_;
 #endif /* HAVE_PSI_INTERFACE */
 
         Lock (const Lock&);
@@ -30,12 +30,12 @@ namespace gu
 
     public:
 
-        Lock (const Mutex& mtx) : value(&mtx.value)
+        Lock (const Mutex& mtx) : mtx_(&mtx)
 #if HAVE_PSI_INTERFACE
-            , mutex()
+            , pfs_mtx_()
 #endif
         {
-            int err = pthread_mutex_lock (value);
+            int const err(mtx_->lock());
             if (gu_unlikely(err))
             {
                 std::string msg = "Mutex lock failed: ";
@@ -47,13 +47,17 @@ namespace gu
         virtual ~Lock ()
         {
 #ifdef HAVE_PSI_INTERFACE
-            if (mutex != NULL)
+            if (pfs_mtx_ != NULL)
             {
-                mutex->unlock();
+                pfs_mtx_->unlock();
                 return;
             }
 #endif /* HAVE_PSI_INTERFACE */
-            int err = pthread_mutex_unlock (value);
+
+#ifdef GU_DEBUG_MUTEX
+            assert(mtx_->owned());
+#endif
+            int const err(mtx_->unlock());
             if (gu_unlikely(err))
             {
                 log_fatal << "Mutex unlock failed: " << err << " ("
@@ -66,7 +70,12 @@ namespace gu
         inline void wait (const Cond& cond)
         {
             cond.ref_count++;
-            pthread_cond_wait (&(cond.cond), value);
+#ifdef HAVE_PSI_INTERFACE
+            if (pfs_mtx_)
+                gu_cond_wait (&(cond.cond), pfs_mtx_->value);
+            else
+#endif /* HAVE_PSI_INTERFACE */
+                gu_cond_wait (&(cond.cond), &(mtx_->impl()));
             cond.ref_count--;
         }
 
@@ -76,19 +85,25 @@ namespace gu
 
             date._timespec(ts);
             cond.ref_count++;
-            int ret = pthread_cond_timedwait (&(cond.cond), value, &ts);
+            int ret;
+#ifdef HAVE_PSI_INTERFACE
+            if (pfs_mtx_)
+                ret = gu_cond_timedwait (&(cond.cond), pfs_mtx_->value, &ts);
+            else
+#endif /* HAVE_PSI_INTERFACE */
+                ret = gu_cond_timedwait (&(cond.cond), &(mtx_->impl()), &ts);
             cond.ref_count--;
 
             if (gu_unlikely(ret)) gu_throw_error(ret);
         }
 
 #ifdef HAVE_PSI_INTERFACE
-        Lock (const MutexWithPFS& mtx)
+        Lock (const MutexWithPFS& pfs_mtx)
             :
-            value(mtx.value),
-            mutex(const_cast<gu::MutexWithPFS*>(&mtx))
+            mtx_(),
+            pfs_mtx_(const_cast<gu::MutexWithPFS*>(&pfs_mtx))
         {
-            mutex->lock();
+            pfs_mtx_->lock();
         }
 
         inline void wait (const CondWithPFS& cond)
@@ -99,7 +114,8 @@ namespace gu
                 WSREP_PFS_INSTR_OPS_WAIT,
                 cond.m_tag,
                 reinterpret_cast<void**>(const_cast<gu_cond_t**>(&(cond.cond))),
-                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(&value)),
+                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(
+                                         &(pfs_mtx_->value))),
                 NULL);
             cond.ref_count--;
         }
@@ -115,7 +131,8 @@ namespace gu
                 WSREP_PFS_INSTR_OPS_WAIT,
                 cond.m_tag,
                 reinterpret_cast<void**>(const_cast<gu_cond_t**>(&(cond.cond))),
-                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(&value)),
+                reinterpret_cast<void**>(const_cast<pthread_mutex_t**>(
+                                         &(pfs_mtx_->value))),
                 &ts);
             cond.ref_count--;
         }

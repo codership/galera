@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"
@@ -8,6 +8,7 @@
 #include "gu_logger.hpp"
 #include "gu_uri.hpp"
 #include "gu_debug_sync.hpp"
+#include "gu_progress.hpp"
 
 #include "GCache.hpp"
 #include "galera_common.hpp"
@@ -50,7 +51,7 @@ namespace galera
             wsrep_seqno_t      first()  { return first_;  }
             wsrep_seqno_t      last()   { return last_;   }
             AsyncSenderMap&    asmap()  { return asmap_;  }
-            pthread_t          thread() { return thread_; }
+            gu_thread_t          thread() { return thread_; }
 
         private:
 
@@ -60,7 +61,7 @@ namespace galera
             wsrep_seqno_t      first_;
             wsrep_seqno_t      last_;
             AsyncSenderMap&    asmap_;
-            pthread_t          thread_;
+            gu_thread_t        thread_;
 
             // GCC 4.8.5 on FreeBSD wants it
             AsyncSender(const AsyncSender&);
@@ -419,6 +420,22 @@ void galera::ist::Receiver::run()
             p.recv_handshake_response(socket);
             p.send_ctrl(socket, Ctrl::C_OK);
         }
+
+        /* wait for ready signal from the STR thread */
+        {
+            gu::Lock lock(mutex_);
+            while (ready_ == false && interrupted_ == false)
+                lock.wait(cond_);
+        }
+
+        gu::Progress<wsrep_seqno_t> progress(
+            "Receiving IST",
+            " events",
+            last_seqno_ - current_seqno_ + 1,
+            /* The following means reporting progress NO MORE frequently than
+             * once per BOTH 10 seconds (default) and 16 events */
+            16);
+
         while (true)
         {
             TrxHandle* trx;
@@ -440,15 +457,18 @@ void galera::ist::Receiver::run()
                     goto err;
                 }
                 ++current_seqno_;
+
+                progress.update(1);
             }
             gu::Lock lock(mutex_);
-            while (ready_ == false || consumers_.empty())
+            assert(ready_ || interrupted_);
+            while (consumers_.empty())
             {
-                lock.wait(cond_);
                 if (interrupted_)
                 {
                     goto Intrrupted;
                 }
+                lock.wait(cond_);
             }
             Consumer* cons(consumers_.top());
             consumers_.pop();
@@ -460,6 +480,8 @@ void galera::ist::Receiver::run()
                 break;
             }
         }
+
+        progress.finish();
     }
     catch (asio::system_error& e)
     {
@@ -562,7 +584,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
         }
 
         int err;
-        if ((err = pthread_join(thread_, 0)) != 0)
+        if ((err = gu_thread_join(thread_, 0)) != 0)
         {
             log_warn << "Failed to join IST receiver thread: " << err;
         }
@@ -849,7 +871,7 @@ void* run_async_sender(void* arg)
     try
     {
         as->asmap().remove(as, join_seqno);
-        pthread_detach(as->thread());
+        gu_thread_detach(as->thread());
         delete as;
     }
     catch (gu::NotFound& nf)
@@ -909,9 +931,9 @@ void galera::ist::AsyncSenderMap::cancel()
         int err;
         as->cancel();
         monitor_.leave();
-        if ((err = pthread_join(as->thread_, 0)) != 0)
+        if ((err = gu_thread_join(as->thread_, 0)) != 0)
         {
-            log_warn << "pthread_join() failed: " << err;
+            log_warn << "thread_join() failed: " << err;
         }
         monitor_.enter();
         delete as;

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -64,7 +64,7 @@ END_TEST
 
 // IST tests
 
-static pthread_barrier_t start_barrier;
+static gu_barrier_t start_barrier;
 
 class TestOrder
 {
@@ -152,7 +152,7 @@ extern "C" void* sender_thd(void* arg)
 
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
-    pthread_barrier_wait(&start_barrier);
+    gu_barrier_wait(&start_barrier);
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
     mark_point();
@@ -163,7 +163,7 @@ extern "C" void* sender_thd(void* arg)
 extern "C" void* trx_thread(void* arg)
 {
     trx_thread_args* targs(reinterpret_cast<trx_thread_args*>(arg));
-    pthread_barrier_wait(&start_barrier);
+    gu_barrier_wait(&start_barrier);
     targs->receiver_.ready();
 
     while (true)
@@ -202,22 +202,22 @@ extern "C" void* receiver_thd(void* arg)
 
     mark_point();
 
-    std::vector<pthread_t> threads(rargs->n_receivers_);
+    std::vector<gu_thread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);
     for (size_t i(0); i < threads.size(); ++i)
     {
         log_info << "starting trx thread " << i;
-        pthread_create(&threads[0] + i, 0, &trx_thread, &trx_thd_args);
+        gu_thread_create(&threads[0] + i, 0, &trx_thread, &trx_thd_args);
     }
 
     trx_thd_args.monitor_.set_initial_position(rargs->first_ - 1);
-    pthread_barrier_wait(&start_barrier);
+    gu_barrier_wait(&start_barrier);
     trx_thd_args.monitor_.wait(rargs->last_);
 
     for (size_t i(0); i < threads.size(); ++i)
     {
         log_info << "joining trx thread " << i;
-        pthread_join(threads[i], 0);
+        gu_thread_join(threads[i], 0);
     }
 
     receiver.finished();
@@ -260,6 +260,7 @@ static void test_ist_common(int const version)
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     std::string gcache_file("ist_check.cache");
     conf.set("gcache.name", gcache_file);
+    conf.set("gcache.size", "1M");
     std::string dir(".");
     std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;
@@ -330,18 +331,18 @@ static void test_ist_common(int const version)
     receiver_args rargs(receiver_addr, 1, 10, 1, sp, version);
     sender_args sargs(*gcache, rargs.listen_addr_, 1, 10, version);
 
-    pthread_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
+    gu_barrier_init(&start_barrier, 0, 1 + 1 + rargs.n_receivers_);
 
-    pthread_t sender_thread, receiver_thread;
+    gu_thread_t sender_thread, receiver_thread;
 
-    pthread_create(&sender_thread, 0, &sender_thd, &sargs);
+    gu_thread_create(&sender_thread, 0, &sender_thd, &sargs);
     mark_point();
     usleep(100000);
-    pthread_create(&receiver_thread, 0, &receiver_thd, &rargs);
+    gu_thread_create(&receiver_thread, 0, &receiver_thd, &rargs);
     mark_point();
 
-    pthread_join(sender_thread, 0);
-    pthread_join(receiver_thread, 0);
+    gu_thread_join(sender_thread, 0);
+    gu_thread_join(receiver_thread, 0);
 
     mark_point();
 

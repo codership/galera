@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 #include "gu_log.h"
-#include "gu_mutex.h"
+#include "gu_threads.h"
 
 extern void
 gu_init (gu_log_cb_t log_cb, gu_pfs_instr_cb_t pfs_instr_cb);

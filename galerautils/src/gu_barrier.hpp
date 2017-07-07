@@ -1,12 +1,12 @@
 //
-// Copyright (C) 2016 Codership Oy <info@codership.com>
+// Copyright (C) 2016-2017 Codership Oy <info@codership.com>
 //
 
 
 #ifndef GU_BARRIER
 #define GU_BARRIER
 
-#include <pthread.h>
+#include <gu_threads.h>
 #include "gu_throw.hpp"
 
 
@@ -20,7 +20,7 @@ namespace gu
             barrier_()
         {
             int err;
-            if ((err = pthread_barrier_init(&barrier_, 0, count)) != 0)
+            if ((err = gu_barrier_init(&barrier_, 0, count)) != 0)
             {
                 gu_throw_error(err) << "Barrier init failed";
             }
@@ -29,7 +29,7 @@ namespace gu
         ~Barrier()
         {
             int err;
-            if ((err = pthread_barrier_destroy(&barrier_)) != 0)
+            if ((err = gu_barrier_destroy(&barrier_)) != 0)
             {
                 assert(0);
                 log_warn << "Barrier destroy failed: " << ::strerror(err);
@@ -38,8 +38,8 @@ namespace gu
 
         void wait()
         {
-            int err(pthread_barrier_wait(&barrier_));
-            if (err != 0 && err != PTHREAD_BARRIER_SERIAL_THREAD)
+            int err(gu_barrier_wait(&barrier_));
+            if (err != 0 && err != GU_BARRIER_SERIAL_THREAD)
             {
                 gu_throw_error(err) << "Barrier wait failed";
             }
@@ -49,7 +49,7 @@ namespace gu
         // Non-copyable
         Barrier(const Barrier&);
         Barrier& operator=(const Barrier&);
-        pthread_barrier_t barrier_;
+        gu_barrier_t barrier_;
     };
 }
 
