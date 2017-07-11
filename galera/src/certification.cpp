@@ -102,7 +102,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 {
     assert(mutex_.owned());
     assert(trx->version() == 3);
-    assert(deps_set_.find(trx->last_seen_seqno()) == deps_set_.end());
+    assert(deps_set_.find(trx->global_seqno()) == deps_set_.end());
     const KeySetIn& keys(trx->write_set_in().keyset());
     keys.rewind();
     purge_key_set(cert_index_ng_, trx, keys, keys.count());

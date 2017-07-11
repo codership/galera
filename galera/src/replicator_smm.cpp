@@ -1139,18 +1139,10 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandle* trx)
 
         log_debug << "Master rolled back " << trx->global_seqno();
 
-        if (trx->pa_unsafe()) /* apply_monitor_ was entered */
+        ApplyOrder ao(*trx);
+        if (apply_monitor_.entered(ao))
         {
-            ApplyOrder ao(*trx);
-            assert(apply_monitor_.entered(ao));
             apply_monitor_.leave(ao);
-        }
-        else
-        {
-#ifndef NDEBUG
-            ApplyOrder ao(*trx);
-            assert(!apply_monitor_.entered(ao));
-#endif
         }
 
         if (co_mode_ != CommitOrder::BYPASS)
