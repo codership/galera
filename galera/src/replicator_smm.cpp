@@ -487,8 +487,14 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
                             "rolled back " : "committed ")
               << trx.global_seqno();
 
+    wsrep_seqno_t safe_to_discard(WSREP_SEQNO_UNDEFINED);
+
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
+        if (gu_unlikely(!applying))
+            /* trx must be set committed while in at least one monitor */
+            safe_to_discard = cert_.set_trx_committed(trx);
+
         commit_monitor_.leave(co);
     }
 
@@ -499,13 +505,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
         GU_DBUG_SYNC_WAIT("after_commit_slave_sync");
     }
 
-    wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(trx));
-    if (gu_likely(trx.local_seqno() != -1))
-    {
-        // trx with local seqno -1 originates from IST (or other source not gcs)
-        report_last_committed(safe_to_discard);
-    }
-
     if (gu_likely(applying))
     {
         /* For now need to keep it inside apply monitor to ensure all processing
@@ -513,6 +512,8 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
          * cleanup (and loss of the writeset buffer). Perhaps unordered monitor
          * is needed here. */
         trx.unordered(recv_ctx, unordered_cb_);
+
+        safe_to_discard = cert_.set_trx_committed(trx);
 
         apply_monitor_.leave(ao);
     }
@@ -522,6 +523,12 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
         log_debug << "Done executing TO isolated action: "
                   << trx.global_seqno();
         st_.mark_safe();
+    }
+
+    if (gu_likely(trx.local_seqno() != -1))
+    {
+        // trx with local seqno -1 originates from IST (or other source not gcs)
+        report_last_committed(safe_to_discard);
     }
 
     trx.set_exit_loop(exit_loop);
@@ -1112,14 +1119,16 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandle* trx)
     CommitOrder co(*trx, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
 
+    trx->set_state(TrxHandle::S_COMMITTED);
+
+    wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(*trx));
+
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
 
-    trx->set_state(TrxHandle::S_COMMITTED);
-
-    report_last_committed(cert_.set_trx_committed(*trx));
-
     ++local_commits_;
+
+    report_last_committed(safe_to_discard);
 
     return WSREP_OK;
 }
@@ -1139,11 +1148,7 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandle* trx)
 
         log_debug << "Master rolled back " << trx->global_seqno();
 
-        ApplyOrder ao(*trx);
-        if (apply_monitor_.entered(ao))
-        {
-            apply_monitor_.leave(ao);
-        }
+        report_last_committed(cert_.set_trx_committed(*trx));
 
         if (co_mode_ != CommitOrder::BYPASS)
         {
@@ -1152,7 +1157,8 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandle* trx)
             commit_monitor_.leave(co);
         }
 
-        report_last_committed(cert_.set_trx_committed(*trx));
+        ApplyOrder ao(*trx);
+        if (apply_monitor_.entered(ao)) apply_monitor_.leave(ao);
     }
 
     assert(trx->state() == TrxHandle::S_ABORTING ||
@@ -1513,7 +1519,6 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, const TrxHandlePtr& trx)
         break;
     case WSREP_TRX_MISSING: // must be skipped due to SST
         assert(trx->state() == TrxHandle::S_ABORTING);
-        report_last_committed(cert_.set_trx_committed(*trx));
         break;
     default:
         // this should not happen for remote actions
@@ -2180,6 +2185,12 @@ wsrep_status_t galera::ReplicatorSMM::cert(const TrxHandlePtr& trx)
         // it inside the monitor
         gcache_.seqno_assign (trx->action(), trx->global_seqno(),
                               GCS_ACT_TORDERED, trx->depends_seqno() < 0);
+
+        if (gu_unlikely(WSREP_TRX_MISSING == retval))
+        {
+            // the last chance to set trx committed while inside of a monitor
+            report_last_committed(cert_.set_trx_committed(*trx));
+        }
 
         local_monitor_.leave(lo);
     }
