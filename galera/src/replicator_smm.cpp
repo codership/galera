@@ -1551,17 +1551,14 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 /* NB: the only use for this method is in cancel_seqnos() below */
 void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
 {
-    // To enter monitors we need to fake trx object
-    TrxHandlePtr dummy(TrxHandle::New(slave_pool_), TrxHandleDeleter());
-    dummy->set_global_seqno(seqno);
-    dummy->set_depends_seqno(dummy->global_seqno() - 1);
+    assert(seqno > 0);
 
-    ApplyOrder  ao(*dummy);
+    ApplyOrder ao(seqno, seqno - 1);
     apply_monitor_.self_cancel(ao);
 
     if (co_mode_ != CommitOrder::BYPASS)
     {
-        CommitOrder co(*dummy, co_mode_);
+        CommitOrder co(seqno, co_mode_);
         commit_monitor_.self_cancel(co);
     }
 }
