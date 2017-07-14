@@ -365,6 +365,7 @@ namespace gcomm
         { }
         void operator()()
         {
+            Critical<AsioProtonet> crit(socket_->net_);
             if (socket_->state() == gcomm::Socket::S_CONNECTED &&
                 socket_->send_q_.empty() == false)
             {
