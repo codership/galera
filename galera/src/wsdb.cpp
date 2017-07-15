@@ -116,7 +116,7 @@ galera::Wsdb::get_conn(wsrep_conn_id_t const conn_id, bool const create)
 galera::TrxHandlePtr
 galera::Wsdb::get_conn_query(const TrxHandle::Params& params,
                              const wsrep_uuid_t&      source_id,
-                             wsrep_trx_id_t const     conn_id,
+                             wsrep_conn_id_t const    conn_id,
                              bool const               create)
 {
     Conn* const conn(get_conn(conn_id, create));

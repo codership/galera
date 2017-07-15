@@ -428,9 +428,8 @@ galera::Certification::do_test(const TrxHandlePtr& trx, bool store_keys)
     }
     else
     {
-        wsrep_seqno_t const ds
-            (std::max(trx->depends_seqno(), trx_map_.begin()->first - 1));
-        trx->set_depends_seqno(ds);
+        wsrep_seqno_t const ds(trx_map_.begin()->first - 1);
+        if (ds > trx->depends_seqno()) trx->set_depends_seqno(ds);
     }
 
     switch (version_)
