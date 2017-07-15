@@ -551,10 +551,7 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandle*        trx,
 
     WriteSetNG::GatherVector actv;
 
-    size_t act_size = trx->write_set_out().gather(trx->source_id(),
-                                                  trx->conn_id(),
-                                                  trx->trx_id(),
-                                                  actv);
+    size_t act_size = trx->gather(actv);
     ssize_t rcode(0);
     do
     {
@@ -631,10 +628,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandlePtr& txp,
     act.seqno_g = GCS_SEQNO_ILL;
 #endif
     act.buf  = NULL;
-    act.size = trx->write_set_out().gather(trx->source_id(),
-                                           trx->conn_id(),
-                                           trx->trx_id(),
-                                           actv);
+    act.size = trx->gather(actv);
     trx->set_state(TrxHandle::S_REPLICATING);
 
     ssize_t rcode(-1);

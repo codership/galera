@@ -253,6 +253,18 @@ namespace galera
             }
         }
 
+        size_t gather(WriteSetNG::GatherVector& out)
+        {
+            assert(wso_);
+
+            uint32_t const wsrep_flags(trx_flags_to_wsrep_flags(flags()));
+            uint16_t const ws_flags
+                (WriteSetNG::wsrep_flags_to_ws_flags(wsrep_flags));
+            write_set_out().set_flags(ws_flags);
+
+            return write_set_out().gather(source_id(),conn_id(),trx_id(),out);
+        }
+
         void finalize(wsrep_seqno_t const last_seen_seqno)
         {
             assert (last_seen_seqno >= 0);
@@ -292,16 +304,7 @@ namespace galera
 
         uint32_t      flags()           const { return write_set_flags_; }
 
-        void set_flags(uint32_t const f)
-        {
-            write_set_flags_ = f;
-            if (wso_)
-            {
-                uint32_t const wsrep_flags(trx_flags_to_wsrep_flags(flags()));
-                uint16_t const ws_flags(WriteSetNG::wsrep_flags_to_ws_flags(wsrep_flags));
-                write_set_out().set_flags(ws_flags);
-            }
-        }
+        void          set_flags(uint32_t const f) { write_set_flags_ = f; }
 
         void append_key(const KeyData& key)
         {

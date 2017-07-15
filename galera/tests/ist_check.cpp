@@ -302,10 +302,7 @@ static void store_trx(gcache::GCache* const gcache,
     else
     {
         galera::WriteSetNG::GatherVector bufs;
-        ssize_t trx_size(trx->write_set_out().gather(trx->source_id(),
-                                                     trx->conn_id(),
-                                                     trx->trx_id(),
-                                                     bufs));
+        ssize_t trx_size(trx->gather(bufs));
         mark_point();
         trx->finalize(last_seen);
         ptr = static_cast<gu::byte_t*>(gcache->malloc(trx_size));
