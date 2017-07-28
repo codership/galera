@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -42,6 +42,8 @@ static suite_creator_t suites[] =
 	NULL
     };
 
+#define LOG_FILE "gcs_tests.log"
+
 int main(int argc, char* argv[])
 {
   bool const nofork(((argc > 1) && !strcmp(argv[1], "nofork")) ? true : false);
@@ -52,7 +54,7 @@ int main(int argc, char* argv[])
 
   if (!nofork)
   {
-    log_file = fopen ("gcs_tests.log", "w");
+    log_file = fopen (LOG_FILE, "w");
     if (!log_file) return EXIT_FAILURE;
     gu_conf_set_log_file (log_file);
   }
@@ -74,6 +76,9 @@ int main(int argc, char* argv[])
 
   if (log_file) fclose (log_file);
   printf ("Total test failed: %d\n", failed);
+
+  if (0 == failed && 0 != log_file) ::unlink(LOG_FILE);
+
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

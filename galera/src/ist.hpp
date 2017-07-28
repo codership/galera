@@ -1,12 +1,10 @@
 //
-// Copyright (C) 2011-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 
 #ifndef GALERA_IST_HPP
 #define GALERA_IST_HPP
-
-#include <pthread.h>
 
 #include "wsrep_api.h"
 #include "galera_gcs.hpp"
@@ -112,7 +110,7 @@ namespace galera
             wsrep_seqno_t         last_seqno_;
             gu::Config&           conf_;
             TrxHandle::SlavePool& trx_pool_;
-            pthread_t             thread_;
+            gu_thread_t           thread_;
             int                   error_code_;
             int                   version_;
             bool                  use_ssl_;

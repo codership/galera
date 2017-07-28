@@ -1,4 +1,4 @@
-/* Copyright (C) 2010 Codership Oy <info@codersip.com> */
+/* Copyright (C) 2010-2017 Codership Oy <info@codersip.com> */
 
 #include "replicator_smm.hpp"
 #include "uuid.hpp"
@@ -99,7 +99,8 @@ typedef enum status_vars
     STATS_LOCAL_CACHED_DOWNTO,
     STATS_FC_PAUSED_NS,
     STATS_FC_PAUSED_AVG,
-    STATS_FC_SENT,
+    STATS_FC_SSENT,
+//    STATS_FC_CSENT,
     STATS_FC_RECEIVED,
     STATS_FC_INTERVAL,
     STATS_FC_INTERVAL_LOW,
@@ -155,6 +156,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "flow_control_paused_ns",   WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_paused",      WSREP_VAR_DOUBLE, { 0 }  },
     { "flow_control_sent",        WSREP_VAR_INT64,  { 0 }  },
+//    { "flow_control_conts_sent",  WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_recv",        WSREP_VAR_INT64,  { 0 }  },
     { "flow_control_interval",    WSREP_VAR_STRING, { 0 }  },
     { "flow_control_interval_low",WSREP_VAR_INT64,  { 0 }  },
@@ -235,7 +237,8 @@ galera::ReplicatorSMM::stats_get()
         seqno_min != GCS_SEQNO_ILL ? seqno_min : GCS_SEQNO_NIL;
     sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
-    sv[STATS_FC_SENT             ].value._int64  = stats.fc_sent;
+    sv[STATS_FC_SSENT            ].value._int64  = stats.fc_ssent;
+//    sv[STATS_FC_CSENT            ].value._int64  = stats.fc_csent;
     sv[STATS_FC_RECEIVED         ].value._int64  = stats.fc_received;
 
     std::ostringstream osinterval;

@@ -121,9 +121,6 @@ public:
 
     AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpAcceptor();
-    void accept_handler(
-        SocketPtr socket,
-        const asio::error_code& error);
     void listen(const gu::URI& uri);
     std::string listen_addr() const;
     void close();
@@ -137,6 +134,10 @@ public:
     SocketId id() const { return &acceptor_; }
 
 private:
+    void accept_handler(
+        SocketPtr socket,
+        const asio::error_code& error);
+
     AsioProtonet& net_;
     asio::ip::tcp::acceptor acceptor_;
     SocketPtr accepted_socket_;

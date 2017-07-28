@@ -1,18 +1,17 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  */
 
 #ifndef __GU_MUTEX__
 #define __GU_MUTEX__
 
-#include <pthread.h>
+#include "gu_macros.h"
+#include "gu_threads.h"
+#include "gu_throw.hpp"
+
 #include <cerrno>
 #include <cstring>
-
-#include "gu_macros.h"
-#include "gu_mutex.h"
-#include "gu_throw.hpp"
 
 namespace gu
 {
@@ -30,19 +29,20 @@ namespace gu
             int err = gu_mutex_destroy (&value);
             if (gu_unlikely(err != 0))
             {
-                gu_throw_error (err) << "pthread_mutex_destroy()";
+                gu_throw_error (err) << "gu_mutex_destroy()";
             }
         }
 
-        void lock()
-        {
-            gu_mutex_lock(&value);
-        }
+        int lock()   const { return gu_mutex_lock(&value); }
 
-        void unlock()
-        {
-            gu_mutex_unlock(&value);
-        }
+        int unlock() const { return gu_mutex_unlock(&value); }
+
+        gu_mutex_t& impl() const { return value; }
+
+#ifdef GU_DEBUG_MUTEX
+        bool locked() const { return gu_mutex_locked(&value); }
+        bool owned()  const { return gu_mutex_owned(&value);  }
+#endif /* GU_DEBUG_MUTEX */
 
     protected:
 
@@ -126,26 +126,26 @@ namespace gu
             pthread_mutex_init(&mutex_, &mattr);
             pthread_mutexattr_destroy(&mattr);
         }
-        
+
         ~RecursiveMutex()
         {
             pthread_mutex_destroy(&mutex_);
         }
-        
+
         void lock()
         {
             if (pthread_mutex_lock(&mutex_)) gu_throw_fatal;
         }
-        
+
         void unlock()
         {
             if (pthread_mutex_unlock(&mutex_)) gu_throw_fatal;
         }
-        
+
     private:
         RecursiveMutex(const RecursiveMutex&);
         void operator=(const RecursiveMutex&);
-        
+
         pthread_mutex_t mutex_;
     };
 

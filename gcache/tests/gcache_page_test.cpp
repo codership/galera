@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -109,6 +109,9 @@ START_TEST(test3) // check that all page size is efficiently used
     void* tmp = static_cast<uint8_t*>(ptr1) + ptr_size;
 
     fail_if (tmp != ptr2, "tmp = %p, ptr2 = %p", tmp, ptr2);
+
+    ps_free(ptr1); ps.discard(ptr2BH(ptr1));
+    ps_free(ptr2); ps.discard(ptr2BH(ptr2));
 }
 END_TEST
 

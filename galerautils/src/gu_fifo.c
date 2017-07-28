@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * Queue (FIFO) class implementation
  *
@@ -22,7 +22,7 @@
 #include "gu_assert.h"
 #include "gu_limits.h"
 #include "gu_mem.h"
-#include "gu_mutex.h"
+#include "gu_threads.h"
 #include "gu_log.h"
 #include "gu_fifo.h"
 
@@ -254,10 +254,10 @@ static inline int fifo_lock_get (gu_fifo_t *q)
 
     fifo_lock(q);
     while (0 == ret && !(ret = q->get_err) && 0 == q->used) {
+        q->get_wait++;
 #ifndef NDEBUG
         q->locked = false;
 #endif
-        q->get_wait++;
         ret = -gu_cond_wait (&q->get_cond, &q->lock);
 #ifndef NDEBUG
         q->locked = true;
@@ -559,6 +559,8 @@ char *gu_fifo_print (gu_fifo_t *queue)
 int
 gu_fifo_cancel_gets (gu_fifo_t* q)
 {
+    assert(q->locked);
+
     if (q->get_err && -ENODATA != q->get_err) {
         gu_error ("Attempt to cancel FIFO gets in state: %d (%s)",
                   q->get_err, strerror(-q->get_err));
