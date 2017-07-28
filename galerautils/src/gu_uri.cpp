@@ -44,7 +44,28 @@ static void parse_authority (const string&     auth,
         pos1 = 0;
     }
 
-    pos2 = auth.find_last_of (':');
+    if (auth[pos1] == '[')
+    {
+        size_t close_bracket = auth.find_first_of(']', pos1);
+        if (close_bracket == string::npos)
+        {
+            gu_throw_error (EINVAL) << "Expected ']' in " << auth;
+        }
+
+        pos2 = string::npos;
+        if (close_bracket < auth.length() && auth[close_bracket + 1] == ':')
+        {
+            pos2 = close_bracket + 1;
+        }
+    }
+    else
+    {
+        pos2 = auth.find_last_of (':');
+        if (auth.find_first_of (':') != pos2)
+        {
+            pos2 = string::npos;
+        }
+    }
 
     if (pos2 != string::npos && pos2 >= pos1)
     {

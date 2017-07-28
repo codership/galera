@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2017 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -71,11 +71,11 @@ START_TEST (gu_fifo_test)
 }
 END_TEST
 
-static pthread_mutex_t
-sync_mtx = PTHREAD_MUTEX_INITIALIZER;
+static gu_mutex_t
+sync_mtx = GU_MUTEX_INITIALIZER;
 
-static pthread_cond_t
-sync_cond = PTHREAD_COND_INITIALIZER;
+static gu_cond_t
+sync_cond = GU_COND_INITIALIZER;
 
 #define ITEM 12345
 
@@ -85,9 +85,9 @@ cancel_thread (void* arg)
     gu_fifo_t* q = arg;
 
     /* sync with parent */
-    pthread_mutex_lock (&sync_mtx);
-    pthread_cond_signal (&sync_cond);
-    pthread_mutex_unlock (&sync_mtx);
+    gu_mutex_lock (&sync_mtx);
+    gu_cond_signal (&sync_cond);
+    gu_mutex_unlock (&sync_mtx);
 
     size_t* item;
     int     err;
@@ -98,10 +98,10 @@ cancel_thread (void* arg)
     fail_if (-ECANCELED != err);
 
     /* signal end of the first gu_fifo_get_head() */
-    pthread_mutex_lock (&sync_mtx);
-    pthread_cond_signal (&sync_cond);
+    gu_mutex_lock (&sync_mtx);
+    gu_cond_signal (&sync_cond);
     /* wait until gets are resumed */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
     item = gu_fifo_get_head (q, &err);
     fail_if (NULL == item);
@@ -109,8 +109,8 @@ cancel_thread (void* arg)
     gu_fifo_pop_head (q);
 
     /* signal end of the 2nd gu_fifo_get_head() */
-    pthread_cond_signal (&sync_cond);
-    pthread_mutex_unlock (&sync_mtx);
+    gu_cond_signal (&sync_cond);
+    gu_mutex_unlock (&sync_mtx);
 
     /* try to get from empty queue (should block) */
     item = gu_fifo_get_head (q, &err);
@@ -118,20 +118,20 @@ cancel_thread (void* arg)
     fail_if (-ECANCELED != err);
 
     /* signal end of the 3rd gu_fifo_get_head() */
-    pthread_mutex_lock (&sync_mtx);
-    pthread_cond_signal (&sync_cond);
+    gu_mutex_lock (&sync_mtx);
+    gu_cond_signal (&sync_cond);
     /* wait until fifo is closed */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
     item = gu_fifo_get_head (q, &err);
     fail_if (NULL != item);
     fail_if (-ECANCELED != err);
 
     /* signal end of the 4th gu_fifo_get_head() */
-    pthread_cond_signal (&sync_cond);
+    gu_cond_signal (&sync_cond);
     /* wait until fifo is resumed */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
-    pthread_mutex_unlock (&sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
+    gu_mutex_unlock (&sync_mtx);
 
     item = gu_fifo_get_head (q, &err);
     fail_if (NULL != item);
@@ -149,14 +149,14 @@ START_TEST(gu_fifo_cancel_test)
     *item = ITEM;
     gu_fifo_push_tail (q);
 
-    pthread_mutex_lock (&sync_mtx);
+    gu_mutex_lock (&sync_mtx);
 
-    pthread_t thread;
-    pthread_create (&thread, NULL, cancel_thread, q);
+    gu_thread_t thread;
+    gu_thread_create (&thread, NULL, cancel_thread, q);
 
     /* sync with child thread */
     gu_fifo_lock (q);
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
     int err;
     err = gu_fifo_cancel_gets (q);
@@ -169,7 +169,8 @@ START_TEST(gu_fifo_cancel_test)
     mark_point();
 
     /* wait for the first gu_fifo_get_head() to complete */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
+    mark_point();
 
     err = gu_fifo_resume_gets (q);
     fail_if (0 != err);
@@ -177,33 +178,35 @@ START_TEST(gu_fifo_cancel_test)
     fail_if (-EBADFD != err);
 
     /* signal that now gets are resumed */
-    pthread_cond_signal (&sync_cond);
+    gu_cond_signal (&sync_cond);
     /* wait for the 2nd gu_fifo_get_head() to complete */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
-    /* wait a bit to make sure 3rd gu_fifo_get_head() is blocked 
+    /* wait a bit to make sure 3rd gu_fifo_get_head() is blocked
      * (even if it is not - still should work)*/
     usleep (100000 /* 0.1s */);
+    gu_fifo_lock(q);
     err = gu_fifo_cancel_gets (q);
+    gu_fifo_release(q);
     fail_if (0 != err);
 
     /* wait for the 3rd gu_fifo_get_head() to complete */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
     gu_fifo_close (q); // closes for puts, but the q still must be canceled
 
-    pthread_cond_signal (&sync_cond);
+    gu_cond_signal (&sync_cond);
     /* wait for the 4th gu_fifo_get_head() to complete */
-    pthread_cond_wait (&sync_cond, &sync_mtx);
+    gu_cond_wait (&sync_cond, &sync_mtx);
 
     gu_fifo_resume_gets (q); // resumes gets
 
-    pthread_cond_signal (&sync_cond);
-    pthread_mutex_unlock (&sync_mtx);
+    gu_cond_signal (&sync_cond);
+    gu_mutex_unlock (&sync_mtx);
 
     mark_point();
 
-    pthread_join(thread, NULL);
+    gu_thread_join(thread, NULL);
 }
 END_TEST
 

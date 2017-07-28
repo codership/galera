@@ -444,7 +444,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
 #else
             /* Print buf into stderr in order to message truncation
              * of application logger. */
-            gu_warn ("Quorum: No node with complete state:\n");
+            gu_warn ("Quorum: No node with complete state:");
             fprintf(stderr, "%s\n", buf);
 #endif /* GCS_CORE_TESTING */
             gu_free (buf);

@@ -25,8 +25,8 @@ namespace gcache
 
         if (g == gid && s == seqno_max) return;
 
-        log_info << "GCache history reset: old(" << gid << ':' << seqno_max
-                 << ") -> new(" << g << ':' << s << ")";
+        log_info << "GCache history reset: " << gid << ':' << seqno_max
+                 << " -> " << g << ':' << s;
 
         seqno_released = SEQNO_NONE;
         gid = g;
