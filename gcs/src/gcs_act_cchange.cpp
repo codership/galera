@@ -115,7 +115,7 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
     char c;
     int msg_ver;
     int memb_num;
-    uint64_t unused;
+    int64_t unused;
     is >> msg_ver >> c
        >> repl_proto_ver >> c
        >> appl_proto_ver >> c
