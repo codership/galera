@@ -603,7 +603,7 @@ ReplicatorSMM::prepare_state_request (const void* const   sst_req,
             {
                 log_info << "State gap can't be serviced using IST."
                             " Switching to SST";
-                log_debug
+                log_info
                     << "Failed to prepare for incremental state transfer: "
                     << e.what() << ". IST will be unavailable.";
             }
