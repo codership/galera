@@ -1356,6 +1356,14 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx->depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATING);
 
+    // If the SST has been canceled, then ignore any other
+    // incoming transactions, as the node should be shutting down
+    if (sst_state_ == SST_CANCELED)
+    {
+        log_info << "Ignorng trx(" << trx->global_seqno() << ") due to SST failure";
+        return;
+    }
+
     wsrep_status_t const retval(cert_and_catch(trx));
 
     switch (retval)

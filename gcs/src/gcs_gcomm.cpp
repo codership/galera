@@ -335,11 +335,18 @@ public:
         pthread_join(thd_, 0);
         {
             gcomm::Critical<Protonet> crit(*net_);
-            log_info << "gcomm: closing backend";
-            tp_->close(error_ != 0 || force == true);
-            gcomm::disconnect(tp_, this);
-            delete tp_;
-            tp_ = 0;
+            if (tp_ == 0)
+            {
+                log_info << "gcomm: backend closed already";
+            }
+            else
+            {
+                log_info << "gcomm: closing backend";
+                tp_->close(error_ != 0 || force == true);
+                gcomm::disconnect(tp_, this);
+                delete tp_;
+                tp_ = 0;
+            }
         }
         const Message* msg;
 
