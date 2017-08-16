@@ -41,6 +41,8 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
         os << "COMMITTING"; return;
     case TrxHandle::S_COMMITTED:
         os << "COMMITTED"; return;
+    case TrxHandle::S_ROLLING_BACK:
+        os << "ROLLING_BACK"; return;
     case TrxHandle::S_ROLLED_BACK:
         os << "ROLLED_BACK"; return;
     // don't use default to make compiler warn if something is missed
@@ -129,8 +131,10 @@ public:
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
-        add(TrxHandle::S_ABORTING, TrxHandle::S_APPLYING);
-        add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLED_BACK);
+        add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLING_BACK);// BF in apply mon
+        add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLED_BACK); // BF in repl
+
+        add(TrxHandle::S_ROLLING_BACK, TrxHandle::S_ROLLED_BACK);
 
         add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
@@ -144,7 +148,7 @@ public:
 
         add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
         add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
-        add(TrxHandle::S_COMMITTING, TrxHandle::S_ROLLED_BACK);
+        add(TrxHandle::S_COMMITTING, TrxHandle::S_ROLLED_BACK); // apply error
 
         add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
         add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
@@ -153,7 +157,6 @@ public:
         add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
         add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
         add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
-
     }
 } trans_map_builder_;
 
@@ -223,7 +226,8 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
 void
 galera::TrxHandle::apply (void*                   recv_ctx,
                           wsrep_apply_cb_t        apply_cb,
-                          const wsrep_trx_meta_t& meta) const
+                          const wsrep_trx_meta_t& meta,
+                          wsrep_bool_t&           exit_loop)
 {
     uint32_t const wsrep_flags
         (trx_flags_to_wsrep_flags(flags()) | WSREP_FLAG_TRX_START);
@@ -236,14 +240,15 @@ galera::TrxHandle::apply (void*                   recv_ctx,
 
     ws.rewind(); // make sure we always start from the beginning
 
+    wsrep_ws_handle_t const wh = { trx_id(), this };
+
     if (ws.count() > 0)
     {
         for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
         {
             gu::Buf buf(ws.next());
             wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
-
-            err = apply_cb(recv_ctx, wsrep_flags, &wb, &meta, &err_msg,&err_len);
+            err = apply_cb(recv_ctx, &wh, wsrep_flags, &wb, &meta, &exit_loop);
         }
     }
     else
@@ -251,7 +256,7 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         // Apply also zero sized write set to inform application side
         // about transaction meta data.
         wsrep_buf_t const wb = { NULL, 0 };
-        err = apply_cb(recv_ctx, wsrep_flags, &wb, &meta, &err_msg, &err_len);
+        err = apply_cb(recv_ctx, &wh, wsrep_flags, &wb, &meta, &exit_loop);
         assert(NULL == err_msg);
         assert(0    == err_len);
     }
@@ -260,7 +265,7 @@ galera::TrxHandle::apply (void*                   recv_ctx,
     {
         std::ostringstream os;
 
-        os << "Failed to apply app buffer: seqno: " << global_seqno()
+        os << "Apply callback failed: seqno: " << global_seqno()
            << ", status: " << err;
 
         galera::ApplyException ae(os.str(), err_msg, NULL, err_len);

@@ -114,6 +114,7 @@ namespace galera
             S_APPLYING,       // grabbing apply monitor, applying
             S_COMMITTING,     // grabbing commit monitor, committing changes
             S_COMMITTED,
+            S_ROLLING_BACK,
             S_ROLLED_BACK
         } State;
 
@@ -369,7 +370,8 @@ namespace galera
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
+                   const wsrep_trx_meta_t& meta,
+                   wsrep_bool_t&           exit_loop) /* throws */;
 
         void unordered(void*                recv_ctx,
                        wsrep_unordered_cb_t apply_cb) const;
@@ -427,6 +429,15 @@ namespace galera
         }
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
+
+        bool must_enter_am() const
+        {
+            assert(state() == S_CERTIFYING           ||
+                   state() == S_MUST_CERT_AND_REPLAY ||
+                   state() == S_ABORTING);
+
+            return (state() != S_ABORTING || pa_unsafe());
+        }
 
         void print(std::ostream& os) const;
 
