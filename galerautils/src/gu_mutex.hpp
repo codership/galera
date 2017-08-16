@@ -85,10 +85,10 @@ namespace gu
 
 #if defined(GU_DEBUG_MUTEX)
         bool locked() const { return gu_mutex_locked(&value_); }
-        bool owned()  const { return gu_mutex_owned(&value_);  }
+        bool owned()  const { return locked() && gu_mutex_owned(&value_);  }
 #elif defined(GU_MUTEX_DEBUG)
         bool locked() const { return locked_; }
-        bool owned()  const { return gu_thread_equal(owned_,gu_thread_self()); }
+        bool owned()  const { return locked() && gu_thread_equal(owned_,gu_thread_self()); }
 #endif /* GU_DEBUG_MUTEX */
     protected:
 

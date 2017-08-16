@@ -71,11 +71,8 @@ namespace galera
 
         virtual wsrep_status_t replicate(TrxHandlePtr& trx,
                                          wsrep_trx_meta_t* meta) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandlePtr& trx,
-                                          wsrep_trx_meta_t* meta) =0;
-        virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
-        virtual wsrep_status_t release_commit(TrxHandle* trx) = 0;
-        virtual wsrep_status_t release_rollback(TrxHandle* trx) = 0;
+        virtual wsrep_status_t certify(TrxHandlePtr& trx, wsrep_trx_meta_t*) = 0;
+        virtual wsrep_status_t release_trx(TrxHandle& trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandlePtr& trx,
                                           void*         replay_ctx) = 0;
         virtual void abort_trx(TrxHandle* trx) = 0;

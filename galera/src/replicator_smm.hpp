@@ -98,10 +98,14 @@ namespace galera
         wsrep_status_t send(TrxHandle* trx, wsrep_trx_meta_t*);
         wsrep_status_t replicate(TrxHandlePtr& trx, wsrep_trx_meta_t*);
         void           abort_trx(TrxHandle* trx);
-        wsrep_status_t pre_commit(TrxHandlePtr& trx, wsrep_trx_meta_t*);
-        wsrep_status_t post_rollback(TrxHandle* trx);
-        wsrep_status_t release_commit(TrxHandle* trx);
-        wsrep_status_t release_rollback(TrxHandle* trx);
+        wsrep_status_t certify(TrxHandlePtr& trx, wsrep_trx_meta_t*);
+        wsrep_status_t commit_order_enter_local(TrxHandle& trx);
+        wsrep_status_t commit_order_enter_remote(TrxHandle& trx);
+        wsrep_status_t commit_order_leave(TrxHandle& trx,
+                                          const wsrep_buf_t*  error);
+        wsrep_status_t release_commit(TrxHandle& trx);
+        wsrep_status_t release_rollback(TrxHandle& trx);
+        wsrep_status_t release_trx(TrxHandle& trx);
         wsrep_status_t replay_trx(TrxHandlePtr& trx, void* replay_ctx);
 
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
@@ -110,7 +114,8 @@ namespace galera
         wsrep_status_t last_committed_id(wsrep_gtid_t* gtid);
 
         wsrep_status_t to_isolation_begin(TrxHandlePtr& trx, wsrep_trx_meta_t*);
-        wsrep_status_t to_isolation_end(TrxHandlePtr& trx, const wsrep_buf_t* err);
+        wsrep_status_t to_isolation_end(TrxHandlePtr& trx,
+                                        const wsrep_buf_t* err);
         wsrep_status_t preordered_collect(wsrep_po_handle_t&      handle,
                                           const struct wsrep_buf* data,
                                           size_t                  count,
@@ -338,17 +343,15 @@ namespace galera
                 :
                 seqno_(trx.local_seqno())
 #ifdef GU_DBUG_ON
-                , trx_(true),
-                is_local_(trx.is_local())
+                ,trx_(&trx)
 #endif //GU_DBUG_ON
             { }
 
-            LocalOrder(wsrep_seqno_t seqno, bool trx = false, bool local = false)
+            LocalOrder(wsrep_seqno_t seqno, const TrxHandle* trx = NULL)
                 :
                 seqno_(seqno)
 #ifdef GU_DBUG_ON
-                , trx_(trx),
-                is_local_(local)
+                ,trx_(trx)
 #endif //GU_DBUG_ON
             { }
 
@@ -363,9 +366,9 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (trx_ != false)
+                if (trx_)
                 {
-                    if (is_local_ == true)
+                    if (trx_->is_local())
                     {
                         mutex.unlock();
                         GU_DBUG_SYNC_WAIT("local_monitor_master_enter_sync");
@@ -380,13 +383,24 @@ namespace galera
                 }
             }
 #endif // GU_DBUG_ON
-        private:
 
-            LocalOrder(const LocalOrder&);
+#ifndef NDEBUG
+            LocalOrder()
+                :
+                seqno_(WSREP_SEQNO_UNDEFINED)
+#ifdef GU_DBUG_ON
+                ,trx_(NULL)
+#endif //GU_DBUG_ON
+            {}
+#endif /* NDEBUG */
+
+        private:
+#ifdef NDEBUG
+            LocalOrder(const LocalOrder& o);
+#endif /* NDEBUG */
             wsrep_seqno_t const seqno_;
 #ifdef GU_DBUG_ON
-            bool const trx_;
-            bool const is_local_;
+            const TrxHandle* const trx_;
 #endif // GU_DBUG_ON
         };
 
@@ -399,6 +413,9 @@ namespace galera
                 global_seqno_ (trx.global_seqno()),
                 depends_seqno_(trx.depends_seqno()),
                 is_local_     (trx.is_local())
+#ifndef NDEBUG
+                ,trx_          (&trx)
+#endif
             { }
 
             ApplyOrder(wsrep_seqno_t gs, wsrep_seqno_t ds, bool l = false)
@@ -406,6 +423,9 @@ namespace galera
                 global_seqno_ (gs),
                 depends_seqno_(ds),
                 is_local_     (l)
+#ifndef NDEBUG
+                ,trx_          (NULL)
+#endif
             { }
 
             wsrep_seqno_t seqno() const { return global_seqno_; }
@@ -434,11 +454,26 @@ namespace galera
             }
 #endif // GU_DBUG_ON
 
+#ifndef NDEBUG
+            ApplyOrder()
+                :
+                global_seqno_ (WSREP_SEQNO_UNDEFINED),
+                depends_seqno_(WSREP_SEQNO_UNDEFINED),
+                is_local_     (false),
+                trx_          (NULL)
+            {}
+#endif /* NDEBUG */
+
         private:
+#ifdef NDEBUG
             ApplyOrder(const ApplyOrder&);
+#endif
             const wsrep_seqno_t global_seqno_;
             const wsrep_seqno_t depends_seqno_;
             const bool is_local_;
+#ifndef NDEBUG
+            const TrxHandle* const trx_;
+#endif
         };
 
     public:
@@ -476,6 +511,9 @@ namespace galera
                 global_seqno_(trx.global_seqno()),
                 mode_(mode),
                 is_local_(trx.is_local())
+#ifndef NDEBUG
+                ,trx_(&trx)
+#endif
             { }
 
             CommitOrder(wsrep_seqno_t gs, Mode mode, bool local = false)
@@ -483,6 +521,9 @@ namespace galera
                 global_seqno_(gs),
                 mode_(mode),
                 is_local_(local)
+#ifndef NDEBUG
+                ,trx_(NULL)
+#endif
             { }
 
             wsrep_seqno_t seqno() const { return global_seqno_; }
@@ -523,11 +564,26 @@ namespace galera
             }
 #endif // GU_DBUG_ON
 
+#ifndef NDEBUG
+            CommitOrder()
+                :
+                global_seqno_ (WSREP_SEQNO_UNDEFINED),
+                mode_         (OOOC),
+                is_local_     (false),
+                trx_          (NULL)
+            {}
+#endif /* NDEBUG */
+
         private:
+#ifdef NDEBUG
             CommitOrder(const CommitOrder&);
+#endif
             const wsrep_seqno_t global_seqno_;
             const Mode mode_;
             const bool is_local_;
+#ifndef NDEBUG
+            const TrxHandle* const trx_;
+#endif
         };
 
         class StateRequest
@@ -699,7 +755,6 @@ namespace galera
         wsrep_view_cb_t        view_cb_;
         wsrep_sst_request_cb_t sst_request_cb_;
         wsrep_apply_cb_t       apply_cb_;
-        wsrep_commit_cb_t      commit_cb_;
         wsrep_unordered_cb_t   unordered_cb_;
         wsrep_sst_donate_cb_t  sst_donate_cb_;
         wsrep_synced_cb_t      synced_cb_;
