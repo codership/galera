@@ -58,6 +58,7 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_REPLICATING);
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_ABORTING);
+        trx->set_state(TrxHandle::S_ROLLING_BACK);
         trx->set_state(TrxHandle::S_ROLLED_BACK);
     }
 
@@ -70,6 +71,7 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
         trx->set_state(TrxHandle::S_ABORTING);
+        trx->set_state(TrxHandle::S_ROLLING_BACK);
         trx->set_state(TrxHandle::S_ROLLED_BACK);
     }
 
@@ -139,8 +141,7 @@ START_TEST(test_states)
         trx->set_state(TrxHandle::S_REPLICATING);
         trx->set_state(TrxHandle::S_CERTIFYING);
         trx->set_state(TrxHandle::S_ABORTING);
-        trx->set_state(TrxHandle::S_APPLYING);
-        trx->set_state(TrxHandle::S_COMMITTING);
+        trx->set_state(TrxHandle::S_ROLLING_BACK);
         trx->set_state(TrxHandle::S_ROLLED_BACK);
     }
 
