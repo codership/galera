@@ -3432,6 +3432,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     // Send messages
     if (state() == S_OPERATIONAL)
     {
+        size_t n_sent(0);
         profile_enter(send_user_prof_);
         while (output_.empty() == false)
         {
@@ -3439,7 +3440,18 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             gu_trace(err = send_user(send_window_));
             if (err != 0)
             {
+                if (err == EAGAIN && n_sent == 0)
+                {
+                    // If the send window was exhausted, send a gap
+                    // message to advance aru_seq/safe_seq on peers.
+                    gu_trace(send_gap(EVS_CALLER, UUID::nil(),
+                                      current_view_.id(), Range()));
+                }
                 break;
+            }
+            else
+            {
+                ++n_sent;
             }
         }
         profile_leave(send_user_prof_);
