@@ -192,7 +192,6 @@ namespace galera
 
         int           version_;
         TrxMap        trx_map_;
-        CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
         DepsSet       deps_set_;
         ServiceThd*   service_thd_;

@@ -342,14 +342,20 @@ namespace galera
             explicit
             LocalOrder(const TrxHandleSlave& ts)
                 :
-                seqno_(ts.local_seqno()),
-                ts_   (&ts)
+                seqno_(ts.local_seqno())
+#ifdef GU_DBUG_ON
+                , ts_(true),
+                is_local_(ts.local())
+#endif //GU_DBUG_ON
             { }
 
-            LocalOrder(wsrep_seqno_t seqno)
+            LocalOrder(wsrep_seqno_t seqno, bool ts = false, bool local = false)
                 :
-                seqno_(seqno),
-                ts_   (0)
+                seqno_(seqno)
+#ifdef GU_DBUG_ON
+                , ts_(ts),
+                is_local_(local)
+#endif //GU_DBUG_ON
             { }
 
             wsrep_seqno_t seqno() const { return seqno_; }
@@ -363,17 +369,20 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_ != 0 && ts_->local() == true)
+                if (ts_ != false)
                 {
-                    mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("local_monitor_master_enter_sync");
-                    mutex.lock();
-                }
-                else if (ts_ != 0 && ts_->local() == false)
-                {
-                    mutex.unlock();
-                    GU_DBUG_SYNC_WAIT("local_monitor_slave_enter_sync");
-                    mutex.lock();
+                    if (is_local_ == true)
+                    {
+                        mutex.unlock();
+                        GU_DBUG_SYNC_WAIT("local_monitor_master_enter_sync");
+                        mutex.lock();
+                    }
+                    else
+                    {
+                        mutex.unlock();
+                        GU_DBUG_SYNC_WAIT("local_monitor_slave_enter_sync");
+                        mutex.lock();
+                    }
                 }
             }
 #endif // GU_DBUG_ON
@@ -381,32 +390,42 @@ namespace galera
 
             LocalOrder(const LocalOrder&);
             wsrep_seqno_t const seqno_;
-            const TrxHandleSlave* const ts_;
+#ifdef GU_DBUG_ON
+            bool const ts_;
+            bool const is_local_;
+#endif // GU_DBUG_ON
         };
 
         class ApplyOrder
         {
         public:
 
-            explicit
             ApplyOrder(const TrxHandleSlave& ts)
                 :
-                ts_(ts)
+                global_seqno_ (ts.global_seqno()),
+                depends_seqno_(ts.depends_seqno()),
+                is_local_     (ts.local())
             { }
 
-            wsrep_seqno_t seqno() const { return ts_.global_seqno(); }
+            ApplyOrder(wsrep_seqno_t gs, wsrep_seqno_t ds, bool l = false)
+                :
+                global_seqno_ (gs),
+                depends_seqno_(ds),
+                is_local_     (l)
+            { }
+
+            wsrep_seqno_t seqno() const { return global_seqno_; }
 
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
-                return (ts_.local() == true ||
-                        last_left >= ts_.depends_seqno());
+                return (is_local_ == true || last_left >= depends_seqno_);
             }
 
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_.local() == true)
+                if (is_local_)
                 {
                     mutex.unlock();
                     GU_DBUG_SYNC_WAIT("apply_monitor_master_enter_sync");
@@ -424,7 +443,9 @@ namespace galera
         private:
 
             ApplyOrder(const ApplyOrder&);
-            const TrxHandleSlave&  ts_;
+            const wsrep_seqno_t global_seqno_;
+            const wsrep_seqno_t depends_seqno_;
+            const bool is_local_;
         };
 
     public:
@@ -457,14 +478,22 @@ namespace galera
                 return static_cast<Mode>(ret);
             }
 
-            CommitOrder(const TrxHandleSlave& ts,
-                        Mode mode)
+            CommitOrder(const TrxHandleSlave& ts, Mode mode)
                 :
-                ts_  (ts  ),
-                mode_(mode)
+                global_seqno_(ts.global_seqno()),
+                mode_(mode),
+                is_local_(ts.local())
             { }
 
-            wsrep_seqno_t seqno() const { return ts_.global_seqno(); }
+            CommitOrder(wsrep_seqno_t gs, Mode mode, bool local = false)
+                :
+                global_seqno_(gs),
+                mode_(mode),
+                is_local_(local)
+            { }
+
+            wsrep_seqno_t seqno() const { return global_seqno_; }
+
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
@@ -476,10 +505,10 @@ namespace galera
                 case OOOC:
                     return true;
                 case LOCAL_OOOC:
-                    return ts_.local();
+                    return is_local_;
                     // in case of remote trx fall through
                 case NO_OOOC:
-                    return (last_left + 1 == ts_.global_seqno());
+                    return (last_left + 1 == global_seqno_);
                 }
                 gu_throw_fatal << "invalid commit mode value " << mode_;
             }
@@ -487,7 +516,7 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_.local() == true)
+                if (is_local_ == true)
                 {
                     mutex.unlock();
                     GU_DBUG_SYNC_WAIT("commit_monitor_master_enter_sync");
@@ -504,8 +533,9 @@ namespace galera
 
         private:
             CommitOrder(const CommitOrder&);
-            const TrxHandleSlave&  ts_;
-            const Mode             mode_;
+            const wsrep_seqno_t global_seqno_;
+            const Mode mode_;
+            const bool is_local_;
         };
 
         class StateRequest

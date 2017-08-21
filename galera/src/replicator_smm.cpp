@@ -560,11 +560,8 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
 
     WriteSetNG::GatherVector actv;
 
-    assert(trx->version() >= WS_NG_VERSION);
-    size_t act_size = trx->write_set_out().gather(trx->source_id(),
-                                                  trx->conn_id(),
-                                                  trx->trx_id(),
-                                                  actv);
+    size_t act_size = trx->gather(actv);
+
     ssize_t rcode(0);
     do
     {
@@ -651,11 +648,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
     assert(trx->version() >= WS_NG_VERSION);
     act.buf  = NULL;
-    act.size = trx->write_set_out().gather(trx->source_id(),
-                                           trx->conn_id(),
-                                           trx->trx_id(),
-                                           actv);
-
+    act.size = trx->gather(actv);
     trx->set_state(TrxHandle::S_REPLICATING);
 
     ssize_t rcode(-1);
@@ -1766,18 +1759,14 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t const seq,
 /* NB: the only use for this method is in cancel_seqnos() below */
 void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
 {
-    // To enter monitors we need to fake trx object
-    TrxHandleSlavePtr dummy(TrxHandleSlave::New(true, slave_pool_),
-                            TrxHandleSlaveDeleter());
-    dummy->set_global_seqno(seqno);
-    dummy->set_depends_seqno(dummy->global_seqno() - 1);
+    assert(seqno > 0);
 
-    ApplyOrder  ao(*dummy);
+    ApplyOrder ao(seqno, seqno - 1);
     apply_monitor_.self_cancel(ao);
 
     if (co_mode_ != CommitOrder::BYPASS)
     {
-        CommitOrder co(*dummy, co_mode_);
+        CommitOrder co(seqno, co_mode_);
         commit_monitor_.self_cancel(co);
     }
 }
@@ -2172,8 +2161,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             {
                 /* CCs from IST already have seqno assigned and cert. position
                  * adjusted */
-
-                gcache_.seqno_reset(gu::GTID(conf.uuid, conf.seqno - 1));
 
                 if (protocol_version_ >= 8)
                 {
