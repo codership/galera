@@ -541,7 +541,7 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     }
     else
     {
-        if (seqno != -1) // don't warn on index reset.
+        if (seqno > 0) // don't warn on index reset.
         {
             log_warn << "moving position backwards: " << position_ << " -> "
                      << seqno;
