@@ -218,7 +218,6 @@ namespace galera
 
         int           version_;
         TrxMap        trx_map_;
-        CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
         NBOMap        nbo_map_;
         NBOCtxMap     nbo_ctx_map_;

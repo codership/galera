@@ -809,6 +809,12 @@ namespace galera
             ts_ = TrxHandleSlavePtr();
         }
 
+        size_t gather(WriteSetNG::GatherVector& out)
+        {
+            set_ws_flags();
+            return write_set_out().gather(source_id(),conn_id(),trx_id(),out);
+        }
+
         void finalize(wsrep_seqno_t const last_seen_seqno)
         {
             assert(last_seen_seqno >= 0);
@@ -835,7 +841,6 @@ namespace galera
                        (flags() & TrxHandle::F_ROLLBACK) == 0);
             }
 
-            write_set_out().set_flags(write_set_flags_);
             write_set_out().finalize(last_seen_seqno, pa_range);
         }
 
@@ -843,6 +848,7 @@ namespace galera
         void serialize(wsrep_seqno_t const last_seen,
                        std::vector<gu::byte_t>& ret)
         {
+            set_ws_flags();
             write_set_out().serialize(ret, source_id(), conn_id(), trx_id(),
                                       last_seen, pa_range_default());
         }
@@ -888,6 +894,14 @@ namespace galera
         inline int pa_range_default()
         {
             return (version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
+        }
+
+        inline void set_ws_flags()
+        {
+            uint32_t const wsrep_flags(trx_flags_to_wsrep_flags(flags()));
+            uint16_t const ws_flags
+                (WriteSetNG::wsrep_flags_to_ws_flags(wsrep_flags));
+            write_set_out().set_flags(ws_flags);
         }
 
         void init_write_set_out()

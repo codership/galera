@@ -251,7 +251,7 @@ static void do_clean_keys(galera::Certification::CertIndexNG& cert_index,
     {
         KeyEntryNG ke(key_set.next());
 
-        // Clean up cert_index_ from entries which were added by this trx
+        // Clean up cert index from entries which were added by this trx
         galera::Certification::CertIndexNG::iterator ci(cert_index.find(&ke));
 
         if (gu_likely(ci != cert_index.end()))
@@ -273,7 +273,7 @@ static void do_clean_keys(galera::Certification::CertIndexNG& cert_index,
         else if(ke.key().shared())
         {
             assert(0); // we actually should never be here, the key should
-            // be either added to cert_index_ or be there already
+                       // be either added to cert_index_ or be there already
             log_warn  << "could not find shared key '"
                       << ke.key() << "' from cert index";
         }
@@ -287,7 +287,7 @@ galera::Certification::do_test_v3(TrxHandleSlave* const trx, bool store_keys)
     cert_debug << "BEGIN CERTIFICATION v3: " << *trx;
 
 #ifndef NDEBUG
-    // to check that cleanup after cert failure returns cert_index_
+    // to check that cleanup after cert failure returns cert_index
     // to original size
     size_t prev_cert_index_size(cert_index_ng_.size());
 #endif // NDEBUG
@@ -360,18 +360,6 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
                     (trx->last_seen_seqno() < initial_position_ ||
                      trx->global_seqno()-trx->last_seen_seqno() > max_length_)))
     {
-        if (trx->last_seen_seqno() < initial_position_)
-        {
-            if (cert_index_.empty() == false)
-            {
-                log_warn << "last seen seqno below limit for trx " << *trx;
-            }
-            else
-            {
-                log_debug << "last seen seqno below limit for trx " << *trx;
-            }
-        }
-
         if (trx->global_seqno() - trx->last_seen_seqno() > max_length_)
         {
             log_warn << "certification interval for trx " << *trx
@@ -392,9 +380,8 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
     }
     else
     {
-        wsrep_seqno_t const ds
-            (std::max(trx->depends_seqno(), trx_map_.begin()->first - 1));
-        trx->set_depends_seqno(ds);
+        wsrep_seqno_t const ds(trx_map_.begin()->first - 1);
+        if (ds > trx->depends_seqno()) trx->set_depends_seqno(ds);
     }
 
     switch (version_)
@@ -420,7 +407,7 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
         ++n_certified_;
         deps_dist_ += (trx->global_seqno() - trx->depends_seqno());
         cert_interval_ += (trx->global_seqno() - trx->last_seen_seqno() - 1);
-        index_size_ = (cert_index_.size() + cert_index_ng_.size());
+        index_size_ = cert_index_ng_.size();
     }
 
     // Additional NBO certification.
@@ -847,7 +834,6 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd* thd)
     :
     version_               (-1),
     trx_map_               (),
-    cert_index_            (),
     cert_index_ng_         (),
     nbo_map_               (),
     nbo_ctx_map_           (),
@@ -882,7 +868,7 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd* thd)
 
 galera::Certification::~Certification()
 {
-    log_info << "cert index usage at exit "   << cert_index_.size();
+    log_info << "cert index usage at exit "   << cert_index_ng_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
     log_info << "deps set usage at exit "     << deps_set_.size();
 
@@ -925,11 +911,29 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
                        << version << " not supported";
     }
 
+    wsrep_seqno_t const seqno(gtid.seqno());
     gu::Lock lock(mutex_);
 
     std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+
+    if (seqno >= position_)
+    {
+        assert(cert_index_ng_.size() == 0);
+    }
+    else
+    {
+        if (seqno > 0) // don't warn on index reset.
+        {
+            log_warn << "moving position backwards: " << position_ << " -> "
+                     << seqno;
+        }
+
+        std::for_each(cert_index_ng_.begin(), cert_index_ng_.end(),
+                      gu::DeleteObject());
+        cert_index_ng_.clear();
+    }
+
     trx_map_.clear();
-    assert(cert_index_.empty());
     assert(cert_index_ng_.empty());
 
     if (service_thd_)
@@ -941,7 +945,6 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     log_info << "####### Assign initial position for certification: " << gtid
              << ", protocol version: " << version;
 
-    wsrep_seqno_t const seqno(gtid.seqno());
     initial_position_      = seqno;
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
@@ -972,7 +975,6 @@ galera::Certification::adjust_position(const View&         view,
         std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
         assert(trx_map_.end()->first + 1 == position_);
         trx_map_.clear();
-        assert(cert_index_.empty());
         assert(cert_index_ng_.empty());
         if (service_thd_)
         {
