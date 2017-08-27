@@ -35,9 +35,6 @@ namespace galera
 
     static std::string const working_dir = "/tmp";
 
-    static int const WS_NG_VERSION = WriteSetNG::VER3;
-    /* new WS version to be used */
-
     // Helper template for building FSMs.
     template <typename T>
     class TransMapBuilder
@@ -484,8 +481,6 @@ namespace galera
                           gu::Atomic<long long>& db,
                           gu::Atomic<long long>& ub)
         {
-            assert(version() >= WS_NG_VERSION);
-
             kc += write_set_.keyset().count();
             kb += write_set_.keyset().size();
             db += write_set_.dataset().size();

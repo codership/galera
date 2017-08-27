@@ -639,7 +639,6 @@ wsrep_status_t galera::ReplicatorSMM::send(TrxHandleMaster* trx,
             trx->set_gcs_handle(gcs_handle);
         }
 
-        assert(trx->version() >= WS_NG_VERSION);
         trx->finalize(last_committed());
         trx->unlock();
         // On rollback fragment, we instruct sendv to use gcs_sm_grab()
@@ -705,7 +704,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
     act.seqno_g = GCS_SEQNO_ILL;
 #endif
 
-    assert(trx->version() >= WS_NG_VERSION);
     act.buf  = NULL;
     act.size = trx->gather(actv);
     trx->set_state(TrxHandle::S_REPLICATING);
@@ -726,7 +724,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
         trx->set_gcs_handle(gcs_handle);
 
-        assert(trx->version() >= WS_NG_VERSION);
         trx->finalize(last_committed());
         trx->unlock();
         assert (act.buf == NULL); // just a sanity check
@@ -777,8 +774,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster* trx,
 
     ++replicated_;
     replicated_bytes_ += rcode;
-
-    assert(trx->version() >= WS_NG_VERSION);
 
     assert(trx->source_id() == ts->source_id());
     assert(trx->conn_id()   == ts->conn_id());
@@ -1823,9 +1818,6 @@ galera::ReplicatorSMM::preordered_collect(wsrep_po_handle_t&            handle,
                                           size_t                  const count,
                                           bool                    const copy)
 {
-    if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
-        return WSREP_NOT_IMPLEMENTED;
-
     WriteSetOut* const ws(writeset_from_handle(handle, trx_params_));
 
     for (size_t i(0); i < count; ++i)
@@ -1844,9 +1836,6 @@ galera::ReplicatorSMM::preordered_commit(wsrep_po_handle_t&         handle,
                                          int                  const pa_range,
                                          bool                 const commit)
 {
-    if (gu_unlikely(trx_params_.version_ < WS_NG_VERSION))
-        return WSREP_NOT_IMPLEMENTED;
-
     WriteSetOut* const ws(writeset_from_handle(handle, trx_params_));
 
     if (gu_likely(true == commit))
