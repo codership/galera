@@ -280,8 +280,6 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
 {
     int err(0);
 
-    assert(version() >= WS_NG_VERSION || skip_event());
-
     const DataSetIn& ws(write_set_.dataset());
     void*  err_msg(NULL);
     size_t err_len(0);
@@ -335,8 +333,6 @@ void
 galera::TrxHandleSlave::unordered(void*                recv_ctx,
                                   wsrep_unordered_cb_t cb) const
 {
-    assert(version() >= WS_NG_VERSION);
-
     if (NULL != cb && write_set_.unrdset().count() > 0)
     {
         const DataSetIn& unrd(write_set_.unrdset());

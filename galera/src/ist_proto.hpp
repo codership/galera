@@ -472,8 +472,6 @@ namespace galera
 
                     if (keep_keys_ || Message::T_CCHANGE == type)
                     {
-                        assert(version_ >= WS_NG_VERSION);
-
                         payload_size = buffer.size();
                         const void* const ptr(buffer.ptr());
                         cbs[1] = asio::const_buffer(ptr, payload_size);
