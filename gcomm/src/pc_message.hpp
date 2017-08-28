@@ -198,7 +198,7 @@ class gcomm::pc::Message
 {
 public:
 
-    enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
+    enum Type {PC_T_NONE, PC_T_STATE, PC_T_INSTALL, PC_T_USER, PC_T_MAX};
     enum
     {
         F_CRC16 = 0x1,
@@ -208,17 +208,17 @@ public:
 
     static const char* to_string(Type t)
     {
-        static const char* str[T_MAX] =
+        static const char* str[PC_T_MAX] =
             { "NONE", "STATE", "INSTALL", "USER" };
 
-        if (t < T_MAX) return str[t];
+        if (t < PC_T_MAX) return str[t];
 
         return "unknown";
     }
 
 
     Message(const int      version  = -1,
-            const Type     type     = T_NONE,
+            const Type     type     = PC_T_NONE,
             const uint32_t seq      = 0,
             const NodeMap& node_map = NodeMap())
         :
@@ -293,14 +293,14 @@ public:
         flags_   = (b & 0xf0) >> 4;
 
         type_ = static_cast<Type>((b >> 8) & 0xff);
-        if (type_ <= T_NONE || type_ >= T_MAX)
+        if (type_ <= PC_T_NONE || type_ >= PC_T_MAX)
             gu_throw_error (EINVAL) << "Bad type value: " << type_;
 
         crc16_ = ((b >> 16) & 0xffff);
 
         gu_trace (off = gu::unserialize4(buf, buflen, off, seq_));
 
-        if (type_ == T_STATE || type_ == T_INSTALL)
+        if (type_ == PC_T_STATE || type_ == PC_T_INSTALL)
         {
             gu_trace (off = node_map_.unserialize(buf, buflen, off));
         }
@@ -324,7 +324,7 @@ public:
         gu_trace (off = gu::serialize4(seq_, buf, buflen, off));
 
 
-        if (type_ == T_STATE || type_ == T_INSTALL)
+        if (type_ == PC_T_STATE || type_ == PC_T_INSTALL)
         {
             gu_trace (off = node_map_.serialize(buf, buflen, off));
         }
@@ -339,7 +339,7 @@ public:
         //            header
         return (sizeof(uint32_t)
                 + sizeof(seq_)
-                + (type_ == T_STATE || type_ == T_INSTALL  ?
+                + (type_ == PC_T_STATE || type_ == PC_T_INSTALL  ?
                    node_map_.serial_size()                 :
                    0));
     }
@@ -378,21 +378,22 @@ inline std::ostream& gcomm::pc::operator<<(std::ostream& os, const Message& m)
 class gcomm::pc::StateMessage : public Message
 {
 public:
-    StateMessage(int version) :  Message(version, Message::T_STATE, 0) {}
+    StateMessage(int version) :  Message(version, Message::PC_T_STATE, 0) {}
 };
 
 
 class gcomm::pc::InstallMessage : public Message
 {
 public:
-    InstallMessage(int version) : Message(version, Message::T_INSTALL, 0) {}
+    InstallMessage(int version) : Message(version, Message::PC_T_INSTALL, 0) {}
 };
 
 
 class gcomm::pc::UserMessage : public Message
 {
 public:
-    UserMessage(int version, uint32_t seq) : Message(version, Message::T_USER, seq) {}
+    UserMessage(int version, uint32_t seq)
+        : Message(version, Message::PC_T_USER, seq) {}
 };
 
 

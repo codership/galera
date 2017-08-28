@@ -131,14 +131,14 @@ class gcomm::evs::Message
 public:
     enum Type
     {
-        T_NONE     = 0,
-        T_USER     = 1, /*!< User generated message */
-        T_DELEGATE = 2, /*!< Delegate message       */
-        T_GAP      = 3, /*!< Gap message            */
-        T_JOIN     = 4, /*!< Join message           */
-        T_INSTALL  = 5, /*!< Install message        */
-        T_LEAVE    = 6, /*!< Leave message          */
-        T_DELAYED_LIST = 7 /*!< Evict list message */
+        EVS_T_NONE     = 0,
+        EVS_T_USER     = 1, /*!< User generated message */
+        EVS_T_DELEGATE = 2, /*!< Delegate message       */
+        EVS_T_GAP      = 3, /*!< Gap message            */
+        EVS_T_JOIN     = 4, /*!< Join message           */
+        EVS_T_INSTALL  = 5, /*!< Install message        */
+        EVS_T_LEAVE    = 6, /*!< Leave message          */
+        EVS_T_DELAYED_LIST = 7 /*!< Evict list message */
     };
 
     typedef std::map<UUID, uint8_t> DelayedList;
@@ -175,13 +175,15 @@ public:
      */
     bool is_membership() const
     {
-        return (type_ == T_JOIN || type_ == T_INSTALL || type_ == T_LEAVE ||
-                type_ == T_DELAYED_LIST);
+        return (type_ == EVS_T_JOIN ||
+                type_ == EVS_T_INSTALL ||
+                type_ == EVS_T_LEAVE ||
+                type_ == EVS_T_DELAYED_LIST);
     }
 
     /*!
      * Get user type of the message. This is applicable only for
-     * messages of type T_USER.
+     * messages of type EVS_T_USER.
      *
      * @return User type of the message.
      */
@@ -341,7 +343,7 @@ public:
 
     /*! Default constructor */
     Message(const uint8_t          version         = 0,
-            const Type             type            = T_NONE,
+            const Type             type            = EVS_T_NONE,
             const UUID&            source          = UUID::nil(),
             const ViewId&          source_view_id  = ViewId(),
             const ViewId&          install_view_id = ViewId(),
@@ -422,7 +424,7 @@ public:
                 const uint8_t      user_type      = 0xff,
                 const uint8_t      flags          = 0) :
         Message(version,
-                Message::T_USER,
+                Message::EVS_T_USER,
                 source,
                 source_view_id,
                 ViewId(),
@@ -491,7 +493,7 @@ public:
                     const ViewId& source_view_id = ViewId(),
                     const int64_t fifo_seq       = -1) :
         Message(version,
-                T_DELEGATE,
+                EVS_T_DELEGATE,
                 source,
                 source_view_id,
                 ViewId(),
@@ -518,7 +520,7 @@ public:
                const Range   range          = Range(),
                const uint8_t flags          = 0) :
         Message(version,
-                T_GAP,
+                EVS_T_GAP,
                 source,
                 source_view_id,
                 ViewId(),
@@ -549,7 +551,7 @@ public:
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
         Message(max_version,
-                Message::T_JOIN,
+                Message::EVS_T_JOIN,
                 source,
                 source_view_id,
                 ViewId(),
@@ -582,7 +584,7 @@ public:
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
                 Message(max_version,
-                Message::T_INSTALL,
+                Message::EVS_T_INSTALL,
                 source,
                 source_view_id,
                 install_view_id,
@@ -614,7 +616,7 @@ public:
                  const int64_t fifo_seq       = -1,
                  const uint8_t flags          = 0) :
         Message(version,
-                T_LEAVE,
+                EVS_T_LEAVE,
                 source,
                 source_view_id,
                 ViewId(),
@@ -641,7 +643,7 @@ public:
                      const seqno_t fifo_seq = -1)
         :
         Message(version,
-                T_DELAYED_LIST,
+                EVS_T_DELAYED_LIST,
                 source,
                 source_view_id,
                 ViewId(),

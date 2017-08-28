@@ -156,8 +156,8 @@ size_t gcomm::evs::Message::serialize(gu::byte_t* const buf,
     uint8_t zeroversion;
     switch (type_)
     {
-    case T_JOIN:
-    case T_INSTALL:
+    case EVS_T_JOIN:
+    case EVS_T_INSTALL:
         zeroversion = 0;
         break;
     default:
@@ -192,7 +192,7 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     // make pre 3.8 nodes to discard messages in new format.
 
     type_    = static_cast<Type>((b >> 2) & 0x7);
-    if (type_ <= T_NONE || type_ > T_DELAYED_LIST)
+    if (type_ <= EVS_T_NONE || type_ > EVS_T_DELAYED_LIST)
     {
         gu_throw_error(EINVAL) << "invalid type " << type_;
     }
@@ -208,8 +208,8 @@ size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, version_));
     switch (type_)
     {
-    case T_JOIN:
-    case T_INSTALL:
+    case EVS_T_JOIN:
+    case EVS_T_INSTALL:
         // Join and install message will always remain protocol zero,
         // version check is not applicable.
         break;
