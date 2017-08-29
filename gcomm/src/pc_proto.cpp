@@ -974,7 +974,7 @@ bool gcomm::pc::Proto::is_prim() const
 
 void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
 {
-    gcomm_assert(msg.type() == Message::T_STATE);
+    gcomm_assert(msg.type() == Message::PC_T_STATE);
     gcomm_assert(state() == S_STATES_EXCH);
     gcomm_assert(state_msgs_.size() < current_view_.members().size());
     log_debug << self_id() << " handle state from " << source << " " << msg;
@@ -1118,7 +1118,7 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
         return;
     }
 
-    gcomm_assert(msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::PC_T_INSTALL);
     gcomm_assert(state() == S_INSTALL || state() == S_NON_PRIM);
 
     if ((msg.flags() & Message::F_BOOTSTRAP) == 0)
@@ -1243,7 +1243,7 @@ namespace
 void
 gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
 {
-    gcomm_assert(msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::PC_T_INSTALL);
     gcomm_assert(state() == S_TRANS);
     gcomm_assert(current_view_.type() == V_TRANS);
 
@@ -1435,7 +1435,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         FAIL
     };
 
-    static const Verdict verdicts[S_MAX][Message::T_MAX] = {
+    static const Verdict verdicts[S_MAX][Message::PC_T_MAX] = {
         // Msg types
         // NONE,   STATE,   INSTALL,  USER
         {  FAIL,   FAIL,    FAIL,     FAIL    },  // Closed
@@ -1468,13 +1468,13 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 
     switch (msg_type)
     {
-    case Message::T_STATE:
+    case Message::PC_T_STATE:
         gu_trace(handle_state(msg, um.source()));
         break;
-    case Message::T_INSTALL:
+    case Message::PC_T_INSTALL:
         gu_trace(handle_install(msg, um.source()));
         break;
-    case Message::T_USER:
+    case Message::PC_T_USER:
         gu_trace(handle_user(msg, rb, um));
         break;
     default:

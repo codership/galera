@@ -38,16 +38,16 @@ public:
 
     enum Type
     {
-        T_INVALID            = 0,
-        T_HANDSHAKE          = 1,
-        T_HANDSHAKE_RESPONSE = 2,
-        T_OK                 = 3,
-        T_FAIL               = 4,
-        T_TOPOLOGY_CHANGE    = 5,
-        T_KEEPALIVE          = 6,
+        GMCAST_T_INVALID            = 0,
+        GMCAST_T_HANDSHAKE          = 1,
+        GMCAST_T_HANDSHAKE_RESPONSE = 2,
+        GMCAST_T_OK                 = 3,
+        GMCAST_T_FAIL               = 4,
+        GMCAST_T_TOPOLOGY_CHANGE    = 5,
+        GMCAST_T_KEEPALIVE          = 6,
         /* Leave room for future use */
-        T_USER_BASE          = 8,
-        T_MAX                = 255
+        GMCAST_T_USER_BASE          = 8,
+        GMCAST_T_MAX                = 255
     };
 
     class NodeList : public Map<UUID, Node> { };
@@ -71,7 +71,7 @@ public:
 
     static const char* type_to_string (Type t)
     {
-        static const char* str[T_MAX] =
+        static const char* str[GMCAST_T_MAX] =
             {
             "INVALID",
             "HANDSHAKE",
@@ -84,7 +84,7 @@ public:
             "USER_BASE"
             };
 
-        if (T_MAX > t) return str[t];
+        if (GMCAST_T_MAX > t) return str[t];
 
         return "UNDEFINED PACKET TYPE";
     }
@@ -106,7 +106,7 @@ public:
     Message ()
         :
         version_               (0),
-        type_                  (T_INVALID),
+        type_                  (GMCAST_T_INVALID),
         flags_                 (0),
         segment_id_            (0),
         handshake_uuid_        (),
@@ -133,7 +133,7 @@ public:
         group_name_            (),
         node_list_             ()
     {
-        if (type_ != T_HANDSHAKE)
+        if (type_ != GMCAST_T_HANDSHAKE)
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
                            << " in handshake constructor";
     }
@@ -155,9 +155,13 @@ public:
         group_name_            (),
         node_list_             ()
     {
-        if (type_ != T_OK && type_ != T_FAIL && type_ != T_KEEPALIVE)
+        if (type_ != GMCAST_T_OK &&
+            type_ != GMCAST_T_FAIL &&
+            type_ != GMCAST_T_KEEPALIVE)
+        {
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
                               << " in ok/fail/keepalive constructor";
+        }
     }
 
 
@@ -178,7 +182,7 @@ public:
         group_name_            (),
         node_list_             ()
     {
-        if (type_ < T_USER_BASE)
+        if (type_ < GMCAST_T_USER_BASE)
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
                               << " in user message constructor";
     }
@@ -203,7 +207,7 @@ public:
         group_name_            (group_name),
         node_list_             ()
     {
-        if (type_ != T_HANDSHAKE_RESPONSE)
+        if (type_ != GMCAST_T_HANDSHAKE_RESPONSE)
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
                            << " in handshake response constructor";
     }
@@ -225,7 +229,7 @@ public:
         group_name_            (group_name),
         node_list_             (nodes)
     {
-        if (type_ != T_TOPOLOGY_CHANGE)
+        if (type_ != GMCAST_T_TOPOLOGY_CHANGE)
             gu_throw_fatal << "Invalid message type " << type_to_string(type_)
                               << " in topology change constructor";
     }
@@ -275,13 +279,13 @@ public:
         type_ = static_cast<Type>(t);
         switch (type_)
         {
-        case T_HANDSHAKE:
-        case T_HANDSHAKE_RESPONSE:
-        case T_OK:
-        case T_FAIL:
-        case T_TOPOLOGY_CHANGE:
-        case T_KEEPALIVE:
-        case T_USER_BASE:
+        case GMCAST_T_HANDSHAKE:
+        case GMCAST_T_HANDSHAKE_RESPONSE:
+        case GMCAST_T_OK:
+        case GMCAST_T_FAIL:
+        case GMCAST_T_TOPOLOGY_CHANGE:
+        case GMCAST_T_KEEPALIVE:
+        case GMCAST_T_USER_BASE:
             break;
         default:
             gu_throw_error(EINVAL) << "invalid message type "
