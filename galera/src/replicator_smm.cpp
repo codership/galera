@@ -1247,7 +1247,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
 
             log_fatal << "Failed to apply trx: " << *trx;
             log_fatal << e.what();
-            log_fatal << "Node consistency compromized, aborting...";
+            log_fatal << "Node consistency compromised, aborting...";
             abort();
         }
         break;
