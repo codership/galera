@@ -946,11 +946,9 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandlePtr& txp,void* trx_ctx
             /* failure to replay own trx is certainly a sign of inconsistency,
              * not trying to catch anything here */
             assert(trx->owned());
-            trx->unlock();
             bool unused(false);
             gu_trace(trx->apply(trx_ctx, apply_cb_, meta, unused));
             assert(false == unused);
-            trx->lock();
             log_debug << "replayed " << trx->global_seqno();
             // trx, ts states will be set to COMMITTED in post_commit()
         }
@@ -1017,29 +1015,15 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
     assert(trx.locked());
 
     assert(trx.state() == TrxHandle::S_APPLYING  ||
-           trx.state() == TrxHandle::S_REPLAYING ||
            trx.state() == TrxHandle::S_ABORTING);
 
-#ifndef NDEBUG
-    if (trx.state() == TrxHandle::S_REPLAYING)
-    {
-        assert(trx.is_local());
-        assert((trx.flags() & TrxHandle::F_ROLLBACK) == 0);
-    }
-#endif /* NDEBUG */
-
     CommitOrder co(trx, co_mode_);
-    /* If the first call to this method fails, we will end up here for the
-     * second time through replaying, in this case trx is processed as a slave
-     * trx and commit monitor may be already entered */
-    assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
+    assert(!commit_monitor_.entered(co));
 
-    if (gu_likely(trx.state() != TrxHandle::S_REPLAYING))
-        trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
-                      TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
+    trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
+                  TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
 
-    if (gu_likely(co_mode_ != CommitOrder::BYPASS &&
-                  !commit_monitor_.entered(co)))
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
         bool interrupted;
 
@@ -1049,7 +1033,6 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
             gu_trace(commit_monitor_.enter(co));
             trx.lock();
             assert(trx.state() == TrxHandle::S_COMMITTING   ||
-                   trx.state() == TrxHandle::S_REPLAYING    ||
                    trx.state() == TrxHandle::S_ROLLING_BACK ||
                    trx.state() == TrxHandle::S_MUST_ABORT);
         }
@@ -1073,7 +1056,6 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
     assert(trx.locked());
 
     assert(trx.state() == TrxHandle::S_COMMITTING ||
-           trx.state() == TrxHandle::S_REPLAYING  ||
            trx.state() == TrxHandle::S_ROLLING_BACK);
 
     return WSREP_OK;
@@ -1082,25 +1064,37 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
 wsrep_status_t
 galera::ReplicatorSMM::commit_order_enter_remote(TrxHandle& trx)
 {
-    assert(trx.is_local() == false);
+    assert(trx.is_local() == false || trx.state() == TrxHandle::S_REPLAYING);
     assert(trx.global_seqno() > 0);
     assert(trx.locked() || trx.local_seqno() == WSREP_SEQNO_UNDEFINED /*IST*/);
 
     assert(trx.state() == TrxHandle::S_APPLYING  ||
+           trx.state() == TrxHandle::S_REPLAYING ||
            trx.state() == TrxHandle::S_ABORTING);
 
+#ifndef NDEBUG
+    if (trx.state() == TrxHandle::S_REPLAYING)
+    {
+        assert(trx.is_local());
+        assert((trx.flags() & TrxHandle::F_ROLLBACK) == 0);
+    }
+#endif /* NDEBUG */
+
     CommitOrder co(trx, co_mode_);
-    assert(!commit_monitor_.entered(co));
+    assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
 
-    trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
-                  TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
+    if (trx.state() != TrxHandle::S_REPLAYING)
+        trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
+                      TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
 
-    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS &&
+                  !commit_monitor_.entered(co)))
     {
         gu_trace(commit_monitor_.enter(co));
     }
 
     assert(trx.state() == TrxHandle::S_COMMITTING ||
+           trx.state() == TrxHandle::S_REPLAYING  ||
            trx.state() == TrxHandle::S_ROLLING_BACK);
 
     return WSREP_OK;
