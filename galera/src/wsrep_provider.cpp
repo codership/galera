@@ -605,7 +605,7 @@ wsrep_status_t galera_commit_order_enter(
 
     try
     {
-        if (trx->is_local())
+        if (trx->is_local() && trx->state() != TrxHandle::S_REPLAYING)
         {
             TrxHandleLock lock(*trx);
 
@@ -657,7 +657,7 @@ wsrep_status_t galera_commit_order_leave(
 
     try
     {
-        if (trx->is_local())
+        if (trx->is_local() && trx->state() != TrxHandle::S_REPLAYING)
         {
             TrxHandleLock lock(*trx);
             retval = repl->commit_order_leave(*trx, error);
