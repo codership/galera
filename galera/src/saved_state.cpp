@@ -113,7 +113,7 @@ SavedState::SavedState  (const std::string& file) :
     }
 
     log_info << "Found saved state: " << uuid_ << ':' << seqno_
-             << ", safe_to_bootsrap: " << safe_to_bootstrap_;
+             << ", safe_to_bootstrap: " << safe_to_bootstrap_;
 
 #if 0 // we'll probably have it legal
     if (seqno_ < 0 && uuid_ != WSREP_UUID_UNDEFINED)
