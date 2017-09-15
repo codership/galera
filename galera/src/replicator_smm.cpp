@@ -1120,7 +1120,7 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
     }
     catch (gu::Exception& e)
     {
-        log_debug << "monitor wait failed for causal read: " << e.what();
+        log_info << "monitor wait failed for causal read (repl.causal_read_timeout): " << e.what();
         return WSREP_TRX_FAIL;
     }
 }

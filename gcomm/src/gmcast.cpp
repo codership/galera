@@ -1089,7 +1089,8 @@ void gcomm::GMCast::check_liveness()
                      << " connection to peer "
                      << p->remote_uuid() << " with addr "
                      << p->remote_addr()
-                     << " timed out, no messages seen in " << peer_timeout_;
+                     << " timed out, no messages seen in " << peer_timeout_
+                     << " (gmcast.peer_timeout)";
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }

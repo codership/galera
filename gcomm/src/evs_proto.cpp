@@ -730,8 +730,9 @@ void gcomm::evs::Proto::handle_install_timer()
                 set_inactive(NodeMap::key(i));
             }
         }
-        log_info << "max install timeouts reached, will isolate node "
-                 << "for " << suspect_timeout_ + inactive_timeout_;
+        log_info << "max install timeouts reached (evs.max_install_timeouts), will isolate node "
+                 << "for " << suspect_timeout_ + inactive_timeout_
+                 << " (evs.suspect_timeout + evs.inactive_timeout)";
         isolate(suspect_timeout_ + inactive_timeout_);
     }
     else if (install_timeout_count_ > max_install_timeouts_)
@@ -741,7 +742,7 @@ void gcomm::evs::Proto::handle_install_timer()
         gu_throw_fatal << self_string()
                        << " failed to form singleton view after exceeding "
                        << "max_install_timeouts " << max_install_timeouts_
-                       << ", giving up";
+                       << " (evs.max_install_timeouts), giving up";
     }
 
 
@@ -920,7 +921,7 @@ void gcomm::evs::Proto::check_inactive()
     if (last_inactive_check_ + inactive_check_period_*3 < now)
     {
         log_warn << "last inactive check more than " << inactive_check_period_*3
-                 << " ago (" << (now - last_inactive_check_)
+                 << " (3*evs.inactive_check_period) ago (" << (now - last_inactive_check_)
                  << "), skipping check";
         last_inactive_check_ = now;
         return;
@@ -1055,7 +1056,8 @@ void gcomm::evs::Proto::check_inactive()
             const DelayedListMessage* const elm(node.delayed_list_message());
             if (elm != 0 && elm->tstamp() + delayed_keep_period_ < now)
             {
-                log_debug << "discarding expired elm from " << elm->source();
+                log_debug << "discarding expired elm from " << elm->source()
+                          << " (evs.delayed_keep_period)";
                 node.set_delayed_list_message(0);
             }
         }
@@ -4671,7 +4673,7 @@ void gcomm::evs::Proto::handle_delayed_list(const DelayedListMessage& msg,
         }
         else if (dlm->tstamp() + delayed_keep_period_ < now)
         {
-            evs_log_debug(D_STATE) << "ignoring expired evict message";
+            evs_log_debug(D_STATE) << "ignoring expired evict message (evs.delayed_keep_period)";
             continue;
         }
 
@@ -4714,7 +4716,8 @@ void gcomm::evs::Proto::handle_delayed_list(const DelayedListMessage& msg,
         }
         evs_log_info(I_STATE) << "evict candidate "
                               << i->first << " " << i->second.first
-                              << " " << i->second.second;
+                              << " " << i->second.second
+                              << " (evs.auto_evict)";
         // If the candidate is in the current view, require majority
         // of the view to agree. If the candidate is not in the current
         // view, require majority of known nodes to agree. Ability to
