@@ -518,6 +518,9 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     if (gu_likely(co_mode_ != CommitOrder::BYPASS) && trx->is_toi())
     {
         gu_trace(commit_monitor_.leave(co));
+
+        // Allow tests to block the applier thread using the DBUG facilities
+        GU_DBUG_SYNC_WAIT("sync.apply_trx.after_commit_leave");
     }
     trx->set_state(TrxHandle::S_COMMITTED);
 
@@ -1015,7 +1018,13 @@ wsrep_status_t galera::ReplicatorSMM::interim_commit(TrxHandle* trx)
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
 
     CommitOrder co(*trx, co_mode_);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+    if (co_mode_ != CommitOrder::BYPASS)
+    {
+        commit_monitor_.leave(co);
+
+        // Allow tests to block the applier thread using the DBUG facilities
+        GU_DBUG_SYNC_WAIT("sync.interim_commit.after_commit_leave");
+    }
     trx->mark_interim_committed(true);
 
     return WSREP_OK;
@@ -1044,6 +1053,9 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     {
         CommitOrder co(*trx, co_mode_);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+
+        // Allow tests to block the applier thread using the DBUG facilities
+        GU_DBUG_SYNC_WAIT("sync.post_commit.after_commit_leave");
     }
     trx->mark_interim_committed(false);
 
@@ -1190,7 +1202,11 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
     log_debug << "Done executing TO isolated action: " << *trx;
 
     CommitOrder co(*trx, co_mode_);
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+    if (co_mode_ != CommitOrder::BYPASS)
+    {
+        commit_monitor_.leave(co);
+        GU_DBUG_SYNC_WAIT("sync.to_isolation_end.after_commit_leave");
+    }
     ApplyOrder ao(*trx);
     report_last_committed(cert_.set_trx_committed(trx));
     apply_monitor_.leave(ao);

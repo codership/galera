@@ -118,6 +118,7 @@ namespace galera
             TrxHandle* trx = reinterpret_cast<TrxHandle*>(trx_handle);
             CommitOrder co(*trx, co_mode_);
             commit_monitor_.leave(co);
+            GU_DBUG_SYNC_WAIT("sync.applier_interim_commit.after_commit_leave");
             trx->mark_interim_committed(true);
             return WSREP_OK;
         }
@@ -129,6 +130,7 @@ namespace galera
             {
                 CommitOrder co(*trx, co_mode_);
                 commit_monitor_.leave(co);
+                GU_DBUG_SYNC_WAIT("sync.applier_post_commit.after_commit_leave");
             }
             trx->mark_interim_committed(false);
             return WSREP_OK;

@@ -77,6 +77,7 @@ typedef enum status_vars
     STATS_STATE_UUID = 0,
     STATS_PROTOCOL_VERSION,
     STATS_LAST_APPLIED,
+    STATS_LAST_COMMITTED,
     STATS_REPLICATED,
     STATS_REPLICATED_BYTES,
     STATS_KEYS_COUNT,
@@ -132,6 +133,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
 {
     { "local_state_uuid",         WSREP_VAR_STRING, { 0 }  },
     { "protocol_version",         WSREP_VAR_INT64,  { 0 }  },
+    { "last_applied",             WSREP_VAR_INT64,  { -1 } },
     { "last_committed",           WSREP_VAR_INT64,  { -1 } },
     { "replicated",               WSREP_VAR_INT64,  { 0 }  },
     { "replicated_bytes",         WSREP_VAR_INT64,  { 0 }  },
@@ -208,6 +210,7 @@ galera::ReplicatorSMM::stats_get()
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
+    sv[STATS_LAST_COMMITTED     ].value._int64  = commit_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
     sv[STATS_KEYS_COUNT         ].value._int64  = keys_count_();
