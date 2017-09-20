@@ -42,6 +42,7 @@ namespace galera
             SST_NONE,
             SST_WAIT,
             SST_REQ_FAILED,
+            SST_CANCELED,
             SST_FAILED
         } SstState;
 
@@ -134,7 +135,7 @@ namespace galera
         void process_join(wsrep_seqno_t seqno, wsrep_seqno_t seqno_l);
         void process_sync(wsrep_seqno_t seqno_l);
 
-        const struct wsrep_stats_var* stats_get()  const;
+        const struct wsrep_stats_var* stats_get();
         void                          stats_reset();
         void                   stats_free(struct wsrep_stats_var*);
 
@@ -207,7 +208,8 @@ namespace galera
         wsrep_status_t cert_and_catch(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
 
-        void update_state_uuid (const wsrep_uuid_t& u);
+        void update_state_uuid (const wsrep_uuid_t& u,
+                                const wsrep_seqno_t seqno);
         void update_incoming_list (const wsrep_view_info_t& v);
 
         /* aborts/exits the program in a clean way */
@@ -354,7 +356,7 @@ namespace galera
                 case OOOC:
                     return true;
                 case LOCAL_OOOC:
-                    return trx_.is_local();
+                    if (trx_.is_local()) { return true; }
                     // in case of remote trx fall through
                 case NO_OOOC:
                     return (last_left + 1 == trx_.global_seqno());
@@ -429,6 +431,30 @@ namespace galera
             State to_;
         };
 
+        // state action
+        class StateAction
+        {
+        public:
+            StateAction () :
+                repl_(),
+                f_()
+            {
+            }
+
+            StateAction (ReplicatorSMM * const repl,
+                         void (ReplicatorSMM::* f) ()) :
+                repl_(repl),
+                f_(f)
+            {
+            }
+            void operator () ()
+            {
+                (repl_->*f_)();
+            }
+        private:
+            ReplicatorSMM* repl_;
+            void (ReplicatorSMM::* f_) ();
+        };
 
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
 
@@ -447,9 +473,9 @@ namespace galera
                                              const wsrep_uuid_t& group_uuid,
                                              wsrep_seqno_t       group_seqno);
 
-        void send_state_request (const StateRequest* req);
+        long send_state_request (const StateRequest* req, const bool unsafe);
 
-        void request_state_transfer (void* recv_ctx,
+        long request_state_transfer (void* recv_ctx,
                                      const wsrep_uuid_t& group_uuid,
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
@@ -504,7 +530,7 @@ namespace galera
         int                    protocol_version_;// general repl layer proto
         int                    proto_max_;    // maximum allowed proto version
 
-        FSM<State, Transition> state_;
+        FSM<State, Transition, EmptyGuard, StateAction> state_;
         SstState               sst_state_;
 
         // configurable params
@@ -536,6 +562,7 @@ namespace galera
         wsrep_unordered_cb_t  unordered_cb_;
         wsrep_sst_donate_cb_t sst_donate_cb_;
         wsrep_synced_cb_t     synced_cb_;
+        wsrep_abort_cb_t      abort_cb_;
 
         // SST
         std::string   sst_donor_;
@@ -555,6 +582,7 @@ namespace galera
         ActionSource*        as_;
         GcsActionSource      gcs_as_;
         ist::Receiver        ist_receiver_;
+        bool                 ist_prepared_;
         ist::AsyncSenderMap  ist_senders_;
 
         // trx processing

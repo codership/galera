@@ -111,6 +111,8 @@ namespace gcache
             assert_size_free();
         }
 
+        size_t allocated_pool_size ();
+
     private:
 
         static size_t const PREAMBLE_LEN = 1024;
@@ -125,6 +127,7 @@ namespace gcache
         uint8_t*           first_;    // pointer to the first (oldest) buffer
         uint8_t*           next_;     // pointer to the next free space
 
+        size_t            max_used_; // maximal memory usage (in bytes)
         seqno2ptr_t&       seqno2ptr_;
         gu::UUID&          gid_;
 

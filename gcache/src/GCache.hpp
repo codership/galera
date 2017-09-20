@@ -99,6 +99,22 @@ namespace gcache
                                    int64_t& seqno_d,
                                    ssize_t& size);
 
+        /*!
+         * Returns allocated gcache memory pool size (in bytes).
+         */
+        size_t allocated_pool_size ();
+
+
+        /*!
+         * Implements the cleanup policy test.
+         */
+        bool cleanup_required()
+        {
+            return (params.keep_pages_size() && ps.total_size() > params.keep_pages_size()) ||
+                   (params.keep_pages_count() && ps.total_pages() > params.keep_pages_count());
+        }
+
+
         class Buffer
         {
         public:
@@ -188,15 +204,17 @@ namespace gcache
             const std::string& rb_name()  const { return rb_name_;  }
             const std::string& dir_name() const { return dir_name_; }
 
-            size_t mem_size()            const { return mem_size_;        }
-            size_t rb_size()             const { return rb_size_;         }
-            size_t page_size()           const { return page_size_;       }
-            size_t keep_pages_size()     const { return keep_pages_size_; }
+            size_t mem_size()            const { return mem_size_;         }
+            size_t rb_size()             const { return rb_size_;          }
+            size_t page_size()           const { return page_size_;        }
+            size_t keep_pages_size()     const { return keep_pages_size_;  }
+            size_t keep_pages_count()    const { return keep_pages_count_; }
             bool   recover()             const { return recover_;         }
 
-            void mem_size        (size_t s) { mem_size_        = s; }
-            void page_size       (size_t s) { page_size_       = s; }
-            void keep_pages_size (size_t s) { keep_pages_size_ = s; }
+            void mem_size         (size_t s) { mem_size_         = s; }
+            void page_size        (size_t s) { page_size_        = s; }
+            void keep_pages_size  (size_t s) { keep_pages_size_  = s; }
+            void keep_pages_count (size_t c) { keep_pages_count_ = c; }
 
         private:
 
@@ -206,6 +224,7 @@ namespace gcache
             size_t      const rb_size_;
             size_t            page_size_;
             size_t            keep_pages_size_;
+            size_t            keep_pages_count_;
             bool        const recover_;
         }
             params;

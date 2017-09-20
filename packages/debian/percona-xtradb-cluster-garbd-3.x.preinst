@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#DEBHELPER#
+
+set -e
+
+if [ ! -d "/var/lib/galera" ]; then
+  mkdir -p /var/lib/galera
+  if id -u nobody > /dev/null 2>&1; then
+    chown nobody:nogroup /var/lib/galera
+  fi
+fi

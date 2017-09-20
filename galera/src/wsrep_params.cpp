@@ -61,7 +61,7 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
         catch (gu::NotFound&)
         {
             log_warn << "Unknown parameter '" << key << "'";
-            gu_throw_error(EINVAL) << "Unknown parameter' " << key << "'";
+            gu_throw_error(EINVAL) << "Unknown parameter '" << key << "'";
         }
         catch (gu::Exception& e)
         {

@@ -29,6 +29,12 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
             {
                 if (local_seqno > group_seqno)
                 {
+                    // Local state sequence number is greater than group
+                    // sequence number: states diverged on SST. We cannot
+                    // move server forward (with local_seqno > group_seqno)
+                    // to avoid potential data loss, and hence will have
+                    // to shut it down. User must to remove state file and
+                    // then restart server, if he/she wish to continue:
                     close();
                     gu_throw_fatal
                         << "Local state seqno (" << local_seqno
@@ -36,6 +42,7 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
                         << "): states diverged. Aborting to avoid potential "
                         << "data loss. Remove '" << state_file_
                         << "' file and restart if you wish to continue.";
+                    abort();
                 }
 
                 return (local_seqno != group_seqno);
@@ -54,16 +61,17 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
                             size_t              state_len,
                             int                 rcode)
 {
-    log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
+    if (rcode != -ECANCELED)
+    {
+        log_info << "SST received: " << state_id.uuid << ':' << state_id.seqno;
+    }
+    else
+    {
+        log_info << "SST request was cancelled";
+        sst_state_ = SST_CANCELED;
+    }
 
     gu::Lock lock(sst_mutex_);
-
-    if (state_() != S_JOINING)
-    {
-        log_error << "not JOINING when sst_received() called, state: "
-                  << state_();
-        return WSREP_CONN_FAIL;
-    }
 
     assert(rcode <= 0);
     if (rcode) { assert(state_id.seqno == WSREP_SEQNO_UNDEFINED); }
@@ -72,7 +80,24 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
     sst_seqno_ = rcode ? WSREP_SEQNO_UNDEFINED : state_id.seqno;
     sst_cond_.signal();
 
-    return WSREP_OK;
+    // We need to check the state only after we signalized about completion
+    // of the SST - otherwise the request_state_transfer() function will be
+    // infinitely wait on the sst_cond_ condition variable, for which no one
+    // will call the signal() function:
+
+    // S_CONNECTED also valid here if sst_received() called just after
+    // send_state_request(), when the state yet not shifted to S_JOINING:
+
+    if (state_() == S_JOINING || state_() == S_CONNECTED)
+    {
+        return WSREP_OK;
+    }
+    else
+    {
+        log_error << "not JOINING when sst_received() called, state: "
+                  << state_();
+        return WSREP_CONN_FAIL;
+    }
 }
 
 
@@ -389,12 +414,40 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 try
                 {
                     gcache_.seqno_lock(istr.last_applied() + 1);
+
+                    // We can use Galera debugging facility to simulate
+                    // unexpected shift of the donor seqno:
+#ifdef GU_DBUG_ON
+                    GU_DBUG_EXECUTE("simulate_seqno_shift",
+                                    throw gu::NotFound(););
+#endif
                 }
                 catch(gu::NotFound& nf)
                 {
                     log_info << "IST first seqno " << istr.last_applied() + 1
                              << " not found from cache, falling back to SST";
                     // @todo: close IST channel explicitly
+
+                    // When new node joining the cluster, it may trying to avoid
+                    // unnecessary SST request. However, the heuristic algorithm,
+                    // which selects the donor node, does not give us a 100%
+                    // guarantee that seqno will not move forward while new
+                    // node sending its request (to joining the cluster).
+                    // Therefore, if seqno had gone forward, and if we have only
+                    // the IST request (without the SST part), then we need to
+                    // inform new node that it should prepare to receive full
+                    // state and re-send the SST request (if the server supports
+                    // it):
+
+                    if (streq->sst_len() == 0)
+                    {
+                        log_info << "IST canceled because the donor seqno had "
+                                    "moved forward, but the SST request was not "
+                                    "prepared by the joiner node.";
+                        rcode = -ENODATA;
+                        goto out;
+                    }
+
                     goto full_sst;
                 }
 
@@ -497,6 +550,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 
     std::string recv_addr = ist_receiver_.prepare(
         local_seqno + 1, group_seqno, protocol_version_);
+    ist_prepared_ = true;
 
     os << IST_request(recv_addr, state_uuid_, local_seqno, group_seqno);
 
@@ -567,8 +621,8 @@ retry_str(int ret)
     return (ret == -EAGAIN || ret == -ENOTCONN);
 }
 
-void
-ReplicatorSMM::send_state_request (const StateRequest* const req)
+long
+ReplicatorSMM::send_state_request (const StateRequest* const req, const bool unsafe)
 {
     long ret;
     long tries = 0;
@@ -595,7 +649,27 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
                                           ist_uuid, ist_seqno, &seqno_l);
         if (ret < 0)
         {
-            if (!retry_str(ret))
+            if (ret == -ENODATA)
+            {
+                // Although the current state has lagged behind state
+                // of the group, we can save it for the next attempt
+                // of the joining cluster, because we do not know how
+                // other nodes will finish their work:
+
+                if (unsafe)
+                {
+                   st_.mark_safe();
+                }
+
+                log_fatal << "State transfer request failed unrecoverably "
+                             "because the donor seqno had gone forward "
+                             "during IST, but SST request was not prepared "
+                             "from our side due to selected state transfer "
+                             "method (which do not supports SST during "
+                             "node operation). Restart required.";
+                abort();
+            }
+            else if (!retry_str(ret))
             {
                 log_error << "Requesting state transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
@@ -648,10 +722,21 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         sst_state_ = SST_REQ_FAILED;
 
         st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
-        st_.mark_safe();
 
-        if (state_() > S_CLOSING)
+        // If in the future someone will change the code above (and
+        // the error handling at the GCS level), then the ENODATA error
+        // will no longer be fatal. Therefore, we will need here
+        // additional test for "ret != ENODATA". Since it is rare event
+        // associated with error handling, then the presence here
+        // of one additional comparison is not an issue for system
+        // performance:
+
+        if (ret != -ENODATA && state_() > S_CLOSING)
         {
+            if (!unsafe)
+            {
+                st_.mark_unsafe();
+            }
             log_fatal << "State transfer request failed unrecoverably: "
                       << -ret << " (" << strerror(-ret) << "). Most likely "
                       << "it is due to inability to communicate with the "
@@ -660,13 +745,19 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
         }
         else
         {
-            // connection is being closed, send failure is expected
+            // connection is being closed, send failure is expected.
+            if (unsafe)
+            {
+                st_.mark_safe();
+            }
         }
     }
+
+    return ret;
 }
 
 
-void
+long
 ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                        const wsrep_uuid_t& group_uuid,
                                        wsrep_seqno_t const group_seqno,
@@ -677,14 +768,59 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
                                                   group_uuid, group_seqno));
+
+    bool trivial = sst_is_trivial(sst_req, sst_req_len);
+
     gu::Lock lock(sst_mutex_);
 
-    st_.mark_unsafe();
+    // We must mark the state as the "unsafe" before SST because
+    // the current state may be changed during execution of the SST
+    // and it will no longer match the stored seqno (state becomes
+    // "unsafe" after the first modification of data during the SST,
+    // but unfortunately, we do not have callback or wsrep API to
+    // notify about the first data modification). On the other hand,
+    // in cases where the full SST is not required and we want to
+    // use IST, we need to save the current state - to prevent
+    // unnecessary SST after node restart (if IST fails before it
+    // starts applying transaction).
+    // Therefore, we need to check whether the full state transfer
+    // (SST) is required or not, before marking state as unsafe:
 
-    send_state_request (req);
+    bool unsafe = sst_req_len != 0 && !trivial;
+
+    if (unsafe)
+    {
+        /* Marking state = unsafe from safe. If SST fails
+        state = unsafe is persisted and restart will demand full SST */
+        st_.mark_unsafe();
+    }
+
+    // We must set SST state to "wait" before
+    // sending request, to avoid racing condition
+    // in the sst_received.
+
+    sst_state_ = SST_WAIT;
+
+    // We should not wait for completion of the SST or to handle it
+    // results if an error has occurred when sending the request:
+
+    long ret = send_state_request(req, unsafe);
+    if (ret < 0)
+    {
+        // If the state transfer request failed, then
+        // we need to close the IST receiver:
+        if (ist_prepared_)
+        {
+            ist_prepared_ = false;
+            (void)ist_receiver_.finished();
+        }
+        delete req;
+        return ret;
+    }
+
+    GU_DBUG_SYNC_WAIT("after_send_state_request");
 
     state_.shift_to(S_JOINING);
-    sst_state_ = SST_WAIT;
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may involve some IO too */
     gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
@@ -692,7 +828,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     if (sst_req_len != 0)
     {
 
-        if (sst_is_trivial(sst_req, sst_req_len))
+        if (trivial)
         {
             sst_uuid_  = group_uuid;
             sst_seqno_ = group_seqno;
@@ -702,7 +838,21 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             lock.wait(sst_cond_);
         }
 
-        if (sst_uuid_ != group_uuid)
+        if (sst_state_ == SST_CANCELED)
+        {
+            // SST request was cancelled, new SST required
+            // after restart, state must be marked as "unsafe":
+            if (! unsafe)
+            {
+                st_.mark_unsafe();
+            }
+
+            close();
+
+            delete req;
+            return -ECANCELED;
+        }
+        else if (sst_uuid_ != group_uuid)
         {
             log_fatal << "Application received wrong state: "
                       << "\n\tReceived: " << sst_uuid_
@@ -712,13 +862,19 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                       << "unrecoverable condition, restart required.";
 
             st_.set(sst_uuid_, sst_seqno_, safe_to_bootstrap_);
-            st_.mark_safe();
+            if (unsafe)
+            {
+                st_.mark_safe();
+            }
 
             abort();
         }
         else
         {
-            update_state_uuid (sst_uuid_);
+            /* Update the proper seq-no so if there is need for IST (post SST)
+            and if IST fails before starting to apply transaction next restart
+            will not do a complete SST one more time. */
+            update_state_uuid (sst_uuid_, sst_seqno_);
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
 
@@ -736,19 +892,41 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
-    st_.mark_safe();
+    if (unsafe)
+    {
+        /* Reaching here means 2 things:
+        * SST completed in which case req->ist_len = 0.
+        * SST is not needed and there is need for IST. req->ist_len > 0.
+        Before starting IST we should restore the state = safe and let
+        IST take a call when to mark it unsafe. */
+        st_.mark_safe();
+    }
+
+    // IST is prepared only with str proto ver 1 and above.
 
     if (req->ist_len() > 0)
     {
-        // IST is prepared only with str proto ver 1 and above
-        if (STATE_SEQNO() < group_seqno)
+        // We should not do the IST when we left S_JOINING state
+        // (for example, if we have lost the connection to the
+        // network or we were evicted from the cluster) or when
+        // SST was failed or cancelled:
+
+        if (sst_state_ < SST_REQ_FAILED &&
+            state_() == S_JOINING && STATE_SEQNO() < group_seqno)
         {
             log_info << "Receiving IST: " << (group_seqno - STATE_SEQNO())
                      << " writesets, seqnos " << STATE_SEQNO()
                      << "-" << group_seqno;
             ist_receiver_.ready();
             recv_IST(recv_ctx);
-            sst_seqno_ = ist_receiver_.finished();
+
+            // We must close the IST receiver if the node
+            // is in the process of shutting down:
+            if (ist_prepared_)
+            {
+                ist_prepared_ = false;
+                sst_seqno_ = ist_receiver_.finished();
+            }
 
             // Note: apply_monitor_ must be drained to avoid race between
             // IST appliers and GCS appliers, GCS action source may
@@ -758,16 +936,38 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
-            (void)ist_receiver_.finished();
+            // We must close the IST receiver if the node
+            // is in the process of shutting down:
+            if (ist_prepared_)
+            {
+                ist_prepared_ = false;
+                (void)ist_receiver_.finished();
+            }
+        }
+    }
+
+    // SST/IST completed successfully. Reset the state to undefined (-1)
+    // in grastate that is default operating state of node to protect from
+    // random failure during normal operation.
+    {
+        wsrep_uuid_t  uuid;
+        wsrep_seqno_t seqno;
+        bool safe_to_boostrap;
+        st_.get (uuid, seqno, safe_to_boostrap);
+        if (seqno != WSREP_SEQNO_UNDEFINED)
+        {
+           st_.set (uuid, WSREP_SEQNO_UNDEFINED, safe_to_boostrap);
         }
     }
 
     delete req;
+    return 0;
 }
 
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
+    bool first= true;
     while (true)
     {
         TrxHandle* trx(0);
@@ -776,6 +976,31 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
         {
             if ((err = ist_receiver_.recv(&trx)) == 0)
             {
+                // Loop below will recieve and apply IST write-set(s). If apply
+                // fails then we should mark leave the state of server = unsafe
+                // in-order to initiate full SST on restart.
+                // This is important as failed apply may leave server data-dir
+                // in an inconsistent state and so incremental IST is not safe
+                // option.
+
+                // If the current position is defined (for example, when
+                // there were no SST before IST), then we need to change
+                // it to an undefined position before applying the first
+                // transaction, since during the application of transactions
+                // (or after the IST) server may fail:
+                if (first)
+                {
+                    first = false;
+                    wsrep_uuid_t  uuid;
+                    wsrep_seqno_t seqno;
+                    bool safe_to_boostrap;
+                    st_.get (uuid, seqno, safe_to_boostrap);
+                    if (seqno != WSREP_SEQNO_UNDEFINED)
+                    {
+                       st_.set (uuid, WSREP_SEQNO_UNDEFINED, safe_to_boostrap);
+                    }
+                }
+
                 assert(trx != 0);
                 TrxHandleLock lock(*trx);
                 // Verify checksum before applying. This is also required
@@ -803,6 +1028,10 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             else
             {
+                // IST completed after applying n transactions where n can be 0.
+                // if recv_IST is called from async_recv then recv_IST may have
+                // return with 0 transaction applied.
+		// If n > 0 then state is marked as unsafe in if loop above.
                 return;
             }
             trx->unref();

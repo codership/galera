@@ -6,7 +6,7 @@
 #include <gu_conf.h>
 
 #include <cstdio>
-
+#include <errno.h>
 #include <syslog.h>
 
 namespace garb
@@ -17,8 +17,8 @@ namespace garb
 
         if (!log_file)
         {
-            gu_throw_error (ENOENT) << "Failed to open '" << fname
-                                    << "' for appending";
+            gu_throw_error (errno) << "Failed to open '" << fname
+                                   << "' for appending";
         }
 
         gu_conf_set_log_file (log_file);

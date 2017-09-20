@@ -42,7 +42,7 @@ namespace gcache
 
         size_t used () const { return used_; }
 
-        size_t size() const { return fd_.size(); } /* size on storage */
+        size_t size() const { return size_; } /* size on storage */
 
         const std::string& name() const { return fd_.name(); }
 
@@ -53,14 +53,18 @@ namespace gcache
 
         void* parent() const { return ps_; }
 
+        size_t allocated_pool_size ();
+
     private:
 
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
         void* const        ps_;
         uint8_t*           next_;
+        size_t             size_;
         size_t             space_;
         size_t             used_;
+        size_t             min_space_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);

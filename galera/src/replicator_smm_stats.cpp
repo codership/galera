@@ -112,6 +112,8 @@ typedef enum status_vars
     STATS_LOCAL_STATE,
     STATS_LOCAL_STATE_COMMENT,
     STATS_CERT_INDEX_SIZE,
+    STATS_CERT_BUCKET_COUNT,
+    STATS_GCACHE_POOL_SIZE,
     STATS_CAUSAL_READS,
     STATS_CERT_INTERVAL,
     STATS_INCOMING_LIST,
@@ -158,6 +160,8 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "local_state",              WSREP_VAR_INT64,  { 0 }  },
     { "local_state_comment",      WSREP_VAR_STRING, { 0 }  },
     { "cert_index_size",          WSREP_VAR_INT64,  { 0 }  },
+    { "cert_bucket_count",        WSREP_VAR_INT64,  { 0 }  },
+    { "gcache_pool_size",         WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
     { "cert_interval",            WSREP_VAR_DOUBLE, { 0 }  },
     { "incoming_addresses",       WSREP_VAR_STRING, { 0 }  },
@@ -180,7 +184,7 @@ galera::ReplicatorSMM::build_stats_vars (
 }
 
 const struct wsrep_stats_var*
-galera::ReplicatorSMM::stats_get() const
+galera::ReplicatorSMM::stats_get()
 {
     if (S_DESTROYED == state_()) return 0;
 
@@ -203,6 +207,8 @@ galera::ReplicatorSMM::stats_get() const
     struct gcs_stats stats;
     gcs_.get_stats (&stats);
 
+    int64_t seqno_min = gcache_.seqno_min();
+
     sv[STATS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
     sv[STATS_LOCAL_SEND_QUEUE_MAX].value._int64  = stats.send_q_len_max;
     sv[STATS_LOCAL_SEND_QUEUE_MIN].value._int64  = stats.send_q_len_min;
@@ -211,7 +217,8 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_LOCAL_RECV_QUEUE_MAX].value._int64  = stats.recv_q_len_max;
     sv[STATS_LOCAL_RECV_QUEUE_MIN].value._int64  = stats.recv_q_len_min;
     sv[STATS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
-    sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  = gcache_.seqno_min();
+    sv[STATS_LOCAL_CACHED_DOWNTO ].value._int64  =
+        seqno_min != GCS_SEQNO_ILL ? seqno_min : GCS_SEQNO_NIL;
     sv[STATS_FC_PAUSED_NS        ].value._int64  = stats.fc_paused_ns;
     sv[STATS_FC_PAUSED_AVG       ].value._double = stats.fc_paused_avg;
     sv[STATS_FC_SSENT            ].value._int64  = stats.fc_ssent;
@@ -227,6 +234,9 @@ galera::ReplicatorSMM::stats_get() const
     sv[STATS_CERT_DEPS_DISTANCE  ].value._double = avg_deps_dist;
     sv[STATS_CERT_INTERVAL       ].value._double = avg_cert_interval;
     sv[STATS_CERT_INDEX_SIZE     ].value._int64 = index_size;
+    sv[STATS_CERT_BUCKET_COUNT   ].value._int64 = cert_.bucket_count();
+
+    sv[STATS_GCACHE_POOL_SIZE    ].value._int64 = gcache_.allocated_pool_size();
 
     double oooe;
     double oool;

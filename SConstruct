@@ -51,6 +51,8 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
+    static_ssl=[0|1]    Build with static SSL
+    with_ssl=path       Prefix for SSL
     debug=n             debug build with optimization level n
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
@@ -70,11 +72,13 @@ Commandline Options:
 build_target = 'all'
 
 # Optimization level
-opt_flags    = ' -g -O3 -DNDEBUG'
+opt_flags    = ' -g -O3 -fno-omit-frame-pointer -DNDEBUG'
 
 # Architecture (defaults to build host type)
 compile_arch = ''
 link_arch    = ''
+
+with_ssl     = ''
 
 # Build directory
 build_dir    = ''
@@ -85,6 +89,7 @@ build_dir    = ''
 #
 
 build_dir = ARGUMENTS.get('build_dir', '')
+with_ssl = ARGUMENTS.get('with_ssl', '/usr/lib64')
 
 # Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
@@ -95,7 +100,7 @@ if debug_lvl >= 0 and debug_lvl < 3:
     opt_flags = ' -g -O%d -fno-inline' % debug_lvl
     dbug = True
 elif debug_lvl == 3:
-    opt_flags = ' -g -O3'
+    opt_flags = ' -g -O3 -fno-omit-frame-pointer'
 
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
@@ -122,6 +127,7 @@ elif machine == 's390x':
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
+static_ssl = int(ARGUMENTS.get('static_ssl', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
@@ -131,12 +137,6 @@ strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
 
 GALERA_VER = ARGUMENTS.get('version', '3.21')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
-
-# Attempt to read from file if not given
-if GALERA_REV == "XXXX" and os.path.isfile("GALERA_REVISION"):
-    with open("GALERA_REVISION", "r") as f:
-        GALERA_REV = f.readline().rstrip("\n")
-
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
 print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
@@ -202,7 +202,7 @@ if sysname == 'darwin' and extra_sysroot == '':
         extra_sysroot = '/sw'
 if extra_sysroot != '':
     env.Append(LIBPATH = [extra_sysroot + '/lib'])
-    env.Append(CPPFLAGS = ' -I' + extra_sysroot + '/include')
+    env.Append(CCFLAGS = ' -I' + extra_sysroot + '/include')
 
 # print env.Dump()
 
@@ -437,12 +437,24 @@ if ssl == 1:
         print 'ssl support required but asio/ssl.hpp not found or not usable'
         print 'compile with ssl=0 or check that openssl devel headers are usable'
         Exit(1)
-    if conf.CheckLib('ssl'):
-        conf.CheckLib('crypto')
+    if static_ssl == 0:
+        if conf.CheckLib('ssl'):
+            conf.CheckLib('crypto')
+        else:
+            print 'ssl support required but openssl library not found'
+            print 'compile with ssl=0 or check that openssl library is usable'
+            Exit(1)
     else:
-        print 'ssl support required but openssl library not found'
-        print 'compile with ssl=0 or check that openssl library is usable'
-        Exit(1)
+        conf.env.Append(LIBPATH  = [with_ssl])
+        if conf.CheckLib('libssl.a', autoadd=0) or \
+            conf.CheckLib('libcrypto.a', autoadd=0) or \
+            conf.CheckLib('libz.a', autoadd=0):
+            pass
+        else:
+            print 'ssl support required but openssl library (static) not found'
+            print 'compile with ssl=0 or check that' 
+            print 'openssl static librares - libssl.a, libcrypto.a, libz.a are available'
+            Exit(1)
 
 
 # get compiler name/version, CXX may be set to "c++" which may be clang or gcc
@@ -468,8 +480,7 @@ if strict_build_flags == 1:
         conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
-
-Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
+Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'static_ssl', 'with_ssl')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

@@ -201,6 +201,8 @@ install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
 install -d $RBR%{libs}
 install -m 755 $RBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
 
+install -d "$RPM_BUILD_ROOT/%{_sharedstatedir}/galera"
+
 install -d $RBR%{docs}
 install -m 644 $RBD/COPYING                       $RBR%{docs}/COPYING
 install -m 644 $RBD/asio/LICENSE_1_0.txt          $RBR%{docs}/LICENSE.asio
@@ -308,6 +310,8 @@ fi
 
 %attr(0755,root,root) %dir %{libs}
 %attr(0755,root,root) %{libs}/libgalera_smm.so
+
+%attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 
 %attr(0755,root,root) %dir %{docs}
 %doc %attr(0644,root,root) %{docs}/COPYING

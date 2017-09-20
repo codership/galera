@@ -245,9 +245,10 @@ gcs_group_find_donor(const gcs_group_t* group,
                      int const str_version,
                      int const joiner_idx,
                      const char* const donor_string, int const donor_len,
-                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno);
+                     const gu_uuid_t* ist_uuid, gcs_seqno_t ist_seqno,
+                     const bool ist_only);
 
 extern void
-gcs_group_get_status(const gcs_group_t* group, gu::Status& status);
+gcs_group_get_status(gcs_group_t* group, gu::Status& status);
 
 #endif /* _gcs_group_h_ */

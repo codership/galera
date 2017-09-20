@@ -105,6 +105,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     version_      (-1),
     use_ssl_      (false),
     running_      (false),
+    interrupted_  (false),
     ready_        (false)
 {
     std::string recv_addr;
@@ -439,7 +440,14 @@ void galera::ist::Receiver::run()
             }
             gu::Lock lock(mutex_);
             assert(ready_);
-            while (consumers_.empty()) lock.wait(cond_);
+            while (consumers_.empty())
+            {
+                lock.wait(cond_);
+                if (interrupted_)
+                {
+                    goto Intrrupted;
+                }
+            }
             Consumer* cons(consumers_.top());
             consumers_.pop();
             cons->trx(trx);
@@ -467,6 +475,7 @@ void galera::ist::Receiver::run()
         }
     }
 
+Intrrupted:
 err:
     gu::Lock lock(mutex_);
     if (use_ssl_ == true)
@@ -542,6 +551,15 @@ wsrep_seqno_t galera::ist::Receiver::finished()
     else
     {
         interrupt();
+
+        // It is necessary to push the loop in the run() method
+        // ahead - if now it awaiting the signal:
+        if (!ready_)
+        {
+            gu::Lock local_lock(mutex_);
+            interrupted_ = true;
+            cond_.signal();
+        }
 
         int err;
         if ((err = gu_thread_join(thread_, 0)) != 0)

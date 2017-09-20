@@ -16,6 +16,7 @@
 #include <assert.h>
 
 #include <galerautils.h>
+#include "gu_debug_sync.hpp"
 
 #include "gcs_priv.hpp"
 #include "gcs_params.hpp"
@@ -175,6 +176,10 @@ struct gcs_conn
     /* #603, #606 join control */
     bool        volatile need_to_join;
     gcs_seqno_t volatile join_seqno;
+    void        join_notification()
+    {
+        need_to_join = true;
+    }
 
     /* sync control */
     bool         sync_sent_;
@@ -301,9 +306,17 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
 
     {
         size_t recv_q_len = gu_avphys_bytes() / sizeof(struct gcs_recv_act) / 4;
-
-        gu_debug ("Requesting recv queue len: %zu", recv_q_len);
-        conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
+        if (recv_q_len == 0)
+        {
+            gu_error ("Requesting recv queue len: %zu", recv_q_len);
+            gu_error ("Available system memory is running low: %zu",
+                      gu_avphys_bytes());
+        }
+        else
+        {
+            gu_debug ("Requesting recv queue len: %zu", recv_q_len);
+            conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
+        }
     }
     if (!conn->recv_q) {
         gu_error ("Failed to create recv_q.");
@@ -831,6 +844,11 @@ _set_fc_limits (gcs_conn_t* conn)
     conn->upper_limit = conn->params.fc_base_limit * fn + .5;
     conn->lower_limit = conn->upper_limit * conn->params.fc_resume_factor + .5;
 
+    /* The upper/lower limits cannot exceed the number of items in the
+     * receive queue, so bound them by the max length. */
+    conn->upper_limit = std::min(conn->upper_limit, gu_fifo_max_length(conn->recv_q));
+    conn->lower_limit = std::min(conn->lower_limit, gu_fifo_max_length(conn->recv_q));
+
     gu_info ("Flow-control interval: [%ld, %ld]",
              conn->lower_limit, conn->upper_limit);
 }
@@ -1035,8 +1053,8 @@ gcs_handle_act_state_req (gcs_conn_t*          conn,
 
 /*! Allocates buffer with malloc to pass to the upper layer. */
 static long
-gcs_handle_state_change (gcs_conn_t*           conn,
-                         const struct gcs_act* act)
+gcs_handle_state_change (gcs_conn_t*     conn,
+                         struct gcs_act* act)
 {
     gu_debug ("Got '%s' dated %lld", gcs_act_type_to_str (act->type),
               gcs_seqno_gtoh(*(gcs_seqno_t*)act->buf));
@@ -1405,9 +1423,12 @@ static void *gcs_recv_thread (void *arg)
     }
     else if (ret < 0)
     {
+        /* We must set connection state to 'closed' to avoid the race
+           condition between gcs_recv_thread() and gcs_recv(), which
+           could lead to assertion in gcs_recv: */
+        gcs_shift_state (conn, GCS_CONN_CLOSED);
         /* In case of error call _close() to release repl_q waiters. */
         (void)_close(conn, false);
-        gcs_shift_state (conn, GCS_CONN_CLOSED);
     }
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
@@ -1496,6 +1517,9 @@ long gcs_close (gcs_conn_t *conn)
     }
     /* recv_thread() is supposed to set state to CLOSED when exiting */
     assert (GCS_CONN_CLOSED == conn->state);
+#ifdef GU_DBUG_ON
+    GU_DBUG_SYNC_WAIT("gcs_close_before_exit");
+#endif
     return ret;
 }
 
@@ -1998,10 +2022,28 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 long
 gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
-    conn->join_seqno   = seqno;
-    conn->need_to_join = true;
+    // Even when node is evicted from the cluster in middle of SST,
+    // the SST may completes normally. After this, the node calls
+    // the gcs_join function and tries to join the cluster. However,
+    // this is impossible, because the node is already evicted.
+    // Therefore, the _join() function (which called from gcs_join)
+    // fails. Then node does IST (which also fails), after/during
+    // which it is aborted. To fix this, we should avoid joining
+    // the cluster through gcs_join function if node is evicted.
+    // To do this, we should check the current connection state
+    // in the gcs_join() function to return from it immediately
+    // if the node's communication channel was closed:
 
-    return _join (conn, seqno);
+    if (conn->state < GCS_CONN_CLOSED)
+    {
+        conn->join_seqno   = seqno;
+        conn->need_to_join = true;
+        return _join (conn, seqno);
+    }
+    else
+    {
+        return GCS_CLOSED_ERROR;
+    }
 }
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)
@@ -2047,6 +2089,9 @@ void gcs_get_status(gcs_conn_t* conn, gu::Status& status)
 {
     if (conn->state < GCS_CONN_CLOSED)
     {
+#ifdef GU_DBUG_ON
+        GU_DBUG_SYNC_WAIT("gcs_get_status");
+#endif
         gcs_core_get_status(conn->core, status);
     }
 }
@@ -2294,4 +2339,10 @@ const char* gcs_param_get (gcs_conn_t* conn, const char* key)
     gu_warn ("Not implemented: %s", __FUNCTION__);
 
     return NULL;
+}
+
+
+void gcs_join_notification(gcs_conn_t* conn)
+{
+     conn->need_to_join = true;
 }

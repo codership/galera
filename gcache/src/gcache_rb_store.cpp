@@ -57,6 +57,8 @@ namespace gcache
         end_       (reinterpret_cast<uint8_t*>(preamble_ + mmap_.size)),
         first_     (start_),
         next_      (first_),
+        max_used_  (first_ - static_cast<uint8_t*>(mmap_.ptr) +
+                    sizeof(BufferHeader)),
         seqno2ptr_ (seqno2ptr),
         gid_       (gid),
         size_cache_(end_ - start_ - sizeof(BufferHeader)),
@@ -168,9 +170,14 @@ namespace gcache
 
         assert (ret <= first_);
 
-        if (size_t(first_ - ret) >= size_next) { assert(size_free_ >= size); }
+        /* Compare with difference to avoid integer overflow: */
+        if (static_cast<size_t>(first_ - ret) >= size_next)
+        {
+            assert(size_free_ >= size);
+        }
 
-        while (size_t(first_ - ret) < size_next) {
+        while (static_cast<size_t>(first_ - ret) < size_next)
+        {
             // try to discard first buffer to get more space
             BufferHeader* bh = BH_cast(first_);
 
@@ -200,7 +207,8 @@ namespace gcache
                 first_ = start_;
                 assert_size_free();
 
-                if (size_t(end_ - ret) >= size_next)
+                /* Compare with difference to avoid integer overflow: */
+                if (static_cast<size_t>(end_ - ret) >= size_next)
                 {
                     assert(size_free_ >= size);
                     size_trail_ = 0;
@@ -219,7 +227,9 @@ namespace gcache
         assert (ret <= first_);
 
 #ifndef NDEBUG
-        if (size_t(first_ - ret) < size_next) {
+        /* Compare with difference to avoid integer overflow: */
+        if (static_cast<size_t>(first_ - ret) < size_next)
+        {
             log_fatal << "Assertion ((first - ret) >= size_next) failed: "
                       << std::endl
                       << "first offt = " << (first_ - start_) << std::endl
@@ -246,6 +256,15 @@ namespace gcache
         bh->ctx     = this;
 
         next_ = ret + size;
+
+        size_t max_used=
+            next_ - static_cast<uint8_t*>(mmap_.ptr) + sizeof(BufferHeader);
+
+        if (max_used > max_used_)
+        {
+            max_used_ = max_used;
+        }
+
         assert (next_ + sizeof(BufferHeader) <= end_);
         BH_clear (BH_cast(next_));
         assert_sizes();
@@ -511,6 +530,11 @@ namespace gcache
 
         if (next_ > first_ && first_ > start_) BH_clear(BH_cast(start_));
         /* this is needed to avoid rescanning from start_ on recovery */
+    }
+
+    size_t RingBuffer::allocated_pool_size ()
+    {
+       return max_used_;
     }
 
     void

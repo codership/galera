@@ -76,9 +76,16 @@ remove_file (void* __restrict__ arg)
     pthread_exit(NULL);
 }
 
+/*
+ * Returns false if there are no more pages to be deleted (either
+ * the queue is empty or if the first page is in use).
+ * Otherwise, returns true.
+*/
 bool
 gcache::PageStore::delete_page ()
 {
+    if (pages_.empty()) return false;
+
     Page* const page = pages_.front();
 
     if (page->used() > 0) return false;
@@ -116,10 +123,34 @@ gcache::PageStore::delete_page ()
 void
 gcache::PageStore::cleanup ()
 {
-    while (total_size_   > keep_size_ &&
-           pages_.size() > keep_page_ &&
+#ifndef NDEBUG
+    size_t counter = 0;
+#endif
+/*
+ * 1. We must release the page if the size (keep_size_ = gcache.keep_pages_size)
+ *    and count (keep_page_ = gcache.keep_pages_count) are NOT set (they are both 0).
+ * 2. We must release the page if we have exceeded the limit on the
+ *    overall size of the page pool (which is set by the user explicitly,
+ *    keep_size_ = gcache.keep_pages_size) OR if the quantity of pages
+ *    more that we should to keep in memory even if they are free (parameter
+ *    keep_page_ = gcache.keep_pages_count).
+ * 3. 
+ */
+    while (((!keep_size_ && !keep_page_) ||
+            (keep_size_ && total_size_ > keep_size_) ||
+            (keep_page_ && pages_.size() > keep_page_)) &&
            delete_page())
-    {}
+    {
+#ifndef NDEBUG
+       counter++;
+#endif
+    }
+#ifndef NDEBUG
+    if (counter)
+    {
+        log_info << "gcache: " << counter << " page(s) deallocated...";
+    }
+#endif
 }
 
 void
@@ -142,7 +173,7 @@ gcache::PageStore::new_page (size_type size)
 gcache::PageStore::PageStore (const std::string& dir_name,
                               size_t             keep_size,
                               size_t             page_size,
-                              bool               keep_page)
+                              size_t             keep_page)
     :
     base_name_ (make_base_name(dir_name)),
     keep_size_ (keep_size),
@@ -266,4 +297,16 @@ gcache::PageStore::realloc (void* ptr, size_type const size)
     }
 
     return ret;
+}
+
+size_t gcache::PageStore::allocated_pool_size ()
+{
+  size_t size= 0;
+  std::deque<Page*>::iterator ptr= pages_.begin();
+  while (ptr != pages_.end())
+  {
+    Page* page= *ptr++;
+    size += page->allocated_pool_size();
+  }
+  return size;
 }

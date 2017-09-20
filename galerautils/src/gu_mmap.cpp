@@ -14,6 +14,11 @@
 
 #include <cerrno>
 #include <sys/mman.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include "gu_limits.h"
 
 #if defined(__FreeBSD__) && defined(MAP_NORESERVE)
 /* FreeBSD has never implemented this flags and will deprecate it. */

@@ -241,12 +241,14 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     {
         log_debug << "write handler for " << id()
                   << " state " << state();
+#ifdef HAVE_ASIO_SSL_HPP
         if (ec.category() == asio::error::get_ssl_category() &&
             gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "write_handler(): " << ec.message()
                      << " (" << gu::extra_error_info(ec) << ")";
         }
+#endif
         return;
     }
 
@@ -380,12 +382,14 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
 
     if (ec)
     {
+#ifdef HAVE_ASIO_SSL_HPP
         if (ec.category() == asio::error::get_ssl_category() &&
             gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "read_handler(): " << ec.message() << " ("
                      << gu::extra_error_info(ec) << ")";
         }
+#endif
         FAILED_HANDLER(ec);
         return;
     }
@@ -471,12 +475,14 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     Critical<AsioProtonet> crit(net_);
     if (ec)
     {
+#ifdef HAVE_ASIO_SSL_HPP
         if (ec.category() == asio::error::get_ssl_category() &&
             gu::exclude_ssl_error(ec) == false)
         {
             log_warn << "read_completion_condition(): " << ec.message() << " ("
                      << gu::extra_error_info(ec) << ")";
         }
+#endif
         FAILED_HANDLER(ec);
         return 0;
     }

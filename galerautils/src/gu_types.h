@@ -9,6 +9,8 @@
 #ifndef _gu_types_h_
 #define _gu_types_h_
 
+#define _FILE_OFFSET_BITS 64
+
 #include <stdint.h>    /* intXX_t and friends */
 #include <stdbool.h>   /* bool */
 #include <unistd.h>    /* ssize_t */

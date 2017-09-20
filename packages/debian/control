@@ -1,0 +1,59 @@
+Source: percona-xtradb-cluster-galera-3.x
+Section: database
+Priority: extra
+Maintainer: Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+Build-Depends: debhelper (>= 7.0.50~), scons, libboost-dev (>= 1.41),
+    libssl-dev, check, libboost-program-options-dev (>= 1.41)
+Standards-Version: 7.0.0
+
+Package: percona-xtradb-cluster-galera-3.x
+Architecture: any
+Provides: percona-xtradb-cluster-galera-25, galera3
+Conflicts: galera,  percona-xtradb-cluster-galera, percona-xtradb-cluster-galera-2.x, percona-galera-3
+Replaces: galera, percona-xtradb-cluster-galera-3, percona-xtradb-cluster-galera, percona-galera-3
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Galera components of Percona XtraDB Cluster
+ This package contains the Galera components required by Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-garbd-3.x
+Architecture: any
+Provides: garbd-3, garbd3
+Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3
+Replaces: percona-galera-arbitrator-3
+Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
+Description: Garbd components of Percona XtraDB Cluster
+ This package contains the garbd of Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-galera-3.x-dbg
+Architecture: any
+Section: debug
+Conflicts: percona-galera-3-dbg
+Replaces: percona-galera-3-dbg
+Depends: percona-xtradb-cluster-galera-3.x (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Galera 3.
+
+Package: percona-xtradb-cluster-garbd-3.x-dbg
+Architecture: any
+Section: debug
+Conflicts: percona-galera-arbitrator-3-dbg
+Replaces: percona-galera-arbitrator-3-dbg
+Depends: percona-xtradb-cluster-garbd-3.x (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Garbd 3.
+
+Package: percona-xtradb-cluster-galera-3
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-galera-3.x (= ${source:Version}), ${misc:Depends}
+Description: Metapackage for latest version of galera3.
+
+Package: percona-xtradb-cluster-garbd-3
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-garbd-3.x (= ${source:Version}), ${misc:Depends}
+Description: Metapackage for latest version of garbd3.
+
+Package: percona-xtradb-cluster-galera3-dbg
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-galera-3.x-dbg (= ${source:Version}), percona-xtradb-cluster-garbd-3.x-dbg (= ${source:Version}), ${misc:Depends}
+Description: Metapackage for latest version of debug packages.

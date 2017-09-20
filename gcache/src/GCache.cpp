@@ -21,6 +21,7 @@ namespace gcache
 
         mallocs  = 0;
         reallocs = 0;
+        frees    = 0;
 
         seqno_locked   = SEQNO_NONE;
         seqno_max      = SEQNO_NONE;
@@ -49,6 +50,8 @@ namespace gcache
                    params.keep_pages_size(),
                    params.page_size(),
                    /* keep last page if PS is the only storage */
+                   params.keep_pages_count() ?
+                   params.keep_pages_count() :
                    !((params.mem_size() + params.rb_size()) > 0)),
         mallocs   (0),
         reallocs  (0),
@@ -68,6 +71,14 @@ namespace gcache
         log_debug << "\n" << "GCache mallocs : " << mallocs
                   << "\n" << "GCache reallocs: " << reallocs
                   << "\n" << "GCache frees   : " << frees;
+    }
+
+    size_t GCache::allocated_pool_size ()
+    {
+        gu::Lock lock(mtx);
+        return mem.allocated_pool_size() +
+               rb.allocated_pool_size() +
+               ps.allocated_pool_size();
     }
 
     /*! prints object properties */

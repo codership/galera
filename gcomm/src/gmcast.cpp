@@ -243,6 +243,10 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
             {
                 port = Defaults::GMCastTcpPort;
             }
+            catch (gu::NotSet&)
+            {
+                port = Defaults::GMCastTcpPort;
+            }
         }
 
         std::string initial_uri = uri_string(get_scheme(use_ssl_), host, port);

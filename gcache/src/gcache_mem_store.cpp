@@ -4,6 +4,7 @@
 
 #include "gcache_mem_store.hpp"
 #include "gcache_page_store.hpp"
+#include "gcache_rb_store.hpp"
 
 #include <gu_logger.hpp>
 
@@ -13,7 +14,7 @@ namespace gcache
 bool
 MemStore::have_free_space (size_type size)
 {
-    while ((size_ + size > max_size_) && !seqno2ptr_.empty())
+    while ((size_ > max_size_ - size) && !seqno2ptr_.empty())
     {
         /* try to free some released bufs */
         seqno2ptr_iter_t const i  (seqno2ptr_.begin());
@@ -50,7 +51,7 @@ MemStore::have_free_space (size_type size)
         }
     }
 
-    return (size_ + size <= max_size_);
+    return (size_ <= max_size_ - size);
 }
 
 void
@@ -60,7 +61,7 @@ MemStore::seqno_reset()
     {
         std::set<void*>::iterator tmp(buf); ++buf;
 
-        BufferHeader* const bh(ptr2BH(*tmp));
+        BufferHeader* const bh(BH_cast(*tmp));
 
         if (bh->seqno_g != SEQNO_NONE)
         {
@@ -72,6 +73,11 @@ MemStore::seqno_reset()
             ::free (bh);
         }
     }
+}
+
+size_t MemStore::allocated_pool_size ()
+{
+  return size_;
 }
 
 } /* namespace gcache */

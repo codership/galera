@@ -23,8 +23,6 @@ start() {
 	    return 0
 	fi
 
-        [ -f $config ] && . $config
-
 	# Check that node addresses are configured
 	if [[ -z "${GALERA_NODES:-}" ]]; then
 		log_failure "List of GALERA_NODES is not configured"

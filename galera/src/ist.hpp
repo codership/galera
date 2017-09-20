@@ -88,6 +88,7 @@ namespace galera
             int                   version_;
             bool                  use_ssl_;
             bool                  running_;
+            bool                  interrupted_;
             bool                  ready_;
 
             // GCC 4.8.5 on FreeBSD wants this

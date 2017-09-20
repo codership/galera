@@ -1,6 +1,6 @@
 # Copyright (C) 2011 Codership Oy <info@codership.com>
 
-Import('env', 'libboost_program_options')
+Import('env', 'libboost_program_options', 'static_ssl', 'with_ssl')
 
 garb_env = env.Clone()
 
@@ -27,6 +27,13 @@ conf_env = garb_env.Clone()
 Import('GALERA_VER', 'GALERA_REV')
 conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
 conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
+
+if static_ssl == 1:
+    garb_env.Append(LIBPATH  = [with_ssl])
+    garb_env.Append(LIBS=File('%s/libssl.a' %(with_ssl)))
+    garb_env.Append(LIBS=File('%s/libcrypto.a' %(with_ssl)))
+    garb_env.Append(LIBS=File('%s/libz.a' %(with_ssl)))
+    garb_env.Append(LIBS=['dl'])
 
 garb = garb_env.Program(target = 'garbd',
                         source = Split('''

@@ -6,7 +6,7 @@
 #
 # chkconfig: - 99 01
 # config: /etc/sysconfig/garb | /etc/default/garb
-
+#
 ### BEGIN INIT INFO
 # Provides:          garb
 # Required-Start:    $remote_fs $syslog
@@ -32,7 +32,7 @@ if [ -f /etc/redhat-release ]; then
 	config=/etc/sysconfig/garb
 else
 	. /lib/lsb/init-functions
-	config=/etc/default/garb
+	config=/etc/default/garbd
 fi
 
 log_failure() {
@@ -45,22 +45,53 @@ log_failure() {
 	fi
 }
 
+if grep -q -E '^# REMOVE' $config; then
+	log_failure "Garbd config $config is not configured yet"
+	exit 0
+fi
+
 PIDFILE=/var/run/garbd
 
-prog=$(which garbd)
+prog="/usr/bin/garbd"
 
 program_start() {
 	local rcode
+	local gpid
 	if [ -f /etc/redhat-release ]; then
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    echo -n $"Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        echo -n $"Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        echo -n $"Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
 		echo -n $"Starting $prog: "
-		daemon --user nobody $prog "$@" >/dev/null
+		runuser nobody -s /bin/sh -c "$prog $*" >/dev/null
 		rcode=$?
-		if [ $rcode -eq 0 ]; then
-			pidof $prog > $PIDFILE || rcode=$?
-		fi
-		[ $rcode -eq 0 ] && echo_success || echo_failure
+		sleep 2
+		[ $rcode -eq 0 ] && pidof $prog > $PIDFILE \
+		&& echo_success || echo_failure
 		echo
 	else
+
+                if [ -r $PIDFILE ];then
+                    gpid=$(cat $PIDFILE)
+                    log_daemon_msg "Stale pid file found at $PIDFILE"
+                    if [[ -n ${gpid:-} ]] && kill -0 $gpid;then
+                        log_daemon_msg "Garbd already running wiht PID $gpid"
+                        exit 17
+                    else
+                        log_daemon_msg "Removing stale pid file $PIDFILE"
+                        rm -f $PIDFILE
+                    fi
+                fi
+                if [ -r $PIDFILE ];then
+                    log_daemon_msg "Stale pid file with $(cat $PIDFILE)"
+                fi
 		log_daemon_msg "Starting $prog: "
 		start-stop-daemon --start --quiet -c nobody --background \
 		                  --exec $prog -- "$@"
@@ -71,7 +102,7 @@ program_start() {
 			pidof $prog > $PIDFILE || rcode=$?
 		fi
 		log_end_msg $rcode
-	fi
+            fi
 	return $rcode
 }
 
@@ -103,11 +134,6 @@ program_status() {
 start() {
 	[ "$EUID" != "0" ] && return 4
 	[ "$NETWORKING" = "no" ] && return 1
-
-	if grep -q -E '^# REMOVE' $config; then
-	    log_failure "Garbd config $config is not configured yet"
-	    return 0
-	fi
 
 	if [ -r $PIDFILE ]; then
 		local PID=$(cat ${PIDFILE})
@@ -164,6 +190,7 @@ case "$1" in
 	;;
   status)
 	program_status
+	exit
 	;;
   restart|reload|force-reload)
 	restart
