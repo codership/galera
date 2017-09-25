@@ -93,11 +93,14 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
         return;
     }
 
+    const char* compression_name = gu::compression(*ssl_socket_);
+
     log_info << "SSL handshake successful, "
              << "remote endpoint " << remote_addr()
              << " local endpoint " << local_addr()
              << " cipher: " << gu::cipher(*ssl_socket_)
-             << " compression: " << gu::compression(*ssl_socket_);
+             << " compression: "
+             << (compression_name != NULL ? compression_name : "none");
     state_ = S_CONNECTED;
     net_.dispatch(id(), Datagram(), ProtoUpMeta(ec.value()));
     async_receive();
