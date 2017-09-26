@@ -2627,10 +2627,8 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
         switch (err)
         {
         case EAGAIN:
-        {
             output_.push_back(std::make_pair(wb, dm));
-            // Fall through
-        }
+            // fall through
         case 0:
             ret = 0;
             break;
