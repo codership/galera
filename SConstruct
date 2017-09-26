@@ -126,7 +126,7 @@ system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
-strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
+strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 
 
 GALERA_VER = ARGUMENTS.get('version', '3.22')
@@ -464,8 +464,9 @@ if strict_build_flags == 1:
         # CXX may be something like "ccache clang++"
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
-    else:
-        conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
+
+if not 'clang' in compiler_version:
+    conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
 
