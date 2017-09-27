@@ -239,6 +239,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
         start_closing();
         wait_for_CLOSED(lock);
         // @todo wait that all users have left the building
+        // fall through
     case S_CLOSED:
         ist_senders_.cancel();
         break;
@@ -995,8 +996,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandlePtr& txp, void* trx_ct
             gu_trace(apply_monitor_.enter(ao));
         }
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
     }
+    // fall through
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {

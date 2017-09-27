@@ -126,7 +126,7 @@ system_asio= int(ARGUMENTS.get('system_asio', 1))
 ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
-strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 1))
+strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 
 
 GALERA_VER = ARGUMENTS.get('version', '4.dev')
@@ -169,6 +169,28 @@ if cxx != 'default':
 link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
+
+# Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
+try:
+    cc_version = subprocess.check_output(
+        env['CC'].split() + ['--version'],
+        stderr=subprocess.STDOUT).splitlines()[0]
+except:
+    # in case "$CC --version" returns an error, e.g. "unknown option"
+    cc_version = 'unknown'
+
+try:
+    cxx_version = subprocess.check_output(
+        env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT).splitlines()[0]
+except:
+    # in case "$CXX --version" returns an error, e.g. "unknown option"
+    cxx_version = 'unknown'
+
+print 'Using C compiler executable: ' + env['CC']
+print 'C compiler version is: ' + cc_version
+print 'Using C++ compiler executable: ' + env['CXX']
+print 'C++ compiler version is: ' + cxx_version
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
@@ -445,37 +467,33 @@ if ssl == 1:
         Exit(1)
 
 
-# get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-try:
-    compiler = subprocess.check_output(
-        conf.env['CXX'].split() + ['--version'],
-        stderr=subprocess.STDOUT)
-except:
-    # in case "$CXX --version" returns an error, e.g. "unknown option"
-    compiler = 'unknown'
-
 # these will be used only with our software
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
-    if 'g++' in compiler:
-        gcc_version = subprocess.check_output(
-            conf.env['CXX'].split() + ['-dumpversion'],
-            stderr=subprocess.STDOUT)
-        if gcc_version >= "4.9.0":
-            conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
-        else:
-            conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
-        conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
-    elif 'clang' in compiler:
+    if 'clang' in cxx_version:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
-        conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
+        conf.env.Append(CXXFLAGS = ' -Wnon-virtual-dtor')
         # CXX may be something like "ccache clang++"
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
+if not 'clang' in cxx_version:
+    gcc_version_num = subprocess.check_output(
+        conf.env['CXX'].split() + ['-dumpversion'],
+        stderr=subprocess.STDOUT)
+    if gcc_version_num >= "4.9.0":
+        conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
+    else:
+        conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
+    conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
+
 env = conf.Finish()
+
+print 'Global flags:'
+for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
+    print f + ': ' + env[f].strip()
 
 Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
