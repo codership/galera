@@ -877,6 +877,7 @@ core_handle_comp_msg (gcs_core_t*          const core,
                   "WAIT_STATE_MSG. Can't continue.");
         ret = -ENOTRECOVERABLE;
         assert(0);
+        // fall through
     default:
         gu_fatal ("Failed to handle component message: %d (%s)!",
                   ret, strerror (-ret));
