@@ -120,10 +120,11 @@ void gcomm::evs::InspectNode::operator()(std::pair<const gcomm::UUID, Node>& p) 
     {
         if (node.suspected_ == false)
         {
-            log_debug << "declaring node with index "
+            log_info  << "declaring node with index "
                       << node.index_
                       << " suspected, timeout "
-                      << node.proto_.suspect_timeout_;
+                      << node.proto_.suspect_timeout_
+                      << " (evs.suspect_timeout)";
         }
         node.suspected_ = true;
     }
@@ -135,8 +136,8 @@ void gcomm::evs::InspectNode::operator()(std::pair<const gcomm::UUID, Node>& p) 
     {
         if (node.inactive_ == false)
         {
-            log_debug << "declaring node with index "
-                      << node.index_ << " inactive ";
+            log_info  << "declaring node with index "
+                      << node.index_ << " inactive (evs.inactive_timeout) ";
         }
         node.inactive_ = true;
     }

@@ -124,6 +124,7 @@ void gcomm::PC::connect(bool start_prim)
 
         if (try_until < gu::datetime::Date::now())
         {
+            log_info << "announce period timed out (pc.announce_timeout)";
             break;
         }
     }
@@ -155,7 +156,7 @@ void gcomm::PC::connect(bool start_prim)
             pstack_.pop_proto(pc_);
             pstack_.pop_proto(evs_);
             pstack_.pop_proto(gmcast_);
-            gu_throw_error(ETIMEDOUT) << "failed to reach primary view";
+            gu_throw_error(ETIMEDOUT) << "failed to reach primary view (pc.wait_prim_timeout)";
         }
     }
 
