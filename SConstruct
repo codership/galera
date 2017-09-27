@@ -170,6 +170,28 @@ link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
 
+# Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
+try:
+    cc_version = subprocess.check_output(
+        env['CC'].split() + ['--version'],
+        stderr=subprocess.STDOUT).splitlines()[0]
+except:
+    # in case "$CC --version" returns an error, e.g. "unknown option"
+    cc_version = 'unknown'
+
+try:
+    cxx_version = subprocess.check_output(
+        env['CXX'].split() + ['--version'],
+        stderr=subprocess.STDOUT).splitlines()[0]
+except:
+    # in case "$CXX --version" returns an error, e.g. "unknown option"
+    cxx_version = 'unknown'
+
+print 'Using C compiler executable: ' + env['CC']
+print 'C compiler version is: ' + cc_version
+print 'Using C++ compiler executable: ' + env['CXX']
+print 'C++ compiler version is: ' + cxx_version
+
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
 env.Replace(CCFLAGS   = os.getenv('CCFLAGS',  opt_flags + compile_arch))
@@ -445,19 +467,10 @@ if ssl == 1:
         Exit(1)
 
 
-# get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-try:
-    compiler_version = subprocess.check_output(
-        conf.env['CXX'].split() + ['--version'],
-        stderr=subprocess.STDOUT)
-except:
-    # in case "$CXX --version" returns an error, e.g. "unknown option"
-    compiler_version = 'unknown'
-
 # these will be used only with our software
 if strict_build_flags == 1:
     conf.env.Append(CCFLAGS = ' -Werror -pedantic')
-    if 'clang' in compiler_version:
+    if 'clang' in cxx_version:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')
         conf.env.Append(CXXFLAGS = ' -Wno-variadic-macros')
@@ -465,10 +478,14 @@ if strict_build_flags == 1:
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
-if not 'clang' in compiler_version:
+if not 'clang' in cxx_version:
     conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
 
 env = conf.Finish()
+
+print 'Global flags:'
+for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
+    print f + ': ' + env[f].strip()
 
 Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
