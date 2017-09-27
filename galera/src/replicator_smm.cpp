@@ -243,6 +243,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_DONOR:
         start_closing();
         wait_for_CLOSED(lock);
+        // fall through
     case S_CLOSED:
         ist_senders_.cancel();
         break;
@@ -1137,8 +1138,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster* trx,
         }
         ts->set_state(TrxHandle::S_APPLYING);
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
     }
+    // fall through
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {

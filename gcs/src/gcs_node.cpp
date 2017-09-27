@@ -187,6 +187,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             else {
                 node->desync_count = 1;
             }
+            // fall through
         case GCS_NODE_STATE_SYNCED:
             node->count_last_applied = true;
             break;
@@ -196,6 +197,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             break;
         case GCS_NODE_STATE_PRIM:
             node->last_applied = 0;
+            // fall through
         case GCS_NODE_STATE_JOINER:
             node->count_last_applied = false;
             break;
