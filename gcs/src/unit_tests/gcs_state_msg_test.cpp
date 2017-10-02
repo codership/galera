@@ -25,7 +25,7 @@ START_TEST (gcs_state_msg_test_basic)
     gcs_seqno_t const cached(2345);
     gcs_seqno_t const last_applied(3450);
     gcs_seqno_t const vote_seqno(3449);
-    uint64_t    const vote_res(12445678790123445);
+    int64_t     const vote_res(12445678790123445);
     int         const vote_policy(0);
     int         const prim_joined(5);
     gcs_node_state_t const prim_state(GCS_NODE_STATE_JOINED);
