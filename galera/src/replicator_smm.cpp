@@ -259,7 +259,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     sst_donor_ = state_donor;
     service_thd_.reset();
 
-    ssize_t err;
+    ssize_t err = 0;
     wsrep_status_t ret(WSREP_OK);
     wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
