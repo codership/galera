@@ -30,6 +30,14 @@ import platform
 import string
 import subprocess
 
+# Execute a command and read the first line of its stdout.
+# For example read_first_line(["ls", "-l", "/usr"])
+def read_first_line(cmd):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    stdout = p.communicate()[0]
+    line = stdout.splitlines()[0]
+    return line
+
 sysname = os.uname()[0].lower()
 machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
@@ -171,21 +179,8 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-try:
-    cc_version = subprocess.check_output(
-        env['CC'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
-except:
-    # in case "$CC --version" returns an error, e.g. "unknown option"
-    cc_version = 'unknown'
-
-try:
-    cxx_version = subprocess.check_output(
-        env['CXX'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
-except:
-    # in case "$CXX --version" returns an error, e.g. "unknown option"
-    cxx_version = 'unknown'
+cc_version = read_first_line(env['CC'].split() + ['--version'])
+cxx_version = read_first_line(env['CXX'].split() + ['--version'])
 
 print 'Using C compiler executable: ' + env['CC']
 print 'C compiler version is: ' + cc_version
