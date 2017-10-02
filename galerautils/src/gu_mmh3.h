@@ -172,6 +172,10 @@ _mmh3_128_blocks (const uint64_t* const blocks, size_t const nblocks,
     }
 }
 
+#if __GNUC__ == 4 && __GNUC_MINOR__ < 7
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif /* < GCC 4.7.0 */
+
 static GU_FORCE_INLINE void
 _mmh3_128_tail (const uint8_t* const tail, size_t const len,
                 uint64_t h1, uint64_t h2, uint64_t* const out)
