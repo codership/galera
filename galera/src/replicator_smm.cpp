@@ -408,10 +408,10 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
     ApplyOrder ao(trx);
     CommitOrder co(trx, co_mode_);
 
-    bool const aborting(TrxHandle::S_ABORTING == trx.state());
     bool const applying(trx.must_enter_am());
 
-    if (!aborting) trx.set_state(TrxHandle::S_APPLYING);
+    if (TrxHandle::S_ABORTING != trx.state())
+        trx.set_state(TrxHandle::S_APPLYING);
 
     if (gu_likely(applying))
     {
@@ -1019,14 +1019,14 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
     assert(trx.state() == TrxHandle::S_APPLYING  ||
            trx.state() == TrxHandle::S_ABORTING);
 
-    CommitOrder co(trx, co_mode_);
-    assert(!commit_monitor_.entered(co));
-
     trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
                   TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
 
     if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
+        CommitOrder co(trx, co_mode_);
+        assert(!commit_monitor_.entered(co));
+
         bool interrupted;
 
         try
@@ -1084,13 +1084,14 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandle& trx)
 
     CommitOrder co(trx, co_mode_);
     assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
+    assert(trx.state() ==TrxHandle::S_REPLAYING || !commit_monitor_.entered(co));
 
     if (trx.state() != TrxHandle::S_REPLAYING)
         trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
                       TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
 
     if (gu_likely(co_mode_ != CommitOrder::BYPASS &&
-                  !commit_monitor_.entered(co)))
+                  trx.state() != TrxHandle::S_REPLAYING))
     {
         gu_trace(commit_monitor_.enter(co));
     }
@@ -1226,19 +1227,6 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandle& trx)
     ++local_rollbacks_;
 
     return WSREP_OK;
-}
-
-
-wsrep_status_t galera::ReplicatorSMM::release_trx(TrxHandle& trx)
-{
-    assert(commit_monitor_.last_left() >= trx.global_seqno());
-
-    TrxHandle::State const state(trx.state());
-
-    if (gu_likely(state == TrxHandle::S_COMMITTED))
-        return release_commit(trx);
-    else
-        return release_rollback(trx);
 }
 
 

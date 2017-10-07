@@ -58,6 +58,15 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State const s)
     return os;
 }
 
+void galera::TrxHandle::print_state_history(std::ostream& os) const
+{
+    const std::vector<TrxHandle::State>& hist(state_.history());
+    for (size_t i(0); i < hist.size(); ++i)
+    {
+        os << hist[i] << "->";
+    }
+}
+
 void
 galera::TrxHandle::print(std::ostream& os) const
 {
@@ -93,6 +102,9 @@ galera::TrxHandle::print(std::ostream& os) const
     {
         os << " skip event";
     }
+
+    os << "; state history: ";
+    print_state_history(os);
 }
 
 std::ostream&
@@ -261,11 +273,11 @@ galera::TrxHandle::apply (void*                   recv_ctx,
         assert(0    == err_len);
     }
 
-    if (gu_unlikely(err > 0))
+    if (gu_unlikely(err != WSREP_CB_SUCCESS))
     {
         std::ostringstream os;
 
-        os << "Apply callback failed: seqno: " << global_seqno()
+        os << "Apply callback failed: Trx: " << *this
            << ", status: " << err;
 
         galera::ApplyException ae(os.str(), err_msg, NULL, err_len);

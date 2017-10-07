@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -706,7 +706,12 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        retval = repl->release_trx(*trx);
+
+        if (gu_likely(trx->state() == TrxHandle::S_COMMITTED))
+            retval = repl->release_commit(*trx);
+        else
+            retval = repl->release_rollback(*trx);
+
         trx_state = trx->state();
     }
     catch (std::exception& e)

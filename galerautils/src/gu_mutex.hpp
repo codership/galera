@@ -57,7 +57,8 @@ namespace gu
             }
             else
             {
-                gu_throw_error(err) << "Mutex lock failed: ";
+                assert(0);
+                gu_throw_error(err) << "Mutex lock failed";
             }
         }
 

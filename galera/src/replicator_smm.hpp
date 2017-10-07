@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -105,7 +105,6 @@ namespace galera
                                           const wsrep_buf_t*  error);
         wsrep_status_t release_commit(TrxHandle& trx);
         wsrep_status_t release_rollback(TrxHandle& trx);
-        wsrep_status_t release_trx(TrxHandle& trx);
         wsrep_status_t replay_trx(TrxHandlePtr& trx, void* replay_ctx);
 
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
@@ -174,6 +173,9 @@ namespace galera
         template<bool local>
         void cancel_monitors(const TrxHandle& trx)
         {
+//            log_info << "canceling " << (local ? "local" : "apply")
+//                     <<" monitor on behalf of trx: " << trx;
+
             if (local)
             {
                 LocalOrder  lo(trx);
@@ -353,7 +355,11 @@ namespace galera
 #ifdef GU_DBUG_ON
                 ,trx_(trx)
 #endif //GU_DBUG_ON
-            { }
+            {
+#ifdef GU_DBUG_ON
+                assert((trx_ && seqno_ == trx_->local_seqno()) || !trx_);
+#endif //GU_DBUG_ON
+            }
 
             wsrep_seqno_t seqno() const { return seqno_; }
 
