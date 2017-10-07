@@ -20,7 +20,11 @@ namespace galera
 
         struct Process
         {
-            Process() : obj_(0), cond_(), wait_cond_(), state_(S_IDLE) { }
+            Process() : obj_(0), cond_(), wait_cond_(), state_(S_IDLE)
+#ifndef NDEBUG
+                      ,dobj_()
+#endif /* NDEBUG */
+            { }
 
             const C* obj_;
             gu::Cond cond_;
@@ -33,6 +37,9 @@ namespace galera
                 S_APPLYING, // Applying
                 S_FINISHED  // Finished
             } state_;
+#ifndef NDEBUG
+            C dobj_;
+#endif /* NDEBUG */
 
         private:
 
@@ -136,7 +143,10 @@ namespace galera
 
                 process_[idx].state_ = Process::S_WAITING;
                 process_[idx].obj_   = &obj;
-
+#ifndef NDEBUG
+                process_[idx].dobj_.~C();
+                new (&process_[idx].dobj_) C(obj);
+#endif /* NDEBUG */
 #ifdef GU_DBUG_ON
                 obj.debug_sync(mutex_);
 #endif // GU_DBUG_ON
@@ -169,14 +179,12 @@ namespace galera
 
         bool entered(const C& obj) const
         {
-            const wsrep_seqno_t obj_seqno(obj.seqno());
-            const size_t        idx(indexof(obj_seqno));
-            gu::Lock lock(mutex_);
-            while (would_block (obj_seqno))
-            {
-                lock.wait(cond_);
-            }
-            return (process_[idx].state_ == Process::S_APPLYING);
+            return state(obj) == Process::S_APPLYING;
+        }
+
+        bool finished(const C& obj) const
+        {
+            return state(obj) == Process::S_FINISHED;
         }
 
         void leave(const C& obj)
@@ -221,6 +229,11 @@ namespace galera
             assert(process_[idx].state_ == Process::S_IDLE ||
                    process_[idx].state_ == Process::S_CANCELED);
 
+#ifndef NDEBUG
+            process_[idx].dobj_.~C();
+            new (&process_[idx].dobj_) C(obj);
+#endif /* NDEBUG */
+
             if (obj_seqno > last_entered_) last_entered_ = obj_seqno;
 
             if (obj_seqno <= drain_seqno_)
@@ -233,9 +246,8 @@ namespace galera
             }
         }
 
-        void interrupt(const C& obj)
+        bool interrupt(const C& obj)
         {
-
             size_t   idx (indexof(obj.seqno()));
             gu::Lock lock(mutex_);
 
@@ -253,6 +265,7 @@ namespace galera
                 process_[idx].cond_.signal();
                 // since last_left + 1 cannot be <= S_WAITING we're not
                 // modifying a window here. No broadcasting.
+                return true;
             }
             else
             {
@@ -261,6 +274,8 @@ namespace galera
                           << " le " << last_entered_
                           << " ll " << last_left_;
             }
+
+            return false;
         }
 
         wsrep_seqno_t last_left() const
@@ -488,6 +503,18 @@ namespace galera
             }
 
             while (last_left_ < drain_seqno_) lock.wait(cond_);
+        }
+
+        typename Process::State state(const C& obj) const
+        {
+            const wsrep_seqno_t obj_seqno(obj.seqno());
+            const size_t        idx(indexof(obj_seqno));
+            gu::Lock lock(mutex_);
+            while (would_block (obj_seqno))
+            {
+                lock.wait(cond_);
+            }
+            return process_[idx].state_;
         }
 
         Monitor(const Monitor&);

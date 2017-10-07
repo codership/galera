@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -41,6 +41,8 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
         os << "COMMITTING"; return;
     case TrxHandle::S_COMMITTED:
         os << "COMMITTED"; return;
+    case TrxHandle::S_ROLLING_BACK:
+        os << "ROLLING_BACK"; return;
     case TrxHandle::S_ROLLED_BACK:
         os << "ROLLED_BACK"; return;
     // don't use default to make compiler warn if something is missed
@@ -120,6 +122,7 @@ galera::TrxHandleSlave::Fsm::TransMap galera::TrxHandleSlave::trans_map_;
 
 
 namespace galera {
+
 template<>
 TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     :
@@ -139,15 +142,15 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     //  ||MUST_ABORT -----------------------------------------          |
     //  ||              |           |                         |         |
     //  ||     Pre Repl |           v                         |    REPLAYING
-    //  ||              |  MUST_CERT_AND_REPLAY --------------|         ^
-    //  || SR Rollback  v           |               --------- | Cert OK  |
+    //  ||              |  MUST_CERT_AND_REPLAY --------------|          ^
+    //  || SR Rollback  v           |               ----------| Cert OK  |
     //  | --------- ABORTING <-------               |         v          |
     //  |               |        Cert Fail          |   MUST_REPLAY_AM   |
     //  |               v                           |         |          |
+    //  |          ROLLING_BACK                     |         v          |
+    //  |               |                           |-> MUST_REPLAY_CM   |
+    //  |               v                           |         |          |
     //  ----------> ROLLED_BACK                     |         v          |
-    //                                              |-> MUST_REPLAY_CM   |
-    //                                              |         |          |
-    //                                              |         v          |
     //                                              |-> MUST_REPLAY      |
     //                                                        |          |
     //                                                        ------------
@@ -174,7 +177,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     // Committing
     add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
     add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
-    add(TrxHandle::S_COMMITTING, TrxHandle::S_EXECUTING); // SR
+    add(TrxHandle::S_COMMITTED, TrxHandle::S_EXECUTING); // SR
 
     // BF aborted
     add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
@@ -200,12 +203,17 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     // Replay stage
     add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
 
-    // BF aborted and/or cert failed
-    add(TrxHandle::S_ABORTING,  TrxHandle::S_ROLLED_BACK);
+    // BF aborted
+    add(TrxHandle::S_ABORTING,     TrxHandle::S_ROLLED_BACK);
+
+    // cert failed or BF in apply monitor
+    add(TrxHandle::S_ABORTING,  TrxHandle::S_ROLLING_BACK);
+    add(TrxHandle::S_ROLLING_BACK, TrxHandle::S_ROLLED_BACK);
 
     // SR rollback
     add(TrxHandle::S_ABORTING, TrxHandle::S_EXECUTING);
 }
+
 
 template<>
 TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
@@ -214,11 +222,14 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
 {
     //                                 Cert OK
     // 0 --> REPLICATING -> CERTIFYING ------> APPLYING --> COMMITTING
-    //            |             |                 ^             |
-    //            |             |Cert failed      |             |
-    //            |             |                 |             |
-    //            |             v                 |             v
-    //            +-------> ABORTING -------------+   COMMITTED / ROLLED_BACK
+    //            |             |                               |
+    //            |             |Cert failed                    |
+    //            |             |                               |
+    //            |             v                               v
+    //            +-------> ABORTING                  COMMITTED / ROLLED_BACK
+    //                          |
+    //                          v
+    //                    ROLLING_BACK
     //                          |
     //                          v
     //                     ROLLED_BACK
@@ -233,20 +244,29 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ABORTING);
     // Processing cert-failed and IST-skipped seqno
     add(TrxHandle::S_ABORTING,    TrxHandle::S_APPLYING);
-    // Shortcut for BF'ed in release_rollback()
+    // Entereing commit monitor after rollback
+    add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLING_BACK);
+    // BF in apply monitor
     add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLED_BACK);
-    // Committing/Rolling back after applying
+    // Entering commit monitor after applying
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
+    // Replay after BF
+    add(TrxHandle::S_APPLYING,    TrxHandle::S_REPLAYING);
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_REPLAYING);
     // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
-    // Rollback cert-failed, apply-failed and IST-skipped seqno finished
-    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ROLLED_BACK);
+    add(TrxHandle::S_REPLAYING,   TrxHandle::S_COMMITTED);
+    // SR BF'ed while waiting for commit monitor
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ABORTING);
+    // Rollback finished
+    add(TrxHandle::S_ROLLING_BACK,  TrxHandle::S_ROLLED_BACK);
 }
+
 
 static TransMapBuilder<TrxHandleMaster> master;
 static TransMapBuilder<TrxHandleSlave> slave;
 
-}
+} /* namespace galera */
 
 void
 galera::TrxHandleSlave::sanity_checks() const
@@ -276,8 +296,11 @@ galera::TrxHandleSlave::deserialize_error_log(const gu::Exception& e) const
 void
 galera::TrxHandleSlave::apply (void*                   recv_ctx,
                                wsrep_apply_cb_t        apply_cb,
-                               const wsrep_trx_meta_t& meta) const
+                               const wsrep_trx_meta_t& meta,
+                               wsrep_bool_t&           exit_loop)
 {
+    uint32_t const wsrep_flags(trx_flags_to_wsrep_flags(flags()));
+
     int err(0);
 
     const DataSetIn& ws(write_set_.dataset());
@@ -286,26 +309,23 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
 
     ws.rewind(); // make sure we always start from the beginning
 
+    wsrep_ws_handle_t const wh = { trx_id(), this };
+
     if (ws.count() > 0)
     {
         for (ssize_t i = 0; WSREP_CB_SUCCESS == err && i < ws.count(); ++i)
         {
             const gu::Buf& buf(ws.next());
             wsrep_buf_t const wb = { buf.ptr, size_t(buf.size) };
-
-            err = apply_cb(recv_ctx, trx_flags_to_wsrep_flags(flags()), &wb,
-                           &meta, &err_msg, &err_len);
+            err = apply_cb(recv_ctx, &wh, wsrep_flags, &wb, &meta, &exit_loop);
         }
     }
     else
     {
         // Apply also zero sized write set to inform application side
-        // about transaction meta data. This is done to avoid spreading
-        // logic around in apply and commit callbacks with streaming
-        // replication.
+        // about transaction meta data.
         wsrep_buf_t const wb = { NULL, 0 };
-        err = apply_cb(recv_ctx, trx_flags_to_wsrep_flags(flags()), &wb, &meta,
-                       &err_msg, &err_len);
+        err = apply_cb(recv_ctx, &wh, wsrep_flags, &wb, &meta, &exit_loop);
         assert(NULL == err_msg);
         assert(0    == err_len);
     }
@@ -314,8 +334,8 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
     {
         std::ostringstream os;
 
-        os << "Failed to apply app buffer: seqno: " << global_seqno()
-           << ", code: " << err;
+        os << "Apply callback failed: seqno: " << global_seqno()
+           << ", status: " << err;
 
         galera::ApplyException ae(os.str(), err_msg, NULL, err_len);
 

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 
@@ -49,7 +49,6 @@ namespace galera
     private:
         typename T::Fsm::TransMap& trans_map_;
     };
-
 
 
     class TrxHandle
@@ -120,6 +119,7 @@ namespace galera
             S_APPLYING,   // grabbing apply monitor, applying
             S_COMMITTING, // grabbing commit monitor, committing changes
             S_COMMITTED,
+            S_ROLLING_BACK,
             S_ROLLED_BACK
         } State;
 
@@ -180,6 +180,8 @@ namespace galera
 
         uint64_t timestamp() const { return timestamp_; }
 
+        bool master() const { return master_; }
+
         void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
@@ -208,7 +210,8 @@ namespace galera
             timestamp_         (),
             version_           (-1),
             write_set_flags_   (0),
-            local_             (local)
+            local_             (local),
+            master_            (false)
         {}
 
         /* local trx ctor */
@@ -225,7 +228,8 @@ namespace galera
             timestamp_         (gu_time_calendar()),
             version_           (version),
             write_set_flags_   (F_BEGIN),
-            local_             (true)
+            local_             (true),
+            master_            (true)
         {}
 
         Fsm state_;
@@ -240,6 +244,7 @@ namespace galera
         // TrxHandleSlave if there exists TrxHandleMaster object corresponding
         // to TrxHandleSlave.
         bool                   local_;
+        bool                   master_; // derived object type
 
     private:
 
@@ -510,7 +515,8 @@ namespace galera
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
+                   const wsrep_trx_meta_t& meta,
+                   wsrep_bool_t&           exit_loop) /* throws */;
 
         bool is_committed() const { return committed_; }
         void mark_committed()     { committed_ = true; }
@@ -575,6 +581,19 @@ namespace galera
             cert_bypass_ = val;
         }
         bool cert_bypass() const { return cert_bypass_; }
+
+        bool must_enter_am() const
+        {
+            static bool const SR_MASK = F_COMMIT | F_BEGIN;
+
+            assert(state() == S_CERTIFYING           ||
+                   state() == S_MUST_CERT_AND_REPLAY ||
+                   state() == S_ABORTING);
+
+            bool const streaming((flags() & SR_MASK) != SR_MASK);
+            return (state() != S_ABORTING || pa_unsafe() || streaming);
+//remove            return true;
+        }
 
     protected:
 
@@ -939,6 +958,7 @@ namespace galera
         int                    gcs_handle_;
         bool                   wso_;
 
+        friend class TrxHandle;
         friend class TrxHandleSlave;
         friend class TrxHandleMasterDeleter;
         friend class TransMapBuilder<TrxHandleMaster>;
