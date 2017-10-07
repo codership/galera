@@ -180,6 +180,8 @@ namespace galera
             i->second.post_action_.push_back(action);
         }
 
+        const std::vector<State>& history() const { return state_hist_; }
+
     private:
 
         FSM(const FSM&);
