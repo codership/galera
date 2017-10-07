@@ -120,6 +120,8 @@ namespace galera
 
         static void print_state(std::ostream&, State);
 
+        void print_state_history(std::ostream&) const;
+
         class Transition
         {
         public:
@@ -234,6 +236,7 @@ namespace galera
                            wsrep_seqno_t seqno_l,
                            wsrep_seqno_t seqno_g)
         {
+            assert(WSREP_SEQNO_UNDEFINED == local_seqno_);
 #ifndef NDEBUG
             if (last_seen_seqno_ >= seqno_g)
             {
