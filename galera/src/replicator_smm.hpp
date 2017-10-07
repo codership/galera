@@ -176,6 +176,9 @@ namespace galera
         template<bool local>
         void cancel_monitors(const TrxHandleSlave& ts)
         {
+//            log_info << "canceling " << (local ? "local" : "apply")
+//                     <<" monitor on behalf of trx: " << trx;
+
             if (local)
             {
                 LocalOrder  lo(ts);
@@ -357,7 +360,11 @@ namespace galera
 #ifdef GU_DBUG_ON
                 ,trx_(ts)
 #endif //GU_DBUG_ON
-            { }
+            {
+#ifdef GU_DBUG_ON
+                assert((trx_ && seqno_ == trx_->local_seqno()) || !trx_);
+#endif //GU_DBUG_ON
+            }
 
             wsrep_seqno_t seqno() const { return seqno_; }
 

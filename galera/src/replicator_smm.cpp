@@ -1247,7 +1247,7 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandleSlave& trx)
                       TrxHandle::S_ROLLING_BACK : TrxHandle::S_COMMITTING);
 
     if (gu_likely(co_mode_ != CommitOrder::BYPASS &&
-                  !commit_monitor_.entered(co)))
+                  trx.state() != TrxHandle::S_REPLAYING))
     {
         gu_trace(commit_monitor_.enter(co));
     }

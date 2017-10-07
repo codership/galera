@@ -63,18 +63,29 @@ void galera::TrxHandle::print_set_state(State state) const
     log_info << "Trx: " << this << " shifting to " << state;
 }
 
+void galera::TrxHandle::print_state_history(std::ostream& os) const
+{
+    const std::vector<TrxHandle::State>& hist(state_.history());
+    for (size_t i(0); i < hist.size(); ++i)
+    {
+        os << hist[i] << "->";
+    }
+}
+
 inline
 void galera::TrxHandle::print(std::ostream& os) const
 {
     os << "source: "   << source_id()
        << " version: " << version()
        << " local: "   << local()
-       << " state: "   << state()
+//remove       << " state: "   << state()
        << " flags: "   << flags()
        << " conn_id: " << int64_t(conn_id())
        << " trx_id: "  << int64_t(trx_id())  // for readability
-       << " tstamp: "  << timestamp();
-
+       << " tstamp: "  << timestamp()
+       << "; state: ";
+    print_state_history(os);
+    os << state();
 }
 
 std::ostream&
@@ -83,7 +94,8 @@ galera::operator<<(std::ostream& os, const TrxHandle& th)
     th.print(os); return os;
 }
 
-void galera::TrxHandleSlave::print(std::ostream& os) const
+void
+galera::TrxHandleSlave::print(std::ostream& os) const
 {
     TrxHandle::print(os);
 
@@ -330,11 +342,11 @@ galera::TrxHandleSlave::apply (void*                   recv_ctx,
         assert(0    == err_len);
     }
 
-    if (gu_unlikely(0 != err))
+    if (gu_unlikely(err != WSREP_CB_SUCCESS))
     {
         std::ostringstream os;
 
-        os << "Apply callback failed: seqno: " << global_seqno()
+        os << "Apply callback failed: Trx: " << *this
            << ", status: " << err;
 
         galera::ApplyException ae(os.str(), err_msg, NULL, err_len);

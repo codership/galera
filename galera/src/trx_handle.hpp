@@ -127,6 +127,8 @@ namespace galera
 
         static void print_state(std::ostream&, State);
 
+        void print_state_history(std::ostream&) const;
+
         class Transition
         {
         public:
