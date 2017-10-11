@@ -715,23 +715,27 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
             }
             else
             {
-                trx.reset_ts();
+//remove                trx.reset_ts();
                 pending_cert_queue_.push(ts);
 
                 LocalOrder lo(*ts);
                 local_monitor_.self_cancel(lo);
                 ApplyOrder ao(*ts);
                 apply_monitor_.self_cancel(ao);
+#if 0 //remove
                 if (co_mode_ != CommitOrder::BYPASS)
                 {
                     CommitOrder co(*ts, co_mode_);
                     commit_monitor_.self_cancel(co);
                 }
-
+#endif
                 ts->set_state(TrxHandle::S_ABORTING);
                 trx.set_state(TrxHandle::S_ABORTING);
 
                 retval = WSREP_TRX_FAIL;
+//remove                assert(NULL == meta ||
+//                       meta->gtid.seqno == WSREP_SEQNO_UNDEFINED);
+//                return retval;
             }
         }
     }
@@ -2702,8 +2706,11 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                 }
                 else
                 {
-                    trx->reset_ts();
+//remove                    trx->reset_ts();
                     pending_cert_queue_.push(ts);
+
+                    ts->set_state(TrxHandle::S_ABORTING);
+                    trx->set_state(TrxHandle::S_ABORTING);
 
                     if (interrupted == true)
                     {
@@ -2714,23 +2721,22 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                         local_monitor_.leave(lo);
                     }
 
-                    // If not ts->pa_unsafe(), apply_monitor_
+                    // If not ts->must_neter_am(), apply_monitor_
                     // will be canceled at the end of the method,
                     // in cancel_monitors().
-                    if (ts->pa_unsafe())
+//remove                    if (ts->pa_unsafe())
+                    if (ts->must_enter_am())
                     {
                         ApplyOrder ao(*ts);
                         apply_monitor_.self_cancel(ao);
                     }
+#if 0 //remove
                     if (co_mode_ != CommitOrder::BYPASS)
                     {
                         CommitOrder co(*ts, co_mode_);
                         commit_monitor_.self_cancel(co);
                     }
-
-                    ts->set_state(TrxHandle::S_ABORTING);
-                    trx->set_state(TrxHandle::S_ABORTING);
-
+#endif
                     retval = WSREP_TRX_FAIL;
                 }
             }
@@ -2760,7 +2766,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             Certification::TestResult result;
             result = cert_.append_trx(aborted_ts);
             report_last_committed(cert_.set_trx_committed(*aborted_ts));
-            aborted_ts->set_state(TrxHandle::S_ROLLED_BACK);
+//remove            aborted_ts->set_state(TrxHandle::S_ROLLED_BACK);
 
             log_debug << "trx in pending cert queue certified, result: "
                       << result;
