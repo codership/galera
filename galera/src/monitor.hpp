@@ -132,7 +132,7 @@ namespace galera
             const size_t        idx(indexof(obj_seqno));
             gu::Lock            lock(mutex_);
 
-            state_debug_print("enter", obj_seqno);
+            state_debug_print("enter", obj);
             assert(obj_seqno > last_left_);
 
             pre_enter(obj, lock);
@@ -173,7 +173,7 @@ namespace galera
             assert(process_[idx].state_ == Process::S_CANCELED);
             process_[idx].state_ = Process::S_IDLE;
 
-            state_debug_print("enter canceled", obj_seqno);
+            state_debug_print("enter canceled", obj);
             gu_throw_error(EINTR);
         }
 
@@ -193,7 +193,7 @@ namespace galera
             size_t   idx(indexof(obj.seqno()));
 #endif /* NDEBUG */
             gu::Lock lock(mutex_);
-            state_debug_print("leave", obj.seqno());
+            state_debug_print("leave", obj);
 
             assert(process_[idx].state_ == Process::S_APPLYING ||
                    process_[idx].state_ == Process::S_CANCELED);
@@ -209,7 +209,7 @@ namespace galera
             size_t   idx(indexof(obj_seqno));
             gu::Lock lock(mutex_);
 
-            state_debug_print("self_cancel", obj_seqno);
+            state_debug_print("self_cancel", obj);
 
             assert(obj_seqno > last_left_);
 
@@ -256,6 +256,8 @@ namespace galera
             {
                 lock.wait(cond_);
             }
+
+            state_debug_print("interrupt", obj);
 
             if ((process_[idx].state_ == Process::S_IDLE &&
                  obj.seqno()          >  last_left_ ) ||
@@ -373,14 +375,13 @@ namespace galera
 
     private:
 
-        void state_debug_print(const std::string& method,
-                               wsrep_seqno_t obj_seqno)
+        template <typename T>
+        void state_debug_print(const std::string& method, const T& x)
         {
 #ifdef GALERA_MONITOR_DEBUG_PRINT
-            log_info << typeid(C).name() << ": " << method
-                     << "(" << obj_seqno << "): "
-                     << " le: " << last_entered_ << " ll: " << last_left_;
-#endif // GALERA_MONITOR_DEBUG_PRINT
+            log_info << typeid(C).name() << ": " << method << "(" << x
+                     << "): le " << last_entered_ << ", ll " << last_left_;
+#endif /* GALERA_MONITOR_DEBUG_PRINT */
         }
 
         size_t indexof(wsrep_seqno_t seqno) const

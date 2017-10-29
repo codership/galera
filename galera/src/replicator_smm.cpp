@@ -924,7 +924,6 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
     assert(ts->depends_seqno() >= 0);
 
     trx.set_state(TrxHandle::S_APPLYING);
-    ts->set_state(TrxHandle::S_APPLYING);
 
     ApplyOrder  ao(*ts);
     bool interrupted(false);
@@ -975,6 +974,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
     else
     {
         assert(apply_monitor_.entered(ao));
+        ts->set_state(TrxHandle::S_APPLYING);
     }
 
     assert(trx.state() != TrxHandle::S_MUST_ABORT);
@@ -2671,9 +2671,11 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     if (gu_unlikely (interrupted ||
                      (trx != 0 && trx->state() == TrxHandle::S_MUST_ABORT)))
     {
-        assert(trx == 0 || trx->state() == TrxHandle::S_MUST_ABORT);
+//remove        assert(trx == 0 || trx->state() == TrxHandle::S_MUST_ABORT);
+        assert(trx != 0);
         retval = cert_for_aborted(ts);
 
+#if 0 //remove
         if (WSREP_TRX_FAIL == retval)
         {
             assert(WSREP_SEQNO_UNDEFINED == ts->depends_seqno());
@@ -2691,13 +2693,16 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             if (trx != 0) trx->set_state(TrxHandle::S_ABORTING);
         }
         else
+#endif //0
+        if (WSREP_TRX_FAIL != retval)
         {
             assert(ts->state() == TrxHandle::S_REPLICATING ||
                    ts->state() == TrxHandle::S_CERTIFYING);
             assert(WSREP_BF_ABORT == retval);
             assert(trx != 0);
-            if (trx != 0)
-            {
+
+//remove            if (trx != 0)
+//            {
                 // If the transaction was committing, it must replay.
                 if (ts->flags() & TrxHandle::F_COMMIT)
                 {
@@ -2710,8 +2715,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                     pending_cert_queue_.push(ts);
 
                     ts->set_state(TrxHandle::S_ABORTING);
-                    trx->set_state(TrxHandle::S_ABORTING);
 
+#if 0 //remove
+                    trx->set_state(TrxHandle::S_ABORTING);
                     if (interrupted == true)
                     {
                         local_monitor_.self_cancel(lo);
@@ -2730,18 +2736,51 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                         ApplyOrder ao(*ts);
                         apply_monitor_.self_cancel(ao);
                     }
-#if 0 //remove
+//#if 0 //remove
                     if (co_mode_ != CommitOrder::BYPASS)
                     {
                         CommitOrder co(*ts, co_mode_);
                         commit_monitor_.self_cancel(co);
                     }
-#endif
+#endif //0
                     retval = WSREP_TRX_FAIL;
                 }
-            }
-            else return retval;
         }
+        else
+        {
+            assert(WSREP_TRX_FAIL == retval);
+            assert(WSREP_SEQNO_UNDEFINED == ts->depends_seqno());
+        }
+
+        if (WSREP_TRX_FAIL == retval)
+        {
+                    assert(TrxHandle::S_ABORTING == ts->state());
+
+                    if (trx) trx->set_state(TrxHandle::S_ABORTING);
+
+                    if (interrupted == true)
+                    {
+                        local_monitor_.self_cancel(lo);
+                    }
+                    else
+                    {
+                        local_monitor_.leave(lo);
+                    }
+
+                    // If not ts->must_neter_am(), apply_monitor_
+                    // will be canceled at the end of the method,
+                    // in cancel_monitors().
+//remove                    if (ts->pa_unsafe())
+#if 0 // remove
+                    if (ts->must_enter_am())
+                    {
+                        ApplyOrder ao(*ts);
+                        apply_monitor_.self_cancel(ao);
+                    }
+#endif
+        }
+        else return retval;
+//remove        }
     }
     else
     {
@@ -2826,7 +2865,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     assert(WSREP_OK == retval || WSREP_TRX_FAIL == retval ||
            WSREP_TRX_MISSING == retval);
 
-    if (gu_unlikely(WSREP_TRX_FAIL == retval && !ts->must_enter_am()))
+    if (gu_unlikely(WSREP_TRX_FAIL == retval &&
+                    (!ts->must_enter_am() || trx != NULL)))
     {
         assert(ts->state() == TrxHandle::S_ABORTING);
         // applicable but failed certification: self-cancel monitors
@@ -2835,6 +2875,12 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     else
     {
         assert(WSREP_OK != retval || ts->depends_seqno() >= 0);
+        if (WSREP_OK != retval && ts->local())
+        {
+            log_info << "#############" << "Skipped cancel_monitors(): retval: "
+                     << retval << ", must_enter_am: " << ts->must_enter_am()
+                     << ", trx: " << trx << ", ts: " << *ts;
+        }
     }
 
 #if 0
