@@ -23,6 +23,11 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	SCONS_ARGS += tests=1 deterministic_tests=1
 endif
 
+# Use strict compilation flags (ie -Werror) if requested
+ifneq (,$(filter strict_build_flags,$(DEB_BUILD_OPTIONS)))
+	SCONS_ARGS += strict_build_flags=1
+endif
+
 
 override_dh_auto_build:
 	# Print build env info to help debug builds on different platforms

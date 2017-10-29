@@ -245,36 +245,47 @@ static GU_INLINE void gu_spooky_short_host(
     {
     case 15:
         d += ((uint64_t)u.p8[14]) << 48;
+        // fall through
     case 14:
         d += ((uint64_t)u.p8[13]) << 40;
+        // fall through
     case 13:
         d += ((uint64_t)u.p8[12]) << 32;
+        // fall through
     case 12:
         d += gu_le32(u.p32[2]);
         c += gu_le64(u.p64[0]);
         break;
     case 11:
         d += ((uint64_t)u.p8[10]) << 16;
+        // fall through
     case 10:
         d += ((uint64_t)u.p8[9]) << 8;
+        // fall through
     case 9:
         d += (uint64_t)u.p8[8];
+        // fall through
     case 8:
         c += gu_le64(u.p64[0]);
         break;
     case 7:
         c += ((uint64_t)u.p8[6]) << 48;
+        // fall through
     case 6:
         c += ((uint64_t)u.p8[5]) << 40;
+        // fall through
     case 5:
         c += ((uint64_t)u.p8[4]) << 32;
+        // fall through
     case 4:
         c += gu_le32(u.p32[0]);
         break;
     case 3:
         c += ((uint64_t)u.p8[2]) << 16;
+        // fall through
     case 2:
         c += ((uint64_t)u.p8[1]) << 8;
+        // fall through
     case 1:
         c += (uint64_t)u.p8[0];
         break;

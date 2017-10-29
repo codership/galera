@@ -242,6 +242,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_DONOR:
         start_closing();
         wait_for_CLOSED(lock);
+        // fall through
     case S_CLOSED:
         ist_senders_.cancel();
         break;
@@ -264,7 +265,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     // make sure there was a proper initialization/cleanup
     assert(WSREP_UUID_UNDEFINED == uuid_);
 
-    ssize_t err;
+    ssize_t err = 0;
     wsrep_status_t ret(WSREP_OK);
     wsrep_seqno_t const seqno(STATE_SEQNO());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
@@ -1057,8 +1058,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
         ts.set_depends_seqno(WSREP_SEQNO_UNDEFINED);
         ts.set_depends_seqno(ds);
         trx.set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
     }
+    // fall through
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {
@@ -1367,7 +1368,7 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
 }
 
 #if 0 //remove
-<<<<<<< HEAD
+//<<<<<<< HEAD
 srep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
 {
     // * Cert failure or BF abort while inside pre_commit() call or
@@ -1418,7 +1419,7 @@ srep_status_t galera::ReplicatorSMM::post_rollback(TrxHandleMaster* trx)
 
     return WSREP_OK;
 }
-=======
+//=======
 #endif //0
 
 
@@ -1426,7 +1427,7 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 {
     assert(trx.locked());
 #if 0 //remove
-<<<<<<< HEAD
+//<<<<<<< HEAD
     // Release monitors if ts was not committed. We may enter here
     // with ts->state() == TrxHandle::S_COMMITTED if transaction
     // replicated a fragment succesfully and then voluntarily rolled
@@ -1472,7 +1473,7 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 
     trx->set_state(TrxHandle::S_ROLLED_BACK);
 
-=======
+//=======
 #endif //0
 
     if (trx.state() == TrxHandle::S_MUST_ABORT) // BF abort before replicaiton
