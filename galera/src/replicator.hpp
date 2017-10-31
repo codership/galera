@@ -74,7 +74,8 @@ namespace galera
         virtual wsrep_status_t certify(TrxHandlePtr& trx, wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t replay_trx(TrxHandlePtr& trx,
                                           void*         replay_ctx) = 0;
-        virtual void abort_trx(TrxHandle* trx) = 0;
+        virtual wsrep_status_t abort_trx(TrxHandle* trx,
+                                         wsrep_seqno_t, wsrep_seqno_t*) = 0;
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;

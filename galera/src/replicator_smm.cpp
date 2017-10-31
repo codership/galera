@@ -697,19 +697,34 @@ out:
     return retval;
 }
 
-void
-galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
+wsrep_status_t
+galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
+                                 wsrep_seqno_t* victim_seqno)
 {
     assert(trx != 0);
     assert(trx->is_local() == true);
 
-    log_debug << "aborting trx " << *trx << " " << trx;
+    log_debug << "BF seqno " << bf_seqno
+              << " aborting trx " << *trx << " " << trx;
 
+    if (trx->global_seqno() != WSREP_SEQNO_UNDEFINED &&
+        trx->global_seqno() < bf_seqno)
+    {
+        // Decline BF abort if the trx comitting (has valid global seqno)
+        // and its global seqno is less than BF seqno. The committing victim
+        // trx is local and is supposed to already have grabbed all locks
+        // and resources, so the BF aborter should wait.
+        return WSREP_NOT_ALLOWED;
+    }
+
+    wsrep_status_t retval(WSREP_OK);
     switch (trx->state())
     {
     case TrxHandle::S_MUST_ABORT:
-    case TrxHandle::S_ABORTING: // guess this is here because we can have a race
-        return;
+    case TrxHandle::S_ABORTING:
+        // victim trx was already BF aborted or it failed certification
+        retval = WSREP_NOT_ALLOWED;
+        break;
     case TrxHandle::S_EXECUTING:
         trx->set_state(TrxHandle::S_MUST_ABORT);
         break;
@@ -750,7 +765,14 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
             // trx waiting in commit monitor
             CommitOrder co(*trx, co_mode_);
             bool const interrupted(commit_monitor_.interrupt(co));
-            if (interrupted) trx->set_state(TrxHandle::S_MUST_ABORT);
+            if (interrupted)
+            {
+                trx->set_state(TrxHandle::S_MUST_ABORT);
+            }
+            else
+            {
+                retval = WSREP_NOT_ALLOWED;
+            }
         }
         break;
     case TrxHandle::S_ROLLING_BACK:
@@ -760,6 +782,11 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     default:
         gu_throw_fatal << "invalid state " << trx->state();
     }
+    if (retval == WSREP_OK)
+    {
+        *victim_seqno = trx->global_seqno();
+    }
+    return retval;
 }
 
 

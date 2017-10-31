@@ -352,6 +352,7 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
+    assert(victim_seqno != 0);
 
     *victim_seqno = WSREP_SEQNO_UNDEFINED;
 
@@ -375,9 +376,7 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
     try
     {
         TrxHandleLock lock(*trx);
-        repl->abort_trx(trx.get());
-        *victim_seqno = trx->global_seqno();
-        retval = WSREP_OK;
+        retval = repl->abort_trx(trx.get(), bf_seqno, victim_seqno);
     }
     catch (std::exception& e)
     {
