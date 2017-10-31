@@ -97,7 +97,7 @@ namespace galera
 
         wsrep_status_t send(TrxHandleMaster& trx, wsrep_trx_meta_t*);
         wsrep_status_t replicate(TrxHandleMaster& trx, wsrep_trx_meta_t*);
-        void           abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno);
+        wsrep_status_t abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno);
         wsrep_status_t certify(TrxHandleMaster& trx, wsrep_trx_meta_t*);
         wsrep_status_t commit_order_enter_local(TrxHandleMaster& trx);
         wsrep_status_t commit_order_enter_remote(TrxHandleSlave& trx);
