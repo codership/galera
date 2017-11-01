@@ -983,6 +983,13 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
             log_fatal << "Failed to re-apply trx: " << *trx;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, aborting...";
+
+            /* Before doing a graceful exit ensure that node isolate itself
+            from the cluster. This will cause the quorum to re-evaluate
+            and if minority nodes are left with different set of data
+            they can turn non-Primary to avoid further data consistency issue. */
+            param_set("gmcast.isolate", "1");
+
             abort();
         }
 
@@ -1396,6 +1403,13 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
             log_fatal << "Failed to apply trx: " << *trx;
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, aborting...";
+
+            /* Before doing a graceful exit ensure that node isolate itself
+            from the cluster. This will cause the quorum to re-evaluate
+            and if minority nodes are left with different set of data
+            they can turn non-Primary to avoid further data consistency issue. */
+            param_set("gmcast.isolate", "1");
+
             abort();
         }
         break;
