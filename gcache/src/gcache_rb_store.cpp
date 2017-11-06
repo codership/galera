@@ -1011,6 +1011,10 @@ namespace gcache
             else assert(size_trail_ >= sizeof(BufferHeader));
 
             estimate_space();
+            /* On graceful shutdown all the active buffers are released
+            so on recovery size_used_ = 0.
+            size_cache_ = size_free_ + size_used_ + releasebutnotdiscarded */
+            size_used_ = 0;
 
             /* now discard all the locked-in buffers (see seqno_reset()) */
             gu::Progress<size_t> progress(
