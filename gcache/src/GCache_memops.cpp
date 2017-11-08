@@ -14,6 +14,10 @@ namespace gcache
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {
+            /* Skip purge from this seqno onwards. */
+            if (params.skip_purge(i->first))
+                return false;
+
             BufferHeader* bh(ptr2BH (i->second));
 
             if (gu_likely(BH_is_released(bh)))

@@ -113,6 +113,17 @@ namespace gcache
 
         size_t allocated_pool_size ();
 
+        void set_freeze_purge_at_seqno(seqno_t seqno)
+        {
+            freeze_purge_at_seqno_ = seqno;
+        }
+
+        bool skip_purge(seqno_t seqno)
+        {
+            return ((freeze_purge_at_seqno_ == SEQNO_ILL)
+                    ? (false) : (seqno >= freeze_purge_at_seqno_));
+        }
+
     private:
 
         static size_t const PREAMBLE_LEN = 1024;
@@ -130,6 +141,8 @@ namespace gcache
         size_t            max_used_; // maximal memory usage (in bytes)
         seqno2ptr_t&       seqno2ptr_;
         gu::UUID&          gid_;
+
+        seqno_t            freeze_purge_at_seqno_;
 
         size_t       const size_cache_;
         size_t             size_free_;

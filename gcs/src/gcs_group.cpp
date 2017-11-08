@@ -1190,7 +1190,8 @@ group_find_ist_donor (const gcs_group_t* const group,
 
     if (ist_seqno < safe_ist_seqno) {
         // unsafe to perform ist.
-        gu_debug("fallback to sst. ist_seqno < safe_ist_seqno");
+        gu_info("may fallback to sst. ist_seqno [%lld] < safe_ist_seqno [%lld]",
+                (long long) ist_seqno, (long long) safe_ist_seqno);
         return -1;
     }
 
