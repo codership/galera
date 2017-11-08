@@ -37,9 +37,7 @@ public:
     void leave();
     size_t mtu() const { return mtu_; }
 
-#ifdef HAVE_ASIO_SSL_HPP
     std::string get_ssl_password() const;
-#endif // HAVE_ASIO_SSL_HPP
 
 private:
 
@@ -54,9 +52,7 @@ private:
     gu::datetime::Date          poll_until_;
     asio::io_service            io_service_;
     asio::deadline_timer        timer_;
-#ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::context          ssl_context_;
-#endif /* HAVE_ASIO_SSL_HPP */
     size_t                      mtu_;
 
     NetHeader::checksum_t       checksum_;
