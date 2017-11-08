@@ -131,7 +131,6 @@ elif machine == 's390x':
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
-ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
@@ -447,19 +446,16 @@ if not system_asio:
         Exit(1)
 
 # asio/ssl
-if ssl == 1:
-    if conf.CheckCXXHeader('asio/ssl.hpp'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_SSL_HPP')
-    else:
-        print 'ssl support required but asio/ssl.hpp not found or not usable'
-        print 'compile with ssl=0 or check that openssl devel headers are usable'
-        Exit(1)
-    if conf.CheckLib('ssl'):
-        conf.CheckLib('crypto')
-    else:
-        print 'ssl support required but openssl library not found'
-        print 'compile with ssl=0 or check that openssl library is usable'
-        Exit(1)
+if not conf.CheckCXXHeader('asio/ssl.hpp'):
+    print 'SSL support required but asio/ssl.hpp was not found or not usable'
+    print 'check that SSL devel headers are installed and usable'
+    Exit(1)
+if not conf.CheckLib('ssl'):
+    print 'SSL support required but libssl was not found'
+    Exit(1)
+if not conf.CheckLib('crypto'):
+    print 'SSL support required libcrypto was not found'
+    Exit(1)
 
 
 # these will be used only with our software

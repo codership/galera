@@ -42,9 +42,7 @@ public:
     AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpSocket();
     void failed_handler(const asio::error_code& ec, const std::string& func, int line);
-#ifdef HAVE_ASIO_SSL_HPP
     void handshake_handler(const asio::error_code& ec);
-#endif // HAVE_ASIO_SSL_HPP
     void connect_handler(const asio::error_code& ec);
     void connect(const gu::URI& uri);
     void close();
@@ -89,9 +87,7 @@ private:
 
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
-#ifdef HAVE_ASIO_SSL_HPP
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
-#endif // HAVE_ASIO_SSL_HPP
     std::deque<Datagram>                      send_q_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;

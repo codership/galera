@@ -28,16 +28,13 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     poll_until_(gu::datetime::Date::max()),
     io_service_(),
     timer_(io_service_),
-#ifdef HAVE_ASIO_SSL_HPP
     ssl_context_(io_service_, asio::ssl::context::sslv23),
-#endif // HAVE_ASIO_SSL_HPP
     mtu_(1 << 15),
     checksum_(NetHeader::checksum_type(
                   conf.get<int>(gcomm::Conf::SocketChecksum,
                                 NetHeader::CS_CRC32C)))
 {
     conf.set(gcomm::Conf::SocketChecksum, checksum_);
-#ifdef HAVE_ASIO_SSL_HPP
     // use ssl if either private key or cert file is specified
     bool use_ssl(conf_.is_set(gu::conf::ssl_key)  == true ||
                  conf_.is_set(gu::conf::ssl_cert) == true);
@@ -54,7 +51,6 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
         log_info << "initializing ssl context";
         gu::ssl_prepare_context(conf_, ssl_context_);
     }
-#endif // HAVE_ASIO_SSL_HPP
 }
 
 gcomm::AsioProtonet::~AsioProtonet()
