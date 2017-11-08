@@ -10,6 +10,7 @@
 #include "gu_utils.hpp"
 
 #include <limits>
+#include <cassert>
 
 #include <cstring>
 #include <stdint.h>

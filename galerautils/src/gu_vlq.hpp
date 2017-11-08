@@ -18,6 +18,7 @@
 #include "gu_throw.hpp"
 
 #include "gu_macros.h"
+#include <cassert>
 
 #define GU_VLQ_CHECKS
 #define GU_VLQ_ALEX

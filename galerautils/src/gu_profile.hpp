@@ -181,15 +181,9 @@ class gu::prof::Profile
         long long int time_calendar_;
         long long int time_thread_cputime_;
     };
-#if defined(HAVE_BOOST_UNORDERED_MAP_HPP)
-    typedef boost::unordered_map<Key, PointStats, KeyHash> Map;
-#elif defined(HAVE_UNORDERED_MAP)
-    typedef std::unordered_map<Key, PointStats, KeyHash> Map;
-#elif defined(HAVE_TR1_UNORDERED_MAP)
-    typedef std::tr1::unordered_map<Key, PointStats, KeyHash> Map;
-#else
-    typedef std::map<Key, PointStats> Map;
-#endif
+
+    typedef gu::UnorderedMap<Key, PointStats, KeyHash> Map;
+
 public:
     /*!
      * Default constructor.

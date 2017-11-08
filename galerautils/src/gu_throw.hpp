@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,6 +18,7 @@
 #include <sstream>
 
 #include "gu_macros.h"
+#include "gu_macros.hpp"
 #include "gu_exception.hpp"
 
 namespace gu
@@ -62,7 +63,7 @@ namespace gu
             err  (err_)
         {}
 
-        ~ThrowError() GU_NORETURN
+        ~ThrowError() GU_NOEXCEPT(false) GU_NORETURN
         {
             base.os << ": " << err << " (" << ::strerror(err) << ')';
 
@@ -90,7 +91,7 @@ namespace gu
             base (file, func, line)
         {}
 
-        ~ThrowFatal () GU_NORETURN
+        ~ThrowFatal () GU_NOEXCEPT(false) GU_NORETURN
         {
             base.os << " (FATAL)";
 
