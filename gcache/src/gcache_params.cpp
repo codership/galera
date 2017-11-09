@@ -20,6 +20,8 @@ static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_COUNT("0");
 static const std::string GCACHE_PARAMS_RECOVER    ("gcache.recover");
 static const std::string GCACHE_DEFAULT_RECOVER   ("no");
+static const std::string GCACHE_PARAMS_FREEZE_PURGE_SEQNO("gcache.freeze_purge_at_seqno");
+static const std::string GCACHE_DEFAULT_FREEZE_PURGE_SEQNO("-1");
 
 void
 gcache::GCache::Params::register_params(gu::Config& cfg)
@@ -32,6 +34,7 @@ gcache::GCache::Params::register_params(gu::Config& cfg)
     cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE,  GCACHE_DEFAULT_KEEP_PAGES_SIZE);
     cfg.add(GCACHE_PARAMS_KEEP_PAGES_COUNT, GCACHE_DEFAULT_KEEP_PAGES_COUNT);
     cfg.add(GCACHE_PARAMS_RECOVER,          GCACHE_DEFAULT_RECOVER);
+    cfg.add(GCACHE_PARAMS_FREEZE_PURGE_SEQNO, GCACHE_DEFAULT_FREEZE_PURGE_SEQNO);
 }
 
 static const std::string&
@@ -68,7 +71,8 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
     keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE)),
     keep_pages_count_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_COUNT)),
-    recover_  (cfg.get<bool>(GCACHE_PARAMS_RECOVER))
+    recover_  (cfg.get<bool>(GCACHE_PARAMS_RECOVER)),
+    freeze_purge_at_seqno_(cfg.get<seqno_t>(GCACHE_PARAMS_FREEZE_PURGE_SEQNO))
 {}
 
 void
@@ -148,6 +152,34 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
    {
        gu_throw_error(EINVAL) << "'" << key
                               << "' has a meaning only on startup.";
+   }
+   else if (key == GCACHE_PARAMS_FREEZE_PURGE_SEQNO)
+   {
+        seqno_t seqno = -1;
+
+        gu::Lock lock(mtx);
+        /* locking here serves two purposes: ensures atomic setting of config
+         * and params. */
+
+        if (val.compare("now") == 0)
+            seqno = (seqno2ptr.empty() ? 1 : seqno2ptr.begin()->first);
+        else
+        {
+            seqno = gu::Config::from_config<seqno_t>(val);
+
+            if (seqno != SEQNO_ILL && seqno2ptr.find(seqno) == seqno2ptr.end())
+            {
+                log_info << "Freezing gcache purge failed "
+                         << " (seqno not found in gcache)";
+                throw gu::NotFound();
+            }
+        }
+
+        log_info << "Freezing gcache purge at " << seqno;
+
+        config.set<seqno_t>(key, seqno);
+        params.freeze_purge_at_seqno(seqno);
+        rb.set_freeze_purge_at_seqno(seqno);
    }
    else
    {

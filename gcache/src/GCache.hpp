@@ -211,10 +211,17 @@ namespace gcache
             size_t keep_pages_count()    const { return keep_pages_count_; }
             bool   recover()             const { return recover_;         }
 
+            bool skip_purge(seqno_t seqno)
+            {
+                return ((freeze_purge_at_seqno_ == SEQNO_ILL)
+                        ? (false) : (seqno >= freeze_purge_at_seqno_));
+            }
+
             void mem_size         (size_t s) { mem_size_         = s; }
             void page_size        (size_t s) { page_size_        = s; }
             void keep_pages_size  (size_t s) { keep_pages_size_  = s; }
             void keep_pages_count (size_t c) { keep_pages_count_ = c; }
+            void freeze_purge_at_seqno(seqno_t s) { freeze_purge_at_seqno_ = s; }
 
         private:
 
@@ -226,6 +233,7 @@ namespace gcache
             size_t            keep_pages_size_;
             size_t            keep_pages_count_;
             bool        const recover_;
+            seqno_t           freeze_purge_at_seqno_;
         }
             params;
 
