@@ -12,12 +12,11 @@
 #include "galera_service_thd.hpp"
 #include "galera_view.hpp"
 
+#include <gu_shared_ptr.hpp>
 #include <gu_unordered.hpp>
 #include <gu_lock.hpp>
 #include <gu_config.hpp>
 #include <gu_gtid.hpp>
-
-#include <boost/shared_ptr.hpp>
 
 #include <map>
 #include <list>
@@ -130,7 +129,7 @@ namespace galera
         //
 
         // Get NBO context matching to global seqno
-        boost::shared_ptr<NBOCtx> nbo_ctx(wsrep_seqno_t);
+        gu::shared_ptr<NBOCtx>::type nbo_ctx(wsrep_seqno_t);
         // Erase NBO context entry
         void erase_nbo_ctx(wsrep_seqno_t);
         size_t nbo_size() const { return nbo_map_.size(); }
@@ -151,7 +150,7 @@ namespace galera
         wsrep_seqno_t get_safe_to_discard_seqno_() const;
         wsrep_seqno_t purge_trxs_upto_(wsrep_seqno_t, bool sync);
 
-        boost::shared_ptr<NBOCtx> nbo_ctx_unlocked(wsrep_seqno_t);
+        gu::shared_ptr<NBOCtx>::type nbo_ctx_unlocked(wsrep_seqno_t);
 
         bool index_purge_required()
         {

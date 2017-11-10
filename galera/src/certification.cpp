@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
@@ -7,8 +7,8 @@
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
-#include <boost/make_shared.hpp>
 #include <map>
+#include <algorithm> // std::for_each
 
 
 using namespace galera;
@@ -472,10 +472,10 @@ galera::Certification::do_test_preordered(TrxHandleSlave* trx)
 galera::NBOEntry copy_ts(
     galera::TrxHandleSlave* ts,
     galera::TrxHandleSlave::Pool& pool,
-    boost::shared_ptr<NBOCtx> nbo_ctx)
+    gu::shared_ptr<NBOCtx>::type nbo_ctx)
 {
     // FIXME: Pass proper working directory from config to MappedBuffer ctor
-    boost::shared_ptr<galera::MappedBuffer> buf(
+    gu::shared_ptr<galera::MappedBuffer>::type buf(
         new galera::MappedBuffer("/tmp"));
     assert(ts->action().first && ts->action().second);
     if (ts->action().first == 0)
@@ -492,7 +492,7 @@ galera::NBOEntry copy_ts(
               buf->begin());
 
     galera::TrxHandleSlaveDeleter d;
-    boost::shared_ptr<galera::TrxHandleSlave> new_ts(
+    gu::shared_ptr<galera::TrxHandleSlave>::type new_ts(
         galera::TrxHandleSlave::New(ts->local(), pool), d);
     if (buf->size() > size_t(std::numeric_limits<int32_t>::max()))
         gu_throw_error(ERANGE) << "Buffer size " << buf->size()
@@ -580,7 +580,7 @@ static void end_nbo(galera::NBOMap::iterator             i,
 }
 
 
-boost::shared_ptr<NBOCtx> galera::Certification::nbo_ctx_unlocked(
+gu::shared_ptr<NBOCtx>::type galera::Certification::nbo_ctx_unlocked(
     wsrep_seqno_t const seqno)
 {
     // This will either
@@ -590,10 +590,10 @@ boost::shared_ptr<NBOCtx> galera::Certification::nbo_ctx_unlocked(
     //   automatically when it goes out of scope
     return nbo_ctx_map_.insert(
         std::make_pair(seqno,
-                       boost::make_shared<NBOCtx>())).first->second;
+                       gu::make_shared<NBOCtx>())).first->second;
 }
 
-boost::shared_ptr<NBOCtx> galera::Certification::nbo_ctx(
+gu::shared_ptr<NBOCtx>::type galera::Certification::nbo_ctx(
     wsrep_seqno_t const seqno)
 {
     assert(seqno > 0);

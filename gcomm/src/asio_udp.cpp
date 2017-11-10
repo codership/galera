@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 #include "asio_udp.hpp"
@@ -7,8 +7,9 @@
 #include "gcomm/util.hpp"
 #include "gcomm/common.hpp"
 
+#include "gu_array.hpp"
+
 #include <boost/bind.hpp>
-#include <boost/array.hpp>
 
 
 static bool is_multicast(const asio::ip::udp::endpoint& ep)
@@ -134,7 +135,7 @@ void gcomm::AsioUdpSocket::close()
 int gcomm::AsioUdpSocket::send(const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
-    boost::array<asio::const_buffer, 3> cbs;
+    gu::array<asio::const_buffer, 3>::type cbs;
     NetHeader hdr(dg.len(), net_.version_);
 
     if (net_.checksum_ != NetHeader::CS_NONE)
@@ -219,7 +220,7 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
 void gcomm::AsioUdpSocket::async_receive()
 {
     Critical<AsioProtonet> crit(net_);
-    boost::array<asio::mutable_buffer, 1> mbs;
+    gu::array<asio::mutable_buffer, 1>::type mbs;
     mbs[0] = asio::mutable_buffer(&recv_buf_[0], recv_buf_.size());
     socket_.async_receive_from(mbs, source_ep_,
                                boost::bind(&AsioUdpSocket::read_handler,

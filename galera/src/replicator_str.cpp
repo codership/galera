@@ -1090,7 +1090,7 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
                     else
                     {
                         // Signal NBO waiter
-                        boost::shared_ptr<NBOCtx> nbo_ctx(
+                        gu::shared_ptr<NBOCtx>::type nbo_ctx(
                             cert_.nbo_ctx(ts.ends_nbo()));
                         assert(nbo_ctx != 0);
                         nbo_ctx->set_ts(tsp);

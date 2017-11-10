@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_ASIO_TCP_HPP
@@ -8,21 +8,23 @@
 #include "socket.hpp"
 #include "asio_protonet.hpp"
 
+#include "gu_array.hpp"
+#include "gu_shared_ptr.hpp"
+
 #include <boost/bind.hpp>
-#include <boost/array.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <vector>
 #include <deque>
 
 //
-// Boost enable_shared_from_this<> does not have virtual destructor,
-// therefore need to ignore -Weffc++
+// Boost and std:: enable_shared_from_this<> does not have virtual destructor,
+// therefore need to ignore -Weffc++ and -Wnon-virtual-dtor
 //
 #if defined(__GNUG__)
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #  pragma GCC diagnostic push
 # endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 # pragma GCC diagnostic ignored "-Weffc++"
+# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #endif
 
 namespace gcomm
@@ -36,7 +38,7 @@ namespace gcomm
 
 class gcomm::AsioTcpSocket :
     public gcomm::Socket,
-    public boost::enable_shared_from_this<AsioTcpSocket>
+    public gu::enable_shared_from_this<AsioTcpSocket>::type
 {
 public:
     AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
@@ -69,8 +71,8 @@ private:
     void operator=(const AsioTcpSocket&);
 
     void set_socket_options();
-    void read_one(boost::array<asio::mutable_buffer, 1>& mbs);
-    void write_one(const boost::array<asio::const_buffer, 2>& cbs);
+    void read_one(gu::array<asio::mutable_buffer, 1>::type& mbs);
+    void write_one(const gu::array<asio::const_buffer, 2>::type& cbs);
     void close_socket();
 
     // call to assign local/remote addresses at the point where it

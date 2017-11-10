@@ -142,9 +142,9 @@ namespace galera
     {
     public:
         NBOEntry(
-            boost::shared_ptr<TrxHandleSlave> ts,
-            boost::shared_ptr<MappedBuffer> buf,
-            boost::shared_ptr<NBOCtx> nbo_ctx)
+            gu::shared_ptr<TrxHandleSlave>::type ts,
+            gu::shared_ptr<MappedBuffer>::type buf,
+            gu::shared_ptr<NBOCtx>::type nbo_ctx)
             :
             ts_ (ts),
             buf_(buf),
@@ -174,16 +174,16 @@ namespace galera
             assert(ts != 0);
             nbo_ctx_->set_ts(ts);
         }
-        boost::shared_ptr<NBOCtx> nbo_ctx() { return nbo_ctx_; }
+        gu::shared_ptr<NBOCtx>::type nbo_ctx() { return nbo_ctx_; }
 
     private:
-        boost::shared_ptr<TrxHandleSlave> ts_;
-        boost::shared_ptr<MappedBuffer>   buf_;
-        View::MembSet                     ended_set_;
-        boost::shared_ptr<NBOCtx>         nbo_ctx_;
+        gu::shared_ptr<TrxHandleSlave>::type ts_;
+        gu::shared_ptr<MappedBuffer>::type   buf_;
+        View::MembSet                        ended_set_;
+        gu::shared_ptr<NBOCtx>::type         nbo_ctx_;
     };
 
-    typedef std::map<NBOKey, boost::shared_ptr<NBOCtx> > NBOCtxMap;
+    typedef std::map<NBOKey, gu::shared_ptr<NBOCtx>::type> NBOCtxMap;
     typedef std::map<NBOKey, NBOEntry> NBOMap;
 }
 

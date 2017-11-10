@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 
@@ -13,10 +13,9 @@
 #include "gcomm/conf.hpp"
 
 #include "gu_logger.hpp"
+#include "gu_shared_ptr.hpp"
 
 #include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 
 #include <fstream>
 
@@ -74,11 +73,11 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
 {
     if (uri.get_scheme() == "tcp" || uri.get_scheme() == "ssl")
     {
-        return boost::shared_ptr<AsioTcpSocket>(new AsioTcpSocket(*this, uri));
+        return gu::shared_ptr<AsioTcpSocket>::type(new AsioTcpSocket(*this, uri));
     }
     else if (uri.get_scheme() == "udp")
     {
-        return boost::shared_ptr<AsioUdpSocket>(new AsioUdpSocket(*this, uri));
+        return gu::shared_ptr<AsioUdpSocket>::type(new AsioUdpSocket(*this, uri));
     }
     else
     {

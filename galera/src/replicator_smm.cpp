@@ -1492,7 +1492,8 @@ wsrep_status_t galera::ReplicatorSMM::last_committed_id(wsrep_gtid_t* gtid)
 wsrep_status_t galera::ReplicatorSMM::wait_nbo_end(TrxHandleMaster* trx,
                                                    wsrep_trx_meta_t* meta)
 {
-    boost::shared_ptr<NBOCtx> nbo_ctx(cert_.nbo_ctx(meta->gtid.seqno));
+    gu::shared_ptr<NBOCtx>::type
+        nbo_ctx(cert_.nbo_ctx(meta->gtid.seqno));
 
     // Send end message
     trx->set_state(TrxHandle::S_REPLICATING);
@@ -1967,7 +1968,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx,
                     assert(ts.ends_nbo() > 0);
                     // Signal NBO waiter here after leaving local ordering
                     // critical section.
-                    boost::shared_ptr<NBOCtx> nbo_ctx(
+                    gu::shared_ptr<NBOCtx>::type nbo_ctx(
                         cert_.nbo_ctx(ts.ends_nbo()));
                     assert(nbo_ctx != 0);
                     nbo_ctx->set_ts(ts_ptr);

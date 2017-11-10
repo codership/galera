@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2012-2017 Codership Oy <info@codership.com>
  */
 
 #include "asio_tcp.hpp"
@@ -299,7 +299,7 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
             else if (send_q_.empty() == false)
             {
                 const Datagram& dg(send_q_.front());
-                boost::array<asio::const_buffer, 2> cbs;
+                gu::array<asio::const_buffer, 2>::type cbs;
                 cbs[0] = asio::const_buffer(dg.header()
                                             + dg.header_offset(),
                                             dg.header_len());
@@ -344,7 +344,7 @@ void gcomm::AsioTcpSocket::set_option(const std::string& key,
 
 namespace gcomm
 {
-    typedef boost::shared_ptr<gcomm::AsioTcpSocket> AsioTcpSocketPtr;
+    typedef gu::shared_ptr<gcomm::AsioTcpSocket>::type AsioTcpSocketPtr;
     class AsioPostForSendHandler
     {
     public:
@@ -359,7 +359,7 @@ namespace gcomm
                 socket_->send_q_.empty() == false)
             {
                 const gcomm::Datagram& dg(socket_->send_q_.front());
-                boost::array<asio::const_buffer, 2> cbs;
+                gu::array<asio::const_buffer, 2>::type cbs;
                 cbs[0] = asio::const_buffer(dg.header()
                                             + dg.header_offset(),
                                             dg.header_len());
@@ -492,7 +492,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
         }
     }
 
-    boost::array<asio::mutable_buffer, 1> mbs;
+    gu::array<asio::mutable_buffer, 1>::type mbs;
     mbs[0] = asio::mutable_buffer(&recv_buf_[0] + recv_offset_,
                                   recv_buf_.size() - recv_offset_);
     read_one(mbs);
@@ -552,7 +552,7 @@ void gcomm::AsioTcpSocket::async_receive()
 
     gcomm_assert(state() == S_CONNECTED);
 
-    boost::array<asio::mutable_buffer, 1> mbs;
+    gu::array<asio::mutable_buffer, 1>::type mbs;
 
     mbs[0] = asio::mutable_buffer(&recv_buf_[0], recv_buf_.size());
     read_one(mbs);
@@ -603,7 +603,8 @@ void gcomm::AsioTcpSocket::set_socket_options()
 #endif
 }
 
-void gcomm::AsioTcpSocket::read_one(boost::array<asio::mutable_buffer, 1>& mbs)
+void gcomm::AsioTcpSocket::read_one(
+    gu::array<asio::mutable_buffer, 1>::type& mbs)
 {
     if (ssl_socket_ != 0)
     {
@@ -633,7 +634,7 @@ void gcomm::AsioTcpSocket::read_one(boost::array<asio::mutable_buffer, 1>& mbs)
 
 
 void gcomm::AsioTcpSocket::write_one(
-    const boost::array<asio::const_buffer, 2>& cbs)
+    const gu::array<asio::const_buffer, 2>::type& cbs)
 {
     if (ssl_socket_ != 0)
     {
