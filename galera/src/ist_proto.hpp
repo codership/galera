@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
@@ -14,6 +14,7 @@
 #include "gu_logger.hpp"
 #include "gu_serialize.hpp"
 #include "gu_vector.hpp"
+#include "gu_array.hpp"
 
 #include <string>
 
@@ -456,7 +457,8 @@ namespace galera
             {
                 Message::Type type(ordered_type(buffer));
 
-                boost::array<asio::const_buffer, 3> cbs;
+                gu::array<asio::const_buffer, 3>::type cbs;
+
                 size_t      payload_size; /* size of the 2nd cbs buffer */
                 size_t      sent;
 

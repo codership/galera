@@ -27,4 +27,11 @@ namespace gu
 #define GU_COMPILE_ASSERT(expr,msg) \
     typedef gu::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1] __attribute__((unused))
 
+/* For C++11 compatibility */
+#if __cplusplus >= 201103L
+#   define GU_NOEXCEPT(x) noexcept(x)
+#else
+#   define GU_NOEXCEPT(x)
+#endif
+
 #endif /* _gu_macros_hpp_ */

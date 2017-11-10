@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -345,25 +345,44 @@ if conf.CheckHeader('execinfo.h'):
 
 # Additional C headers and libraries
 
+cxx11=False
+
+#array
+if conf.CheckCXXHeader('array'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_ARRAY')
+    # if it worked, we are running C++11 compiler
+    cxx11=True
+elif conf.CheckCXXHeader('tr1/array'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_ARRAY')
+elif conf.CheckCXXHeader('boost/array.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_ARRAY_HPP')
+else:
+    print('no suitable array header found')
+    Exit(1)
 
 # shared_ptr
-if conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+if cxx11 and conf.CheckCXXHeader('memory'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_MEMORY')
+elif False and conf.CheckCXXHeader('tr1/memory'):
+    # std::tr1::shared_ptr<> is not derived from std::auto_ptr<>
+    # this upsets boost in asio, so don't use tr1 version, use boost instead
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_MEMORY')
+elif conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 else:
-    print('no suitable shared_ptr headers found')
+    print('no suitable shared_ptr header found')
     Exit(1)
 
 # unordered_map
-if conf.CheckCXXHeader('unordered_map'):
+if cxx11 and conf.CheckCXXHeader('unordered_map'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_UNORDERED_MAP')
 elif conf.CheckCXXHeader('tr1/unordered_map'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
+elif conf.CheckCXXHeader('boost/unordered_map.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
 else:
-    if conf.CheckCXXHeader('boost/unordered_map.hpp'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
-    else:
-        print('no unordered map header available')
-        Exit(1)
+    print('no suitable unordered map header found')
+    Exit(1)
 
 # pool allocator
 if boost == 1:
