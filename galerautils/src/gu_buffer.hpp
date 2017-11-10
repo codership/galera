@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -11,13 +11,13 @@
 
 #include "gu_types.hpp" // for gu::byte_t
 
-#include <boost/shared_ptr.hpp>
+#include "gu_shared_ptr.hpp"
 #include <vector>
 
 namespace gu
 {
     typedef std::vector<byte_t> Buffer;
-    typedef boost::shared_ptr<Buffer> SharedBuffer;
+    typedef gu::shared_ptr<Buffer>::type SharedBuffer;
 }
 
 #endif // GU_BUFFER_HPP

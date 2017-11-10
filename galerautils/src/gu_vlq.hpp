@@ -18,6 +18,7 @@
 #include "gu_throw.hpp"
 
 #include "gu_macros.h"
+#include <cassert>
 
 #include <cassert>
 
