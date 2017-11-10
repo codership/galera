@@ -1296,8 +1296,8 @@ galera::ReplicatorSMM::commit_order_leave(TrxHandleSlave&          trx,
 
     assert(trx.state() == TrxHandle::S_COMMITTING ||
            trx.state() == TrxHandle::S_REPLAYING  ||
+           trx.state() == TrxHandle::S_ABORTING  ||
            trx.state() == TrxHandle::S_ROLLING_BACK);
-
 #ifndef NDEBUG
     {
         CommitOrder co(trx, co_mode_);
@@ -1582,14 +1582,14 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
         }
         gu::datetime::Date wait_until(gu::datetime::Date::calendar() + timeout);
 
-        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-        {
-            commit_monitor_.wait(wait_gtid, wait_until);
-        }
-        else
-        {
-            apply_monitor_.wait(wait_gtid, wait_until);
-        }
+        // Note: Since wsrep API 26 application may request release of
+        // commit monitor before the commit actually happens (commit
+        // may have been ordered/queued on application side for later
+        // processing). Therefore we now rely on apply_monitor on sync
+        // wait. This is sufficient since apply_monitor is always released
+        // only after the whole transaction is over.
+        apply_monitor_.wait(wait_gtid, wait_until);
+
         if (gtid != 0)
         {
             commit_monitor_.last_left_gtid(*gtid);
