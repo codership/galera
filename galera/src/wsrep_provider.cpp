@@ -599,6 +599,12 @@ wsrep_status_t galera_commit_order_enter(
     REPL_CLASS * const repl(static_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* const trx(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != trx);
+    if (trx == 0)
+    {
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order enter";
+        return WSREP_TRX_MISSING;
+    }
 
     wsrep_status_t retval;
 
@@ -652,6 +658,13 @@ wsrep_status_t galera_commit_order_leave(
     TrxHandle* const trx(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != trx);
 
+    if (trx == 0)
+    {
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order leave";
+        return WSREP_TRX_MISSING;
+    }
+
     wsrep_status_t retval;
 
     try
@@ -695,7 +708,8 @@ wsrep_status_t galera_release(wsrep_t*            gh,
 
     if (trx == 0)
     {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
+        log_debug << "trx " << ws_handle->trx_id
+                  << " not found for release";
         return WSREP_OK;
     }
 
