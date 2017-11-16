@@ -254,13 +254,13 @@ namespace gcomm
 
         const gu::Buffer& payload() const
         {
-            assert(payload_ != 0);
+            assert(payload_);
             return *payload_;
         }
 
         gu::Buffer& payload()
         {
-            assert(payload_ != 0);
+            assert(payload_);
             return *payload_;
         }
 

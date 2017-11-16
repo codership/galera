@@ -15,7 +15,7 @@
 #ifndef GU_UNORDERED_HPP
 #define GU_UNORDERED_HPP
 
-#if defined(HAVE_UNORDERED_MAP)
+#if __cplusplus >= 201103
 #include <unordered_map>
 #include <unordered_set>
 #define GU_UNORDERED_MAP_NAMESPACE std
@@ -88,9 +88,6 @@ namespace gu
         bool empty() const { return impl_.empty(); }
         void clear() { impl_.clear(); }
         void rehash(size_t n) { impl_.rehash(n); }
-#if defined(HAVE_UNORDERED_MAP)
-        void reserve(size_t n) { impl_.reserve(n); }
-#endif
     };
 
     template <typename K, typename H = UnorderedHash<K>,
@@ -125,9 +122,6 @@ namespace gu
         bool empty() const { return impl_.empty(); }
         void clear() { impl_.clear(); }
         void rehash(size_t n) { impl_.rehash(n); }
-#if defined(HAVE_UNORDERED_MAP)
-        void reserve(size_t n) { impl_.reserve(n); }
-#endif
     };
 
 

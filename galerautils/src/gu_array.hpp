@@ -17,10 +17,7 @@
 #ifndef GU_ARRAY_HPP
 #define GU_ARRAY_HPP
 
-#if defined(HAVE_ARRAY)
-#   if __cplusplus < 201103L
-        #error This configuration requires at least C++11 support
-#   endif
+#if __cplusplus >= 201103
 #   include <array>
 #   define GU_ARRAY_NAMESPACE std
 #elif defined(HAVE_TR1_ARRAY)
