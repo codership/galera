@@ -360,11 +360,12 @@ gu_mmh128_append (gu_mmh128_ctx_t* const mmh,
 static GU_INLINE void
 gu_mmh128_get (const gu_mmh128_ctx_t* const mmh, void* const res)
 {
-    uint64_t* const r = (uint64_t*)res;
+    uint64_t r[2];
     _mmh3_128_tail ((const uint8_t*)mmh->tail, mmh->length,
                     mmh->hash[0], mmh->hash[1], r);
     r[0] = gu_le64(r[0]);
     r[1] = gu_le64(r[1]);
+    memcpy(res, r, sizeof(r));
 }
 
 static GU_INLINE uint64_t

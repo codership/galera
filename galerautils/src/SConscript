@@ -33,7 +33,6 @@ libgalerautils_sources = [
 
 libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
-crc32c_sources = [ '#/www.evanjones.ca/crc32c.c' ]
 crc32c_env = env.Clone()
 crc32c_env.Append(CPPPATH = [ '#' ])
 crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
@@ -79,6 +78,7 @@ libgalerautilsxx_sources = [
     'gu_vlq.cpp',
     'gu_datetime.cpp',
     'gu_exception.cpp',
+    'gu_serialize.cpp',
     'gu_logger.cpp',
     'gu_prodcons.cpp',
     'gu_regex.cpp',

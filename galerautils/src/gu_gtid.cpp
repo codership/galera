@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2015-2017 Codership Oy <info@codership.com>
  */
 
 #include "gu_gtid.hpp"
@@ -36,30 +36,4 @@ gu::GTID::scan(std::istream& is)
 
     uuid_  = u;
     seqno_ = s;
-}
-
-size_t
-gu::GTID::serialize(void* const buf, size_t const buflen, size_t const offset)
-    const
-{
-    if (gu_unlikely(buflen - offset < serial_size()))
-    {
-        gu_throw_error(EMSGSIZE) << "Buffer too short for GTID: "
-                                 << buflen - offset;
-    }
-
-    return serialize_unchecked(buf, buflen, offset);
-}
-
-size_t
-gu::GTID::unserialize(const void* const buf, size_t const buflen,
-                      size_t const offset)
-{
-    if (gu_unlikely(buflen - offset < serial_size()))
-    {
-        gu_throw_error(EMSGSIZE) << "Buffer too short for GTID: "
-                                 << buflen - offset;
-    }
-
-    return unserialize_unchecked(buf, buflen, offset);
 }

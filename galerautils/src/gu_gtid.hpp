@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2015-2017 Codership Oy <info@codership.com>
  */
 
 #ifndef _gu_gtid_hpp_
 #define _gu_gtid_hpp_
 
 #include "gu_uuid.hpp"
-#include "gu_byteswap.hpp"
+#include "gu_serialize.hpp"
 
 #include "gu_hash.h"
 #include <stdint.h>
@@ -76,36 +76,39 @@ public:
 
     static size_t serial_size() { return UUID::serial_size() +sizeof(int64_t); }
 
-    size_t serialize_unchecked(void* const buf, size_t const buflen,
-                               size_t offset) const
+    size_t serialize(void* const buf, size_t offset) const
     {
         assert(serial_size() == (uuid_.serial_size() + sizeof(int64_t)));
-        assert(buflen - offset >= serial_size());
 
-        offset = uuid_.serialize_unchecked(buf, buflen, offset);
+        offset = uuid_.serialize(buf, offset);
+        offset = gu::serialize8(seqno_, buf, offset);
 
-        void* const seqno_ptr(static_cast<byte_t*>(buf) + offset);
-        *static_cast<int64_t*>(seqno_ptr) = htog(int64_t(seqno_));
-
-        return offset + sizeof(seqno_t);
+        return offset;
     }
 
-    size_t unserialize_unchecked(const void* const buf, size_t const buflen,
-                                 size_t offset)
+    size_t unserialize(const void* const buf, size_t offset)
     {
         assert(serial_size() == (uuid_.serial_size() + sizeof(seqno_)));
-        assert(buflen - offset >= serial_size());
 
-        offset = uuid_.unserialize_unchecked(buf, buflen, offset);
+        offset = uuid_.unserialize(buf, offset);
+        offset = gu::unserialize8(buf, offset, seqno_);
 
-        const void* const seqno_ptr(static_cast<const byte_t*>(buf) + offset);
-        seqno_ = gtoh(*static_cast<const int64_t*>(seqno_ptr));
-
-        return offset + sizeof(int64_t);
+        return offset;
     }
 
-    size_t serialize  (void* buf, size_t buflen, size_t offset) const;
-    size_t unserialize(const void* buf, size_t buflen, size_t offset);
+    size_t unserialize(const void* const buf, const size_t buflen,
+                       const size_t offset)
+    {
+        gu_trace(gu::check_bounds(offset + serial_size(), buflen));
+        return unserialize(buf, offset);
+    }
+
+    size_t serialize  (void* const buf, const size_t buflen,
+                       const size_t offset) const
+    {
+        gu_trace(gu::check_bounds(offset + serial_size(), buflen));
+        return serialize(buf, offset);
+    }
 
     class TableHash // for std::map, does not have to be endian independent
     {
@@ -123,8 +126,6 @@ private:
     UUID    uuid_;
     seqno_t seqno_;
 
-//    GU_COMPILE_ASSERT(&(reinterpret_cast<UUID*>(0)->seqno_) == sizeof(uuid_),
-//                      unaligned_GTID);
 }; /* class GTID */
 
 namespace gu

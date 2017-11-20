@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -9,7 +9,8 @@
 #include <gu_uuid.hpp>
 
 const galera::TrxHandleMaster::Params
-galera::TrxHandleMaster::Defaults(".", -1, KeySet::MAX_VERSION, false);
+galera::TrxHandleMaster::Defaults(".", -1, KeySet::MAX_VERSION,
+                                  gu::RecordSet::VER2, false);
 
 void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
 {

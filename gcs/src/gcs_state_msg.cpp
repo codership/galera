@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <galerautils.h>
+#include <gu_serialize.hpp>
 
 #define GCS_STATE_MSG_VER 5
 
@@ -190,15 +191,19 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *prim_uuid      = state->prim_uuid;
     *received       = htog64(state->received);
     *prim_seqno     = htog64(state->prim_seqno);
+
+    /* from this point alignment breaks */
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
-    *cached         = htog64(state->cached);
-    *desync_count   = htog32(state->desync_count);
-    *last_applied   = htog64(state->last_applied);
-    *vote_seqno     = htog64(state->vote_seqno);
-    *vote_res       = htog64(state->vote_res);
-    *vote_policy    = state->vote_policy;
+
+    gu::serialize8(state->cached, cached, 0);
+    gu::serialize4(state->desync_count, desync_count, 0);
+    gu::serialize8(state->last_applied, last_applied, 0);
+
+    gu::serialize8(state->vote_seqno, vote_seqno, 0); // 4.ee
+    gu::serialize8(state->vote_res, vote_res, 0);
+    gu::serialize1(state->vote_policy, vote_policy, 0);
 
     return ((uint8_t*)(vote_policy + 1) - (uint8_t*)buf);
 }
@@ -224,28 +229,29 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
     int64_t* cached_ptr = (int64_t*)(appl_ptr + 1);
     if (*version >= 3) {
         assert(buf_len >= (uint8_t*)(cached_ptr + 1) - (uint8_t*)buf);
-        cached = gtoh64(*cached_ptr);
+        gu::unserialize8(cached_ptr, 0, cached);
     }
 // v4 stuff
     int32_t  desync_count = 0;
     int32_t* desync_count_ptr = (int32_t*)(cached_ptr + 1);
     if (*version >= 4) {
         assert(buf_len >= (uint8_t*)(desync_count_ptr + 1) - (uint8_t*)buf);
-        desync_count = gtoh32(*desync_count_ptr);
+        gu::unserialize4(desync_count_ptr, 0, desync_count);
     }
 // v5 stuff
     int64_t last_applied = 0;
     int64_t vote_seqno   = 0;
     int64_t vote_res     = 0;
     uint8_t vote_policy  = GCS_VOTE_ZERO_WINS; // backward compatibility
+
     if (*version >= 5) {
         int64_t* last_applied_ptr = (int64_t*)(desync_count_ptr + 1);
         assert(buf_len > (uint8_t*)(last_applied_ptr + 3) - (uint8_t*)buf);
-        last_applied = gtoh64(*last_applied_ptr);
-        vote_seqno   = gtoh64(*(last_applied_ptr + 1));
-        vote_res     = gtoh64(*(last_applied_ptr + 2));
+        gu::unserialize8(last_applied_ptr, 0, last_applied);
 
-        vote_policy  = *((uint8_t*)(last_applied_ptr + 3));
+        gu::unserialize8(last_applied_ptr + 1, 0, vote_seqno); // 4.ee
+        gu::unserialize8(last_applied_ptr + 2, 0, vote_res);
+        gu::unserialize1(last_applied_ptr + 3, 0, vote_policy);
     }
 
     gcs_state_msg_t* ret = gcs_state_msg_create (

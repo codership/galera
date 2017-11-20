@@ -8,6 +8,7 @@
 #include "gu_buffer.hpp"
 #include "gu_serialize.hpp"
 #include "gu_utils.hpp"
+#include "gu_throw.hpp"
 
 #include <limits>
 #include <cassert>

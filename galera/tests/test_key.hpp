@@ -9,7 +9,6 @@
 #include "../src/key_data.hpp"
 #include "../src/key_set.hpp" // for version_to_hash_size
 
-#include <check.h> // for version_to_hash_size
 #include <string.h>
 
 #include <vector>

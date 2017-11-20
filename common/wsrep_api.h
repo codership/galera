@@ -189,8 +189,9 @@ typedef enum wsrep_cb_status
 /*!
  * UUID type - for all unique IDs
  */
-typedef struct wsrep_uuid {
+typedef union wsrep_uuid {
     uint8_t data[16];
+    size_t  alignment;
 } wsrep_uuid_t;
 
 /*! Undefined UUID */

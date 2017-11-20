@@ -57,4 +57,6 @@ static inline size_t gu_avphys_bytes()
 #define GU_LLONG_MIN  (-GU_LONG_LONG_MAX - 1)
 #endif
 
+#define GU_MIN_ALIGNMENT 8
+
 #endif /* _gu_limits_h_ */

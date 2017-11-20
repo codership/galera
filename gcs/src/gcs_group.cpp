@@ -591,8 +591,9 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     if (GCS_GROUP_WAIT_STATE_UUID == group->state &&
         0 == msg->sender_idx /* check that it is from the representative */) {
-        group->state_uuid = *(gu_uuid_t*)msg->buf;
-        group->state      = GCS_GROUP_WAIT_STATE_MSG;
+//        group->state_uuid = *(gu_uuid_t*)msg->buf;
+        gu_uuid_copy(&group->state_uuid, (const gu_uuid_t*)msg->buf);
+        group->state = GCS_GROUP_WAIT_STATE_MSG;
     }
     else {
         gu_warn ("Stray state UUID msg: " GU_UUID_FORMAT

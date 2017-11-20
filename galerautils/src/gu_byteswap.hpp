@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2017 Codership Oy <info@codership.com>
 
 /**
  * @file Endian conversion templates for serialization
@@ -10,59 +10,63 @@
 #define _gu_byteswap_hpp_
 
 #include "gu_byteswap.h"
+#include "gu_macros.hpp" // GU_COMPILE_ASSERT
 
 #include <stdint.h>
 
 namespace gu
 {
 
-/* General template: undefined */
-template <typename T> T gtoh (const T& val)
+/* General template utility class: undefined */
+template <typename T, size_t>
+class gtoh_template_helper
 {
-    // to generate error on compilation rather then linking
-    return val.this_template_does_not_support_this_type();
-}
+public:
+    static T f(T val)
+    {
+        // to generate error on compilation stage rather then linking
+        return val.this_template_use_is_not_supported();
+    }
+};
 
-/* Specialized templates */
+/* Utility argument size-specialized templates, don't use directly */
 
-template <> GU_FORCE_INLINE int8_t  gtoh (const int8_t& val)
+template <typename T>
+class gtoh_template_helper<T, 1>
 {
-    return  val;
-}
+    GU_COMPILE_ASSERT(1 == sizeof(T), gtoh_wrong_argument_size1);
+public:
+    static GU_FORCE_INLINE T f(T val) { return  val; }
+};
 
-template <> GU_FORCE_INLINE uint8_t  gtoh (const uint8_t& val)
+template <typename T>
+class gtoh_template_helper<T, 2>
 {
-    return  val;
-}
+    GU_COMPILE_ASSERT(2 == sizeof(T), gtoh_wrong_argument_size2);
+public:
+    static GU_FORCE_INLINE T f(T val) { return  gtoh16(val); }
+};
 
-template <> GU_FORCE_INLINE int16_t gtoh (const int16_t& val)
+template <typename T>
+class gtoh_template_helper<T, 4>
 {
-    return  gtoh16(val);
-}
+    GU_COMPILE_ASSERT(4 == sizeof(T), gtoh_wrong_argument_size4);
+public:
+    static GU_FORCE_INLINE T f(T val) { return  gtoh32(val); }
+};
 
-template <> GU_FORCE_INLINE uint16_t gtoh (const uint16_t& val)
+template <typename T>
+class gtoh_template_helper<T, 8>
 {
-    return  gtoh16(val);
-}
+    GU_COMPILE_ASSERT(8 == sizeof(T), gtoh_wrong_argument_size8);
+public:
+    static GU_FORCE_INLINE T f(T val) { return  gtoh64(val); }
+};
 
-template <> GU_FORCE_INLINE int32_t gtoh (const int32_t& val)
+/* Proper generic byteswap templates for general use */
+template <typename T> GU_FORCE_INLINE T gtoh (const T& val)
 {
-    return  gtoh32(val);
-}
-
-template <> GU_FORCE_INLINE uint32_t gtoh (const uint32_t& val)
-{
-    return  gtoh32(val);
-}
-
-template <> GU_FORCE_INLINE int64_t gtoh (const int64_t& val)
-{
-    return  gtoh64(val);
-}
-
-template <> GU_FORCE_INLINE uint64_t gtoh (const uint64_t& val)
-{
-    return  gtoh64(val);
+    return gtoh_template_helper<T, sizeof(T)>::f(val);
 }
 
 template <typename T> T htog (const T& val) { return gtoh<T>(val); }

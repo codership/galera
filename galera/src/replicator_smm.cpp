@@ -60,6 +60,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     safe_to_bootstrap_  (true),
     trx_params_         (config_.get(BASE_DIR), -1,
                          KeySet::version(config_.get(Param::key_format)),
+                         TrxHandleMaster::Defaults.record_set_ver_,
                          gu::from_string<int>(config_.get(
                              Param::max_write_set_size))),
     uuid_               (WSREP_UUID_UNDEFINED),
@@ -1787,7 +1788,7 @@ static WriteSetOut*
 writeset_from_handle (wsrep_po_handle_t&             handle,
                       const TrxHandleMaster::Params& trx_params)
 {
-    WriteSetOut* ret = reinterpret_cast<WriteSetOut*>(handle.opaque);
+    WriteSetOut* ret = static_cast<WriteSetOut*>(handle.opaque);
 
     if (NULL == ret)
     {
@@ -1798,6 +1799,7 @@ writeset_from_handle (wsrep_po_handle_t&             handle,
                 trx_params.working_dir_, wsrep_trx_id_t(&handle),
                 /* key format is not essential since we're not adding keys */
                 KeySet::version(trx_params.key_format_), NULL, 0, 0,
+                trx_params.record_set_ver_,
                 WriteSetNG::MAX_VERSION, DataSet::MAX_VERSION, DataSet::MAX_VERSION,
                 trx_params.max_write_set_size_);
 
@@ -2130,6 +2132,8 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
 
 void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
 {
+    trx_params_.record_set_ver_ = gu::RecordSet::VER1;
+
     switch (proto_ver)
     {
     case 1:
@@ -2161,7 +2165,9 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         str_proto_ver_ = 2;
         break;
     case 8:
+        // Protocol upgrade to enforce 8-byte alignment in writesets and CCs
         trx_params_.version_ = 4;
+        trx_params_.record_set_ver_ = gu::RecordSet::VER2;
         str_proto_ver_ = 3;
         break;
     default:

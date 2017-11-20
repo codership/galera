@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2015-2017 Codership Oy <info@codership.com>
 //
 
 #include "gcs.hpp"
@@ -7,6 +7,9 @@
 #include "gu_hexdump.hpp"
 #include "gu_uuid.hpp"
 #include "gu_macros.hpp"
+#include "gu_logger.hpp"
+
+#include "gu_limits.h"
 
 #include <sstream>
 #include <string>
@@ -104,10 +107,16 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
 
     if (gu_unlikely(!std::equal(b + check_offset, b + cc_size, check)))
     {
-        gu_throw_error(EINVAL) << "CC action checksum mismatch. Expected "
+        std::vector<char> debug(check_offset);
+        std::copy(b + 1, b + check_offset, debug.begin());
+        debug[check_offset - 1] = '\0';
+
+        gu_throw_error(EINVAL) << "CC action checksum mismatch. Found "
                                << gu::Hexdump(b + check_offset, check_len)
+                               << " at offset " << check_offset
                                << ", computed "
-                               << gu::Hexdump(check, check_len);
+                               << gu::Hexdump(check, sizeof(check))
+                               << ", action contents: '" << debug.data() << "'";
     }
 
     b += 1; // skip version byte
@@ -148,9 +157,7 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
         m.incoming_ = b;
         b += m.incoming_.length() + 1;
 
-        const gcs_seqno_t* cached(reinterpret_cast<const gcs_seqno_t*>(b));
-        m.cached_ = gu::gtoh<uint64_t>(*cached);
-        b += sizeof(gcs_seqno_t);
+        b += gu::unserialize8(b, 0, m.cached_);
 
         m.state_ = _int_to_node_state(b[0]);
         ++b;
@@ -158,7 +165,7 @@ gcs_act_cchange::gcs_act_cchange(const void* const cc_buf, int const cc_size)
         memb.push_back(m);
     }
 
-    assert(b - static_cast<const char*>(cc_buf) == check_offset);
+    assert(b - static_cast<const char*>(cc_buf) <= check_offset);
 }
 
 static size_t
@@ -201,11 +208,11 @@ gcs_act_cchange::write(void** buf) const
        << memb.size();
 
     std::string const str(os.str());
-
-    int const payload_len(str.length() + 1 + _memb_size(memb));
-    int const check_offset(1 + payload_len);    // version byte + payload
+    int const payload_len(1 + str.length() + 1 + _memb_size(memb));
     int const check_len(_checksum_len(cc_ver)); // checksum length
-    int const ret(check_offset + check_len);    // total message length
+
+    // total message length, with necessary padding for alignment
+    int const ret(GU_ALIGN(payload_len + check_len, GU_MIN_ALIGNMENT));
 
     /* using malloc() for C compatibility */
     *buf = ::malloc(ret);
@@ -214,6 +221,7 @@ gcs_act_cchange::write(void** buf) const
         gu_throw_error(ENOMEM) << "Failed to allocate " << ret
                                << " bytes for configuration change event.";
     }
+    ::memset(*buf, 0, ret); // initialize
 
     char* b(static_cast<char*>(*buf));
 
@@ -235,21 +243,24 @@ gcs_act_cchange::write(void** buf) const
         b += _strcopy(m.incoming_, b);
         b[0] = '\0'; ++b;
 
-        gcs_seqno_t* const cached(reinterpret_cast<gcs_seqno_t*>(b));
-        *cached = gu::htog<uint64_t>(m.cached_);
-        b += sizeof(gcs_seqno_t);
+        b += gu::serialize8(m.cached_, b, 0);
 
         b[0] = m.state_; ++b;
     }
 
-    assert(static_cast<char*>(*buf) + check_offset == b);
+    int const check_offset(ret - check_len); // writing checksum to the end
+    assert(gu::ptr_offset(*buf, check_offset) >= b);
+    b = static_cast<char*>(gu::ptr_offset(*buf, check_offset));
 
     checksum_t check;
     _checksum(cc_ver, *buf, check_offset, check);
 
+    log_info << "Writing down CC checksum: " << gu::Hexdump(check, sizeof(check))
+             << " at offset " << check_offset;
+
     std::copy(check, check + check_len, b); b += check_len;
 
-    assert(static_cast<char*>(*buf) + ret == b);
+    assert(gu::ptr_offset(*buf, ret) == b);
 
     return ret;
 }
