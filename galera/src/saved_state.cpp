@@ -274,14 +274,13 @@ SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s,
         if (s >= 0) { log_debug << "Saving state: " << u << ':' << s; }
 
         char buf[MAX_SIZE];
-        const gu_uuid_t* const uu(reinterpret_cast<const gu_uuid_t*>(&u));
         int state_len = snprintf (buf, MAX_SIZE - 1,
                                   "# GALERA saved state"
                                   "\nversion: " VERSION
                                   "\nuuid:    " GU_UUID_FORMAT
                                   "\nseqno:   %" PRId64
                                   "\nsafe_to_bootstrap: %d\n",
-                                  GU_UUID_ARGS(uu), s, safe_to_bootstrap);
+                                  GU_UUID_ARGS(&u), s, safe_to_bootstrap);
 
         int write_size;
         for (write_size = state_len; write_size < current_len_; ++write_size)

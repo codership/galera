@@ -335,7 +335,7 @@ static GU_INLINE void gu_spooky_inline (
         const uint8_t* p8;
         uint64_t*      p64;
 #if !GU_ALLOW_UNALIGNED_READS
-        size_t         i;
+        gu_word_t      i;
 #endif /* !GU_ALLOW_UNALIGNED_READS */
     } u;
 

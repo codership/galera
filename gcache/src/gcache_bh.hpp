@@ -42,6 +42,8 @@ namespace gcache
 
     GU_COMPILE_ASSERT(sizeof(BufferHeader().size) >= sizeof(MemOps::size_type),
                       buffer_header_size_check);
+    GU_COMPILE_ASSERT((sizeof(BufferHeader) % MemOps::ALIGNMENT) == 0,
+                      buffer_header_alignment_check);
 
     /*! must store pointer on both 32 and 64-bit systems */
     GU_COMPILE_ASSERT(sizeof(BufferHeader().ctx) >= sizeof(void*),

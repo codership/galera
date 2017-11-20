@@ -104,8 +104,11 @@ private:
 };
 
 
-START_TEST (ver0)
+static void test_ver(gu::RecordSet::Version const rsv)
 {
+    int const alignment
+        (rsv >= gu::RecordSet::VER2 ? gu::RecordSet::VER2_ALIGNMENT : 1);
+
     size_t const MB = 1 << 20;
 
     TestRecord rout0(128,  "abc0");
@@ -123,9 +126,10 @@ START_TEST (ver0)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    gu::byte_t reserved[1024];
+    union { gu::byte_t buf[1024]; gu_word_t align; } reserved;
     TestBaseName str("data_set_test");
-    DataSetOut dset_out(reserved, sizeof(reserved), str, DataSet::VER1);
+    DataSetOut dset_out(reserved.buf, sizeof(reserved.buf), str, DataSet::VER1,
+                        rsv);
 
     size_t offset(dset_out.size());
 
@@ -158,6 +162,7 @@ START_TEST (ver0)
 
     DataSetOut::GatherVector out_bufs;
     out_bufs().reserve (dset_out.page_count());
+    bool const padding_page(offset % alignment);
 
     size_t min_out_size(0);
     for (size_t i = 0; i < records.size(); ++i)
@@ -166,9 +171,12 @@ START_TEST (ver0)
     }
 
     size_t const out_size (dset_out.gather (out_bufs));
+    fail_if(out_size % alignment, "out size %zu not aligned by %d",
+            out_size,  alignment);
 
     fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs->size() != static_cast<size_t>(dset_out.page_count()),
+    fail_if (out_bufs->size() > size_t(dset_out.page_count()) ||
+             out_bufs->size() < size_t(dset_out.page_count() - padding_page),
              "Expected %zu buffers, got: %zd",
              dset_out.page_count(), out_bufs->size());
 
@@ -206,6 +214,8 @@ START_TEST (ver0)
 
     fail_if (dset_in.size()  != dset_out.size());
     fail_if (dset_in.count() != dset_out.count());
+    try { dset_in.checksum(); }
+    catch(gu::Exception& e) { fail(e.what()); }
 
     for (ssize_t i = 0; i < dset_in.count(); ++i)
     {
@@ -229,12 +239,24 @@ START_TEST (ver0)
                  i, records[i]->c_str(), rin.c_str());
     }
 }
+
+START_TEST (ver1)
+{
+    test_ver(gu::RecordSet::VER1);
+}
+END_TEST
+
+START_TEST (ver2)
+{
+    test_ver(gu::RecordSet::VER2);
+}
 END_TEST
 
 Suite* data_set_suite ()
 {
     TCase* t = tcase_create ("DataSet");
-    tcase_add_test (t, ver0);
+    tcase_add_test (t, ver1);
+    tcase_add_test (t, ver2);
     tcase_set_timeout(t, 60);
 
     Suite* s = suite_create ("DataSet");

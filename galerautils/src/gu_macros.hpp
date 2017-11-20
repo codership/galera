@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2017 Codership Oy <info@codership.com>
 
 /**
  * @file Miscellaneous C++-related macros
@@ -8,6 +8,8 @@
 
 #ifndef _gu_macros_hpp_
 #define _gu_macros_hpp_
+
+#include "gu_macros.h"
 
 /* To protect against "old-style" casts in libc macros
  * must be included after respective libc headers */
