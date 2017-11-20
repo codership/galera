@@ -85,17 +85,20 @@ namespace galera
         DataSetOut (gu::byte_t*             reserved,
                     size_t                  reserved_size,
                     const BaseName&         base_name,
-                    DataSet::Version        version)
+                    DataSet::Version        version,
+                    gu::RecordSet::Version  rsv)
             :
             gu::RecordSetOut<DataSet::RecordOut> (
                 reserved,
                 reserved_size,
                 base_name,
-                check_type      (version),
-                ds_to_rs_version(version)
+                check_type(version),
+                rsv
                 ),
             version_(version)
-        {}
+        {
+            assert((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
+        }
 
         size_t
         append (const void* const src, size_t const size, bool const store)
@@ -131,17 +134,7 @@ namespace galera
             throw;
         }
 
-        static gu::RecordSet::Version
-        ds_to_rs_version (DataSet::Version ver)
-        {
-            switch (ver)
-            {
-            case DataSet::EMPTY: break; /* Can't create EMPTY DataSetOut */
-            case DataSet::VER1:  return gu::RecordSet::VER1;
-            }
-            throw;
-        }
-    };
+    }; /* class DataSetOut */
 
 
     class DataSetIn : public gu::RecordSetIn<DataSet::RecordIn>

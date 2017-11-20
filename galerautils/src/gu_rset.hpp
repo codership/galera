@@ -17,6 +17,8 @@
 #include "gu_alloc.hpp"
 #include "gu_digest.hpp"
 
+#include "gu_limits.h" // GU_MIN_ALIGNMENT
+
 #ifdef GU_RSET_CHECK_SIZE
 #  include "gu_throw.hpp"
 #endif
@@ -32,10 +34,12 @@ public:
     enum Version
     {
         EMPTY = 0,
-        VER1
+        VER1,
+        VER2
     };
 
-    static Version const MAX_VERSION = VER1;
+    static Version const MAX_VERSION    = VER2;
+    static int     const VER2_ALIGNMENT = GU_MIN_ALIGNMENT;
 
     enum CheckType
     {
@@ -45,11 +49,22 @@ public:
         CHECK_MMH128
     };
 
-    /*! return total size of a RecordSet */
+    static int check_size(CheckType ct);
+
+    /*! return net, payload size of a RecordSet */
     size_t size() const  { return size_; }
+
+    /*! return total, padded size of a RecordSet */
+    size_t serial_size() const  { return GU_ALIGN(size_, alignment_); }
 
     /*! return number of records in the record set */
     int    count() const { return count_; }
+
+    Version   version()    const { return Version(version_); }
+    CheckType check_type() const { return CheckType(check_type_); }
+
+    /*! return alignment of the records */
+    int       alignment()  const { return alignment_; };
 
     typedef gu::Vector<gu::Buf, 16> GatherVector;
 
@@ -58,15 +73,24 @@ protected:
     ssize_t   size_;
     int       count_;
 
-    Version   version_;
-    CheckType check_type_;
+private:
 
+    byte_t    version_;
+    byte_t    check_type_;
+    byte_t    alignment_;
+
+protected:
     /* ctor for RecordSetOut */
     RecordSet (Version const version, CheckType const ct);
 
     /* ctor for RecordSetIn */
     RecordSet ()
-        : size_(0), count_(0), version_(EMPTY), check_type_(CHECK_NONE) {}
+        : size_      (0),
+          count_     (0),
+          version_   (EMPTY),
+          check_type_(CHECK_NONE),
+          alignment_ (Version(0))
+    {}
 
     void init (const byte_t* buf, ssize_t size);
 
@@ -89,7 +113,7 @@ public:
     typedef Allocator::BaseName BaseName;
 
     /*! return number of disjoint pages in the record set */
-    ssize_t page_count() const { return bufs_->size(); }
+    ssize_t page_count() const { return bufs_->size() + padding_page_needed(); }
 
     /*! return vector of RecordSet fragments in adjusent order */
     ssize_t gather (GatherVector& out);
@@ -123,9 +147,8 @@ protected:
                   bool,
                   HasPtr<false>)
     {
-        byte_t* const dst(alloc_.alloc (size, new_page));
+        byte_t* const dst(alloc(size, new_page));
 
-        new_page = (new_page || !prev_stored_);
         ptr = dst;
 
 #ifdef NDEBUG
@@ -180,6 +203,8 @@ protected:
 
         post_append (new_page, ptr, size);
 
+        size_ += size;
+
         return std::pair<const byte_t*, size_t>(ptr, size);
     }
 
@@ -188,19 +213,49 @@ private:
 #ifdef GU_RSET_CHECK_SIZE
     ssize_t const max_size_;
 #endif
-
     Allocator     alloc_;
     Hash          check_;
     Vector<Buf, Allocator::INITIAL_VECTOR_SIZE> bufs_;
     bool          prev_stored_;
 
-    void
-    post_alloc (bool const new_page, const byte_t* const ptr,
-                ssize_t const size);
+    inline bool padding_page_needed() const
+    {
+        return (size_ % alignment());
+    }
 
-    void
-    post_append (bool const new_page, const byte_t* const ptr,
-                 ssize_t const size);
+    inline byte_t*
+    alloc(size_t const size, bool& new_page)
+    {
+        byte_t* const ret(alloc_.alloc (size, new_page));
+        new_page = (new_page || !prev_stored_);
+        return ret;
+    }
+
+    inline void
+    post_alloc (bool const          new_page,
+                const byte_t* const ptr,
+                ssize_t const       size)
+    {
+        if (new_page)
+        {
+            Buf b = { ptr, size };
+            bufs_->push_back (b);
+        }
+        else
+        {
+            bufs_->back().size += size;
+        }
+    }
+
+    inline void
+    post_append (bool const          new_page,
+                 const byte_t* const ptr,
+                 ssize_t const       size)
+    {
+        check_.append (ptr, size);
+        post_alloc (new_page, ptr, size);
+    }
+
 
     int header_size     () const;
     int header_size_max () const;
@@ -327,7 +382,7 @@ public:
 
     gu::Buf buf() const
     {
-        gu::Buf ret = { head_, size_ }; return ret;
+        gu::Buf ret = { head_, ssize_t(serial_size()) }; return ret;
     }
 
 protected:
@@ -387,7 +442,7 @@ private:
     /* size_ from parent class is offset past all records */
 
     /* takes total size of the supplied buffer */
-    void parse_header_v1 (size_t size);
+    void parse_header_v1_2 (size_t size);
 
     enum Error
     {

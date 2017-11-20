@@ -2227,7 +2227,7 @@ Suite* evs2_suite()
 
         tc = tcase_create("test_input_map_overwrap");
         tcase_add_test(tc, test_input_map_overwrap);
-        tcase_set_timeout(tc, 15);
+        tcase_set_timeout(tc, 60);
         suite_add_tcase(s, tc);
 
         tc = tcase_create("test_input_map_random_insert");

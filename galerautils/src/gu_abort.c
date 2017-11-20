@@ -6,7 +6,7 @@
  * $Id$
  */
 
-
+#define _GNU_SOURCE
 #include "gu_abort.h"
 
 #include "gu_system.h"

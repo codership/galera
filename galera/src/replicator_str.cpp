@@ -125,7 +125,9 @@ private:
 
     ssize_t len (ssize_t offset) const
     {
-        return gtohl(*(reinterpret_cast<uint32_t*>(req_ + offset)));
+        int32_t ret;
+        gu::unserialize4(req_, offset, ret);
+        return ret;
     }
 
     void*   req (ssize_t offset) const
@@ -155,7 +157,7 @@ StateRequest_v1::StateRequest_v1 (
     len_(MAGIC.length() + 1 +
          sizeof(uint32_t) + sst_req_len +
          sizeof(uint32_t) + ist_req_len),
-    req_(reinterpret_cast<char*>(malloc(len_))),
+    req_(static_cast<char*>(malloc(len_))),
     own_(true)
 {
     if (!req_)
@@ -174,16 +176,12 @@ StateRequest_v1::StateRequest_v1 (
     strcpy (ptr, MAGIC.c_str());
     ptr += MAGIC.length() + 1;
 
-    uint32_t* tmp(reinterpret_cast<uint32_t*>(ptr));
-    *tmp = htogl(sst_req_len);
-    ptr += sizeof(uint32_t);
+    ptr += gu::serialize4(uint32_t(sst_req_len), ptr, 0);
 
     memcpy (ptr, sst_req, sst_req_len);
     ptr += sst_req_len;
 
-    tmp = reinterpret_cast<uint32_t*>(ptr);
-    *tmp = htogl(ist_req_len);
-    ptr += sizeof(uint32_t);
+    ptr += gu::serialize4(uint32_t(ist_req_len), ptr, 0);
 
     memcpy (ptr, ist_req, ist_req_len);
 
@@ -194,7 +192,7 @@ StateRequest_v1::StateRequest_v1 (
 StateRequest_v1::StateRequest_v1 (const void* str, ssize_t str_len)
 :
     len_(str_len),
-    req_(reinterpret_cast<char*>(const_cast<void*>(str))),
+    req_(static_cast<char*>(const_cast<void*>(str))),
     own_(false)
 {
     if (sst_offset() + 2*sizeof(uint32_t) > size_t(len_))
@@ -229,7 +227,7 @@ StateRequest_v1::StateRequest_v1 (const void* str, ssize_t str_len)
 static ReplicatorSMM::StateRequest*
 read_state_request (const void* const req, size_t const req_len)
 {
-    const char* const str(reinterpret_cast<const char*>(req));
+    const char* const str(static_cast<const char*>(req));
 
     if (req_len > StateRequest_v1::MAGIC.length() &&
         !strncmp(str, StateRequest_v1::MAGIC.c_str(),
@@ -291,7 +289,7 @@ static void
 get_ist_request(const ReplicatorSMM::StateRequest* str, IST_request* istr)
 {
   assert(str->ist_len());
-  std::string ist_str(reinterpret_cast<const char*>(str->ist_req()),
+  std::string ist_str(static_cast<const char*>(str->ist_req()),
                       str->ist_len());
   std::istringstream is(ist_str);
   is >> *istr;
@@ -351,11 +349,11 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
     // somehow the following does not work, string is initialized beyond
     // the first \0:
-    //std::string const req_str(reinterpret_cast<const char*>(streq->sst_req()),
+    //std::string const req_str(static_cast<const char*>(streq->sst_req()),
     //                          streq->sst_len());
     // have to resort to C ways.
 
-    char* const tmp(strndup(reinterpret_cast<const char*>(streq->sst_req()),
+    char* const tmp(strndup(static_cast<const char*>(streq->sst_req()),
                             streq->sst_len()));
     std::string const req_str(tmp);
     free (tmp);

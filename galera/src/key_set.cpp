@@ -40,50 +40,73 @@ KeySet::version (const std::string& ver)
 
 size_t
 KeySet::KeyPart::store_annotation (const wsrep_buf_t* const parts,
-                                   int const part_num,
-                                   gu::byte_t* buf, int const size)
+                                   int                const part_num,
+                                   gu::byte_t*              buf,
+                                   int                const size,
+                                   int                const alignment)
 {
     assert(size >= 0);
 
-    static size_t const max_len(std::numeric_limits<gu::byte_t>::max());
+    /* max len representable in one byte */
+    static size_t const max_part_len(std::numeric_limits<gu::byte_t>::max());
+
+    /* max multiple of alignment_ len representable in ann_size_t */
+    ann_size_t const max_ann_len(std::numeric_limits<ann_size_t>::max() /
+                                 alignment * alignment);
 
     ann_size_t ann_size;
     int        tmp_size(sizeof(ann_size));
 
     for (int i(0); i <= part_num; ++i)
     {
-        tmp_size += 1 + std::min<size_t>(parts[i].len, max_len);
+        tmp_size += 1 + std::min(parts[i].len, max_part_len);
     }
 
-    tmp_size = std::min(tmp_size, size);
-    ann_size = std::min<size_t>(tmp_size,
-                                std::numeric_limits<ann_size_t>::max());
+    assert(tmp_size > 0);
 
+    /* Make sure that final annotation size is
+     * 1) is a multiple of alignment
+     * 2) is representable with ann_size_t
+     * 3) doesn't exceed dst buffer size
+     */
+    ann_size = std::min<size_t>(GU_ALIGN(tmp_size, alignment), max_ann_len);
+    ann_size = std::min<size_t>(ann_size, size / alignment * alignment);
     assert (ann_size <= size);
+    assert ((ann_size % alignment) == 0);
 
-    ann_size_t const tmp(gu::htog(ann_size));
-    size_t           off(sizeof(tmp));
+    ann_size_t const pad_size(tmp_size < ann_size ? ann_size - tmp_size : 0);
 
-    ::memcpy(buf, &tmp, off);
-
-    for (int i(0); i <= part_num && off < ann_size; ++i)
+    if (gu_likely(ann_size > 0))
     {
-        size_t const left(ann_size - off - 1);
-        gu::byte_t const part_len
-            (std::min(std::min(parts[i].len, left), max_len));
+        ann_size_t const tmp(gu::htog(ann_size));
+        ann_size_t       off(sizeof(tmp));
 
-        buf[off] = part_len; ++off;
+        ::memcpy(buf, &tmp, off);
 
-        const gu::byte_t* const from(
-            reinterpret_cast<const gu::byte_t*>(parts[i].ptr));
+        for (int i(0); i <= part_num && off < ann_size; ++i)
+        {
+            size_t const left(ann_size - off - 1);
+            gu::byte_t const part_len
+                (std::min(std::min(parts[i].len, left), max_part_len));
 
-        std::copy(from, from + part_len, buf + off);
+            buf[off] = part_len; ++off;
 
-        off += part_len;
+            const gu::byte_t* const from(
+                static_cast<const gu::byte_t*>(parts[i].ptr));
+
+            std::copy(from, from + part_len, buf + off);
+
+            off += part_len;
+        }
+
+        if (pad_size > 0)
+        {
+            ::memset(buf + off, 0, pad_size);
+            off += pad_size;
+        }
+
+        assert (off == ann_size);
     }
-
-    assert (off == ann_size);
-
 //    log_info << "stored annotation of size: " << ann_size;
 
     return ann_size;
@@ -157,7 +180,8 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
                              KeySetOut&     store,
                              const KeyPart* parent,
                              const KeyData& kd,
-                             int const      part_num)
+                             int const      part_num,
+                             int const      alignment)
     :
     hash_ (parent->hash_),
     part_ (0),
@@ -182,7 +206,7 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     assert (kd.parts_num > part_num);
 
-    KeySet::KeyPart kp(ts, hd, ver_, exclusive, kd.parts, part_num);
+    KeySet::KeyPart kp(ts, hd, ver_, exclusive, kd.parts, part_num, alignment);
 
 #if 0 /* find() way */
     /* the reason to use find() first, instead of going straight to insert()
@@ -341,7 +365,7 @@ KeySetOut::append (const KeyData& kd)
     {
         try
         {
-            KeyPart kp(added_, *this, parent, kd, i);
+            KeyPart kp(added_, *this, parent, kd, i, alignment());
 
 #ifdef CHECK_PREVIOUS_KEY
             if (size_t(j) < new_.size())

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2014-2017 Codership Oy <info@codership.com>
  *
  */
 
@@ -7,14 +7,16 @@
 #define _gu_uuid_hpp_
 
 #include "gu_uuid.h"
+#include "gu_arch.h"        // GU_ASSERT_ALIGNMENT
 #include "gu_assert.hpp"
 #include "gu_macros.hpp"
 #include "gu_buffer.hpp"
-#include "gu_throw.hpp"
+#include "gu_exception.hpp"
+#include "gu_serialize.hpp" // check_range()
+#include "gu_utils.hpp"     // ptr_offset()
 
-#include <iostream>
+#include <istream>
 #include <cstring>
-#include <algorithm> // std::copy
 
 inline bool operator==(const gu_uuid_t& a, const gu_uuid_t& b)
 {
@@ -36,7 +38,20 @@ inline std::ostream& operator<<(std::ostream& os, const gu_uuid_t& uuid)
     return (os << uuid_buf);
 }
 
-size_t gu_uuid_from_string(const std::string& s, gu_uuid_t& uuid);
+namespace gu {
+    class UUIDScanException : public Exception
+    {
+    public:
+        UUIDScanException(const std::string& s);
+    };
+}
+
+inline ssize_t gu_uuid_from_string(const std::string& s, gu_uuid_t& uuid)
+{
+    ssize_t ret(gu_uuid_scan(s.c_str(), s.size(), &uuid));
+    if (gu_unlikely(ret == -1)) throw gu::UUIDScanException(s);
+    return ret;
+}
 
 inline std::istream& operator>>(std::istream& is, gu_uuid_t& uuid)
 {
@@ -46,41 +61,6 @@ inline std::istream& operator>>(std::istream& is, gu_uuid_t& uuid)
     gu_uuid_from_string(str, uuid);
     return is;
 }
-
-inline size_t gu_uuid_serial_size(const gu_uuid_t& uuid)
-{
-    return sizeof(uuid.data);
-}
-
-inline
-size_t gu_uuid_serialize_unchecked(const gu_uuid_t& uuid, void* const buf,
-                                   size_t const buflen, size_t const offset)
-{
-    assert(offset + gu_uuid_serial_size(uuid) <= buflen);
-
-    std::copy(uuid.data, uuid.data + gu_uuid_serial_size(uuid),
-              static_cast<char*>(buf) + offset);
-
-    return (offset + gu_uuid_serial_size(uuid));
-}
-
-size_t gu_uuid_serialize(const gu_uuid_t& uuid,
-                         void* buf, size_t buflen, size_t offset);
-
-inline
-size_t gu_uuid_unserialize_unchecked(const void* const buf, size_t const buflen,
-                                     size_t const offset, gu_uuid_t& uuid)
-{
-    assert(offset + gu_uuid_serial_size(uuid) <= buflen);
-
-    const char* const from(static_cast<const char*>(buf) + offset);
-    std::copy(from, from + gu_uuid_serial_size(uuid), uuid.data);
-
-    return (offset + gu_uuid_serial_size(uuid));
-}
-
-size_t gu_uuid_unserialize(const void* buf, size_t buflen, size_t offset,
-                           gu_uuid_t& uuid);
 
 namespace gu {
     class UUID_base;
@@ -96,39 +76,50 @@ public:
 
     UUID_base() : uuid_(GU_UUID_NIL) {}
 
-    UUID_base(const void* node, const size_t node_len) : uuid_()
+    UUID_base(const void* const node, const size_t node_len) : uuid_()
     {
         gu_uuid_generate(&uuid_, node, node_len);
     }
 
     UUID_base(gu_uuid_t uuid) : uuid_(uuid) {}
 
-    size_t unserialize(const void* buf,
-                       const size_t buflen, const size_t offset)
+    class SerializeException : public Exception
     {
-        return gu_uuid_unserialize(buf, buflen, offset, uuid_);
-    }
-
-    size_t serialize(void* buf, const size_t buflen, const size_t offset) const
-    {
-        return gu_uuid_serialize(uuid_, buf, buflen, offset);
-    }
-
-    size_t unserialize_unchecked(const void* buf,
-                                 const size_t buflen, const size_t offset)
-    {
-        return gu_uuid_unserialize_unchecked(buf, buflen, offset, uuid_);
-    }
-
-    size_t serialize_unchecked(void* buf,
-                               const size_t buflen, const size_t offset) const
-    {
-        return gu_uuid_serialize_unchecked(uuid_, buf, buflen, offset);
-    }
+    public:
+        SerializeException(size_t need, size_t have);
+    };
 
     static size_t serial_size()
     {
-        return sizeof(gu_uuid_t);
+        return sizeof(UUID_base().uuid_);
+    }
+
+    size_t unserialize(const void* const buf, const size_t offset)
+    {
+        size_t const len(serial_size());
+        ::memcpy(&uuid_, ptr_offset(buf, offset), len);
+        return offset + len;
+    }
+
+    size_t serialize  (void* const buf, const size_t offset) const
+    {
+        size_t const len(serial_size());
+        ::memcpy(ptr_offset(buf, offset), &uuid_, len);
+        return offset + len;
+    }
+
+    size_t unserialize(const void* const buf, const size_t buflen,
+                       const size_t offset)
+    {
+        gu_trace(gu::check_bounds(offset + serial_size(), buflen));
+        return unserialize(buf, offset);
+    }
+
+    size_t serialize  (void* const buf, const size_t buflen,
+                       const size_t offset) const
+    {
+        gu_trace(gu::check_bounds(offset + serial_size(), buflen));
+        return serialize(buf, offset);
     }
 
     const gu_uuid_t* ptr() const
@@ -136,9 +127,13 @@ public:
         return &uuid_;
     }
 
-    gu_uuid_t* ptr()
+    /* ::memcpy() seems to be considerably faster than default = */
+    GU_FORCE_INLINE
+    UUID_base& operator=(const UUID_base& u)
     {
-        return &uuid_;
+        GU_ASSERT_ALIGNMENT(u.uuid_);
+        ::memcpy(&uuid_, &u.uuid_, sizeof(uuid_));
+        return *this;
     }
 
     bool operator<(const UUID_base& cmp) const
@@ -181,12 +176,6 @@ public:
         return (is >> uuid_);
     }
 
-    UUID_base& operator=(const gu_uuid_t& other)
-    {
-        uuid_ = other;
-        return *this;
-    }
-
     const gu_uuid_t& operator()() const
     {
         return uuid_;
@@ -199,7 +188,9 @@ protected:
     gu_uuid_t uuid_;
 
 private:
+
     GU_COMPILE_ASSERT(sizeof(gu_uuid_t) == GU_UUID_LEN, UUID_size);
+
 }; /* class UUID_base */
 
 class gu::UUID : public UUID_base

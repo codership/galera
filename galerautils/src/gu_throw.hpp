@@ -17,7 +17,6 @@
 #include <cstring>
 #include <sstream>
 
-#include "gu_macros.h"
 #include "gu_macros.hpp"
 #include "gu_exception.hpp"
 
@@ -50,7 +49,7 @@ namespace gu
         friend class ThrowFatal;
     };
 
-    /* final*/ class ThrowError //: public ThrowBase
+    /* final */ class ThrowError
     {
     public:
 
@@ -82,7 +81,7 @@ namespace gu
         int const err;
     };
 
-    /* final*/ class ThrowFatal
+    /* final */ class ThrowFatal
     {
     public:
 
