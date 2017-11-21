@@ -23,7 +23,7 @@ void
 gu_abort (void)
 {
     /* avoid coredump */
-    struct rlimit core_limits = { 0, 0 };
+    struct rlimit core_limits = { 1, 1 };
     setrlimit (RLIMIT_CORE, &core_limits);
 
 #ifdef __linux__
