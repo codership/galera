@@ -773,22 +773,15 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
     if (ts)
     {
         log_debug << "aborting ts  " << *ts;
-        if (ts->global_seqno() < bf_seqno)
+        assert(ts->global_seqno() != WSREP_SEQNO_UNDEFINED);
+        if (ts->global_seqno() < bf_seqno &&
+            (ts->flags() & TrxHandle::F_COMMIT))
         {
             log_debug << "seqno " << bf_seqno
                       << " trying to abort seqno " << ts->global_seqno();
-
-    log_debug << "BF seqno " << bf_seqno
-              << " aborting trx " << *trx << " " << trx;
-
-    if (trx->global_seqno() != WSREP_SEQNO_UNDEFINED &&
-        trx->global_seqno() < bf_seqno)
-    {
-        // Decline BF abort if the trx comitting (has valid global seqno)
-        // and its global seqno is less than BF seqno. The committing victim
-        // trx is local and is supposed to already have grabbed all locks
-        // and resources, so the BF aborter should wait.
-        return WSREP_NOT_ALLOWED;
+            *victim_seqno = ts->global_seqno();
+            return WSREP_NOT_ALLOWED;
+        }
     }
 
     wsrep_status_t retval(WSREP_OK);
@@ -866,6 +859,19 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
         }
         break;
     }
+    case TrxHandle::S_COMMITTED:
+        assert(ts);
+        assert(ts->global_seqno() > 0);
+        if (ts->global_seqno() < bf_seqno &&
+            (ts->flags() & TrxHandle::F_COMMIT))
+        {
+            retval = WSREP_NOT_ALLOWED;
+        }
+        else
+        {
+            retval = WSREP_OK;
+        }
+        break;
     case TrxHandle::S_ROLLING_BACK:
         log_error << "Attempt to enter commit monitor while holding "
             "locks in rollback by " << trx;
@@ -876,7 +882,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
                  << trx;
         assert(0);
     }
-    if (retval == WSREP_OK)
+    if (retval == WSREP_OK || retval == WSREP_NOT_ALLOWED)
     {
         *victim_seqno = trx->global_seqno();
     }
@@ -1373,6 +1379,8 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
         trx.set_state(TrxHandle::S_EXECUTING);
     }
 
+    trx.reset_ts();
+
     ++local_commits_;
 
     report_last_committed(safe_to_discard);
@@ -1519,6 +1527,11 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
         if (ts.global_seqno() > 0)
         {
             ApplyOrder ao(ts);
+            if (apply_monitor_.last_left() < ts.global_seqno() &&
+                !(apply_monitor_.entered(ao) || apply_monitor_.finished(ao)))
+            {
+                apply_monitor_.enter(ao);
+            }
             if (apply_monitor_.entered(ao))
             {
                 wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
