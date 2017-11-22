@@ -115,8 +115,6 @@ public:
 
     UUID(gu_uuid_t uuid) : uuid_(uuid) {}
 
-    virtual ~UUID() {}
-
     size_t unserialize(const gu::byte_t* buf,
                        const size_t buflen, const size_t offset)
     {
@@ -139,12 +137,10 @@ public:
         return &uuid_;
     }
 
-    /* ::memcpy() seems to be considerably faster than default = */
     GU_FORCE_INLINE
     UUID& operator=(const UUID& u)
     {
-        GU_ASSERT_ALIGNMENT(u.uuid_);
-        ::memcpy(&uuid_, &u.uuid_, gu_uuid_serial_size(uuid_));
+        gu_uuid_copy(&uuid_, &u.uuid_);
         return *this;
     }
 
