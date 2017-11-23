@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2017 Codership Oy <info@codership.com>
 
 #include "galera_info.hpp"
 

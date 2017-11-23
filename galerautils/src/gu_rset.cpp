@@ -147,14 +147,20 @@ header_size_v1(ssize_t size, ssize_t const count)
 #define VER2_COUNT_SIZE_LEN 24 /* total bits avaiable in short version    */
 
 #define VER2_COUNT_LEN  ((VER2_COUNT_SIZE_LEN - 4) / 2) /* bits for count */
-#define VER2_COUNT_MAX  (1 << VER2_COUNT_LEN)          /* max count value */
+
+/* max count value we can encode in VER2_COUNT_LEN bits [1, ...] */
+#define VER2_COUNT_MAX  (1 << VER2_COUNT_LEN)
+
 #define VER2_COUNT_OFF  8               /* count offset: 8 bits of byte 0 */
 #define VER2_COUNT_MASK ((VER2_COUNT_MAX - 1) << VER2_COUNT_OFF)
 #define VER2_COUNT(h)   ((((h) & VER2_COUNT_MASK) >> VER2_COUNT_OFF) + 1)
 
-#define VER2_SIZE_LEN  (VER2_COUNT_SIZE_LEN - VER2_COUNT_LEN) /* bits for size */
-#define VER2_SIZE_MAX  (1 << VER2_SIZE_LEN)                  /* max size value */
-#define VER2_SIZE_OFF  (VER2_COUNT_OFF + VER2_COUNT_LEN)        /* size offset */
+#define VER2_SIZE_LEN  (VER2_COUNT_SIZE_LEN - VER2_COUNT_LEN) /* bits for size*/
+
+/* max size value we can encode in VER2_SIZE_LEN bits [1, ...] */
+#define VER2_SIZE_MAX  (1 << VER2_SIZE_LEN)
+
+#define VER2_SIZE_OFF  (VER2_COUNT_OFF + VER2_COUNT_LEN)        /* size offset*/
 #define VER2_SIZE_MASK ((VER2_SIZE_MAX - 1) << VER2_SIZE_OFF)
 #define VER2_SIZE(h)   ((((h) & VER2_SIZE_MASK) >> VER2_SIZE_OFF) + 1)
 
@@ -164,6 +170,8 @@ header_size_v1(ssize_t size, ssize_t const count)
 static int
 header_size_v2(ssize_t const size, int const count)
 {
+    assert(count > 0); // should never send empty recordsets
+
     /* if we potentially can fit count and size in 3 bytes
      * header (and the whole set) can be shortened by 16 */
     bool const can_reduce((count <= VER2_COUNT_MAX) &&
