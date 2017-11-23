@@ -66,12 +66,15 @@ typedef uint64_t gu_word_t;
 
 #define GU_WORD_BYTES sizeof(gu_word_t)
 
-/* I'm not aware of the platforms that don't, but still */
-#define GU_ALLOW_UNALIGNED_READS 1
-
 #include <assert.h>
+#ifdef __cpluplus // to avoid "old-style cast" in C++ make it temp instantiation
 #define GU_ASSERT_ALIGNMENT(x)                              \
     assert((uintptr_t(&(x)) % sizeof(x))     == 0 ||        \
            (uintptr_t(&(x)) % GU_WORD_BYTES) == 0)
+#else // ! __cplusplus
+#define GU_ASSERT_ALIGNMENT(x)                              \
+    assert(((uintptr_t)(&(x)) % sizeof(x))     == 0 ||      \
+           ((uintptr_t)(&(x)) % GU_WORD_BYTES) == 0)
+#endif // !__cplusplus
 
 #endif /* _gu_arch_h_ */

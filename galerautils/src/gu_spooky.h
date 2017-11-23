@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2017 Codership Oy <info@codership.com>
 
 /*!
  * @file Spooky hash by Bob Jenkins:
@@ -173,9 +173,12 @@ static GU_FORCE_INLINE void _spooky_short_end(uint64_t* h0, uint64_t* h1,
     *h1 ^= *h0;  *h0 = GU_ROTL64(*h0,63);  *h1 += *h0;
 }
 
+/* 0x3/0x7 on 32/64-bit platforms respectively */
+#define GU_SPOOKY_ALIGNMENT_MASK (GU_WORD_BYTES - 1)
+
 //
 // short hash ... it could be used on any message,
-// but it's used by Spooky just for short messages.
+// but it's used by Spooky just for short messages ( <= _spooky_bufSize )
 //
 static GU_INLINE void gu_spooky_short_host(
     const void* const message,
@@ -187,21 +190,20 @@ static GU_INLINE void gu_spooky_short_host(
         const uint8_t* p8;
         uint32_t*      p32;
         uint64_t*      p64;
-#if !GU_ALLOW_UNALIGNED_READS
-        size_t i;
-#endif /* !GU_ALLOW_UNALIGNED_READS */
+        uintptr_t      i;
     } u;
 
     u.p8 = (const uint8_t *)message;
 
-#if !GU_ALLOW_UNALIGNED_READS
-    if (u.i & 0x7)
+#ifndef GU_ALLOW_UNALIGNED_READS
+    uint64_t buf[_spooky_numVars << 1];
+    if (u.i & GU_SPOOKY_ALIGNMENT_MASK)
     {
-        uint64_t buf[_spooky_numVars << 1];
+        /* message unaligned, make aligned copy and point to it */
         memcpy(buf, message, length);
         u.p64 = buf;
     }
-#endif /* !GU_ALLOW_UNALIGNED_READS */
+#endif /* GU_ALLOW_UNALIGNED_READS */
 
     size_t   remainder = length & 0x1F; /* length%32 */
 
@@ -302,9 +304,9 @@ static GU_INLINE void gu_spooky_short_host(
 }
 
 static GU_FORCE_INLINE void gu_spooky_short(
-    const void* message,
-    size_t      length,
-    void* const hash)
+    const void* const message,
+    size_t      const length,
+    uint64_t*   const hash)
 {
     uint64_t* const u64 = (uint64_t*)hash;
     gu_spooky_short_host(message, length, u64);
@@ -334,9 +336,7 @@ static GU_INLINE void gu_spooky_inline (
     {
         const uint8_t* p8;
         uint64_t*      p64;
-#if !GU_ALLOW_UNALIGNED_READS
-        gu_word_t      i;
-#endif /* !GU_ALLOW_UNALIGNED_READS */
+        uintptr_t      i;
     } u;
 
     size_t remainder;
@@ -353,16 +353,16 @@ static GU_INLINE void gu_spooky_inline (
     end  = u.p64 + (length/_spooky_blockSize)*_spooky_numVars;
 
     // handle all whole _spooky_blockSize blocks of bytes
-#if !GU_ALLOW_UNALIGNED_READS
-    if ((u.i & 0x7) == 0)
+#ifndef GU_ALLOW_UNALIGNED_READS
+    if ((u.i & GU_SPOOKY_ALIGNMENT_MASK) == 0)
     {
-#endif /* !GU_ALLOW_UNALIGNED_READS */
+#endif /* GU_ALLOW_UNALIGNED_READS */
         while (u.p64 < end)
         {
             _spooky_mix(u.p64, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-	    u.p64 += _spooky_numVars;
+            u.p64 += _spooky_numVars;
         }
-#if !GU_ALLOW_UNALIGNED_READS
+#ifndef GU_ALLOW_UNALIGNED_READS
     }
     else
     {
@@ -370,10 +370,10 @@ static GU_INLINE void gu_spooky_inline (
         {
             memcpy(buf, u.p64, _spooky_blockSize);
             _spooky_mix(buf, &h0,&h1,&h2,&h3,&h4,&h5,&h6,&h7,&h8,&h9,&h10,&h11);
-	    u.p64 += _spooky_numVars;
+            u.p64 += _spooky_numVars;
         }
     }
-#endif /* !GU_ALLOW_UNALIGNED_READS */
+#endif /* GU_ALLOW_UNALIGNED_READS */
 
     // handle the last partial block of _spooky_blockSize bytes
     remainder = (length - ((const uint8_t*)end - (const uint8_t*)message));

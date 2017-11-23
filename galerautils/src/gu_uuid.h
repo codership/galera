@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -14,6 +14,8 @@
 
 #include "gu_types.h"
 #include "gu_macros.h"
+#include "gu_arch.h" // GU_ASSERT_ALIGNMENT()
+
 #include <wsrep_api.h>
 
 #include <string.h>
@@ -73,7 +75,7 @@ gu_uuid_generate (gu_uuid_t*  uuid,
  * Compare two UUIDs according to RFC
  * @return -1, 0, 1 if left is respectively less, equal or greater than right
  */
-extern long
+extern int
 gu_uuid_compare (const gu_uuid_t* left,
                  const gu_uuid_t* right);
 
@@ -81,7 +83,7 @@ gu_uuid_compare (const gu_uuid_t* left,
  * Compare ages of two UUIDs
  * @return -1, 0, 1 if left is respectively younger, equal or older than right
  */
-extern long
+extern int
 gu_uuid_older (const gu_uuid_t* left,
                const gu_uuid_t* right);
 
@@ -106,6 +108,8 @@ gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid);
 GU_FORCE_INLINE void
 gu_uuid_copy(gu_uuid_t* const to, const gu_uuid_t* const from)
 {
+    GU_ASSERT_ALIGNMENT(*to);
+    GU_ASSERT_ALIGNMENT(*from);
     memcpy(to, from, sizeof(gu_uuid_t));
 }
 

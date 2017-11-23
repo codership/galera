@@ -127,12 +127,10 @@ public:
         return &uuid_;
     }
 
-    /* ::memcpy() seems to be considerably faster than default = */
     GU_FORCE_INLINE
     UUID_base& operator=(const UUID_base& u)
     {
-        GU_ASSERT_ALIGNMENT(u.uuid_);
-        ::memcpy(&uuid_, &u.uuid_, sizeof(uuid_));
+        gu_uuid_copy(&uuid_, &u.uuid_);
         return *this;
     }
 
