@@ -4,6 +4,8 @@
 
 #include "gu_serialize.hpp"
 
+#include <sstream>
+
 namespace gu
 {
     class serialization_error_message

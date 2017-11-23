@@ -25,6 +25,7 @@ galerautils/tests/gu_tests++.passed
 galerautils/tests/gu_tests.passed
 galerautils/tests/gu_to_test
 galerautils/tests/avalanche*
+galerautils/tests/copy_vs_assignment*
 garb/garbd
 gcache.page.*
 gcache/src/test
