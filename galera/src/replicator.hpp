@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_REPLICATOR_HPP
@@ -69,16 +69,13 @@ namespace galera
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 
-        virtual wsrep_status_t replicate(TrxHandleMaster*  trx,
-                                         wsrep_trx_meta_t* meta) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandleMaster*  trx,
-                                          wsrep_trx_meta_t* meta) =0;
-        virtual wsrep_status_t post_rollback(TrxHandleMaster* trx) = 0;
-        virtual wsrep_status_t release_commit(TrxHandleMaster* trx) = 0;
-        virtual wsrep_status_t release_rollback(TrxHandleMaster* trx) = 0;
-        virtual wsrep_status_t replay_trx(TrxHandleMaster* trx,
-                                          void*            replay_ctx) = 0;
-        virtual void abort_trx(TrxHandleMaster* trx, wsrep_seqno_t bf_seqno) = 0;
+        virtual wsrep_status_t replicate(TrxHandleMaster&   trx,
+                                         wsrep_trx_meta_t*  meta) = 0;
+        virtual wsrep_status_t certify(TrxHandleMaster&     trx,
+                                       wsrep_trx_meta_t*    meta) = 0;
+        virtual wsrep_status_t replay_trx(TrxHandleMaster&  trx,
+                                          void*             replay_ctx) = 0;
+        virtual void abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno) = 0;
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;

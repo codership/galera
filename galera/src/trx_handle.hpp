@@ -53,6 +53,7 @@ namespace galera
         typename T::Fsm::TransMap& trans_map_;
     };
 
+
     class TrxHandle
     {
     public:
@@ -135,12 +136,15 @@ namespace galera
             S_APPLYING,   // grabbing apply monitor, applying
             S_COMMITTING, // grabbing commit monitor, committing changes
             S_COMMITTED,
+            S_ROLLING_BACK,
             S_ROLLED_BACK
         } State;
 
         static const int num_states_ = S_ROLLED_BACK + 1;
 
         static void print_state(std::ostream&, State);
+
+        void print_state_history(std::ostream&) const;
 
         class Transition
         {
@@ -195,6 +199,8 @@ namespace galera
 
         uint64_t timestamp() const { return timestamp_; }
 
+        bool master() const { return master_; }
+
         void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
@@ -223,7 +229,8 @@ namespace galera
             timestamp_         (),
             version_           (-1),
             write_set_flags_   (0),
-            local_             (local)
+            local_             (local),
+            master_            (false)
         {}
 
         /* local trx ctor */
@@ -240,7 +247,8 @@ namespace galera
             timestamp_         (gu_time_calendar()),
             version_           (version),
             write_set_flags_   (F_BEGIN),
-            local_             (true)
+            local_             (true),
+            master_            (true)
         {}
 
         Fsm state_;
@@ -255,6 +263,7 @@ namespace galera
         // TrxHandleSlave if there exists TrxHandleMaster object corresponding
         // to TrxHandleSlave.
         bool                   local_;
+        bool                   master_; // derived object type
 
     private:
 
@@ -528,7 +537,8 @@ namespace galera
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
+                   const wsrep_trx_meta_t& meta,
+                   wsrep_bool_t&           exit_loop) /* throws */;
 
         bool is_committed() const { return committed_; }
         void mark_committed()     { committed_ = true; }
@@ -597,6 +607,20 @@ namespace galera
         }
         bool cert_bypass() const { return cert_bypass_; }
 
+        bool must_enter_am() const
+        {
+//            static bool const SR_MASK = F_COMMIT | F_BEGIN;
+
+            assert(state() == S_REPLICATING          ||
+                   state() == S_CERTIFYING           ||
+                   state() == S_MUST_CERT_AND_REPLAY ||
+                   state() == S_ABORTING);
+
+//            bool const streaming((flags() & SR_MASK) != SR_MASK);
+//            return (state() != S_ABORTING || pa_unsafe() || streaming);
+            return true; // to reduce races for the time being.
+        }
+
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
@@ -610,7 +634,6 @@ namespace galera
             write_set_         (),
             buf_               (buf),
             action_            (0, 0),
-            refcnt_            (1),
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
@@ -633,7 +656,6 @@ namespace galera
         WriteSetIn             write_set_;
         void* const            buf_;
         std::pair<const void*, size_t> action_;
-        gu::Atomic<int>        refcnt_;
         bool                   certified_;
         bool                   committed_;
         bool                   exit_loop_;
@@ -972,6 +994,7 @@ namespace galera
         int                    gcs_handle_;
         bool                   wso_;
 
+        friend class TrxHandle;
         friend class TrxHandleSlave;
         friend class TrxHandleMasterDeleter;
         friend class TransMapBuilder<TrxHandleMaster>;

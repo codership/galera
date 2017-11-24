@@ -28,7 +28,6 @@ static suite_creator_t suites[] =
     key_set_suite,
     write_set_ng_suite,
     certification_suite,
-//remove    write_set_suite,
     trx_handle_suite,
     service_thd_suite,
     ist_suite,
