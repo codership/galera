@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -95,14 +95,17 @@ namespace galera
         void apply_trx(void* recv_ctx, TrxHandleSlave& trx);
         void process_apply_exception(TrxHandleSlave&, const ApplyException&);
 
-        wsrep_status_t send(TrxHandleMaster* trx, wsrep_trx_meta_t*);
-        wsrep_status_t replicate(TrxHandleMaster* trx, wsrep_trx_meta_t*);
-        void           abort_trx(TrxHandleMaster* trx, wsrep_seqno_t bf_seqno);
-        wsrep_status_t pre_commit(TrxHandleMaster*  trx, wsrep_trx_meta_t*);
-        wsrep_status_t post_rollback(TrxHandleMaster* trx);
-        wsrep_status_t release_commit(TrxHandleMaster* trx);
-        wsrep_status_t release_rollback(TrxHandleMaster* trx);
-        wsrep_status_t replay_trx(TrxHandleMaster* trx, void* replay_ctx);
+        wsrep_status_t send(TrxHandleMaster& trx, wsrep_trx_meta_t*);
+        wsrep_status_t replicate(TrxHandleMaster& trx, wsrep_trx_meta_t*);
+        void           abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno);
+        wsrep_status_t certify(TrxHandleMaster& trx, wsrep_trx_meta_t*);
+        wsrep_status_t commit_order_enter_local(TrxHandleMaster& trx);
+        wsrep_status_t commit_order_enter_remote(TrxHandleSlave& trx);
+        wsrep_status_t commit_order_leave(TrxHandleSlave& trx,
+                                          const wsrep_buf_t*  error);
+        wsrep_status_t release_commit(TrxHandleMaster& trx);
+        wsrep_status_t release_rollback(TrxHandleMaster& trx);
+        wsrep_status_t replay_trx(TrxHandleMaster& trx, void* replay_ctx);
 
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                  int           tout,
@@ -173,6 +176,9 @@ namespace galera
         template<bool local>
         void cancel_monitors(const TrxHandleSlave& ts)
         {
+            log_info << "canceling " << (local ? "local" : "apply")
+                     <<" monitor on behalf of ts: " << ts;
+
             if (local)
             {
                 LocalOrder  lo(ts);
@@ -281,6 +287,19 @@ namespace galera
             InitConfig(gu::Config&, const char* node_addr,const char* base_dir);
         };
 
+        class StateRequest
+        {
+        public:
+            virtual int         version () const = 0;
+            virtual const void* req     () const = 0;
+            virtual ssize_t     len     () const = 0;
+            virtual const void* sst_req () const = 0;
+            virtual ssize_t     sst_len () const = 0;
+            virtual const void* ist_req () const = 0;
+            virtual ssize_t     ist_len () const = 0;
+            virtual ~StateRequest() {}
+        };
+
     private:
 
         ReplicatorSMM(const ReplicatorSMM&);
@@ -335,6 +354,10 @@ namespace galera
         /* aborts/exits the program in a clean way */
         void abort() GU_NORETURN;
 
+#ifdef GALERA_MONITOR_DEBUG_PRINT
+    public:
+#endif /* GALERA_MONITOR_DEBUG_PRINT */
+
         class LocalOrder
         {
         public:
@@ -343,20 +366,22 @@ namespace galera
             LocalOrder(const TrxHandleSlave& ts)
                 :
                 seqno_(ts.local_seqno())
-#ifdef GU_DBUG_ON
-                , ts_(true),
-                is_local_(ts.local())
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
+                ,trx_(&ts)
 #endif //GU_DBUG_ON
             { }
 
-            LocalOrder(wsrep_seqno_t seqno, bool ts = false, bool local = false)
+            LocalOrder(wsrep_seqno_t seqno, const TrxHandleSlave* ts = NULL)
                 :
                 seqno_(seqno)
-#ifdef GU_DBUG_ON
-                , ts_(ts),
-                is_local_(local)
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
+                ,trx_(ts)
 #endif //GU_DBUG_ON
-            { }
+            {
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
+                assert((trx_ && seqno_ == trx_->local_seqno()) || !trx_);
+#endif //GU_DBUG_ON
+            }
 
             wsrep_seqno_t seqno() const { return seqno_; }
 
@@ -369,9 +394,9 @@ namespace galera
 #ifdef GU_DBUG_ON
             void debug_sync(gu::Mutex& mutex)
             {
-                if (ts_ != false)
+                if (trx_)
                 {
-                    if (is_local_ == true)
+                    if (trx_->local())
                     {
                         mutex.unlock();
                         GU_DBUG_SYNC_WAIT("local_monitor_master_enter_sync");
@@ -385,15 +410,34 @@ namespace galera
                     }
                 }
             }
-#endif // GU_DBUG_ON
-        private:
+#endif //GU_DBUG_ON
 
-            LocalOrder(const LocalOrder&);
-            wsrep_seqno_t const seqno_;
+#ifndef NDEBUG
+            LocalOrder()
+                :
+                seqno_(WSREP_SEQNO_UNDEFINED)
 #ifdef GU_DBUG_ON
-            bool const ts_;
-            bool const is_local_;
-#endif // GU_DBUG_ON
+                ,trx_(NULL)
+#endif //GU_DBUG_ON
+            {}
+#endif /* NDEBUG */
+
+            void print(std::ostream& os) const
+            {
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
+                if (trx_) os << *trx_; else
+#endif //GU_DBUG_ON
+                    os << seqno_;
+            }
+
+        private:
+#ifdef NDEBUG
+            LocalOrder(const LocalOrder& o);
+#endif /* NDEBUG */
+            wsrep_seqno_t const seqno_;
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
+            const TrxHandleSlave* const trx_;
+#endif //GU_DBUG_ON
         };
 
         class ApplyOrder
@@ -405,6 +449,9 @@ namespace galera
                 global_seqno_ (ts.global_seqno()),
                 depends_seqno_(ts.depends_seqno()),
                 is_local_     (ts.local())
+#ifndef NDEBUG
+                ,trx_         (&ts)
+#endif
             { }
 
             ApplyOrder(wsrep_seqno_t gs, wsrep_seqno_t ds, bool l = false)
@@ -412,6 +459,9 @@ namespace galera
                 global_seqno_ (gs),
                 depends_seqno_(ds),
                 is_local_     (l)
+#ifndef NDEBUG
+                ,trx_         (NULL)
+#endif
             { }
 
             wsrep_seqno_t seqno() const { return global_seqno_; }
@@ -438,17 +488,38 @@ namespace galera
                     mutex.lock();
                 }
             }
-#endif // GU_DBUG_ON
+#endif //GU_DBUG_ON
+
+#ifndef NDEBUG
+            ApplyOrder()
+                :
+                global_seqno_ (WSREP_SEQNO_UNDEFINED),
+                depends_seqno_(WSREP_SEQNO_UNDEFINED),
+                is_local_     (false),
+                trx_          (NULL)
+            {}
+#endif /* NDEBUG */
+
+            void print(std::ostream& os) const
+            {
+#ifndef NDEBUG
+                if (trx_) os << *trx_; else
+#endif /* NDEBUG */
+                    os << "g:" << global_seqno_ << " d:" << depends_seqno_
+                       << (is_local_ ? " L" : " R");
+            }
 
         private:
-
+#ifdef NDEBUG
             ApplyOrder(const ApplyOrder&);
+#endif /* NDEBUG */
             const wsrep_seqno_t global_seqno_;
             const wsrep_seqno_t depends_seqno_;
             const bool is_local_;
+#ifndef NDEBUG
+            const TrxHandleSlave* const trx_;
+#endif
         };
-
-    public:
 
         class CommitOrder
         {
@@ -483,6 +554,9 @@ namespace galera
                 global_seqno_(ts.global_seqno()),
                 mode_(mode),
                 is_local_(ts.local())
+#ifndef NDEBUG
+                ,trx_(&ts)
+#endif
             { }
 
             CommitOrder(wsrep_seqno_t gs, Mode mode, bool local = false)
@@ -490,6 +564,9 @@ namespace galera
                 global_seqno_(gs),
                 mode_(mode),
                 is_local_(local)
+#ifndef NDEBUG
+                ,trx_(NULL)
+#endif
             { }
 
             wsrep_seqno_t seqno() const { return global_seqno_; }
@@ -529,29 +606,41 @@ namespace galera
                     mutex.lock();
                 }
             }
-#endif // GU_DBUG_ON
+#endif //GU_DBUG_ON
+
+#ifndef NDEBUG
+            CommitOrder()
+                :
+                global_seqno_ (WSREP_SEQNO_UNDEFINED),
+                mode_         (OOOC),
+                is_local_     (false),
+                trx_          (NULL)
+            {}
+#endif /* NDEBUG */
+
+            void print(std::ostream& os) const
+            {
+#ifndef NDEBUG
+                if (trx_) os << *trx_; else
+#endif /* NDEBUG */
+                    os << "g:" << global_seqno_ << " m:" << mode_
+                       << (is_local_ ? " L" : " R");
+            }
 
         private:
+#ifdef NDEBUG
             CommitOrder(const CommitOrder&);
+#endif
             const wsrep_seqno_t global_seqno_;
             const Mode mode_;
             const bool is_local_;
-        };
-
-        class StateRequest
-        {
-        public:
-            virtual int         version () const = 0;
-            virtual const void* req     () const = 0;
-            virtual ssize_t     len     () const = 0;
-            virtual const void* sst_req () const = 0;
-            virtual ssize_t     sst_len () const = 0;
-            virtual const void* ist_req () const = 0;
-            virtual ssize_t     ist_len () const = 0;
-            virtual ~StateRequest() {}
+#ifndef NDEBUG
+            const TrxHandleSlave* const trx_;
+#endif
         };
 
     private:
+
         // state machine
         class Transition
         {
@@ -712,7 +801,6 @@ namespace galera
         wsrep_view_cb_t        view_cb_;
         wsrep_sst_request_cb_t sst_request_cb_;
         wsrep_apply_cb_t       apply_cb_;
-        wsrep_commit_cb_t      commit_cb_;
         wsrep_unordered_cb_t   unordered_cb_;
         wsrep_sst_donate_cb_t  sst_donate_cb_;
         wsrep_synced_cb_t      synced_cb_;
@@ -820,6 +908,19 @@ namespace galera
     };
 
     std::ostream& operator<<(std::ostream& os, ReplicatorSMM::State state);
-}
+
+#ifdef GALERA_MONITOR_DEBUG_PRINT
+    inline std::ostream&
+    operator<<(std::ostream& os,const ReplicatorSMM::LocalOrder& o)
+    { o.print(os); return os; }
+    inline std::ostream&
+    operator<<(std::ostream& os,const ReplicatorSMM::ApplyOrder& o)
+    { o.print(os); return os; }
+    inline std::ostream&
+    operator<<(std::ostream& os,const ReplicatorSMM::CommitOrder& o)
+    { o.print(os); return os; }
+#endif /* GALERA_MONITOR_DEBUG_PRINT */
+
+} /* namespace galera */
 
 #endif /* GALERA_REPLICATOR_SMM_HPP */
