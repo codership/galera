@@ -848,7 +848,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
         {
             CommitOrder co(*ts, co_mode_);
             bool const interrupted(commit_monitor_.interrupt(co));
-            if (interrupted)
+            if (interrupted || !(ts->flags() & TrxHandle::F_COMMIT))
             {
                 trx->set_state(TrxHandle::S_MUST_ABORT);
             }
@@ -1193,7 +1193,8 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandleMaster& trx)
     {
         TrxHandleSlavePtr tsp(trx.ts());
         TrxHandleSlave& ts(*tsp);
-        ts.set_state(trx.state());
+        ts.set_state(ts.state() == TrxHandle::S_APPLYING ?
+                     TrxHandle::S_COMMITTING : TrxHandle::S_ROLLING_BACK);
 
         CommitOrder co(ts, co_mode_);
         assert(!commit_monitor_.entered(co));
@@ -1519,13 +1520,24 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
         {
 //remove            assert(ts.state() == TrxHandle::S_ROLLED_BACK);
 
-            CommitOrder co(ts, co_mode_);
-            assert(commit_monitor_.entered(co) == false);
+            // CommitOrder co(ts, co_mode_);
+            // assert(commit_monitor_.entered(co) == false);
         }
 #endif /* NDEBUG */
 
         if (ts.global_seqno() > 0)
         {
+            CommitOrder co(ts, co_mode_);
+            if (commit_monitor_.last_left() < ts.global_seqno() &&
+                !(commit_monitor_.entered(co) || commit_monitor_.finished(co)))
+            {
+                commit_monitor_.enter(co);
+            }
+            if (commit_monitor_.entered(co))
+            {
+                commit_monitor_.leave(co);
+            }
+
             ApplyOrder ao(ts);
             if (apply_monitor_.last_left() < ts.global_seqno() &&
                 !(apply_monitor_.entered(ao) || apply_monitor_.finished(ao)))

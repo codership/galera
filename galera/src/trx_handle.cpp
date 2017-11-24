@@ -135,6 +135,108 @@ galera::TrxHandleSlave::Fsm::TransMap galera::TrxHandleSlave::trans_map_;
 
 namespace galera {
 
+//
+// About transaction states:
+//
+// The TrxHandleMaster stats are used to track the state of the
+// transaction, while TrxHandleSlave states are used to track
+// which critical sections have been accessed during write set
+// applying. For this reason TrxHandleSlave state machine is
+// significantly simpler than TrxHandleMaster.
+//
+// TrxHandleMaster states during normal execution:
+//
+// EXECUTING   - Transaction handle has been created by appending key
+//               or write set data
+// REPLICATING - Transaction write set has been send to group
+//               communication layer for ordering
+// CERTIFYING  - Transaction write set has been received from group
+//               communication layer, has entered local monitor and
+//               is certifying
+// APPLYING    - Transaction has entered applying critical section
+// COMMITTING  - Transaction has entered committing critical section
+// COMMITTED   - Transaction has released commit time critical section
+// ROLLED_BACK - Application performed a voluntary rollback
+//
+// Note that streaming replication rollback happens by replicating
+// special rollback writeset which will go through regular write set
+// critical sections.
+//
+// Note/Fixme: CERTIFYING, APPLYING and COMMITTING states seem to be
+//             redundant as these states can be tracked via
+//             associated TrxHandleSlave states.
+//
+//
+// TrxHandleMaster states after effective BF abort:
+//
+// MUST_ABORT   - Transaction enter this state after succesful BF abort.
+//                BF abort is allowed if:
+//                * Transaction does not have associated TrxHandleSlave
+//                * Transaction has associated TrxHandleSlave but it does
+//                  not have commit flag set
+//                * Transaction has associated TrxHandleSlave, commit flag
+//                  is set and the TrxHandleSlave global sequence number is
+//                  higher than BF aborter global sequence number
+//
+// 1) If the certification after BF abort results a failure:
+// ABORTING     - BF abort was effective and certification
+//                resulted a failure
+// ROLLING_BACK - Commit order critical section has been grabbed for
+//                rollback
+// ROLLED_BACK  - Commit order critical section has been released after
+//                succesful rollback
+//
+// 2) The case where BF abort happens after succesful certification or
+//    if out-of-order certification results a success:
+// MUST_REPLAY  - The transaction must roll back and replay in applier
+//                context.
+//                * If the BF abort happened before certification,
+//                  certification must be performed in applier context
+//                  and the transaction replay must be aborted if
+//                  the certification fails.
+//                * TrxHandleSlave state can be used to determine
+//                  which critical sections must be entered before the
+//                  replay. For example, if the TrxHandleSlave state is
+//                  REPLICATING, write set must be certified under local
+//                  monitor and both apply and commit monitors must be
+//                  entered before applying. On the other hand, if
+//                  TrxHandleSlave state is APPLYING, only commit monitor
+//                  must be grabbed before replay.
+//
+// TrxHandleMaster states after replication failure:
+//
+// ABORTING     - Replicaition resulted a failure
+// ROLLING_BACK - Error has been returned to application
+// ROLLED_BACK  - Application has finished rollback
+//
+//
+// TrxHandleMaster states after certification failure:
+//
+// ABORTING - Certification resulted a failure
+// ROLLING_BACK - Commit order critical section has been grabbed for
+//                rollback
+// ROLLED_BACK  - Commit order critical section has been released
+//                after succesful rollback
+//
+//
+//
+// TrxHandleSlave:
+// REPLICATING - this is the first state for TrxHandleSlave after it
+//               has been received from group
+// CERTIFYING  - local monitor has been entered succesfully
+// APPLYING    - apply monitor has been entered succesfully
+// COMMITTING  - commit monitor has been entered succesfully
+// ABORTING    - certification has failed
+// ROLLING_BACK - certification has failed and commit monitor has been
+//                entered
+// COMMITTED   - commit has been finished, commit order critical section
+//               has been released
+// ROLLED_BACK - transaction has rolled back, commit order critical section
+//               has been released
+//
+//
+// State machine diagrams can be found below.
+
 template<>
 TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     :

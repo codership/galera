@@ -408,7 +408,7 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
 
     if (!victim)
     {
-        log_warn << "trx to rollback " << trx_id << " not found";
+        log_debug << "trx to rollback " << trx_id << " not found";
         return WSREP_OK;
     }
 
@@ -706,8 +706,23 @@ wsrep_status_t galera_commit_order_leave(
             TrxHandleMaster& trx(*reinterpret_cast<TrxHandleMaster*>(txp));
             TrxHandleLock lock(trx);
             assert(trx.ts() && trx.ts()->global_seqno() > 0);
-            retval = repl->commit_order_leave(*trx.ts(), error);
-            trx.set_state(trx.ts()->state());
+            if (trx.state() == TrxHandle::S_MUST_ABORT)
+            {
+                // Trx is non-committing streaming replication and
+                // the trx was BF aborted while committing a fragment
+                assert(!(trx.ts()->flags() & TrxHandle::F_COMMIT));
+                trx.set_state(TrxHandle::S_ABORTING);
+                retval = WSREP_BF_ABORT;
+            }
+            else
+            {
+                retval = repl->commit_order_leave(*trx.ts(), error);
+                assert(trx.state() == TrxHandle::S_COMMITTING ||
+                       !(trx.ts()->flags() & TrxHandle::F_COMMIT));
+                trx.set_state(trx.state() == TrxHandle::S_ROLLING_BACK ?
+                              TrxHandle::S_ROLLED_BACK :
+                              TrxHandle::S_COMMITTED);
+            }
         }
         else
         {
