@@ -33,7 +33,7 @@ import subprocess
 sysname = os.uname()[0].lower()
 machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
-print 'Host: ' + sysname + ' ' + machine + ' ' + bits
+print('Host: ' + sysname + ' ' + machine + ' ' + bits)
 
 x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386', 'i86pc' ])
 
@@ -139,10 +139,10 @@ if GALERA_REV == "XXXX" and os.path.isfile("GALERA_REVISION"):
 
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
-print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
+print('Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV)
 
 LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '')
-LIBBOOST_SYSTEM_A = string.replace(LIBBOOST_PROGRAM_OPTIONS_A, 'boost_program_options', 'boost_system')
+LIBBOOST_SYSTEM_A = LIBBOOST_PROGRAM_OPTIONS_A.replace('boost_program_options', 'boost_system')
 
 #
 # Set up and export default build environment
@@ -174,7 +174,7 @@ if link != 'default':
 try:
     cc_version = subprocess.check_output(
         env['CC'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
+        stderr=subprocess.STDOUT).splitlines()[0].decode("utf-8")
 except:
     # in case "$CC --version" returns an error, e.g. "unknown option"
     cc_version = 'unknown'
@@ -182,15 +182,15 @@ except:
 try:
     cxx_version = subprocess.check_output(
         env['CXX'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
+        stderr=subprocess.STDOUT).splitlines()[0].decode("utf-8")
 except:
     # in case "$CXX --version" returns an error, e.g. "unknown option"
     cxx_version = 'unknown'
 
-print 'Using C compiler executable: ' + env['CC']
-print 'C compiler version is: ' + cc_version
-print 'Using C++ compiler executable: ' + env['CXX']
-print 'C++ compiler version is: ' + cxx_version
+print('Using C compiler executable: ' + env['CC'])
+print('C compiler version is: ' + cc_version)
+print('Using C++ compiler executable: ' + env['CXX'])
+print('C++ compiler version is: ' + cxx_version)
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
@@ -292,7 +292,7 @@ conf = Configure(env, custom_tests = {'CheckSystemASIOVersion': CheckSystemASIOV
 # System headers and libraries
 
 if not conf.CheckLib('pthread'):
-    print 'Error: pthread library not found'
+    print('Error: pthread library not found')
     Exit(1)
 
 # libatomic may be needed on some 32bit platforms (and 32bit userland PPC64)
@@ -302,23 +302,23 @@ if not x86:
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
-        print 'Error: rt library not found'
+        print('Error: rt library not found')
         Exit(1)
 
 if sysname == 'freebsd':
     if not conf.CheckLib('execinfo'):
-        print 'Error: execinfo library not found'
+        print('Error: execinfo library not found')
         Exit(1)
 
 if sysname == 'sunos':
     if not conf.CheckLib('socket'):
-        print 'Error: socket library not found'
+        print('Error: socket library not found')
         Exit(1)
     if not conf.CheckLib('crypto'):
-        print 'Error: crypto library not found'
+        print('Error: crypto library not found')
         Exit(1)
     if not conf.CheckLib('nsl'):
-        print 'Error: nsl library not found'
+        print('Error: nsl library not found')
         Exit(1)
 
 if conf.CheckHeader('sys/epoll.h'):
@@ -334,7 +334,7 @@ elif conf.CheckHeader('sys/endian.h'):
 elif conf.CheckHeader('sys/byteorder.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_BYTEORDER_H')
 elif sysname != 'darwin':
-    print 'can\'t find byte order information'
+    print('can\'t find byte order information')
     Exit(1)
 
 if conf.CheckHeader('execinfo.h'):
@@ -345,7 +345,7 @@ if conf.CheckHeader('execinfo.h'):
 # boost headers
 
 if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
-    print 'boost/shared_ptr.hpp not found or not usable'
+    print('boost/shared_ptr.hpp not found or not usable')
     Exit(1)
 conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 
@@ -357,7 +357,7 @@ else:
     if conf.CheckCXXHeader('boost/unordered_map.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
     else:
-        print 'no unordered map header available'
+        print('no unordered map header available')
         Exit(1)
 
 # pool allocator
@@ -383,7 +383,7 @@ if boost == 1:
     def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
         libName = libBaseName + boost_library_suffix
         if configuredLibPath != '' and not os.path.isfile(configuredLibPath):
-            print "Error: file '%s' does not exist" % configuredLibPath
+            print("Error: file '%s' does not exist" % configuredLibPath)
             Exit(1)
         if configuredLibPath == '':
            for libpath in boost_libpaths:
@@ -393,7 +393,7 @@ if boost == 1:
                    break
         if configuredLibPath != '':
             if not conf.CheckCXXHeader(header):
-                print "Error: header '%s' does not exist" % header
+                print("Error: header '%s' does not exist" % header)
                 Exit (1)
             if autoadd:
                 conf.env.Append(LIBS=File(configuredLibPath))
@@ -404,7 +404,7 @@ if boost == 1:
                                            header=header,
                                            language='CXX',
                                            autoadd=autoadd):
-                print 'Error: library %s does not exist' % libName
+                print('Error: library %s does not exist' % libName)
                 Exit (1)
             return [libName]
 
@@ -412,7 +412,7 @@ if boost == 1:
     #
     if boost_pool == 1:
         if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
-            print 'Using boost pool alloc'
+            print('Using boost pool alloc')
             conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
             # due to a bug in boost >= 1.50 we need to link with boost_system
             # - should be a noop with no boost_pool.
@@ -423,7 +423,7 @@ if boost == 1:
                                 'boost/system/error_code.hpp',
                                 LIBBOOST_SYSTEM_A)
         else:
-            print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
+            print('Error: boost/pool/pool_alloc.hpp not found or not usable')
             Exit(1)
 
     libboost_program_options = check_boost_library('boost_program_options',
@@ -431,14 +431,14 @@ if boost == 1:
                                                    LIBBOOST_PROGRAM_OPTIONS_A,
                                                    autoadd = 0)
 else:
-    print 'Not using boost'
+    print('Not using boost')
 
 # asio
 if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
     conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     system_asio = False
-    print "Falling back to bundled asio"
+    print("Falling back to bundled asio")
 
 if not system_asio:
     # Make sure that -Iasio goes before other paths (e.g. -I/usr/local/include)
@@ -448,7 +448,7 @@ if not system_asio:
     if conf.CheckCXXHeader('asio.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
     else:
-        print 'asio headers not found or not usable'
+        print('asio headers not found or not usable')
         Exit(1)
 
 # asio/ssl
@@ -456,14 +456,14 @@ if ssl == 1:
     if conf.CheckCXXHeader('asio/ssl.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_SSL_HPP')
     else:
-        print 'ssl support required but asio/ssl.hpp not found or not usable'
-        print 'compile with ssl=0 or check that openssl devel headers are usable'
+        print('ssl support required but asio/ssl.hpp not found or not usable')
+        print('compile with ssl=0 or check that openssl devel headers are usable')
         Exit(1)
     if conf.CheckLib('ssl'):
         conf.CheckLib('crypto')
     else:
-        print 'ssl support required but openssl library not found'
-        print 'compile with ssl=0 or check that openssl library is usable'
+        print('ssl support required but openssl library not found')
+        print('compile with ssl=0 or check that openssl library is usable')
         Exit(1)
 
 
@@ -483,9 +483,9 @@ if not 'clang' in cxx_version:
 
 env = conf.Finish()
 
-print 'Global flags:'
+print('Global flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
-    print f + ': ' + env[f].strip()
+    print(f + ': ' + env[f].strip())
 
 Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
@@ -509,15 +509,15 @@ conf = Configure(check_env)
 # Check header and library
 
 if not conf.CheckHeader('check.h'):
-    print 'Error: check header file not found or not usable'
+    print('Error: check header file not found or not usable')
     Exit(1)
 
 if not conf.CheckLib('check'):
-    print 'Error: check library not found or not usable'
+    print('Error: check library not found or not usable')
     Exit(1)
 
 if not conf.CheckLib('m'):
-    print 'Error: math library not found or not usable'
+    print('Error: math library not found or not usable')
     Exit(1)
 
 # potential check dependency, link if present
@@ -525,7 +525,7 @@ conf.CheckLib('subunit')
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
-        print 'Error: realtime library not found or not usable'
+        print('Error: realtime library not found or not usable')
         Exit(1)
 
 conf.Finish()
