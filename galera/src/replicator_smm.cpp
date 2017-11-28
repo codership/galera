@@ -1240,8 +1240,8 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandleSlave& trx)
 #endif /* NDEBUG */
 
     CommitOrder co(trx, co_mode_);
-    assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
-    assert(trx.state() ==TrxHandle::S_REPLAYING || !commit_monitor_.entered(co));
+    assert(!commit_monitor_.entered(co) ||
+           trx.state() == TrxHandle::S_REPLAYING);
 
     if (trx.state() != TrxHandle::S_REPLAYING)
         trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
@@ -2615,17 +2615,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         {
             local_monitor_.leave(lo);
         }
-
-#if 0 // remove
-        // If not ts->must_neter_am(), apply_monitor_
-        // will be canceled at the end of the method,
-        // in cancel_monitors().
-        if (ts->must_enter_am())
-        {
-            ApplyOrder ao(*ts);
-            apply_monitor_.self_cancel(ao);
-        }
-#endif
     }
     else
     {
