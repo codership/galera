@@ -1377,14 +1377,13 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 
     assert(trx.state() == TrxHandle::S_ROLLED_BACK);
 
-    log_debug << "release_rollback() trx: " << trx;
-
     TrxHandleSlavePtr tsp(trx.ts());
     if (tsp)
     {
         TrxHandleSlave& ts(*tsp);
 
-        log_info << "release_rollback() trx: " << trx << ", ts: " << ts;
+        log_debug << "release_rollback() trx: " << trx
+                  << ", ts: " << ts;
 
 #ifndef NDEBUG
         {
@@ -1410,7 +1409,8 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
     }
     else
     {
-        log_info << "release_rollback() trx: " << trx << ", ts: nil";
+        log_debug << "release_rollback() trx: " << trx
+                  << ", ts: nil";
     }
 
     // Trx was either rolled back by user or via certification failure,
