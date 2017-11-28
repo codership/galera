@@ -173,8 +173,8 @@ namespace galera
         template<bool local>
         void cancel_monitors(const TrxHandle& trx)
         {
-//            log_info << "canceling " << (local ? "local" : "apply")
-//                     <<" monitor on behalf of trx: " << trx;
+            log_debug << "canceling " << (local ? "local" : "apply")
+                      <<" monitor on behalf of trx: " << trx;
 
             if (local)
             {
@@ -418,10 +418,7 @@ namespace galera
 
             void print(std::ostream& os) const
             {
-#if defined(GU_DBUG_ON) || !defined(NDEBUG)
-                if (trx_) os << *trx_; else
-#endif //GU_DBUG_ON
-                    os << seqno_;
+                os << seqno_;
             }
 
         private:
@@ -430,6 +427,8 @@ namespace galera
 #endif /* NDEBUG */
             wsrep_seqno_t const seqno_;
 #if defined(GU_DBUG_ON) || !defined(NDEBUG)
+            // this pointer is for debugging purposes only and
+            // is not guaranteed to point at a valid location
             const TrxHandle* const trx_;
 #endif //GU_DBUG_ON
         };
@@ -448,7 +447,9 @@ namespace galera
 #endif
             { }
 
-            ApplyOrder(wsrep_seqno_t gs, wsrep_seqno_t ds, bool l = false)
+            ApplyOrder(wsrep_seqno_t gs,
+                       wsrep_seqno_t ds,
+                       bool          l = false)
                 :
                 global_seqno_ (gs),
                 depends_seqno_(ds),
@@ -496,11 +497,9 @@ namespace galera
 
             void print(std::ostream& os) const
             {
-#ifndef NDEBUG
-                if (trx_) os << *trx_; else
-#endif /* NDEBUG */
-                    os << "g:" << global_seqno_ << " d:" << depends_seqno_
-                       << (is_local_ ? " L" : " R");
+                os << "g:" << global_seqno_
+                   << " d:" << depends_seqno_
+                   << (is_local_ ? " L" : " R");
             }
 
         private:
@@ -511,6 +510,8 @@ namespace galera
             const wsrep_seqno_t depends_seqno_;
             const bool is_local_;
 #ifndef NDEBUG
+            // this pointer is for debugging purposes only and
+            // is not guaranteed to point at a valid location
             const TrxHandle* const trx_;
 #endif
         };
@@ -613,11 +614,8 @@ namespace galera
 
             void print(std::ostream& os) const
             {
-#ifndef NDEBUG
-                if (trx_) os << *trx_; else
-#endif /* NDEBUG */
-                    os << "g:" << global_seqno_ << " m:" << mode_
-                       << (is_local_ ? " L" : " R");
+                os << "g:" << global_seqno_ << " m:" << mode_
+                   << (is_local_ ? " L" : " R");
             }
 
         private:
@@ -628,6 +626,8 @@ namespace galera
             const Mode mode_;
             const bool is_local_;
 #ifndef NDEBUG
+            // this pointer is for debugging purposes only and
+            // is not guaranteed to point at a valid location
             const TrxHandle* const trx_;
 #endif
         };

@@ -1027,7 +1027,7 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandle& trx)
         CommitOrder co(trx, co_mode_);
         assert(!commit_monitor_.entered(co));
 
-        bool interrupted;
+        bool interrupted(false);
 
         try
         {
@@ -1083,8 +1083,8 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandle& trx)
 #endif /* NDEBUG */
 
     CommitOrder co(trx, co_mode_);
-    assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
-    assert(trx.state() ==TrxHandle::S_REPLAYING || !commit_monitor_.entered(co));
+    assert(!commit_monitor_.entered(co) ||
+           trx.state() == TrxHandle::S_REPLAYING);
 
     if (trx.state() != TrxHandle::S_REPLAYING)
         trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
