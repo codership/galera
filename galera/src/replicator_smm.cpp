@@ -1247,8 +1247,8 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandleSlave& trx)
 #endif /* NDEBUG */
 
     CommitOrder co(trx, co_mode_);
-    assert(!commit_monitor_.entered(co) || trx.state() ==TrxHandle::S_REPLAYING);
-    assert(trx.state() ==TrxHandle::S_REPLAYING || !commit_monitor_.entered(co));
+    assert(!commit_monitor_.entered(co) ||
+           trx.state() == TrxHandle::S_REPLAYING);
 
     if (trx.state() != TrxHandle::S_REPLAYING)
         trx.set_state(trx.state() == TrxHandle::S_ABORTING ?
@@ -1451,14 +1451,13 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 
     assert(trx.state() == TrxHandle::S_ROLLED_BACK);
 
-    log_debug << "release_rollback() trx: " << trx;
-
     TrxHandleSlavePtr tsp(trx.ts());
     if (tsp)
     {
         TrxHandleSlave& ts(*tsp);
 
-        log_info << "release_rollback() trx: " << trx << ", ts: " << ts;
+        log_debug << "release_rollback() trx: " << trx
+                  << ", ts: " << ts;
 
 #ifndef NDEBUG
         {
@@ -1484,7 +1483,8 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
     }
     else
     {
-        log_info << "release_rollback() trx: " << trx << ", ts: nil";
+        log_debug << "release_rollback() trx: " << trx
+                  << ", ts: nil";
     }
 
     // Trx was either rolled back by user or via certification failure,
@@ -2897,17 +2897,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         {
             local_monitor_.leave(lo);
         }
-
-#if 0 // remove
-        // If not ts->must_neter_am(), apply_monitor_
-        // will be canceled at the end of the method,
-        // in cancel_monitors().
-        if (ts->must_enter_am())
-        {
-            ApplyOrder ao(*ts);
-            apply_monitor_.self_cancel(ao);
-        }
-#endif
     }
     else
     {
