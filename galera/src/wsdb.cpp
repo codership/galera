@@ -74,6 +74,12 @@ galera::Wsdb::find_trx(wsrep_trx_id_t const trx_id)
     gu::Lock lock(trx_mutex_);
 
     galera::TrxHandle* trx;
+    /* trx-id = 0 is safe-guard condition.
+    trx-id is generally assigned from thd->query-id
+    and query-id default is 0. If background thread
+    try to assign set wsrep_next_trx_id before setting
+    query-id we will hit the said assert. */
+    assert(trx_id != 0);
 
     if (trx_id != wsrep_trx_id_t(-1))
     {
