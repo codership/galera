@@ -324,15 +324,32 @@ int main() { std::tr1::unordered_map<int, int> m; return 0; }
     context.Result(result)
     return result
 
+def CheckWeffcpp(context):
+    # Some compilers (gcc <= 4.8 at least) produce a bogus warning for the code
+    # below when -Weffc++ is used.
+    test_source = """
+class A {};
+class B : public A {};
+int main() { return 0; }
+"""
+    context.Message('Checking whether to enable -Weffc++ ... ')
+    cxxflags_orig = context.env['CXXFLAGS']
+    context.env.Prepend(CXXFLAGS = '-Weffc++ -Werror ')
+    result = context.TryLink(test_source, '.cpp')
+    context.env.Replace(CXXFLAGS = cxxflags_orig)
+    context.Result(result)
+    return result
+
 #
-# Construct confuration context
+# Construct configuration context
 #
 conf = Configure(env, custom_tests = {
     'CheckCpp11': CheckCpp11,
     'CheckSystemASIOVersion': CheckSystemASIOVersion,
     'CheckTr1Array': CheckTr1Array,
     'CheckTr1SharedPtr': CheckTr1SharedPtr,
-    'CheckTr1UnorderedMap': CheckTr1UnorderedMap
+    'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
+    'CheckWeffcpp': CheckWeffcpp
 })
 
 # System headers and libraries
@@ -539,8 +556,11 @@ if strict_build_flags == 1:
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
+if conf.CheckWeffcpp():
+    conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
+
 if not 'clang' in cxx_version:
-    conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
+    conf.env.Prepend(CXXFLAGS = '-Wold-style-cast ')
 
 env = conf.Finish()
 
