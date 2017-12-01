@@ -376,8 +376,8 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
     try
     {
         TrxHandleMaster& trx(*txp);
-        TrxHandleLock lock(*trx);
-        retval = repl->abort_trx(trx.get(), bf_seqno, victim_seqno);
+        TrxHandleLock lock(trx);
+        retval = repl->abort_trx(trx, bf_seqno, victim_seqno);
     }
     catch (std::exception& e)
     {
@@ -627,9 +627,9 @@ wsrep_status_t galera_commit_order_enter(
     assert(ws_handle != 0);
 
     REPL_CLASS * const repl(static_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* const trx(static_cast<TrxHandle*>(ws_handle->opaque));
-    assert(NULL != trx);
-    if (trx == 0)
+    TrxHandle* const txp(static_cast<TrxHandle*>(ws_handle->opaque));
+    assert(NULL != txp);
+    if (txp == 0)
     {
         log_warn << "Trx " << ws_handle->trx_id
                  << " not found for commit order enter";
@@ -690,7 +690,7 @@ wsrep_status_t galera_commit_order_leave(
     TrxHandle* const txp(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != txp);
 
-    if (trx == 0)
+    if (txp == 0)
     {
         log_warn << "Trx " << ws_handle->trx_id
                  << " not found for commit order leave";

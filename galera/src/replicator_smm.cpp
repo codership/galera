@@ -762,7 +762,7 @@ out:
 }
 
 wsrep_status_t
-galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
+galera::ReplicatorSMM::abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno,
                                  wsrep_seqno_t* victim_seqno)
 {
     assert(trx.local() == true);
@@ -785,7 +785,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
     }
 
     wsrep_status_t retval(WSREP_OK);
-    switch (trx->state())
+    switch (trx.state())
     {
     case TrxHandle::S_MUST_ABORT:
     case TrxHandle::S_ABORTING:
@@ -850,7 +850,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
             bool const interrupted(commit_monitor_.interrupt(co));
             if (interrupted || !(ts->flags() & TrxHandle::F_COMMIT))
             {
-                trx->set_state(TrxHandle::S_MUST_ABORT);
+                trx.set_state(TrxHandle::S_MUST_ABORT);
             }
             else
             {
@@ -884,7 +884,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx, wsrep_seqno_t bf_seqno,
     }
     if (retval == WSREP_OK || retval == WSREP_NOT_ALLOWED)
     {
-        *victim_seqno = trx->global_seqno();
+        *victim_seqno = (ts != 0 ? ts->global_seqno() : WSREP_SEQNO_UNDEFINED);
     }
     return retval;
 }
