@@ -272,6 +272,18 @@ if gcov:
 # Custom tests:
 #
 
+def CheckCpp11(context):
+    test_source = """
+#if __cplusplus < 201103
+#error Not compiling in C++11 mode
+#endif
+int main() { return 0; }
+"""
+    context.Message('Checking if compiling in C++11 mode ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
 def CheckSystemASIOVersion(context):
     system_asio_test_source_file = """
 #include <asio.hpp>
@@ -291,11 +303,63 @@ int main()
     context.Result(result)
     return result
 
+def CheckTr1Array(context):
+    test_source = """
+#include <tr1/array>
+int main() { std::tr1::array<int, 5> a; return 0; }
+"""
+    context.Message('Checking for std::tr1::array ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckTr1SharedPtr(context):
+    test_source = """
+#include <tr1/memory>
+int main() { int n; std::tr1::shared_ptr<int> p(&n); return 0; }
+"""
+    context.Message('Checking for std::tr1::shared_ptr ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckTr1UnorderedMap(context):
+    test_source = """
+#include <tr1/unordered_map>
+int main() { std::tr1::unordered_map<int, int> m; return 0; }
+"""
+    context.Message('Checking for std::tr1::unordered_map ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckWeffcpp(context):
+    # Some compilers (gcc <= 4.8 at least) produce a bogus warning for the code
+    # below when -Weffc++ is used.
+    test_source = """
+class A {};
+class B : public A {};
+int main() { return 0; }
+"""
+    context.Message('Checking whether to enable -Weffc++ ... ')
+    cxxflags_orig = context.env['CXXFLAGS']
+    context.env.Prepend(CXXFLAGS = '-Weffc++ -Werror ')
+    result = context.TryLink(test_source, '.cpp')
+    context.env.Replace(CXXFLAGS = cxxflags_orig)
+    context.Result(result)
+    return result
 
 #
-# Construct confuration context
+# Construct configuration context
 #
-conf = Configure(env, custom_tests = {'CheckSystemASIOVersion': CheckSystemASIOVersion})
+conf = Configure(env, custom_tests = {
+    'CheckCpp11': CheckCpp11,
+    'CheckSystemASIOVersion': CheckSystemASIOVersion,
+    'CheckTr1Array': CheckTr1Array,
+    'CheckTr1SharedPtr': CheckTr1SharedPtr,
+    'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
+    'CheckWeffcpp': CheckWeffcpp
+})
 
 # System headers and libraries
 
@@ -350,14 +414,12 @@ if conf.CheckHeader('execinfo.h'):
 
 # Additional C headers and libraries
 
-cxx11=False
+cpp11 = conf.CheckCpp11()
 
-#array
-if conf.CheckCXXHeader('array'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_ARRAY')
-    # if it worked, we are running C++11 compiler
-    cxx11=True
-elif conf.CheckCXXHeader('tr1/array'):
+# array
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_ARRAY')
+elif conf.CheckTr1Array():
     conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_ARRAY')
 elif conf.CheckCXXHeader('boost/array.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_ARRAY_HPP')
@@ -366,12 +428,12 @@ else:
     Exit(1)
 
 # shared_ptr
-if cxx11 and conf.CheckCXXHeader('memory'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_MEMORY')
-elif False and conf.CheckCXXHeader('tr1/memory'):
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_SHARED_PTR')
+elif False and conf.CheckTr1SharedPtr():
     # std::tr1::shared_ptr<> is not derived from std::auto_ptr<>
     # this upsets boost in asio, so don't use tr1 version, use boost instead
-    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_MEMORY')
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_SHARED_PTR')
 elif conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 else:
@@ -379,9 +441,9 @@ else:
     Exit(1)
 
 # unordered_map
-if cxx11 and conf.CheckCXXHeader('unordered_map'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_UNORDERED_MAP')
-elif conf.CheckCXXHeader('tr1/unordered_map'):
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_UNORDERED_MAP')
+elif conf.CheckTr1UnorderedMap():
     conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 elif conf.CheckCXXHeader('boost/unordered_map.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
@@ -504,14 +566,15 @@ if strict_build_flags == 1:
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
+if conf.CheckWeffcpp():
+    conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
+
 # We assume that if it is not Clang, then it is GCC
 if not 'clang' in cxx_version:
     gcc_version_num = read_first_line(conf.env['CXX'].split() + ['-dumpversion'])
-    if gcc_version_num >= "4.9.0":
-        conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
-    else:
+    if gcc_version_num < "4.9.0":
         conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
-    conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
+    conf.env.Prepend(CXXFLAGS = '-Wold-style-cast ')
 
 env = conf.Finish()
 
