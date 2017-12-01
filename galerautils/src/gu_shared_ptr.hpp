@@ -17,7 +17,7 @@
 #ifndef GU_SHARED_PTR_HPP
 #define GU_SHARED_PTR_HPP
 
-#if __cplusplus >= 201103
+#if defined(HAVE_STD_SHARED_PTR)
 #   include <memory>
 #   define GU_SHARED_PTR_NAMESPACE std
 #elif defined(HAVE_TR1_SHARED_PTR)

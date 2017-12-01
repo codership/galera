@@ -409,7 +409,7 @@ cpp11 = conf.CheckCpp11()
 
 # array
 if cpp11:
-    pass
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_ARRAY')
 elif conf.CheckTr1Array():
     conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_ARRAY')
 elif conf.CheckCXXHeader('boost/array.hpp'):
@@ -420,7 +420,7 @@ else:
 
 # shared_ptr
 if cpp11:
-    pass
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_SHARED_PTR')
 elif False and conf.CheckTr1SharedPtr():
     # std::tr1::shared_ptr<> is not derived from std::auto_ptr<>
     # this upsets boost in asio, so don't use tr1 version, use boost instead
@@ -433,7 +433,7 @@ else:
 
 # unordered_map
 if cpp11:
-    pass
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_UNORDERED_MAP')
 elif conf.CheckTr1UnorderedMap():
     conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 elif conf.CheckCXXHeader('boost/unordered_map.hpp'):

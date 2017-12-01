@@ -15,7 +15,7 @@
 #ifndef GU_UNORDERED_HPP
 #define GU_UNORDERED_HPP
 
-#if __cplusplus >= 201103
+#if defined(HAVE_STD_UNORDERED_MAP)
 #include <unordered_map>
 #include <unordered_set>
 #define GU_UNORDERED_MAP_NAMESPACE std
