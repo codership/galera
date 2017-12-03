@@ -717,7 +717,8 @@ wsrep_status_t galera_commit_order_leave(
             else
             {
                 retval = repl->commit_order_leave(*trx.ts(), error);
-                assert(trx.state() == TrxHandle::S_COMMITTING ||
+                assert(trx.state() == TrxHandle::S_ROLLING_BACK ||
+                       trx.state() == TrxHandle::S_COMMITTING ||
                        !(trx.ts()->flags() & TrxHandle::F_COMMIT));
                 trx.set_state(trx.state() == TrxHandle::S_ROLLING_BACK ?
                               TrxHandle::S_ROLLED_BACK :
