@@ -2357,9 +2357,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             cert_.adjust_position(*view_info, gu::GTID(group_uuid, group_seqno),
                                   trx_params_.version_);
 
+            // Note: Monitor release/cancel happens after view event has been
+            // processed.
             log_info << "####### Setting monitor position to " << group_seqno;
             set_initial_position(group_uuid, group_seqno - 1);
-            cancel_seqno(group_seqno); // cancel CC seqno
 
             if (!from_IST)
             {
@@ -2493,6 +2494,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         }
     }
     free(view_info);
+
+    // Cancel monitors after view event has been processed by the
+    // application. Otherwise last_committe_id() will return incorrect
+    // value if called from view callback.
+    if (!st_required && group_seqno > 0)
+        cancel_seqno(group_seqno);
 
     if (!from_IST)
     {
