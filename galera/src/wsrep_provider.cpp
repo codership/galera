@@ -649,7 +649,8 @@ wsrep_status_t galera_commit_order_enter(
 
             if (gu_unlikely(trx.state() == TrxHandle::S_MUST_ABORT))
             {
-                trx.set_state(TrxHandle::S_MUST_REPLAY_CM);
+                // trx.set_state(TrxHandle::S_MUST_REPLAY_CM);
+                trx.set_state(TrxHandle::S_MUST_REPLAY);
                 return WSREP_BF_ABORT;
             }
 

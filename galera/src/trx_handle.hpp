@@ -111,9 +111,9 @@ namespace galera
             S_ABORTING,
             S_REPLICATING,
             S_CERTIFYING,
-            S_MUST_CERT_AND_REPLAY,
-            S_MUST_REPLAY_AM, // grab apply_monitor, commit_monitor, replay
-            S_MUST_REPLAY_CM, // commit_monitor, replay
+            // S_MUST_CERT_AND_REPLAY,
+            // S_MUST_REPLAY_AM, // grab apply_monitor, commit_monitor, replay
+            // S_MUST_REPLAY_CM, // commit_monitor, replay
             S_MUST_REPLAY,    // replay
             S_REPLAYING,
             S_APPLYING,   // grabbing apply monitor, applying
@@ -584,6 +584,7 @@ namespace galera
         }
         bool cert_bypass() const { return cert_bypass_; }
 
+#if 0
         bool must_enter_am() const
         {
             static bool const SR_MASK = F_COMMIT | F_BEGIN;
@@ -596,7 +597,7 @@ namespace galera
             return (state() != S_ABORTING || pa_unsafe() || streaming);
 //remove            return true;
         }
-
+#endif
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
