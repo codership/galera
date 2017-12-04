@@ -2739,8 +2739,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     bool const applicable(ts->global_seqno() > STATE_SEQNO());
     assert(!ts->local() || applicable); // applicable can't be false for locals
 
-    if (gu_unlikely (interrupted ||
-                     (trx != 0 && trx->state() == TrxHandle::S_MUST_ABORT)))
+    if (gu_unlikely (interrupted))
     {
 //remove        assert(trx == 0 || trx->state() == TrxHandle::S_MUST_ABORT);
         assert(trx != 0);
@@ -2827,7 +2826,15 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         case Certification::TEST_OK:
             if (gu_likely(applicable))
             {
-                retval = WSREP_OK;
+                if (trx != 0 && trx->state() == TrxHandle::S_MUST_ABORT)
+                {
+                    trx->set_state(TrxHandle::S_MUST_REPLAY);
+                    retval = WSREP_BF_ABORT;
+                }
+                else
+                {
+                    retval = WSREP_OK;
+                }
                 assert(ts->depends_seqno() >= 0);
             }
             else
@@ -2874,7 +2881,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     }
 
     assert(WSREP_OK == retval || WSREP_TRX_FAIL == retval ||
-           WSREP_TRX_MISSING == retval);
+           WSREP_TRX_MISSING == retval || WSREP_BF_ABORT == retval);
 
     if (gu_unlikely(WSREP_TRX_FAIL == retval /* &&
                                                 (!ts->must_enter_am() || trx != NULL) */))
