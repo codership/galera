@@ -1243,7 +1243,7 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandleMaster& trx)
                     ApplyOrder ao(ts);
                     apply_monitor_.leave(ao);
 
-                    ts.set_state(TrxHandle::S_ABORTING);
+                    // ts.set_state(TrxHandle::S_ABORTING);
                     trx.set_state(TrxHandle::S_ABORTING);
                     return WSREP_TRX_FAIL;
                 }
@@ -1310,6 +1310,7 @@ galera::ReplicatorSMM::commit_order_leave(TrxHandleSlave&          trx,
 {
     if (trx.state() == TrxHandle::S_MUST_ABORT)
     {
+        assert(0);
         // This is possible in case of ALG: BF applier BF aborts
         // trx that has already grabbed commit monitor and is committing.
         // However, this should be acceptable assuming that commit
@@ -2828,8 +2829,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             {
                 if (trx != 0 && trx->state() == TrxHandle::S_MUST_ABORT)
                 {
-                    trx->set_state(TrxHandle::S_MUST_REPLAY);
-                    retval = WSREP_BF_ABORT;
+                    if (ts->flags() & TrxHandle::F_COMMIT)
+                    {
+                        trx->set_state(TrxHandle::S_MUST_REPLAY);
+                        retval = WSREP_BF_ABORT;
+                    }
+                    else
+                    {
+                        // Abort the transaction if non-committing
+                        // fragment was BF aborted during certification.
+                        trx->set_state(TrxHandle::S_ABORTING);
+                        ts->set_state(TrxHandle::S_ABORTING);
+                        retval = WSREP_TRX_FAIL;
+                    }
                 }
                 else
                 {
