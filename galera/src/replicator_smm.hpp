@@ -186,11 +186,8 @@ namespace galera
                 local_monitor_.self_cancel(lo);
             }
 
-            if (ts.pa_unsafe() == false)
-            {
-                ApplyOrder  ao(ts);
-                apply_monitor_.self_cancel(ao);
-            }
+            ApplyOrder  ao(ts);
+            apply_monitor_.self_cancel(ao);
         }
 
         // Cancel all monitors for given seqnos

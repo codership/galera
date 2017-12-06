@@ -564,7 +564,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
                                                 wsrep_trx_meta_t* meta)
 {
     assert(trx.locked());
-
+    assert(!(trx.flags() & TrxHandle::F_ROLLBACK));
     assert(trx.state() == TrxHandle::S_EXECUTING ||
            trx.state() == TrxHandle::S_MUST_ABORT);
 
@@ -680,6 +680,9 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
     // getting BF aborted inside provider
     if (gu_unlikely(trx.flags() & TrxHandle::F_ROLLBACK))
     {
+        // ROLLBACK fragments should be replicate through ReplicatorSMM::send(),
+        // assert here for debug builds to catch if this is not a case.
+        assert(0);
         assert(ts->depends_seqno() > 0); // must be set at unserialization
         ts->cert_bypass(true);
         ts->mark_certified();
