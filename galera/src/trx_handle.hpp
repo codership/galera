@@ -566,6 +566,7 @@ namespace galera
                 set_state(S_ABORTING);
                 break;
             case S_ABORTING:
+            case S_ROLLING_BACK:
             case S_ROLLED_BACK:
                 break;
             default:

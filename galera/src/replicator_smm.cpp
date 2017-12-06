@@ -930,9 +930,11 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
             assert(ts->depends_seqno() >= 0);
             // assert(trx.state() == TrxHandle::S_MUST_CERT_AND_REPLAY ||
             //       trx.state() == TrxHandle::S_MUST_REPLAY_AM);
-            assert(trx.state() == TrxHandle::S_MUST_REPLAY);
+            assert(trx.state() == TrxHandle::S_MUST_REPLAY ||
+                   !(ts->flags() & TrxHandle::F_COMMIT));
             assert(ts->state() == TrxHandle::S_REPLICATING ||
-                   ts->state() == TrxHandle::S_CERTIFYING);
+                   ts->state() == TrxHandle::S_CERTIFYING ||
+                   ts->state() == TrxHandle::S_ABORTING);
             break;
         case WSREP_TRX_FAIL:
             assert(trx.state() == TrxHandle::S_ABORTING);
@@ -2832,7 +2834,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                     if (ts->flags() & TrxHandle::F_COMMIT)
                     {
                         trx->set_state(TrxHandle::S_MUST_REPLAY);
-                        retval = WSREP_BF_ABORT;
                     }
                     else
                     {
@@ -2840,8 +2841,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
                         // fragment was BF aborted during certification.
                         trx->set_state(TrxHandle::S_ABORTING);
                         ts->set_state(TrxHandle::S_ABORTING);
-                        retval = WSREP_TRX_FAIL;
                     }
+                    retval = WSREP_BF_ABORT;
                 }
                 else
                 {
