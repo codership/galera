@@ -707,6 +707,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
 
             assert(trx.state() == TrxHandle::S_MUST_ABORT);
             trx.set_state(TrxHandle::S_ABORTING);
+            ts->mark_committed();
             assert(ts->is_dummy());
             assert(WSREP_OK != retval);
         }
@@ -2743,6 +2744,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
 
     wsrep_status_t retval(WSREP_OK);
     bool const applicable(ts->global_seqno() > STATE_SEQNO());
+    bool queued(false);
     assert(!ts->local() || applicable); // applicable can't be false for locals
 
     if (gu_unlikely (interrupted))
@@ -2768,7 +2770,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
             else
             {
                 pending_cert_queue_.push(ts);
-
+                queued = true;
                 ts->set_state(TrxHandle::S_ABORTING);
 
                 retval = WSREP_TRX_FAIL;
@@ -2899,11 +2901,11 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     assert(WSREP_OK == retval || WSREP_TRX_FAIL == retval ||
            WSREP_TRX_MISSING == retval || WSREP_BF_ABORT == retval);
 
-    if (gu_unlikely(WSREP_TRX_FAIL == retval /* &&
-                                                (!ts->must_enter_am() || trx != NULL) */))
+    if (gu_unlikely(WSREP_TRX_FAIL == retval))
     {
         assert(ts->state() == TrxHandle::S_ABORTING);
         // applicable but failed certification: self-cancel monitors
+        if (!queued) ts->mark_committed();
         cancel_monitors<false>(*ts);
     }
     else
