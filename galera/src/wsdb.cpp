@@ -50,6 +50,8 @@ galera::Wsdb::~Wsdb()
     // and don't clean up to let valgrind etc to detect leaks.
 #ifndef NDEBUG
     std::cerr << *this;
+    assert(trx_map_.size() == 0);
+    assert(conn_map_.size() == 0);
 #else
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 #endif // !NDEBUG
