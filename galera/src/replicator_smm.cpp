@@ -281,6 +281,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_SYNCED:
     case S_DONOR:
         close();
+        // fall through
     case S_CLOSING:
         // @todo wait that all users have left the building
     case S_CLOSED:
@@ -882,8 +883,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         ApplyOrder ao(*trx);
         gu_trace(apply_monitor_.enter(ao));
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
     }
+    // fall through
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {
@@ -1297,7 +1298,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
 
             log_fatal << "Failed to apply trx: " << *trx;
             log_fatal << e.what();
-            log_fatal << "Node consistency compromized, aborting...";
+            log_fatal << "Node consistency compromised, aborting...";
 
             /* Before doing a graceful exit ensure that node isolate itself
             from the cluster. This will cause the quorum to re-evaluate

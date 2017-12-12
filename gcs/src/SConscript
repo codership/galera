@@ -15,18 +15,18 @@ libgcs_env.Append(CPPPATH = Split('''
 # Backends (TODO: Get from global options)
 libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
 # For C-style logging
-libgcs_env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX -Wno-variadic-macros')
+libgcs_env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
 # Disable old style cast warns until code is fixed
-libgcs_env.Append(CPPFLAGS = ' -Wno-old-style-cast')
+libgcs_env.Replace(CXXFLAGS = libgcs_env['CXXFLAGS'].replace('-Wold-style-cast', ''))
+libgcs_env.Replace(CXXFLAGS = libgcs_env['CXXFLAGS'].replace('-Weffc++', ''))
 # Allow zero sized arrays
 libgcs_env.Replace(CCFLAGS = libgcs_env['CCFLAGS'].replace('-pedantic', ''))
-libgcs_env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
-libgcs_env.Append(CPPFLAGS = ' -Wno-effc++')
+libgcs_env.Append(CCFLAGS = ' -Wno-missing-field-initializers')
+libgcs_env.Append(CCFLAGS = ' -Wno-variadic-macros')
 
-print libgcs_env['CFLAGS']
-print libgcs_env['CCFLAGS']
-print libgcs_env['CPPFLAGS']
-print libgcs_env['CXXFLAGS']
+print 'gcs flags:'
+for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
+    print f + ': ' + libgcs_env[f].strip()
 
 gcs4garb_env = libgcs_env.Clone()
 

@@ -31,7 +31,7 @@
 #endif // __GNUG__
 
 #ifdef ASIO_HPP
-#error asio.hpp is already included before gu_asio.hpp, can't customize asio.hpp
+#error "asio.hpp is already included before gu_asio.hpp, can't customize asio.hpp"
 #endif // ASIO_HPP
 
 #include "asio/version.hpp"
