@@ -130,7 +130,7 @@ START_TEST(test_states_slave)
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5  MUST_REPLAY
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6  REPLAYING
         {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 7 APPLYING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 8 COMMITTNG
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1 }, // 8 COMMITTNG
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9 COMMITTED
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 10 ROLLING_BACK
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 11 ROLLED_BACK
@@ -147,7 +147,6 @@ START_TEST(test_states_slave)
     visits[TrxHandle::S_ABORTING] = 1;
     visits[TrxHandle::S_REPLICATING] = 1;
     visits[TrxHandle::S_CERTIFYING] = 1;
-    // visits[TrxHandle::S_REPLAYING] = 1;
     visits[TrxHandle::S_APPLYING] = 1;
     visits[TrxHandle::S_COMMITTING] = 1;
     visits[TrxHandle::S_COMMITTED] = 1;

@@ -321,7 +321,7 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     //            |             |Cert failed                    |
     //            |             |                               |
     //            |             v                               v
-    //            +-------> ABORTING                  COMMITTED / ROLLED_BACK?
+    //            +-------> ABORTING                  COMMITTED / ROLLED_BACK
     //                          |
     //                          v
     //                    ROLLING_BACK
@@ -343,6 +343,8 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
     // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
+    // Error reported in leave_commit_order() call
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ROLLED_BACK);
     // Rollback finished
     add(TrxHandle::S_ROLLING_BACK,  TrxHandle::S_ROLLED_BACK);
 }
