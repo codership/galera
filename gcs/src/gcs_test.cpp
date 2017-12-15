@@ -644,15 +644,19 @@ static long gcs_test_conf (gcs_test_conf_t *conf, long argc, char *argv[])
     case 6:
         conf->n_recv = strtol (argv[5], &endptr, 10);
         if ('\0' != *endptr) goto error;
+        // fall through
     case 5:
         conf->n_send = strtol (argv[4], &endptr, 10);
         if ('\0' != *endptr) goto error;
+        // fall through
     case 4:
         conf->n_repl = strtol (argv[3], &endptr, 10);
         if ('\0' != *endptr) goto error;
+        // fall through
     case 3:
         conf->n_tries = strtol (argv[2], &endptr, 10);
         if ('\0' != *endptr) goto error;
+        // fall through
     case 2:
         conf->backend = argv[1];
         break;

@@ -421,6 +421,7 @@ long gu_to_interrupt (gu_to_t *to, gu_seqno_t seqno)
             gu_debug ("signaling to interrupt wait seqno: seqno = %llu, "
                       "TO seqno = %llu", seqno, to->seqno);
             rcode    = to_wake_waiter (w);
+            /* fall through */
         case RELEASED:
             w->state = INTERRUPTED;
             break;
