@@ -352,6 +352,9 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
+    assert(victim_seqno != 0);
+
+    *victim_seqno = WSREP_SEQNO_UNDEFINED;
 
     *victim_seqno = WSREP_SEQNO_UNDEFINED;
 
@@ -376,9 +379,7 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
     {
         TrxHandleMaster& trx(*txp);
         TrxHandleLock lock(trx);
-        repl->abort_trx(trx, bf_seqno);
-        if (trx.ts() != NULL) *victim_seqno = trx.ts()->global_seqno();
-        retval = WSREP_OK;
+        retval = repl->abort_trx(trx, bf_seqno, victim_seqno);
     }
     catch (std::exception& e)
     {
@@ -409,7 +410,7 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
 
     if (!victim)
     {
-        log_warn << "trx to rollback " << trx_id << " not found";
+        log_debug << "trx to rollback " << trx_id << " not found";
         return WSREP_OK;
     }
 
@@ -630,6 +631,12 @@ wsrep_status_t galera_commit_order_enter(
     REPL_CLASS * const repl(static_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* const txp(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != txp);
+    if (txp == 0)
+    {
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order enter";
+        return WSREP_TRX_MISSING;
+    }
 
     wsrep_status_t retval;
 
@@ -644,7 +651,7 @@ wsrep_status_t galera_commit_order_enter(
 
             if (gu_unlikely(trx.state() == TrxHandle::S_MUST_ABORT))
             {
-                trx.set_state(TrxHandle::S_MUST_REPLAY_CM);
+                trx.set_state(TrxHandle::S_MUST_REPLAY);
                 return WSREP_BF_ABORT;
             }
 
@@ -685,6 +692,13 @@ wsrep_status_t galera_commit_order_leave(
     TrxHandle* const txp(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != txp);
 
+    if (txp == 0)
+    {
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order leave";
+        return WSREP_TRX_MISSING;
+    }
+
     wsrep_status_t retval;
 
     try
@@ -694,8 +708,25 @@ wsrep_status_t galera_commit_order_leave(
             TrxHandleMaster& trx(*reinterpret_cast<TrxHandleMaster*>(txp));
             TrxHandleLock lock(trx);
             assert(trx.ts() && trx.ts()->global_seqno() > 0);
-            retval = repl->commit_order_leave(*trx.ts(), error);
-            trx.set_state(trx.ts()->state());
+
+            if (trx.state() == TrxHandle::S_MUST_ABORT)
+            {
+                // Trx is non-committing streaming replication and
+                // the trx was BF aborted while committing a fragment
+                assert(!(trx.ts()->flags() & TrxHandle::F_COMMIT));
+                trx.set_state(TrxHandle::S_ABORTING);
+                retval = WSREP_BF_ABORT;
+            }
+            else
+            {
+                retval = repl->commit_order_leave(*trx.ts(), error);
+                assert(trx.state() == TrxHandle::S_ROLLING_BACK ||
+                       trx.state() == TrxHandle::S_COMMITTING ||
+                       !(trx.ts()->flags() & TrxHandle::F_COMMIT));
+                trx.set_state(trx.state() == TrxHandle::S_ROLLING_BACK ?
+                              TrxHandle::S_ROLLED_BACK :
+                              TrxHandle::S_COMMITTED);
+            }
         }
         else
         {
@@ -730,7 +761,8 @@ wsrep_status_t galera_release(wsrep_t*            gh,
 
     if (txp == 0)
     {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
+        log_debug << "trx " << ws_handle->trx_id
+                  << " not found for release";
         return WSREP_OK;
     }
 

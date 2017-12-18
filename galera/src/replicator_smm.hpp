@@ -62,7 +62,8 @@ namespace galera
         wsrep_status_t close();
         wsrep_status_t async_recv(void* recv_ctx);
 
-        TrxHandleMasterPtr get_local_trx(wsrep_trx_id_t trx_id, bool create = false)
+        TrxHandleMasterPtr get_local_trx(wsrep_trx_id_t trx_id,
+                                         bool create = false)
         {
             return wsdb_.get_trx(trx_params_, uuid_, trx_id, create);
         }
@@ -97,7 +98,8 @@ namespace galera
 
         wsrep_status_t send(TrxHandleMaster& trx, wsrep_trx_meta_t*);
         wsrep_status_t replicate(TrxHandleMaster& trx, wsrep_trx_meta_t*);
-        void           abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno);
+        wsrep_status_t abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno,
+                                 wsrep_seqno_t* victim_seqno);
         wsrep_status_t certify(TrxHandleMaster& trx, wsrep_trx_meta_t*);
         wsrep_status_t commit_order_enter_local(TrxHandleMaster& trx);
         wsrep_status_t commit_order_enter_remote(TrxHandleSlave& trx);
@@ -185,11 +187,8 @@ namespace galera
                 local_monitor_.self_cancel(lo);
             }
 
-            if (ts.pa_unsafe() == false)
-            {
-                ApplyOrder  ao(ts);
-                apply_monitor_.self_cancel(ao);
-            }
+            ApplyOrder  ao(ts);
+            apply_monitor_.self_cancel(ao);
         }
 
         // Cancel all monitors for given seqnos
@@ -347,6 +346,9 @@ namespace galera
         wsrep_status_t cert_and_catch   (TrxHandleMaster*,
                                          const TrxHandleSlavePtr&);
         wsrep_status_t cert_for_aborted (const TrxHandleSlavePtr&);
+
+        wsrep_status_t handle_commit_interrupt(TrxHandleMaster&,
+                                               const TrxHandleSlave&);
 
         void update_state_uuid    (const wsrep_uuid_t& u);
         void update_incoming_list (const wsrep_view_info_t& v);

@@ -111,9 +111,6 @@ namespace galera
             S_ABORTING,
             S_REPLICATING,
             S_CERTIFYING,
-            S_MUST_CERT_AND_REPLAY,
-            S_MUST_REPLAY_AM, // grab apply_monitor, commit_monitor, replay
-            S_MUST_REPLAY_CM, // commit_monitor, replay
             S_MUST_REPLAY,    // replay
             S_REPLAYING,
             S_APPLYING,   // grabbing apply monitor, applying
@@ -566,6 +563,7 @@ namespace galera
                 set_state(S_ABORTING);
                 break;
             case S_ABORTING:
+            case S_ROLLING_BACK:
             case S_ROLLED_BACK:
                 break;
             default:
@@ -583,20 +581,6 @@ namespace galera
             cert_bypass_ = val;
         }
         bool cert_bypass() const { return cert_bypass_; }
-
-        bool must_enter_am() const
-        {
-//            static bool const SR_MASK = F_COMMIT | F_BEGIN;
-
-            assert(state() == S_REPLICATING          ||
-                   state() == S_CERTIFYING           ||
-                   state() == S_MUST_CERT_AND_REPLAY ||
-                   state() == S_ABORTING);
-
-//            bool const streaming((flags() & SR_MASK) != SR_MASK);
-//            return (state() != S_ABORTING || pa_unsafe() || streaming);
-            return true; // to reduce races for the time being.
-        }
 
     protected:
 
@@ -825,8 +809,7 @@ namespace galera
                             (flags() & TrxHandle::F_ISOLATION) == 0))
             {
                 /* make sure this fragment depends on the previous */
-                assert(ts_ != 0);
-                wsrep_seqno_t prev_seqno(ts_->global_seqno());
+                wsrep_seqno_t prev_seqno(last_ts_seqno_);
                 assert(version() >= 4);
                 assert(prev_seqno >= 0);
                 assert(prev_seqno <= last_seen_seqno);
@@ -865,6 +848,7 @@ namespace galera
                 write_set_flags_ &= ~TrxHandle::F_BEGIN;
             }
             ts_ = ts;
+            last_ts_seqno_ = ts_->global_seqno();
         }
 
         WriteSetOut& write_set_out()
@@ -944,7 +928,9 @@ namespace galera
             ts_                (),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
-            wso_               (false)
+            wso_               (false),
+            last_ts_seqno_     (WSREP_SEQNO_UNDEFINED)
+
         {
             assert(reserved_size > sizeof(*this) + 1024);
         }
@@ -968,6 +954,7 @@ namespace galera
         size_t const           wso_buf_size_;
         int                    gcs_handle_;
         bool                   wso_;
+        wsrep_seqno_t          last_ts_seqno_;
 
         friend class TrxHandle;
         friend class TrxHandleSlave;
