@@ -26,12 +26,6 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
         os << "REPLICATING"; return;
     case TrxHandle::S_CERTIFYING:
         os << "CERTIFYING"; return;
-    case TrxHandle::S_MUST_CERT_AND_REPLAY:
-        os << "MUST_CERT_AND_REPLAY"; return;
-    case TrxHandle::S_MUST_REPLAY_AM:
-        os << "MUST_REPLAY_AM"; return;
-    case TrxHandle::S_MUST_REPLAY_CM:
-        os << "MUST_REPLAY_CM"; return;
     case TrxHandle::S_MUST_REPLAY:
         os << "MUST_REPLAY"; return;
     case TrxHandle::S_REPLAYING:
@@ -135,6 +129,109 @@ galera::TrxHandleSlave::Fsm::TransMap galera::TrxHandleSlave::trans_map_;
 
 namespace galera {
 
+//
+// About transaction states:
+//
+// The TrxHandleMaster stats are used to track the state of the
+// transaction, while TrxHandleSlave states are used to track
+// which critical sections have been accessed during write set
+// applying. As a convention, TrxHandleMaster states are changed
+// before entering the critical section, TrxHandleSlave states
+// after critical section has been succesfully entered.
+//
+// TrxHandleMaster states during normal execution:
+//
+// EXECUTING   - Transaction handle has been created by appending key
+//               or write set data
+// REPLICATING - Transaction write set has been send to group
+//               communication layer for ordering
+// CERTIFYING  - Transaction write set has been received from group
+//               communication layer, has entered local monitor and
+//               is certifying
+// APPLYING    - Transaction has entered applying critical section
+// COMMITTING  - Transaction has entered committing critical section
+// COMMITTED   - Transaction has released commit time critical section
+// ROLLED_BACK - Application performed a voluntary rollback
+//
+// Note that streaming replication rollback happens by replicating
+// special rollback writeset which will go through regular write set
+// critical sections.
+//
+// Note/Fixme: CERTIFYING, APPLYING and COMMITTING states seem to be
+//             redundant as these states can be tracked via
+//             associated TrxHandleSlave states.
+//
+//
+// TrxHandleMaster states after effective BF abort:
+//
+// MUST_ABORT   - Transaction enter this state after succesful BF abort.
+//                BF abort is allowed if:
+//                * Transaction does not have associated TrxHandleSlave
+//                * Transaction has associated TrxHandleSlave but it does
+//                  not have commit flag set
+//                * Transaction has associated TrxHandleSlave, commit flag
+//                  is set and the TrxHandleSlave global sequence number is
+//                  higher than BF aborter global sequence number
+//
+// 1) If the certification after BF abort results a failure:
+// ABORTING     - BF abort was effective and certification
+//                resulted a failure
+// ROLLING_BACK - Commit order critical section has been grabbed for
+//                rollback
+// ROLLED_BACK  - Commit order critical section has been released after
+//                succesful rollback
+//
+// 2) The case where BF abort happens after succesful certification or
+//    if out-of-order certification results a success:
+// MUST_REPLAY  - The transaction must roll back and replay in applier
+//                context.
+//                * If the BF abort happened before certification,
+//                  certification must be performed in applier context
+//                  and the transaction replay must be aborted if
+//                  the certification fails.
+//                * TrxHandleSlave state can be used to determine
+//                  which critical sections must be entered before the
+//                  replay. For example, if the TrxHandleSlave state is
+//                  REPLICATING, write set must be certified under local
+//                  monitor and both apply and commit monitors must be
+//                  entered before applying. On the other hand, if
+//                  TrxHandleSlave state is APPLYING, only commit monitor
+//                  must be grabbed before replay.
+//
+// TrxHandleMaster states after replication failure:
+//
+// ABORTING     - Replicaition resulted a failure
+// ROLLING_BACK - Error has been returned to application
+// ROLLED_BACK  - Application has finished rollback
+//
+//
+// TrxHandleMaster states after certification failure:
+//
+// ABORTING - Certification resulted a failure
+// ROLLING_BACK - Commit order critical section has been grabbed for
+//                rollback
+// ROLLED_BACK  - Commit order critical section has been released
+//                after succesful rollback
+//
+//
+//
+// TrxHandleSlave:
+// REPLICATING - this is the first state for TrxHandleSlave after it
+//               has been received from group
+// CERTIFYING  - local monitor has been entered succesfully
+// APPLYING    - apply monitor has been entered succesfully
+// COMMITTING  - commit monitor has been entered succesfully
+// ABORTING    - certification has failed
+// ROLLING_BACK - certification has failed and commit monitor has been
+//                entered
+// COMMITTED   - commit has been finished, commit order critical section
+//               has been released
+// ROLLED_BACK - transaction has rolled back, commit order critical section
+//               has been released
+//
+//
+// State machine diagrams can be found below.
+
 template<>
 TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     :
@@ -192,21 +289,8 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     add(TrxHandle::S_COMMITTED, TrxHandle::S_EXECUTING); // SR
 
     // BF aborted
-    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
-    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_AM);
-    add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_CM);
     add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
     add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
-
-    // Cert and Replay
-    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
-    add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_MUST_REPLAY_AM);
-
-    // Replay, interrupted before grabbing apply monitor
-    add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
-
-    // Replay, interrupted before grabbing commit monitor
-    add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
 
     // Replay, BF abort happens on application side after
     // commit monitor has been grabbed
@@ -254,14 +338,8 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
     // Roll back due to cert failure
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ABORTING);
-    // Processing cert-failed and IST-skipped seqno
-    add(TrxHandle::S_ABORTING,    TrxHandle::S_APPLYING);
     // Entering commit monitor after rollback
     add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLING_BACK);
-    // BF waiting for apply monitor
-    add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLED_BACK);
-    // BF while applying (waiting for commit monitor)
-    add(TrxHandle::S_APPLYING,    TrxHandle::S_ABORTING);
     // Entering commit monitor after applying
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
     // Replay after BF
@@ -269,9 +347,8 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_REPLAYING);
     // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
-    add(TrxHandle::S_REPLAYING,   TrxHandle::S_COMMITTED);
-    // SR BF'ed while waiting for commit monitor
-    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ABORTING);
+    // Error reported in leave_commit_order() call
+    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ROLLED_BACK);
     // Rollback finished
     add(TrxHandle::S_ROLLING_BACK,  TrxHandle::S_ROLLED_BACK);
 }
