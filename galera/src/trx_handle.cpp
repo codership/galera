@@ -34,10 +34,10 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
         os << "APPLYING"; return;
     case TrxHandle::S_COMMITTING:
         os << "COMMITTING"; return;
-    case TrxHandle::S_COMMITTED:
-        os << "COMMITTED"; return;
     case TrxHandle::S_ROLLING_BACK:
         os << "ROLLING_BACK"; return;
+    case TrxHandle::S_COMMITTED:
+        os << "COMMITTED"; return;
     case TrxHandle::S_ROLLED_BACK:
         os << "ROLLED_BACK"; return;
     // don't use default to make compiler warn if something is missed
@@ -60,11 +60,14 @@ void galera::TrxHandle::print_set_state(State state) const
 
 void galera::TrxHandle::print_state_history(std::ostream& os) const
 {
-    const std::vector<TrxHandle::State>& hist(state_.history());
+    const std::vector<TrxHandle::Fsm::StateEntry>& hist(state_.history());
     for (size_t i(0); i < hist.size(); ++i)
     {
-        os << hist[i] << "->";
+        os << hist[i].first << ':' << hist[i].second << "->";
     }
+
+    const TrxHandle::Fsm::StateEntry current_state(state_.get_state_entry());
+    os << current_state.first << ':' << current_state.second;
 }
 
 inline
@@ -79,7 +82,6 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " tstamp: "  << timestamp()
        << "; state: ";
     print_state_history(os);
-    os << state();
 }
 
 std::ostream&
@@ -298,7 +300,6 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     // Replay, BF abort happens on application side after
     // commit monitor has been grabbed
     add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
-
     // In-order certification failed for BF'ed action
     add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_ABORTING);
 

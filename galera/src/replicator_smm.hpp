@@ -177,6 +177,7 @@ namespace galera
         // Enter apply monitor without waiting
         void apply_monitor_enter_immediately(const TrxHandleSlave& ts)
         {
+            assert(!ts.pa_unsafe());
             ApplyOrder ao(ts.global_seqno(), 0, ts.local());
             gu_trace(apply_monitor_.enter(ao));
         }

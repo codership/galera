@@ -624,7 +624,7 @@ galera::Certification::test(const TrxHandleSlavePtr& trx, bool store_keys)
 
     assert(TEST_FAILED == ret || trx->depends_seqno() >= 0);
 
-    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(); }
+    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(__LINE__); }
 
     return ret;
 }

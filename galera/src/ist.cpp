@@ -525,7 +525,7 @@ void galera::ist::Receiver::run()
                 else
                 {
                     ts->set_global_seqno(act.seqno_g);
-                    ts->mark_dummy();
+                    ts->mark_dummy(__LINE__);
                 }
 
                 //log_info << "####### Passing WS " << act.seqno_g;
