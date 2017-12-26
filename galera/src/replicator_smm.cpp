@@ -1950,6 +1950,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             }
             break;
         case Certification::TEST_FAILED:
+#if 0
             if (gu_unlikely(trx->is_toi() && applicable)) // small sanity check
             {
                 // In some rare scenarios (e.g., when we have multiple
@@ -1971,6 +1972,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 local_monitor_.leave(lo);
                 abort();
             }
+#endif
+            /* Code above fails to handle TOI (read DDL) transaction
+            as DDL are non-atomic and so can't be rolled back in case of
+            certification failure. But given the TOI flow, certification
+            checks are done well before the real-action starts and so
+            error returned at stage shouldn't cause any rollback for TOI/DDL. */
+            if (gu_unlikely(trx->is_toi() && applicable))
+                log_info << "Certification failed for TO isolated action: "
+                          << *trx;
+            else
+                log_debug << "Certification failed for replicated action: "
+                          << *trx;
+
             local_cert_failures_ += trx->is_local();
             trx->set_state(TrxHandle::S_MUST_ABORT);
             retval = WSREP_TRX_FAIL;
