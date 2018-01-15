@@ -443,15 +443,6 @@ namespace galera
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
 
-        bool must_enter_am() const
-        {
-            assert(state() == S_CERTIFYING           ||
-                   state() == S_MUST_CERT_AND_REPLAY ||
-                   state() == S_ABORTING);
-
-            return (state() != S_ABORTING || pa_unsafe());
-        }
-
         void print(std::ostream& os) const;
 
     private:

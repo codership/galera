@@ -408,15 +408,10 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
     ApplyOrder ao(trx);
     CommitOrder co(trx, co_mode_);
 
-    bool const applying(trx.must_enter_am());
-
     if (TrxHandle::S_ABORTING != trx.state())
         trx.set_state(TrxHandle::S_APPLYING);
 
-    if (gu_likely(applying))
-    {
-        gu_trace(apply_monitor_.enter(ao));
-    }
+    gu_trace(apply_monitor_.enter(ao));
 
     wsrep_trx_meta_t meta = { {state_uuid_, trx.global_seqno() },
                               { trx.source_id(), trx.trx_id(), trx.conn_id() },
@@ -446,19 +441,15 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle& trx)
         GU_DBUG_SYNC_WAIT("after_commit_slave_sync");
     }
 
-    wsrep_seqno_t safe_to_discard(WSREP_SEQNO_UNDEFINED);
-    if (gu_likely(applying))
-    {
-        /* For now need to keep it inside apply monitor to ensure all processing
-         * ends by the time monitors are drained because of potential gcache
-         * cleanup (and loss of the writeset buffer). Perhaps unordered monitor
-         * is needed here. */
-        trx.unordered(recv_ctx, unordered_cb_);
+    wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(trx));
 
-        safe_to_discard = cert_.set_trx_committed(trx);
+    /* For now need to keep it inside apply monitor to ensure all processing
+     * ends by the time monitors are drained because of potential gcache
+     * cleanup (and loss of the writeset buffer). Perhaps unordered monitor
+     * is needed here. */
+    trx.unordered(recv_ctx, unordered_cb_);
 
-        apply_monitor_.leave(ao);
-    }
+    apply_monitor_.leave(ao);
 
     if (trx.is_toi())
     {
@@ -633,12 +624,14 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandlePtr& txp,
     replicated_bytes_ += rcode;
     trx->set_gcs_handle(-1);
 
-    gu_trace(trx->unserialize(static_cast<const gu::byte_t*>(act.buf), act.size, 0));
+    gu_trace(trx->unserialize(static_cast<const gu::byte_t*>(act.buf),
+                              act.size, 0));
 
     trx->update_stats(keys_count_, keys_bytes_, data_bytes_, unrd_bytes_);
 
-    wsrep_status_t retval(WSREP_TRX_FAIL);
+    trx->set_received(act.buf, act.seqno_l, act.seqno_g);
 
+    wsrep_status_t retval(WSREP_TRX_FAIL);
     // ROLLBACK event shortcut to avoid blocking in monitors or
     // getting BF aborted inside provider
     if (gu_unlikely(trx->flags() & TrxHandle::F_ROLLBACK))
@@ -647,7 +640,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandlePtr& txp,
         trx->mark_certified();
         gcache_.seqno_assign(trx->action(), trx->global_seqno(),
                              GCS_ACT_TORDERED, false);
-        cancel_monitors<true>(*trx);
+
+        cancel_monitors_for_local(*trx);
 
         trx->set_state(TrxHandle::S_MUST_ABORT);
         trx->set_state(TrxHandle::S_ABORTING);
@@ -655,15 +649,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandlePtr& txp,
         goto out;
     }
 
-    trx->set_received(act.buf, act.seqno_l, act.seqno_g);
-
     if (gu_unlikely(trx->state() == TrxHandle::S_MUST_ABORT))
     {
         retval = cert_for_aborted(txp);
 
         if (retval != WSREP_BF_ABORT)
         {
-            cancel_monitors<true>(*trx);
+            cancel_monitors_for_local(*trx);
 
             assert(trx->is_dummy());
             assert(WSREP_OK != retval);
@@ -823,10 +815,13 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandlePtr&     trx,
             assert(trx->depends_seqno() >= 0);
             assert(trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY ||
                    trx->state() == TrxHandle::S_MUST_REPLAY_AM);
+            // apply monitor will be entered in due course during replay
             break;
         case WSREP_TRX_FAIL:
             assert(trx->depends_seqno() < 0);
             assert(trx->state() == TrxHandle::S_ABORTING);
+            // trx will rollback, must enter apply monitor without blocking
+            apply_monitor_enter_immediately(*trx.get());
             break;
         default:
             assert(0);
@@ -929,7 +924,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandlePtr& txp,void* trx_ctx
         {
             assert(retval == WSREP_TRX_FAIL);
             assert(trx->state() == TrxHandle::S_ABORTING);
-            // apply monitor is self canceled in cert
+            apply_monitor_enter_immediately(*trx);
             break;
         }
         trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
@@ -939,11 +934,11 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandlePtr& txp,void* trx_ctx
         // safety measure to make sure that all preceding trxs finish before
         // replaying
         trx->set_depends_seqno(trx->global_seqno() - 1);
+
         ApplyOrder ao(*trx);
-        if (apply_monitor_.entered(ao) == false)
-        {
-            gu_trace(apply_monitor_.enter(ao));
-        }
+        assert(apply_monitor_.entered(ao) == false);
+        gu_trace(apply_monitor_.enter(ao));
+
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
     }
     // fall through
@@ -1106,6 +1101,9 @@ galera::ReplicatorSMM::commit_order_enter_remote(TrxHandle& trx)
     {
         assert(trx.is_local());
         assert((trx.flags() & TrxHandle::F_ROLLBACK) == 0);
+
+        ApplyOrder ao(trx);
+        assert(apply_monitor_.entered(ao));
     }
 #endif /* NDEBUG */
 
@@ -1240,12 +1238,10 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandle& trx)
     if (trx.global_seqno() > 0)
     {
         ApplyOrder ao(trx);
-        if (apply_monitor_.entered(ao))
-        {
-            wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(trx));
-            apply_monitor_.leave(ao);
-            report_last_committed(safe_to_discard);
-        }
+        assert(apply_monitor_.entered(ao));
+        wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(trx));
+        apply_monitor_.leave(ao);
+        report_last_committed(safe_to_discard);
     }
 
     // Trx was either rolled back by user or via certification failure,
@@ -1361,7 +1357,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandlePtr&     txp,
         break;
     }
     case WSREP_TRX_FAIL:
-        // Apply monitor is released in cert() in case of failure.
+        apply_monitor_enter_immediately(trx);
         trx.set_state(TrxHandle::S_ABORTING);
         break;
     default:
@@ -1410,11 +1406,6 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandlePtr& txp,
 
     CommitOrder co(trx, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
-    ApplyOrder ao(trx);
-    report_last_committed(cert_.set_trx_committed(trx));
-    apply_monitor_.leave(ao);
-
-    st_.mark_safe();
 
     if (trx.state() == TrxHandle::S_COMMITTING)
     {
@@ -1423,10 +1414,15 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandlePtr& txp,
     }
     else
     {
-        // apply_monitor_ was canceled in cert()
         assert(trx.state() == TrxHandle::S_ABORTING);
         trx.set_state(TrxHandle::S_ROLLED_BACK);
     }
+
+    ApplyOrder ao(trx);
+    report_last_committed(cert_.set_trx_committed(trx));
+    apply_monitor_.leave(ao);
+
+    st_.mark_safe();
 
     return WSREP_OK;
 }
@@ -1629,36 +1625,6 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 
     local_monitor_.leave(lo);
     log_debug << "Got commit cut from GCS: " << seq;
-}
-
-
-/* NB: the only use for this method is in cancel_seqnos() below */
-void galera::ReplicatorSMM::cancel_seqno(wsrep_seqno_t const seqno)
-{
-    assert(seqno > 0);
-
-    ApplyOrder ao(seqno, seqno - 1);
-    apply_monitor_.self_cancel(ao);
-
-    if (co_mode_ != CommitOrder::BYPASS)
-    {
-        CommitOrder co(seqno, co_mode_);
-        commit_monitor_.self_cancel(co);
-    }
-}
-
-/* NB: the only use for this method is to dismiss the slave queue
- *     in corrupt state */
-void galera::ReplicatorSMM::cancel_seqnos(wsrep_seqno_t const seqno_l,
-                                          wsrep_seqno_t const seqno_g)
-{
-    if (seqno_l > 0)
-    {
-        LocalOrder lo(seqno_l);
-        local_monitor_.self_cancel(lo);
-    }
-
-    if (seqno_g > 0) cancel_seqno(seqno_g);
 }
 
 
@@ -2198,7 +2164,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(const TrxHandlePtr& trx)
 
     wsrep_status_t retval(WSREP_OK);
     bool const applicable(trx->global_seqno() > STATE_SEQNO());
-    assert(!trx->is_local() || applicable); // applicable can't be false for locals
+    // applicable can't be false for locals
+    assert(!trx->is_local() || applicable);
 
     if (gu_unlikely(interrupted || trx->state() == TrxHandle::S_MUST_ABORT))
     {
@@ -2275,29 +2242,13 @@ wsrep_status_t galera::ReplicatorSMM::cert(const TrxHandlePtr& trx)
         gcache_.seqno_assign (trx->action(), trx->global_seqno(),
                               GCS_ACT_TORDERED, trx->depends_seqno() < 0);
 
-        if (gu_unlikely(WSREP_TRX_MISSING == retval ||
-                        !trx->must_enter_am()))
-        {
-            // last chance to set trx committed while inside of a monitor
-            report_last_committed(cert_.set_trx_committed(*trx));
-        }
-
         local_monitor_.leave(lo);
     }
 
     assert(WSREP_OK == retval || WSREP_TRX_FAIL == retval ||
            WSREP_TRX_MISSING == retval);
 
-    if (gu_unlikely(WSREP_TRX_FAIL == retval && !trx->must_enter_am()))
-    {
-        assert(trx->state() == TrxHandle::S_ABORTING);
-        // applicable but failed certification: self-cancel monitors
-        cancel_monitors<false>(*trx);
-    }
-    else
-    {
-        assert(WSREP_OK != retval || trx->depends_seqno() >= 0);
-    }
+    assert(WSREP_OK != retval || trx->depends_seqno() >= 0);
 
     return retval;
 }

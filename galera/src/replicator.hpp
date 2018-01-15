@@ -135,8 +135,6 @@ namespace galera
 
         virtual const wsrep_uuid_t& source_id() const = 0;
 
-        virtual void cancel_seqnos(wsrep_seqno_t seqno_l,
-                                   wsrep_seqno_t seqno_g) = 0;
         virtual bool corrupt() const = 0;
 
     protected:

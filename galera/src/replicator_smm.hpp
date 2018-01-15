@@ -169,28 +169,25 @@ namespace galera
         void ist_trx(const TrxHandlePtr& ts, bool must_apply);
         void ist_end(int error);
 
-        // Cancel local and apply monitors for TrxHandle
-        template<bool local>
-        void cancel_monitors(const TrxHandle& trx)
+        // Enter apply monitor without waiting
+        void apply_monitor_enter_immediately(const TrxHandle& trx)
         {
-            log_debug << "canceling " << (local ? "local" : "apply")
-                      <<" monitor on behalf of trx: " << trx;
-
-            if (local)
-            {
-                LocalOrder  lo(trx);
-                local_monitor_.self_cancel(lo);
-            }
-
-            if (trx.pa_unsafe() == false)
-            {
-                ApplyOrder  ao(trx);
-                apply_monitor_.self_cancel(ao);
-            }
+            ApplyOrder ao(trx.global_seqno(), 0, trx.is_local());
+            gu_trace(apply_monitor_.enter(ao));
         }
 
-        // Cancel all monitors for given seqnos
-        void cancel_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g);
+        // Cancel local and enter apply monitors for TrxHandle
+        void cancel_monitors_for_local(const TrxHandle& trx)
+        {
+            log_debug << "canceling monitors on behalf of trx: " << trx;
+            assert(trx.is_local());
+            assert(trx.global_seqno() > 0);
+
+            LocalOrder lo(trx);
+            local_monitor_.self_cancel(lo);
+
+            gu_trace(apply_monitor_enter_immediately(trx));
+        }
 
         // Drain apply and commit monitors up to seqno
         void drain_monitors(wsrep_seqno_t seqno);
