@@ -17,13 +17,10 @@
 #ifndef GU_SHARED_PTR_HPP
 #define GU_SHARED_PTR_HPP
 
-#if defined(HAVE_MEMORY)
-#   if __cplusplus < 201103L
-        #error This configuration requires at least C++11 support
-#   endif
+#if defined(HAVE_STD_SHARED_PTR)
 #   include <memory>
 #   define GU_SHARED_PTR_NAMESPACE std
-#elif defined(HAVE_TR1_MEMORY)
+#elif defined(HAVE_TR1_SHARED_PTR)
 #   include <tr1/memory>
 #   define GU_SHARED_PTR_NAMESPACE std::tr1
 #elif defined(HAVE_BOOST_SHARED_PTR_HPP)
