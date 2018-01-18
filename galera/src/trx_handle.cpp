@@ -114,6 +114,9 @@ galera::TrxHandleSlave::print(std::ostream& os) const
     {
         os << " skip event";
     }
+
+    os << "; state history: ";
+    print_state_history(os);
 }
 
 std::ostream&
@@ -295,6 +298,9 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     // Replay, BF abort happens on application side after
     // commit monitor has been grabbed
     add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
+
+    // In-order certification failed for BF'ed action
+    add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_ABORTING);
 
     // Replay stage
     add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);

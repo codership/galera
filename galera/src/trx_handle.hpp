@@ -605,6 +605,15 @@ namespace galera
         }
         bool cert_bypass() const { return cert_bypass_; }
 
+        bool must_enter_am() const
+        {
+            assert(state() == S_CERTIFYING  ||
+                   state() == S_MUST_REPLAY ||
+                   state() == S_ABORTING);
+
+            return (state() != S_ABORTING || pa_unsafe());
+        }
+
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :

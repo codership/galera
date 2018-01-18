@@ -953,7 +953,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
 
     trx.set_state(TrxHandle::S_APPLYING);
 
-    ApplyOrder  ao(*ts);
+    ApplyOrder ao(*ts);
     bool interrupted(false);
 
     try
@@ -1728,7 +1728,6 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
     {
     case WSREP_OK:
     {
-
         trx.set_state(TrxHandle::S_APPLYING);
         ts.set_state(TrxHandle::S_APPLYING);
 
@@ -3031,7 +3030,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
                               GCS_ACT_WRITESET, skip);
 
-        if (gu_unlikely(WSREP_TRX_MISSING == retval))
+        if (gu_unlikely(WSREP_TRX_MISSING == retval ||
+                        !ts->must_enter_am()))
         {
             // last chance to set trx committed while inside of a monitor
             report_last_committed(cert_.set_trx_committed(*ts));
