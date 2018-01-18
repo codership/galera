@@ -356,8 +356,6 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
 
     *victim_seqno = WSREP_SEQNO_UNDEFINED;
 
-    *victim_seqno = WSREP_SEQNO_UNDEFINED;
-
     REPL_CLASS *     repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     wsrep_status_t   retval;
     galera::TrxHandleMasterPtr txp(repl->get_local_trx(victim_trx));
@@ -692,7 +690,7 @@ wsrep_status_t galera_commit_order_leave(
     TrxHandle* const txp(static_cast<TrxHandle*>(ws_handle->opaque));
     assert(NULL != txp);
 
-    if (txp == 0)
+    if (txp == NULL)
     {
         log_warn << "Trx " << ws_handle->trx_id
                  << " not found for commit order leave";
