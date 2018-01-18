@@ -1074,9 +1074,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
         {
             ts.set_state(TrxHandle::S_CERTIFYING);
         }
-
-        if (gu_unlikely(ts.skip_event() && must_apply))
-            cancel_monitors<false>(ts);
     }
 
     if (gu_likely(must_apply == true))

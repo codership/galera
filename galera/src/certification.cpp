@@ -588,7 +588,8 @@ galera::Certification::adjust_position(const View&         view,
 // this assert is too strong: local ordered transactions may get canceled without
 // entering certification    assert(position_ + 1 == seqno || 0 == position_);
 
-    log_info << "####### Adjusting cert position to " << gtid;
+    log_info << "####### Adjusting cert position: "
+             << position_ << " -> " << gtid.seqno();
 
     if (version != version_)
     {
