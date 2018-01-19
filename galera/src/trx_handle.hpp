@@ -132,8 +132,8 @@ namespace galera
             S_REPLAYING,
             S_APPLYING,   // grabbing apply monitor, applying
             S_COMMITTING, // grabbing commit monitor, committing changes
-            S_COMMITTED,
             S_ROLLING_BACK,
+            S_COMMITTED,
             S_ROLLED_BACK
         } State;
 
@@ -210,9 +210,9 @@ namespace galera
 
     protected:
 
-        void  set_state(State state)
+        void  set_state(State const state, int const line)
         {
-            state_.shift_to(state);
+            state_.shift_to(state, line);
             if (state == S_EXECUTING) state_.reset_history();
         }
 
@@ -527,9 +527,9 @@ namespace galera
             global_seqno_ = s;
         }
 
-        void set_state(TrxHandle::State const state)
+        void set_state(TrxHandle::State const state, int const line = -1)
         {
-            TrxHandle::set_state(state);
+            TrxHandle::set_state(state, line);
         }
 
         void apply(void*                   recv_ctx,
@@ -575,7 +575,7 @@ namespace galera
         void set_ends_nbo(wsrep_seqno_t seqno) { ends_nbo_ = seqno; }
         wsrep_seqno_t ends_nbo() const { return ends_nbo_; }
 
-        void mark_dummy()
+        void mark_dummy(int const line = -2)
         {
             set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
@@ -583,7 +583,7 @@ namespace galera
             {
             case S_CERTIFYING:
             case S_REPLICATING:
-                set_state(S_ABORTING);
+                set_state(S_ABORTING, line);
                 break;
             case S_ABORTING:
             case S_ROLLING_BACK:
@@ -597,6 +597,11 @@ namespace galera
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
 
+        bool is_streaming() const
+        {
+            return !((flags() & F_BEGIN) && (flags() & F_COMMIT));
+        }
+
         void cert_bypass(bool const val)
         {
             assert(true  == val);
@@ -604,15 +609,6 @@ namespace galera
             cert_bypass_ = val;
         }
         bool cert_bypass() const { return cert_bypass_; }
-
-        bool must_enter_am() const
-        {
-            assert(state() == S_CERTIFYING  ||
-                   state() == S_MUST_REPLAY ||
-                   state() == S_ABORTING);
-
-            return (state() != S_ABORTING || pa_unsafe());
-        }
 
     protected:
 
@@ -754,11 +750,11 @@ namespace galera
             mutex_.unlock();
         }
 
-        void set_state(TrxHandle::State const s)
+        void set_state(TrxHandle::State const s, int const line = -1)
         {
             assert(locked());
             assert(owned());
-            TrxHandle::set_state(s);
+            TrxHandle::set_state(s, line);
         }
 
         long gcs_handle() const { return gcs_handle_; }

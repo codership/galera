@@ -187,6 +187,11 @@ namespace galera
             return state(obj) == Process::S_FINISHED;
         }
 
+        bool canceled(const C& obj) const
+        {
+            return state(obj) == Process::S_CANCELED;
+        }
+
         void leave(const C& obj)
         {
 #ifndef NDEBUG

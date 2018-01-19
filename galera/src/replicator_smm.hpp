@@ -178,21 +178,25 @@ namespace galera
         void ist_cc(const gcs_action&, bool must_apply, bool preload);
         void ist_end(int error);
 
-        // Cancel local and apply monitors for TrxHandleSlave
-        template<bool local>
-        void cancel_monitors(const TrxHandleSlave& ts)
+        // Enter apply monitor without waiting
+        void apply_monitor_enter_immediately(const TrxHandleSlave& ts)
         {
-            log_debug << "canceling " << (local ? "local" : "apply")
-                      <<" monitor on behalf of ts: " << ts;
+            assert(!ts.pa_unsafe());
+            ApplyOrder ao(ts.global_seqno(), 0, ts.local());
+            gu_trace(apply_monitor_.enter(ao));
+        }
 
-            if (local)
-            {
-                LocalOrder  lo(ts);
-                local_monitor_.self_cancel(lo);
-            }
+        // Cancel local and enter apply monitors for TrxHandle
+        void cancel_monitors_for_local(const TrxHandleSlave& ts)
+        {
+            log_debug << "canceling monitors on behalf of trx: " << ts;
+            assert(ts.local());
+            assert(ts.global_seqno() > 0);
 
-            ApplyOrder  ao(ts);
-            apply_monitor_.self_cancel(ao);
+            LocalOrder lo(ts);
+            local_monitor_.self_cancel(lo);
+
+            gu_trace(apply_monitor_enter_immediately(ts));
         }
 
         // Cancel all monitors for given seqnos
