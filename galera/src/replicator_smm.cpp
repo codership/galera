@@ -976,6 +976,11 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
         if (ts->flags() & TrxHandle::F_COMMIT)
         {
             TX_SET_STATE(trx, TrxHandle::S_MUST_REPLAY);
+
+            if (!interrupted)
+                TX_SET_STATE(*ts, TrxHandle::S_APPLYING);
+            else
+                assert(ts->state() == TrxHandle::S_CERTIFYING);
         }
         else
         {

@@ -77,8 +77,7 @@ uint64_t galera_capabilities(wsrep_t* gh)
                                   WSREP_CAP_TRX_REPLAY           |
                                   WSREP_CAP_ISOLATION            |
                                   WSREP_CAP_PAUSE                |
-                                  WSREP_CAP_CAUSAL_READS         |
-                                  WSREP_CAP_STREAMING);
+                                  WSREP_CAP_CAUSAL_READS);
 
     static uint64_t const v5_caps(WSREP_CAP_INCREMENTAL_WRITESET |
                                   WSREP_CAP_UNORDERED            |
