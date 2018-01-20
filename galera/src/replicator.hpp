@@ -58,6 +58,7 @@ namespace galera
         virtual wsrep_status_t close() = 0;
         virtual wsrep_status_t async_recv(void* recv_ctx) = 0;
 
+        virtual wsrep_cap_t capabilities() const = 0;
         virtual int trx_proto_ver() const = 0;
         virtual int repl_proto_ver() const = 0;
 

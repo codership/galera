@@ -115,6 +115,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 #define WSREP_CAP_SNAPSHOT              ( 1ULL << 16 )
 #define WSREP_CAP_NBO                   ( 1ULL << 17 )
 
+typedef uint32_t wsrep_cap_t; //!< capabilities bitmask
 
 /*!
  *  Writeset flags
@@ -335,6 +336,7 @@ typedef struct wsrep_view_info {
     wsrep_gtid_t        state_id;  //!< global state ID
     wsrep_seqno_t       view;      //!< global view number
     wsrep_view_status_t status;    //!< view status
+    wsrep_cap_t         capabilities;//!< capabilities available in the view
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
     int                 proto_ver; //!< application protocol agreed on the view
@@ -641,11 +643,15 @@ struct wsrep {
                               const struct wsrep_init_args* args);
 
   /*!
-   * @brief Returns provider capabilities flag bitmap
+   * @brief Returns provider capabilities bitmap
+   *
+   * Note that these are potential provider capabilities. Provider will
+   * offer only capabilities supported by all members in the view
+   * (see wsrep_view_info).
    *
    * @param wsrep provider handle
    */
-    uint64_t       (*capabilities) (wsrep_t* wsrep);
+    wsrep_cap_t    (*capabilities) (wsrep_t* wsrep);
 
   /*!
    * @brief Passes provider-specific configuration string to provider.

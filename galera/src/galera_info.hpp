@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2018 Codership Oy <info@codership.com>
 
 #ifndef __GALERA_INFO_H__
 #define __GALERA_INFO_H__
@@ -12,6 +12,7 @@
 
 extern wsrep_view_info_t*
 galera_view_info_create (const gcs_act_cchange& conf,
+                         wsrep_cap_t            capabilities,
                          int                    my_idx,
                          wsrep_uuid_t&          my_uuid);
 
