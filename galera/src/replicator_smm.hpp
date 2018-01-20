@@ -52,6 +52,7 @@ namespace galera
 
         ~ReplicatorSMM();
 
+        wsrep_cap_t capabilities() const { return capabilities(proto_max_); }
         int trx_proto_ver() const { return trx_params_.version_; }
         int repl_proto_ver() const{ return protocol_version_; }
 
@@ -330,6 +331,8 @@ namespace galera
 
         static const Defaults defaults;
         // both a list of parameters and a list of default values
+
+        static wsrep_cap_t capabilities(int protocol_version);
 
         wsrep_seqno_t last_committed()
         {

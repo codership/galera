@@ -15,7 +15,37 @@
 #include <sstream>
 #include <iostream>
 
+
 #define TX_SET_STATE(t_,s_) (t_).set_state(s_, __LINE__)
+
+
+wsrep_cap_t
+galera::ReplicatorSMM::capabilities(int protocol_version)
+{
+    static uint64_t const v4_caps(WSREP_CAP_MULTI_MASTER         |
+                                  WSREP_CAP_CERTIFICATION        |
+                                  WSREP_CAP_PARALLEL_APPLYING    |
+                                  WSREP_CAP_TRX_REPLAY           |
+                                  WSREP_CAP_ISOLATION            |
+                                  WSREP_CAP_PAUSE                |
+                                  WSREP_CAP_CAUSAL_READS);
+
+    static uint64_t const v5_caps(WSREP_CAP_INCREMENTAL_WRITESET |
+                                  WSREP_CAP_UNORDERED            |
+                                  WSREP_CAP_PREORDERED);
+
+    static uint64_t const v8_caps(WSREP_CAP_STREAMING);
+
+    assert(protocol_version >= 4);
+
+    uint64_t caps(v4_caps);
+
+    if (protocol_version >= 5) caps |= v5_caps;
+    if (protocol_version >= 8) caps |= v8_caps;
+
+    return caps;
+}
+
 
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
@@ -392,7 +422,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             gcs_act_cchange const cc;
             wsrep_uuid_t tmp(uuid_);
             wsrep_view_info_t* const err_view
-                (galera_view_info_create(cc, -1, tmp));
+                (galera_view_info_create(cc, 0, -1, tmp));
             view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
             free(err_view);
 
@@ -2064,7 +2094,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     wsrep_uuid_t new_uuid(uuid_);
     wsrep_view_info_t* const view_info
-        (galera_view_info_create(conf, (!from_IST ? cc.seqno_g : -1), new_uuid));
+        (galera_view_info_create(conf,
+                                 capabilities(conf.repl_proto_ver),
+                                 (!from_IST ? cc.seqno_g : -1), new_uuid));
+
     if (view_info->status == WSREP_VIEW_PRIMARY)
     {
         safe_to_bootstrap_ = (view_info->memb_num == 1);

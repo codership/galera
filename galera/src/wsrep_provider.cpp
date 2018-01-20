@@ -66,33 +66,14 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 
 
 extern "C"
-uint64_t galera_capabilities(wsrep_t* gh)
+wsrep_cap_t galera_capabilities(wsrep_t* gh)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-    static uint64_t const v4_caps(WSREP_CAP_MULTI_MASTER         |
-                                  WSREP_CAP_CERTIFICATION        |
-                                  WSREP_CAP_PARALLEL_APPLYING    |
-                                  WSREP_CAP_TRX_REPLAY           |
-                                  WSREP_CAP_ISOLATION            |
-                                  WSREP_CAP_PAUSE                |
-                                  WSREP_CAP_CAUSAL_READS);
-
-    static uint64_t const v5_caps(WSREP_CAP_INCREMENTAL_WRITESET |
-                                  WSREP_CAP_UNORDERED            |
-                                  WSREP_CAP_PREORDERED);
-
-    static uint64_t const v8_caps(WSREP_CAP_STREAMING);
-
-    uint64_t caps(v4_caps);
-
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    if (repl->repl_proto_ver() >= 5) caps |= v5_caps;
-    if (repl->repl_proto_ver() >= 8) caps |= v8_caps;
-
-    return caps;
+    return repl->capabilities();
 }
 
 
