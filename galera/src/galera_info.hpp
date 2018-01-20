@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2018 Codership Oy <info@codership.com>
 
 #ifndef __GALERA_INFO_H__
 #define __GALERA_INFO_H__
@@ -8,7 +8,9 @@
 
 /* create view info out of configuration message */
 extern wsrep_view_info_t*
-galera_view_info_create (const gcs_act_conf_t* conf, bool st_required);
+galera_view_info_create (const gcs_act_conf_t* conf,
+                         wsrep_cap_t           capabilities,
+                         bool                  st_required);
 
 /* make a copy of view info object */
 extern wsrep_view_info_t*

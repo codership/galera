@@ -14,6 +14,29 @@
 #include <sstream>
 #include <iostream>
 
+wsrep_cap_t
+galera::ReplicatorSMM::capabilities(int protocol_version)
+{
+    static uint64_t const v4_caps(WSREP_CAP_MULTI_MASTER         |
+                                  WSREP_CAP_CERTIFICATION        |
+                                  WSREP_CAP_PARALLEL_APPLYING    |
+                                  WSREP_CAP_TRX_REPLAY           |
+                                  WSREP_CAP_ISOLATION            |
+                                  WSREP_CAP_PAUSE                |
+                                  WSREP_CAP_CAUSAL_READS);
+
+    static uint64_t const v5_caps(WSREP_CAP_INCREMENTAL_WRITESET |
+                                  WSREP_CAP_UNORDERED            |
+                                  WSREP_CAP_PREORDERED);
+
+    assert(protocol_version >= 4);
+
+    uint64_t caps(v4_caps);
+
+    if (protocol_version >= 5) caps |= v5_caps;
+
+    return caps;
+}
 
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
@@ -377,7 +400,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             else
             {
                 // Generate zero view before exit to notify application
-                wsrep_view_info_t* err_view(galera_view_info_create(0, false));
+                wsrep_view_info_t* err_view(galera_view_info_create(0, 0,false));
                 view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
                 free(err_view);
             }
@@ -1778,7 +1801,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
               << ")";
 
     wsrep_view_info_t* const view_info
-        (galera_view_info_create(&conf, conf.my_state == GCS_NODE_STATE_PRIM));
+        (galera_view_info_create(&conf,
+                                 capabilities(conf.repl_proto_ver),
+                                 conf.my_state == GCS_NODE_STATE_PRIM));
 
     assert(view_info->memb_num == conf.memb_num);
     assert(view_info->my_idx == conf.my_idx);
@@ -1817,7 +1842,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     }
 
     bool const st_required
-        (state_transfer_required(*view_info, conf.my_state == GCS_NODE_STATE_PRIM));
+        (state_transfer_required(*view_info,
+                                 conf.my_state == GCS_NODE_STATE_PRIM));
 
     void*  app_req(0);
     size_t app_req_len(0);
