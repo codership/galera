@@ -36,6 +36,8 @@ galera::ReplicatorSMM::capabilities(int protocol_version)
 
     static uint64_t const v8_caps(WSREP_CAP_STREAMING);
 
+    if (protocol_version == -1) return 0;
+
     assert(protocol_version >= 4);
 
     uint64_t caps(v4_caps);
@@ -422,7 +424,8 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             gcs_act_cchange const cc;
             wsrep_uuid_t tmp(uuid_);
             wsrep_view_info_t* const err_view
-                (galera_view_info_create(cc, 0, -1, tmp));
+                (galera_view_info_create(cc, capabilities(cc.repl_proto_ver),
+                                         -1, tmp));
             view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
             free(err_view);
 
