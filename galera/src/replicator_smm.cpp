@@ -29,6 +29,8 @@ galera::ReplicatorSMM::capabilities(int protocol_version)
                                   WSREP_CAP_UNORDERED            |
                                   WSREP_CAP_PREORDERED);
 
+    if (protocol_version == -1) return 0;
+
     assert(protocol_version >= 4);
 
     uint64_t caps(v4_caps);
