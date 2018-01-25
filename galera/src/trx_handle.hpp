@@ -598,6 +598,13 @@ namespace galera
             return ret;
         }
 
+        void mark_queued()
+        {
+            assert(!queued_);
+            queued_ = true;
+        }
+        bool queued() const { return queued_; }
+
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
@@ -613,7 +620,8 @@ namespace galera
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
-            cert_bypass_       (false)
+            cert_bypass_       (false),
+            queued_            (false)
 #ifndef NDEBUG
             ,explicit_rollback_(false)
 #endif
@@ -638,6 +646,7 @@ namespace galera
         bool                   committed_;
         bool                   exit_loop_;
         bool                   cert_bypass_;
+        bool                   queued_;
 #ifndef NDEBUG
         bool                   explicit_rollback_;
 #endif /* NDEBUG */

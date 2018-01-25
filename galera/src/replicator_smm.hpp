@@ -852,6 +852,7 @@ namespace galera
                 assert(ts->local());
                 gu::Lock lock(mutex_);
                 ts_queue_.push(ts);
+                ts->mark_queued();
             }
 
             TrxHandleSlavePtr must_cert_next(wsrep_seqno_t seqno)

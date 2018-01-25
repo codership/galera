@@ -1421,6 +1421,7 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
     assert(ts.local_seqno() > 0 && ts.global_seqno() > 0);
     assert(ts.state() == TrxHandle::S_COMMITTED);
     assert(trx.state() == TrxHandle::S_COMMITTED);
+    assert(!ts.is_committed());
 
     wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
 
@@ -1492,7 +1493,11 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 
             assert(commit_monitor_.last_left() >= ts.global_seqno());
 
-            wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
+            /* Queued transactions will be set committed in the queue */
+            wsrep_seqno_t const safe_to_discard
+                (ts.queued() ?
+                 WSREP_SEQNO_UNDEFINED : cert_.set_trx_committed(ts));
+
             apply_monitor_.leave(ao);
             report_last_committed(safe_to_discard);
         }
@@ -2741,6 +2746,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
 
             log_debug << "trx in pending cert queue certified, result: "
                       << result;
+
+            cert_.set_trx_committed(*aborted_ts);
         }
 
         switch (cert_.append_trx(ts))
