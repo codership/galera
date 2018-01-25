@@ -568,7 +568,8 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
         assert(retval == WSREP_OK ||       // success
                retval == WSREP_TRX_FAIL || // cert failure
                retval == WSREP_BF_ABORT || // BF abort
-               retval == WSREP_CONN_FAIL); // not in joined/synced state
+               retval == WSREP_CONN_FAIL|| // not in joined/synced state
+               retval == WSREP_NODE_FAIL); // node inconsistent
     }
     catch (gu::Exception& e)
     {
