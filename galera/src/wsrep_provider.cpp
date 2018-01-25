@@ -409,7 +409,7 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     meta.stid.node  = repl->source_id();
     meta.stid.trx   = trx_id;
 
-    trx->set_flags(TrxHandle::F_ROLLBACK | TrxHandle::F_PA_UNSAFE);
+    trx->set_flags(TrxHandle::EXPLICIT_ROLLBACK_FLAGS);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
 
