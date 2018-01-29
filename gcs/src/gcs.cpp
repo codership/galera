@@ -903,6 +903,7 @@ _join (gcs_conn_t* conn, gcs_seqno_t seqno)
     case -ENOTCONN:
         gu_warn ("Sending JOIN failed: %d (%s). "
                  "Will retry in new primary component.", err, strerror(-err));
+        // fall through
     case 0:
         return 0;
     default:

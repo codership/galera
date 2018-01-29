@@ -215,6 +215,8 @@ namespace gcomm
             send_up(rb, um);
         }
 
+        void set_queueing(bool val) { queue_ = val; }
+
         int handle_down(Datagram& wb, const ProtoDownMeta& dm)
         {
             if (queue_ == true)
@@ -228,6 +230,8 @@ namespace gcomm
                 gu_trace(return send_down(wb, ProtoDownMeta(0xff, O_UNRELIABLE, uuid_)));
             }
         }
+
+        bool empty() const { return out_.empty(); }
 
         Datagram* out()
         {
@@ -383,7 +387,7 @@ namespace gcomm
                 //         << rb.header_len();
                 if (available != 8)
                 {
-                    log_info << "check_trace fail";
+                    log_info << "check_trace fail: " << available;
                 }
                 gcomm_assert(available == 8);
                 int64_t seq;

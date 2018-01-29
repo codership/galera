@@ -355,9 +355,11 @@ namespace galera
                         << "commit order condition called in bypass mode";
                 case OOOC:
                     return true;
+                    // fall through
                 case LOCAL_OOOC:
                     if (trx_.is_local()) { return true; }
                     // in case of remote trx fall through
+                    // fall through
                 case NO_OOOC:
                     return (last_left + 1 == trx_.global_seqno());
                 }

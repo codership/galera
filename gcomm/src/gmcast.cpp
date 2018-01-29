@@ -1322,7 +1322,7 @@ void gcomm::GMCast::handle_up(const void*        id,
             return;
         }
 
-        if (msg.type() >= Message::T_USER_BASE)
+        if (msg.type() >= Message::GMCAST_T_USER_BASE)
         {
             gu_trace(send_up(Datagram(dg, dg.offset() + msg.serial_size()),
                              ProtoUpMeta(msg.source_uuid())));
@@ -1364,7 +1364,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                 return;
             }
 
-            if (msg.type() >= Message::T_USER_BASE)
+            if (msg.type() >= Message::GMCAST_T_USER_BASE)
             {
                 if (evict_list().empty() == false &&
                     evict_list().find(msg.source_uuid()) != evict_list().end())
@@ -1449,7 +1449,7 @@ void gcomm::GMCast::handle_up(const void*        id,
 
 int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    Message msg(version_, Message::T_USER_BASE, uuid(), 1, segment_);
+    Message msg(version_, Message::GMCAST_T_USER_BASE, uuid(), 1, segment_);
 
     // handle relay set first, skip these peers below
     if (relay_set_.empty() == false)

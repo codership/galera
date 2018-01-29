@@ -208,7 +208,7 @@ void single_boot(int version, PCUser* pu1)
     fail_unless(rb != 0);
     Message sm1;
     get_msg(rb, &sm1);
-    fail_unless(sm1.type() == Message::T_STATE);
+    fail_unless(sm1.type() == Message::PC_T_STATE);
     fail_unless(sm1.node_map().size() == 1);
     {
         const pc::Node& pi1 = pc::NodeMap::value(sm1.node_map().begin());
@@ -222,7 +222,7 @@ void single_boot(int version, PCUser* pu1)
     fail_unless(rb != 0);
     Message im1;
     get_msg(rb, &im1);
-    fail_unless(im1.type() == Message::T_INSTALL);
+    fail_unless(im1.type() == Message::PC_T_INSTALL);
     fail_unless(im1.node_map().size() == 1);
     {
         const pc::Node& pi1 = pc::NodeMap::value(im1.node_map().begin());
@@ -281,13 +281,13 @@ static void double_boot(int version, PCUser* pu1, PCUser* pu2)
     fail_unless(rb != 0);
     Message sm1;
     get_msg(rb, &sm1);
-    fail_unless(sm1.type() == Message::T_STATE);
+    fail_unless(sm1.type() == Message::PC_T_STATE);
 
     rb = pu2->tp()->out();
     fail_unless(rb != 0);
     Message sm2;
     get_msg(rb, &sm2);
-    fail_unless(sm2.type() == Message::T_STATE);
+    fail_unless(sm2.type() == Message::PC_T_STATE);
 
     rb = pu1->tp()->out();
     fail_unless(rb == 0);
@@ -323,7 +323,7 @@ static void double_boot(int version, PCUser* pu1, PCUser* pu2)
 
     fail_unless(rb != 0);
     get_msg(rb, &im1);
-    fail_unless(im1.type() == Message::T_INSTALL);
+    fail_unless(im1.type() == Message::PC_T_INSTALL);
 
     fail_unless(pu1->tp()->out() == 0);
     fail_unless(pu2->tp()->out() == 0);
@@ -482,7 +482,7 @@ START_TEST(test_pc_view_changes_double)
     fail_unless(rb != 0);
     Message sm2;
     get_msg(rb, &sm2);
-    fail_unless(sm2.type() == Message::T_STATE);
+    fail_unless(sm2.type() == Message::PC_T_STATE);
     fail_unless(pu2.tp()->out() == 0);
     pu2.pc()->handle_msg(sm2, Datagram(), pum2);
     fail_unless(pu2.pc()->state() == Proto::S_INSTALL);
@@ -490,7 +490,7 @@ START_TEST(test_pc_view_changes_double)
     fail_unless(rb != 0);
     Message im2;
     get_msg(rb, &im2);
-    fail_unless(im2.type() == Message::T_INSTALL);
+    fail_unless(im2.type() == Message::PC_T_INSTALL);
     pu2.pc()->handle_msg(im2, Datagram(), pum2);
     fail_unless(pu2.pc()->state() == Proto::S_PRIM);
 
@@ -1575,7 +1575,7 @@ START_TEST(test_trac_191)
     fail_unless(dg != 0);
     Message sm4;
     get_msg(dg, &sm4);
-    fail_unless(sm4.type() == Message::T_STATE);
+    fail_unless(sm4.type() == Message::PC_T_STATE);
 
     // Handle first sm from uuid3
 

@@ -484,17 +484,17 @@ void gcomm::evs::Proto::handle_get_status(gu::Status& status) const
                       gu::to_string(std::fabs(double(send_queue_s_)/
                                               double(n_send_queue_s_))));
         status.insert("evs_sent_user",
-                      gu::to_string(sent_msgs_[Message::T_USER]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_USER]));
         status.insert("evs_sent_delegate",
-                      gu::to_string(sent_msgs_[Message::T_DELEGATE]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_DELEGATE]));
         status.insert("evs_sent_gap",
-                      gu::to_string(sent_msgs_[Message::T_GAP]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_GAP]));
         status.insert("evs_sent_join",
-                      gu::to_string(sent_msgs_[Message::T_JOIN]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_JOIN]));
         status.insert("evs_sent_install",
-                      gu::to_string(sent_msgs_[Message::T_INSTALL]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_INSTALL]));
         status.insert("evs_sent_leave",
-                      gu::to_string(sent_msgs_[Message::T_LEAVE]));
+                      gu::to_string(sent_msgs_[Message::EVS_T_LEAVE]));
         status.insert("evs_retransmitted", gu::to_string(retrans_msgs_));
         status.insert("evs_recovered", gu::to_string(recovered_msgs_));
         status.insert("evs_deliv_safe",
@@ -1565,7 +1565,7 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         log_debug << "send failed: "  << strerror(ret);
     }
     gu_trace(pop_header(msg, dg));
-    sent_msgs_[Message::T_USER]++;
+    sent_msgs_[Message::EVS_T_USER]++;
 
     if (delivering_ == false)
     {
@@ -1692,7 +1692,7 @@ int gcomm::evs::Proto::send_delegate(Datagram& wb)
     push_header(dm, wb);
     int ret = send_down(wb, ProtoDownMeta());
     pop_header(dm, wb);
-    sent_msgs_[Message::T_DELEGATE]++;
+    sent_msgs_[Message::EVS_T_DELEGATE]++;
     return ret;
 }
 
@@ -1736,7 +1736,7 @@ void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
     {
         log_debug << "send failed: " << strerror(err);
     }
-    sent_msgs_[Message::T_GAP]++;
+    sent_msgs_[Message::EVS_T_GAP]++;
     gu_trace(handle_gap(gm, self_i_));
 }
 
@@ -1893,7 +1893,7 @@ void gcomm::evs::Proto::send_join(bool handle)
     {
         log_debug << "send failed: " << strerror(err);
     }
-    sent_msgs_[Message::T_JOIN]++;
+    sent_msgs_[Message::EVS_T_JOIN]++;
     if (handle == true)
     {
         handle_join(jm, self_i_);
@@ -1946,7 +1946,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
         log_debug << "send failed " << strerror(err);
     }
 
-    sent_msgs_[Message::T_LEAVE]++;
+    sent_msgs_[Message::EVS_T_LEAVE]++;
 
     if (handle == true)
     {
@@ -2032,7 +2032,7 @@ void gcomm::evs::Proto::send_install(EVS_CALLER_ARG)
         log_debug << "send failed: " << strerror(err);
     }
 
-    sent_msgs_[Message::T_INSTALL]++;
+    sent_msgs_[Message::EVS_T_INSTALL]++;
     handle_install(imsg, self_i_);
 }
 
@@ -2216,7 +2216,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 void gcomm::evs::Proto::handle_foreign(const Message& msg)
 {
     // no need to handle foreign LEAVE message
-    if (msg.type() == Message::T_LEAVE)
+    if (msg.type() == Message::EVS_T_LEAVE)
     {
         return;
     }
@@ -2261,7 +2261,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     // Set join message after shift to recovery, shift may clean up
     // join messages
-    if (msg.type() == Message::T_JOIN)
+    if (msg.type() == Message::EVS_T_JOIN)
     {
         set_join(static_cast<const JoinMessage&>(msg), msg.source());
     }
@@ -2272,8 +2272,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
                                    const Datagram& rb,
                                    bool direct)
 {
-    assert(msg.type() <= Message::T_DELAYED_LIST);
-    if (msg.type() > Message::T_DELAYED_LIST)
+    assert(msg.type() <= Message::EVS_T_DELAYED_LIST);
+    if (msg.type() > Message::EVS_T_DELAYED_LIST)
     {
         return;
     }
@@ -2406,25 +2406,25 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 
     switch (msg.type())
     {
-    case Message::T_USER:
+    case Message::EVS_T_USER:
         gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb));
         break;
-    case Message::T_DELEGATE:
+    case Message::EVS_T_DELEGATE:
         gu_trace(handle_delegate(static_cast<const DelegateMessage&>(msg), ii, rb));
         break;
-    case Message::T_GAP:
+    case Message::EVS_T_GAP:
         gu_trace(handle_gap(static_cast<const GapMessage&>(msg), ii));
         break;
-    case Message::T_JOIN:
+    case Message::EVS_T_JOIN:
         gu_trace(handle_join(static_cast<const JoinMessage&>(msg), ii));
         break;
-    case Message::T_LEAVE:
+    case Message::EVS_T_LEAVE:
         gu_trace(handle_leave(static_cast<const LeaveMessage&>(msg), ii));
         break;
-    case Message::T_INSTALL:
+    case Message::EVS_T_INSTALL:
         gu_trace(handle_install(static_cast<const InstallMessage&>(msg), ii));
         break;
-    case Message::T_DELAYED_LIST:
+    case Message::EVS_T_DELAYED_LIST:
         gu_trace(handle_delayed_list(
                      static_cast<const DelayedListMessage&>(msg), ii));
         break;
@@ -2456,34 +2456,34 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
 
     switch (msg->type())
     {
-    case Message::T_NONE:
+    case Message::EVS_T_NONE:
         gu_throw_fatal;
         break;
-    case Message::T_USER:
+    case Message::EVS_T_USER:
         gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_DELEGATE:
+    case Message::EVS_T_DELEGATE:
         gu_trace(offset = static_cast<DelegateMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_GAP:
+    case Message::EVS_T_GAP:
         gu_trace(offset = static_cast<GapMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_JOIN:
+    case Message::EVS_T_JOIN:
         gu_trace(offset = static_cast<JoinMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_INSTALL:
+    case Message::EVS_T_INSTALL:
         gu_trace(offset = static_cast<InstallMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_LEAVE:
+    case Message::EVS_T_LEAVE:
         gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
-    case Message::T_DELAYED_LIST:
+    case Message::EVS_T_DELAYED_LIST:
         gu_trace(offset = static_cast<DelayedListMessage&>(*msg).unserialize(
                      begin, available, offset, true));
         break;
@@ -2627,10 +2627,8 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
         switch (err)
         {
         case EAGAIN:
-        {
             output_.push_back(std::make_pair(wb, dm));
-            // Fall through
-        }
+            // fall through
         case 0:
             ret = 0;
             break;
@@ -3432,6 +3430,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     // Send messages
     if (state() == S_OPERATIONAL)
     {
+        size_t n_sent(0);
         profile_enter(send_user_prof_);
         while (output_.empty() == false)
         {
@@ -3439,7 +3438,18 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             gu_trace(err = send_user(send_window_));
             if (err != 0)
             {
+                if (err == EAGAIN && n_sent == 0)
+                {
+                    // If the send window was exhausted, send a gap
+                    // message to advance aru_seq/safe_seq on peers.
+                    gu_trace(send_gap(EVS_CALLER, UUID::nil(),
+                                      current_view_.id(), Range()));
+                }
                 break;
+            }
+            else
+            {
+                ++n_sent;
             }
         }
         profile_leave(send_user_prof_);
