@@ -433,31 +433,31 @@ static void single_join(DummyTransport* t, Proto* p)
 
     Datagram* rb = get_msg(t, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
 
     // Install message is emitted at the end of JOIN handling
     // 'cause this is the only instance and is always consistent
     // with itself
     rb = get_msg(t, &im);
     fail_unless(rb != 0);
-    fail_unless(im.type() == Message::T_INSTALL);
+    fail_unless(im.type() == Message::EVS_T_INSTALL);
 
     // Handling INSTALL message emits three gap messages,
     // one for receiving install message (commit gap), one for
     // shift to install and one for shift to operational
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless(gm.type() == Message::EVS_T_GAP);
     fail_unless((gm.flags() & Message::F_COMMIT) != 0);
 
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless(gm.type() == Message::EVS_T_GAP);
     fail_unless((gm.flags() & Message::F_COMMIT) == 0);
 
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless(gm.type() == Message::EVS_T_GAP);
     fail_unless((gm.flags() & Message::F_COMMIT) == 0);
 
     // State must have evolved JOIN -> S_GATHER -> S_INSTALL -> S_OPERATIONAL
@@ -524,7 +524,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p2->state() == Proto::S_JOINING);
     rb = get_msg(t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
@@ -534,7 +534,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p1->state() == Proto::S_GATHER);
     rb = get_msg(t1, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
 
@@ -544,7 +544,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p2->state() == Proto::S_GATHER);
     rb = get_msg(t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 
@@ -554,10 +554,10 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p1->state() == Proto::S_GATHER);
     rb = get_msg(t1, &im);
     fail_unless(rb != 0);
-    fail_unless(im.type() == Message::T_INSTALL);
+    fail_unless(im.type() == Message::EVS_T_INSTALL);
     rb = get_msg(t1, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless(gm.type() == Message::EVS_T_GAP);
     fail_unless((gm.flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
@@ -568,7 +568,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p2->state() == Proto::S_GATHER);
     rb = get_msg(t2, &gm2);
     fail_unless(rb != 0);
-    fail_unless(gm2.type() == Message::T_GAP);
+    fail_unless(gm2.type() == Message::EVS_T_GAP);
     fail_unless((gm2.flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
@@ -581,7 +581,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     Message gm12;
     rb = get_msg(t1, &gm12);
     fail_unless(rb != 0);
-    fail_unless(gm12.type() == Message::T_GAP);
+    fail_unless(gm12.type() == Message::EVS_T_GAP);
     fail_unless((gm12.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
@@ -591,7 +591,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     Message gm22;
     rb = get_msg(t2, &gm22);
     fail_unless(rb != 0);
-    fail_unless(gm22.type() == Message::T_GAP);
+    fail_unless(gm22.type() == Message::EVS_T_GAP);
     fail_unless((gm22.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
@@ -603,7 +603,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p1->state() == Proto::S_OPERATIONAL);
     rb = get_msg(t1, &msg);
     fail_unless(rb != 0);
-    fail_unless(msg.type() == Message::T_GAP);
+    fail_unless(msg.type() == Message::EVS_T_GAP);
     fail_unless((msg.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
@@ -612,7 +612,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(p2->state() == Proto::S_OPERATIONAL);
     rb = get_msg(t2, &msg);
     fail_unless(rb != 0);
-    fail_unless(msg.type() == Message::T_GAP);
+    fail_unless(msg.type() == Message::EVS_T_GAP);
     fail_unless((msg.flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
@@ -683,7 +683,12 @@ namespace
 {
     gcomm::evs::Proto* evs_from_dummy(DummyNode* dn)
     {
-        return reinterpret_cast<Proto*>(dn->protos().back());
+        return static_cast<Proto*>(dn->protos().back());
+    }
+
+    DummyTransport* transport_from_dummy(DummyNode* dn)
+    {
+        return static_cast<DummyTransport*>(dn->protos().front());
     }
 }
 
@@ -1975,7 +1980,7 @@ START_TEST(test_gh_100)
     fail_unless(p2.state() == Proto::S_JOINING);
     rb = get_msg(&t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(&t2, &msg);
     fail_unless(rb == 0);
 
@@ -1985,7 +1990,7 @@ START_TEST(test_gh_100)
     fail_unless(p1.state() == Proto::S_GATHER);
     rb = get_msg(&t1, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(&t1, &msg);
     fail_unless(rb == 0);
 
@@ -1995,7 +2000,7 @@ START_TEST(test_gh_100)
     fail_unless(p2.state() == Proto::S_GATHER);
     rb = get_msg(&t2, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(&t2, &msg);
     fail_unless(rb == 0);
 
@@ -2005,10 +2010,10 @@ START_TEST(test_gh_100)
     fail_unless(p1.state() == Proto::S_GATHER);
     rb = get_msg(&t1, &im);
     fail_unless(rb != 0);
-    fail_unless(im.type() == Message::T_INSTALL);
+    fail_unless(im.type() == Message::EVS_T_INSTALL);
     rb = get_msg(&t1, &gm);
     fail_unless(rb != 0);
-    fail_unless(gm.type() == Message::T_GAP);
+    fail_unless(gm.type() == Message::EVS_T_GAP);
     fail_unless((gm.flags() & Message::F_COMMIT) != 0);
     rb = get_msg(&t1, &msg);
     fail_unless(rb == 0);
@@ -2020,10 +2025,10 @@ START_TEST(test_gh_100)
     p1.handle_install_timer();
     rb = get_msg(&t1, &jm);
     fail_unless(rb != 0);
-    fail_unless(jm.type() == Message::T_JOIN);
+    fail_unless(jm.type() == Message::EVS_T_JOIN);
     rb = get_msg(&t1, &im2);
     fail_unless(rb != 0);
-    fail_unless(im2.type() == Message::T_INSTALL);
+    fail_unless(im2.type() == Message::EVS_T_INSTALL);
     fail_unless(im2.install_view_id().seq() > im.install_view_id().seq());
 
 }
@@ -2070,6 +2075,119 @@ START_TEST(test_evs_protocol_upgrade)
     fail_unless(evs_from_dummy(dn[GCOMM_PROTOCOL_MAX_VERSION])->current_view().version() == GCOMM_PROTOCOL_MAX_VERSION);
     check_trace(dn);
     for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
+START_TEST(test_gal_521)
+{
+    // Test the case where two nodes exhaust their user send windows
+    // simultaneously.
+    log_info << "Start test_gal_521";
+
+    std::vector<DummyNode*> dn;
+
+    dn.push_back(create_dummy_node(1, 0));
+    dn.push_back(create_dummy_node(2, 0));
+
+
+    gcomm::evs::Proto *evs1(evs_from_dummy(dn[0]));
+    DummyTransport* t1(transport_from_dummy(dn[0]));
+    t1->set_queueing(true);
+
+    gcomm::evs::Proto *evs2(evs_from_dummy(dn[1]));
+    DummyTransport* t2(transport_from_dummy(dn[1]));
+    t2->set_queueing(true);
+
+    single_join(t1, evs1);
+    double_join(t1, evs1, t2, evs2);
+
+    fail_unless(t1->empty() == true);
+    fail_unless(t2->empty() == true);
+
+    // Adjust send windows to allow sending only single user generated
+    // message at the time
+    evs1->set_param(gcomm::Conf::EvsUserSendWindow, "1");
+    evs1->set_param(gcomm::Conf::EvsSendWindow, "1");
+
+    evs2->set_param(gcomm::Conf::EvsUserSendWindow, "1");
+    evs2->set_param(gcomm::Conf::EvsSendWindow, "1");
+
+    // Make both sides send two messages without communicating with
+    // each other. This will place one user message into transport
+    // queue and one into send queue for both nodes.
+    send_n(dn[0], 2);
+    fail_unless(t1->empty() == false);
+    send_n(dn[1], 2);
+    fail_unless(t2->empty() == false);
+
+    Datagram *d1;
+    Message um1;
+    fail_unless((d1 = get_msg(t1, &um1, false)) != 0);
+    fail_unless(um1.type() == Message::EVS_T_USER);
+    fail_unless(t1->empty() == true);
+    Datagram *d2;
+    Message um2;
+    fail_unless((d2 = get_msg(t2, &um2, false)) != 0);
+    fail_unless(um2.type() == Message::EVS_T_USER);
+    fail_unless(t2->empty() == true);
+
+    // Both of the nodes handle each other's messages. Now due to
+    // send_window == 1 they are not allowed to send the second
+    // message since safe_seq has not been incremented. Instead, they
+    // must emit gap messages to make safe_seq to progress.
+    evs1->handle_up(0, *d2, ProtoUpMeta(dn[1]->uuid()));
+    delete d2;
+    Message gm1;
+    fail_unless(get_msg(t1, &gm1) != 0);
+    fail_unless(gm1.type() == Message::EVS_T_GAP);
+    fail_unless(t1->empty() == true);
+
+    evs2->handle_up(0, *d1, ProtoUpMeta(dn[0]->uuid()));
+    delete d1;
+    Message gm2;
+    fail_unless(get_msg(t2, &gm2) != 0);
+    fail_unless(gm2.type() == Message::EVS_T_GAP);
+    fail_unless(t2->empty() == true);
+
+    // Handle gap messages. The safe_seq is now incremented so the
+    // second user messages are now sent from output queue.
+    evs1->handle_msg(gm2);
+    fail_unless((d1 = get_msg(t1, &um1, false)) != 0);
+    fail_unless(um1.type() == Message::EVS_T_USER);
+    fail_unless(t1->empty() == true);
+
+    evs2->handle_msg(gm1);
+    fail_unless((d2 = get_msg(t2, &um2, false)) != 0);
+    fail_unless(um2.type() == Message::EVS_T_USER);
+    fail_unless(t2->empty() == true);
+
+    // Handle user messages. Each node should now emit gap
+    // because the output queue is empty.
+    evs1->handle_up(0, *d2, ProtoUpMeta(dn[1]->uuid()));
+    delete d2;
+    fail_unless(get_msg(t1, &gm1) != 0);
+    fail_unless(gm1.type() == Message::EVS_T_GAP);
+    fail_unless(t1->empty() == true);
+
+    evs2->handle_up(0, *d1, ProtoUpMeta(dn[0]->uuid()));
+    delete d1;
+    fail_unless(get_msg(t2, &gm2) != 0);
+    fail_unless(gm2.type() == Message::EVS_T_GAP);
+    fail_unless(t2->empty() == true);
+
+    // Handle gap messages. No further messages should be emitted
+    // since both user messages have been delivered, there are
+    // no pending user messages in the output queue and no timers
+    // have been expired.
+    evs1->handle_msg(gm2);
+    fail_unless((d1 = get_msg(t1, &um1, false)) == 0);
+
+    evs2->handle_msg(gm1);
+    fail_unless((d2 = get_msg(t2, &um2, false)) == 0);
+
+
+    std::for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -2257,6 +2375,10 @@ Suite* evs2_suite()
             tcase_add_test(tc, test_evs_protocol_upgrade);
             suite_add_tcase(s, tc);
         }
+
+        tc = tcase_create("test_gal_521");
+        tcase_add_test(tc, test_gal_521);
+        suite_add_tcase(s, tc);
     }
 
     return s;

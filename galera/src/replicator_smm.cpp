@@ -304,6 +304,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_SYNCED:
     case S_DONOR:
         close();
+        // fall through
     case S_CLOSING:
         // @todo wait that all users have left the building
     case S_CLOSED:
@@ -935,8 +936,8 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         ApplyOrder ao(*trx);
         gu_trace(apply_monitor_.enter(ao));
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
-        // fall through
     }
+    // fall through
     case TrxHandle::S_MUST_REPLAY_CM:
         if (co_mode_ != CommitOrder::BYPASS)
         {
@@ -1402,7 +1403,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
 
             log_fatal << "Failed to apply trx: " << *trx;
             log_fatal << e.what();
-            log_fatal << "Node consistency compromized, aborting...";
+            log_fatal << "Node consistency compromised, aborting...";
 
             /* Before doing a graceful exit ensure that node isolate itself
             from the cluster. This will cause the quorum to re-evaluate
@@ -1949,6 +1950,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             }
             break;
         case Certification::TEST_FAILED:
+#if 0
             if (gu_unlikely(trx->is_toi() && applicable)) // small sanity check
             {
                 // In some rare scenarios (e.g., when we have multiple
@@ -1970,6 +1972,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 local_monitor_.leave(lo);
                 abort();
             }
+#endif
+            /* Code above fails to handle TOI (read DDL) transaction
+            as DDL are non-atomic and so can't be rolled back in case of
+            certification failure. But given the TOI flow, certification
+            checks are done well before the real-action starts and so
+            error returned at stage shouldn't cause any rollback for TOI/DDL. */
+            if (gu_unlikely(trx->is_toi() && applicable))
+                log_info << "Certification failed for TO isolated action: "
+                          << *trx;
+            else
+                log_debug << "Certification failed for replicated action: "
+                          << *trx;
+
             local_cert_failures_ += trx->is_local();
             trx->set_state(TrxHandle::S_MUST_ABORT);
             retval = WSREP_TRX_FAIL;

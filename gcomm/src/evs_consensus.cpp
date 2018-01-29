@@ -73,10 +73,10 @@ public:
 
 bool gcomm::evs::Consensus::equal(const Message& m1, const Message& m2) const
 {
-    gcomm_assert(m1.type() == Message::T_JOIN ||
-                 m1.type() == Message::T_INSTALL);
-    gcomm_assert(m2.type() == Message::T_JOIN ||
-                 m2.type() == Message::T_INSTALL);
+    gcomm_assert(m1.type() == Message::EVS_T_JOIN ||
+                 m1.type() == Message::EVS_T_INSTALL);
+    gcomm_assert(m2.type() == Message::EVS_T_JOIN ||
+                 m2.type() == Message::EVS_T_INSTALL);
 
     // Seq and aru seq are comparable only if coming from same view
     if (m1.source_view_id() == m2.source_view_id())
@@ -212,8 +212,8 @@ private:
 bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
     const MessageNodeList& node_list(msg.node_list());
@@ -294,8 +294,8 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
 
 bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
 
@@ -353,8 +353,8 @@ bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
 
 bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
 
@@ -402,8 +402,8 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
 
 bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
     // Compare instances that were present in the current view but are
@@ -450,8 +450,8 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
 
 bool gcomm::evs::Consensus::is_consistent_same_view(const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
     gcomm_assert(msg.source_view_id() == current_view_.id());
 
     if (is_consistent_highest_reachable_safe_seq(msg) == false)
@@ -485,8 +485,8 @@ bool gcomm::evs::Consensus::is_consistent_same_view(const Message& msg) const
 
 bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
 {
-    gcomm_assert(msg.type() == Message::T_JOIN ||
-                 msg.type() == Message::T_INSTALL);
+    gcomm_assert(msg.type() == Message::EVS_T_JOIN ||
+                 msg.type() == Message::EVS_T_INSTALL);
 
     const JoinMessage* my_jm =
         NodeMap::value(known_.find_checked(proto_.uuid())).join_message();

@@ -85,7 +85,7 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 void gcomm::gmcast::Proto::send_handshake()
 {
     handshake_uuid_ = UUID(0, 0);
-    Message hs (version_, Message::T_HANDSHAKE, handshake_uuid_,
+    Message hs (version_, Message::GMCAST_T_HANDSHAKE, handshake_uuid_,
                 gmcast_.uuid(), local_segment_);
 
     send_msg(hs);
@@ -116,7 +116,7 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
     remote_uuid_ = hs.source_uuid();
     remote_segment_ = hs.segment_id();
 
-    Message hsr (version_, Message::T_HANDSHAKE_RESPONSE,
+    Message hsr (version_, Message::GMCAST_T_HANDSHAKE_RESPONSE,
                  handshake_uuid_,
                  gmcast_.uuid(),
                  local_addr_,
@@ -140,7 +140,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             {
                 log_info << "handshake failed, my group: '" << group_name_
                          << "', peer group: '" << grp << "'";
-                Message failed(version_, Message::T_FAIL,
+                Message failed(version_, Message::GMCAST_T_FAIL,
                                gmcast_.uuid(), local_segment_, "invalid group");
                 send_msg(failed);
                 set_state(S_FAILED);
@@ -159,7 +159,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 log_info << "peer " << remote_uuid_
                          << " from " << remote_addr_
                          << " has been evicted out, rejecting connection";
-                Message failed(version_, Message::T_FAIL,
+                Message failed(version_, Message::GMCAST_T_FAIL,
                                gmcast_.uuid(), local_segment_, "evicted");
                 send_msg(failed);
                 set_state(S_FAILED);
@@ -167,7 +167,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             }
 
             propagate_remote_ = true;
-            Message ok(version_, Message::T_OK, gmcast_.uuid(),
+            Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(),
                        local_segment_, "");
             send_msg(ok);
             set_state(S_OK);
@@ -176,7 +176,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         {
             log_warn << "Parsing peer address '"
                      << hs.node_address() << "' failed: " << e.what();
-            Message nok (version_, Message::T_FAIL,
+            Message nok (version_, Message::GMCAST_T_FAIL,
                          gmcast_.uuid(), local_segment_,
                          "invalid node address");
             send_msg (nok);
@@ -240,7 +240,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 void gcomm::gmcast::Proto::handle_keepalive(const Message& msg)
 {
     log_debug << "keepalive: " << *this;
-    Message ok(version_, Message::T_OK, gmcast_.uuid(), local_segment_, "");
+    Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(), local_segment_, "");
     send_msg(ok);
 }
 
@@ -258,7 +258,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
                            Node(LinkMap::value(i).addr())));
     }
 
-    Message msg(version_, Message::T_TOPOLOGY_CHANGE, gmcast_.uuid(),
+    Message msg(version_, Message::GMCAST_T_TOPOLOGY_CHANGE, gmcast_.uuid(),
                 group_name_, nl);
 
     send_msg(msg);
@@ -268,7 +268,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
 void gcomm::gmcast::Proto::send_keepalive()
 {
     log_debug << "sending keepalive: " << *this;
-    Message msg(version_, Message::T_KEEPALIVE,
+    Message msg(version_, Message::GMCAST_T_KEEPALIVE,
                 gmcast_.uuid(), local_segment_, "");
     send_msg(msg);
 }
@@ -278,22 +278,22 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
 
     switch (msg.type())
     {
-    case Message::T_HANDSHAKE:
+    case Message::GMCAST_T_HANDSHAKE:
         handle_handshake(msg);
         break;
-    case Message::T_HANDSHAKE_RESPONSE:
+    case Message::GMCAST_T_HANDSHAKE_RESPONSE:
         handle_handshake_response(msg);
         break;
-    case Message::T_OK:
+    case Message::GMCAST_T_OK:
         handle_ok(msg);
         break;
-    case Message::T_FAIL:
+    case Message::GMCAST_T_FAIL:
         handle_failed(msg);
         break;
-    case Message::T_TOPOLOGY_CHANGE:
+    case Message::GMCAST_T_TOPOLOGY_CHANGE:
         handle_topology_change(msg);
         break;
-    case Message::T_KEEPALIVE:
+    case Message::GMCAST_T_KEEPALIVE:
         handle_keepalive(msg);
         break;
     default:
