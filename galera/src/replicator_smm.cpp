@@ -796,21 +796,31 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
     This means transaction can get aborted on completion of replicate
     before pre-commit action start. This condition capture that scenario
     and ensure that resources are released. */
-    if (trx->state() == TrxHandle::S_MUST_ABORT ||
-        trx->state() == TrxHandle::S_ABORTING)
+    if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
-        LocalOrder lo(*trx);
-        ApplyOrder ao(*trx);
-        CommitOrder co(*trx, co_mode_);
+        wsrep_status_t retval(WSREP_PRECOMMIT_ABORT);
+        retval = cert_for_aborted(trx);
 
-        local_monitor_.self_cancel(lo);
+        if (retval != WSREP_BF_ABORT)
+        {
+            LocalOrder  lo(*trx);
+            ApplyOrder  ao(*trx);
+            CommitOrder co(*trx, co_mode_);
+            local_monitor_.self_cancel(lo);
+            apply_monitor_.self_cancel(ao);
+            if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+        }
+        else if (meta != 0)
+        {
+            meta->gtid.uuid  = state_uuid_;
+            meta->gtid.seqno = trx->global_seqno();
+            meta->depends_on = trx->depends_seqno();
+        }
 
-        gcache_.seqno_assign (trx->action(), trx->global_seqno(), -1);
+        if (trx->state() == TrxHandle::S_MUST_ABORT)
+            trx->set_state(TrxHandle::S_ABORTING);
 
-        apply_monitor_.self_cancel(ao);
-        if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
-
-        return WSREP_PRECOMMIT_ABORT;
+        return retval;
     }
 
     assert(trx->state() == TrxHandle::S_REPLICATING);
