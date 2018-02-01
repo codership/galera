@@ -244,17 +244,14 @@ RecordSetOutBase::write_header (byte_t* const buf, ssize_t const size)
             uint32_t const h((uint32_t(size_ - 1) << VER2_SIZE_OFF)  |
                              (uint32_t(count_- 1) << VER2_COUNT_OFF) |
                              (ver_byte | VER2_SHORT_FLAG));
-//            *reinterpret_cast<uint32_t*>(buf + off) = gu_le32(h);
             gu::serialize4(h, buf, off);
             assert(off + 8 == header_size_max());
             break;
         }
         else /* long header version */
         {
-#ifndef NDEBUG
             /* zero up potential padding bytes */
             ::memset(buf + off + 4, 0, hdr_size - 8);
-#endif
         }
         /* fall through *//* to uleb encoding */
     case VER1:
@@ -309,6 +306,14 @@ RecordSetOutBase::gather (GatherVector& out)
                 pad_size = VER2_ALIGNMENT - dangling_bytes;
                 bool new_page;
                 byte_t* const pad_ptr(alloc(pad_size, new_page));
+
+                /* zero up padding bytes to pacify valgrind:
+                 * these bytes are checksummed along with the rest of the set
+                 * and it makes valgrind unhappy if they are not initialized.
+                 * However they don't need to be initialized to anything specific
+                 * - they just need to remain unaltered */
+                ::memset(pad_ptr, 0, pad_size);
+
                 post_append(new_page, pad_ptr, pad_size);
                 // note that size_ should be preserved and not increased here
                 assert(saved_size == size_);
