@@ -1067,6 +1067,10 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 
+#ifndef NDEBUG
+    bool const explicit_rollback(trx->explicit_rollback());
+#endif /* NDEBUG */
+
     {
         gu::Lock lock(mutex_);
 
@@ -1133,6 +1137,15 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
     }
 
     if (!trx->certified()) trx->mark_certified();
+
+#ifndef NDEBUG
+    if (explicit_rollback)
+    {
+        assert(trx->explicit_rollback());
+        assert(retval == TEST_OK);
+        assert(trx->state() == TrxHandle::S_CERTIFYING);
+    }
+#endif /* NDEBUG */
 
     return retval;
 }

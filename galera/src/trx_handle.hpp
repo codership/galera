@@ -77,6 +77,7 @@ namespace galera
         };
 
         static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 7) - 1);
+        static const uint32_t EXPLICIT_ROLLBACK_FLAGS = F_PA_UNSAFE | F_ROLLBACK;
 
         static bool const FLAGS_MATCH_API_FLAGS =
                                  (WSREP_FLAG_TRX_END     == F_COMMIT       &&
@@ -454,6 +455,9 @@ namespace galera
                         certified_ = true;
                     }
 
+                    explicit_rollback_ =
+                        (write_set_flags_ == EXPLICIT_ROLLBACK_FLAGS);
+
                     timestamp_ = write_set_.timestamp();
 
                     assert(trx_id() != uint64_t(-1) || is_toi());
@@ -610,6 +614,20 @@ namespace galera
         }
         bool cert_bypass() const { return cert_bypass_; }
 
+        bool explicit_rollback() const
+        {
+            bool const ret(flags() == EXPLICIT_ROLLBACK_FLAGS);
+            assert(ret == explicit_rollback_);
+            return ret;
+        }
+
+        void mark_queued()
+        {
+            assert(!queued_);
+            queued_ = true;
+        }
+        bool queued() const { return queued_; }
+
     protected:
 
         TrxHandleSlave(bool local, gu::MemPool<true>& mp, void* buf) :
@@ -626,7 +644,11 @@ namespace galera
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
-            cert_bypass_       (false)
+            cert_bypass_       (false),
+            queued_            (false)
+#ifndef NDEBUG
+            ,explicit_rollback_(false)
+#endif
         {}
 
         friend class TrxHandleMaster;
@@ -649,11 +671,18 @@ namespace galera
         bool                   committed_;
         bool                   exit_loop_;
         bool                   cert_bypass_;
+        bool                   queued_;
+#ifndef NDEBUG
+        bool                   explicit_rollback_;
+#endif /* NDEBUG */
 
         TrxHandleSlave(const TrxHandleSlave&);
         void operator=(const TrxHandleSlave& other);
 
-        ~TrxHandleSlave() { }
+        ~TrxHandleSlave()
+        {
+            if (explicit_rollback_) assert (flags() == EXPLICIT_ROLLBACK_FLAGS);
+        }
 
         void destroy_local(void* ptr);
 

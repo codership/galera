@@ -410,7 +410,7 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     meta.stid.node  = repl->source_id();
     meta.stid.trx   = trx_id;
 
-    trx->set_flags(TrxHandle::F_ROLLBACK | TrxHandle::F_PA_UNSAFE);
+    trx->set_flags(TrxHandle::EXPLICIT_ROLLBACK_FLAGS);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
 
@@ -569,7 +569,8 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
         assert(retval == WSREP_OK ||       // success
                retval == WSREP_TRX_FAIL || // cert failure
                retval == WSREP_BF_ABORT || // BF abort
-               retval == WSREP_CONN_FAIL); // not in joined/synced state
+               retval == WSREP_CONN_FAIL|| // not in joined/synced state
+               retval == WSREP_NODE_FAIL); // node inconsistent
     }
     catch (gu::Exception& e)
     {

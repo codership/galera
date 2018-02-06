@@ -182,7 +182,8 @@ namespace galera
         // Enter apply monitor without waiting
         void apply_monitor_enter_immediately(const TrxHandleSlave& ts)
         {
-            assert(!ts.pa_unsafe());
+            assert(!ts.explicit_rollback());
+            assert(ts.state() == TrxHandle::S_ABORTING);
             ApplyOrder ao(ts.global_seqno(), 0, ts.local());
             gu_trace(apply_monitor_.enter(ao));
         }
@@ -859,6 +860,7 @@ namespace galera
                 assert(ts->local());
                 gu::Lock lock(mutex_);
                 ts_queue_.push(ts);
+                ts->mark_queued();
             }
 
             TrxHandleSlavePtr must_cert_next(wsrep_seqno_t seqno)

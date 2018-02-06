@@ -38,6 +38,8 @@ galera::ReplicatorSMM::capabilities(int protocol_version)
 
     static uint64_t const v9_caps(WSREP_CAP_NBO);
 
+    if (protocol_version == -1) return 0;
+
     assert(protocol_version >= 4);
 
     uint64_t caps(v4_caps);
@@ -425,7 +427,8 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
             gcs_act_cchange const cc;
             wsrep_uuid_t tmp(uuid_);
             wsrep_view_info_t* const err_view
-                (galera_view_info_create(cc, 0, -1, tmp));
+                (galera_view_info_create(cc, capabilities(cc.repl_proto_ver),
+                                         -1, tmp));
             view_cb_(app_ctx_, recv_ctx, err_view, 0, 0);
             free(err_view);
 
@@ -1495,6 +1498,7 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
     assert(ts.local_seqno() > 0 && ts.global_seqno() > 0);
     assert(ts.state() == TrxHandle::S_COMMITTED);
     assert(trx.state() == TrxHandle::S_COMMITTED);
+    assert(!ts.is_committed());
 
     wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
 
@@ -1566,7 +1570,11 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
 
             assert(commit_monitor_.last_left() >= ts.global_seqno());
 
-            wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
+            /* Queued transactions will be set committed in the queue */
+            wsrep_seqno_t const safe_to_discard
+                (ts.queued() ?
+                 WSREP_SEQNO_UNDEFINED : cert_.set_trx_committed(ts));
+
             apply_monitor_.leave(ao);
             report_last_committed(safe_to_discard);
         }
@@ -3024,6 +3032,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
 
             log_debug << "trx in pending cert queue certified, result: "
                       << result;
+
+            cert_.set_trx_committed(*aborted_ts);
         }
 
         switch (cert_.append_trx(ts))
