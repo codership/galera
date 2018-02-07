@@ -726,13 +726,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
         gcache_.seqno_assign(ts->action().first, ts->global_seqno(),
                              GCS_ACT_WRITESET, false);
 
-        pending_cert_queue_.push(ts);
-        cancel_monitors_for_local(*ts);
-
         TX_SET_STATE(trx, TrxHandle::S_MUST_ABORT);
         TX_SET_STATE(trx, TrxHandle::S_ABORTING);
         // to pass asserts in post_rollback
         TX_SET_STATE(*ts, TrxHandle::S_ABORTING);
+
+        pending_cert_queue_.push(ts);
+        cancel_monitors_for_local(*ts);
 
         goto out;
     }
@@ -743,11 +743,11 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
 
         if (retval != WSREP_BF_ABORT)
         {
-            pending_cert_queue_.push(ts);
-            cancel_monitors_for_local(*ts);
-
             assert(trx.state() == TrxHandle::S_MUST_ABORT);
             TX_SET_STATE(trx, TrxHandle::S_ABORTING);
+
+            pending_cert_queue_.push(ts);
+            cancel_monitors_for_local(*ts);
 
             assert(ts->is_dummy());
             assert(WSREP_OK != retval);
@@ -761,11 +761,11 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
             }
             else
             {
-                pending_cert_queue_.push(ts);
-                cancel_monitors_for_local(*ts);
-
                 TX_SET_STATE(*ts, TrxHandle::S_ABORTING);
                 TX_SET_STATE(trx, TrxHandle::S_ABORTING);
+
+                pending_cert_queue_.push(ts);
+                cancel_monitors_for_local(*ts);
 
                 retval = WSREP_TRX_FAIL;
             }
@@ -1027,6 +1027,9 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
         }
         else
         {
+            TX_SET_STATE(*ts, TrxHandle::S_ABORTING);
+            TX_SET_STATE(trx, TrxHandle::S_ABORTING);
+
             if (interrupted == true)
             {
                 assert(!apply_monitor_.entered(ao));
@@ -1036,9 +1039,6 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
             {
                 assert(apply_monitor_.entered(ao));
             }
-
-            TX_SET_STATE(*ts, TrxHandle::S_ABORTING);
-            TX_SET_STATE(trx, TrxHandle::S_ABORTING);
         }
         retval = WSREP_BF_ABORT;
     }
