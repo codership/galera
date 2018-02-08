@@ -25,7 +25,7 @@ const std::string galera::ReplicatorSMM::Param::key_format =
 const std::string galera::ReplicatorSMM::Param::max_write_set_size =
     common_prefix + "max_ws_size";
 
-int const galera::ReplicatorSMM::MAX_PROTO_VER(8);
+int const galera::ReplicatorSMM::MAX_PROTO_VER(9);
 
 galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {

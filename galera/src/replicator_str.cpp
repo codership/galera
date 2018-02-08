@@ -1082,7 +1082,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
                     // This is the same as in  process_trx()
                     if (ts.ends_nbo() == WSREP_SEQNO_UNDEFINED)
                     {
-                        cancel_monitors<false>(ts);
                         assert(ts.is_dummy());
                     }
                     else
@@ -1100,7 +1099,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             {
                 assert(ts.nbo_end()); // non-effective nbo_end
                 assert(ts.is_dummy());
-                cancel_monitors<false>(ts);
                 break;
             }
             }
@@ -1153,9 +1151,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
         {
             ts.set_state(TrxHandle::S_CERTIFYING);
         }
-
-        if (gu_unlikely(ts.skip_event() && must_apply))
-            cancel_monitors<false>(ts);
     }
 
     if (gu_likely(must_apply == true))
@@ -1185,7 +1180,8 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
 
         wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
         wsrep_view_info_t* const view_info(
-            galera_view_info_create(conf, -1, uuid_undefined));
+            galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
+                                    -1, uuid_undefined));
         cert_.adjust_position(*view_info, gu::GTID(conf.uuid, act.seqno_g),
                               trx_params_.version_);
         free(view_info);

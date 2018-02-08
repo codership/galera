@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -83,32 +83,28 @@ START_TEST(test_states_master)
     // ABORTING 2
     // REPLICATING 3
     // CERTIFYING 4
-    // MUST_CERT_AND_REPLAY 5
-    // MUST_REPLAY_AM 6
-    // MUST_REPLAY_CM 7
-    // MUST_REPLAY  8
-    // REPLAYING 9
-    // APPLYING 10
-    // COMMITTING 11
-    // COMMITTED 12
-    // ROLLED_BACK 13
+    // MUST_REPLAY  5
+    // REPLAYING 6
+    // APPLYING 7
+    // COMMITTING 8
+    // ROLLING_BACK 9
+    // COMMITTED 10
+    // ROLLED_BACK 11
 
     int state_trans_master[TrxHandle::num_states_][TrxHandle::num_states_] = {
-        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13
-        {  0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 0
-        {  0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 }, // 1
-        {  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 2
-        {  0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3
-        {  0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4
-        {  0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 5
-        {  0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 }, // 6
-        {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 }, // 7
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 8
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 9
-        {  0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10
-        {  1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 11
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13
+        // 0  1  2  3  4  5  6  7  8  9  10 11  To / From
+        {  0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 }, // 0
+        {  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1
+        {  1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1 }, // 2
+        {  0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 3
+        {  0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 4
+        {  0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0 }, // 5
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 6
+        {  0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 7
+        {  0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 8
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 9
+        {  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 10
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 11
     };
 
     // Visits all states
@@ -125,21 +121,19 @@ START_TEST(test_states_slave)
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "test_states_slave");
     int state_trans_slave[TrxHandle::num_states_][TrxHandle::num_states_] = {
 
-        // 0  1  2  3  4  5  6  7  8  9  10 11 12 13  To / From
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0    EXECUTING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1    MUST_ABORT
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1 }, // 2    ABORTING
-        {  0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 3    REPLICATING
-        {  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 4    CERTIFYING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5    MUST_CERT_AND_REPL
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6    MUST_REPLAY_AM
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 7    MUST_REPLAY_CM
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 8    MUST_REPLAY
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9    REPLAYING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 10   APPLYING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 }, // 11   COMMITTNG
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 12   COMMITTED
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 13   ROLLED_BACK
+        // 0  1  2  3  4  5  6  7  8  9  10 11  To / From
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0  EXECUTING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1  MUST_ABORT
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 2  ABORTING
+        {  0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 3  REPLICATING
+        {  0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 4  CERTIFYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5  MUST_REPLAY
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6  REPLAYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 7  APPLYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 }, // 8  COMMITTNG
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 9  ROLLING_BACK
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 10 COMMITTED
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 11 ROLLED_BACK
     };
 
     TrxHandleSlavePtr ts(TrxHandleSlave::New(false, sp),
@@ -150,12 +144,13 @@ START_TEST(test_states_slave)
     // ROLLED_BACK
     std::vector<int> visits(TrxHandle::num_states_);
     std::fill(visits.begin(), visits.end(), 0);
+    visits[TrxHandle::S_ABORTING] = 1;
     visits[TrxHandle::S_REPLICATING] = 1;
     visits[TrxHandle::S_CERTIFYING] = 1;
     visits[TrxHandle::S_APPLYING] = 1;
     visits[TrxHandle::S_COMMITTING] = 1;
     visits[TrxHandle::S_COMMITTED] = 1;
-    visits[TrxHandle::S_ABORTING] = 1;
+    visits[TrxHandle::S_ROLLING_BACK] = 1;
     visits[TrxHandle::S_ROLLED_BACK] = 1;
 
     check_states_graph(state_trans_slave, ts.get(), visits);
@@ -192,14 +187,14 @@ START_TEST(test_serialization)
 }
 END_TEST
 
-static int
+static enum wsrep_cb_status
 apply_cb(
     void*                   ctx,
+    const wsrep_ws_handle_t* wh,
     uint32_t                flags,
     const wsrep_buf_t*      data,
     const wsrep_trx_meta_t* meta,
-    void**                  err_buf,
-    size_t*                 err_len
+    wsrep_bool_t*           exit_loop
     )
 {
     std::vector<char>* const res(static_cast<std::vector<char>* >(ctx));
@@ -211,10 +206,7 @@ apply_cb(
 
     res->push_back(*c);
 
-    *err_buf = NULL;
-    *err_len = 0;
-
-    return 0;
+    return WSREP_CB_SUCCESS;
 }
 
 START_TEST(test_streaming)
@@ -260,7 +252,8 @@ START_TEST(test_streaming)
         fail_if(ts->flags() & TrxHandle::F_COMMIT);
         trx->add_replicated(ts);
 
-        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
+        wsrep_bool_t exit_loop;
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t(), exit_loop);
     }
 
     {
@@ -281,7 +274,9 @@ START_TEST(test_streaming)
         fail_if(ts->flags() & TrxHandle::F_BEGIN);
         fail_if(ts->flags() & TrxHandle::F_COMMIT);
         trx->add_replicated(ts);
-        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
+
+        wsrep_bool_t exit_loop;
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t(), exit_loop);
     }
 
     {
@@ -303,7 +298,9 @@ START_TEST(test_streaming)
         fail_if(ts->flags() & TrxHandle::F_BEGIN);
         fail_unless(ts->flags() & TrxHandle::F_COMMIT);
         trx->add_replicated(ts);
-        ts->apply(&res, apply_cb, wsrep_trx_meta_t());
+
+        wsrep_bool_t exit_loop;
+        ts->apply(&res, apply_cb, wsrep_trx_meta_t(), exit_loop);
     }
 
     fail_if(res != src);
