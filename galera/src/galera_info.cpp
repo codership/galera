@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2018 Codership Oy <info@codership.com>
 
 #include "galera_info.hpp"
 #include <galerautils.h>
@@ -13,7 +13,8 @@ view_info_size (int members)
 
 /* create view info out of configuration message */
 wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
-                                            bool                  st_required)
+                                            wsrep_cap_t const     capabilities,
+                                            bool        const     st_required)
 {
     wsrep_view_info_t* ret = static_cast<wsrep_view_info_t*>(
         malloc(view_info_size(conf ? conf->memb_num : 0)));
@@ -34,6 +35,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
             ret->view      = conf->conf_id;
             ret->status    = conf->conf_id != -1 ?
                 WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
+            ret->capabilities = capabilities;
             ret->my_idx    = conf->my_idx;
             ret->memb_num  = conf->memb_num;
             ret->proto_ver = conf->appl_proto_ver;

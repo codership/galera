@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_REPLICATOR_HPP
@@ -58,6 +58,7 @@ namespace galera
         virtual wsrep_status_t close() = 0;
         virtual wsrep_status_t async_recv(void* recv_ctx) = 0;
 
+        virtual wsrep_cap_t capabilities() const = 0;
         virtual int trx_proto_ver() const = 0;
         virtual int repl_proto_ver() const = 0;
 
@@ -71,14 +72,11 @@ namespace galera
 
         virtual wsrep_status_t replicate(TrxHandlePtr& trx,
                                          wsrep_trx_meta_t* meta) = 0;
-        virtual wsrep_status_t pre_commit(TrxHandlePtr& trx,
-                                          wsrep_trx_meta_t* meta) =0;
-        virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
-        virtual wsrep_status_t release_commit(TrxHandle* trx) = 0;
-        virtual wsrep_status_t release_rollback(TrxHandle* trx) = 0;
+        virtual wsrep_status_t certify(TrxHandlePtr& trx, wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t replay_trx(TrxHandlePtr& trx,
                                           void*         replay_ctx) = 0;
-        virtual void abort_trx(TrxHandle* trx) = 0;
+        virtual wsrep_status_t abort_trx(TrxHandle* trx,
+                                         wsrep_seqno_t, wsrep_seqno_t*) = 0;
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;
@@ -138,8 +136,6 @@ namespace galera
 
         virtual const wsrep_uuid_t& source_id() const = 0;
 
-        virtual void cancel_seqnos(wsrep_seqno_t seqno_l,
-                                   wsrep_seqno_t seqno_g) = 0;
         virtual bool corrupt() const = 0;
 
     protected:

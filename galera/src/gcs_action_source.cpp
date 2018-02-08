@@ -80,6 +80,7 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
         assert(act.seqno_l != GCS_SEQNO_ILL);
         GcsActionTrx const trx(trx_pool_, act);
         gu_trace(replicator_.process_trx(recv_ctx, trx.txp()));
+        assert(trx.txp()->owned());
         exit_loop = trx.txp()->exit_loop(); // this is the end of trx lifespan
         break;
     }

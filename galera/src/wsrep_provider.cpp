@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -65,30 +65,14 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 
 
 extern "C"
-uint64_t galera_capabilities(wsrep_t* gh)
+wsrep_cap_t galera_capabilities(wsrep_t* gh)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-    static uint64_t const v4_caps(WSREP_CAP_MULTI_MASTER         |
-                                  WSREP_CAP_CERTIFICATION        |
-                                  WSREP_CAP_PARALLEL_APPLYING    |
-                                  WSREP_CAP_TRX_REPLAY           |
-                                  WSREP_CAP_ISOLATION            |
-                                  WSREP_CAP_PAUSE                |
-                                  WSREP_CAP_CAUSAL_READS);
-
-    static uint64_t const v5_caps(WSREP_CAP_INCREMENTAL_WRITESET |
-                                  WSREP_CAP_UNORDERED            |
-                                  WSREP_CAP_PREORDERED);
-
-    uint64_t caps(v4_caps);
-
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    if (repl->repl_proto_ver() >= 5) caps |= v5_caps;
-
-    return caps;
+    return repl->capabilities();
 }
 
 
@@ -345,12 +329,16 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
 
 
 extern "C"
-wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
-                                       wsrep_seqno_t  bf_seqno,
-                                       wsrep_trx_id_t victim_trx)
+wsrep_status_t galera_abort_certification(wsrep_t*       gh,
+                                          wsrep_seqno_t  bf_seqno,
+                                          wsrep_trx_id_t victim_trx,
+                                          wsrep_seqno_t* victim_seqno)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
+    assert(victim_seqno != 0);
+
+    *victim_seqno = WSREP_SEQNO_UNDEFINED;
 
     REPL_CLASS *     repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     wsrep_status_t   retval;
@@ -358,18 +346,21 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 
     if (!trx)
     {
-        log_warn << "trx to abort "
-                 << victim_trx
-                 << " with bf seqno "
-                 << bf_seqno <<
-            " not found";
+        log_warn << "trx to abort " << victim_trx
+                 << " with bf seqno " << bf_seqno
+                 << " not found";
         return WSREP_OK;
     }
+    else
+    {
+        log_debug << "ABORTING trx " << victim_trx
+                  << " with bf seqno " << bf_seqno;
+    }
+
     try
     {
         TrxHandleLock lock(*trx);
-        repl->abort_trx(trx.get());
-        retval = WSREP_OK;
+        retval = repl->abort_trx(trx.get(), bf_seqno, victim_seqno);
     }
     catch (std::exception& e)
     {
@@ -460,11 +451,11 @@ wsrep_status_t galera_assign_read_view(wsrep_t*           const  gh,
 
 
 extern "C"
-wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
-                                 wsrep_conn_id_t    const conn_id,
-                                 wsrep_ws_handle_t* const trx_handle,
-                                 uint32_t           const flags,
-                                 wsrep_trx_meta_t*  const meta)
+wsrep_status_t galera_certify(wsrep_t*           const gh,
+                              wsrep_conn_id_t    const conn_id,
+                              wsrep_ws_handle_t* const trx_handle,
+                              uint32_t           const flags,
+                              wsrep_trx_meta_t*  const meta)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -534,10 +525,14 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
         if (retval == WSREP_OK)
         {
+            assert(trx->state() != TrxHandle::S_MUST_ABORT);
+
             if ((flags & WSREP_FLAG_ROLLBACK) == 0)
             {
                 assert(trx->last_seen_seqno() >= 0);
-                retval = repl->pre_commit(trx->get_shared_ptr(), meta);
+                retval = repl->certify(trx->get_shared_ptr(), meta);
+                assert(trx->state() != TrxHandle::S_MUST_ABORT ||
+                       retval != WSREP_OK);
                 if (meta) assert(meta->depends_on >= 0 || retval != WSREP_OK);
             }
         }
@@ -576,28 +571,47 @@ wsrep_status_t galera_pre_commit(wsrep_t*           const gh,
 
 
 extern "C"
-wsrep_status_t galera_post_rollback(wsrep_t*            gh,
-                                    wsrep_ws_handle_t*  ws_handle)
+wsrep_status_t galera_commit_order_enter(
+    wsrep_t*                 const gh,
+    const wsrep_ws_handle_t* const ws_handle
+    )
 {
-    assert(gh != 0);
-    assert(gh->ctx != 0);
+    assert(gh        != 0);
+    assert(gh->ctx   != 0);
+    assert(ws_handle != 0);
 
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, ws_handle, false));
-
+    REPL_CLASS * const repl(static_cast< REPL_CLASS * >(gh->ctx));
+    TrxHandle* const trx(static_cast<TrxHandle*>(ws_handle->opaque));
+    assert(NULL != trx);
     if (trx == 0)
     {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
-        assert(0);
-        return WSREP_OK;
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order enter";
+        return WSREP_TRX_MISSING;
     }
 
     wsrep_status_t retval;
 
     try
     {
-        TrxHandleLock lock(*trx);
-        retval = repl->post_rollback(trx);
+        if (trx->is_local() && trx->state() != TrxHandle::S_REPLAYING)
+        {
+            TrxHandleLock lock(*trx);
+
+            if (gu_unlikely(trx->state() == TrxHandle::S_MUST_ABORT))
+            {
+                trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+                return WSREP_BF_ABORT;
+            }
+
+            retval = repl->commit_order_enter_local(*trx);
+        }
+        else
+        {
+            /* IST writesets need not be locked */
+            assert(trx->owned() || trx->local_seqno() == WSREP_SEQNO_UNDEFINED);
+            retval = repl->commit_order_enter_remote(*trx);
+        }
     }
     catch (std::exception& e)
     {
@@ -610,7 +624,58 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    assert(WSREP_OK == retval);
+    return retval;
+}
+
+extern "C"
+wsrep_status_t galera_commit_order_leave(
+    wsrep_t*                 const gh,
+    const wsrep_ws_handle_t* const ws_handle,
+    const wsrep_buf_t*       const error
+    )
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    assert(ws_handle != 0);
+
+    REPL_CLASS * const repl(static_cast< REPL_CLASS * >(gh->ctx));
+    TrxHandle* const trx(static_cast<TrxHandle*>(ws_handle->opaque));
+    assert(NULL != trx);
+
+    if (trx == 0)
+    {
+        log_warn << "Trx " << ws_handle->trx_id
+                 << " not found for commit order leave";
+        return WSREP_TRX_MISSING;
+    }
+
+    wsrep_status_t retval;
+
+    try
+    {
+        if (trx->is_local() && trx->state() != TrxHandle::S_REPLAYING)
+        {
+            TrxHandleLock lock(*trx);
+            retval = repl->commit_order_leave(*trx, error);
+        }
+        else
+        {
+            /* IST writesets need not be locked */
+            assert(trx->owned() || trx->local_seqno() == WSREP_SEQNO_UNDEFINED);
+            retval = repl->commit_order_leave(*trx, error);
+        }
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+        retval = WSREP_NODE_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+
     return retval;
 }
 
@@ -627,27 +692,24 @@ wsrep_status_t galera_release(wsrep_t*            gh,
 
     if (trx == 0)
     {
-        log_debug << "trx " << ws_handle->trx_id << " not found";
+        log_debug << "trx " << ws_handle->trx_id
+                  << " not found for release";
         return WSREP_OK;
     }
 
     wsrep_status_t retval;
+    TrxHandle::State trx_state(TrxHandle::S_EXECUTING);
 
     try
     {
         TrxHandleLock lock(*trx);
 
-        /* S_EXECUTING:  BF'ed / rolled back in local state
-         * S_MUST_ABORT: BF'ed before replication
-         * S_ABORTING:   BF'ed after  replication */
-        bool const commit(TrxHandle::S_EXECUTING  != trx->state() &&
-                          TrxHandle::S_MUST_ABORT != trx->state() &&
-                          TrxHandle::S_ABORTING   != trx->state());
-
-        if (gu_likely(commit))
-            retval = repl->release_commit(trx);
+        if (gu_likely(trx->state() == TrxHandle::S_COMMITTED))
+            retval = repl->release_commit(*trx);
         else
-            retval = repl->release_rollback(trx);
+            retval = repl->release_rollback(*trx);
+
+        trx_state = trx->state();
     }
     catch (std::exception& e)
     {
@@ -660,7 +722,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         retval = WSREP_FATAL;
     }
 
-    switch(trx->state())
+    switch(trx_state)
     {
     case TrxHandle::S_COMMITTED:
     case TrxHandle::S_ROLLED_BACK:
@@ -1290,11 +1352,12 @@ static wsrep_t galera_str = {
     &galera_disconnect,
     &galera_recv,
     &galera_assign_read_view,
-    &galera_pre_commit,
-    &galera_post_rollback,
+    &galera_certify,
+    &galera_commit_order_enter,
+    &galera_commit_order_leave,
     &galera_release,
     &galera_replay_trx,
-    &galera_abort_pre_commit,
+    &galera_abort_certification,
     &galera_rollback,
     &galera_append_key,
     &galera_append_data,

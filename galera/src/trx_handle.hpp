@@ -124,10 +124,13 @@ namespace galera
             S_APPLYING,       // grabbing apply monitor, applying
             S_COMMITTING,     // grabbing commit monitor, committing changes
             S_COMMITTED,
+            S_ROLLING_BACK,
             S_ROLLED_BACK
         } State;
 
         static void print_state(std::ostream&, State);
+
+        void print_state_history(std::ostream&) const;
 
         class Transition
         {
@@ -243,6 +246,7 @@ namespace galera
                            wsrep_seqno_t seqno_l,
                            wsrep_seqno_t seqno_g)
         {
+            assert(WSREP_SEQNO_UNDEFINED == local_seqno_);
 #ifndef NDEBUG
             if (last_seen_seqno_ >= seqno_g)
             {
@@ -379,7 +383,8 @@ namespace galera
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
+                   const wsrep_trx_meta_t& meta,
+                   wsrep_bool_t&           exit_loop) /* throws */;
 
         void unordered(void*                recv_ctx,
                        wsrep_unordered_cb_t apply_cb) const;
