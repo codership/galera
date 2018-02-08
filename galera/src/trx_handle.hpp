@@ -50,6 +50,7 @@ namespace galera
         typename T::Fsm::TransMap& trans_map_;
     };
 
+
     class TrxHandle
     {
     public:
@@ -73,6 +74,7 @@ namespace galera
         };
 
         static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 7) - 1);
+        static const uint32_t EXPLICIT_ROLLBACK_FLAGS = F_PA_UNSAFE | F_ROLLBACK;
 
         static bool const FLAGS_MATCH_API_FLAGS =
                                  (WSREP_FLAG_TRX_END     == F_COMMIT       &&
@@ -110,13 +112,11 @@ namespace galera
             S_ABORTING,
             S_REPLICATING,
             S_CERTIFYING,
-            S_MUST_CERT_AND_REPLAY,
-            S_MUST_REPLAY_AM, // grab apply_monitor, commit_monitor, replay
-            S_MUST_REPLAY_CM, // commit_monitor, replay
             S_MUST_REPLAY,    // replay
             S_REPLAYING,
             S_APPLYING,   // grabbing apply monitor, applying
             S_COMMITTING, // grabbing commit monitor, committing changes
+            S_ROLLING_BACK,
             S_COMMITTED,
             S_ROLLED_BACK
         } State;
@@ -124,6 +124,8 @@ namespace galera
         static const int num_states_ = S_ROLLED_BACK + 1;
 
         static void print_state(std::ostream&, State);
+
+        void print_state_history(std::ostream&) const;
 
         class Transition
         {
@@ -178,6 +180,8 @@ namespace galera
 
         uint64_t timestamp() const { return timestamp_; }
 
+        bool master() const { return master_; }
+
         void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
@@ -190,9 +194,9 @@ namespace galera
 
     protected:
 
-        void  set_state(State state)
+        void  set_state(State const state, int const line)
         {
-            state_.shift_to(state);
+            state_.shift_to(state, line);
             if (state == S_EXECUTING) state_.reset_history();
         }
 
@@ -206,7 +210,8 @@ namespace galera
             timestamp_         (),
             version_           (-1),
             write_set_flags_   (0),
-            local_             (local)
+            local_             (local),
+            master_            (false)
         {}
 
         /* local trx ctor */
@@ -223,7 +228,8 @@ namespace galera
             timestamp_         (gu_time_calendar()),
             version_           (version),
             write_set_flags_   (F_BEGIN),
-            local_             (true)
+            local_             (true),
+            master_            (true)
         {}
 
         Fsm state_;
@@ -238,6 +244,7 @@ namespace galera
         // TrxHandleSlave if there exists TrxHandleMaster object corresponding
         // to TrxHandleSlave.
         bool                   local_;
+        bool                   master_; // derived object type
 
     private:
 
@@ -428,6 +435,9 @@ namespace galera
                         certified_ = true;
                     }
 
+                    explicit_rollback_ =
+                        (write_set_flags_ == EXPLICIT_ROLLBACK_FLAGS);
+
                     timestamp_ = write_set_.timestamp();
 
                     assert(trx_id() != uint64_t(-1) || is_toi());
@@ -501,14 +511,15 @@ namespace galera
             global_seqno_ = s;
         }
 
-        void set_state(TrxHandle::State const state)
+        void set_state(TrxHandle::State const state, int const line = -1)
         {
-            TrxHandle::set_state(state);
+            TrxHandle::set_state(state, line);
         }
 
         void apply(void*                   recv_ctx,
                    wsrep_apply_cb_t        apply_cb,
-                   const wsrep_trx_meta_t& meta) const /* throws */;
+                   const wsrep_trx_meta_t& meta,
+                   wsrep_bool_t&           exit_loop) /* throws */;
 
         bool is_committed() const { return committed_; }
         void mark_committed()     { committed_ = true; }
@@ -545,7 +556,7 @@ namespace galera
 
         size_t   size()         const { return write_set_.size(); }
 
-        void mark_dummy()
+        void mark_dummy(int const line = -2)
         {
             set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
@@ -553,9 +564,10 @@ namespace galera
             {
             case S_CERTIFYING:
             case S_REPLICATING:
-                set_state(S_ABORTING);
+                set_state(S_ABORTING, line);
                 break;
             case S_ABORTING:
+            case S_ROLLING_BACK:
             case S_ROLLED_BACK:
                 break;
             default:
@@ -566,6 +578,11 @@ namespace galera
         bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
 
+        bool is_streaming() const
+        {
+            return !((flags() & F_BEGIN) && (flags() & F_COMMIT));
+        }
+
         void cert_bypass(bool const val)
         {
             assert(true  == val);
@@ -573,6 +590,20 @@ namespace galera
             cert_bypass_ = val;
         }
         bool cert_bypass() const { return cert_bypass_; }
+
+        bool explicit_rollback() const
+        {
+            bool const ret(flags() == EXPLICIT_ROLLBACK_FLAGS);
+            assert(ret == explicit_rollback_);
+            return ret;
+        }
+
+        void mark_queued()
+        {
+            assert(!queued_);
+            queued_ = true;
+        }
+        bool queued() const { return queued_; }
 
     protected:
 
@@ -586,11 +617,14 @@ namespace galera
             write_set_         (),
             buf_               (buf),
             action_            (0, 0),
-            refcnt_            (1),
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
-            cert_bypass_       (false)
+            cert_bypass_       (false),
+            queued_            (false)
+#ifndef NDEBUG
+            ,explicit_rollback_(false)
+#endif
         {}
 
         friend class TrxHandleMaster;
@@ -608,16 +642,22 @@ namespace galera
         WriteSetIn             write_set_;
         void* const            buf_;
         std::pair<const void*, size_t> action_;
-        gu::Atomic<int>        refcnt_;
         bool                   certified_;
         bool                   committed_;
         bool                   exit_loop_;
         bool                   cert_bypass_;
+        bool                   queued_;
+#ifndef NDEBUG
+        bool                   explicit_rollback_;
+#endif /* NDEBUG */
 
         TrxHandleSlave(const TrxHandleSlave&);
         void operator=(const TrxHandleSlave& other);
 
-        ~TrxHandleSlave() { }
+        ~TrxHandleSlave()
+        {
+            if (explicit_rollback_) assert (flags() == EXPLICIT_ROLLBACK_FLAGS);
+        }
 
         void destroy_local(void* ptr);
 
@@ -714,11 +754,11 @@ namespace galera
             mutex_.unlock();
         }
 
-        void set_state(TrxHandle::State const s)
+        void set_state(TrxHandle::State const s, int const line = -1)
         {
             assert(locked());
             assert(owned());
-            TrxHandle::set_state(s);
+            TrxHandle::set_state(s, line);
         }
 
         long gcs_handle() const { return gcs_handle_; }
@@ -803,8 +843,7 @@ namespace galera
                             (flags() & TrxHandle::F_ISOLATION) == 0))
             {
                 /* make sure this fragment depends on the previous */
-                assert(ts_ != 0);
-                wsrep_seqno_t prev_seqno(ts_->global_seqno());
+                wsrep_seqno_t prev_seqno(last_ts_seqno_);
                 assert(version() >= 4);
                 assert(prev_seqno >= 0);
                 assert(prev_seqno <= last_seen_seqno);
@@ -843,6 +882,7 @@ namespace galera
                 write_set_flags_ &= ~TrxHandle::F_BEGIN;
             }
             ts_ = ts;
+            last_ts_seqno_ = ts_->global_seqno();
         }
 
         WriteSetOut& write_set_out()
@@ -922,7 +962,9 @@ namespace galera
             ts_                (),
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
-            wso_               (false)
+            wso_               (false),
+            last_ts_seqno_     (WSREP_SEQNO_UNDEFINED)
+
         {
             assert(reserved_size > sizeof(*this) + 1024);
         }
@@ -946,7 +988,9 @@ namespace galera
         size_t const           wso_buf_size_;
         int                    gcs_handle_;
         bool                   wso_;
+        wsrep_seqno_t          last_ts_seqno_;
 
+        friend class TrxHandle;
         friend class TrxHandleSlave;
         friend class TrxHandleMasterDeleter;
         friend class TransMapBuilder<TrxHandleMaster>;

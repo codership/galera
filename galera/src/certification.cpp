@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 //
 
 #include "certification.hpp"
@@ -588,7 +588,8 @@ galera::Certification::adjust_position(const View&         view,
 // this assert is too strong: local ordered transactions may get canceled without
 // entering certification    assert(position_ + 1 == seqno || 0 == position_);
 
-    log_info << "####### Adjusting cert position to " << gtid;
+    log_info << "####### Adjusting cert position: "
+             << position_ << " -> " << gtid.seqno();
 
     if (version != version_)
     {
@@ -623,7 +624,7 @@ galera::Certification::test(const TrxHandleSlavePtr& trx, bool store_keys)
 
     assert(TEST_FAILED == ret || trx->depends_seqno() >= 0);
 
-    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(); }
+    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(__LINE__); }
 
     return ret;
 }
@@ -676,6 +677,10 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 // explicit ROLLBACK is dummy()    assert(!trx->is_dummy());
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
+
+#ifndef NDEBUG
+    bool const explicit_rollback(trx->explicit_rollback());
+#endif /* NDEBUG */
 
     {
         gu::Lock lock(mutex_);
@@ -743,6 +748,15 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
     }
 
     if (!trx->certified()) trx->mark_certified();
+
+#ifndef NDEBUG
+    if (explicit_rollback)
+    {
+        assert(trx->explicit_rollback());
+        assert(retval == TEST_OK);
+        assert(trx->state() == TrxHandle::S_CERTIFYING);
+    }
+#endif /* NDEBUG */
 
     return retval;
 }

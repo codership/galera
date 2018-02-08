@@ -1074,9 +1074,6 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
         {
             ts.set_state(TrxHandle::S_CERTIFYING);
         }
-
-        if (gu_unlikely(ts.skip_event() && must_apply))
-            cancel_monitors<false>(ts);
     }
 
     if (gu_likely(must_apply == true))
@@ -1106,7 +1103,8 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
 
         wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
         wsrep_view_info_t* const view_info(
-            galera_view_info_create(conf, -1, uuid_undefined));
+            galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
+                                    -1, uuid_undefined));
         cert_.adjust_position(*view_info, gu::GTID(conf.uuid, act.seqno_g),
                               trx_params_.version_);
         free(view_info);

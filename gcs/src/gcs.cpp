@@ -51,7 +51,7 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
 {
     static const char* str[GCS_ACT_UNKNOWN + 1] =
     {
-        "TORDERED", "COMMIT_CUT", "STATE_REQUEST", "CONFIGURATION",
+        "WRITESET", "COMMIT_CUT", "STATE_REQUEST", "CONFIGURATION",
         "JOIN", "SYNC", "FLOW", "SERVICE", "ERROR", "UNKNOWN"
     };
 
@@ -1401,10 +1401,21 @@ static void *gcs_recv_thread (void *arg)
 //                    "action %p", rcvd.act.type, rcvd.act.buf_len,
 //                    this_act_id, rcvd.act.buf);
         }
+        else if (rcvd.id == -EAGAIN)
+        {
+            gu_fatal("Action {%p, %zd, %s} needs resending: "
+                     "sender idx %d, my idx %d",
+                     rcvd.act.buf, rcvd.act.buf_len,
+                     gcs_act_type_to_str(rcvd.act.type),
+                     rcvd.id, conn->my_idx);
+            assert (0);
+            ret = -ENOTRECOVERABLE;
+            break;
+        }
         else if (conn->my_idx == rcvd.sender_idx)
         {
             gu_debug("Discarding: unordered local action not in repl_q: "
-                     "{ {%p, %zd, %s}, %ld, %lld }.",
+                     "{ {%p, %zd, %s}, %d, %lld }.",
                      rcvd.act.buf, rcvd.act.buf_len,
                      gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
                      rcvd.id);
@@ -1412,7 +1423,7 @@ static void *gcs_recv_thread (void *arg)
         else
         {
             gu_fatal ("Protocol violation: unordered remote action: "
-                      "{ {%p, %zd, %s}, %ld, %lld }",
+                      "{ {%p, %zd, %s}, %d, %lld }",
                       rcvd.act.buf, rcvd.act.buf_len,
                       gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
                       rcvd.id);

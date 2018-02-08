@@ -111,8 +111,7 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
      * but by the time inconsistency is detected an arbitrary number of
      * transactions may be already committed, so no reason to try that hard
      * in a critical section */
-    bool const skip(replicator_.corrupt()       &&
-                    GCS_ACT_CCHANGE != act.type);
+    bool const skip(replicator_.corrupt() && GCS_ACT_CCHANGE != act.type);
 
     if (gu_likely(rc > 0 && !skip))
     {

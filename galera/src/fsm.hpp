@@ -45,13 +45,17 @@ namespace galera
             std::list<Action> pre_action_;
             std::list<Action> post_action_;
         };
-        typedef gu::UnorderedMap<Transition, TransAttr, typename Transition::Hash> TransMap;
+
+        typedef gu::UnorderedMap<Transition, TransAttr,
+                                 typename Transition::Hash> TransMap;
+
+        typedef std::pair<State, int> StateEntry;
 
         FSM(State const initial_state)
             :
             delete_(true),
             trans_map_(new TransMap),
-            state_(initial_state),
+            state_(initial_state, 0),
             state_hist_()
         { }
 
@@ -59,7 +63,7 @@ namespace galera
             :
             delete_(false),
             trans_map_(trans_map),
-            state_(initial_state),
+            state_(initial_state, 0),
             state_hist_()
         { }
 
@@ -68,14 +72,14 @@ namespace galera
             if (delete_ == true) delete trans_map_;
         }
 
-        void shift_to(State const state)
+        void shift_to(State const state, int const line = -1)
         {
             typename TransMap::iterator
-                i(trans_map_->find(Transition(state_, state)));
+                i(trans_map_->find(Transition(state_.first, state)));
             if (i == trans_map_->end())
             {
                 log_fatal << "FSM: no such a transition "
-                          << state_ << " -> " << state;
+                          << state_.first << " -> " << state;
 //                gu_throw_fatal << "FSM: no such a transition "
 //                               << state_ << " -> " << state;
                 abort(); // we want to catch it in the stack
@@ -88,9 +92,9 @@ namespace galera
                 if ((*gi)() == false)
                 {
                     log_fatal << "FSM: pre guard failed for "
-                              << state_ << " -> " << state;
+                              << state_.first << " -> " << state;
                     gu_throw_fatal << "FSM: pre guard failed for "
-                                   << state_ << " -> " << state;
+                                   << state_.first << " -> " << state;
                 }
             }
 
@@ -101,8 +105,9 @@ namespace galera
                 (*ai)();
             }
 
+            StateEntry const se(state, line);
             state_hist_.push_back(state_);
-            state_ = state;
+            state_ = se;
 
             for (ai = i->second.post_action_.begin();
                  ai != i->second.post_action_.end(); ++ai)
@@ -116,16 +121,16 @@ namespace galera
                 if ((*gi)() == false)
                 {
                     log_fatal << "FSM: post guard failed for "
-                              << state_ << " -> " << state;
+                              << state_.first << " -> " << state;
                     gu_throw_fatal << "FSM: post guard failed for "
-                                   << state_ << " -> " << state;
+                                   << state_.first << " -> " << state;
                 }
             }
         }
 
         void force(State const state)
         {
-            state_ = state;
+            state_ = StateEntry(state, 0);
         }
 
         void reset_history()
@@ -133,7 +138,8 @@ namespace galera
             state_hist_.clear();
         }
 
-        const State& operator()() const { return state_; }
+        const State& operator()() const { return state_.first; }
+        const StateEntry& get_state_entry() const { return state_; }
 
         void add_transition(Transition const& trans)
         {
@@ -190,6 +196,8 @@ namespace galera
             i->second.post_action_.push_back(action);
         }
 
+        const std::vector<StateEntry>& history() const { return state_hist_; }
+
     private:
 
         FSM(const FSM&);
@@ -197,8 +205,9 @@ namespace galera
 
         bool delete_;
         TransMap* const trans_map_;
-        State state_;
-        std::vector<State> state_hist_;
+
+        StateEntry state_;
+        std::vector<StateEntry> state_hist_;
     };
 
 }
