@@ -630,7 +630,9 @@ namespace galera
                 mode_         (OOOC),
                 is_local_     (false),
                 trx_          (NULL)
-            {}
+            {
+                (void)trx_; // to pacify clang's -Wunused-private-field
+            }
 #endif /* NDEBUG */
 
             void print(std::ostream& os) const

@@ -454,10 +454,10 @@ namespace galera
                         assert(depends_seqno_ < global_seqno_);
                         certified_ = true;
                     }
-
+#ifndef NDEBUG
                     explicit_rollback_ =
                         (write_set_flags_ == EXPLICIT_ROLLBACK_FLAGS);
-
+#endif /* NDEBUG */
                     timestamp_ = write_set_.timestamp();
 
                     assert(trx_id() != uint64_t(-1) || is_toi());
@@ -648,7 +648,7 @@ namespace galera
             queued_            (false)
 #ifndef NDEBUG
             ,explicit_rollback_(false)
-#endif
+#endif /* NDEBUG */
         {}
 
         friend class TrxHandleMaster;
@@ -681,7 +681,9 @@ namespace galera
 
         ~TrxHandleSlave()
         {
+#ifndef NDEBUG
             if (explicit_rollback_) assert (flags() == EXPLICIT_ROLLBACK_FLAGS);
+#endif /* NDEBUG */
         }
 
         void destroy_local(void* ptr);
