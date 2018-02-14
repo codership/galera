@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2017 Codership Oy <info@codership.com>
 
 /**
  * @file CPU architecture related functions/macros
@@ -55,11 +55,26 @@
 # define GU_WORDSIZE __WORDSIZE
 #endif
 
-#if (GU_WORDSIZE != 32) && (GU_WORDSIZE != 64)
+#include <stdint.h>
+#if (GU_WORDSIZE == 32)
+typedef uint32_t gu_word_t;
+#elif (GU_WORDSIZE == 64)
+typedef uint64_t gu_word_t;
+#else
 # error "Unsupported wordsize"
 #endif
 
-/* I'm not aware of the platforms that don't, but still */
-#define GU_ALLOW_UNALIGNED_READS 1
+#define GU_WORD_BYTES sizeof(gu_word_t)
+
+#include <assert.h>
+#ifdef __cpluplus // to avoid "old-style cast" in C++ make it temp instantiation
+#define GU_ASSERT_ALIGNMENT(x)                              \
+    assert((uintptr_t(&(x)) % sizeof(x))     == 0 ||        \
+           (uintptr_t(&(x)) % GU_WORD_BYTES) == 0)
+#else // ! __cplusplus
+#define GU_ASSERT_ALIGNMENT(x)                              \
+    assert(((uintptr_t)(&(x)) % sizeof(x))     == 0 ||      \
+           ((uintptr_t)(&(x)) % GU_WORD_BYTES) == 0)
+#endif // !__cplusplus
 
 #endif /* _gu_arch_h_ */

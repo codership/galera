@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_ASIO_UDP_HPP
@@ -7,18 +7,19 @@
 
 #include "socket.hpp"
 #include "asio_protonet.hpp"
-#include <boost/enable_shared_from_this.hpp>
+#include "gu_shared_ptr.hpp"
 #include <vector>
 
 //
 // Boost enable_shared_from_this<> does not have virtual destructor,
-// therefore need to ignore -Weffc++
+// therefore need to ignore -Weffc++ and -Wnon-virtual-dtor
 //
 #if defined(__GNUG__)
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 #  pragma GCC diagnostic push
 # endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
 # pragma GCC diagnostic ignored "-Weffc++"
+# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #endif
 
 namespace gcomm
@@ -29,7 +30,7 @@ namespace gcomm
 
 class gcomm::AsioUdpSocket :
     public gcomm::Socket,
-    public boost::enable_shared_from_this<AsioUdpSocket>
+    public gu::enable_shared_from_this<AsioUdpSocket>::type
 {
 public:
     AsioUdpSocket(AsioProtonet& net, const gu::URI& uri);

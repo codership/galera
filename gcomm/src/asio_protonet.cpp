@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
  */
 
 
@@ -13,10 +13,9 @@
 #include "gcomm/conf.hpp"
 
 #include "gu_logger.hpp"
+#include "gu_shared_ptr.hpp"
 
 #include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 
 #include <fstream>
 
@@ -28,16 +27,13 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     poll_until_(gu::datetime::Date::max()),
     io_service_(),
     timer_(io_service_),
-#ifdef HAVE_ASIO_SSL_HPP
     ssl_context_(io_service_, asio::ssl::context::sslv23),
-#endif // HAVE_ASIO_SSL_HPP
     mtu_(1 << 15),
     checksum_(NetHeader::checksum_type(
                   conf.get<int>(gcomm::Conf::SocketChecksum,
                                 NetHeader::CS_CRC32C)))
 {
     conf.set(gcomm::Conf::SocketChecksum, checksum_);
-#ifdef HAVE_ASIO_SSL_HPP
     // use ssl if either private key or cert file is specified
     bool use_ssl(conf_.is_set(gu::conf::ssl_key)  == true ||
                  conf_.is_set(gu::conf::ssl_cert) == true);
@@ -54,7 +50,6 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
         log_info << "initializing ssl context";
         gu::ssl_prepare_context(conf_, ssl_context_);
     }
-#endif // HAVE_ASIO_SSL_HPP
 }
 
 gcomm::AsioProtonet::~AsioProtonet()
@@ -78,11 +73,11 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
 {
     if (uri.get_scheme() == "tcp" || uri.get_scheme() == "ssl")
     {
-        return boost::shared_ptr<AsioTcpSocket>(new AsioTcpSocket(*this, uri));
+        return gu::shared_ptr<AsioTcpSocket>::type(new AsioTcpSocket(*this, uri));
     }
     else if (uri.get_scheme() == "udp")
     {
-        return boost::shared_ptr<AsioUdpSocket>(new AsioUdpSocket(*this, uri));
+        return gu::shared_ptr<AsioUdpSocket>::type(new AsioUdpSocket(*this, uri));
     }
     else
     {

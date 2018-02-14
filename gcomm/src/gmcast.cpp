@@ -339,7 +339,7 @@ void gcomm::GMCast::close(bool force)
 {
     log_debug << "gmcast " << uuid() << " close";
     pstack_.pop_proto(this);
-    if (mcast_ != 0)
+    if (mcast_)
     {
         mcast_->close();
         // delete mcast;
@@ -905,7 +905,7 @@ void gcomm::GMCast::update_addresses()
 
     Segment& local_segment(segment_map_[segment_]);
 
-    if (mcast_ != 0)
+    if (mcast_)
     {
         log_debug << mcast_addr_;
         local_segment.push_back(mcast_.get());
@@ -1296,7 +1296,7 @@ void gcomm::GMCast::handle_up(const void*        id,
     {
         gmcast_accept();
     }
-    else if (mcast_.get() != 0 && id == mcast_->id())
+    else if (mcast_ && id == mcast_->id())
     {
         Message msg;
 

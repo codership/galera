@@ -118,6 +118,11 @@ namespace gcache
         static size_t const PREAMBLE_LEN = 1024;
         static size_t const HEADER_LEN = 32;
 
+        // 0 - undetermined version
+        // 1 - initial version, no buffer alignment
+        // 2 - buffer alignemnt to GU_WORD_BYTES
+        static int    const VERSION = 2;
+
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
         char*        const preamble_; // ASCII text preamble
@@ -155,8 +160,8 @@ namespace gcache
         void          close_preamble();
 
         // returns lower bound (not inclusive) of valid seqno range
-        int64_t       scan(off_t offset);
-        void          recover(off_t offset);
+        int64_t       scan(off_t offset, int scan_step);
+        void          recover(off_t offset, int version);
 
         void          estimate_space();
 

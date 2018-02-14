@@ -272,14 +272,22 @@ namespace gcomm
 
         ~DummyNode()
         {
-            std::list<Protolay*>::iterator i, i_next;
-            i = i_next = protos_.begin();
-            for (++i_next; i_next != protos_.end(); ++i, ++i_next)
+            try
             {
-                gu_trace(gcomm::disconnect(*i, *i_next));
+                std::list<Protolay*>::iterator i, i_next;
+                i = i_next = protos_.begin();
+                for (++i_next; i_next != protos_.end(); ++i, ++i_next)
+                {
+                    gu_trace(gcomm::disconnect(*i, *i_next));
+                }
+                gu_trace(gcomm::disconnect(*i, this));
+                std::for_each(protos_.begin(), protos_.end(), gu::DeleteObject());
             }
-            gu_trace(gcomm::disconnect(*i, this));
-            std::for_each(protos_.begin(), protos_.end(), gu::DeleteObject());
+            catch(std::exception& e)
+            {
+                log_fatal << e.what();
+                abort();
+            }
         }
 
 

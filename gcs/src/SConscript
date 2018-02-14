@@ -24,9 +24,9 @@ libgcs_env.Replace(CCFLAGS = libgcs_env['CCFLAGS'].replace('-pedantic', ''))
 libgcs_env.Append(CCFLAGS = ' -Wno-missing-field-initializers')
 libgcs_env.Append(CCFLAGS = ' -Wno-variadic-macros')
 
-print 'gcs flags:'
+print('gcs flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
-    print f + ': ' + libgcs_env[f].strip()
+    print(f + ': ' + libgcs_env[f].strip())
 
 gcs4garb_env = libgcs_env.Clone()
 

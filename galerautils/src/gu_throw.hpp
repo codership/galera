@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -17,7 +17,7 @@
 #include <cstring>
 #include <sstream>
 
-#include "gu_macros.h"
+#include "gu_macros.hpp"
 #include "gu_exception.hpp"
 
 namespace gu
@@ -49,7 +49,7 @@ namespace gu
         friend class ThrowFatal;
     };
 
-    /* final*/ class ThrowError //: public ThrowBase
+    /* final */ class ThrowError
     {
     public:
 
@@ -62,7 +62,7 @@ namespace gu
             err  (err_)
         {}
 
-        ~ThrowError() GU_NORETURN
+        ~ThrowError() GU_NOEXCEPT(false) GU_NORETURN
         {
             base.os << ": " << err << " (" << ::strerror(err) << ')';
 
@@ -81,7 +81,7 @@ namespace gu
         int const err;
     };
 
-    /* final*/ class ThrowFatal
+    /* final */ class ThrowFatal
     {
     public:
 
@@ -90,7 +90,7 @@ namespace gu
             base (file, func, line)
         {}
 
-        ~ThrowFatal () GU_NORETURN
+        ~ThrowFatal () GU_NOEXCEPT(false) GU_NORETURN
         {
             base.os << " (FATAL)";
 

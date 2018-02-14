@@ -5,11 +5,14 @@
 
 #undef NDEBUG
 
+#include "gu_serialize.hpp"
 #include "../src/gu_rset.hpp"
 
 #include "gu_rset_test.hpp"
 #include "gu_logger.hpp"
 #include "gu_hexdump.hpp"
+
+#include "gu_macros.h"
 
 class TestBaseName : public gu::Allocator::BaseName
 {
@@ -28,14 +31,14 @@ public:
     TestRecord (size_t size, const char* str) :
         Serializable(),
         size_(size),
-        buf_(reinterpret_cast<gu::byte_t*>(::malloc(size_))),
+        buf_(static_cast<gu::byte_t*>(::malloc(size_))),
         str_(reinterpret_cast<const char*>(buf_ + sizeof(uint32_t))),
         own_(true)
     {
         fail_if (size_ > 0x7fffffff);
         if (0 == buf_) throw std::runtime_error("failed to allocate record");
         gu::byte_t* tmp = const_cast<gu::byte_t*>(buf_);
-        *reinterpret_cast<uint32_t*>(tmp) = htog32(size_);
+        gu::serialize4(uint32_t(size_), tmp, 0);
         ::strncpy (const_cast<char*>(str_), str, size_ - 4);
     }
 
@@ -61,7 +64,9 @@ public:
     static ssize_t serial_size(const gu::byte_t* const buf, ssize_t const size)
     {
         check_buf (buf, size, 1);
-        return gtoh32 (*reinterpret_cast<const uint32_t*>(buf));
+        uint32_t ret;
+        gu::unserialize4(buf, 0, ret);
+        return ret;
     }
 
     bool operator!= (const TestRecord& t) const
@@ -103,9 +108,28 @@ private:
     TestRecord& operator= (const TestRecord&);
 };
 
-
-START_TEST (ver0)
+START_TEST (empty)
 {
+    gu::RecordSetIn<TestRecord> const rset_in(0, 0);
+
+    fail_if (0 != rset_in.size());
+    fail_if (0 != rset_in.count());
+
+    try {
+        rset_in.checksum();
+    }
+    catch (std::exception& e)
+    {
+        fail("%s", e.what());
+    }
+}
+END_TEST
+
+static void
+test_version (gu::RecordSet::Version version)
+{
+    int const alignment(gu::RecordSet::VER2 == version ?
+                        gu::RecordSet::VER2_ALIGNMENT : 1);
     size_t const MB = 1 << 20;
 
     // the choice of sizes below is based on default allocator memory store size
@@ -127,11 +151,14 @@ START_TEST (ver0)
     records.push_back (&rout4);
     records.push_back (&rout5);
 
-    gu::byte_t reserved[1024];
-    TestBaseName str("gu_rset_test");
-    gu::RecordSetOut<TestRecord> rset_out(reserved, sizeof(reserved), str,
-                                          gu::RecordSet::CHECK_MMH64,
-                                          gu::RecordSet::VER1);
+    // ensure alignment to 8
+    union { gu_word_t align; gu::byte_t buf[1024]; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_WORD_BYTES) == 0);
+    std::ostringstream os;
+    os << "gu_rset_test_ver" << version;
+    TestBaseName str(os.str().c_str());
+    gu::RecordSetOut<TestRecord> rset_out(reserved.buf, sizeof(reserved), str,
+                                          gu::RecordSet::CHECK_MMH64, version);
 
     size_t offset(rset_out.size());
     fail_if (1 != rset_out.page_count());
@@ -160,7 +187,10 @@ START_TEST (ver0)
     offset += rsize;
     fail_if (rset_out.size() != offset);
 
-    fail_if (2 != rset_out.page_count());
+    if (0 == (offset % alignment)) // aligment page may be required
+        fail_if (2 != rset_out.page_count());
+    else
+        fail_if (3 != rset_out.page_count());
 
     // this should trigger new page since previous one was not stored
     rp = rset_out.append (rout2);
@@ -172,8 +202,12 @@ START_TEST (ver0)
     offset += rsize;
     fail_if (rset_out.size() != offset);
 
-    fail_if (3 != rset_out.page_count(),
-             "Expected %d pages, found %zu", 3, rset_out.page_count());
+    if (0 == (offset % alignment)) // aligment page may be required
+        fail_if (3 != rset_out.page_count(),
+                 "Expected %d pages, found %zu", 3, rset_out.page_count());
+    else
+        fail_if (4 != rset_out.page_count(),
+                 "Expected %d pages, found %zu", 4, rset_out.page_count());
 
     //***** test partial record appending *****//
     // this should be allocated inside the current page.
@@ -181,7 +215,7 @@ START_TEST (ver0)
 //    rout_ptrs[2] = rp.first;
     rsize = rp.second;
     offset += rp.second;
-    fail_if (3 != rset_out.page_count());
+    fail_if ((3 + (0 != (offset % alignment))) != rset_out.page_count());
 
     // this should trigger a new page, since not stored
     rp = rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false,
@@ -192,7 +226,7 @@ START_TEST (ver0)
     offset += rp.second;
     fail_if (rset_out.size() != offset);
 
-    fail_if (4 != rset_out.page_count());
+    fail_if ((4 + (0 != (offset % alignment))) != rset_out.page_count());
 
     // this should trigger new page, because won't fit in the current page
     rp = rset_out.append (rout4);
@@ -202,7 +236,7 @@ START_TEST (ver0)
     offset += rsize;
     fail_if (rset_out.size() != offset);
 
-    fail_if (5 != rset_out.page_count());
+    fail_if ((5 + (0 != (offset % alignment))) != rset_out.page_count());
 
     // this should trigger new page, because 4MB RAM limit exceeded
     rp = rset_out.append (rout5);
@@ -212,13 +246,18 @@ START_TEST (ver0)
     offset += rsize;
     fail_if (rset_out.size() != offset);
 
-    fail_if (6 != rset_out.page_count(),
-             "Expected %d pages, found %zu", 5, rset_out.page_count());
+    if (0 == (offset % alignment)) // aligment page may be required
+        fail_if (6 != rset_out.page_count(),
+                 "Expected %d pages, found %zu", 6, rset_out.page_count());
+    else
+        fail_if (7 != rset_out.page_count(),
+                 "Expected %d pages, found %zu", 7, rset_out.page_count());
 
     fail_if (records.size() != size_t(rset_out.count()));
 
     gu::RecordSet::GatherVector out_bufs;
     out_bufs->reserve (rset_out.page_count());
+    bool const padding_page(offset % alignment);
 
     size_t min_out_size(0);
     for (size_t i = 0; i < records.size(); ++i)
@@ -228,10 +267,13 @@ START_TEST (ver0)
 
     size_t const out_size (rset_out.gather (out_bufs));
 
+    fail_if (out_size != rset_out.serial_size());
     fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs->size() != static_cast<size_t>(rset_out.page_count()),
+    fail_if (out_bufs->size() > size_t(rset_out.page_count()) ||
+             out_bufs->size() < size_t(rset_out.page_count() - padding_page),
              "Expected %zu buffers, got: %zd",
              rset_out.page_count(), out_bufs->size());
+    fail_if (out_size % alignment); // make sure it is aligned
 
     /* concatenate all buffers into one */
     std::vector<gu::byte_t> in_buf;
@@ -240,18 +282,20 @@ START_TEST (ver0)
     for (size_t i = 0; i < out_bufs->size(); ++i)
     {
         // 0th fragment starts with header, so it it can't be used in this check
-        fail_if (i > 0 && rout_ptrs[i] != out_bufs[i].ptr,
+        // last fragment may be a padding page
+        bool const check_fragment(i > 0 && i < (out_bufs->size()- padding_page));
+
+        fail_if (check_fragment && rout_ptrs[i] != out_bufs[i].ptr,
                  "Record pointers don't mathch after gather(). "
                  "old: %p, new: %p", rout_ptrs[i],out_bufs[i].ptr);
 
-        ssize_t size = gtoh32(
-            *reinterpret_cast<const uint32_t*>(out_bufs[i].ptr));
+        ssize_t size;
+        int const off(gu::unserialize4(out_bufs[i].ptr, 0, size));
 
         const char* str =
-            reinterpret_cast<const char*>(out_bufs[i].ptr) + sizeof(uint32_t);
+            reinterpret_cast<const char*>(out_bufs[i].ptr) + off;
 
-        // 0th fragment starts with header, so it it can't be used in this check
-        fail_if (i > 0 && size <= ssize_t(sizeof(uint32_t)),
+        fail_if (check_fragment && size <= ssize_t(sizeof(uint32_t)),
                  "Expected size > 4, got %zd(%#010zx). i = %zu, buf = %s",
                  size, size, i, str);
 
@@ -302,6 +346,7 @@ START_TEST (ver0)
 
     fail_if (rset_in.size()  != rset_out.size());
     fail_if (rset_in.count() != rset_out.count());
+    fail_if (rset_in.serial_size() != rset_out.serial_size());
 
     for (ssize_t i = 0; i < rset_in.count(); ++i)
     {
@@ -364,34 +409,200 @@ START_TEST (ver0)
     }
     catch (std::exception& e) {}
 }
+
+START_TEST (ver1)
+{
+    test_version(gu::RecordSet::VER1);
+}
 END_TEST
 
-START_TEST (empty)
+START_TEST (ver2)
 {
-    gu::RecordSetIn<TestRecord> const rset_in(0, 0);
+    test_version(gu::RecordSet::VER2);
+}
+END_TEST
 
-    fail_if (0 != rset_in.size());
-    fail_if (0 != rset_in.count());
+/* This test is to test how padding mixes with persistent (stored outside)
+ * pages. In this case new padding buf needs to be allocated */
+static void
+test_padding(gu::RecordSet::Version rsv)
+{
+    int const alignment(gu::RecordSet::VER2 == rsv ?
+                        gu::RecordSet::VER2_ALIGNMENT : 1);
 
-    try {
-        rset_in.checksum();
+    union { gu_word_t align; gu::byte_t buf[1024]; } reserved;
+    assert((uintptr_t(reserved.buf) % GU_WORD_BYTES) == 0);
+    std::ostringstream os;
+    os << "gu_rset_padding_test_ver" << rsv;
+    TestBaseName str(os.str().c_str());
+    gu::RecordSetOut<uint64_t> rso(reserved.buf, sizeof(reserved), str,
+                                   gu::RecordSet::CHECK_MMH64, rsv);
+
+    uint64_t const data_out_volatile(0xaabbccdd);
+    uint32_t const data_out_persistent(0xffeeddcc);
+    size_t   const payload_size(sizeof(data_out_volatile)
+                                + sizeof(data_out_persistent));
+    bool     const padding_page(payload_size % alignment);
+
+    {
+        uint64_t const d(data_out_volatile);
+        rso.append(&d, sizeof(d), true, false);
     }
-    catch (std::exception& e)
+
+    rso.append(&data_out_persistent, sizeof(data_out_persistent), false, false);
+
+    gu::RecordSet::GatherVector out;
+    size_t const out_size(rso.gather(out));
+    /* here we must get a vector of */
+    size_t const expected_pages(2 + padding_page);
+    fail_if(out->size() != expected_pages,
+            "Expected %zu pages, got %zu", expected_pages, out->size());
+
+    /* concatenate all out buffers */
+    std::vector<gu::byte_t> in_buf;
+    in_buf.reserve(out_size);
+    for (size_t i(0); i < out->size(); ++i)
+    {
+        const gu::byte_t* ptr(static_cast<const gu::byte_t*>(out[i].ptr));
+        in_buf.insert (in_buf.end(), ptr, ptr + out[i].size);
+    }
+
+    fail_if (in_buf.size() != out_size);
+
+    try
+    {
+        gu::RecordSetIn<uint64_t> rsi(in_buf.data(), in_buf.size());
+        rsi.checksum();
+    }
+    catch (gu::Exception& e)
     {
         fail("%s", e.what());
     }
+}
+
+START_TEST (ver1_padding)
+{
+    test_padding(gu::RecordSet::VER1);
+}
+END_TEST
+
+START_TEST (ver2_padding)
+{
+    test_padding(gu::RecordSet::VER2);
+}
+END_TEST
+
+/* return the total size of serialized record set
+ * @param count number of records
+ * @param size  record size */
+static size_t
+ver2_size(int const count, size_t const size, gu::RecordSet::CheckType ct)
+{
+    typedef std::vector<gu::byte_t> record_t;
+    record_t record(size);
+    assert(record.size() == size);
+
+    std::ostringstream os;
+    os << "gu_rset_test_ver2_count" << count << "_size" << size;
+    TestBaseName name(os.str().c_str());
+    gu::RecordSetOut<record_t> rset(NULL, 0, name, ct, gu::RecordSet::VER2);
+    for (int i(0); i < count; ++i)
+    {
+        rset.append(record.data(), record.size());
+    }
+
+    gu::RecordSet::GatherVector out_bufs;
+    out_bufs->reserve(rset.page_count());
+
+    size_t const out_size(rset.gather(out_bufs));
+    fail_if((out_size % gu::RecordSet::VER2_ALIGNMENT),
+            "Final size %zu is not multiple of %d. "
+            "Params: count: %d, size: %zu, ct: %d",
+            out_size, gu::RecordSet::VER2_ALIGNMENT, count, size, ct);
+
+    return out_size;
+}
+
+START_TEST (ver2_sizes)
+{
+    gu::RecordSet::CheckType ct;
+    size_t s, ct_s, rs, es;
+    int c;
+
+#ifdef NDEBUG
+    ct   = gu::RecordSet::CHECK_MMH32;
+    ct_s = gu::RecordSet::check_size(ct);
+    try
+    {
+        s = ver2_size(128, 1, ct);
+        fail("Must throw exception!");
+    }
+    catch(gu::Exception& e) {}
+#endif
+
+    c    = 1024; // max count allowed in "short" header
+    s    = 1;    // record size
+    ct   = gu::RecordSet::CHECK_NONE;
+    ct_s = gu::RecordSet::check_size(ct);
+    rs   = ver2_size(c, s, ct);
+    // expected size: short header(8) + checksum size + aligned payload size
+    es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
+    fail_if(rs != es);
+
+    c   += 1; // this count must force "long" header
+    s    = 1; // record size
+    ct   = gu::RecordSet::CHECK_MMH64;
+    ct_s = gu::RecordSet::check_size(ct);
+    rs   = ver2_size(c, s, ct);
+    // expected size: long header(16) + checksum size + aligned payload size
+    es   = 16 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
+    fail_if(rs != es);
+
+    ct   = gu::RecordSet::CHECK_MMH128;
+    ct_s = gu::RecordSet::check_size(ct);
+    c  = 1;                    // record count
+    s  = (1 << 14) - ct_s - 8; // max record size representable in "short" header
+    rs = ver2_size(c, s, ct);
+    // expected size: long header(16) + checksum size + aligned payload size
+    es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
+    fail_if(rs != es);
+
+    ct   = gu::RecordSet::CHECK_MMH128;
+    ct_s = gu::RecordSet::check_size(ct);
+    c  = 1; // record count
+    s += 1; // must force "long" header
+    rs = ver2_size(c, s, ct);
+    // expected size: long header(16) + checksum size + aligned payload size
+    es   = 16 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
+    fail_if(rs != es);
+
+    ct   = gu::RecordSet::CHECK_NONE;
+    ct_s = gu::RecordSet::check_size(ct);
+    c  = 1023;
+    s  = 16;
+    rs = ver2_size(c, s, ct);
+    // expected size: long header(16) + checksum size + aligned payload size
+    es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
+    fail_if(rs != es);
 }
 END_TEST
 
 Suite* gu_rset_suite ()
 {
-    TCase* t = tcase_create ("RecordSet");
-    tcase_add_test (t, ver0);
-    tcase_add_test (t, empty);
-    tcase_set_timeout(t, 60);
+    Suite* s(suite_create("gu::RecordSet"));
 
-    Suite* s = suite_create ("gu::RecordSet");
+    TCase* t(tcase_create("RecordSet v1"));
+    tcase_add_test (t, empty);
+    tcase_add_test (t, ver1);
+    tcase_add_test (t, ver1_padding);
     suite_add_tcase (s, t);
+
+    t = tcase_create("RecordSet v2");
+    tcase_add_test (t, ver2);
+    tcase_add_test (t, ver2_padding);
+    tcase_add_test (t, ver2_sizes);
+    suite_add_tcase (s, t);
+//    tcase_set_timeout(t, 60);
 
     return s;
 }

@@ -16,6 +16,7 @@
 #define _DEFAULT_SOURCE
 
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -94,7 +95,7 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 
         ull alloc_size = array_size + sizeof (gu_fifo_t);
 
-        if (alloc_size > (size_t)-1) {
+        if (sizeof(alloc_size) > sizeof(size_t) && alloc_size > SIZE_MAX) {
             gu_error ("Initial FIFO size %llu exceeds size_t range %zu",
                       alloc_size, (size_t)-1);
             return NULL;
@@ -102,7 +103,7 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 
         ull max_size = array_len * row_size + alloc_size;
 
-        if (max_size > (size_t)-1) {
+        if (sizeof(max_size) > sizeof(size_t) && max_size > SIZE_MAX) {
             gu_error ("Maximum FIFO size %llu exceeds size_t range %zu",
                       max_size, (size_t)-1);
             return NULL;
