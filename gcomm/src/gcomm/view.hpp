@@ -236,6 +236,7 @@ namespace gcomm
         std::istream& read_stream(std::istream& is);
         void write_file() const;
         bool read_file();
+        static bool file_exists(const char* fname = NULL);
         static void remove_file(gu::Config& conf);
         bool operator== (const ViewState& vst) const
         {

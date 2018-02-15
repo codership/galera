@@ -24,12 +24,33 @@ void gcomm::PC::handle_up(const void* cid, const Datagram& rb,
         um.has_view() &&
         um.view().id().type() == V_PRIM)
     {
-        ViewState vst(const_cast<UUID&>(uuid()),
-                      const_cast<View&>(um.view()),
-                      conf_);
-        log_info << "save pc into disk";
-        vst.write_file();
+        size_t total_weight_new= weighted_sum(um.view().members(),
+                                              pc_->instances());
+        /*
+          When pc.recover_minimum_weight is set to non-zero, save the PC
+          state on disk iff the new total weight is greater than or equal
+          to the specified value.
+        */
+        if (pc_recover_minimum_weight_ == 0   || /* backward compatibility */
+            total_weight_new >= pc_recover_minimum_weight_)
+        {
+            ViewState vst(const_cast<UUID&>(uuid()),
+                          const_cast<View&>(um.view()),
+                          conf_);
+            log_info << "Saving PC state on disk.";
+            vst.write_file();
+        }
+        else
+        {
+            log_info << "New PC weight is less than the configured "
+                        "pc.recover_minimum_weight, state file not "
+                        "being saved.";
+        }
+
+        // Update total_weight
+        total_weight_= total_weight_new;
     }
+
     send_up(rb, um);
 }
 
@@ -74,6 +95,11 @@ std::string gcomm::PC::listen_addr() const
 
 void gcomm::PC::connect(bool start_prim)
 {
+    if (start_prim && pc_recovery_ && ViewState::file_exists())
+    {
+        gu_throw_error(EPROTO) << "PC state file exists, aborting bootstrap.";
+    }
+
     try
     {
         // for backward compatibility with old approach: gcomm://0.0.0.0
@@ -213,7 +239,18 @@ void gcomm::PC::close(bool force)
     pstack_.pop_proto(pc_);
     pstack_.pop_proto(evs_);
     pstack_.pop_proto(gmcast_);
-    ViewState::remove_file(conf_);
+
+    if (pc_recover_minimum_weight_ == 0 || /* backward compatibility */
+        total_weight_ > pc_recover_minimum_weight_)
+    {
+        ViewState::remove_file(conf_);
+    }
+    else if (ViewState::file_exists())
+    {
+        log_info << "New PC weight has fallen below the configured "
+                    "pc.recover_minimum_weight; state file not being "
+                    "deleted.";
+    }
 
     closed_ = true;
 }
@@ -236,6 +273,10 @@ gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
                           Defaults::PcAnnounceTimeout)),
     pc_recovery_ (param<bool>(conf_, uri,
                               Conf::PcRecovery, Defaults::PcRecovery)),
+    pc_recover_minimum_weight_ (param<size_t>(conf_, uri,
+                                              Conf::PcRecoverMinimumWeight,
+                                              Defaults::PcRecoverMinimumWeight)),
+    total_weight_(0),
     rst_uuid_(),
     rst_view_()
 

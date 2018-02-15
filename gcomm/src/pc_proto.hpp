@@ -190,6 +190,11 @@ public:
                    rst_view -> id().seq()));
     }
     const View* restored_view() const { return rst_view_; }
+    const NodeMap& instances() const
+    {
+        return instances_;
+    }
+
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);
     Proto (const Proto&);
@@ -229,5 +234,7 @@ private:
     View*             rst_view_;      // restored PC view
 };
 
+size_t weighted_sum(const gcomm::NodeList& node_list,
+                    const gcomm::pc::NodeMap& node_map);
 
 #endif // PC_PROTO_HPP

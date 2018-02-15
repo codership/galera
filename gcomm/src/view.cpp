@@ -324,6 +324,15 @@ bool gcomm::ViewState::read_file()
     }
 }
 
+bool gcomm::ViewState::file_exists(const char* fname)
+{
+    if (fname == NULL) fname = COMMON_VIEW_STAT_FILE;
+    if (access(fname, F_OK) == 0) {
+        return true;
+    }
+    return false;
+}
+
 // remove_file is static function, it should remove the view
 // state file even if there is no ViewState object around.
 // View state file name is derived in the same way as for

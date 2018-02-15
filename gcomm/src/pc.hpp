@@ -47,11 +47,13 @@ namespace gcomm
         evs::Proto* evs_;                // EVS protocol layer
         pc::Proto*  pc_;                 // PC protocol layer
         bool        closed_;             // flag for destructor
-                                        // Period to wait graceful leave
-        gu::datetime::Period linger_;
+        gu::datetime::Period linger_;    // Period to wait graceful leave
         gu::datetime::Period announce_timeout_;
 
-        bool        pc_recovery_;
+        bool        pc_recovery_;        // Automatic PC recovery
+        // Minimum PC weight for recovery to kick-in
+        size_t      pc_recover_minimum_weight_;
+        size_t      total_weight_;       // Current total PC weight
         UUID        rst_uuid_;
         View        rst_view_;
 

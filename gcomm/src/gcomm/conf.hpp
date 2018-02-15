@@ -415,6 +415,8 @@ namespace gcomm
          */
         static std::string const PcRecovery;
 
+        static std::string const PcRecoverMinimumWeight;
+
         static void register_params(gu::Config&);
 
         static void check_params(const gu::Config&);
