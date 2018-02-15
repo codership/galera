@@ -20,7 +20,7 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
 {
     int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
-    wsrep_uuid_t source;
+    wsrep_uuid_t source __attribute__ ((aligned (GU_WORD_BYTES)));
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
@@ -285,7 +285,7 @@ static void ver3_annotation(gu::RecordSet::Version const rsv)
 {
     int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
-    wsrep_uuid_t source;
+    wsrep_uuid_t source __attribute__ ((aligned (GU_WORD_BYTES)));
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
