@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -232,8 +232,13 @@ namespace gcache
         std::set<const void*> buf_tracker;
 #endif
 
+        void discard_buffer (BufferHeader* bh);
+
         /* returns true when successfully discards all seqnos up to s */
         bool discard_seqno (int64_t s);
+
+        /* discards all seqnos greater than s */
+        void discard_tail (int64_t s);
 
         // disable copying
         GCache (const GCache&);

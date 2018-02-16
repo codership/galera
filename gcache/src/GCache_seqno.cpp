@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -23,7 +23,16 @@ namespace gcache
 
         assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
 
-        if (g == gid && s == seqno_max) return;
+        if (g == gid && s != SEQNO_ILL && seqno_max >= s)
+        {
+            if (seqno_max > s)
+            {
+                discard_tail(s);
+                seqno_max = s;
+                seqno_released = s;
+            }
+            return;
+        }
 
         log_info << "GCache history reset: " << gid << ':' << seqno_max
                  << " -> " << g << ':' << s;
