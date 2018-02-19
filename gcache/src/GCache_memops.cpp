@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -8,6 +8,21 @@
 
 namespace gcache
 {
+    void
+    GCache::discard_buffer (BufferHeader* bh)
+    {
+        bh->seqno_g = SEQNO_ILL; // will never be reused
+        switch (bh->store)
+        {
+        case BUFFER_IN_MEM:  mem.discard (bh); break;
+        case BUFFER_IN_RB:   rb.discard  (bh); break;
+        case BUFFER_IN_PAGE: ps.discard  (bh); break;
+        default:
+            log_fatal << "Corrupt buffer header: " << bh;
+            abort();
+        }
+    }
+
     bool
     GCache::discard_seqno (int64_t seqno)
     {
@@ -24,18 +39,7 @@ namespace gcache
                 assert (bh->seqno_g <= seqno_released);
 
                 seqno2ptr.erase (i++); // post ++ is significant!
-
-                bh->seqno_g = SEQNO_ILL; // will never be reused
-
-                switch (bh->store)
-                {
-                case BUFFER_IN_MEM:  mem.discard (bh); break;
-                case BUFFER_IN_RB:   rb.discard  (bh); break;
-                case BUFFER_IN_PAGE: ps.discard  (bh); break;
-                default:
-                    log_fatal << "Corrupt buffer header: " << bh;
-                    abort();
-                }
+                discard_buffer(bh);
             }
             else
             {
@@ -44,6 +48,24 @@ namespace gcache
         }
 
         return true;
+    }
+
+    void
+    GCache::discard_tail (int64_t seqno)
+    {
+        seqno2ptr_t::reverse_iterator r;
+        while ((r = seqno2ptr.rbegin()) != seqno2ptr.rend() &&
+               r->first > seqno)
+        {
+            BufferHeader* bh(ptr2BH(r->second));
+
+            assert(BH_is_released(bh));
+            assert(bh->seqno_g == r->first);
+            assert(bh->seqno_g > seqno);
+
+            seqno2ptr.erase(--(seqno2ptr.end()));
+            discard_buffer(bh);
+        }
     }
 
     void*
