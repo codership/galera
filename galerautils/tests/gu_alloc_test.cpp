@@ -3,6 +3,7 @@
 // $Id$
 
 #include "../src/gu_alloc.hpp"
+#include "../src/gu_arch.h"
 
 #include "gu_alloc_test.hpp"
 
@@ -19,7 +20,7 @@ public:
 START_TEST (basic)
 {
     ssize_t const extra_size(1 << 12); /* extra size to force new page */
-    gu::byte_t reserved[extra_size];
+    gu::byte_t reserved[extra_size] __attribute__ ((aligned (GU_WORD_BYTES)));
 
     const char test0[] = "test0";
     ssize_t const test0_size(sizeof(test0));

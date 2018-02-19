@@ -1,6 +1,6 @@
 ###################################################################
 #
-# Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+# Copyright (C) 2010-2017 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
@@ -14,6 +14,11 @@
 # Set LDFLAGS  to *override* linking flags
 # Set LIBPATH  to add non-standard linker paths
 # Set RPATH    to add rpaths
+#
+# Some useful CPPFLAGS:
+# GCS_SM_DEBUG          - enable dumping of send monitor state and history
+# GU_DEBUG_MUTEX        - enable mutex debug instrumentation
+# GU_DBUG_ON            - enable sync point macros
 #
 # Script structure:
 # - Help message
@@ -30,10 +35,18 @@ import platform
 import string
 import subprocess
 
+# Execute a command and read the first line of its stdout.
+# For example read_first_line(["ls", "-l", "/usr"])
+def read_first_line(cmd):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    stdout = p.communicate()[0]
+    line = stdout.splitlines()[0]
+    return line
+
 sysname = os.uname()[0].lower()
 machine = platform.machine()
 bits = ARGUMENTS.get('bits', platform.architecture()[0])
-print 'Host: ' + sysname + ' ' + machine + ' ' + bits
+print('Host: ' + sysname + ' ' + machine + ' ' + bits)
 
 x86 = any(arch in machine for arch in [ 'x86', 'amd64', 'i686', 'i386', 'i86pc' ])
 
@@ -51,8 +64,6 @@ Build targets:  build tests check install all
 Default target: all
 
 Commandline Options:
-    static_ssl=[0|1]    Build with static SSL
-    with_ssl=path       Prefix for SSL
     debug=n             debug build with optimization level n
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
@@ -79,8 +90,6 @@ opt_flags    = ' -g -O3 -fno-omit-frame-pointer -DNDEBUG'
 compile_arch = ''
 link_arch    = ''
 
-with_ssl     = ''
-
 # Build directory
 build_dir    = ''
 
@@ -90,7 +99,6 @@ build_dir    = ''
 #
 
 build_dir = ARGUMENTS.get('build_dir', '')
-with_ssl = ARGUMENTS.get('with_ssl', '/usr/lib64')
 
 # Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
@@ -128,9 +136,7 @@ elif machine == 's390x':
 
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
-static_ssl = int(ARGUMENTS.get('static_ssl', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
-ssl        = int(ARGUMENTS.get('ssl', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
@@ -144,7 +150,7 @@ GALERA_VER = ARGUMENTS.get('version', '3.24')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
-print 'Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV
+print('Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV)
 
 LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '')
 LIBBOOST_SYSTEM_A = string.replace(LIBBOOST_PROGRAM_OPTIONS_A, 'boost_program_options', 'boost_system')
@@ -176,26 +182,13 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-try:
-    cc_version = subprocess.check_output(
-        env['CC'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
-except:
-    # in case "$CC --version" returns an error, e.g. "unknown option"
-    cc_version = 'unknown'
+cc_version = read_first_line(env['CC'].split() + ['--version'])
+cxx_version = read_first_line(env['CXX'].split() + ['--version'])
 
-try:
-    cxx_version = subprocess.check_output(
-        env['CXX'].split() + ['--version'],
-        stderr=subprocess.STDOUT).splitlines()[0]
-except:
-    # in case "$CXX --version" returns an error, e.g. "unknown option"
-    cxx_version = 'unknown'
-
-print 'Using C compiler executable: ' + env['CC']
-print 'C compiler version is: ' + cc_version
-print 'Using C++ compiler executable: ' + env['CXX']
-print 'C++ compiler version is: ' + cxx_version
+print('Using C compiler executable: ' + env['CC'])
+print('C compiler version is: ' + cc_version)
+print('Using C++ compiler executable: ' + env['CXX'])
+print('C++ compiler version is: ' + cxx_version)
 
 # Initialize CPPFLAGS and LIBPATH from environment to get user preferences
 env.Replace(CPPFLAGS  = os.getenv('CPPFLAGS', ''))
@@ -269,6 +262,18 @@ if sysname != 'sunos':
 # Custom tests:
 #
 
+def CheckCpp11(context):
+    test_source = """
+#if __cplusplus < 201103
+#error Not compiling in C++11 mode
+#endif
+int main() { return 0; }
+"""
+    context.Message('Checking if compiling in C++11 mode ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
 def CheckSystemASIOVersion(context):
     system_asio_test_source_file = """
 #include <asio.hpp>
@@ -288,16 +293,68 @@ int main()
     context.Result(result)
     return result
 
+def CheckTr1Array(context):
+    test_source = """
+#include <tr1/array>
+int main() { std::tr1::array<int, 5> a; return 0; }
+"""
+    context.Message('Checking for std::tr1::array ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckTr1SharedPtr(context):
+    test_source = """
+#include <tr1/memory>
+int main() { int n; std::tr1::shared_ptr<int> p(&n); return 0; }
+"""
+    context.Message('Checking for std::tr1::shared_ptr ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckTr1UnorderedMap(context):
+    test_source = """
+#include <tr1/unordered_map>
+int main() { std::tr1::unordered_map<int, int> m; return 0; }
+"""
+    context.Message('Checking for std::tr1::unordered_map ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckWeffcpp(context):
+    # Some compilers (gcc <= 4.8 at least) produce a bogus warning for the code
+    # below when -Weffc++ is used.
+    test_source = """
+class A {};
+class B : public A {};
+int main() { return 0; }
+"""
+    context.Message('Checking whether to enable -Weffc++ ... ')
+    cxxflags_orig = context.env['CXXFLAGS']
+    context.env.Prepend(CXXFLAGS = '-Weffc++ -Werror ')
+    result = context.TryLink(test_source, '.cpp')
+    context.env.Replace(CXXFLAGS = cxxflags_orig)
+    context.Result(result)
+    return result
 
 #
-# Construct confuration context
+# Construct configuration context
 #
-conf = Configure(env, custom_tests = {'CheckSystemASIOVersion': CheckSystemASIOVersion})
+conf = Configure(env, custom_tests = {
+    'CheckCpp11': CheckCpp11,
+    'CheckSystemASIOVersion': CheckSystemASIOVersion,
+    'CheckTr1Array': CheckTr1Array,
+    'CheckTr1SharedPtr': CheckTr1SharedPtr,
+    'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
+    'CheckWeffcpp': CheckWeffcpp
+})
 
 # System headers and libraries
 
 if not conf.CheckLib('pthread'):
-    print 'Error: pthread library not found'
+    print('Error: pthread library not found')
     Exit(1)
 
 # libatomic may be needed on some 32bit platforms (and 32bit userland PPC64)
@@ -307,23 +364,23 @@ if not x86:
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
-        print 'Error: rt library not found'
+        print('Error: rt library not found')
         Exit(1)
 
 if sysname == 'freebsd':
     if not conf.CheckLib('execinfo'):
-        print 'Error: execinfo library not found'
+        print('Error: execinfo library not found')
         Exit(1)
 
 if sysname == 'sunos':
     if not conf.CheckLib('socket'):
-        print 'Error: socket library not found'
+        print('Error: socket library not found')
         Exit(1)
     if not conf.CheckLib('crypto'):
-        print 'Error: crypto library not found'
+        print('Error: crypto library not found')
         Exit(1)
     if not conf.CheckLib('nsl'):
-        print 'Error: nsl library not found'
+        print('Error: nsl library not found')
         Exit(1)
 
 if conf.CheckHeader('sys/epoll.h'):
@@ -339,7 +396,7 @@ elif conf.CheckHeader('sys/endian.h'):
 elif conf.CheckHeader('sys/byteorder.h'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_BYTEORDER_H')
 elif sysname != 'darwin':
-    print 'can\'t find byte order information'
+    print('can\'t find byte order information')
     Exit(1)
 
 if conf.CheckHeader('execinfo.h'):
@@ -347,23 +404,42 @@ if conf.CheckHeader('execinfo.h'):
 
 # Additional C headers and libraries
 
-# boost headers
+cpp11 = conf.CheckCpp11()
 
-if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
-    print 'boost/shared_ptr.hpp not found or not usable'
-    Exit(1)
-conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
-
-if conf.CheckCXXHeader('unordered_map'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_UNORDERED_MAP')
-elif conf.CheckCXXHeader('tr1/unordered_map'):
-    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
+# array
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_ARRAY')
+elif conf.CheckTr1Array():
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_ARRAY')
+elif conf.CheckCXXHeader('boost/array.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_ARRAY_HPP')
 else:
-    if conf.CheckCXXHeader('boost/unordered_map.hpp'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
-    else:
-        print 'no unordered map header available'
-        Exit(1)
+    print('no suitable array header found')
+    Exit(1)
+
+# shared_ptr
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_SHARED_PTR')
+elif False and conf.CheckTr1SharedPtr():
+    # std::tr1::shared_ptr<> is not derived from std::auto_ptr<>
+    # this upsets boost in asio, so don't use tr1 version, use boost instead
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_SHARED_PTR')
+elif conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
+else:
+    print('no suitable shared_ptr header found')
+    Exit(1)
+
+# unordered_map
+if cpp11:
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_UNORDERED_MAP')
+elif conf.CheckTr1UnorderedMap():
+    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
+elif conf.CheckCXXHeader('boost/unordered_map.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
+else:
+    print('no suitable unordered map header found')
+    Exit(1)
 
 # pool allocator
 if boost == 1:
@@ -388,7 +464,7 @@ if boost == 1:
     def check_boost_library(libBaseName, header, configuredLibPath, autoadd = 1):
         libName = libBaseName + boost_library_suffix
         if configuredLibPath != '' and not os.path.isfile(configuredLibPath):
-            print "Error: file '%s' does not exist" % configuredLibPath
+            print("Error: file '%s' does not exist" % configuredLibPath)
             Exit(1)
         if configuredLibPath == '':
            for libpath in boost_libpaths:
@@ -398,7 +474,7 @@ if boost == 1:
                    break
         if configuredLibPath != '':
             if not conf.CheckCXXHeader(header):
-                print "Error: header '%s' does not exist" % header
+                print("Error: header '%s' does not exist" % header)
                 Exit (1)
             if autoadd:
                 conf.env.Append(LIBS=File(configuredLibPath))
@@ -409,7 +485,7 @@ if boost == 1:
                                            header=header,
                                            language='CXX',
                                            autoadd=autoadd):
-                print 'Error: library %s does not exist' % libName
+                print('Error: library %s does not exist' % libName)
                 Exit (1)
             return [libName]
 
@@ -417,7 +493,7 @@ if boost == 1:
     #
     if boost_pool == 1:
         if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
-            print 'Using boost pool alloc'
+            print('Using boost pool alloc')
             conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
             # due to a bug in boost >= 1.50 we need to link with boost_system
             # - should be a noop with no boost_pool.
@@ -428,7 +504,7 @@ if boost == 1:
                                 'boost/system/error_code.hpp',
                                 LIBBOOST_SYSTEM_A)
         else:
-            print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
+            print('Error: boost/pool/pool_alloc.hpp not found or not usable')
             Exit(1)
 
     libboost_program_options = check_boost_library('boost_program_options',
@@ -436,14 +512,14 @@ if boost == 1:
                                                    LIBBOOST_PROGRAM_OPTIONS_A,
                                                    autoadd = 0)
 else:
-    print 'Not using boost'
+    print('Not using boost')
 
 # asio
 if system_asio == 1 and conf.CheckCXXHeader('asio.hpp') and conf.CheckSystemASIOVersion():
     conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     system_asio = False
-    print "Falling back to bundled asio"
+    print("Falling back to bundled asio")
 
 if not system_asio:
     # Make sure that -Iasio goes before other paths (e.g. -I/usr/local/include)
@@ -453,36 +529,20 @@ if not system_asio:
     if conf.CheckCXXHeader('asio.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
     else:
-        print 'asio headers not found or not usable'
+        print('asio headers not found or not usable')
         Exit(1)
 
 # asio/ssl
-if ssl == 1:
-    if conf.CheckCXXHeader('asio/ssl.hpp'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_SSL_HPP')
-    else:
-        print 'ssl support required but asio/ssl.hpp not found or not usable'
-        print 'compile with ssl=0 or check that openssl devel headers are usable'
-        Exit(1)
-    if static_ssl == 0:
-        if conf.CheckLib('ssl'):
-            conf.CheckLib('crypto')
-        else:
-            print 'ssl support required but openssl library not found'
-            print 'compile with ssl=0 or check that openssl library is usable'
-            Exit(1)
-    else:
-        conf.env.Append(LIBPATH  = [with_ssl])
-        if conf.CheckLib('libssl.a', autoadd=0) or \
-            conf.CheckLib('libcrypto.a', autoadd=0) or \
-            conf.CheckLib('libz.a', autoadd=0):
-            pass
-        else:
-            print 'ssl support required but openssl library (static) not found'
-            print 'compile with ssl=0 or check that' 
-            print 'openssl static librares - libssl.a, libcrypto.a, libz.a are available'
-            Exit(1)
-
+if not conf.CheckCXXHeader('asio/ssl.hpp'):
+    print('SSL support required but asio/ssl.hpp was not found or not usable')
+    print('check that SSL devel headers are installed and usable')
+    Exit(1)
+if not conf.CheckLib('ssl'):
+    print('SSL support required but libssl was not found')
+    Exit(1)
+if not conf.CheckLib('crypto'):
+    print('SSL support required libcrypto was not found')
+    Exit(1)
 
 # these will be used only with our software
 if strict_build_flags == 1:
@@ -495,16 +555,19 @@ if strict_build_flags == 1:
         if 'ccache' in conf.env['CXX'] or 'ccache' in conf.env['CC']:
             conf.env.Append(CCFLAGS = ' -Qunused-arguments')
 
+if conf.CheckWeffcpp():
+    conf.env.Prepend(CXXFLAGS = '-Weffc++ ')
+
 if not 'clang' in cxx_version:
-    conf.env.Prepend(CXXFLAGS = '-Weffc++ -Wold-style-cast ')
+    conf.env.Prepend(CXXFLAGS = '-Wold-style-cast ')
 
 env = conf.Finish()
 
-print 'Global flags:'
+print('Global flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
-    print f + ': ' + env[f].strip()
+    print(f + ': ' + env[f].strip())
 
-Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'static_ssl', 'with_ssl')
+Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
@@ -526,15 +589,15 @@ conf = Configure(check_env)
 # Check header and library
 
 if not conf.CheckHeader('check.h'):
-    print 'Error: check header file not found or not usable'
+    print('Error: check header file not found or not usable')
     Exit(1)
 
 if not conf.CheckLib('check'):
-    print 'Error: check library not found or not usable'
+    print('Error: check library not found or not usable')
     Exit(1)
 
 if not conf.CheckLib('m'):
-    print 'Error: math library not found or not usable'
+    print('Error: math library not found or not usable')
     Exit(1)
 
 # potential check dependency, link if present
@@ -542,7 +605,7 @@ conf.CheckLib('subunit')
 
 if sysname != 'darwin':
     if not conf.CheckLib('rt'):
-        print 'Error: realtime library not found or not usable'
+        print('Error: realtime library not found or not usable')
         Exit(1)
 
 conf.Finish()

@@ -134,7 +134,7 @@ core_recv_thread (void* arg)
 // this macro logs errors from within a function
 #define FAIL_IF(expr, format, ...)                            \
     if (expr) {                                               \
-        gu_fatal ("FAIL: "format, __VA_ARGS__, NULL);         \
+        gu_fatal ("FAIL: " format, __VA_ARGS__, NULL);        \
         fail_if (true, format, __VA_ARGS__, NULL);            \
         return true;                                          \
     }
