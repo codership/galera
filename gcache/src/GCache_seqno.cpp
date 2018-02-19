@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ /*
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -19,10 +19,20 @@ namespace gcache
     GCache::seqno_reset (const gu::GTID& gtid)
     {
         gu::Lock lock(mtx);
-
+        
         assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
 
-        if (gtid.uuid() == gid && gtid.seqno() == seqno_max) return;
+        const int64_t s(gtid.seqno());
+        if (gtid.uuid() == gid && s != SEQNO_ILL && seqno_max >= s)
+        {
+            if (seqno_max > s)
+            {
+                discard_tail(s);
+                seqno_max = s;
+                seqno_released = s;
+            }
+            return;
+        }
 
         log_info << "GCache history reset: old(" << gu::GTID(gid, seqno_max)
                  << " -> " << gtid;
