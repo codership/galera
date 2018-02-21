@@ -141,7 +141,7 @@ deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 
 
-GALERA_VER = ARGUMENTS.get('version', '3.23')
+GALERA_VER = ARGUMENTS.get('version', '3.25')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
