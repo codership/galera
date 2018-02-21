@@ -233,11 +233,14 @@ namespace gu
                   << name_ << "'...";
 
 #if defined(__APPLE__)
-        if (0 != fcntl (fd_, F_SETSIZE, size_) && 0 != ftruncate (fd_, size_))
-#else
-        if (0 != posix_fallocate (fd_, start, diff))
-#endif
+        if (-1 == fcntl (fd_, F_SETSIZE, size_) && -1 == ftruncate (fd_, size_))
         {
+#else
+        int const ret = posix_fallocate (fd_, start, diff);
+        if (0 != ret)
+        {
+            errno = ret;
+#endif
             if ((EINVAL == errno || ENOSYS == errno) && start >= 0 && diff > 0)
             {
                 // FS does not support the operation, try physical write
