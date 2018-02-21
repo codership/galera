@@ -146,7 +146,7 @@ psi        = int(ARGUMENTS.get('psi', 0))
 if psi:
     opt_flags = opt_flags + ' -DHAVE_PSI_INTERFACE'
 
-GALERA_VER = ARGUMENTS.get('version', '3.24')
+GALERA_VER = ARGUMENTS.get('version', '3.26')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
