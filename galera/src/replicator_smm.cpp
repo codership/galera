@@ -1887,6 +1887,7 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
         assert(trx.state() == TrxHandle::S_ABORTING);
         assert(ts.state() == TrxHandle::S_ABORTING);
         TX_SET_STATE(trx, TrxHandle::S_ROLLED_BACK);
+        TX_SET_STATE(ts, TrxHandle::S_ROLLING_BACK);
         TX_SET_STATE(ts, TrxHandle::S_ROLLED_BACK);
     }
 
