@@ -183,7 +183,7 @@ namespace gcomm
         AddrList          remote_addrs_;
         AddrList          addr_blacklist_;
         bool              relaying_;
-        bool              isolate_;
+        int               isolate_;
 
         gmcast::ProtoMap*  proto_map_;
         std::set<Socket*>   relay_set_;

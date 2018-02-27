@@ -704,6 +704,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
             if (cm_size <= msg->buf_len)
             {
                 memcpy(msg->buf, cm, cm_size);
+                msg->size = cm_size;
                 recv_buf.pop_front();
                 msg->type = GCS_MSG_COMPONENT;
             }
