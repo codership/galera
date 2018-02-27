@@ -46,6 +46,30 @@ static std::string get_scheme(bool use_ssl)
     return gu::scheme::tcp;
 }
 
+//
+// Check if the node should stay isolated.
+// Possible outcomes:
+// * Return false, node should continue reconnecting and accepting connections
+//   (isolate = 0)
+// * Return true, node should remain isolated (isolate = 1)
+// * Throw fatal exception to terminate the backend (isolate = 2)
+//
+static inline bool is_isolated(int isolate)
+{
+    switch (isolate)
+    {
+    case 1:
+        return true;
+    case 2:
+        gu_throw_fatal<< "Gcomm backend termination was "
+                      << "requested by setting gmcast.isolate=2.";
+        break;
+    default:
+        break;
+    }
+    return false;
+}
+
 gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
                       const UUID* my_uuid)
     :
@@ -77,7 +101,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     remote_addrs_ (),
     addr_blacklist_(),
     relaying_     (false),
-    isolate_      (false),
+    isolate_      (0),
     proto_map_    (new ProtoMap()),
     relay_set_    (),
     segment_map_  (),
@@ -389,7 +413,7 @@ void gcomm::GMCast::gmcast_accept()
         return;
     }
 
-    if (isolate_ == true)
+    if (is_isolated(isolate_))
     {
         log_debug << "dropping accepted socket due to isolation";
         tp->close();
@@ -944,7 +968,7 @@ void gcomm::GMCast::update_addresses()
 
 void gcomm::GMCast::reconnect()
 {
-    if (isolate_ == true)
+    if (is_isolated(isolate_))
     {
         log_debug << "skipping reconnect due to isolation";
         return;
@@ -1712,10 +1736,18 @@ bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
         }
         else if (key == Conf::GMCastIsolate)
         {
-            isolate_ = gu::from_string<bool>(val);
+            int tmpval = gu::from_string<int>(val);
+            if (tmpval < 0 || tmpval > 2)
+            {
+                gu_throw_error(EINVAL)
+                    << "invalid value for gmacst.isolate: '"
+                    << tmpval << "'";
+            }
+            isolate_ = tmpval;
             log_info << "turning isolation "
-                     << (isolate_ == true ? "on" : "off");
-            if (isolate_ == true)
+                     << (isolate_ == 1 ? "on" :
+                         (isolate_ == 2 ? "force quit" : "off"));
+            if (isolate_)
             {
                 // delete all entries in proto map
                 ProtoMap::iterator pi, pi_next;
