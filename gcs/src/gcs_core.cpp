@@ -740,7 +740,8 @@ core_handle_comp_msg (gcs_core_t*          const core,
     assert (GCS_MSG_COMPONENT == msg->type);
 
     if (msg->size < (ssize_t)sizeof(gcs_comp_msg_t)) {
-        gu_error ("Malformed component message. Ignoring");
+        gu_error ("Malformed component message (size %zd < %zd). Ignoring",
+                  msg->size, sizeof(gcs_comp_msg_t));
         return 0;
     }
 
