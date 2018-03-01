@@ -13,6 +13,12 @@
 #include <sys/file.h>
 #include <fcntl.h>
 
+#ifdef __GLIBC__
+#define STR_O_EXCL_CLOEXEC "ex"
+#else
+#define STR_O_EXCL_CLOEXEC ""
+#endif
+
 namespace galera
 {
 
@@ -44,7 +50,7 @@ SavedState::SavedState  (const std::string& file) :
         log_warn << "Could not open state file for reading: '" << file << '\'';
     }
 
-    fs_ = fopen(file.c_str(), "a");
+    fs_ = fopen(file.c_str(), "a" STR_O_EXCL_CLOEXEC);
 
     if (!fs_)
     {
