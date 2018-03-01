@@ -634,7 +634,22 @@ void gcomm::pc::Proto::handle_view(const View& view)
 }
 
 
-
+int gcomm::pc::Proto::cluster_weight() const
+{
+    int total_weight(0);
+    if (pc_view_.type() == V_PRIM)
+    {
+        for (NodeMap::const_iterator i(instances_.begin());
+             i != instances_.end(); ++i)
+        {
+            if (pc_view_.id() == i->second.last_prim())
+            {
+                total_weight += i->second.weight();
+            }
+        }
+    }
+    return total_weight;
+}
 
 // Validate state message agains local state
 void gcomm::pc::Proto::validate_state_msgs() const

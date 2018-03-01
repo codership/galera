@@ -190,6 +190,7 @@ public:
                    rst_view -> id().seq()));
     }
     const View* restored_view() const { return rst_view_; }
+    int cluster_weight() const;
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);
     Proto (const Proto&);
