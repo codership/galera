@@ -73,4 +73,7 @@
 #  define gu_unlikely(x) (x)
 #endif
 
+/* returns minimum multiple of A that is >= S */
+#define GU_ALIGN(S,A) ((((S) - 1)/(A) + 1)*(A))
+
 #endif /* _gu_macros_h_ */

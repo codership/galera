@@ -8,6 +8,7 @@
 #include "gu_alloc.hpp"
 #include "gu_throw.hpp"
 #include "gu_assert.hpp"
+#include "gu_arch.h"
 #include "gu_limits.h"
 
 #include <sstream>
@@ -17,6 +18,7 @@
 gu::Allocator::HeapPage::HeapPage (page_size_type const size) :
     Page (static_cast<byte_t*>(::malloc(size)), size)
 {
+    assert(0 == (uintptr_t(base_ptr_) % GU_WORD_BYTES));
     if (0 == base_ptr_) gu_throw_error (ENOMEM);
 }
 
@@ -56,7 +58,8 @@ gu::Allocator::FilePage::FilePage (const std::string& name,
 #endif /* HAVE_PSI_INTERFACE */
     mmap_(fd_, true)
 {
-    base_ptr_ = reinterpret_cast<byte_t*>(mmap_.ptr);
+    base_ptr_ = static_cast<byte_t*>(mmap_.ptr);
+    assert(0 == (uintptr_t(base_ptr_) % GU_WORD_BYTES));
     ptr_      = base_ptr_;
     left_     = mmap_.size;
 }
@@ -188,6 +191,7 @@ gu::Allocator::Allocator (const BaseName&         base_name,
     size_         (0)
 {
     assert (NULL != reserved || 0 == reserved_size);
+    assert (0 == (uintptr_t(reserved) % GU_WORD_BYTES));
     assert (current_page_ != 0);
     pages_->push_back (current_page_);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -13,6 +13,10 @@
 #define _gu_uuid_h_
 
 #include "gu_types.h"
+#include "gu_macros.h"
+#include "gu_arch.h" // GU_ASSERT_ALIGNMENT()
+
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,11 +25,12 @@ extern "C" {
 /*! UUID internally is represented as a BE integer which allows using
  *  memcmp() as comparison function and straightforward printing */
 #define GU_UUID_LEN 16
-typedef struct {
-    uint8_t data[GU_UUID_LEN];
+typedef union {
+    uint8_t   data[GU_UUID_LEN];
+    gu_word_t alignment;
 } gu_uuid_t;
 
-extern const gu_uuid_t GU_UUID_NIL;
+static gu_uuid_t const GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
 /*! length of string representation */
 #define GU_UUID_STR_LEN 36
@@ -70,7 +75,7 @@ gu_uuid_generate (gu_uuid_t*  uuid,
  * Compare two UUIDs according to RFC
  * @return -1, 0, 1 if left is respectively less, equal or greater than right
  */
-extern long
+extern int
 gu_uuid_compare (const gu_uuid_t* left,
                  const gu_uuid_t* right);
 
@@ -78,7 +83,7 @@ gu_uuid_compare (const gu_uuid_t* left,
  * Compare ages of two UUIDs
  * @return -1, 0, 1 if left is respectively younger, equal or older than right
  */
-extern long
+extern int
 gu_uuid_older (const gu_uuid_t* left,
                const gu_uuid_t* right);
 
@@ -95,6 +100,18 @@ gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen);
  */
 extern ssize_t
 gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid);
+
+/*!
+ * Copy UUID from to as ::memcpy() seems to be considerably faster than the
+ * default assignement operator for structs
+ */
+GU_FORCE_INLINE void
+gu_uuid_copy(gu_uuid_t* const to, const gu_uuid_t* const from)
+{
+    GU_ASSERT_ALIGNMENT(*to);
+    GU_ASSERT_ALIGNMENT(*from);
+    memcpy(to, from, sizeof(gu_uuid_t));
+}
 
 #ifdef __cplusplus
 }

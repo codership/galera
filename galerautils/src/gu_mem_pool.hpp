@@ -43,6 +43,7 @@ namespace gu
               reserve_  (reserve)
         {
             assert(buf_size_ >  0);
+            assert(reserve   >= 0);
             pool_.reserve(reserve_);
         }
 

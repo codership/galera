@@ -58,7 +58,7 @@ namespace gcache
 
         if (gu_likely(s > 0))
         {
-            size_type const size(s + sizeof(BufferHeader));
+            size_type const size(MemOps::align_size(s + sizeof(BufferHeader)));
 
             gu::Lock lock(mtx);
 
@@ -74,6 +74,8 @@ namespace gcache
             if (0 != ptr) buf_tracker.insert (ptr);
 #endif
         }
+
+        assert((uintptr_t(ptr) % MemOps::ALIGNMENT) == 0);
 
         return ptr;
     }
@@ -161,7 +163,9 @@ namespace gcache
             return NULL;
         }
 
-        size_type const size(s + sizeof(BufferHeader));
+        assert((uintptr_t(ptr) % MemOps::ALIGNMENT) == 0);
+
+        size_type const size(MemOps::align_size(s + sizeof(BufferHeader)));
 
         void*               new_ptr(NULL);
         BufferHeader* const bh(ptr2BH(ptr));
@@ -214,6 +218,7 @@ namespace gcache
 
         }
 #endif
+        assert((uintptr_t(new_ptr) % MemOps::ALIGNMENT) == 0);
 
         return new_ptr;
     }
