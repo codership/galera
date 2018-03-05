@@ -9,6 +9,7 @@
 #include "gu_throw.hpp"
 
 #include <map>
+#include <algorithm> // std::for_each
 
 using namespace galera;
 

@@ -56,6 +56,7 @@ START_TEST(test_resolver)
 }
 END_TEST
 
+#if 0 /* bogus test, commenting out for now */
 START_TEST(trac_288)
 {
     try
@@ -69,7 +70,7 @@ START_TEST(trac_288)
     }
 }
 END_TEST
-
+#endif
 
 
 Suite* gu_net_suite()
@@ -82,9 +83,9 @@ Suite* gu_net_suite()
     tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
+#if 0 /* bogus test, commenting out for now */
     tc = tcase_create("trac_288");
     tcase_add_test(tc, trac_288);
-#if 0 /* bogus test, commenting out for now */
     suite_add_tcase(s, tc);
 #endif
 

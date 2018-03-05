@@ -8,8 +8,10 @@
 #include "gu_buffer.hpp"
 #include "gu_serialize.hpp"
 #include "gu_utils.hpp"
+#include "gu_throw.hpp"
 
 #include <limits>
+#include <cassert>
 
 #include <cstring>
 #include <stdint.h>
@@ -252,13 +254,13 @@ namespace gcomm
 
         const gu::Buffer& payload() const
         {
-            assert(payload_ != 0);
+            assert(payload_);
             return *payload_;
         }
 
         gu::Buffer& payload()
         {
-            assert(payload_ != 0);
+            assert(payload_);
             return *payload_;
         }
 

@@ -1,7 +1,8 @@
-// Copyright (C) 2009-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2017 Codership Oy <info@codership.com>
 
 #include "galera_info.hpp"
 #include <galerautils.h>
+#include <gu_uuid.hpp>
 #include <string.h>
 
 static size_t
@@ -42,8 +43,9 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
                 wsrep_member_info_t* member = &ret->members[m];
 
                 size_t id_len = strlen(str);
-                gu_uuid_scan (str, id_len,
-                              reinterpret_cast<gu_uuid_t*>(&member->id));
+                gu_uuid_t memb_id;
+                gu_uuid_from_string(str, memb_id);
+                memcpy(&member->id, &memb_id, sizeof(memb_id));
                 str = str + id_len + 1;
 
                 strncpy(member->name, str, sizeof(member->name) - 1);

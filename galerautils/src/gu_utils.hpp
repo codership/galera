@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2017 Codership Oy <info@codership.com>
 
 /**
  * @file General-purpose functions and templates
@@ -15,6 +15,7 @@
 #include <limits>
 
 #include "gu_exception.hpp"
+#include "gu_types.hpp"
 
 namespace gu {
 
@@ -163,6 +164,17 @@ swap_array(T (&a)[N], T (&b)[N])
 {
     for (size_t n(0); n < N; ++n) std::swap(a[n], b[n]);
 }
+
+/*! template to do arithmetics on void and byte pointers, compiler will
+ *  catch anything else.
+ * @return input type */
+template <typename T>
+inline T*
+ptr_offset(T* ptr, ptrdiff_t i) { return static_cast<byte_t*>(ptr) + i; }
+
+template <typename T>
+inline const T*
+ptr_offset(const T* ptr, ptrdiff_t i) { return static_cast<const byte_t*>(ptr)+i; }
 
 } // namespace gu
 

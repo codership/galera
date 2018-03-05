@@ -66,8 +66,8 @@ public:
         static size_t const TMP_STORE_SIZE = 4096;
         static size_t const MAX_HASH_SIZE  = 16;
 
-        struct TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; };
-        union  HashData { gu::byte_t buf[MAX_HASH_SIZE]; uint64_t align; };
+        union TmpStore { gu::byte_t buf[TMP_STORE_SIZE]; gu_word_t align; };
+        union HashData { gu::byte_t buf[MAX_HASH_SIZE];  gu_word_t align; };
 
         /* This ctor creates a serialized representation of a key in tmp store
          * from a key hash and optional annotation. */
@@ -76,7 +76,8 @@ public:
                  Version const   ver,
                  bool const      exclusive,
                  const wsrep_buf_t* parts, /* for annotation */
-                 int const       part_num
+                 int const       part_num,
+                 int const       alignment
             )
             : data_(tmp.buf)
         {
@@ -86,7 +87,11 @@ public:
             int const key_size
                 (8 << (static_cast<unsigned int>(ver - FLAT16) <= 1));
 
-            memcpy (tmp.buf, hash.buf, key_size);
+            assert((key_size % alignment) == 0);
+            assert((uintptr_t(tmp.buf)  % GU_WORD_BYTES) == 0);
+            assert((uintptr_t(hash.buf) % GU_WORD_BYTES) == 0);
+
+            ::memcpy (tmp.buf, hash.buf, key_size);
 
             /*  use lower bits for header:  */
 
@@ -104,7 +109,9 @@ public:
             if (annotated(ver))
             {
                 store_annotation(parts, part_num,
-                                 tmp.buf + key_size,sizeof(tmp.buf) - key_size);
+                                 tmp.buf + key_size,
+                                 sizeof(tmp.buf) - key_size,
+                                 alignment);
             }
         }
 
@@ -296,7 +303,7 @@ public:
 
         static size_t
         store_annotation (const wsrep_buf_t* parts, int part_num,
-                          gu::byte_t* buf, int size);
+                          gu::byte_t* buf, int size, int alignment);
 
         static void
         print_annotation (std::ostream& os, const gu::byte_t* buf);
@@ -527,7 +534,8 @@ public:
                  KeySetOut&     store,
                  const KeyPart* parent,
                  const KeyData& kd,
-                 int const      part_num);
+                 int const      part_num,
+                 int const      alignment);
 
         KeyPart (const KeyPart& k)
         :
@@ -622,14 +630,15 @@ public:
     KeySetOut (gu::byte_t*             reserved,
                size_t                  reserved_size,
                const BaseName&         base_name,
-               KeySet::Version const   version)
+               KeySet::Version const   version,
+               gu::RecordSet::Version const rsv)
         :
         gu::RecordSetOut<KeySet::KeyPart> (
             reserved,
             reserved_size,
             base_name,
-            check_type      (version),
-            ks_to_rs_version(version)
+            check_type(version),
+            rsv
             ),
         added_(),
         prev_ (),
@@ -637,6 +646,7 @@ public:
         version_(version)
     {
         assert (version_ != KeySet::EMPTY);
+        assert ((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
         KeyPart zero(version_);
         prev_().push_back(zero);
     }
@@ -664,18 +674,6 @@ private:
         {
         case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
         default: return gu::RecordSet::CHECK_MMH128;
-        }
-
-        KeySet::throw_version(ver);
-    }
-
-    static gu::RecordSet::Version
-    ks_to_rs_version (KeySet::Version ver)
-    {
-        switch (ver)
-        {
-        case KeySet::EMPTY: break; /* Can't create EMPTY KeySetOut */
-        default: return gu::RecordSet::VER1;
         }
 
         KeySet::throw_version(ver);

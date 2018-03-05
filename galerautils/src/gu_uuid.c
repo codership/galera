@@ -25,8 +25,6 @@
 #include <errno.h>    // for errno
 #include <stddef.h>
 
-const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
-
 #define UUID_NODE_LEN 6
 
 /** Returns 64-bit system time in 100 nanoseconds */
@@ -108,6 +106,7 @@ uuid_fill_node (uint8_t* node, size_t node_len)
 void
 gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
 {
+    GU_ASSERT_ALIGNMENT(*uuid);
     assert (NULL != uuid);
     assert (NULL == node || 0 != node_len);
 
@@ -140,7 +139,7 @@ gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
  * Compare two UUIDs
  * @return -1, 0, 1 if left is respectively less, equal or greater than right
  */
-long
+int
 gu_uuid_compare (const gu_uuid_t* left,
                  const gu_uuid_t* right)
 {
@@ -166,10 +165,13 @@ uuid_time (const gu_uuid_t* uuid)
  * Compare ages of two UUIDs
  * @return -1, 0, 1 if left is respectively younger, equal or older than right
  */
-long
+int
 gu_uuid_older (const gu_uuid_t* left,
                const gu_uuid_t* right)
 {
+    GU_ASSERT_ALIGNMENT(*left);
+    GU_ASSERT_ALIGNMENT(*right);
+
     uint64_t time_left  = uuid_time (left);
     uint64_t time_right = uuid_time (right);
 
@@ -181,6 +183,7 @@ gu_uuid_older (const gu_uuid_t* left,
 
 ssize_t gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen)
 {
+    GU_ASSERT_ALIGNMENT(*uuid);
     if (buflen < GU_UUID_STR_LEN) return -1;
     return sprintf(buf, GU_UUID_FORMAT, GU_UUID_ARGS(uuid));
 }
@@ -188,6 +191,7 @@ ssize_t gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen)
 
 ssize_t gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid)
 {
+    GU_ASSERT_ALIGNMENT(*uuid);
     ssize_t ret;
     if (buflen < GU_UUID_STR_LEN) return -1;
     ret = sscanf(buf, GU_UUID_FORMAT_SCANF, GU_UUID_ARGS_SCANF(uuid));

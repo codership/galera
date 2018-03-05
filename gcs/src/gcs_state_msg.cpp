@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <galerautils.h>
+#include <gu_serialize.hpp>
 
 #define GCS_STATE_MSG_VER 4
 
@@ -171,11 +172,14 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *prim_uuid      = state->prim_uuid;
     *received       = htog64(state->received);
     *prim_seqno     = htog64(state->prim_seqno);
+
+    /* from this point alignment breaks */
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
     *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
-    *cached         = htog64(state->cached);
-    *desync_count   = htog32(state->desync_count);
+
+    gu::serialize8(state->cached, cached, 0);
+    gu::serialize4(state->desync_count, desync_count, 0);
 
     return ((uint8_t*)(desync_count + 1) - (uint8_t*)buf);
 }
@@ -201,14 +205,14 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
     int64_t* cached_ptr = (int64_t*)(appl_ptr + 1);
     if (*version >= 3) {
         assert(buf_len >= (uint8_t*)(cached_ptr + 1) - (uint8_t*)buf);
-        cached = gtoh64(*cached_ptr);
+        gu::unserialize8(cached_ptr, 0, cached);
     }
 
     int32_t  desync_count = 0;
     int32_t* desync_count_ptr = (int32_t*)(cached_ptr + 1);
     if (*version >= 4) {
         assert(buf_len >= (uint8_t*)(desync_count_ptr + 1) - (uint8_t*)buf);
-        desync_count = gtoh32(*desync_count_ptr);
+        gu::unserialize4(desync_count_ptr, 0, desync_count);
     }
 
     gcs_state_msg_t* ret = gcs_state_msg_create (
