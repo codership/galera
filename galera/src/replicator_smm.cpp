@@ -1133,14 +1133,9 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
         // finished.
         gu::datetime::Date wait_until(gu::datetime::Date::calendar()
                                       + causal_read_timeout_);
-        if (gu_likely(co_mode_ != CommitOrder::BYPASS))
-        {
-            commit_monitor_.wait(cseq, wait_until);
-        }
-        else
-        {
-            apply_monitor_.wait(cseq, wait_until);
-        }
+
+        apply_monitor_.wait(cseq, wait_until);
+
         if (gtid != 0)
         {
             gtid->uuid = state_uuid_;
