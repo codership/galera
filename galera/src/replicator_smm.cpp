@@ -1600,6 +1600,12 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     size_t app_req_len(0);
 
     const_cast<wsrep_view_info_t&>(view_info).state_gap = st_required;
+
+    // We need to set the protocol version BEFORE the view callback, so that
+    // any version-dependent code is run using the correct version instead of -1.
+    if (view_info.view >= 0) // Primary configuration
+        establish_protocol_versions (repl_proto);
+
     wsrep_cb_status_t const rcode(
         view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len));
 
@@ -1624,8 +1630,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (view_info.view >= 0) // Primary configuration
     {
-        establish_protocol_versions (repl_proto);
-
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         // Also this must be done before releasing GCache buffers.
