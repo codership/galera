@@ -390,9 +390,9 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     if (!exit_loop && receivers_.sub_and_fetch(1) == 0)
     {
         gu::Lock lock(closing_mutex_);
-
         if (state_() > S_CLOSED && !closing_)
         {
+            start_closing();
             if (retval == WSREP_OK)
             {
                 log_warn << "Broken shutdown sequence, provider state: "
