@@ -409,18 +409,19 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     if (!exit_loop && receivers_.sub_and_fetch(1) == 0)
     {
         gu::Lock lock(closing_mutex_);
-
         if (state_() > S_CLOSED && !closing_)
         {
             assert(WSREP_CONN_FAIL == retval);
             /* Last recv thread exiting due to error but replicator is not
              * closed. We need to at least gracefully leave the cluster.*/
 
-            log_warn << "Broken shutdown sequence, provider state: "
-                     << state_() << ", retval: " << retval;
-            assert (0);
+            if (WSREP_OK == retval)
+            {
+                log_warn << "Broken shutdown sequence, provider state: "
+                         << state_() << ", retval: " << retval;
+                assert (0);
+            }
 
-            /* avoid abort in production */
             start_closing();
 
             // Generate zero view before exit to notify application
