@@ -1030,7 +1030,6 @@ wsrep_status_t galera_to_execute_end(wsrep_t*           const gh,
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
-    wsrep_status_t retval;
     TrxHandlePtr txp(repl->local_conn_trx(conn_id, false));
     TrxHandle* trx(txp.get());
 
@@ -1040,13 +1039,6 @@ wsrep_status_t galera_to_execute_end(wsrep_t*           const gh,
         log_warn << "No trx handle for connection " << conn_id
                  << " in galera_to_execute_end()";
         return WSREP_CONN_FAIL;
-    }
-
-    if (trx == 0)
-    {
-        log_warn << "Could not find local connection object for "
-                 << conn_id;
-        return WSREP_WARNING;
     }
 
     wsrep_status_t ret(WSREP_OK);
