@@ -49,6 +49,8 @@ galera::Wsdb::~Wsdb()
     std::cerr << *this;
     assert(trx_map_.size() == 0);
     assert(conn_map_.size() == 0);
+#else
+    for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 #endif // !NDEBUG
 }
 
@@ -156,15 +158,6 @@ void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
         i->second.reset_trx();
-    }
-}
-
-void galera::Wsdb::discard_conn(wsrep_conn_id_t conn_id)
-{
-    gu::Lock lock(conn_mutex_);
-    ConnMap::iterator i;
-    if ((i = conn_map_.find(conn_id)) != conn_map_.end())
-    {
         conn_map_.erase(i);
     }
 }

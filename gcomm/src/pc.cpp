@@ -221,6 +221,8 @@ void gcomm::PC::close(bool force)
 void gcomm::PC::handle_get_status(gu::Status& status) const
 {
     status.insert("gcomm_uuid", uuid().full_str());
+    status.insert("cluster_weight", gu::to_string(
+                      pc_ ? pc_->cluster_weight() : 0));
 }
 
 gcomm::PC::PC(Protonet& net, const gu::URI& uri) :
