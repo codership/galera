@@ -51,7 +51,6 @@ namespace galera
             TrxHandleMasterPtr trx_;
         };
 
-
         class TrxHash
         {
         public:
@@ -92,13 +91,30 @@ namespace galera
                                           wsrep_conn_id_t conn_id,
                                           bool create = false);
 
-        void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
 
         Wsdb();
         ~Wsdb();
 
         void print(std::ostream& os) const;
+
+        struct stats
+        {
+            stats(size_t n_trx, size_t n_conn)
+                : n_trx_(n_trx)
+                , n_conn_(n_conn)
+            { }
+            size_t n_trx_;
+            size_t n_conn_;
+        };
+
+        stats get_stats() const
+        {
+            gu::Lock trx_lock(trx_mutex_);
+            gu::Lock conn_lock(conn_mutex_);
+            stats ret(trx_map_.size(), conn_map_.size());
+            return ret;
+        }
 
     private:
         // Create new trx handle

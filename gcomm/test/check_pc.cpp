@@ -2123,6 +2123,12 @@ START_TEST(test_weighted_quorum)
         gu_trace(prop.propagate_until_cvi(false));
     }
 
+    for (size_t i(0); i < n_nodes; ++i)
+    {
+        int weight(pc_from_dummy(dn[i])->cluster_weight());
+        fail_unless(weight == 3,
+                    "index: %i weight: %i", i, weight);
+    }
     // split node 3 (weight 2) out, node 3 should remain in prim while
     // nodes 1 and 2 (weights 0 + 1 = 1) should end up in non-prim
     prop.split(1, 3);
@@ -2131,6 +2137,10 @@ START_TEST(test_weighted_quorum)
     set_cvi(dn, 0, 1, view_seq, V_NON_PRIM);
     set_cvi(dn, 2, 2, view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(true));
+
+    fail_unless(pc_from_dummy(dn[0])->cluster_weight() == 0);
+    fail_unless(pc_from_dummy(dn[1])->cluster_weight() == 0);
+    fail_unless(pc_from_dummy(dn[2])->cluster_weight() == 2);
 }
 END_TEST
 
