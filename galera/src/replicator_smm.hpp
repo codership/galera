@@ -89,11 +89,6 @@ namespace galera
             wsdb_.discard_conn_query(conn_id);
         }
 
-        void discard_local_conn(wsrep_conn_id_t conn_id)
-        {
-            wsdb_.discard_conn(conn_id);
-        }
-
         void apply_trx(void* recv_ctx, TrxHandleSlave& trx);
         void handle_apply_error(TrxHandleSlave&    trx,
                                 const wsrep_buf_t& error_buf,
