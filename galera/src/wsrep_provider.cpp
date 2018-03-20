@@ -675,24 +675,12 @@ wsrep_status_t galera_free_connection(wsrep_t*        const gh,
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
-
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-
-    try
-    {
-        repl->discard_local_conn(conn_id);
-        return WSREP_OK;
-    }
-    catch (std::exception& e)
-    {
-        log_warn << e.what();
-        return WSREP_CONN_FAIL;
-    }
-    catch (...)
-    {
-        log_fatal << "non-standard exception";
-        return WSREP_FATAL;
-    }
+    // This function is now no-op and can be removed from the
+    // future versions. Connection object is allocated only from
+    // galera_to_execute_start() and will be released either
+    // from that function in case of failure or from
+    // galera_to_execute_end().
+    return WSREP_OK;
 }
 
 
@@ -804,7 +792,6 @@ wsrep_status_t galera_to_execute_end(wsrep_t*        const gh,
 
     // trx will be unreferenced (destructed) during purge
     repl->discard_local_conn_trx(conn_id);
-    repl->discard_local_conn(conn_id);
     return ret;
 }
 

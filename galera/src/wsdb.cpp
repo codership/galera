@@ -169,15 +169,6 @@ void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
         i->second.assign_trx(0);
-    }
-}
-
-void galera::Wsdb::discard_conn(wsrep_conn_id_t conn_id)
-{
-    gu::Lock lock(conn_mutex_);
-    ConnMap::iterator i;
-    if ((i = conn_map_.find(conn_id)) != conn_map_.end())
-    {
         conn_map_.erase(i);
     }
 }

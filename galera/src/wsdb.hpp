@@ -47,7 +47,6 @@ namespace galera
             TrxHandle* trx_;
         };
 
-
         class TrxHash
         {
         public:
@@ -77,7 +76,6 @@ namespace galera
                                   wsrep_conn_id_t conn_id,
                                   bool create = false);
 
-        void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
 
         Wsdb();

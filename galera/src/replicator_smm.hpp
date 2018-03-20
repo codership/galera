@@ -88,11 +88,6 @@ namespace galera
             wsdb_.discard_conn_query(conn_id);
         }
 
-        void discard_local_conn(wsrep_conn_id_t conn_id)
-        {
-            wsdb_.discard_conn(conn_id);
-        }
-
         void apply_trx(void* recv_ctx, TrxHandle* trx);
 
         wsrep_status_t replicate(TrxHandle* trx, wsrep_trx_meta_t*);
