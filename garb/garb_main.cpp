@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include <stdlib.h> // exit()
-#include <unistd.h> // setsid(), chdir()
+#include <unistd.h> // setsid()
 #include <fcntl.h>  // open()
 
 namespace garb
@@ -37,11 +37,6 @@ become_daemon ()
     if (setsid()<0) // become a new process leader, detach from terminal
     {
         gu_throw_error(errno) << "setsid() failed";
-    }
-
-    if (chdir("/")) // detach from potentially removable block devices
-    {
-        gu_throw_error(errno) << "chdir(\"/\") failed";
     }
 
     // umask(0);

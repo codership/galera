@@ -212,6 +212,12 @@ install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 install -d $RBR%{_mandir}/man8
 install -m 644 $RBD/man/garbd.8        $RBR%{_mandir}/man8/garbd.8
 
+%pre
+getent group garb >/dev/null || groupadd -r garb
+getent passwd garb >/dev/null || useradd -r -g garb -d /var/lib/garb -s /sbin/nologin garb
+mkdir -p /var/lib/garb && chown garb:garb /var/lib/garb
+exit 0
+
 
 %if 0%{?systemd}
 
