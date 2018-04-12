@@ -405,9 +405,9 @@ namespace galera
             LocalOrder()
                 :
                 seqno_(WSREP_SEQNO_UNDEFINED)
-#ifdef GU_DBUG_ON
+#if defined(GU_DBUG_ON) || !defined(NDEBUG)
                 ,trx_(NULL)
-#endif //GU_DBUG_ON
+#endif /* GU_DBUG_ON || !NDEBUG */
             {}
 #endif /* NDEBUG */
 
@@ -425,7 +425,7 @@ namespace galera
             // this pointer is for debugging purposes only and
             // is not guaranteed to point at a valid location
             const TrxHandle* const trx_;
-#endif //GU_DBUG_ON
+#endif /* GU_DBUG_ON || !NDEBUG */
         };
 
         class ApplyOrder
@@ -440,7 +440,11 @@ namespace galera
 #ifndef NDEBUG
                 ,trx_          (&trx)
 #endif
-            { }
+            {
+#ifndef NDEBUG
+                (void)trx_; // to pacify clang's -Wunused-private-field
+#endif
+            }
 
             ApplyOrder(wsrep_seqno_t gs,
                        wsrep_seqno_t ds,
