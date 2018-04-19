@@ -414,11 +414,13 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
  *       malloc()/calloc()/realloc() and it will be freed by
  *       wsrep provider.
  *
+ * @param app_ctx     application context
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code,
  *                    value of 0 means no SST.
  */
 typedef enum wsrep_cb_status (*wsrep_sst_request_cb_t) (
+    void*                     app_ctx,
     void**                    sst_req,
     size_t*                   sst_req_len
 );
