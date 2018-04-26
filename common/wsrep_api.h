@@ -627,11 +627,11 @@ typedef struct wsrep_po_handle { void* opaque; } wsrep_po_handle_t;
 static const wsrep_po_handle_t WSREP_PO_INITIALIZER = { NULL };
 
 
-typedef struct wsrep wsrep_t;
+typedef struct wsrep_st wsrep_t;
 /*!
  * wsrep interface for dynamically loadable libraries
  */
-struct wsrep {
+struct wsrep_st {
 
     const char *version; //!< interface version string
 
@@ -773,12 +773,14 @@ struct wsrep {
    *
    * @param wsrep      provider handle
    * @param ws_handle  internal provider writeset handle
+   * @param meta       transaction meta data
    *
    * @retval WSREP_OK         commit order entered succesfully
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
     wsrep_status_t (*commit_order_enter)(wsrep_t*                 wsrep,
-                                         const wsrep_ws_handle_t* ws_handle);
+                                         const wsrep_ws_handle_t* ws_handle,
+                                         const wsrep_trx_meta_t* meta);
 
   /*!
    * @brief Leaves commit order critical section
@@ -788,6 +790,7 @@ struct wsrep {
    *
    * @param wsrep      provider handle
    * @param ws_handle  internal provider writeset handle
+   * @param meta       transaction meta data
    * @param error      buffer containing error info (null/empty for no error)
    *
    * @retval WSREP_OK         commit order left succesfully
@@ -795,6 +798,7 @@ struct wsrep {
    */
     wsrep_status_t (*commit_order_leave)(wsrep_t*                 wsrep,
                                          const wsrep_ws_handle_t* ws_handle,
+                                         const wsrep_trx_meta_t*  meta,
                                          const wsrep_buf_t*       error);
 
   /*!
@@ -833,10 +837,10 @@ struct wsrep {
                                  void*               trx_ctx);
 
   /*!
-   * @brief Abort pre_commit() call of another thread.
+   * @brief Abort certify() call of another thread.
    *
    * It is possible, that some high-priority transaction needs to abort
-   * another transaction which is in pre_commit() call waiting for resources.
+   * another transaction which is in certify() call waiting for resources.
    *
    * The kill routine checks that abort is not attmpted against a transaction
    * which is front of the caller (in total order).
