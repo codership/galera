@@ -2467,7 +2467,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         // call connected callback to notify application.
         if ((first_view || state_uuid_ != group_uuid) && connected_cb_)
         {
-            wsrep_cb_status_t cret(connected_cb_(0, view_info));
+            wsrep_cb_status_t cret(connected_cb_(app_ctx_, view_info));
             if (cret != WSREP_CB_SUCCESS)
             {
                 log_fatal << "Application returned error "
@@ -2499,7 +2499,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
 
-        wsrep_cb_status_t const rcode(sst_request_cb_(&app_req, &app_req_len));
+        wsrep_cb_status_t const rcode(sst_request_cb_(app_ctx_,
+                                                      &app_req, &app_req_len));
 
         if (WSREP_CB_SUCCESS != rcode)
         {

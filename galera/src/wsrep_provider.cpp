@@ -601,7 +601,8 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
 extern "C"
 wsrep_status_t galera_commit_order_enter(
     wsrep_t*                 const gh,
-    const wsrep_ws_handle_t* const ws_handle
+    const wsrep_ws_handle_t* const ws_handle,
+    const wsrep_trx_meta_t*  const meta
     )
 {
     assert(gh        != 0);
@@ -661,6 +662,7 @@ extern "C"
 wsrep_status_t galera_commit_order_leave(
     wsrep_t*                 const gh,
     const wsrep_ws_handle_t* const ws_handle,
+    const wsrep_trx_meta_t*  const meta,
     const wsrep_buf_t*       const error
     )
 {

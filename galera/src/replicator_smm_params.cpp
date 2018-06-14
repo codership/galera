@@ -124,6 +124,11 @@ galera::ReplicatorSMM::ParseOptions::ParseOptions(Replicator&       repl,
                                                   gu::Config&       conf,
                                                   const char* const opts)
 {
+    assert(opts);
+    if (opts == 0)
+    {
+        gu_throw_fatal << "ReplicatorSMM::ParseOptions ctor: options is NULL";
+    }
     conf.parse(opts);
 
     if (conf.get<bool>(Replicator::Param::debug_log))
