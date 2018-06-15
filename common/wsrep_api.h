@@ -118,7 +118,7 @@ typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
 typedef uint32_t wsrep_cap_t; //!< capabilities bitmask
 
 /*!
- *  Writeset flags
+ * Writeset flags
  *
  * TRX_END      the writeset and all preceding writesets must be committed
  * ROLLBACK     all preceding writesets in a transaction must be rolled back
@@ -128,6 +128,7 @@ typedef uint32_t wsrep_cap_t; //!< capabilities bitmask
  * NATIVE       the writeset contains another writeset in this provider format
  *
  * TRX_START    shall be set on the first trx fragment by provider
+ * TRX_PREPARE  shall be set on the fragment which prepares the transaction
  *
  * Note that some of the flags are mutually exclusive (e.g. TRX_END and
  * ROLLBACK).
@@ -139,7 +140,8 @@ typedef uint32_t wsrep_cap_t; //!< capabilities bitmask
 #define WSREP_FLAG_COMMUTATIVE          ( 1ULL << 4 )
 #define WSREP_FLAG_NATIVE               ( 1ULL << 5 )
 #define WSREP_FLAG_TRX_START            ( 1ULL << 6 )
-#define WSREP_FLAG_SNAPSHOT             ( 1ULL << 7 )
+#define WSREP_FLAG_TRX_PREPARE          ( 1ULL << 7 )
+#define WSREP_FLAG_SNAPSHOT             ( 1ULL << 8 )
 
 #define WSREP_FLAGS_LAST                WSREP_FLAG_SNAPSHOT
 #define WSREP_FLAGS_MASK                ((WSREP_FLAGS_LAST << 1) - 1)
@@ -398,7 +400,7 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
 /*!
  * @brief Creates and returns State Snapshot Transfer request for provider.
  *
- * This handler is called whenvever the node is found to miss some of events
+ * This handler is called whenever the node is found to miss some of events
  * from the cluster history (e.g. fresh node joining the cluster).
  * SST will be used if it is impossible (or impractically long) to replay
  * missing events, which may be not known in advance, so the node must always
@@ -408,7 +410,7 @@ typedef enum wsrep_cb_status (*wsrep_view_cb_t) (
  * chosen SST donor node and must contain information sufficient for
  * donor to deliver SST (typically SST method and delivery address).
  * See above macros WSREP_STATE_TRANSFER_TRIVIAL and WSREP_STATE_TRANSFER_NONE
- * to modify the standard provider benavior.
+ * to modify the standard provider behavior.
  *
  * @note Currently it is assumed that sst_req is allocated using
  *       malloc()/calloc()/realloc() and it will be freed by
@@ -575,7 +577,7 @@ typedef struct wsrep_key
 
 /*! Key type:
  *  EXCLUSIVE conflicts with any key type
- *  SEMI      reserved. If not supported, should be interpeted as EXCLUSIVE
+ *  SEMI      reserved. If not supported, should be interpreted as EXCLUSIVE
  *  SHARED    conflicts only with EXCLUSIVE keys */
 typedef enum wsrep_key_type
 {
@@ -662,7 +664,7 @@ struct wsrep_st {
    * @param conf  configuration string
    *
    * @retval WSREP_OK      configuration string was parsed successfully
-   * @retval WSREP_WARNING could't not parse conf string, no action taken
+   * @retval WSREP_WARNING could not parse configuration string, no action taken
    */
     wsrep_status_t (*options_set) (wsrep_t* wsrep, const char* conf);
 
@@ -679,7 +681,7 @@ struct wsrep_st {
   /*!
    * @brief Opens connection to cluster
    *
-   * Returns when either node is ready to operate as a part of the clsuter
+   * Returns when either node is ready to operate as a part of the cluster
    * or fails to reach operating status.
    *
    * @param wsrep        provider handle
@@ -688,7 +690,7 @@ struct wsrep_st {
    * @param state_donor  name of the node to be asked for state transfer.
    * @param bootstrap    a flag to request initialization of a new wsrep
    *                     service rather then a connection to the existing one.
-   *                     clister_url may still carry important initialization
+   *                     cluster_url may still carry important initialization
    *                     parameters, like backend spec and/or listen address.
    */
     wsrep_status_t (*connect) (wsrep_t*     wsrep,
@@ -722,7 +724,7 @@ struct wsrep_st {
    *        with it.
    *
    * @param wsrep  provider handle
-   * @param handle writset handle
+   * @param handle writeset handle
    * @param rv     read view GTID established by the caller or if NULL,
    *               provider will infer it internally.
    */
@@ -775,7 +777,7 @@ struct wsrep_st {
    * @param ws_handle  internal provider writeset handle
    * @param meta       transaction meta data
    *
-   * @retval WSREP_OK         commit order entered succesfully
+   * @retval WSREP_OK         commit order entered successfully
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
     wsrep_status_t (*commit_order_enter)(wsrep_t*                 wsrep,
@@ -793,7 +795,7 @@ struct wsrep_st {
    * @param meta       transaction meta data
    * @param error      buffer containing error info (null/empty for no error)
    *
-   * @retval WSREP_OK         commit order left succesfully
+   * @retval WSREP_OK         commit order left successfully
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
     wsrep_status_t (*commit_order_leave)(wsrep_t*                 wsrep,
@@ -842,7 +844,7 @@ struct wsrep_st {
    * It is possible, that some high-priority transaction needs to abort
    * another transaction which is in certify() call waiting for resources.
    *
-   * The kill routine checks that abort is not attmpted against a transaction
+   * The kill routine checks that abort is not attempted against a transaction
    * which is front of the caller (in total order).
    *
    * If the abort was successful, the victim sequence number is stored
@@ -853,7 +855,7 @@ struct wsrep_st {
    * @param victim_trx transaction to be aborted, and which is committing
    * @param victim_seqno seqno of the victim transaction if assigned
    *
-   * @retval WSREP_OK          abort succeded
+   * @retval WSREP_OK          abort succeeded
    * @retval WSREP_NOT_ALLOWED the provider declined the abort request
    * @retval WSREP_TRX_MISSING the victim_trx was missing
    * @retval WSREP_WARNING     abort failed
@@ -886,7 +888,7 @@ struct wsrep_st {
    * @param ws_handle  writeset handle
    * @param keys       array of keys
    * @param count      length of the array of keys
-   * @param type       type ot the key
+   * @param type       type of the key
    * @param copy       can be set to FALSE if keys persist through commit.
    */
     wsrep_status_t (*append_key)(wsrep_t*            wsrep,
@@ -983,7 +985,7 @@ struct wsrep_st {
    *
    * In this mode a query execution is split in two phases. The first phase is
    * acquiring total order isolation to access critical section and the
-   * second phase is to release aquired resources in total order.
+   * second phase is to release acquired resources in total order.
    *
    * To start the first phase the call is made with WSREP_FLAG_TRX_START set.
    * The action is replicated and success code is returned. The total order
@@ -999,7 +1001,7 @@ struct wsrep_st {
    * @param wsrep       provider handle
    * @param conn_id     connection ID
    * @param keys        array of keys
-   * @param keys_num    lenght of the array of keys
+   * @param keys_num    length of the array of keys
    * @param action      action buffer array to be executed
    * @param count       action buffer count
    * @param flags       flags
@@ -1116,7 +1118,7 @@ struct wsrep_st {
   /*!
    * @brief Generate request for consistent snapshot.
    *
-   * If successfull, this call will generate internally SST request
+   * If successful, this call will generate internally SST request
    * which in turn triggers calling SST donate callback on the nodes
    * specified in donor_spec. If donor_spec is null, callback is
    * called only locally. This call will block until sst_sent is called
@@ -1179,7 +1181,7 @@ struct wsrep_st {
    * @brief Request to resynchronize with cluster.
    *
    * Effectively turns on flow control. Asynchronous - actual synchronization
-   * event to be deliverred via sync_cb.
+   * event to be delivered via sync_cb.
    */
     wsrep_status_t (*resync) (wsrep_t* wsrep);
 
@@ -1245,7 +1247,7 @@ struct wsrep_st {
     void (*free)(wsrep_t* wsrep);
 
     void *dlh;    //!< reserved for future use
-    void *ctx;    //!< reserved for implemetation private context
+    void *ctx;    //!< reserved for implementation private context
 };
 
 
@@ -1253,7 +1255,7 @@ struct wsrep_st {
  *
  * @brief Loads wsrep library
  *
- * @param spec   path to wsrep library. If NULL or WSREP_NONE initialises dummy
+ * @param spec   path to wsrep library. If NULL or WSREP_NONE initializes dummy
  *               pass-through implementation.
  * @param hptr   wsrep handle
  * @param log_cb callback to handle loader messages. Otherwise writes to stderr.
