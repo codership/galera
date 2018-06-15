@@ -106,6 +106,7 @@ namespace galera
             F_COMMUTATIVE = 1 << 4,
             F_NATIVE      = 1 << 5,
             F_BEGIN       = 1 << 6,
+            F_PREPARE     = 1 << 7,
             /*
              * reserved for provider extension
              */
@@ -121,7 +122,8 @@ namespace galera
                             WSREP_FLAG_PA_UNSAFE   == F_PA_UNSAFE    &&
                             WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
                             WSREP_FLAG_NATIVE      == F_NATIVE       &&
-                            WSREP_FLAG_TRX_START   == F_BEGIN);
+                            WSREP_FLAG_TRX_START   == F_BEGIN        &&
+                            WSREP_FLAG_TRX_PREPARE == F_PREPARE);
 
         static uint32_t wsrep_flags_to_ws_flags (uint32_t flags);
 
@@ -466,6 +468,7 @@ namespace galera
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
             if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
+            if (flags & WSREP_FLAG_TRX_PREPARE) ret |= F_PREPARE;
 
             return ret;
         }

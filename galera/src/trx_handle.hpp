@@ -64,6 +64,7 @@ namespace galera
             F_COMMUTATIVE = 1 << 4,
             F_NATIVE      = 1 << 5,
             F_BEGIN       = 1 << 6,
+            F_PREPARE     = 1 << 7,
             /*
              * reserved for API extension
              */
@@ -73,7 +74,7 @@ namespace galera
              */
         };
 
-        static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 7) - 1);
+        static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 8) - 1);
         static const uint32_t EXPLICIT_ROLLBACK_FLAGS = F_PA_UNSAFE | F_ROLLBACK;
 
         static bool const FLAGS_MATCH_API_FLAGS =
@@ -84,6 +85,7 @@ namespace galera
                                   WSREP_FLAG_COMMUTATIVE == F_COMMUTATIVE  &&
                                   WSREP_FLAG_NATIVE      == F_NATIVE       &&
                                   WSREP_FLAG_TRX_START   == F_BEGIN        &&
+                                  WSREP_FLAG_TRX_PREPARE == F_PREPARE      &&
                                   int(WriteSetNG::F_PREORDERED) ==F_PREORDERED);
 
         static uint32_t wsrep_flags_to_trx_flags (uint32_t flags);
@@ -267,6 +269,7 @@ namespace galera
             if (flags & WSREP_FLAG_COMMUTATIVE) ret |= F_COMMUTATIVE;
             if (flags & WSREP_FLAG_NATIVE)      ret |= F_NATIVE;
             if (flags & WSREP_FLAG_TRX_START)   ret |= F_BEGIN;
+            if (flags & WSREP_FLAG_TRX_PREPARE) ret |= F_PREPARE;
 
             return ret;
         }
@@ -284,6 +287,7 @@ namespace galera
             if (flags & F_COMMUTATIVE) ret |= WSREP_FLAG_COMMUTATIVE;
             if (flags & F_NATIVE)      ret |= WSREP_FLAG_NATIVE;
             if (flags & F_BEGIN)       ret |= WSREP_FLAG_TRX_START;
+            if (flags & F_PREPARE)     ret |= WSREP_FLAG_TRX_PREPARE;
 
             return ret;
         }
@@ -302,6 +306,7 @@ namespace galera
             if (flags & WriteSetNG::F_NATIVE)      ret |= F_NATIVE;
             if (flags & WriteSetNG::F_BEGIN)       ret |= F_BEGIN;
             if (flags & WriteSetNG::F_PREORDERED)  ret |= F_PREORDERED;
+            if (flags & WriteSetNG::F_PREPARE)     ret |= F_PREPARE;
 
             return ret;
         }
