@@ -289,17 +289,22 @@ get_local_trx(REPL_CLASS* const        repl,
 }
 
 extern "C"
-wsrep_status_t galera_replay_trx(wsrep_t*            gh,
-                                 wsrep_ws_handle_t*  trx_handle,
-                                 void*               recv_ctx)
+wsrep_status_t galera_replay_trx(wsrep_t*                  gh,
+                                 const wsrep_ws_handle_t*  trx_handle,
+                                 void*                     recv_ctx)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    TrxHandle* trx(get_local_trx(repl, trx_handle, false));
+    TrxHandle* const trx(static_cast<TrxHandle*>(trx_handle->opaque));
     assert(trx != 0);
-
+    if (trx == 0)
+    {
+        log_warn << "Trx " << trx_handle->trx_id
+                 << " not found for replaying";
+        return WSREP_TRX_MISSING;
+    }
     log_debug << "replaying " << *trx;
     wsrep_status_t retval;
 
