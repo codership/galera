@@ -1097,10 +1097,6 @@ void gcomm::pc::Proto::handle_install(const Message& msg, const UUID& source)
                      << " weight (reg) " << NodeMap::value(local_i).weight()
                      << " -> " << msg_n.weight();
             NodeMap::value(local_i).set_weight(msg_n.weight());
-            if (source == uuid())
-            {
-                conf_.set(gcomm::Conf::PcWeight, gu::to_string(msg_n.weight()));
-            }
         }
         return;
     }
@@ -1291,12 +1287,6 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
                         {
                             NodeMap::value(local_i).set_weight(
                                 NodeMap::value(i).weight());
-                            if (source == uuid())
-                            {
-                                conf_.set(gcomm::Conf::PcWeight,
-                                          gu::to_string(NodeMap::value(i).weight()));
-                            }
-
                         }
                         NodeMap::value(local_i).set_un(true);
                     }
@@ -1311,10 +1301,6 @@ gcomm::pc::Proto::handle_trans_install(const Message& msg, const UUID& source)
                      << " weight (trans) " << NodeMap::value(local_i).weight()
                      << " -> " << msg_n.weight();
             NodeMap::value(local_i).set_weight(msg_n.weight());
-            if (source == uuid())
-            {
-                conf_.set(gcomm::Conf::PcWeight, gu::to_string(msg_n.weight()));
-            }
         }
     }
     else
@@ -1631,6 +1617,7 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
                                        << "' out of range";
             }
             weight_ = w;
+            conf_.set(gcomm::Conf::PcWeight, weight_);
             send_install(false, weight_);
             return true;
         }
