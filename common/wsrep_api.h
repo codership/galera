@@ -834,9 +834,9 @@ struct wsrep_st {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*replay_trx)(wsrep_t*            wsrep,
-                                 wsrep_ws_handle_t*  ws_handle,
-                                 void*               trx_ctx);
+    wsrep_status_t (*replay_trx)(wsrep_t*                  wsrep,
+                                 const wsrep_ws_handle_t*  ws_handle,
+                                 void*                     trx_ctx);
 
   /*!
    * @brief Abort certify() call of another thread.
