@@ -64,7 +64,7 @@ void gu::ssl_init_options(gu::Config& conf)
         // set defaults
 
         // cipher list
-        const std::string cipher_list(conf.get(conf::ssl_cipher, "AES128-SHA"));
+        const std::string cipher_list(conf.get(conf::ssl_cipher, ""));
         conf.set(conf::ssl_cipher, cipher_list);
 
         // compression
@@ -121,6 +121,15 @@ namespace
     };
 }
 
+static void throw_last_SSL_error(const std::string& msg)
+{
+    unsigned long const err(ERR_peek_last_error());
+    char errstr[120] = {0, };
+    ERR_error_string_n(err, errstr, sizeof(errstr));
+    gu_throw_error(EINVAL) << msg << ": "
+                           << err << ": '" << errstr << "'";
+}
+
 void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
                              bool verify_peer_cert)
 {
@@ -135,6 +144,12 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
 
     try
     {
+#ifdef OPENSSL_HAS_SET_ECDH_AUTO
+        if (!SSL_CTX_set_ecdh_auto(ctx.impl(), 1))
+        {
+            throw_last_SSL_error("SSL_CTX_set_ecdh_auto() failed");
+        }
+#endif /* OPENSSL_HAS_SET_ECDH_AUTO */
         param = conf::ssl_key;
         ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
         param = conf::ssl_cert;
@@ -142,7 +157,19 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
         param = conf::ssl_ca;
         ctx.load_verify_file(conf.get(param, conf.get(conf::ssl_cert)));
         param = conf::ssl_cipher;
-        SSL_CTX_set_cipher_list(ctx.impl(), conf.get(param).c_str());
+        std::string const value(conf.get(param));
+        if (!value.empty())
+        {
+            if (!SSL_CTX_set_cipher_list(ctx.impl(), value.c_str()))
+            {
+                throw_last_SSL_error("Error setting SSL cipher list to '"
+                                      + value + "'");
+            }
+            else
+            {
+                log_info << "SSL cipher list set to '" << value << '\'';
+            }
+        }
         ctx.set_options(asio::ssl::context::no_sslv2 |
                         asio::ssl::context::no_sslv3 |
                         asio::ssl::context::no_tlsv1);
