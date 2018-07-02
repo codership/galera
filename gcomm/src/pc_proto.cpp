@@ -1470,7 +1470,7 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         gu_trace(handle_install(msg, um.source()));
         {
           gu::Lock lock(sync_param_mutex_);
-          if (param_sync_set_)
+          if (param_sync_set_ && (um.source() == uuid()))
           {
               param_sync_set_ = false;
               sync_param_cond_.signal();
