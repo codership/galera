@@ -96,7 +96,7 @@ public:
         rst_view_         (),
         sync_param_mutex_ (),
         sync_param_cond_  (),
-        param_set_        (0)
+        param_sync_set_   (0)
 
     {
         set_weight(weight_);
@@ -241,7 +241,7 @@ private:
 
     gu::Mutex         sync_param_mutex_;
     gu::Cond          sync_param_cond_;
-    bool              param_set_;
+    bool              param_sync_set_;
 };
 
 

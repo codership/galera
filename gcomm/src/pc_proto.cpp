@@ -1470,9 +1470,9 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         gu_trace(handle_install(msg, um.source()));
         {
           gu::Lock lock(sync_param_mutex_);
-          if (param_set_)
+          if (param_sync_set_)
           {
-              param_set_ = true;
+              param_sync_set_ = false;
               sync_param_cond_.signal();
           }
         }
@@ -1601,7 +1601,7 @@ void gcomm::pc::Proto::sync_param()
 {
     gu::Lock lock(sync_param_mutex_);
 
-    while(!param_set_) 
+    while(param_sync_set_) 
     {
         lock.wait(sync_param_cond_);
     }
@@ -1655,7 +1655,7 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
             sync_param_cb = boost::bind(&gcomm::pc::Proto::sync_param, this);
             {
                 gu::Lock lock(sync_param_mutex_);
-                param_set_ = false;
+                param_sync_set_ = true;
             }
             send_install(false, weight_);
    
