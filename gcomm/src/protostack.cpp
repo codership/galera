@@ -66,13 +66,14 @@ void gcomm::Protostack::dispatch(const void* id,
 
 
 bool gcomm::Protostack::set_param(const std::string& key,
-                                  const std::string& val)
+                                  const std::string& val,
+                                  Protolay::sync_param_cb_t& sync_param_cb)
 {
     bool ret(false);
     for (std::deque<Protolay*>::iterator i(protos_.begin());
          i != protos_.end(); ++i)
     {
-        ret |= (*i)->set_param(key, val);
+        ret |= (*i)->set_param(key, val, sync_param_cb);
     }
     return ret;
 }

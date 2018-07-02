@@ -1590,6 +1590,7 @@ START_TEST(test_trac_724)
     const size_t n_nodes(2);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    Protolay::sync_param_cb_t sync_param_cb;
 
     const string suspect_timeout("PT0.5S");
     const string inactive_timeout("PT1S");
@@ -1612,18 +1613,18 @@ START_TEST(test_trac_724)
     // Slightly asymmetric settings and evs.use_aggregate=false to
     // allow completion window to grow over 0xff.
     Proto* evs0(evs_from_dummy(dn[0]));
-    bool ret(evs0->set_param("evs.use_aggregate", "false"));
-    fail_unless(ret == true);
-    ret = evs0->set_param("evs.send_window", "1024");
-    fail_unless(ret == true);
-    ret = evs0->set_param("evs.user_send_window", "515");
 
+    bool ret(evs0->set_param("evs.use_aggregate", "false", sync_param_cb));
+    fail_unless(ret == true);
+    ret = evs0->set_param("evs.send_window", "1024", sync_param_cb);
+    fail_unless(ret == true);
+    ret = evs0->set_param("evs.user_send_window", "515", sync_param_cb);
     Proto* evs1(evs_from_dummy(dn[1]));
-    ret = evs1->set_param("evs.use_aggregate", "false");
+    ret = evs1->set_param("evs.use_aggregate", "false", sync_param_cb);
     fail_unless(ret == true);
-    ret = evs1->set_param("evs.send_window", "1024");
+    ret = evs1->set_param("evs.send_window", "1024", sync_param_cb);
     fail_unless(ret == true);
-    ret = evs1->set_param("evs.user_send_window", "512");
+    ret = evs1->set_param("evs.user_send_window", "512", sync_param_cb);
 
     prop.set_loss(1, 2, 0.);
 
@@ -2086,6 +2087,7 @@ START_TEST(test_gal_521)
     log_info << "Start test_gal_521";
 
     std::vector<DummyNode*> dn;
+    Protolay::sync_param_cb_t sync_param_cb;
 
     dn.push_back(create_dummy_node(1, 0));
     dn.push_back(create_dummy_node(2, 0));
@@ -2107,11 +2109,11 @@ START_TEST(test_gal_521)
 
     // Adjust send windows to allow sending only single user generated
     // message at the time
-    evs1->set_param(gcomm::Conf::EvsUserSendWindow, "1");
-    evs1->set_param(gcomm::Conf::EvsSendWindow, "1");
+    evs1->set_param(gcomm::Conf::EvsUserSendWindow, "1", sync_param_cb);
+    evs1->set_param(gcomm::Conf::EvsSendWindow, "1", sync_param_cb);
 
-    evs2->set_param(gcomm::Conf::EvsUserSendWindow, "1");
-    evs2->set_param(gcomm::Conf::EvsSendWindow, "1");
+    evs2->set_param(gcomm::Conf::EvsUserSendWindow, "1", sync_param_cb);
+    evs2->set_param(gcomm::Conf::EvsSendWindow, "1", sync_param_cb);
 
     // Make both sides send two messages without communicating with
     // each other. This will place one user message into transport

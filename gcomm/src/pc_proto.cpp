@@ -7,10 +7,13 @@
 
 #include "gcomm/util.hpp"
 
+#include "gu_lock.hpp"
 #include "gu_logger.hpp"
 #include "gu_macros.h"
 #include <algorithm>
 #include <set>
+
+#include <boost/bind.hpp>
 
 using std::rel_ops::operator!=;
 using std::rel_ops::operator>;
@@ -1465,6 +1468,14 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         break;
     case Message::PC_T_INSTALL:
         gu_trace(handle_install(msg, um.source()));
+        {
+          gu::Lock lock(sync_param_mutex_);
+          if (param_set_)
+          {
+              param_set_ = true;
+              sync_param_cond_.signal();
+          }
+        }
         break;
     case Message::PC_T_USER:
         gu_trace(handle_user(msg, rb, um));
@@ -1586,9 +1597,19 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
     return ret;
 }
 
+void gcomm::pc::Proto::sync_param()
+{
+    gu::Lock lock(sync_param_mutex_);
+
+    while(!param_set_) 
+    {
+        lock.wait(sync_param_cond_);
+    }
+}
 
 bool gcomm::pc::Proto::set_param(const std::string& key,
-                                 const std::string& value)
+                                 const std::string& value,
+                                 Protolay::sync_param_cb_t& sync_param_cb)
 {
     if (key == gcomm::Conf::PcIgnoreSb)
     {
@@ -1631,7 +1652,13 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
                                        << "' out of range";
             }
             weight_ = w;
+            sync_param_cb = boost::bind(&gcomm::pc::Proto::sync_param, this);
+            {
+                gu::Lock lock(sync_param_mutex_);
+                param_set_ = false;
+            }
             send_install(false, weight_);
+   
             return true;
         }
     }

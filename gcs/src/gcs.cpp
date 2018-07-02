@@ -2286,23 +2286,7 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     }
 #endif /* GCS_SM_DEBUG */
     else {
-
-        long ret = gcs_core_param_set (conn->core, key, value);
-
-        if (ret == 0) {
-
-            gcs_seqno_t seqno = gcs_core_caused(conn->core);
-
-            if (seqno < 0) {
-
-                gu_warn("gcs_caused() returned %d (%s)",
-                        seqno, strerror(-seqno));
-
-                ret = seqno;
-            }
-        }
-
-        return ret;
+        return gcs_core_param_set (conn->core, key, value);
     }
 }
 

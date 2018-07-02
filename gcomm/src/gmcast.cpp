@@ -1709,7 +1709,8 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
 }
 
 
-bool gcomm::GMCast::set_param(const std::string& key, const std::string& val)
+bool gcomm::GMCast::set_param(const std::string& key, const std::string& val,
+                              Protolay::sync_param_cb_t& sync_param_cb)
 {
     try
     {

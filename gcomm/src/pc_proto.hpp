@@ -15,6 +15,8 @@
 #include "defaults.hpp"
 
 #include "gu_uri.hpp"
+#include "gu_mutex.hpp"
+#include "gu_cond.hpp"
 
 #ifndef GCOMM_PC_MAX_VERSION
 #define GCOMM_PC_MAX_VERSION 0
@@ -68,30 +70,34 @@ public:
           View*          rst_view = NULL)
         :
         Protolay(conf),
-        my_uuid_       (uuid),
-        start_prim_    (),
-        npvo_          (param<bool>(conf, uri, Conf::PcNpvo, Defaults::PcNpvo)),
-        ignore_quorum_ (param<bool>(conf, uri, Conf::PcIgnoreQuorum,
-                                    Defaults::PcIgnoreQuorum)),
-        ignore_sb_     (param<bool>(conf, uri, Conf::PcIgnoreSb,
-                                    gu::to_string(ignore_quorum_))),
-        closing_       (false),
-        state_         (S_CLOSED),
-        last_sent_seq_ (0),
-        checksum_      (param<bool>(conf, uri, Conf::PcChecksum,
-                                    Defaults::PcChecksum)),
-        instances_     (),
-        self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
-        state_msgs_    (),
-        current_view_  (0, V_NONE),
-        pc_view_       (0, V_NON_PRIM),
-        views_         (),
-        mtu_           (std::numeric_limits<int32_t>::max()),
-        weight_        (check_range(Conf::PcWeight,
-                                    param<int>(conf, uri, Conf::PcWeight,
-                                               Defaults::PcWeight),
-                                    0, 0xff)),
-        rst_view_      ()
+        my_uuid_          (uuid),
+        start_prim_       (),
+        npvo_             (param<bool>(conf, uri, Conf::PcNpvo, Defaults::PcNpvo)),
+        ignore_quorum_    (param<bool>(conf, uri, Conf::PcIgnoreQuorum,
+                                       Defaults::PcIgnoreQuorum)),
+        ignore_sb_        (param<bool>(conf, uri, Conf::PcIgnoreSb,
+                                       gu::to_string(ignore_quorum_))),
+        closing_          (false),
+        state_            (S_CLOSED),
+        last_sent_seq_    (0),
+        checksum_         (param<bool>(conf, uri, Conf::PcChecksum,
+                                       Defaults::PcChecksum)),
+        instances_        (),
+        self_i_           (instances_.insert_unique(std::make_pair(uuid, Node()))),
+        state_msgs_       (),
+        current_view_     (0, V_NONE),
+        pc_view_          (0, V_NON_PRIM),
+        views_            (),
+        mtu_              (std::numeric_limits<int32_t>::max()),
+        weight_           (check_range(Conf::PcWeight,
+                                      param<int>(conf, uri, Conf::PcWeight,
+                                                 Defaults::PcWeight),
+                                      0, 0xff)),
+        rst_view_         (),
+        sync_param_mutex_ (),
+        sync_param_cond_  (),
+        param_set_        (0)
+
     {
         set_weight(weight_);
         NodeMap::value(self_i_).set_segment(segment);
@@ -176,7 +182,11 @@ public:
 
     void handle_view (const View&);
 
-    bool set_param(const std::string& key, const std::string& val);
+    bool set_param(const std::string& key, const std::string& val, 
+                   Protolay::sync_param_cb_t& sync_param_cb);
+    
+    void sync_param();
+
     void set_mtu(size_t mtu) { mtu_ = mtu; }
     size_t mtu() const { return mtu_; }
     void set_restored_view(View* rst_view) {
@@ -228,6 +238,10 @@ private:
     size_t            mtu_;           // Maximum transmission unit
     int               weight_;        // Node weight in voting
     View*             rst_view_;      // restored PC view
+
+    gu::Mutex         sync_param_mutex_;
+    gu::Cond          sync_param_cond_;
+    bool              param_set_;
 };
 
 
