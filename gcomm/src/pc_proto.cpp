@@ -158,7 +158,7 @@ void gcomm::pc::Proto::send_state()
     }
 }
 
-void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
+int gcomm::pc::Proto::send_install(bool bootstrap, int weight)
 {
     gcomm_assert(bootstrap == false || weight == -1);
     log_debug << self_id() << " send install";
@@ -207,6 +207,7 @@ void gcomm::pc::Proto::send_install(bool bootstrap, int weight)
         log_warn << self_id() << " sending install message failed: "
                  << strerror(ret);
     }
+    return ret;
 }
 
 
@@ -1611,6 +1612,8 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
                                  const std::string& value,
                                  Protolay::sync_param_cb_t& sync_param_cb)
 {
+    bool ret;
+    
     if (key == gcomm::Conf::PcIgnoreSb)
     {
         ignore_sb_ = gu::from_string<bool>(value);
@@ -1632,7 +1635,8 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
         }
         else
         {
-            send_install(true);
+            ret = send_install(true);
+            if (ret != 0) gu_throw_error(ret); 
         }
         return true;
     }
@@ -1652,13 +1656,11 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
                                        << "' out of range";
             }
             weight_ = w;
+            ret = send_install(false, weight_);
+            if (ret != 0)  gu_throw_error(ret);
             sync_param_cb = boost::bind(&gcomm::pc::Proto::sync_param, this);
-            {
-                gu::Lock lock(sync_param_mutex_);
-                param_sync_set_ = true;
-            }
-            send_install(false, weight_);
-   
+            gu::Lock lock(sync_param_mutex_);
+            param_sync_set_ = true;
             return true;
         }
     }

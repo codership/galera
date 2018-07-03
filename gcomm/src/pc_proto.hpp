@@ -158,7 +158,7 @@ public:
 
     void shift_to    (State);
     void send_state  ();
-    void send_install(bool bootstrap, int weight = -1);
+    int  send_install(bool bootstrap, int weight = -1);
 
     void handle_first_trans (const View&);
     void handle_trans       (const View&);
