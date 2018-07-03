@@ -1656,11 +1656,18 @@ bool gcomm::pc::Proto::set_param(const std::string& key,
                                        << "' out of range";
             }
             weight_ = w;
+            {
+                sync_param_cb = boost::bind(&gcomm::pc::Proto::sync_param, this);
+                gu::Lock lock(sync_param_mutex_);
+                param_sync_set_ = true;
+            }
             ret = send_install(false, weight_);
-            if (ret != 0)  gu_throw_error(ret);
-            sync_param_cb = boost::bind(&gcomm::pc::Proto::sync_param, this);
-            gu::Lock lock(sync_param_mutex_);
-            param_sync_set_ = true;
+            if (ret != 0) 
+            { 
+                gu::Lock lock(sync_param_mutex_);
+                param_sync_set_ = false;
+                gu_throw_error(ret);
+            }
             return true;
         }
     }
