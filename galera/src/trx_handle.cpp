@@ -304,7 +304,7 @@ TransMapBuilder<TrxHandleMaster>::TransMapBuilder()
     add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_ABORTING);
 
     // Replay stage
-    add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
+    add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTING);
 
     // BF aborted
     add(TrxHandle::S_ABORTING,     TrxHandle::S_ROLLED_BACK);

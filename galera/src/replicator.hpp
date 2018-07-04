@@ -74,6 +74,7 @@ namespace galera
         virtual wsrep_status_t certify(TrxHandleMaster&     trx,
                                        wsrep_trx_meta_t*    meta) = 0;
         virtual wsrep_status_t replay_trx(TrxHandleMaster&  trx,
+                                          TrxHandleLock&    lock,
                                           void*             replay_ctx) = 0;
         virtual wsrep_status_t abort_trx(TrxHandleMaster& trx,
                                          wsrep_seqno_t bf_seqno,

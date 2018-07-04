@@ -1053,11 +1053,38 @@ namespace galera
     class TrxHandleLock
     {
     public:
-        TrxHandleLock(TrxHandleMaster& trx) : trx_(trx) { trx_.lock(); }
-        ~TrxHandleLock() { trx_.unlock(); }
-    private:
-        TrxHandleMaster& trx_;
+        TrxHandleLock(TrxHandleMaster& trx)
+            : trx_(trx)
+            , locked_(false)
+        {
+            trx_.lock();
+            locked_ = true;
+        }
+        ~TrxHandleLock()
+        {
+            if (locked_)
+            {
+                trx_.unlock();
+            }
+        }
 
+        void lock()
+        {
+            trx_.lock();
+            locked_ = true;
+        }
+
+        void unlock()
+        {
+            assert(locked_ = true);
+            locked_ = false;
+            trx_.unlock();
+        }
+    private:
+        TrxHandleLock(const TrxHandleLock&);
+        TrxHandleLock& operator=(const TrxHandleLock&);
+        TrxHandleMaster& trx_;
+        bool locked_;
     }; /* class TrxHnadleLock */
 
 } /* namespace galera*/

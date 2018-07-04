@@ -1071,6 +1071,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
 
 
 wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
+                                                 TrxHandleLock& lock,
                                                  void* const      trx_ctx)
 {
     TrxHandleSlavePtr tsp(trx.ts());
@@ -1153,11 +1154,13 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
              * not trying to catch anything here */
             assert(trx.owned());
             bool unused(false);
+            lock.unlock();
             gu_trace(ts.apply(trx_ctx, apply_cb_, meta, unused));
+            lock.lock();
             assert(false == unused);
             log_debug << "replayed " << ts.global_seqno();
             assert(ts.state() == TrxHandle::S_COMMITTED);
-            TX_SET_STATE(trx, ts.state());
+            assert(trx.state() == TrxHandle::S_COMMITTED);
         }
         catch (gu::Exception& e)
         {
@@ -1241,7 +1244,8 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandleMaster& trx)
     assert(trx.locked());
 
     assert(trx.state() == TrxHandle::S_APPLYING  ||
-           trx.state() == TrxHandle::S_ABORTING);
+           trx.state() == TrxHandle::S_ABORTING  ||
+           trx.state() == TrxHandle::S_REPLAYING);
 
     TrxHandle::State const next_state
         (trx.state() == TrxHandle::S_ABORTING ?

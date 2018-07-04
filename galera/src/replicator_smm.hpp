@@ -106,7 +106,9 @@ namespace galera
                                           const wsrep_buf_t*  error);
         wsrep_status_t release_commit(TrxHandleMaster& trx);
         wsrep_status_t release_rollback(TrxHandleMaster& trx);
-        wsrep_status_t replay_trx(TrxHandleMaster& trx, void* replay_ctx);
+        wsrep_status_t replay_trx(TrxHandleMaster& trx,
+                                  TrxHandleLock& lock,
+                                  void* replay_ctx);
 
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                  int           tout,

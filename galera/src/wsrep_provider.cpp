@@ -308,7 +308,7 @@ wsrep_status_t galera_replay_trx(wsrep_t*                  gh,
     try
     {
         TrxHandleLock lock(*trx);
-        retval = repl->replay_trx(*trx, recv_ctx);
+        retval = repl->replay_trx(*trx, lock, recv_ctx);
     }
     catch (std::exception& e)
     {
@@ -633,7 +633,7 @@ wsrep_status_t galera_commit_order_enter(
             TrxHandleMaster& trx(*reinterpret_cast<TrxHandleMaster*>(txp));
             TrxHandleLock lock(trx);
 
-            assert(trx.state() != TrxHandle::S_REPLAYING);
+            // assert(trx.state() != TrxHandle::S_REPLAYING);
 
             if (gu_unlikely(trx.state() == TrxHandle::S_MUST_ABORT))
             {
