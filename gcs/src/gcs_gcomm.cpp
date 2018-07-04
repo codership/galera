@@ -870,6 +870,8 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
         return -EBADFD;
     }
 
+    Protolay::sync_param_cb_t sync_param_cb;
+
     GCommConn& conn(*ref.get());
     try
     {
@@ -879,14 +881,10 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
             return -ECONNABORTED;
         }
 
-        if (conn.get_pnet().set_param(key, value) == false)
+        if (conn.get_pnet().set_param(key, value, sync_param_cb) == false)
         {
             log_debug << "param " << key << " not recognized";
             return 1;
-        }
-        else
-        {
-            return 0;
         }
     }
     catch (gu::Exception& e)
@@ -910,6 +908,13 @@ GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
         log_fatal << "gcomm param set: caught unknown exception";
         return -ENOTRECOVERABLE;
     }
+
+    if (!sync_param_cb.empty()) 
+    {
+        sync_param_cb();
+    }
+  
+    return 0;
 }
 
 
