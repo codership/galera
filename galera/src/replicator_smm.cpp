@@ -1530,7 +1530,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     else
     {
         // Non-primary configuration
-        if (state_uuid_ != WSREP_UUID_UNDEFINED)
+        if (state_uuid_ != WSREP_UUID_UNDEFINED && next_state == S_CLOSING)
         {
             st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         }
