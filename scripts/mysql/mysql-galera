@@ -285,7 +285,9 @@ galera_start()
         mv "$MYSQL_DATA_DIR/core" "$MYSQL_DATA_DIR/core.old"
     fi
 
-    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+    echo -n "Starting mysqld instance with base dir $MYSQL_BASE_DIR, " \
+            "data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT " \
+            "and socket $MYSQL_SOCKET..."
     ulimit -n 4096 # This is normally allowed for non-privileged users
     echo 0x3f > /proc/self/coredump_filter # dump mmapped memory as well
 
@@ -295,6 +297,7 @@ galera_start()
             $DEFAULTS_OPTION \
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
+            --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
             --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
@@ -324,6 +327,7 @@ galera_start()
             $DEFAULTS_OPTION \
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
+            --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
             --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
@@ -345,6 +349,7 @@ galera_start()
             $DEFAULTS_OPTION \
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
+            --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
             --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
