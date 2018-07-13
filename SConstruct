@@ -183,8 +183,8 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-cc_version = read_first_line(env['CC'].split() + ['--version'])
-cxx_version = read_first_line(env['CXX'].split() + ['--version'])
+cc_version = read_first_line(env['CC'].split() + ['--version']).decode()
+cxx_version = read_first_line(env['CXX'].split() + ['--version']).decode()
 
 print('Using C compiler executable: ' + env['CC'])
 print('C compiler version is: ' + cc_version)
