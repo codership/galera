@@ -1190,7 +1190,7 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
     if (must_apply == true)
     {
         drain_monitors(act.seqno_g - 1);
-        process_conf_change(app_ctx_, act);
+        process_conf_change(0, act);
         GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
     }
 }
