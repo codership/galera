@@ -1,11 +1,12 @@
 //
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp"
 #include "galera_info.hpp"
 
 #include <gu_abort.h>
+#include <gu_throw.hpp>
 
 namespace galera {
 
@@ -1025,33 +1026,72 @@ void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
+    ISTEvent::Type event_type(ISTEvent::T_NULL);
     TrxHandleSlavePtr ts;
+    wsrep_view_info_t* view;
+
     try
     {
         bool exit_loop(false);
 
         while (exit_loop == false)
         {
-            ts = ist_event_queue_.pop_front();
-            if (gu_likely(ts != 0))
+            ISTEvent ev(ist_event_queue_.pop_front());
+            event_type = ev.type();
+            switch (event_type)
             {
+            case ISTEvent::T_NULL:
+                exit_loop = true;
+                continue;
+            case ISTEvent::T_TRX:
+                ts = ev.ts();
+                assert(ts);
                 process_IST_writeset(recv_ctx, ts);
                 exit_loop = ts->exit_loop();
-            }
-            else
+                continue;
+            case ISTEvent::T_VIEW:
             {
-                break;
+                view = ev.view();
+                wsrep_seqno_t const cs(view->state_id.seqno);
+
+                submit_view_info(recv_ctx, view);
+
+                ::free(view);
+
+                CommitOrder co(cs, CommitOrder::NO_OOOC);
+                commit_monitor_.leave(co);
+                ApplyOrder ao(cs, cs - 1, false);
+                apply_monitor_.leave(ao);
+                GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
+                continue;
             }
+            }
+
+            gu_throw_fatal << "Unrecognized event of type " << ev.type();
         }
     }
     catch (gu::Exception& e)
     {
-        log_fatal << "receiving IST failed, node restart required: "
-                  << e.what();
-        if (ts != 0)
-            log_fatal << "failed action: " << *ts;
-        else
-            log_fatal << "null action";
+        std::ostringstream os;
+        os << "Receiving IST failed, node restart required: " << e.what();
+
+        switch (event_type)
+        {
+        case ISTEvent::T_NULL:
+            os << ". Null event.";
+            break;
+        case ISTEvent::T_TRX:
+            if (ts)
+                os << ". Failed writeset: " << *ts;
+            else
+                os << ". Corrupt IST event queue.";
+            break;
+        case ISTEvent::T_VIEW:
+            os << ". VIEW event";
+            break;
+        }
+
+        log_fatal << os.str();
 
         mark_corrupt_and_close();
     }
@@ -1066,6 +1106,7 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
 
     assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING ||
            ts.nbo_end());
+    assert(ts.local_seqno() == WSREP_SEQNO_UNDEFINED);
 
     if (ts.nbo_start() == true || ts.nbo_end() == true)
     {
@@ -1165,33 +1206,52 @@ void ReplicatorSMM::ist_end(int error)
 }
 
 void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
-                               bool preload)
+                           bool preload)
 {
     assert(GCS_ACT_CCHANGE == act.type);
     assert(act.seqno_g > 0);
     //log_info << "~~~~~ preprocessing CC " << act.seqno_g;
-    if (preload == true && must_apply == false)
-    {
-        // CC is part of index preload and won't be processed
-        // by process_conf_change()
-        gcs_act_cchange const conf(act.buf, act.size);
 
-        establish_protocol_versions(conf.repl_proto_ver);
+    gcs_act_cchange const conf(act.buf, act.size);
 
-        wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
-        wsrep_view_info_t* const view_info(
-            galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
-                                    -1, uuid_undefined));
-        cert_.adjust_position(*view_info, gu::GTID(conf.uuid, act.seqno_g),
-                              trx_params_.version_);
-        free(view_info);
-    }
+    assert(conf.conf_id >= 0); // Primary configuration
+    assert(conf.seqno == act.seqno_g);
+
+    wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
+    wsrep_view_info_t* const view_info(
+        galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
+                                -1, uuid_undefined));
 
     if (must_apply == true)
     {
-        drain_monitors(act.seqno_g - 1);
         process_conf_change(0, act);
-        GU_DBUG_SYNC_WAIT("recv_IST_after_conf_change");
+        /* TO monitors need to be entered here to maintain critical
+         * section over passing the view through the event queue to
+         * an applier and ensure that the view is submitted in isolation.
+         * Applier is to leave monitors and free the view after it is
+         * submitted */
+        ApplyOrder ao(conf.seqno, conf.seqno - 1, false);
+        apply_monitor_.enter(ao);
+        CommitOrder co(conf.seqno, CommitOrder::NO_OOOC);
+        commit_monitor_.enter(co);
+        ist_event_queue_.push_back(view_info);
+    }
+    else
+    {
+        if (preload == true)
+        {
+            /* CC is part of index preload but won't be processed
+             * by process_conf_change()
+             * Order of these calls is essential: trx_params_.version_ may
+             * be altered by establish_protocol_versions() */
+            establish_protocol_versions(conf.repl_proto_ver);
+            cert_.adjust_position(*view_info, gu::GTID(conf.uuid, conf.seqno),
+                                  trx_params_.version_);
+
+        }
+
+        gcache_.free(const_cast<void*>(act.buf));
+        ::free(view_info);
     }
 }
 

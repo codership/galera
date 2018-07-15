@@ -151,10 +151,10 @@ extern "C" void* sender_thd(void* arg)
 
 namespace
 {
-    class ISTObserver : public galera::ist::EventObserver
+    class ISTHandler : public galera::ist::EventHandler
     {
     public:
-        ISTObserver() :
+        ISTHandler() :
             mutex_(),
             cond_(),
             seqno_(0),
@@ -162,7 +162,7 @@ namespace
             error_(0)
         { }
 
-        ~ISTObserver() {}
+        ~ISTHandler() {}
 
         void ist_trx(const TrxHandleSlavePtr& ts, bool must_apply, bool preload)
         {
@@ -248,9 +248,9 @@ extern "C" void* receiver_thd(void* arg)
     mark_point();
 
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
-    ISTObserver isto;
+    ISTHandler isth;
     galera::ist::Receiver receiver(conf, rargs->gcache_, slave_pool,
-                                   isto, 0);
+                                   isth, 0);
 
     // Prepare starts IST receiver thread
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
@@ -262,7 +262,7 @@ extern "C" void* receiver_thd(void* arg)
 
     receiver.ready(rargs->first_);
 
-    log_info << "IST wait finished with status: " << isto.wait();
+    log_info << "IST wait finished with status: " << isth.wait();
 
     receiver.finished();
     return 0;

@@ -91,7 +91,7 @@ galera::ist::register_params(gu::Config& conf)
 galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 gcache::GCache&       gc,
                                 TrxHandleSlave::Pool& slave_pool,
-                                EventObserver&        ob,
+                                EventHandler&         handler,
                                 const char*           addr)
     :
     recv_addr_    (),
@@ -108,7 +108,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     gcache_       (gc),
     slave_pool_   (slave_pool),
     source_id_    (WSREP_UUID_UNDEFINED),
-    observer_     (ob),
+    handler_      (handler),
     thread_       (),
     error_code_   (0),
     version_      (-1),
@@ -529,12 +529,12 @@ void galera::ist::Receiver::run()
                 }
 
                 //log_info << "####### Passing WS " << act.seqno_g;
-                observer_.ist_trx(ts, must_apply, preload);
+                handler_.ist_trx(ts, must_apply, preload);
                 break;
             }
             case GCS_ACT_CCHANGE:
                 //log_info << "####### Passing CC " << act.seqno_g;
-                observer_.ist_cc(act, must_apply, preload);
+                handler_.ist_cc(act, must_apply, preload);
                 break;
             default:
                 assert(0);
@@ -583,7 +583,7 @@ err:
     {
         error_code_ = ec;
     }
-    observer_.ist_end(ec);
+    handler_.ist_end(ec);
 }
 
 

@@ -34,7 +34,7 @@
 
 namespace galera
 {
-    class ReplicatorSMM : public Replicator, public ist::EventObserver
+    class ReplicatorSMM : public Replicator, public ist::EventHandler
     {
     public:
 
@@ -135,6 +135,7 @@ namespace galera
 
         void process_trx(void* recv_ctx, const TrxHandleSlavePtr& trx);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
+        void submit_view_info(void* recv_ctx, const wsrep_view_info_t* cc);
         void process_conf_change(void* recv_ctx, const struct gcs_action& cc);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
@@ -204,6 +205,55 @@ namespace galera
         // Drain apply and commit monitors up to seqno
         void drain_monitors(wsrep_seqno_t seqno);
 
+        class ISTEvent
+        {
+        public:
+            enum Type
+            {
+                T_NULL, // empty
+                T_TRX,  // TrxHandleSlavePtr
+                T_VIEW  // configuration change
+            };
+
+            ISTEvent()
+                : ts_()
+                , view_()
+                , type_(T_NULL)
+            { }
+            ISTEvent(const TrxHandleSlavePtr& ts)
+                : ts_(ts)
+                , view_()
+                , type_(T_TRX)
+            { }
+            ISTEvent(wsrep_view_info_t* view)
+                : ts_()
+                , view_(view)
+                , type_(T_VIEW)
+            { }
+            ISTEvent(const ISTEvent& other)
+                : ts_(other.ts_)
+                , view_(other.view_)
+                , type_(other.type_)
+            { }
+            ISTEvent& operator=(const ISTEvent& other)
+            {
+                ts_ = other.ts_;
+                view_ = other.view_;
+                type_ = other.type_;
+                return *this;
+            }
+            ~ISTEvent()
+            { }
+            Type type() const { return type_; }
+            TrxHandleSlavePtr ts() const
+            { assert(T_TRX == type_); return ts_; }
+            wsrep_view_info_t* view() const
+            { assert(T_VIEW == type_); return view_; }
+        private:
+            TrxHandleSlavePtr  ts_;
+            wsrep_view_info_t* view_;
+            Type               type_;
+        };
         // Helper class to synchronize between IST receiver thread
         // applier threads.
         class ISTEventQueue
@@ -215,7 +265,7 @@ namespace galera
                 cond_(),
                 eof_(false),
                 error_(0),
-                ts_queue_()
+                queue_()
             { }
             void reset() { eof_ = false; error_ = 0; }
             void eof(int error)
@@ -230,7 +280,15 @@ namespace galera
             void push_back(const TrxHandleSlavePtr& ts)
             {
                 gu::Lock lock(mutex_);
-                ts_queue_.push(ts);
+                queue_.push(ISTEvent(ts));
+                cond_.signal();
+            }
+
+            // Push back
+            void push_back(wsrep_view_info_t* view)
+            {
+                gu::Lock lock(mutex_);
+                queue_.push(ISTEvent(view));
                 cond_.signal();
             }
 
@@ -239,19 +297,19 @@ namespace galera
             // Throws gu::Exception() in case of error for the first
             // caller which will detect the error.
             // Returns null in case of EOF
-            TrxHandleSlavePtr pop_front()
+            ISTEvent pop_front()
             {
                 gu::Lock lock(mutex_);
-                while (eof_ == false && ts_queue_.empty() == true)
+                while (eof_ == false && queue_.empty() == true)
                 {
                     lock.wait(cond_);
                 }
 
-                TrxHandleSlavePtr ret;
-                if (ts_queue_.empty() == false)
+                ISTEvent ret;
+                if (queue_.empty() == false)
                 {
-                    ret = ts_queue_.front();
-                    ts_queue_.pop();
+                    ret = queue_.front();
+                    queue_.pop();
                 }
                 else
                 {
@@ -272,7 +330,7 @@ namespace galera
             gu::Cond  cond_;
             bool eof_;
             int error_;
-            std::queue<TrxHandleSlavePtr> ts_queue_;
+            std::queue<ISTEvent> queue_;
         };
 
 

@@ -1068,9 +1068,10 @@ galera::Certification::adjust_position(const View&         view,
         service_thd_->flush(gtid.uuid());
     }
 
-    position_     = gtid.seqno();
-    version_      = version;
-    current_view_ = view;
+    position_       = gtid.seqno();
+    last_pa_unsafe_ = position_;
+    version_        = version;
+    current_view_   = view;
 
     // Loop over NBO entries, clear state and abort waiters. NBO end waiters
     // must resend end messages.

@@ -29,8 +29,8 @@ namespace galera
         void register_params(gu::Config& conf);
 
 
-        // IST event observer interface
-        class EventObserver
+        // IST event handler interface
+        class EventHandler
         {
         public:
             // Process transaction from IST
@@ -42,7 +42,7 @@ namespace galera
             // Report IST end
             virtual void ist_end(int error) = 0;
         protected:
-            virtual ~EventObserver() {}
+            virtual ~EventHandler() {}
         };
 
         class Receiver
@@ -53,7 +53,7 @@ namespace galera
 
             Receiver(gu::Config& conf, gcache::GCache&,
                      TrxHandleSlave::Pool& slave_pool,
-                     EventObserver&, const char* addr);
+                     EventHandler&, const char* addr);
             ~Receiver();
 
             std::string   prepare(wsrep_seqno_t       first_seqno,
@@ -89,7 +89,7 @@ namespace galera
             gcache::GCache&       gcache_;
             TrxHandleSlave::Pool& slave_pool_;
             wsrep_uuid_t          source_id_;
-            EventObserver&        observer_;
+            EventHandler&         handler_;
             gu_thread_t           thread_;
             int                   error_code_;
             int                   version_;
