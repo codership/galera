@@ -637,8 +637,16 @@ wsrep_status_t galera_commit_order_enter(
 
             if (gu_unlikely(trx.state() == TrxHandle::S_MUST_ABORT))
             {
-                trx.set_state(TrxHandle::S_MUST_REPLAY);
-                return WSREP_BF_ABORT;
+                if (trx.ts() && (trx.ts()->flags() & TrxHandle::F_COMMIT))
+                {
+                    trx.set_state(TrxHandle::S_MUST_REPLAY);
+                    return WSREP_BF_ABORT;
+                }
+                else
+                {
+                    trx.set_state(TrxHandle::S_ABORTING);
+                    return WSREP_TRX_FAIL;
+                }
             }
 
             retval = repl->commit_order_enter_local(trx);
@@ -699,10 +707,15 @@ wsrep_status_t galera_commit_order_leave(
             if (trx.state() == TrxHandle::S_MUST_ABORT)
             {
                 // Trx is non-committing streaming replication and
-                // the trx was BF aborted while committing a fragment
+                // the trx was BF aborted while committing a fragment.
+                // At this point however, we can't know if the
+                // fragment is already committed into DBMS fragment storage
+                // or not, so we return a success. The BF abort error
+                // is returned to the caller from galera_release().
                 assert(!(trx.ts()->flags() & TrxHandle::F_COMMIT));
                 trx.set_state(TrxHandle::S_ABORTING);
-                retval = WSREP_BF_ABORT;
+                retval = repl->commit_order_leave(*trx.ts(), error);
+                trx.set_deferred_abort(true);
             }
             else
             {
@@ -790,7 +803,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
 
         if (gu_likely(trx.state() == TrxHandle::S_COMMITTED))
             retval = repl->release_commit(trx);
-        else
+        else if (trx.deferred_abort() == false)
             retval = repl->release_rollback(trx);
 
         switch(trx.state())
@@ -800,9 +813,19 @@ wsrep_status_t galera_release(wsrep_t*            gh,
             break;
         case TrxHandle::S_EXECUTING:
             // trx ready for new fragment
-        case TrxHandle::S_ABORTING:
-            // SR trx was BF aborted between pre_commit() and post_commit()
             if (retval == WSREP_OK) discard_trx = false;
+            break;
+        case TrxHandle::S_ABORTING:
+            // SR trx was BF aborted before commit_order_leave()
+            // We return BF abort error code here and do not clean up
+            // the transaction. The transaction is needed for sending
+            // rollback fragment.
+            if (trx.deferred_abort())
+            {
+                discard_trx = false;
+                retval = WSREP_BF_ABORT;
+                trx.set_deferred_abort(false);
+            }
             break;
         default:
             assert(0);

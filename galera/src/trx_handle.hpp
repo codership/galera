@@ -940,6 +940,9 @@ namespace galera
             }
         }
 
+        void set_deferred_abort(bool deferred_abort)
+        { deferred_abort_ = deferred_abort; }
+        bool deferred_abort() const { return deferred_abort_; }
     private:
 
         inline int pa_range_default() const
@@ -1000,8 +1003,8 @@ namespace galera
             wso_buf_size_      (reserved_size - sizeof(*this)),
             gcs_handle_        (-1),
             wso_               (false),
-            last_ts_seqno_     (WSREP_SEQNO_UNDEFINED)
-
+            last_ts_seqno_     (WSREP_SEQNO_UNDEFINED),
+            deferred_abort_    (false)
         {
             assert(reserved_size > sizeof(*this) + 1024);
         }
@@ -1026,6 +1029,7 @@ namespace galera
         int                    gcs_handle_;
         bool                   wso_;
         wsrep_seqno_t          last_ts_seqno_;
+        bool                   deferred_abort_;
 
         friend class TrxHandle;
         friend class TrxHandleSlave;

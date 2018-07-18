@@ -1440,7 +1440,8 @@ wsrep_status_t
 galera::ReplicatorSMM::commit_order_leave(TrxHandleSlave&          trx,
                                           const wsrep_buf_t* const error)
 {
-    if (trx.state() == TrxHandle::S_MUST_ABORT)
+    if (trx.state() == TrxHandle::S_MUST_ABORT &&
+        (trx.flags() & TrxHandle::F_COMMIT))
     {
         assert(0);
         // This is possible in case of ALG: BF applier BF aborts
@@ -1507,7 +1508,12 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
     assert((ts.flags() & TrxHandle::F_ROLLBACK) == 0);
     assert(ts.local_seqno() > 0 && ts.global_seqno() > 0);
     assert(ts.state() == TrxHandle::S_COMMITTED);
-    assert(trx.state() == TrxHandle::S_COMMITTED);
+    // Streaming transction may enter here in aborting state if the
+    // BF abort happens during fragment commit ordering. Otherwise
+    // should always be committed.
+    assert(trx.state() == TrxHandle::S_COMMITTED ||
+           (trx.state() == TrxHandle::S_ABORTING &&
+            (ts.flags() & TrxHandle::F_COMMIT) == 0));
     assert(!ts.is_committed());
 
     wsrep_seqno_t const safe_to_discard(cert_.set_trx_committed(ts));
@@ -1515,7 +1521,8 @@ wsrep_status_t galera::ReplicatorSMM::release_commit(TrxHandleMaster& trx)
     ApplyOrder ao(ts);
     apply_monitor_.leave(ao);
 
-    if ((ts.flags() & TrxHandle::F_COMMIT) == 0)
+    if ((ts.flags() & TrxHandle::F_COMMIT) == 0 &&
+        trx.state() == TrxHandle::S_COMMITTED)
     {
         // continue streaming
         TX_SET_STATE(trx, TrxHandle::S_EXECUTING);
@@ -1601,6 +1608,8 @@ wsrep_status_t galera::ReplicatorSMM::release_rollback(TrxHandleMaster& trx)
     // Trx was either rolled back by user or via certification failure,
     // last committed report not needed since cert index state didn't change.
     // report_last_committed();
+
+    trx.reset_ts();
     ++local_rollbacks_;
 
     return WSREP_OK;
