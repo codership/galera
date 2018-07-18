@@ -1,0 +1,4 @@
+[submodule "wsrep-API"]
+	path = wsrep/src
+	url = https://github.com/codership/wsrep-API.git
+	branch = master

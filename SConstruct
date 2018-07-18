@@ -373,6 +373,8 @@ conf = Configure(env, custom_tests = {
     'CheckSetEcdhAuto': CheckSetEcdhAuto
 })
 
+conf.env.Append(CPPPATH = [ '#/wsrep/src' ])
+
 # System headers and libraries
 
 if not conf.CheckLib('pthread'):

@@ -41,7 +41,7 @@ export WSPATCH_REVNO=$WSREP_REV
 if [ -r "VERSION" ]
 then
     . "VERSION"
-    WSREP_API=$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f 2)
+    WSREP_API=$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f 2)
     WSREP_PATCH=$(grep SET\(WSREP_PATCH_VERSION cmake/wsrep.cmake | cut -d '"' -f 2)
     export MYSQL_VER=$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH
 else
