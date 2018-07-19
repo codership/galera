@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -492,7 +492,8 @@ namespace galera
          * |                 5 |           3 |              1 |               1 |
          * |                 6 |           3 |              2 |               1 |
          * |                 7 |           3 |              2 |               1 |
-         * |                 8 |           4 |              2 |               2 |
+         * |                 8 |           3 |              2 |               2 |
+         * |                 9 |           4 |              2 |               2 |
          * |--------------------------------------------------------------------|
          */
 

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -111,7 +111,7 @@ namespace galera
 
         TestResult do_test(TrxHandle*, bool);
         TestResult do_test_v1to2(TrxHandle*, bool);
-        TestResult do_test_v3(TrxHandle*, bool);
+        TestResult do_test_v3to4(TrxHandle*, bool);
         TestResult do_test_preordered(TrxHandle*);
         void purge_for_trx(TrxHandle*);
         void purge_for_trx_v1to2(TrxHandle*);

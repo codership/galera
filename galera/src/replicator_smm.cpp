@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -1322,6 +1322,12 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
     case 8:
         // Protocol upgrade to enforce 8-byte alignment in writesets.
         trx_params_.version_ = 3;
+        trx_params_.record_set_ver_ = gu::RecordSet::VER2;
+        str_proto_ver_ = 2;
+        break;
+    case 9:
+        // Protocol upgrade to enable support for semi-shared key type.
+        trx_params_.version_ = 4;
         trx_params_.record_set_ver_ = gu::RecordSet::VER2;
         str_proto_ver_ = 2;
         break;

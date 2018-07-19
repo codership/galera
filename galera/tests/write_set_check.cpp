@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
@@ -437,8 +437,8 @@ START_TEST(test_cert_hierarchical_v1)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
-                    trx->global_seqno(), result, wsi[i].result);
+        fail_unless(result == wsi[i].result, "wsi: %zu, g: %lld r: %d er: %d",
+                    i, trx->global_seqno(), result, wsi[i].result);
         fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
                     "wsi: %zu g: %lld ld: %lld eld: %lld",
                     i, trx->global_seqno(), trx->depends_seqno(),

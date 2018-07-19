@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2018 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -20,13 +20,13 @@ class TestKey
 public:
 
     TestKey (int a, int  ver,
-             bool        exclusive,
+             wsrep_key_type_t type,
              std::vector<const char*> parts,
              bool        copy = true)
         :
         parts_    (),
         ver_      (ver),
-        exclusive_(exclusive),
+        type_     (type),
         copy_     (copy)
     {
         parts_.reserve(parts.size());
@@ -40,7 +40,7 @@ public:
     }
 
     TestKey (int         ver,
-             bool        exclusive,
+             wsrep_key_type_t type,
              bool        copy,
              const char* part0,
              const char* part1 = 0,
@@ -56,7 +56,7 @@ public:
         :
         parts_    (),
         ver_      (ver),
-        exclusive_(exclusive),
+        type_     (type),
         copy_     (copy)
     {
         parts_.reserve(10);
@@ -77,9 +77,7 @@ public:
     KeyData
     operator() ()
     {
-        return KeyData (ver_, parts_.data(), parts_.size(),
-                        exclusive_ ? WSREP_KEY_EXCLUSIVE : WSREP_KEY_SHARED,
-                        copy_);
+        return KeyData (ver_, parts_.data(), parts_.size(), type_, copy_);
     }
 
 private:
@@ -87,7 +85,7 @@ private:
     std::vector<wsrep_buf_t> parts_;
 
     int  const ver_;
-    bool const exclusive_;
+    wsrep_key_type_t const type_;
     bool const copy_;
 
     bool
@@ -104,12 +102,6 @@ private:
         return false;
     }
 
-};
-
-enum
-{
-    SHARED    = false,
-    EXCLUSIVE = true
 };
 
 #endif /* _TEST_KEY_HPP_ */
