@@ -232,6 +232,11 @@ void galera::ReplicatorSMM::shift_to_CLOSED()
 
     state_.shift_to(S_CLOSED);
 
+    if (state_uuid_ != WSREP_UUID_UNDEFINED)
+    {
+        st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
+    }
+
     /* Cleanup for re-opening. */
     uuid_ = WSREP_UUID_UNDEFINED;
     closing_ = false;
@@ -2702,11 +2707,6 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // reset sst_seqno_ every time we disconnct from PC
         sst_seqno_ = WSREP_SEQNO_UNDEFINED;
-
-        if (state_uuid_ != WSREP_UUID_UNDEFINED)
-        {
-            st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
-        }
 
         gcache_.free(const_cast<void*>(cc.buf));
 
