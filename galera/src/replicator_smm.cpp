@@ -1860,8 +1860,8 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
     TrxHandleSlavePtr ts_ptr(trx.ts());
     TrxHandleSlave& ts(*ts_ptr);
 
-    log_debug << "Done executing TO isolated action: " << ts
-              << ", error message: " << gu::Hexdump(err->ptr, err->len, true);
+    log_debug << "Done executing TO isolated action: " << ts;
+
     assert(trx.state() == TrxHandle::S_COMMITTING ||
            trx.state() == TrxHandle::S_ABORTING);
     assert(ts.state() == TrxHandle::S_COMMITTING ||
@@ -1869,6 +1869,7 @@ galera::ReplicatorSMM::to_isolation_end(TrxHandleMaster&         trx,
 
     if (NULL != err && NULL != err->ptr)
     {
+        log_debug << "TO error message: " << gu::Hexdump(err->ptr, err->len, true);
         handle_apply_error(ts, *err, "Failed to execute TOI action ");
     }
 
