@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2018 Codership Oy <info@codership.com>
 //
 
 #include "saved_state.hpp"
@@ -21,6 +21,7 @@ namespace galera
 
 SavedState::SavedState  (const std::string& file) :
     fs_           (0),
+    filename_     (file),
     uuid_         (WSREP_UUID_UNDEFINED),
     seqno_        (WSREP_SEQNO_UNDEFINED),
     safe_to_bootstrap_(true),
@@ -182,7 +183,7 @@ SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap)
     safe_to_bootstrap_ = safe_to_bootstrap;
 
     if (0 == unsafe_())
-        write_and_flush (u, s, safe_to_bootstrap);
+        write_file (u, s, safe_to_bootstrap);
     else
         log_debug << "Not writing state: unsafe counter is " << unsafe_();
 }
@@ -205,8 +206,8 @@ SavedState::mark_unsafe()
 
         if (written_uuid_ != WSREP_UUID_UNDEFINED)
         {
-            write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
-                             safe_to_bootstrap_);
+            write_file (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
+                        safe_to_bootstrap_);
         }
     }
 }
@@ -228,7 +229,7 @@ SavedState::mark_safe()
             assert(false == corrupt_);
             /* this will write down proper seqno if set() was called too early
              * (in unsafe state) */
-            write_and_flush (uuid_, seqno_, safe_to_bootstrap_);
+            write_file (uuid_, seqno_, safe_to_bootstrap_);
         }
     }
 }
@@ -248,13 +249,13 @@ SavedState::mark_corrupt()
     seqno_ = WSREP_SEQNO_UNDEFINED;
     corrupt_ = true;
 
-    write_and_flush (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
-                     safe_to_bootstrap_);
+    write_file (WSREP_UUID_UNDEFINED, WSREP_SEQNO_UNDEFINED,
+                safe_to_bootstrap_);
 }
 
 void
-SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s,
-                            bool safe_to_bootstrap)
+SavedState::write_file(const wsrep_uuid_t& u, const wsrep_seqno_t s,
+                       bool safe_to_bootstrap)
 {
     assert (current_len_ <= MAX_SIZE);
 
@@ -277,8 +278,24 @@ SavedState::write_and_flush(const wsrep_uuid_t& u, const wsrep_seqno_t s,
             buf[write_size] = ' '; // overwrite whatever is there currently
 
         rewind(fs_);
-        fwrite(buf, write_size, 1, fs_);
-        fflush(fs_);
+
+        if (fwrite(buf, write_size, 1, fs_) == 0) {
+            log_warn << "write file(" << filename_ << ") failed("
+                     << strerror(errno) << ")";
+            return;
+        }
+
+        if (fflush(fs_) != 0) {
+            log_warn << "fflush file(" << filename_ << ") failed("
+                     << strerror(errno) << ")";
+            return;
+        }
+
+        if (fsync(fileno(fs_)) < 0) {
+            log_warn << "fsync file(" << filename_ << ") failed("
+                     << strerror(errno) << ")";
+            return;
+        }
 
         current_len_ = state_len;
         written_uuid_ = u;
