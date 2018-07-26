@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #include "common/common.h"
@@ -288,7 +288,21 @@ void gcomm::ViewState::write_file() const
         fclose(fout);
         return ;
     }
-    // fflush is called inside.
+
+    if (fflush(fout) != 0) {
+        log_warn << "fflush file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        fclose(fout);
+        return ;
+    }
+
+    if (fsync(fileno(fout)) < 0) {
+        log_warn << "fsync file(" << tmp << ") failed("
+                 << strerror(errno) << ")";
+        fclose(fout);
+        return ;
+    }
+
     if (fclose(fout) != 0){
         log_warn << "close file(" << tmp << ") failed("
                  << strerror(errno) << ")";
