@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 
@@ -388,6 +388,7 @@ namespace galera
                 {
                 case WriteSetNG::VER3:
                 case WriteSetNG::VER4:
+                case WriteSetNG::VER5:
                     write_set_.read_buf (act.buf, act.size);
                     assert(version_ == write_set_.version());
                     write_set_flags_ = ws_flags_to_trx_flags(write_set_.flags());
@@ -430,7 +431,7 @@ namespace galera
                                       (flags() & (TrxHandle::F_ISOLATION |
                                                   TrxHandle::F_PA_UNSAFE))))
                         {
-                            if (gu_likely(version_) >= WriteSetNG::VER4)
+                            if (gu_likely(version_) >= WriteSetNG::VER5)
                             {
                                 depends_seqno_ = std::max<wsrep_seqno_t>
                                     (last_seen_seqno_ - write_set_.pa_range(),
@@ -514,7 +515,8 @@ namespace galera
             }
 
             /* make sure to not exceed original pa_range() */
-            assert(version_ < 4 || last_seen_seqno_ - write_set_.pa_range() <=
+            assert(version_ < WriteSetNG::VER5 ||
+                   last_seen_seqno_ - write_set_.pa_range() <=
                    global_seqno_ - dw || preordered());
 
             write_set_.set_seqno(global_seqno_, dw);
@@ -807,7 +809,7 @@ namespace galera
 
         void append_key(const KeyData& key)
         {
-            // Current limitations with certification on trx versions 3 and 4
+            // Current limitations with certification on trx versions 3 to 5
             // impose the the following restrictions on keys
 
             // The shared key behavior for TOI operations is completely
@@ -876,7 +878,7 @@ namespace galera
             {
                 /* make sure this fragment depends on the previous */
                 wsrep_seqno_t prev_seqno(last_ts_seqno_);
-                assert(version() >= 4);
+                assert(version() >= WriteSetNG::VER5);
                 assert(prev_seqno >= 0);
                 assert(prev_seqno <= last_seen_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
@@ -940,9 +942,9 @@ namespace galera
 
     private:
 
-        inline int pa_range_default()
+        inline int pa_range_default() const
         {
-            return (version() >= 4 ? WriteSetNG::MAX_PA_RANGE : 0);
+            return (version() >= WriteSetNG::VER5 ? WriteSetNG::MAX_PA_RANGE :0);
         }
 
         inline void set_ws_flags()

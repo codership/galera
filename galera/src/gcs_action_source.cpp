@@ -131,7 +131,12 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
         ++received_;
         received_bytes_ += rc;
         try { gu_trace(dispatch(recv_ctx, act, exit_loop)); }
-        catch (gu::Exception& e) { rc = -e.get_errno(); }
+        catch (gu::Exception& e)
+        {
+            log_error << "Failed to process action " << act << ": "
+                      << e.what();
+            rc = -e.get_errno();
+        }
     }
     else if (rc > 0 && skip)
     {

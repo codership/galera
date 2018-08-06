@@ -162,7 +162,7 @@ START_TEST(test_serialization)
     TrxHandleMaster::Pool lp(4096, 16, "serialization_lp");
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "serialization_sp");
 
-    for (int version = 3; version <= 4; ++version)
+    for (int version = 3; version <= 5; ++version)
     {
         galera::TrxHandleMaster::Params const trx_params("", version,
                                                          KeySet::MAX_VERSION);
@@ -214,7 +214,7 @@ START_TEST(test_streaming)
     TrxHandleMaster::Pool lp(4096, 16, "streaming_lp");
     TrxHandleSlave::Pool  sp(sizeof(TrxHandleSlave), 16, "streaming_sp");
 
-    int const version(4);
+    int const version(galera::WriteSetNG::VER5);
     galera::TrxHandleMaster::Params const trx_params("", version,
                                                      KeySet::MAX_VERSION);
     wsrep_uuid_t uuid;

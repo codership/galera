@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"

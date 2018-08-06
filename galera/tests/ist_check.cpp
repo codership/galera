@@ -342,7 +342,7 @@ static void store_trx(gcache::GCache* const gcache,
         mark_point();
         galera::WriteSetIn wsi(ws_buf);
         assert (wsi.last_seen() == last_seen);
-        assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER4 ?
+        assert (wsi.pa_range()  == (wsi.version() < WriteSetNG::VER5 ?
                                     0 : WriteSetNG::MAX_PA_RANGE));
         wsi.set_seqno(i, pa_range);
         assert (wsi.seqno()     == int64_t(i));

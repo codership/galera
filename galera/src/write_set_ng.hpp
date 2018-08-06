@@ -38,11 +38,12 @@ namespace galera
         enum Version
         {
             VER3 = 3,
-            VER4 = 4
+            VER4,
+            VER5
         };
 
         /* Max header version that we can understand */
-        static Version const MAX_VERSION = VER4;
+        static Version const MAX_VERSION = VER5;
 
         /* Parses beginning of the header to detect writeset version and
          * returns it as raw integer for backward compatibility
@@ -89,6 +90,7 @@ namespace galera
             {
             case VER3: return VER3;
             case VER4: return VER4;
+            case VER5: return VER5;
             }
 
             gu_throw_error (EPROTO) << "Unrecognized writeset version: " << v;
@@ -111,8 +113,8 @@ namespace galera
              * reserved for provider extension
              */
             F_CERTIFIED   = 1 << 14, // needed to correctly interprete pa_range
-                                     // field (VER4 and up)
-            F_PREORDERED  = 1 << 15  // (VER4 and up)
+                                     // field (VER5 and up)
+            F_PREORDERED  = 1 << 15  // (VER5 and up)
         };
 
         static bool const FLAGS_MATCH_API_FLAGS =
@@ -151,6 +153,8 @@ namespace galera
                 case VER3:
                 // fall through
                 case VER4:
+                // fall through
+                case VER5:
                 {
                     GU_COMPILE_ASSERT(0 == (V3_SIZE % GU_MIN_ALIGNMENT),
                                       unaligned_header_size);
@@ -272,7 +276,7 @@ namespace galera
 
             wsrep_seqno_t    last_seen() const
             {
-                assert (pa_range() == 0 || version() >= VER4);
+                assert (pa_range() == 0 || version() >= VER5);
                 return seqno_priv();
             }
 
@@ -507,7 +511,7 @@ namespace galera
             kbn_   (base_name_),
             keys_  (reserved,
                     (reserved_size >>= 6, reserved_size <<= 3, reserved_size),
-                    kbn_, kver, rsv),
+                    kbn_, kver, rsv, ver),
             /* 5/8 of reserved goes to data set  */
             dbn_   (base_name_),
             data_  (reserved + reserved_size, reserved_size*5, dbn_, dver, rsv),
@@ -778,7 +782,7 @@ namespace galera
         int           pa_range()  const { return header_.pa_range();  }
         bool          certified() const
         {
-            if (gu_likely(version() >= WriteSetNG::VER4))
+            if (gu_likely(version() >= WriteSetNG::VER5))
                 return (flags() & WriteSetNG::F_CERTIFIED);
             else
                 return (pa_range()); // VER3

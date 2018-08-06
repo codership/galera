@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2018 Codership Oy <info@codership.com>
 //
 
 #include "key_set.hpp"
@@ -36,6 +36,15 @@ KeySet::version (const std::string& ver)
     }
 
     gu_throw_error(EINVAL) << "Unsupported KeySet version: " << ver; throw;
+}
+
+static const char* type_str[3] = { "SH", "SS", "EX" };
+
+const char*
+KeySet::type(wsrep_key_type_t t)
+{
+    assert(size_t(t) < sizeof(type_str) / sizeof(type_str[0]));
+    return type_str[t];
 }
 
 size_t
@@ -147,9 +156,16 @@ KeySet::KeyPart::throw_buffer_too_short (size_t expected, size_t got)
 }
 
 void
+KeySet::KeyPart::throw_bad_type_version (wsrep_key_type_t t, int v)
+{
+    gu_throw_error(EINVAL) << "Internal program error: wsrep key type: " << t
+                           << ", writeset version: " << v;
+}
+
+void
 KeySet::KeyPart::throw_bad_prefix (gu::byte_t p)
 {
-    gu_throw_error(EPROTO) << "Unsupported key prefix: " << p;
+    gu_throw_error(EPROTO) << "Unsupported key prefix: " << int(p);
 }
 
 void
@@ -166,7 +182,7 @@ KeySet::KeyPart::print (std::ostream& os) const
 
     size_t const size(ver != EMPTY ? base_size(ver, data_, 1) : 0);
 
-    os << '(' << int(exclusive()) << ',' << ver_str[ver] << ')'
+    os << '(' << prefix() << ',' << ver_str[ver] << ')'
        << gu::Hexdump(data_, size);
 
     if (annotated(ver))
@@ -176,16 +192,25 @@ KeySet::KeyPart::print (std::ostream& os) const
     }
 }
 
+/* returns true if left type is stronger than right */
+static inline bool
+key_prefix_is_stronger_than(int const left,
+                            int const right)
+{
+    return left > right; // for now key prefix is numerically ordered
+}
+
 KeySetOut::KeyPart::KeyPart (KeyParts&      added,
                              KeySetOut&     store,
                              const KeyPart* parent,
                              const KeyData& kd,
                              int const      part_num,
+                             int const      ws_ver,
                              int const      alignment)
     :
     hash_ (parent->hash_),
     part_ (0),
-    value_(reinterpret_cast<const gu::byte_t*>(kd.parts[part_num].ptr)),
+    value_(static_cast<const gu::byte_t*>(kd.parts[part_num].ptr)),
     size_ (kd.parts[part_num].len),
     ver_  (parent->ver_),
     own_  (false)
@@ -200,13 +225,14 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     hash_.gather<sizeof(hd.buf)>(hd.buf);
 
-    /* only leaf part of the key can be exclusive */
+    /* only leaf part of the key can be not WSREP_KEY_SHARED */
     bool const leaf (part_num + 1 == kd.parts_num);
-    bool const exclusive (!kd.shared() && leaf);
+    wsrep_key_type_t const type (leaf ? kd.type : WSREP_KEY_SHARED);
+    int const prefix (KeySet::KeyPart::prefix(type, ws_ver));
 
     assert (kd.parts_num > part_num);
 
-    KeySet::KeyPart kp(ts, hd, ver_, exclusive, kd.parts, part_num, alignment);
+    KeySet::KeyPart kp(ts, hd, kd.parts, ver_, prefix, part_num, alignment);
 
 #if 0 /* find() way */
     /* the reason to use find() first, instead of going straight to insert()
@@ -217,18 +243,18 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     if (added.end() != found)
     {
-        if (exclusive && found->shared())
-        {       /* need to ditch shared and add exclusive version of the key */
+        if (key_prefix_is_stronger_than(prefix, found->prefix()))
+        {       /* need to ditch weaker and add stronger version of the key */
             added.erase(found);
             found = added.end();
         }
-        else if (leaf || found->exclusive())
+        else if (leaf || key_prefix_is_stronger_than(found->prefix(), prefix))
         {
 #ifndef NDEBUG
             if (leaf)
                 log_debug << "KeyPart ctor: full duplicate of " << *found;
             else
-                log_debug << "Duplicate of exclusive: " << *found;
+                log_debug << "Duplicate of stronger: " << *found;
 #endif
             throw DUPLICATE();
         }
@@ -256,7 +282,7 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
     {
         /* A matching key part instance is already present in the set,
            check constraints */
-        if (exclusive && inserted.first->shared())
+        if (key_prefix_is_stronger_than(prefix, inserted.first->prefix()))
         {
             /* The key part instance present in the set has weaker constraint,
                store this instance as well and update inserted to point there.
@@ -269,7 +295,8 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
                change hash and equality test results. And we get it to point to
                a duplicate here.*/
         }
-        else if (leaf || inserted.first->exclusive())
+        else if (leaf || key_prefix_is_stronger_than(inserted.first->prefix(),
+                                                     prefix))
         {
             /* we don't throw DUPLICATE for branch parts, just ignore them.
                DUPLICATE is thrown only when the whole key is a duplicate. */
@@ -323,27 +350,35 @@ KeySetOut::append (const KeyData& kd)
     }
 //    log_info << "matched " << i << " parts";
 
-    /* if we have a fully matched key OR common ancestor is exclusive, return */
+    int const kd_leaf_prefix(KeySet::KeyPart::prefix(kd.type, ws_ver_));
+
+    /* if we have a fully matched key OR common ancestor is stronger, return */
     if (i > 0)
     {
         assert (size_t(i) < prev_.size());
 
-        if (prev_[i].exclusive())
+        int const exclusive_prefix
+            (KeySet::KeyPart::prefix(WSREP_KEY_EXCLUSIVE, ws_ver_));
+
+        if (key_prefix_is_stronger_than(prev_[i].prefix(), kd_leaf_prefix) ||
+            prev_[i].prefix() == exclusive_prefix)
         {
+//            log_info << "Returning after matching a stronger key:\n"<<prev_[i];
             assert (prev_.size() == (i + 1U)); // only leaf can be exclusive.
-//           log_info << "Returning after matching exclusive key:\n"<< prev_[i];
             return 0;
         }
 
         if (kd.parts_num == i) /* leaf */
         {
-            assert (prev_[i].shared());
-            if (kd.shared())
+            assert(!key_prefix_is_stronger_than(prev_[i].prefix(),
+                                                kd_leaf_prefix));
+
+            if (prev_[i].prefix() == kd_leaf_prefix)
             {
 //                log_info << "Returning after matching all " << i << " parts";
                 return 0;
             }
-            else /* need to add exclusive copy of the key */
+            else /* need to add a stronger copy of the leaf */
                 --i;
         }
     }
@@ -358,14 +393,14 @@ KeySetOut::append (const KeyData& kd)
 #endif /* CHECK_PREVIOUS_KEY */
 
     /* create parts that didn't match previous key and add to the set
-     * of preiously added keys. */
+     * of previously added keys. */
     size_t const old_size (size());
     int j(0);
     for (; i < kd.parts_num; ++i, ++j)
     {
         try
         {
-            KeyPart kp(added_, *this, parent, kd, i, alignment());
+            KeyPart kp(added_, *this, parent, kd, i, ws_ver_, alignment());
 
 #ifdef CHECK_PREVIOUS_KEY
             if (size_t(j) < new_.size())

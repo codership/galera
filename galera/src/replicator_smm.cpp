@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -2287,11 +2287,22 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         str_proto_ver_ = 2;
         break;
     case 8:
-    case 9:
         // Protocol upgrade to enforce 8-byte alignment in writesets and CCs
+        trx_params_.version_ = 3;
+        trx_params_.record_set_ver_ = gu::RecordSet::VER2;
+        str_proto_ver_ = 2;
+        break;
+    case 9:
+        // Protocol upgrade to enable support for semi-shared key type.
         trx_params_.version_ = 4;
         trx_params_.record_set_ver_ = gu::RecordSet::VER2;
-        str_proto_ver_ = 3;
+        str_proto_ver_ = 2;
+        break;
+    case 10:
+        // Protocol upgrade to enable support for:
+        trx_params_.version_ = 5;// PA range preset in the writeset
+        trx_params_.record_set_ver_ = gu::RecordSet::VER2;
+        str_proto_ver_ = 3; // CC events in IST.
         break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "

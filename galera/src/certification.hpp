@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_CERTIFICATION_HPP
@@ -141,7 +141,7 @@ namespace galera
         Certification& operator=(const Certification&);
 
         TestResult do_test(const TrxHandleSlavePtr&, bool store_keys);
-        TestResult do_test_v3(TrxHandleSlave*, bool);
+        TestResult do_test_v3to4(TrxHandleSlave*, bool);
         TestResult do_test_preordered(TrxHandleSlave*);
         TestResult do_test_nbo(const TrxHandleSlavePtr&);
         void purge_for_trx(TrxHandleSlave*);
