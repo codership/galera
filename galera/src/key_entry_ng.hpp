@@ -17,7 +17,7 @@ namespace galera
         {
             std::fill(&refs_[0],
                       &refs_[KeySet::Key::TYPE_MAX],
-                      static_cast<TrxHandle*>(NULL));
+                      static_cast<TrxHandleSlave*>(NULL));
         }
 
         KeyEntryNG(const KeyEntryNG& other)
