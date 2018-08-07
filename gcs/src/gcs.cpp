@@ -1598,9 +1598,9 @@ long gcs_interrupt (gcs_conn_t* conn, long handle)
     return gcs_sm_interrupt (conn->sm, handle);
 }
 
-gcs_seqno_t gcs_caused(gcs_conn_t* conn)
+long gcs_caused(gcs_conn_t* conn, gcs_seqno_t& seqno)
 {
-    return gcs_core_caused(conn->core);
+    return gcs_core_caused(conn->core, seqno);
 }
 
 /* Puts action in the send queue and returns after it is replicated */

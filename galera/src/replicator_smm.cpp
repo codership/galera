@@ -969,12 +969,19 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 
 wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
 {
-    wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
+    wsrep_seqno_t cseq;
+    gu::datetime::Date wait_until(gu::datetime::Date::calendar() +
+                                  causal_read_timeout_);
 
-    if (cseq < 0)
+    try
     {
-        log_warn << "gcs_caused() returned " << cseq << " (" << strerror(-cseq)
-                 << ')';
+        gcs_.caused(cseq, wait_until);
+        assert(cseq >= 0);
+    }
+    catch (gu::Exception& e)
+    {
+        log_warn << "gcs_caused() returned " << -e.get_errno()
+                 << " (" << strerror(e.get_errno()) << ")";
         return WSREP_TRX_FAIL;
     }
 
@@ -987,8 +994,6 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
         // at monitor drain and disallowing further waits until
         // configuration change related operations (SST etc) have been
         // finished.
-        gu::datetime::Date wait_until(gu::datetime::Date::calendar()
-                                      + causal_read_timeout_);
         if (gu_likely(co_mode_ != CommitOrder::BYPASS))
         {
             commit_monitor_.wait(cseq, wait_until);
