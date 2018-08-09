@@ -257,13 +257,17 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
         {
             port = i->port();
         }
-        catch (gu::NotSet& )
+        catch (gu::NotSet&)
         {
             try
             {
                 port = conf_.get(BASE_PORT_KEY);
             }
             catch (gu::NotFound&)
+            {
+                port = Defaults::GMCastTcpPort;
+            }
+            catch (gu::NotSet&)
             {
                 port = Defaults::GMCastTcpPort;
             }
