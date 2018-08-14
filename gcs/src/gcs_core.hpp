@@ -161,7 +161,7 @@ gcs_core_send_vote (gcs_core_t* core, const gu::GTID& gtid, int64_t code,
 extern ssize_t
 gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
 
-extern ssize_t
+extern long
 gcs_core_caused(gcs_core_t* core, gu::GTID& gtid);
 
 extern int

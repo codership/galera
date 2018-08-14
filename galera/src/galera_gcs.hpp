@@ -42,7 +42,8 @@ namespace galera
         virtual ssize_t replv(const WriteSetVector&,
                               gcs_action& act, bool) = 0;
         virtual ssize_t repl (gcs_action& act, bool) = 0;
-        virtual long    caused(gu::GTID& gtid) = 0;
+        virtual void    caused(gu::GTID& gtid,
+                               gu::datetime::Date& wait_until) = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
         virtual ssize_t resume_recv() = 0;
@@ -142,7 +143,23 @@ namespace galera
             return gcs_repl(conn_, &act, scheduled);
         }
 
-        long caused(gu::GTID& gtid) { return gcs_caused(conn_, gtid); }
+        void caused(gu::GTID& gtid, gu::datetime::Date& wait_until)
+        {
+            long err;
+
+            while ((err = gcs_caused(conn_, gtid)) == -EAGAIN &&
+                   gu::datetime::Date::calendar() < wait_until)
+            {
+                usleep(1000);
+            }
+
+            if (err == -EAGAIN) err = -ETIMEDOUT;
+
+            if (err < 0)
+            {
+                gu_throw_error(-err);
+            }
+        }
 
         ssize_t schedule()   { return gcs_schedule(conn_); }
 
@@ -323,10 +340,9 @@ namespace galera
             return ret;
         }
 
-        long caused(gu::GTID& gtid)
+        void caused(gu::GTID& gtid, gu::datetime::Date& wait_until)
         {
             gtid.set(uuid_, global_seqno_);
-            return 0;
         }
 
         ssize_t schedule()

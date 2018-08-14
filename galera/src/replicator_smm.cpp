@@ -1608,14 +1608,21 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
                                                 wsrep_gtid_t* gtid)
 {
     gu::GTID wait_gtid;
+    gu::datetime::Date wait_until(gu::datetime::Date::calendar() +
+                                  ((tout == -1) ?
+                                   gu::datetime::Period(causal_read_timeout_) :
+                                   gu::datetime::Period(tout * gu::datetime::Sec)));
 
     if (upto == 0)
     {
-        long ret = gcs_.caused(wait_gtid);
-        if (ret < 0)
+        try
         {
-            log_warn << "gcs_caused() returned " << ret
-                     << " ("  << strerror(-ret) << ')';
+            gcs_.caused(wait_gtid, wait_until);
+        }
+        catch (gu::Exception& e)
+        {
+            log_warn << "gcs_caused() returned " << -e.get_errno()
+                     << " (" << strerror(e.get_errno()) << ")";
             return WSREP_TRX_FAIL;
         }
     }
@@ -1633,12 +1640,6 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
         // at monitor drain and disallowing further waits until
         // configuration change related operations (SST etc) have been
         // finished.
-        gu::datetime::Period timeout(causal_read_timeout_);
-        if (tout != -1)
-        {
-            timeout = gu::datetime::Period(tout * gu::datetime::Sec);
-        }
-        gu::datetime::Date wait_until(gu::datetime::Date::calendar() + timeout);
 
         // Note: Since wsrep API 26 application may request release of
         // commit monitor before the commit actually happens (commit

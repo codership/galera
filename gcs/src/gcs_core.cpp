@@ -102,8 +102,9 @@ core_act_t;
 
 typedef struct causal_act
 {
-    gcs_seqno_t*  act_id;
-    gu_uuid_t*    act_uuid;
+    gcs_seqno_t* act_id;
+    gu_uuid_t*   act_uuid;
+    long*        error;
     gu_mutex_t*  mtx;
     gu_cond_t*   cond;
 } causal_act_t;
@@ -1121,23 +1122,34 @@ core_msg_to_action (gcs_core_t*          core,
 static long core_msg_causal(gcs_core_t* conn,
                             struct gcs_recv_msg* msg)
 {
-    causal_act_t* act;
-    if (gu_unlikely(msg->size != sizeof(*act)))
+    if (gu_unlikely(msg->size != sizeof(causal_act_t)))
     {
         gu_error("invalid causal act len %ld, expected %ld",
-                 msg->size, sizeof(*act));
+                 msg->size, sizeof(causal_act_t));
         return -EPROTO;
     }
 
-    act = (causal_act_t*)msg->buf;
+    causal_act_t* act = (causal_act_t*)msg->buf;
     gu_mutex_lock(act->mtx);
-    if (conn->group.state == GCS_GROUP_PRIMARY)
     {
-        *act->act_id = conn->group.act_id_;
-        *act->act_uuid = conn->group.group_uuid;
+        switch (conn->group.state)
+        {
+        case GCS_GROUP_PRIMARY:
+            *act->act_id = conn->group.act_id_;
+            *act->act_uuid = conn->group.group_uuid;
+            break;
+        case GCS_GROUP_WAIT_STATE_UUID:
+        case GCS_GROUP_WAIT_STATE_MSG:
+            *act->error = -EAGAIN;
+            break;
+        default:
+            *act->error = -EPERM;
+        }
+
+        gu_cond_signal(act->cond);
     }
-    gu_cond_signal(act->cond);
     gu_mutex_unlock(act->mtx);
+
     return msg->size;
 }
 
@@ -1481,38 +1493,44 @@ gcs_core_send_fc (gcs_core_t* core, const void* const fc, size_t const fc_size)
     return ret;
 }
 
-ssize_t
+long
 gcs_core_caused (gcs_core_t* core, gu::GTID& gtid)
 {
-    ssize_t      ret;
+    long         error = 0;
     gcs_seqno_t  act_id = GCS_SEQNO_ILL;
     gu_uuid_t    act_uuid = GU_UUID_NIL;
     gu_mutex_t   mtx;
     gu_cond_t    cond;
-    causal_act_t act = {&act_id, &act_uuid, &mtx, &cond};
+    causal_act_t act = {&act_id, &act_uuid, &error, &mtx, &cond};
 
     gu_mutex_init (&mtx, NULL);
     gu_cond_init  (&cond, NULL);
     gu_mutex_lock (&mtx);
     {
-        ret = core_msg_send_retry (core, &act, sizeof(act), GCS_MSG_CAUSAL);
+        long ret = core_msg_send_retry (core,
+                                        &act,
+                                        sizeof(act),
+                                        GCS_MSG_CAUSAL);
 
         if (ret == sizeof(act))
         {
             gu_cond_wait (&cond, &mtx);
-            gtid.set (act_uuid, act_id);
+            if (error == 0)
+            {
+              gtid.set (act_uuid, act_id);
+            }
         }
         else
         {
             assert (ret < 0);
-            gtid.set (GU_UUID_NIL, GCS_SEQNO_ILL);
+            error = ret;
         }
     }
     gu_mutex_unlock  (&mtx);
     gu_mutex_destroy (&mtx);
     gu_cond_destroy  (&cond);
 
-    return ret;
+    return error;
 }
 
 int
