@@ -963,6 +963,9 @@ namespace galera
             gu::byte_t* const wso(static_cast<gu::byte_t*>(wso_buf()));
             gu::byte_t* const store(wso + sizeof(WriteSetOut));
 
+            assert(params_.version_ >= 0 &&
+                   params_.version_ <= WriteSetNG::MAX_VERSION);
+
             new (wso) WriteSetOut (params_.working_dir_,
                                    trx_id(), params_.key_format_,
                                    store,
