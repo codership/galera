@@ -160,7 +160,7 @@ Export('GALERA_VER', 'GALERA_REV')
 print('Signature: version: ' + GALERA_VER + ', revision: ' + GALERA_REV)
 
 LIBBOOST_PROGRAM_OPTIONS_A = ARGUMENTS.get('bpostatic', '')
-LIBBOOST_SYSTEM_A = string.replace(LIBBOOST_PROGRAM_OPTIONS_A, 'boost_program_options', 'boost_system')
+LIBBOOST_SYSTEM_A = LIBBOOST_PROGRAM_OPTIONS_A.replace('boost_program_options', 'boost_system')
 
 #
 # Set up and export default build environment
@@ -189,8 +189,8 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-cc_version = read_first_line(env['CC'].split() + ['--version'])
-cxx_version = read_first_line(env['CXX'].split() + ['--version'])
+cc_version = str(read_first_line(env['CC'].split() + ['--version']))
+cxx_version = str(read_first_line(env['CXX'].split() + ['--version']))
 
 print('Using C compiler executable: ' + env['CC'])
 print('C compiler version is: ' + cc_version)
