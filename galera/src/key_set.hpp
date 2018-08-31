@@ -140,10 +140,14 @@ public:
                 {
                 case WSREP_KEY_SHARED:
                     return 0;
-                case WSREP_KEY_SEMI:
-                    return 1;
+                case WSREP_KEY_REFERENCE:
+                    return ws_ver < 4 ? KeySet::Key::P_EXCLUSIVE : 1;
+                case WSREP_KEY_UPDATE:
+                    return ws_ver < 4 ? KeySet::Key::P_EXCLUSIVE :
+                    (ws_ver < 5 ? 1 : 2);
                 case WSREP_KEY_EXCLUSIVE:
-                    return ws_ver < 4 ? KeySet::Key::P_EXCLUSIVE : 2;
+                    return ws_ver < 4 ? KeySet::Key::P_EXCLUSIVE :
+                    (ws_ver < 5 ? 2 : 3);
                 }
             }
             assert(0);
@@ -169,10 +173,14 @@ public:
                 ret = WSREP_KEY_SHARED;
                 break;
             case 1:
-                ret = ws_ver >= 4 ? WSREP_KEY_SEMI : WSREP_KEY_EXCLUSIVE;
+                ret = ws_ver < 4 ? WSREP_KEY_EXCLUSIVE : WSREP_KEY_REFERENCE;
                 break;
             case 2:
                 assert(ws_ver >= 4);
+                ret = ws_ver < 5 ? WSREP_KEY_EXCLUSIVE : WSREP_KEY_UPDATE;
+                break;
+            case 3:
+                assert(ws_ver >= 5);
                 ret = WSREP_KEY_EXCLUSIVE;
                 break;
             default:

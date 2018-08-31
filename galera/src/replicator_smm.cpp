@@ -2312,7 +2312,8 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         break;
     case 10:
         // Protocol upgrade to enable support for:
-        trx_params_.version_ = 5;// PA range preset in the writeset
+        trx_params_.version_ = 5;// PA range preset in the writeset,
+                                 // WSREP_KEY_UPDATE support (API v26)
         trx_params_.record_set_ver_ = gu::RecordSet::VER2;
         str_proto_ver_ = 3; // CC events in IST.
         break;

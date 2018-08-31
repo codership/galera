@@ -38,7 +38,7 @@ KeySet::version (const std::string& ver)
     gu_throw_error(EINVAL) << "Unsupported KeySet version: " << ver; throw;
 }
 
-static const char* type_str[3] = { "SH", "SS", "EX" };
+static const char* type_str[4] = { "SH", "RE", "UP", "EX" };
 
 const char*
 KeySet::type(wsrep_key_type_t t)
@@ -333,6 +333,8 @@ KeySetOut::append (const KeyData& kd)
 {
     int i(0);
 
+//    log_info << "Appending key data:" << kd;
+
 #ifdef CHECK_PREVIOUS_KEY
     /* find common ancestor with the previous key */
     for (;
@@ -423,7 +425,7 @@ KeySetOut::append (const KeyData& kd)
         catch (KeyPart::DUPLICATE& e)
         {
             assert (i + 1 == kd.parts_num);
-            /* There is a very small probability that child part thows DUPLICATE
+            /* There is a very small probability that child part throws DUPLICATE
              * even after parent was added as a new key. It does not matter:
              * a duplicate will be a duplicate in certification as well. */
 #ifndef NDEBUG

@@ -92,7 +92,7 @@ static void test_ver(gu::RecordSet::Version const rsv, int const ws_ver)
              kso.size(), total_size);
 
     /* this should update a sronger version of "a2" */
-    TestKey tk2_(tk_ver, WSREP_KEY_SEMI, false, "a0", "a1", "a2");
+    TestKey tk2_(tk_ver, WSREP_KEY_REFERENCE, false, "a0", "a1", "a2");
     kso.append(tk2_());
     fail_if (kso.count() != 5, "key count: expected 5, got %d", kso.count());
 
@@ -131,9 +131,17 @@ static void test_ver(gu::RecordSet::Version const rsv, int const ws_ver)
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
              kso.size(), total_size);
 
-    /* adding semi key should have no effect */
-    TestKey tk5_(tk_ver, WSREP_KEY_SHARED, true, "a0", "a1");
-    kso.append(tk5_());
+    /* adding REFERENCE key should have no effect */
+    TestKey tk5_1(tk_ver, WSREP_KEY_REFERENCE, true, "a0", "a1");
+    kso.append(tk5_1());
+    fail_if (kso.count() != 6, "key count: expected 6, got %d", kso.count());
+
+    fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
+             kso.size(), total_size);
+
+    /* adding UPDATE key should have no effect */
+    TestKey tk5_2(tk_ver, WSREP_KEY_UPDATE, true, "a0", "a1");
+    kso.append(tk5_2());
     fail_if (kso.count() != 6, "key count: expected 6, got %d", kso.count());
 
     fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
@@ -148,7 +156,7 @@ static void test_ver(gu::RecordSet::Version const rsv, int const ws_ver)
              kso.size(), total_size);
 
     /* a0:b1:... should still be possible, should add 2 keys: b1 and c2 */
-    TestKey tk7(tk_ver, WSREP_KEY_SEMI, true, "a0", "b1", "c2");
+    TestKey tk7(tk_ver, WSREP_KEY_REFERENCE, true, "a0", "b1", "c2");
     kso.append(tk7());
     fail_if (kso.count() != 8, "key count: expected 8, got %d", kso.count());
 
@@ -161,7 +169,7 @@ static void test_ver(gu::RecordSet::Version const rsv, int const ws_ver)
 
     /* make sure a0:b1:b2 is possible despite we have a0:a1:b2 already
      * (should be no collision on b2) */
-    TestKey tk8(tk_ver, WSREP_KEY_SEMI, false, "a0", "b1", "b2");
+    TestKey tk8(tk_ver, WSREP_KEY_REFERENCE, false, "a0", "b1", "b2");
     kso.append(tk8());
     fail_if (kso.count() != 9, "key count: expected 9, got %d", kso.count());
 
@@ -171,23 +179,56 @@ static void test_ver(gu::RecordSet::Version const rsv, int const ws_ver)
              kso.size(), total_size);
 
     int expected_count(kso.count());
-    TestKey tk8_(tk_ver, WSREP_KEY_EXCLUSIVE, false, "a0", "b1", "b2");
-    kso.append(tk8_());
-    if (3 == ws_ver)
+    TestKey tk8_1(tk_ver, WSREP_KEY_UPDATE, false, "a0", "b1", "b2");
+    kso.append(tk8_1());
+    if (3 == ws_ver || 4 == ws_ver)
     {
-        /* version 3 does not distinguish SEMI and EXCLUSIVE,
+        /* versions 3, 4 do not distinguish REEFERENCE and UPDATE,
            the key should be ignored */
     }
-    else if (4 <= ws_ver)
+    else if (5 <= ws_ver)
     {
-        /* in verson 4 EXCLUSIVE is a stronger key than SEMI - should be added
-           to the set */
+        /* in version 5 UPDATE is a stronger key than REFERENCE - should be
+         * added to the set */
 
         expected_count++;
         total_size += base_size + 2 + 3*4;
         total_size = GU_ALIGN(total_size, alignment);
     }
     else abort();
+
+    fail_if (kso.count() != expected_count, "key count: expected %d, got %d",
+             expected_count, kso.count());
+    fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
+             kso.size(), total_size);
+
+    TestKey tk8_2(tk_ver, WSREP_KEY_EXCLUSIVE, false, "a0", "b1", "b2");
+    kso.append(tk8_2());
+    if (3 == ws_ver)
+    {
+        /* version 3 does not distinguish REFERENCE, UPDATE and EXCLUSIVE,
+           the key should be ignored */
+    }
+    else if (4 <= ws_ver)
+    {
+        /* in version 4 EXCLUSIVE is a stronger key than REFERENCE and
+         * in version 5 EXCLUSIVE is a stronger key than UPDATE - should be
+         * added to the set */
+
+        expected_count++;
+        total_size += base_size + 2 + 3*4;
+        total_size = GU_ALIGN(total_size, alignment);
+    }
+    else abort();
+
+    fail_if (kso.count() != expected_count, "key count: expected %d, got %d",
+             expected_count, kso.count());
+    fail_if (total_size != kso.size(), "Size: %zu, expected: %zu",
+             kso.size(), total_size);
+
+    TestKey tk8_3(tk_ver, WSREP_KEY_UPDATE, false, "a0", "b1", "b2");
+    kso.append(tk8_3());
+    /* UPDATE key is weaker than EXCLUSIVE, should be ignored */
 
     fail_if (kso.count() != expected_count, "key count: expected %d, got %d",
              expected_count, kso.count());

@@ -114,7 +114,7 @@ galera::Certification::purge_for_trx(TrxHandleSlave* trx)
     purge_key_set(cert_index_ng_, trx, keys, keys.count());
 }
 
-/* Specifically for chain use in certify_and_depend_v3to4() */
+/* Specifically for chain use in certify_and_depend_v3to5() */
 template <wsrep_key_type_t REF_KEY_TYPE>
 bool
 check_against(const galera::KeyEntryNG*   const found,
@@ -124,6 +124,23 @@ check_against(const galera::KeyEntryNG*   const found,
               bool                        const log_conflict,
               wsrep_seqno_t&                    depends_seqno)
 {
+    enum CheckType
+    {
+        CONFLICT,
+        DEPENDENCY,
+        NOTHING
+    };
+
+    static CheckType const check_table
+        [WSREP_KEY_EXCLUSIVE+1][WSREP_KEY_EXCLUSIVE+1] =
+        {
+            //  SH          RE            UP         EX   second / first
+            { NOTHING,    NOTHING,    DEPENDENCY, DEPENDENCY },  // SH
+            { NOTHING,    NOTHING,    DEPENDENCY, CONFLICT   },  // RE
+            { DEPENDENCY, DEPENDENCY, CONFLICT,   CONFLICT   },  // UP
+            { CONFLICT,   CONFLICT,   CONFLICT,   CONFLICT   }   // EX
+        };
+
     const galera::TrxHandleSlave* const ref_trx(found->ref_trx(REF_KEY_TYPE));
 
     // trx should not have any references in index at this point
@@ -133,50 +150,49 @@ check_against(const galera::KeyEntryNG*   const found,
 
     if (gu_likely(0 != ref_trx))
     {
-        if (REF_KEY_TYPE == WSREP_KEY_EXCLUSIVE && ref_trx)
+        if ((REF_KEY_TYPE == WSREP_KEY_EXCLUSIVE ||
+             REF_KEY_TYPE == WSREP_KEY_UPDATE) && ref_trx)
         {
             cert_debug << KeySet::type(REF_KEY_TYPE) << " match: "
-                       << *trx << " <-----> " << *ref_trx;
+                       << *trx << " <---> " << *ref_trx;
         }
 
-        if (REF_KEY_TYPE == WSREP_KEY_SHARED ||
-            REF_KEY_TYPE == WSREP_KEY_SEMI) assert(!ref_trx->is_toi());
+        if (REF_KEY_TYPE == WSREP_KEY_SHARED    ||
+            REF_KEY_TYPE == WSREP_KEY_REFERENCE ||
+            REF_KEY_TYPE == WSREP_KEY_UPDATE) assert(!ref_trx->is_toi());
 
-        // cert conflict takes place if
-        // 1) write sets originated from different nodes, are within cert range
-        // 2) ref_trx is in isolation mode, write sets are within cert range
-        // 3) Trx has not been certified yet. Already certified trxs show up
-        //    here during index rebuild.
-        switch(REF_KEY_TYPE)
+        CheckType const check_type(check_table[REF_KEY_TYPE][key_type]);
+
+        switch (check_type)
         {
-        case WSREP_KEY_EXCLUSIVE:
-            conflict = ref_trx->is_toi();
-            /* fall through */
-        case WSREP_KEY_SEMI:
+        case CONFLICT:
+            // cert conflict takes place if
+            // 1) write sets originated from different nodes, are within cert
+            //    range
+            // 2) ref_trx is in isolation mode, write sets are within cert range
+            // 3) Trx has not been certified yet. Already certified trxs show up
+            //    here during index rebuild.
             conflict = (ref_trx->global_seqno() > trx->last_seen_seqno() &&
-                        (conflict || trx->source_id() != ref_trx->source_id()) &&
+                        (ref_trx->is_toi() ||
+                         trx->source_id() != ref_trx->source_id()) &&
                         trx->certified() == false);
+
+            if (gu_unlikely(cert_debug_on || (conflict && log_conflict == true)))
+            {
+                log_info << KeySet::type(key_type) << '-'
+                         << KeySet::type(REF_KEY_TYPE)
+                         << " trx " << (conflict ? "conflict" : "match")
+                         << " for key " << key << ": "
+                         << *trx << " <---> " << *ref_trx;
+            }
             /* fall through */
-        case WSREP_KEY_SHARED:;
-        }
-
-        if (gu_unlikely(cert_debug_on || (conflict && log_conflict == true)))
-        {
-            log_info << KeySet::type(key_type) << '-'
-                     << KeySet::type(REF_KEY_TYPE)
-                     << " trx " << (conflict ? "conflict" : "match")
-                     << " for key " << key << ": "
-                     << *trx << " <---> " << *ref_trx;
-        }
-
-        if (conflict)
-        {
-            depends_seqno = -1;
-        }
-        else if (key_type     == WSREP_KEY_EXCLUSIVE ||
-                 REF_KEY_TYPE == WSREP_KEY_EXCLUSIVE)
-        {
-            depends_seqno = std::max(ref_trx->global_seqno(), depends_seqno);
+        case DEPENDENCY:
+            if (conflict)
+                depends_seqno = WSREP_SEQNO_UNDEFINED;
+            else
+                depends_seqno = std::max(ref_trx->global_seqno(), depends_seqno);
+            /* fall through */
+        case NOTHING:;
         }
     }
 
@@ -185,7 +201,7 @@ check_against(const galera::KeyEntryNG*   const found,
 
 /*! for convenience returns true if conflict and false if not */
 static inline bool
-certify_and_depend_v3to4(const galera::KeyEntryNG*   const found,
+certify_and_depend_v3to5(const galera::KeyEntryNG*   const found,
                          const galera::KeySet::KeyPart&    key,
                          galera::TrxHandleSlave*     const trx,
                          bool                        const log_conflict)
@@ -196,23 +212,27 @@ certify_and_depend_v3to4(const galera::KeyEntryNG*   const found,
     /*
      * The following cascade implements these rules:
      *
-     *      | ex | ss | sh |  <- horizontal axis: trx   key type
-     *   -------------------     vertical   axis: found key type
-     *   ex | C  | C  | C  |
-     *   -------------------     C - conflict
-     *   ss | C  | N  | N  |     D - dependency
-     *   -------------------     N - nothing
-     *   sh | D  | N  | N  |
-     *   -------------------
+     *      | ex | up | re | sh |  <- horizontal axis: trx   key type
+     *   ------------------------     vertical   axis: found key type
+     *   ex | C  | C  | C  | C  |
+     *   ------------------------
+     *   up | C  | C  | D  | D  |
+     *   ------------------------     C - conflict
+     *   re | C  | D  | N  | N  |     D - dependency
+     *   ------------------------     N - nothing
+     *   sh | D  | D  | N  | N  |
+     *   ------------------------
      *
      * Note that depends_seqno is an in/out parameter and is updated on every
      * step.
      */
     if (check_against<WSREP_KEY_EXCLUSIVE>
         (found, key, key_type, trx, log_conflict, depends_seqno) ||
-        (key_type == WSREP_KEY_EXCLUSIVE &&
+        check_against<WSREP_KEY_UPDATE>
+        (found, key, key_type, trx, log_conflict, depends_seqno) ||
+        (key_type >= WSREP_KEY_UPDATE &&
          /* exclusive keys must be checked against shared */
-         (check_against<WSREP_KEY_SEMI>
+         (check_against<WSREP_KEY_REFERENCE>
           (found, key, key_type, trx, log_conflict, depends_seqno) ||
           check_against<WSREP_KEY_SHARED>
           (found, key, key_type, trx, log_conflict, depends_seqno))))
@@ -229,7 +249,7 @@ certify_and_depend_v3to4(const galera::KeyEntryNG*   const found,
 
 /* returns true on collision, false otherwise */
 static bool
-certify_v3to4(galera::Certification::CertIndexNG& cert_index_ng,
+certify_v3to5(galera::Certification::CertIndexNG& cert_index_ng,
               const galera::KeySet::KeyPart&      key,
               galera::TrxHandleSlave*     const   trx,
               bool                        const   store_keys,
@@ -257,7 +277,7 @@ certify_v3to4(galera::Certification::CertIndexNG& cert_index_ng,
         // Note: For we skip certification for isolated trxs, only
         // cert index and key_list is populated.
         return (!trx->is_toi() &&
-                certify_and_depend_v3to4(kep, key, trx, log_conflicts));
+                certify_and_depend_v3to5(kep, key, trx, log_conflicts));
     }
 }
 
@@ -336,7 +356,7 @@ static void do_clean_keys(galera::Certification::CertIndexNG& cert_index,
 }
 
 galera::Certification::TestResult
-galera::Certification::do_test_v3to4(TrxHandleSlave* trx, bool store_keys)
+galera::Certification::do_test_v3to5(TrxHandleSlave* trx, bool store_keys)
 {
     cert_debug << "BEGIN CERTIFICATION v" << trx->version() << ": " << *trx;
 
@@ -356,7 +376,7 @@ galera::Certification::do_test_v3to4(TrxHandleSlave* trx, bool store_keys)
     {
         const KeySet::KeyPart& key(key_set.next());
 
-        if (certify_v3to4(cert_index_ng_, key, trx, store_keys, log_conflicts_))
+        if (certify_v3to5(cert_index_ng_, key, trx, store_keys, log_conflicts_))
         {
             goto cert_fail;
         }
@@ -468,7 +488,7 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
     case 3:
     case 4:
     case 5:
-        res = do_test_v3to4(trx.get(), store_keys);
+        res = do_test_v3to5(trx.get(), store_keys);
         break;
     default:
         gu_throw_fatal << "certification test for version "
@@ -692,12 +712,15 @@ static bool is_exclusive(const galera::KeyEntryNG* ke)
 {
     assert(ke != 0);
     assert((ke->ref_trx(WSREP_KEY_SHARED) ||
-            ke->ref_trx(WSREP_KEY_SEMI) ||
+            ke->ref_trx(WSREP_KEY_REFERENCE) ||
+            ke->ref_trx(WSREP_KEY_UPDATE) ||
             ke->ref_trx(WSREP_KEY_EXCLUSIVE)) &&
            !(ke->ref_trx(WSREP_KEY_SHARED) &&
-             ke->ref_trx(WSREP_KEY_SEMI) &&
+             ke->ref_trx(WSREP_KEY_REFERENCE) &&
+             ke->ref_trx(WSREP_KEY_UPDATE) &&
              ke->ref_trx(WSREP_KEY_EXCLUSIVE)));
-    return (ke->ref_trx(WSREP_KEY_EXCLUSIVE) != 0);
+    return (ke->ref_trx(WSREP_KEY_EXCLUSIVE) != 0 ||
+            ke->ref_trx(WSREP_KEY_UPDATE) != 0);
 }
 
 static bool

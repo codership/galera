@@ -14,6 +14,7 @@ libgaleraxx_env.Append(CPPPATH = Split('''
 
 libgaleraxx_srcs = [
     'mapped_buffer.cpp',
+    'key_data.cpp',
     'write_set.cpp',
     'data_set.cpp',
     'key_set.cpp',

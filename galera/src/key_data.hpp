@@ -1,11 +1,13 @@
 //
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2018 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_KEY_DATA_HPP
 #define GALERA_KEY_DATA_HPP
 
 #include "wsrep_api.h"
+
+#include <ostream>
 
 namespace galera
 {
@@ -37,11 +39,20 @@ struct KeyData
 
     bool shared() const { return type == WSREP_KEY_SHARED; }
 
+    void print(std::ostream& os) const;
+
 private:
 
     KeyData& operator = (const KeyData&);
 
 }; /* struct KeyData */
+
+inline std::ostream&
+operator << (std::ostream& os, const KeyData& kd)
+{
+    kd.print(os);
+    return os;
+}
 
 } /* namespace galera */
 

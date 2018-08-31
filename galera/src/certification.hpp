@@ -142,7 +142,7 @@ namespace galera
         Certification& operator=(const Certification&);
 
         TestResult do_test(const TrxHandleSlavePtr&, bool store_keys);
-        TestResult do_test_v3to4(TrxHandleSlave*, bool);
+        TestResult do_test_v3to5(TrxHandleSlave*, bool);
         TestResult do_test_preordered(TrxHandleSlave*);
         TestResult do_test_nbo(const TrxHandleSlavePtr&);
         void purge_for_trx(TrxHandleSlave*);
