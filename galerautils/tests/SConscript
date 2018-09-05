@@ -73,7 +73,7 @@ avalanche = env.Program(target = 'avalanche',
                              avalanche.c
                          '''))
 
-copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
-                         source = Split('''
-                             copy_vs_assignment.cpp
-                         '''))
+# copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
+#                         source = Split('''
+#                             copy_vs_assignment.cpp
+#                         '''))
