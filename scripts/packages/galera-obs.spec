@@ -28,7 +28,7 @@
 %global _enable_debug_package 0
 %global debug_package %{nil}
 %global __os_install_post /usr/lib/rpm/brp-compress %{nil}
-
+%define ssl_package_devel openssl-devel
 # Define dist tag if not given by platform
 
 # For suse versions see:
@@ -44,6 +44,10 @@
 %endif
 %if 0%{?suse_version} == 1320
 %define dist .suse13.2
+%endif
+%if 0%{?sle_version} == 150000 && 0%{?is_opensuse}
+%define dist .lp151
+%define ssl_package_devel libopenssl-devel
 %endif
 
 
@@ -63,7 +67,7 @@ BuildRoot:     %{_tmppath}/%{name}_%{version}-build
 BuildRequires: boost-devel >= 1.41
 BuildRequires: check-devel
 BuildRequires: glibc-devel
-BuildRequires: openssl-devel
+BuildRequires: %{ssl_package_devel}
 BuildRequires: scons
 %if 0%{?suse_version} == 1110
 # On SLES11 SPx use the linked gcc47 to build instead of default gcc43

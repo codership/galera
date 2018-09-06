@@ -45,7 +45,8 @@ namespace gcomm
         void handle_stable_view(const View& view);
         void handle_evict(const UUID& uuid);
         std::string handle_get_address(const UUID& uuid) const;
-        bool set_param(const std::string& key, const std::string& val);
+        bool set_param(const std::string& key, const std::string& val,
+                       Protolay::sync_param_cb_t& sync_param_cb);
         // Transport interface
         const UUID& uuid() const { return my_uuid_; }
         SegmentId segment() const { return segment_; }
@@ -183,7 +184,7 @@ namespace gcomm
         AddrList          remote_addrs_;
         AddrList          addr_blacklist_;
         bool              relaying_;
-        bool              isolate_;
+        int               isolate_;
 
         gmcast::ProtoMap*  proto_map_;
         std::set<Socket*>   relay_set_;

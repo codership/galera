@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2018 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_SAVED_STATE_HPP
@@ -40,24 +40,25 @@ public:
 
 private:
 
-    FILE*            fs_;
-    wsrep_uuid_t     uuid_;
-    wsrep_seqno_t    seqno_;
-    bool             safe_to_bootstrap_;
-    gu::Atomic<long> unsafe_;
-    bool             corrupt_;
+    FILE*               fs_;
+    const std::string   filename_;
+    wsrep_uuid_t        uuid_;
+    wsrep_seqno_t       seqno_;
+    bool                safe_to_bootstrap_;
+    gu::Atomic<long>    unsafe_;
+    bool                corrupt_;
 
     /* this mutex is needed because mark_safe() and mark_corrupt() will be
      * called outside local monitor, so race is possible */
-    gu::Mutex        mtx_;
-    wsrep_uuid_t     written_uuid_;
-    ssize_t          current_len_;
-    gu::Atomic<long> total_marks_;
-    long             total_locks_;
-    long             total_writes_;
+    gu::Mutex           mtx_;
+    wsrep_uuid_t        written_uuid_;
+    ssize_t             current_len_;
+    gu::Atomic<long>    total_marks_;
+    long                total_locks_;
+    long                total_writes_;
 
-    void write_and_flush (const wsrep_uuid_t& u, const wsrep_seqno_t s,
-                          bool safe_to_bootstrap);
+    void write_file (const wsrep_uuid_t& u, const wsrep_seqno_t s,
+                     bool safe_to_bootstrap);
 
     SavedState (const SavedState&);
     SavedState& operator=(const SavedState&);
