@@ -348,6 +348,9 @@ namespace galera
             }
         }
 
+        /* process pending queue events scheduled before seqno */
+        void process_pending_queue(wsrep_seqno_t seqno);
+
         wsrep_status_t cert             (TrxHandleMaster*,
                                          const TrxHandleSlavePtr&);
         wsrep_status_t cert_and_catch   (TrxHandleMaster*,

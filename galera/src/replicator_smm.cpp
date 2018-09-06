@@ -2391,6 +2391,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     if (!from_IST)
     {
         gu_trace(local_monitor_.enter(lo));
+        gu_trace(process_pending_queue(cc.seqno_g));
     }
 
     assert(!from_IST || WSREP_UUID_UNDEFINED != uuid_);
@@ -2926,6 +2927,32 @@ void galera::ReplicatorSMM::resync()
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+/* process pending queue events scheduled before seqno */
+void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t seqno)
+{
+    // pending_cert_queue_ contains all writesets that:
+    //   a) were BF aborted before being certified
+    //   b) are not going to be replayed even though
+    //      cert_for_aborted() returned TEST_OK for them
+    //
+    // Before certifying the current seqno, check if
+    // pending_cert_queue contains any smaller seqno.
+    // This avoids the certification index to diverge
+    // across nodes.
+    TrxHandleSlavePtr aborted_ts;
+    while ((aborted_ts = pending_cert_queue_.must_cert_next(seqno)) != NULL)
+    {
+        log_debug << "must cert next " << seqno << " aborted ts " << *aborted_ts;
+
+        Certification::TestResult result;
+        result = cert_.append_trx(aborted_ts);
+
+        log_debug << "trx in pending cert queue certified, result: " << result;
+
+        cert_.set_trx_committed(*aborted_ts);
+    }
+}
+
 /* don't use this directly, use cert_and_catch() instead */
 inline
 wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
@@ -3023,33 +3050,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     }
     else
     {
-        // TX_SET_STATE(*ts, TrxHandle::S_CERTIFYING);
         assert(ts->state() == TrxHandle::S_CERTIFYING);
-        // pending_cert_queue_ contains all writesets that:
-        //   a) were BF aborted before being certified
-        //   b) are not going to be replayed even though
-        //      cert_for_aborted() returned TEST_OK for them
-        //
-        // Before certifying the current seqno, check if
-        // pending_cert_queue contains any smaller seqno.
-        // This avoids the certification index to diverge
-        // across nodes.
-        TrxHandleSlavePtr aborted_ts;
-        while ((aborted_ts =
-                pending_cert_queue_.must_cert_next(ts->global_seqno()))
-               != NULL)
-        {
-            log_debug << "must cert next " << ts->global_seqno()
-                      << " aborted ts " << *aborted_ts;
 
-            Certification::TestResult result;
-            result = cert_.append_trx(aborted_ts);
-
-            log_debug << "trx in pending cert queue certified, result: "
-                      << result;
-
-            cert_.set_trx_committed(*aborted_ts);
-        }
+        gu_trace(process_pending_queue(ts->global_seqno()));
 
         switch (cert_.append_trx(ts))
         {
