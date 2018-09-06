@@ -590,7 +590,7 @@ if conf.CheckWeffcpp():
 # We assume that if it is not Clang, then it is GCC
 if not 'clang' in cxx_version:
     gcc_version_num = read_first_line(conf.env['CXX'].split() + ['-dumpversion'])
-    if gcc_version_num < "4.9.0":
+    if str(gcc_version_num) < "4.9.0":
         conf.env.Prepend(CXXFLAGS = '-Wnon-virtual-dtor ')
     conf.env.Prepend(CXXFLAGS = '-Wold-style-cast ')
 
