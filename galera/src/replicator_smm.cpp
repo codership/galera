@@ -2742,8 +2742,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     free(app_req);
 
-    if (!st_required              /* in-order processing  */ ||
-        sst_seqno_ >= group_seqno /* SST "ate" this event */)
+    if (!st_required /* in-order processing  */)
     {
         wsrep_cb_status_t const rcode
             (view_cb_(app_ctx_, recv_ctx, view_info, 0, 0));

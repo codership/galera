@@ -24,6 +24,7 @@ do
 
     start
     pause 5
+    consistency_check
     stop
 
 done
