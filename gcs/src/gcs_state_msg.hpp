@@ -189,7 +189,7 @@ gcs_state_msg_flags (const gcs_state_msg_t* state);
  *         quorum parameter */
 extern long
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
-                          long                   states_num,
+                          size_t                 states_num,
                           gcs_state_quorum_t*    quorum);
 
 /* Print state message contents to buffer */

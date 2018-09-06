@@ -486,7 +486,7 @@ state_report_uuids (char* buf, size_t buf_len,
  * @retval (void*)-1 in case of fatal error */
 static const gcs_state_msg_t*
 state_quorum_inherit (const gcs_state_msg_t* states[],
-                      long                   states_num,
+                      size_t                 states_num,
                       gcs_state_quorum_t*    quorum)
 {
     /* They all must have the same group_uuid or otherwise quorum is impossible.
@@ -496,7 +496,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
      * Of those with the status >= GCS_STATE_JOINED we choose the most
      * representative: with the highest act_seqno and prim_seqno.
      */
-    long i, j;
+    size_t i, j;
     const gcs_state_msg_t* rep = NULL;
 
     // find at least one JOINED/DONOR (donor was once joined)
@@ -857,13 +857,13 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
 /* Get quorum decision from state messages */
 long
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
-                          long                   states_num,
+                          size_t                 states_num,
                           gcs_state_quorum_t*    quorum)
 {
     assert (states_num > 0);
     assert (NULL != states);
 
-    long i;
+    size_t i;
     const gcs_state_msg_t*   rep = NULL;
 
     *quorum = GCS_QUORUM_NON_PRIMARY; // pessimistic assumption
