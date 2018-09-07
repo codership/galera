@@ -5,7 +5,7 @@
 d 755 root root $INCS_DEST -
 f 644 root root $INCS_DEST/gcs.h       $BUILD_BASE/gcs/src/gcs.h
 f 644 root root $INCS_DEST/wsdb_api.h  $BUILD_BASE/wsdb/src/wsdb_api.h
-f 644 root root $INCS_DEST/wsrep_api.h $BUILD_BASE/galera/src/wsrep_api.h
+f 644 root root $INCS_DEST/wsrep_api.h $BUILD_BASE/wsrep/src/wsrep_api.h
 
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST/libgalerautils.a      $BUILD_BASE/galerautils/src/.libs/libgalerautils.a

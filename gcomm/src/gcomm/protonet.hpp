@@ -111,7 +111,8 @@ public:
     //
     virtual void leave() = 0;
 
-    bool set_param(const std::string& key, const std::string& val);
+    bool set_param(const std::string& key, const std::string& val,
+                  Protolay::sync_param_cb_t& sync_param_cb);
 
     gu::Config& conf() { return conf_; }
 
