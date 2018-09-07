@@ -121,6 +121,8 @@ typedef enum status_vars
     STATS_GCACHE_POOL_SIZE,
     STATS_CAUSAL_READS,
     STATS_CERT_INTERVAL,
+    STATS_OPEN_TRX,
+    STATS_OPEN_CONN,
     STATS_IST_RECEIVE_STATUS,
     STATS_IST_RECEIVE_SEQNO_START,
     STATS_IST_RECEIVE_SEQNO_CURRENT,
@@ -178,6 +180,8 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "gcache_pool_size",         WSREP_VAR_INT64,  { 0 }  },
     { "causal_reads",             WSREP_VAR_INT64,  { 0 }  },
     { "cert_interval",            WSREP_VAR_DOUBLE, { 0 }  },
+    { "open_transactions",        WSREP_VAR_INT64,  { 0 }  },
+    { "open_connections",         WSREP_VAR_INT64,  { 0 }  },
     { "ist_receive_status",       WSREP_VAR_STRING, { 0 }  },
     { "ist_receive_seqno_start",  WSREP_VAR_INT64,  { 0 }  },
     { "ist_receive_seqno_current",WSREP_VAR_INT64,  { 0 }  },
@@ -286,6 +290,10 @@ galera::ReplicatorSMM::stats_get()
     sv[STATS_LOCAL_STATE_COMMENT ].value._string = state2stats_str(state_(),
                                                                    sst_state_);
     sv[STATS_CAUSAL_READS].value._int64    = causal_reads_();
+
+    Wsdb::stats wsdb_stats(wsdb_.get_stats());
+    sv[STATS_OPEN_TRX].value._int64 = wsdb_stats.n_trx_;
+    sv[STATS_OPEN_CONN].value._int64 = wsdb_stats.n_conn_;
 
     if (ist_receiver_.running())
     {

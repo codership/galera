@@ -47,13 +47,14 @@ gu::datetime::Date gcomm::Protonet::handle_timers()
     return next_time;
 }
 
-bool gcomm::Protonet::set_param(const std::string& key, const std::string& val)
+bool gcomm::Protonet::set_param(const std::string& key, const std::string& val, 
+                                Protolay::sync_param_cb_t& sync_param_cb)
 {
     bool ret(false);
     for (std::deque<Protostack*>::iterator i(protos_.begin());
          i != protos_.end(); ++i)
     {
-        ret |= (*i)->set_param(key, val);
+        ret |= (*i)->set_param(key, val, sync_param_cb);
     }
     return ret;
 }

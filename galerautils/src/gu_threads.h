@@ -10,7 +10,7 @@
 #include "gu_types.h" // bool
 
 /* Callback for PFS instrumentation */
-#include "../../common/wsrep_api.h"
+#include "wsrep_api.h"
 extern gu_pfs_instr_cb_t pfs_instr_callback;
 
 #if __unix__

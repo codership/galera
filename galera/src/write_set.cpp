@@ -82,6 +82,11 @@ void galera::WriteSet::append_key(const KeyData& kd)
                (kd.shared() ? galera::KeyOS::F_SHARED : 0)
                );
 
+    if (kd.shared())
+        assert(key.flags() & galera::KeyOS::F_SHARED);
+    else
+        assert(!(key.flags() & galera::KeyOS::F_SHARED));
+
     const size_t hash(key.hash());
 
     std::pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator>

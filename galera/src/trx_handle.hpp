@@ -746,6 +746,8 @@ namespace galera
                 WriteSetOut* wso = &write_set_out();
                 assert(static_cast<void*>(wso) == static_cast<void*>(store));
                 assert((uintptr_t(wso) % GU_WORD_BYTES) == 0);
+                assert(params.version_ >= 0 &&
+                       params.version_ <= WriteSetNG::MAX_VERSION);
 
                 new (wso) WriteSetOut (params.working_dir_,
                                        trx_id_, params.key_format_,
@@ -753,7 +755,7 @@ namespace galera
                                        store_size - sizeof(WriteSetOut),
                                        0,
                                        params.record_set_ver_,
-                                       WriteSetNG::MAX_VERSION,
+                                       WriteSetNG::Version(params.version_),
                                        DataSet::MAX_VERSION,
                                        DataSet::MAX_VERSION,
                                        params.max_write_set_size_);

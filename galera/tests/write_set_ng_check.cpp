@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2018 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -16,7 +16,8 @@
 
 using namespace galera;
 
-static void ver3_basic(gu::RecordSet::Version const rsv)
+static void ver3_basic(gu::RecordSet::Version const rsv,
+                       WriteSetNG::Version    const wsv)
 {
     int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
@@ -27,13 +28,12 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
 
     std::string const dir(".");
     wsrep_trx_id_t trx_id(1);
-    WriteSetOut wso (dir, trx_id, KeySet::FLAT8A, 0, 0, flag1, rsv,
-                     WriteSetNG::VER3);
+    WriteSetOut wso (dir, trx_id, KeySet::FLAT8A, 0, 0, flag1, rsv, wsv);
 
     fail_unless (wso.is_empty());
 
-    // keep SHARED here, see loop below
-    TestKey tk0(KeySet::MAX_VERSION, SHARED, true, "a0");
+    // keep WSREP_KEY_SHARED here, see loop below
+    TestKey tk0(KeySet::MAX_VERSION, WSREP_KEY_SHARED, true, "a0");
     wso.append_key(tk0());
     fail_if (wso.is_empty());
 
@@ -76,6 +76,8 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
 
     gu::Buf const in_buf = { in.data(), static_cast<ssize_t>(in.size()) };
 
+    int const P_SHARED(KeySet::KeyPart::prefix(WSREP_KEY_SHARED, wsv));
+
     /* read ws buffer and "certify" */
     {
         mark_point();
@@ -99,7 +101,7 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
         for (int i(0); i < ksi.count(); ++i)
         {
             KeySet::KeyPart kp(ksi.next());
-            shared += kp.shared();
+            shared += (kp.prefix() == P_SHARED);
         }
         fail_unless(shared > 0);
 
@@ -130,7 +132,7 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
         for (int i(0); i < ksi.count(); ++i)
         {
             KeySet::KeyPart kp(ksi.next());
-            shared += kp.shared();
+            shared += (kp.prefix() == P_SHARED);
         }
         fail_unless(shared > 0);
 
@@ -271,13 +273,19 @@ static void ver3_basic(gu::RecordSet::Version const rsv)
 
 START_TEST (ver3_basic_rsv1)
 {
-    ver3_basic(gu::RecordSet::VER1);
+    ver3_basic(gu::RecordSet::VER1, WriteSetNG::VER3);
 }
 END_TEST
 
-START_TEST (ver3_basic_rsv2)
+START_TEST (ver3_basic_rsv2_wsv3)
 {
-    ver3_basic(gu::RecordSet::VER2);
+    ver3_basic(gu::RecordSet::VER2, WriteSetNG::VER3);
+}
+END_TEST
+
+START_TEST (ver3_basic_rsv2_wsv4)
+{
+    ver3_basic(gu::RecordSet::VER2, WriteSetNG::VER4);
 }
 END_TEST
 
@@ -298,7 +306,7 @@ static void ver3_annotation(gu::RecordSet::Version const rsv)
 
     fail_unless (wso.is_empty());
 
-    TestKey tk0(KeySet::MAX_VERSION, SHARED, true, "key0");
+    TestKey tk0(KeySet::MAX_VERSION, WSREP_KEY_SHARED, true, "key0");
     wso.append_key(tk0());
     fail_if (wso.is_empty());
 
@@ -379,7 +387,8 @@ Suite* write_set_ng_suite ()
 
     TCase* t = tcase_create ("WriteSet basic");
     tcase_add_test (t, ver3_basic_rsv1);
-    tcase_add_test (t, ver3_basic_rsv2);
+    tcase_add_test (t, ver3_basic_rsv2_wsv3);
+    tcase_add_test (t, ver3_basic_rsv2_wsv4);
     tcase_set_timeout(t, 60);
     suite_add_tcase (s, t);
 
