@@ -183,7 +183,7 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
 {
     long ret;
 
-    if ((ret = params_init_long (config, GCS_PARAMS_FC_LIMIT, 0, LONG_MAX,
+    if ((ret = params_init_long (config, GCS_PARAMS_FC_LIMIT, 1, LONG_MAX,
                                  &params->fc_base_limit))) return ret;
 
     if ((ret = params_init_long (config, GCS_PARAMS_FC_DEBUG, 0, LONG_MAX,
