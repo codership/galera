@@ -51,6 +51,8 @@ galera::Wsdb::~Wsdb()
     // and don't clean up to let valgrind etc to detect leaks.
 #ifndef NDEBUG
     std::cerr << *this;
+    assert(trx_map_.size() == 0);
+    assert(conn_map_.size() == 0);
 #else
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
     for_each(conn_trx_map_.begin(),
@@ -215,15 +217,6 @@ void galera::Wsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
         i->second.assign_trx(0);
-    }
-}
-
-void galera::Wsdb::discard_conn(wsrep_conn_id_t conn_id)
-{
-    gu::Lock lock(conn_mutex_);
-    ConnMap::iterator i;
-    if ((i = conn_map_.find(conn_id)) != conn_map_.end())
-    {
         conn_map_.erase(i);
     }
 }

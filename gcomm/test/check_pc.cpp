@@ -1854,6 +1854,7 @@ START_TEST(test_set_param)
 {
     log_info << "START (test_pc_transport)";
     gu::Config conf;
+    Protolay::sync_param_cb_t sync_param_cb;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
@@ -1867,7 +1868,7 @@ START_TEST(test_set_param)
                 "node.name=n1");
     pu1.start();
     // no such a parameter
-    fail_unless(net->set_param("foo.bar", "1") == false);
+    fail_unless(net->set_param("foo.bar", "1", sync_param_cb) == false);
 
     const evs::seqno_t send_window(
         gu::from_string<evs::seqno_t>(conf.get("evs.send_window")));
@@ -1876,7 +1877,7 @@ START_TEST(test_set_param)
 
     try
     {
-        net->set_param("evs.send_window", gu::to_string(user_send_window - 1));
+        net->set_param("evs.send_window", gu::to_string(user_send_window - 1), sync_param_cb);
         fail("exception not thrown");
     }
     catch (gu::Exception& e)
@@ -1887,7 +1888,7 @@ START_TEST(test_set_param)
     try
     {
         net->set_param("evs.user_send_window",
-                      gu::to_string(send_window + 1));
+                      gu::to_string(send_window + 1), sync_param_cb);
         fail("exception not thrown");
     }
     catch (gu::Exception& e)
@@ -1898,12 +1899,12 @@ START_TEST(test_set_param)
     // Note: These checks may have to change if defaults are changed
     fail_unless(net->set_param(
                     "evs.send_window",
-                    gu::to_string(send_window - 1)) == true);
+                    gu::to_string(send_window - 1), sync_param_cb) == true);
     fail_unless(gu::from_string<evs::seqno_t>(conf.get("evs.send_window")) ==
                 send_window - 1);
     fail_unless(net->set_param(
                     "evs.user_send_window",
-                    gu::to_string(user_send_window + 1)) == true);
+                    gu::to_string(user_send_window + 1), sync_param_cb) == true);
     fail_unless(gu::from_string<evs::seqno_t>(
                     conf.get("evs.user_send_window")) == user_send_window + 1);
     pu1.stop();
@@ -2123,6 +2124,12 @@ START_TEST(test_weighted_quorum)
         gu_trace(prop.propagate_until_cvi(false));
     }
 
+    for (size_t i(0); i < n_nodes; ++i)
+    {
+        int weight(pc_from_dummy(dn[i])->cluster_weight());
+        fail_unless(weight == 3,
+                    "index: %i weight: %i", i, weight);
+    }
     // split node 3 (weight 2) out, node 3 should remain in prim while
     // nodes 1 and 2 (weights 0 + 1 = 1) should end up in non-prim
     prop.split(1, 3);
@@ -2131,6 +2138,10 @@ START_TEST(test_weighted_quorum)
     set_cvi(dn, 0, 1, view_seq, V_NON_PRIM);
     set_cvi(dn, 2, 2, view_seq, V_PRIM);
     gu_trace(prop.propagate_until_cvi(true));
+
+    fail_unless(pc_from_dummy(dn[0])->cluster_weight() == 0);
+    fail_unless(pc_from_dummy(dn[1])->cluster_weight() == 0);
+    fail_unless(pc_from_dummy(dn[2])->cluster_weight() == 2);
 }
 END_TEST
 
@@ -2540,7 +2551,9 @@ START_TEST(test_weight_change_partitioning_1)
 
     // weight change
     {
-        pu1.pc()->set_param("pc.weight", "3");
+        Protolay::sync_param_cb_t sync_param_cb;
+        pu1.pc()->set_param("pc.weight", "3", sync_param_cb);
+        fail_unless(sync_param_cb.empty() == false);
         Datagram* install_dg(pu1.tp()->out());
         fail_unless(install_dg != 0);
 
@@ -2670,8 +2683,10 @@ START_TEST(test_weight_change_partitioning_2)
     triple_boot(0, &pu1, &pu2, &pu3);
 
     // weight change
-    {
-        pu1.pc()->set_param("pc.weight", "1");
+    {   
+        Protolay::sync_param_cb_t sync_param_cb;
+        pu1.pc()->set_param("pc.weight", "1", sync_param_cb);
+        fail_unless(sync_param_cb.empty() == false);
         Datagram* install_dg(pu1.tp()->out());
         fail_unless(install_dg != 0);
 
@@ -2788,11 +2803,11 @@ START_TEST(test_weight_change_joining)
     DummyTransport tp3;
     PCUser pu3(conf3, uuid3, &tp3, &pc3);
 
-
-
     // weight change
     {
-        pu1.pc()->set_param("pc.weight", "1");
+        Protolay::sync_param_cb_t sync_param_cb;
+        pu1.pc()->set_param("pc.weight", "1", sync_param_cb);
+        fail_unless(sync_param_cb.empty() == false);
         Datagram* install_dg(pu1.tp()->out());
         fail_unless(install_dg != 0);
 
@@ -2933,8 +2948,10 @@ START_TEST(test_weight_change_leaving)
 
     // weight change
     {
+        Protolay::sync_param_cb_t sync_param_cb;
         // change weight for node 2 while node 1 leaves the group gracefully
-        pu2.pc()->set_param("pc.weight", "1");
+        pu2.pc()->set_param("pc.weight", "1", sync_param_cb);
+        fail_unless(sync_param_cb.empty() == false);
         Datagram* install_dg(pu2.tp()->out());
         fail_unless(install_dg != 0);
 

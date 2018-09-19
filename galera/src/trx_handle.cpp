@@ -230,6 +230,7 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
 
             break;
         case 3:
+        case 4:
             write_set_in_.read_buf (buf, buflen);
             write_set_flags_ = wsng_flags_to_trx_flags(write_set_in_.flags());
             source_id_       = write_set_in_.source_id();
@@ -258,6 +259,7 @@ galera::TrxHandle::unserialize(const gu::byte_t* const buf, size_t const buflen,
             timestamp_       = write_set_in_.timestamp();
             break;
         default:
+            assert(0);
             gu_throw_error(EPROTONOSUPPORT);
         }
 

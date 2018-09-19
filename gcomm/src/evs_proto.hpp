@@ -305,7 +305,8 @@ public:
         set_inactive(uuid);
     }
 
-    bool set_param(const std::string& key, const std::string& val);
+    bool set_param(const std::string& key, const std::string& val,
+                   Protolay::sync_param_cb_t& sync_param_cb);
 
     void handle_get_status(gu::Status& status) const;
 

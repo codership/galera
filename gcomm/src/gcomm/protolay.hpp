@@ -30,6 +30,8 @@
 #include <list>
 #include <utility>
 
+#include <boost/function.hpp>
+
 // Declarations
 namespace gcomm
 {
@@ -193,6 +195,8 @@ class gcomm::Protolay
 {
 public:
     typedef Map<UUID, gu::datetime::Date> EvictList;
+
+    typedef boost::function<void()> sync_param_cb_t;
 
     virtual ~Protolay() {}
 
@@ -376,7 +380,8 @@ public:
         return gu::datetime::Date::max();
     }
 
-    virtual bool set_param(const std::string& key, const std::string& val)
+    virtual bool set_param(const std::string& key, const std::string& val, 
+                           sync_param_cb_t& sync_param_cb)
     {
         return false;
     }
