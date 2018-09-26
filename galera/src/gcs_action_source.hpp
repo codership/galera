@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_ACTION_SOURCE_HPP
@@ -49,6 +49,11 @@ namespace galera
         long long received_bytes() const { return received_bytes_(); }
 
     private:
+
+        void process_writeset(void*                    recv_ctx,
+                              const struct gcs_action& act,
+                              bool&                    exit_loop);
+        void resend_writeset(const struct gcs_action& act);
 
         void dispatch(void*, const gcs_action&, bool& exit_loop);
 

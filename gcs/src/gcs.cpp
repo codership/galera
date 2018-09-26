@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2018 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1470,9 +1470,16 @@ static void *gcs_recv_thread (void *arg)
             gu_cond_signal  (&repl_act->wait_cond);
             gu_mutex_unlock (&repl_act->wait_mutex);
         }
-        else if (gu_likely(this_act_id >= 0))
+        else if (this_act_id >= 0 ||
+                 /* action that was SENT and there is no sender waiting for it */
+                 (rcvd.id == -EAGAIN && rcvd.act.type == GCS_ACT_WRITESET))
         {
             /* remote/non-repl'ed action */
+
+            assert(rcvd.local != NULL || rcvd.id != -EAGAIN);
+            /* Note that the resource pointed to by rcvd.local belongs to
+             * the original action sender, so we don't care about freeing it */
+
             struct gcs_recv_act* recv_act =
                 (struct gcs_recv_act*)gu_fifo_get_tail (conn->recv_q);
 
@@ -1482,7 +1489,10 @@ static void *gcs_recv_thread (void *arg)
                 recv_act->local_id = this_act_id;
 
                 conn->queue_len = gu_fifo_length (conn->recv_q) + 1;
-                bool const send_stop(gcs_fc_stop_begin(conn));
+
+                /* attempt to send stops only for foreign actions */
+                bool const send_stop
+                    (rcvd.local == NULL && gcs_fc_stop_begin(conn));
 
                 // release queue
                 GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
@@ -1510,11 +1520,12 @@ static void *gcs_recv_thread (void *arg)
         }
         else if (rcvd.id == -EAGAIN)
         {
+            assert(rcvd.local != NULL); /* local action */
             gu_fatal("Action {%p, %zd, %s} needs resending: "
-                     "sender idx %d, my idx %d",
+                     "sender idx %d, my idx %d, local %p",
                      rcvd.act.buf, rcvd.act.buf_len,
                      gcs_act_type_to_str(rcvd.act.type),
-                     rcvd.id, conn->my_idx);
+                     rcvd.sender_idx, conn->my_idx, rcvd.local);
             assert (0);
             ret = -ENOTRECOVERABLE;
             break;
@@ -1787,9 +1798,7 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
         {
             struct gcs_repl_act** act_ptr;
 
-//#ifndef NDEBUG
             const void* const orig_buf = act->buf;
-//#endif
 
             // some hack here to achieve one if() instead of two:
             // ret = -EAGAIN part is a workaround for #569

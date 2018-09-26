@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "replicator.hpp"
@@ -7,6 +7,7 @@
 #include "trx_handle.hpp"
 
 #include "gu_serialize.hpp"
+#include "gu_throw.hpp"
 
 #include "galera_info.hpp"
 
@@ -45,6 +46,54 @@ private:
     gcache::GCache&    gcache_;
 };
 
+void
+galera::GcsActionSource::process_writeset(void* const              recv_ctx,
+                                          const struct gcs_action& act,
+                                          bool&                    exit_loop)
+{
+    assert(act.seqno_g > 0);
+    assert(act.seqno_l != GCS_SEQNO_ILL);
+
+    TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
+                          TrxHandleSlaveDeleter());
+
+    gu_trace(tsp->unserialize<true>(act));
+    tsp->set_local(replicator_.source_id() == tsp->source_id());
+    gu_trace(replicator_.process_trx(recv_ctx, tsp));
+    exit_loop = tsp->exit_loop(); // this is the end of trx lifespan
+}
+
+void
+galera::GcsActionSource::resend_writeset(const struct gcs_action& act)
+{
+    assert(act.seqno_g == -EAGAIN);
+    assert(act.seqno_l == GCS_SEQNO_ILL);
+
+    ssize_t ret;
+    struct gu_buf const sb = { act.buf, act.size };
+    GcsI::WriteSetVector v;
+    v[0] = sb;
+
+    /* grab send monitor to resend asap */
+    while ((ret = gcs_.sendv(v, act.size, act.type, false, true)) == -EAGAIN) {
+        usleep(1000);
+    }
+
+    if (ret > 0) {
+        log_debug << "Local action "
+                  << gcs_act_type_to_str(act.type)
+                  << " of size " << ret << '/' << act.size
+                  << " was resent.";
+        /* release source buffer */
+        gcache_.free(const_cast<void*>(act.buf));
+    }
+    else {
+        gu_throw_fatal << "Failed to resend action {" << act.buf
+                       << ", " << act.size
+                       << ", " << gcs_act_type_to_str(act.type)
+                       << "}";
+    }
+}
 
 void galera::GcsActionSource::dispatch(void* const              recv_ctx,
                                        const struct gcs_action& act,
@@ -52,23 +101,18 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
 {
     assert(recv_ctx != 0);
     assert(act.buf != 0);
-    assert(act.seqno_l > 0);
+    assert(act.seqno_l > 0 || act.seqno_g == -EAGAIN);
 
     switch (act.type)
     {
     case GCS_ACT_WRITESET:
-    {
-        assert(act.seqno_g > 0);
-        assert(act.seqno_l != GCS_SEQNO_ILL);
-
-        TrxHandleSlavePtr tsp(TrxHandleSlave::New(false, trx_pool_),
-                              TrxHandleSlaveDeleter());
-        gu_trace(tsp->unserialize<true>(act));
-        tsp->set_local(replicator_.source_id() == tsp->source_id());
-        gu_trace(replicator_.process_trx(recv_ctx, tsp));
-        exit_loop = tsp->exit_loop(); // this is the end of trx lifespan
+        if (act.seqno_g > 0) {
+            process_writeset(recv_ctx, act, exit_loop);
+        }
+        else {
+            resend_writeset(act);
+        }
         break;
-    }
     case GCS_ACT_COMMIT_CUT:
     {
         wsrep_seqno_t seqno;
@@ -123,13 +167,19 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
      * in a critical section */
     bool const skip(replicator_.corrupt()       &&
                     GCS_ACT_CCHANGE != act.type &&
-                    GCS_ACT_VOTE    != act.type);
+                    GCS_ACT_VOTE    != act.type &&
+                    /* action needs resending */
+                    -EAGAIN         != act.seqno_g);
 
     if (gu_likely(rc > 0 && !skip))
     {
         Release release(act, gcache_);
-        ++received_;
-        received_bytes_ += rc;
+
+        if (-EAGAIN != act.seqno_g /* replicated action */)
+        {
+            ++received_;
+            received_bytes_ += rc;
+        }
         try { gu_trace(dispatch(recv_ctx, act, exit_loop)); }
         catch (gu::Exception& e)
         {
