@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -1113,12 +1113,19 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 
 wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
 {
-    wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
+    wsrep_seqno_t cseq;
+    gu::datetime::Date wait_until(gu::datetime::Date::calendar() +
+                                  causal_read_timeout_);
 
-    if (cseq < 0)
+    try
     {
-        log_warn << "gcs_caused() returned " << cseq << " (" << strerror(-cseq)
-                 << ')';
+        gcs_.caused(cseq, wait_until);
+        assert(cseq >= 0);
+    }
+    catch (gu::Exception& e)
+    {
+        log_warn << "gcs_caused() returned " << -e.get_errno()
+                 << " (" << strerror(e.get_errno()) << ")";
         return WSREP_TRX_FAIL;
     }
 
@@ -1131,9 +1138,14 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_gtid_t* gtid)
         // at monitor drain and disallowing further waits until
         // configuration change related operations (SST etc) have been
         // finished.
-        gu::datetime::Date wait_until(gu::datetime::Date::calendar()
-                                      + causal_read_timeout_);
 
+        // With PXC performance optimization, commit monitor is released
+        // once transaction is added to MySQL Commit Queue (Group Commit
+        // Protocol Queue). This effectively means even though commit
+        // monitor is freed, transaction is not yet committed so it is not
+        // safe to allow caused read statement to proceed.
+        // With the new framework, safe point is to proceed once apply
+        // monitor is released.
         apply_monitor_.wait(cseq, wait_until);
 
         if (gtid != 0)
@@ -1492,6 +1504,12 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
         trx_params_.record_set_ver_ = gu::RecordSet::VER2;
         str_proto_ver_ = 2;
         break;
+    case 9:
+        // Protocol upgrade to enable support for semi-shared key type.
+        trx_params_.version_ = 4;
+        trx_params_.record_set_ver_ = gu::RecordSet::VER2;
+        str_proto_ver_ = 2;
+        break;
     default:
         log_fatal << "Configuration change resulted in an unsupported protocol "
             "version: " << proto_ver << ". Can't continue.";
@@ -1738,7 +1756,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     else
     {
         // Non-primary configuration
-        if (state_uuid_ != WSREP_UUID_UNDEFINED)
+        if (state_uuid_ != WSREP_UUID_UNDEFINED && next_state == S_CLOSING)
         {
             st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
         }

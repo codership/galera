@@ -67,7 +67,6 @@ namespace galera
         virtual TrxHandle* local_conn_trx(wsrep_conn_id_t conn_id,
                                           bool create) = 0;
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
-        virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 
         virtual wsrep_status_t replicate(TrxHandle* trx, wsrep_trx_meta_t*) = 0;
         virtual wsrep_status_t pre_commit(TrxHandle* trx, wsrep_trx_meta_t*) =0;

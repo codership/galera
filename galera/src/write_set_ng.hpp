@@ -37,11 +37,12 @@ namespace galera
 
         enum Version
         {
-            VER3 = 3
+            VER3 = 3,
+            VER4
         };
 
         /* Max header version that we can understand */
-        static Version const MAX_VERSION = VER3;
+        static Version const MAX_VERSION = VER4;
 
         /* Parses beginning of the header to detect writeset version and
          * returns it as raw integer for backward compatibility
@@ -87,6 +88,7 @@ namespace galera
             switch (v)
             {
             case VER3: return VER3;
+            case VER4: return VER4;
             }
 
             gu_throw_error (EPROTO) << "Unrecognized writeset version: " << v;
@@ -131,6 +133,7 @@ namespace galera
                 switch (ver)
                 {
                 case VER3:
+                case VER4:
                 {
                     GU_COMPILE_ASSERT(0 == (V3_SIZE % GU_MIN_ALIGNMENT),
                                       unaligned_header_size);
@@ -497,7 +500,7 @@ namespace galera
             kbn_   (base_name_),
             keys_  (reserved,
                     (reserved_size >>= 6, reserved_size <<= 3, reserved_size),
-                    kbn_, kver, rsv),
+                    kbn_, kver, rsv, ver),
             /* 5/8 of reserved goes to data set  */
             dbn_   (base_name_),
             data_  (reserved + reserved_size, reserved_size*5, dbn_, dver, rsv),

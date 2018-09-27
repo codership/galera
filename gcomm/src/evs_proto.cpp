@@ -251,7 +251,8 @@ gcomm::evs::Proto::~Proto()
 
 
 bool
-gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
+gcomm::evs::Proto::set_param(const std::string& key, const std::string& val, 
+                            Protolay::sync_param_cb_t& sync_param_cb)
 {
     if (key == gcomm::Conf::EvsVersion)
     {

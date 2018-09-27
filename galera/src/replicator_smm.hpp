@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -87,11 +87,6 @@ namespace galera
         void discard_local_conn_trx(wsrep_conn_id_t conn_id)
         {
             wsdb_.discard_conn_query(conn_id);
-        }
-
-        void discard_local_conn(wsrep_conn_id_t conn_id)
-        {
-            wsdb_.discard_conn(conn_id);
         }
 
         void apply_trx(void* recv_ctx, TrxHandle* trx);
@@ -571,7 +566,8 @@ namespace galera
          * |                 5 |           3 |              1 |               1 |
          * |                 6 |           3 |              2 |               1 |
          * |                 7 |           3 |              2 |               1 |
-         * |                 8 |           4 |              2 |               2 |
+         * |                 8 |           3 |              2 |               2 |
+         * |                 9 |           4 |              2 |               2 |
          * |--------------------------------------------------------------------|
          */
 

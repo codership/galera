@@ -147,7 +147,7 @@ psi        = int(ARGUMENTS.get('psi', 0))
 if psi:
     opt_flags = opt_flags + ' -DHAVE_PSI_INTERFACE'
 
-GALERA_VER = ARGUMENTS.get('version', '3.26')
+GALERA_VER = ARGUMENTS.get('version', '3.31')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -183,8 +183,12 @@ if link != 'default':
     env.Replace(LINK = link)
 
 # Get compiler name/version, CXX may be set to "c++" which may be clang or gcc
-cc_version = read_first_line(env['CC'].split() + ['--version'])
-cxx_version = read_first_line(env['CXX'].split() + ['--version'])
+cc_version = str(read_first_line(env['CC'].split() + ['--version']))
+cxx_version = str(read_first_line(env['CXX'].split() + ['--version']))
+
+if python_ver >= 3:
+    cc_version = cc_version.decode()
+    cxx_version = cxx_version.decode()
 
 if python_ver >= 3:
     cc_version = cc_version.decode()
@@ -344,6 +348,17 @@ int main() { return 0; }
     context.Result(result)
     return result
 
+# advanced SSL features
+def CheckSetEcdhAuto(context):
+    test_source = """
+#include <openssl/ssl.h>
+int main() { SSL_CTX* ctx=NULL; return !SSL_CTX_set_ecdh_auto(ctx, 1); }
+"""
+    context.Message('Checking for SSL_CTX_set_ecdh_auto() ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
 #
 # Construct configuration context
 #
@@ -353,8 +368,11 @@ conf = Configure(env, custom_tests = {
     'CheckTr1Array': CheckTr1Array,
     'CheckTr1SharedPtr': CheckTr1SharedPtr,
     'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
-    'CheckWeffcpp': CheckWeffcpp
+    'CheckWeffcpp': CheckWeffcpp,
+    'CheckSetEcdhAuto': CheckSetEcdhAuto
 })
+
+conf.env.Append(CPPPATH = [ '#/wsrep/src' ])
 
 # System headers and libraries
 
@@ -548,6 +566,10 @@ if not conf.CheckLib('ssl'):
 if not conf.CheckLib('crypto'):
     print('SSL support required libcrypto was not found')
     Exit(1)
+
+# advanced SSL features
+if conf.CheckSetEcdhAuto():
+    conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_ECDH_AUTO')
 
 # these will be used only with our software
 if strict_build_flags == 1:

@@ -154,8 +154,8 @@ gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno);
 extern long
 gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
 
-extern gcs_seqno_t
-gcs_core_caused(gcs_core_t* core);
+extern long
+gcs_core_caused (gcs_core_t* core, gcs_seqno_t& seqno);
 
 extern long
 gcs_core_param_set (gcs_core_t* core, const char* key, const char* value);

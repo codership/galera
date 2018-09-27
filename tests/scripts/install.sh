@@ -6,8 +6,12 @@ untar_cmd()
 {
     local node=${@:$#}
     local path="${NODE_TEST_DIR[$node]}"
+    local data=$path/mysql/var
     local hst=$(hostname -s)
-    echo -n "mkdir -p \"$path\" && tar --strip 1 -C \"$path\" -xzf - && > \"$path/mysql/var/mysqld.err\" && exit 0"
+    local SAVE="([ -d \"$data\" ] && rm -rf \"$data\".saved && mv \"$data\" \"$data\".saved || :) && "
+    local UNTAR="mkdir -p \"$path\" && tar --strip 1 -C \"$path\" -xzf - && > \"$path/mysql/var/mysqld.err\" && "
+    local RESTORE="([ -d \"$data\".saved ] && rm -rf \"$data\" && mv \"$data\".saved \"$data\" || :) "
+    echo -n "$SAVE $UNTAR $RESTORE"
 }
 
 copy_config()
