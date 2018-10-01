@@ -144,12 +144,28 @@ void gu::ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
 
     try
     {
-#ifdef OPENSSL_HAS_SET_ECDH_AUTO
+        // In some older OpenSSL versions ECDH engines must be enabled
+        // explicitly. Here we use SSL_CTX_set_ecdh_auto() or
+        // SSL_CTX_set_tmp_ecdh() if present.
+#if defined(OPENSSL_HAS_SET_ECDH_AUTO)
         if (!SSL_CTX_set_ecdh_auto(ctx.impl(), 1))
         {
             throw_last_SSL_error("SSL_CTX_set_ecdh_auto() failed");
         }
-#endif /* OPENSSL_HAS_SET_ECDH_AUTO */
+#elif defined(OPENSSL_HAS_SET_TMP_ECDH)
+        {
+            EC_KEY* const ecdh(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
+            if (ecdh == NULL)
+            {
+                throw_last_SSL_error("EC_KEY_new_by_curve_name() failed");
+            }
+            if (!SSL_CTX_set_tmp_ecdh(ctx.impl(),ecdh))
+            {
+                throw_last_SSL_error("SSL_CTX_set_tmp_ecdh() failed");
+            }
+            EC_KEY_free(ecdh);
+        }
+#endif /* OPENSSL_HAS_SET_ECDH_AUTO | OPENSSL_HAS_SET_TMP_ECDH */
         param = conf::ssl_key;
         ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
         param = conf::ssl_cert;

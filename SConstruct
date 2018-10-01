@@ -360,6 +360,16 @@ int main() { SSL_CTX* ctx=NULL; return !SSL_CTX_set_ecdh_auto(ctx, 1); }
     context.Result(result)
     return result
 
+def CheckSetTmpEcdh(context):
+    test_source = """
+#include <openssl/ssl.h>
+int main() { SSL_CTX* ctx=NULL; EC_KEY* ecdh=NULL; return !SSL_CTX_set_tmp_ecdh(ctx,ecdh); }
+"""
+    context.Message('Checking for SSL_CTX_set_tmp_ecdh_() ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
 #
 # Construct configuration context
 #
@@ -370,7 +380,8 @@ conf = Configure(env, custom_tests = {
     'CheckTr1SharedPtr': CheckTr1SharedPtr,
     'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
     'CheckWeffcpp': CheckWeffcpp,
-    'CheckSetEcdhAuto': CheckSetEcdhAuto
+    'CheckSetEcdhAuto': CheckSetEcdhAuto,
+    'CheckSetTmpEcdh': CheckSetTmpEcdh
 })
 
 conf.env.Append(CPPPATH = [ '#/wsrep/src' ])
@@ -571,6 +582,8 @@ if not conf.CheckLib('crypto'):
 # advanced SSL features
 if conf.CheckSetEcdhAuto():
     conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_ECDH_AUTO')
+elif conf.CheckSetTmpEcdh():
+    conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_TMP_ECDH')
 
 # these will be used only with our software
 if strict_build_flags == 1:
