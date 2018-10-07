@@ -7,6 +7,7 @@
 #include "trx_handle.hpp"
 #include "wsrep_api.h"
 #include "gu_unordered.hpp"
+#include "gu_thread.hpp"
 
 namespace galera
 {
@@ -54,6 +55,23 @@ namespace galera
         };
 
         typedef gu::UnorderedMap<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
+
+        /* TrxMap structure doesn't take into consideration presence of
+        two trx objects with same trx_id (2^64 - 1 which is default trx_id)
+        belonging to two different connections.
+        This eventually causes same trx object to get shared among two
+        different unrelated connections which causes state inconsistency
+        leading to crash (RACE CONDITION).
+        This problem could be solved by taking into consideration conn-id,
+        but that would invite interface change. To avoid this we maintain a
+        separate map of such trx objects based on gu_thread_id: */
+        class ConnTrxHash
+        {
+        public:
+            size_t operator()(const gu_thread_t& key) const { return key; }
+        };
+
+        typedef gu::UnorderedMap<gu_thread_t, TrxHandle*, ConnTrxHash> ConnTrxMap;
 
         class ConnHash
         {
@@ -117,6 +135,7 @@ namespace galera
         TrxHandle::LocalPool trx_pool_;
 
         TrxMap       trx_map_;
+        ConnTrxMap   conn_trx_map_;
         gu::Mutex    trx_mutex_;
         ConnMap      conn_map_;
         gu::Mutex    conn_mutex_;
