@@ -151,6 +151,11 @@ char* galera_parameters_get (wsrep_t* gh)
     }
 }
 
+extern "C"
+wsrep_status_t galera_enc_set_key(wsrep_t* gh, const wsrep_enc_key_t*key)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
 
 extern "C"
 wsrep_status_t galera_connect (wsrep_t*     gh,
@@ -1473,6 +1478,7 @@ static wsrep_t galera_str = {
     &galera_capabilities,
     &galera_parameters_set,
     &galera_parameters_get,
+    &galera_enc_set_key,
     &galera_connect,
     &galera_disconnect,
     &galera_recv,
