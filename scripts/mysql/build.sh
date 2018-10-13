@@ -6,19 +6,7 @@ then
     exit -1
 fi
 
-use_mysql_5.1_sources()
-{
-    MYSQL_MAJOR="5.1"
-    export MYSQL_MAJOR # for DEB build
-    export MYSQL_MAJOR_VER="5"
-    export MYSQL_MINOR_VER="1"
-    MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
-}
-
-use_mariadb_5.1_sources()
-{
-    use_mysql_5.1_sources
-}
+MYSQL=""
 
 use_mysql_5.5_sources()
 {
@@ -30,14 +18,22 @@ use_mysql_5.5_sources()
     MYSQL_VER=$MYSQL_MAJOR.$MYSQL_PATCH_VER
 }
 
-if test -f "$MYSQL_SRC/configure.in"
-then
-    use_mysql_5.1_sources
-elif test -f "$MYSQL_SRC/VERSION"
+if test -f "$MYSQL_SRC/VERSION"
 then
     use_mysql_5.5_sources
-else
-    echo "Unknown MySQL version in MYSQL_SRC path. Versions 5.1 and 5.5 are supported. Can't continue."
+    if grep -q -i "mariadb" $MYSQL_SRC/CMakeLists.txt
+    then
+        export MYSQL="mariadb"
+    else
+        export MYSQL="mysql"
+    fi
+fi
+
+if [ -z "$MYSQL" ]
+then
+    echo "Unrecognized MySQL/MariaDB version in MYSQL_SRC path. "\
+"MySQL versions 5.5, 5.6, 5.7 and MariaDB version 10.4 are supported. "\
+"Can't continue."
     exit -1
 fi
 
@@ -231,6 +227,15 @@ do
     shift
 done
 
+if [ "$PACKAGE" = "yes" ] || [ "$BIN_DIST" = "yes" ]
+then
+    if [ "$MYSQL" = "mariadb" ]
+    then
+        echo "Packaging not supported for MariaDB yet"
+        exit 1
+    fi
+fi
+
 if [ "$PACKAGE" == "yes" -a "$OS" == "Linux" ]
 then
     # check whether sudo accepts -E to preserve environment
@@ -292,15 +297,12 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 
-if [ "$MYSQL_MAJOR" = "5.1" ]
+if [ "$DEBUG" == "yes" ]
 then
-    MYSQL_BUILD_DIR="$MYSQL_SRC"
+    MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug"
 else
-    [ "$DEBUG" == "yes" ] \
-    && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
-    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
+    MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
 fi
-
 
 ######################################
 ##                                  ##
@@ -334,7 +336,7 @@ WSREP_REV="XXXX"
 WSREP_REV=${WSREP_REV//[[:space:]]/}
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 
-if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
+if [ "$PACKAGE" = "yes" ] || [ "$BIN_DIST" = "yes" ]
 then
     # fetch and patch pristine sources
     cd ${TMPDIR:-/tmp}
@@ -385,8 +387,8 @@ then
         if [ "$OS" == "FreeBSD" ]; then
             # don't use INSTALL_LAYOUT=STANDALONE(default), it assumes prefix=.
             CMAKE_LAYOUT_OPTIONS=(
-                -DCMAKE_INSTALL_PREFIX="/usr/local" \
                 -DINSTALL_LAYOUT=RPM \
+                -DCMAKE_INSTALL_PREFIX="/usr/local" \
                 -DMYSQL_UNIX_ADDR="/tmp/mysql.sock" \
                 -DINSTALL_BINDIR="bin" \
                 -DINSTALL_DOCDIR="share/doc/mysql" \
@@ -428,73 +430,77 @@ then
                 -DCMAKE_PREFIX_PATH="$EXTRA_SYSROOT" \
             )
 
-        if [ $MYSQL_MAJOR = "5.1" ]
-        then
-            # This will be put to --prefix by SETUP.sh.
-            export MYSQL_BUILD_PREFIX="/usr"
-            export wsrep_configs="--libexecdir=/usr/sbin \
-                                  --localstatedir=/var/lib/mysql/ \
-                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH \
-                                  --with-extra-charsets=all \
-                                  --with-ssl"
+        # Common build options
+        [ "$DEBUG" = "yes" ] \
+        && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
+        || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
-            [ "$DEBUG" = "yes" ] && BUILD_OPT="-debug"
-            BUILD/compile-${CPU}${BUILD_OPT}-wsrep > /dev/null
-        else # CMake build
-            [ "$DEBUG" = "yes" ] \
-            && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
-            || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
+        BUILD_OPT+=" -DWITH_WSREP=1"
+        BUILD_OPT+=" -DWITH_EXTRA_CHARSETS=all"
+        BUILD_OPT+=" -DMYSQL_MAINTAINER_MODE=0"
+        BUILD_OPT+=" -DWITH_ZLIB=system"
 
+        if [ "$MYSQL" == "mysql" ] # remove this distinction when MySQL
+        then                       # fixes its SSL support
+            BUILD_OPT="-DWITH_SSL=bundled"
+        else
+            BUILD_OPT="-DWITH_SSL=system"
+        fi
+
+        if [ "$MYSQL" = "mysql" ]
+        then # MySQL-spcific build options
             MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
 
-            [ "$MYSQL_MM_VER" -ge "56" ] \
-            && MEMCACHED_OPT="-DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON" \
-            || MEMCACHED_OPT=""
+            [ "$MYSQL_MM_VER" -ge "56" ] && \
+                BUILD_OPT+=" -DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON"
 
             if [ "$MYSQL_MM_VER" -ge "57" ]
             then
-                BOOST_OPT="-DWITH_BOOST=boost_$MYSQL_MM_VER"
-                [ "yes" = "$BOOTSTRAP" ] && \
-                    BOOST_OPT="$BOOST_OPT -DDOWNLOAD_BOOST=1"
-            else
-                BOOST_OPT=""
+                BUILD_OPT+=" -DWITH_BOOST=boost_$MYSQL_MM_VER"
+                [ "yes" = "$BOOTSTRAP" ] && BUILD_OPT+=" -DDOWNLOAD_BOOST=1"
             fi
-
-            if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
-            then
-               [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
-               [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
-            fi
-
-            pushd $MYSQL_BUILD_DIR
-
-            # cmake wants either absolute path or a link from build directory
-            # Incidentally link trick also allows us to use ccache
-            # (at least it distinguishes between gcc/clang)
-            ln -sf $(which ccache || which $CC)  $(basename $CC)
-            ln -sf $(which ccache || which $CXX) $(basename $CXX)
-
-            cmake \
-                  -DCMAKE_C_COMPILER=$(basename $CC) \
-                  -DCMAKE_CXX_COMPILER=$(basename $CXX) \
-                  -DCMAKE_CXX_FLAGS=-fpermissive \
-                  -DBUILD_CONFIG=mysql_release \
-                  "${CMAKE_LAYOUT_OPTIONS[@]}" \
-                  $BUILD_OPT \
-                  -DWITH_WSREP=1 \
-                  -DWITH_EXTRA_CHARSETS=all \
-                  -DWITH_SSL=yes \
-                  -DWITH_ZLIB=system \
-                  -DMYSQL_MAINTAINER_MODE=0 \
-                  $MEMCACHED_OPT \
-                  $BOOST_OPT \
-                  $MYSQL_SRC \
-            && make -j $JOBS -S && popd || exit 1
+        else # MariaDB-specific build options
+            BUILD_OPT+=" -DWITH_DEBUG:BOOL=ON"
+            BUILD_OPT+=" -DWITH_INNODB_DISALLOW_WRITES:BOOL=ON"
+            BUILD_OPT+=" -DWITH_MARIABACKUP:BOOL=ON"
+            BUILD_OPT+=" -DPLUGIN_TOKUDB:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_ROCKSDB:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_MROONGA:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_ARIA:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_SPHINX:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_SPIDER:STRING=NO"
+            BUILD_OPT+=" -DPLUGIN_BLACKHOLE:STRING=NO"
+            BUILD_OPT+=" -DWITH_EMBEDDED_SERVER:BOOL=OFF"
         fi
+
+        if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
+        then
+           [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
+           [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
+        fi
+
+        pushd $MYSQL_BUILD_DIR
+
+        # cmake wants either absolute path or a link from build directory
+        # Incidentally link trick also allows us to use ccache
+        # (at least it distinguishes between gcc/clang)
+        ln -sf $(which ccache || which $CC)  $(basename $CC)
+        ln -sf $(which ccache || which $CXX) $(basename $CXX)
+
+        cmake \
+            -DCMAKE_C_COMPILER=$(basename $CC) \
+            -DCMAKE_CXX_COMPILER=$(basename $CXX) \
+            -DCMAKE_CXX_FLAGS='-fpermissive' \
+            -DBUILD_CONFIG=mysql_release \
+            "${CMAKE_LAYOUT_OPTIONS[@]}" \
+            $BUILD_OPT \
+            $MYSQL_SRC \
+        && make VERBOSE=1 -j $JOBS -S && popd || exit 1
+
     else  # just recompile and relink with old configuration
-        [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
+        pushd $MYSQL_BUILD_DIR
         make -j $JOBS -S > /dev/null
-        [ $MYSQL_MAJOR != "5.1" ] && popd
+        popd
     fi
 fi # SKIP_BUILD
 
@@ -510,77 +516,6 @@ fi
 ##      Making of demo tarball      ##
 ##                                  ##
 ######################################
-
-install_mysql_5.1_demo()
-{
-
-    MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
-    MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
-    MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
-    # BSD-based OSes does not have -D option on 'install'
-    install -m 755 -d $MYSQL_DIST_DIR/share/mysql/english
-    install -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-    install -m 755 -d $MYSQL_DIST_DIR/sbin
-    install -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/sbin/mysqld
-    if [ "$SKIP_CLIENTS" == "no" ]
-    then
-        # Hack alert:
-        #  install libmysqlclient.so as libmysqlclient.so.16 as client binaries
-        #  seem to be linked against explicit version. Figure out better way to 
-        #  deal with this.
-        install -m 755 -d $MYSQL_LIBS
-        install -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
-    fi
-    if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
-    then
-        install -m 755 -d $MYSQL_PLUGINS
-        install -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
-                $MYSQL_PLUGINS/ha_innodb_plugin.so
-    fi
-    install -m 755 -d $MYSQL_BINS
-    install -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-    install -m 755 -d $MYSQL_DIST_DIR/sbin
-    install -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/sbin/mysqld
-    if [ "$SKIP_CLIENTS" == "no" ]
-    then
-        # Hack alert:
-        #  install libmysqlclient.so as libmysqlclient.so.16 as client binaries
-        #  seem to be linked against explicit version. Figure out better way to 
-        #  deal with this.
-        install -m 755 -d $MYSQL_LIBS
-        install -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
-    fi
-    if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
-    then
-        install -m 755 -d $MYSQL_PLUGINS
-        install -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
-                $MYSQL_PLUGINS/ha_innodb_plugin.so
-    fi
-    install -m 755 -d $MYSQL_BINS
-    if [ "$SKIP_CLIENTS" == "no" ]
-    then
-        if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
-        then
-            MYSQL_CLIENTS=$MYSQL_SRC/client/.libs
-        elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
-        then
-            MYSQL_CLIENTS=$MYSQL_SRC/client
-        else
-            echo "Can't find MySQL clients. Aborting."
-            exit 1
-        fi
-        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
-        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
-        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
-    fi
-
-    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_common
-    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
-    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
-    install -m 755 -d $MYSQL_CHARSETS
-    install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/*.xml
-    install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/README
-}
 
 install_mysql_5.5_dist()
 {
@@ -625,20 +560,16 @@ if [ $TAR == "yes" ]; then
     rm -rf $DIST_DIR
 
     # Install required MySQL files in the DIST_DIR
-    if [ $MYSQL_MAJOR == "5.1" ]; then
-        install_mysql_5.1_demo
-        install -m 755 -d $(dirname $MYSQL_DIST_CNF)
-        install -m 644 my-5.1.cnf $MYSQL_DIST_CNF
-    else
-        install_mysql_5.5_demo > /dev/null
-        install -m 755 -d $(dirname $MYSQL_DIST_CNF)
-        install -m 644 my-5.5.cnf $MYSQL_DIST_CNF
-    fi
+    install_mysql_5.5_demo > /dev/null
+    install -m 755 -d $(dirname $MYSQL_DIST_CNF)
+    install -m 644 my-5.5.cnf $MYSQL_DIST_CNF
 
     cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
-    pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
-    tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
+    pushd $MYSQL_BINS;
+    [ -x wsrep_sst_rsync_wan ] || ln -s wsrep_sst_rsync wsrep_sst_rsync_wan
+    popd
+    tar -xzf ${MYSQL}_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
     install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 
     # Copy required Galera libraries
@@ -696,7 +627,7 @@ if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]; then
         GALERA_RELEASE="$WSREP_REV,$GALERA_REV"
     fi
 
-    RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
+    RELEASE_NAME=$(echo $MYSQL-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
     rm -rf $RELEASE_NAME
     mv $DIST_DIR $RELEASE_NAME
 
