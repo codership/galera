@@ -477,9 +477,15 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
 
     TrxHandleMaster* txp(get_local_trx(repl, trx_handle, false));
 
-    // TRX_START and ROLLBACK flags should not be set together
-    assert((flags & (WSREP_FLAG_TRX_START | WSREP_FLAG_ROLLBACK))
-           != (WSREP_FLAG_TRX_START | WSREP_FLAG_ROLLBACK));
+    // The following combinations of flags should not be set together
+    assert(!((flags & WSREP_FLAG_TRX_START) &&
+             (flags & WSREP_FLAG_ROLLBACK)));
+
+    assert(!((flags & WSREP_FLAG_TRX_PREPARE) &&
+             (flags & WSREP_FLAG_ROLLBACK)));
+
+    assert(!((flags & WSREP_FLAG_TRX_PREPARE) &&
+             (flags & WSREP_FLAG_TRX_END)));
 
     if (gu_unlikely(txp == 0))
     {

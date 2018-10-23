@@ -965,6 +965,7 @@ namespace galera
             if ((write_set_flags_ & TrxHandle::F_ISOLATION) == 0)
             {
                 write_set_flags_ &= ~TrxHandle::F_BEGIN;
+                write_set_flags_ &= ~TrxHandle::F_PREPARE;
             }
             ts_ = ts;
             last_ts_seqno_ = ts_->global_seqno();
