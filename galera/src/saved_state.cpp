@@ -50,9 +50,9 @@ SavedState::SavedState  (const std::string& file) :
         log_warn << "No persistent state found. Bootstraping with default state";
     }
 
-    fs_ = fopen(file.c_str(), "a");
+    FILE* fs_tmp_ = fopen(file.c_str(), "a");
 
-    if (!fs_)
+    if (!fs_tmp_)
     {
         gu_throw_error(errno)
             << "Could not open state file for writing: '" << file
@@ -67,11 +67,11 @@ SavedState::SavedState  (const std::string& file) :
     flck.l_type   = F_WRLCK;
     flck.l_whence = SEEK_SET;
 
-    if (::fcntl(fileno(fs_), F_SETLK, &flck))
+    if (::fcntl(fileno(fs_tmp_), F_SETLK, &flck))
     {
-        log_warn << "Could not get exclusive lock on state file: " << file
-                 << ": " << ::strerror(errno);
-        return;
+        gu_throw_error(errno)
+            << "Could not get exclusive lock on state file: " << file
+            << ". Ensure no other instance is using the same state file";
     }
 
     std::string version("0.8");
@@ -132,17 +132,26 @@ SavedState::SavedState  (const std::string& file) :
 
     written_uuid_ = uuid_;
 
-    current_len_ = ftell (fs_);
+    current_len_ = ftell (fs_tmp_);
     log_debug << "Initialized current_len_ to " << current_len_;
     if (current_len_ <= MAX_SIZE)
     {
-        fs_ = freopen (file.c_str(), "r+", fs_);
+        fs_ = freopen (file.c_str(), "r+", fs_tmp_);
     }
     else // normalize file contents
     {
-        fs_ = freopen (file.c_str(), "w+", fs_); // truncate
+        fs_ = freopen (file.c_str(), "w+", fs_tmp_); // truncate
         current_len_ = 0;
         set (uuid_, seqno_, safe_to_bootstrap_);
+    }
+
+    /* freopen will not retain the lock taken on the original fd.
+    Re-obtain the lock. */
+    if (::fcntl(fileno(fs_), F_SETLK, &flck))
+    {
+        gu_throw_error(errno)
+            << "Could not get exclusive lock on state file: " << file
+            << ". Ensure no other instance is using the same state file";
     }
 }
 
