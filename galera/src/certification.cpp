@@ -1030,12 +1030,16 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 
     TrxMap::iterator purge_bound(trx_map_.upper_bound(seqno));
 
-    cert_debug << "purging index up to " << seqno;
+    log_debug << "purging index up to " << seqno;
 
     for_each(trx_map_.begin(), purge_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), purge_bound);
 
-    if (handle_gcache) service_thd_.release_seqno(seqno);
+    if (handle_gcache)
+    {
+        log_debug << "releasing seqno from gcache " << seqno;
+        service_thd_.release_seqno(seqno);
+    }
 
     if (0 == ((trx_map_.size() + 1) % 10000))
     {
