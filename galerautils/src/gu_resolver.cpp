@@ -272,7 +272,7 @@ out:
                 }
 #if defined(__linux__) || defined(__GNU__)
                 idx = ifrp->ifr_ifindex;
-#elif defined(__sun__)
+#elif defined(__sun__) || defined(__FreeBSD_kernel__)
                 idx = ifrp->ifr_index;
 #else
 # error "Unsupported ifreq structure"
