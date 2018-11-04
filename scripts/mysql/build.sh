@@ -477,6 +477,8 @@ then
             cmake \
                   -DCMAKE_C_COMPILER=$(basename $CC) \
                   -DCMAKE_CXX_COMPILER=$(basename $CXX) \
+                  -DCMAKE_C_FLAGS=$(CFLAGS) \
+                  -DCMAKE_CXX_FLAGS=$(CXXFLAGS) \
                   -DBUILD_CONFIG=mysql_release \
                   "${CMAKE_LAYOUT_OPTIONS[@]}" \
                   $BUILD_OPT \
