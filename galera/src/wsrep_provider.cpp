@@ -348,9 +348,9 @@ wsrep_status_t galera_abort_certification(wsrep_t*       gh,
 
     if (!txp)
     {
-        log_warn << "trx to abort " << victim_trx
-                 << " with bf seqno " << bf_seqno
-                 << " not found";
+        log_debug << "trx to abort " << victim_trx
+                  << " with bf seqno " << bf_seqno
+                  << " not found";
         return WSREP_OK;
     }
     else
