@@ -1,3 +1,9 @@
+galera-4 (26.4.0-1) UNRELEASED; URGENCY=low
+
+  * First Galera 4 release
+
+ -- Codership Oy <info@codership.com>  Tue, 13 Nov 2018 15:10:04 +0200
+
 galera-3 (25.3.14-1) UNRELEASED; urgency=low
 
   * Sync Debian packaging from downstream to include improvements developed at
