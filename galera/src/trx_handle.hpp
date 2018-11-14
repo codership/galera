@@ -656,7 +656,11 @@ namespace galera
             }
             // must be set to S_ROLLED_BACK after commit_cb()
         }
-        bool is_dummy()   const { return (flags() &  F_ROLLBACK); }
+        bool is_dummy() const
+        {
+            return (flags() &  F_ROLLBACK) &&
+                (flags() != EXPLICIT_ROLLBACK_FLAGS);
+        }
         bool skip_event() const { return (flags() == F_ROLLBACK); }
 
         bool is_streaming() const
@@ -929,6 +933,12 @@ namespace galera
             {
                 /* make sure this fragment depends on the previous */
                 wsrep_seqno_t prev_seqno(last_ts_seqno_);
+                if (prev_seqno == WSREP_SEQNO_UNDEFINED)
+                {
+                    assert((flags() & TrxHandle::F_COMMIT) ||
+                           (flags() & TrxHandle::F_ROLLBACK));
+                    prev_seqno = 0;
+                }
                 assert(version() >= WriteSetNG::VER5);
                 assert(prev_seqno >= 0);
                 assert(prev_seqno <= last_seen_seqno);

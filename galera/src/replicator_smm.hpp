@@ -69,9 +69,14 @@ namespace galera
             return wsdb_.get_trx(trx_params_, uuid_, trx_id, create);
         }
 
+        TrxHandleMasterPtr new_trx(const wsrep_uuid_t& uuid, wsrep_trx_id_t trx_id)
+        {
+            return wsdb_.new_trx(trx_params_, uuid, trx_id);
+        }
+
         TrxHandleMasterPtr new_local_trx(wsrep_trx_id_t trx_id)
         {
-            return wsdb_.new_trx(trx_params_, uuid_, trx_id);
+            return new_trx(uuid_, trx_id);
         }
 
         void discard_local_trx(TrxHandleMaster* trx)

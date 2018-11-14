@@ -462,6 +462,7 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
         assert(ts.trx_id() != uint64_t(-1) || ts.is_toi());
         assert(ts.certified() /*Repl*/ || ts.preordered() /*IST*/);
         assert(ts.local() == false || ts.nbo_end() ||
+               (ts.flags() & TrxHandle::F_COMMIT) ||
                (ts.flags() & TrxHandle::F_ROLLBACK));
         assert(ts.nbo_end() == false || ts.is_dummy());
     }

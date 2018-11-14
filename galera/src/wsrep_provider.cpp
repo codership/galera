@@ -392,14 +392,6 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     galera::TrxHandleMasterPtr victim(repl->get_local_trx(trx_id));
 
-    if (!victim)
-    {
-        log_debug << "trx to rollback " << trx_id << " not found";
-        return WSREP_OK;
-    }
-
-    TrxHandleLock victim_lock(*victim);
-
     /* Send the rollback fragment from a different context */
     galera::TrxHandleMasterPtr trx(repl->new_local_trx(trx_id));
 
@@ -419,13 +411,18 @@ wsrep_status_t galera_rollback(wsrep_t*                 gh,
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
 
-    // Victim may already be in S_ABORTING state if it was BF aborted
-    // in pre commit.
-    if (victim->state() != TrxHandle::S_ABORTING)
+    if (victim)
     {
-        if (victim->state() != TrxHandle::S_MUST_ABORT)
-            victim->set_state(TrxHandle::S_MUST_ABORT);
-        victim->set_state(TrxHandle::S_ABORTING);
+        TrxHandleLock victim_lock(*victim);
+        // Victim may already be in S_ABORTING state
+        // if it was BF aborted in certify().
+        if (victim->state() != TrxHandle::S_ABORTING)
+        {
+            if (victim->state() != TrxHandle::S_MUST_ABORT)
+                victim->set_state(TrxHandle::S_MUST_ABORT);
+            victim->set_state(TrxHandle::S_ABORTING);
+        }
+        return repl->send(*trx, &meta);
     }
 
     return repl->send(*trx, &meta);
@@ -462,6 +459,60 @@ wsrep_status_t galera_assign_read_view(wsrep_t*           const  gh,
     return WSREP_NOT_IMPLEMENTED;
 }
 
+extern "C"
+wsrep_status_t galera_sync_wait(wsrep_t*      const wsrep,
+                                wsrep_gtid_t* const upto,
+                                int                 tout,
+                                wsrep_gtid_t* const gtid)
+{
+    assert(wsrep != 0);
+    assert(wsrep->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
+    wsrep_status_t retval;
+    try
+    {
+        retval = repl->sync_wait(upto, tout, gtid);
+    }
+    catch (std::exception& e)
+    {
+        log_warn << e.what();
+        retval = WSREP_CONN_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+    return retval;
+}
+
+static wsrep_status_t
+galera_terminate_trx(wsrep_t*           const gh,
+                     uint32_t           const flags,
+                     wsrep_trx_meta_t*  const meta)
+{
+    assert((flags & WSREP_FLAG_PA_UNSAFE));
+    assert(!(flags & WSREP_FLAG_TRX_START));
+    assert((flags & WSREP_FLAG_TRX_END) || (flags & WSREP_FLAG_ROLLBACK));
+
+    REPL_CLASS* const repl(static_cast< REPL_CLASS * >(gh->ctx));
+    galera::TrxHandleMasterPtr trx(repl->new_trx(meta->stid.node,
+                                                 meta->stid.trx));
+    TrxHandleLock lock(*trx);
+    trx->set_flags(TrxHandle::wsrep_flags_to_trx_flags(flags));
+    if ((flags & WSREP_FLAG_ROLLBACK))
+    {
+        trx->set_state(TrxHandle::S_MUST_ABORT);
+        trx->set_state(TrxHandle::S_ABORTING);
+    }
+    wsrep_status_t retval(repl->send(*trx, meta));
+    if (retval == WSREP_OK)
+    {
+        retval = galera_sync_wait(gh, NULL, -1, NULL);
+    }
+    return retval;
+}
 
 extern "C"
 wsrep_status_t galera_certify(wsrep_t*           const gh,
@@ -491,10 +542,28 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
     {
         if (meta != 0)
         {
-            meta->gtid       = WSREP_GTID_UNDEFINED;
-            meta->depends_on = WSREP_SEQNO_UNDEFINED;
-            meta->stid.node  = repl->source_id();
-            meta->stid.trx   = -1;
+            // If the caller passed a valid transaction id in meta,
+            // then send a commit / rollback fragment to terminate
+            // the transaction.
+
+            // Notice that we are making two assumptions here:
+            // 1) meta is treated as "in" parameter
+            // 2) (uint64_t)-1 means "undefined transaction ID"
+            // Rather than abusing galera_certify(), we should
+            // expose this functionality through dedicated API,
+            // and should be fixed next time we get a chance
+            // to update the wsrep API (codership/wsrep-API#40).
+            if (meta->stid.trx != (uint64_t)-1)
+            {
+                return galera_terminate_trx(gh, flags, meta);
+            }
+            else
+            {
+                meta->gtid       = WSREP_GTID_UNDEFINED;
+                meta->depends_on = WSREP_SEQNO_UNDEFINED;
+                meta->stid.node  = repl->source_id();
+                meta->stid.trx   = -1;
+            }
         }
         // no data to replicate
         return WSREP_OK;
@@ -986,36 +1055,6 @@ wsrep_status_t galera_append_data(wsrep_t*                const wsrep,
 
     return retval;
 }
-
-
-extern "C"
-wsrep_status_t galera_sync_wait(wsrep_t*      const wsrep,
-                                wsrep_gtid_t* const upto,
-                                int                 tout,
-                                wsrep_gtid_t* const gtid)
-{
-    assert(wsrep != 0);
-    assert(wsrep->ctx != 0);
-
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
-    wsrep_status_t retval;
-    try
-    {
-        retval = repl->sync_wait(upto, tout, gtid);
-    }
-    catch (std::exception& e)
-    {
-        log_warn << e.what();
-        retval = WSREP_CONN_FAIL;
-    }
-    catch (...)
-    {
-        log_fatal << "non-standard exception";
-        retval = WSREP_FATAL;
-    }
-    return retval;
-}
-
 
 extern "C"
 wsrep_status_t galera_last_committed_id(wsrep_t*      const wsrep,
