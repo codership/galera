@@ -3137,6 +3137,13 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
         gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
                               GCS_ACT_WRITESET, skip);
 
+        if (gu_unlikely(WSREP_TRX_MISSING == retval))
+        {
+            assert(!applicable);
+            /* this trx will never go through application chain */
+            report_last_committed(cert_.set_trx_committed(*ts));
+        }
+
         local_monitor_.leave(lo);
     }
 
