@@ -19,11 +19,12 @@ static const bool cert_debug_on(false);
     else log_info << "cert debug: "
 
 #define CERT_PARAM_LOG_CONFLICTS galera::Certification::PARAM_LOG_CONFLICTS
+#define CERT_PARAM_OPTIMISTIC_PA galera::Certification::PARAM_OPTIMISTIC_PA
 
 static std::string const CERT_PARAM_PREFIX("cert.");
 
-std::string const galera::Certification::PARAM_LOG_CONFLICTS(CERT_PARAM_PREFIX +
-                                                             "log_conflicts");
+std::string const CERT_PARAM_LOG_CONFLICTS(CERT_PARAM_PREFIX + "log_conflicts");
+std::string const CERT_PARAM_OPTIMISTIC_PA(CERT_PARAM_PREFIX + "optimistic_pa");
 
 static std::string const CERT_PARAM_MAX_LENGTH   (CERT_PARAM_PREFIX +
                                                   "max_length");
@@ -31,6 +32,7 @@ static std::string const CERT_PARAM_LENGTH_CHECK (CERT_PARAM_PREFIX +
                                                   "length_check");
 
 static std::string const CERT_PARAM_LOG_CONFLICTS_DEFAULT("no");
+static std::string const CERT_PARAM_OPTIMISTIC_PA_DEFAULT("yes");
 
 /*** It is EXTREMELY important that these constants are the same on all nodes.
  *** Don't change them ever!!! ***/
@@ -41,6 +43,7 @@ void
 galera::Certification::register_params(gu::Config& cnf)
 {
     cnf.add(CERT_PARAM_LOG_CONFLICTS, CERT_PARAM_LOG_CONFLICTS_DEFAULT);
+    cnf.add(CERT_PARAM_OPTIMISTIC_PA, CERT_PARAM_OPTIMISTIC_PA_DEFAULT);
     /* The defaults below are deliberately not reflected in conf: people
      * should not know about these dangerous setting unless they read RTFM. */
     cnf.add(CERT_PARAM_MAX_LENGTH);
@@ -185,9 +188,10 @@ static inline bool
 certify_and_depend_v3to4(const galera::KeyEntryNG*   const found,
                          const galera::KeySet::KeyPart&    key,
                          galera::TrxHandleSlave*     const trx,
-                         bool                        const log_conflict)
+                         bool                        const log_conflict,
+                         bool                        const optimistic_pa)
 {
-    wsrep_seqno_t depends_seqno(-1);
+    wsrep_seqno_t depends_seqno(optimistic_pa ? -1 : trx->last_seen_seqno());
     wsrep_key_type_t const key_type(key.wsrep_type(trx->version()));
 
     /*
@@ -229,7 +233,8 @@ certify_v3to4(galera::Certification::CertIndexNG& cert_index_ng,
               const galera::KeySet::KeyPart&      key,
               galera::TrxHandleSlave*     const   trx,
               bool                        const   store_keys,
-              bool                        const   log_conflicts)
+              bool                        const   log_conflicts,
+              bool const                          optimistic_pa)
 {
     galera::KeyEntryNG ke(key);
     galera::Certification::CertIndexNG::iterator ci(cert_index_ng.find(&ke));
@@ -253,7 +258,8 @@ certify_v3to4(galera::Certification::CertIndexNG& cert_index_ng,
         // Note: For we skip certification for isolated trxs, only
         // cert index and key_list is populated.
         return (!trx->is_toi() &&
-                certify_and_depend_v3to4(kep, key, trx, log_conflicts));
+                certify_and_depend_v3to4(kep, key, trx, log_conflicts,
+                                         optimistic_pa));
     }
 }
 
@@ -352,7 +358,8 @@ galera::Certification::do_test_v3to4(TrxHandleSlave* trx, bool store_keys)
     {
         const KeySet::KeyPart& key(key_set.next());
 
-        if (certify_v3to4(cert_index_ng_, key, trx, store_keys, log_conflicts_))
+        if (certify_v3to4(cert_index_ng_, key, trx, store_keys, log_conflicts_,
+                          optimistic_pa_))
         {
             goto cert_fail;
         }
@@ -933,7 +940,8 @@ galera::Certification::Certification(gu::Config& conf, ServiceThd* thd)
     max_length_            (max_length(conf)),
     max_length_check_      (length_check(conf)),
     log_conflicts_         (conf.get<bool>(CERT_PARAM_LOG_CONFLICTS)),
-    current_view_          ()
+    current_view_          (),
+    optimistic_pa_         (conf.get<bool>(CERT_PARAM_OPTIMISTIC_PA))
 {}
 
 
@@ -1260,23 +1268,39 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
 }
 
 void
-galera::Certification::set_log_conflicts(const std::string& str)
+set_boolean_parameter(bool& param,
+                      const std::string& value,
+                      const std::string& param_name,
+                      const std::string& change_msg)
 {
     try
     {
-        bool const old(log_conflicts_);
-        log_conflicts_ = gu::Config::from_config<bool>(str);
-        if (old != log_conflicts_)
+        bool const old(param);
+        param = gu::Config::from_config<bool>(value);
+        if (old != param)
         {
-            log_info << (log_conflicts_ ? "Enabled" : "Disabled")
-                     << " logging of certification conflicts.";
+            log_info << (param ? "Enabled" : "Disabled") << change_msg;
         }
     }
     catch (gu::NotFound& e)
     {
-        gu_throw_error(EINVAL) << "Bad value '" << str
+        gu_throw_error(EINVAL) << "Bad value '" << value
                                << "' for boolean parameter '"
-                               << CERT_PARAM_LOG_CONFLICTS << '\'';
+                               << param_name << '\'';
     }
+}
+
+void
+galera::Certification::set_log_conflicts(const std::string& str)
+{
+    set_boolean_parameter(log_conflicts_, str, CERT_PARAM_LOG_CONFLICTS,
+                          " logging of certification conflicts.");
+}
+
+void
+galera::Certification::set_optimistic_pa(const std::string& str)
+{
+    set_boolean_parameter(optimistic_pa_, str, CERT_PARAM_OPTIMISTIC_PA,
+                          " \"optimistic\" parallel applying.");
 }
 

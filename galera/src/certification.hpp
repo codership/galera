@@ -28,6 +28,7 @@ namespace galera
     public:
 
         static std::string const PARAM_LOG_CONFLICTS;
+        static std::string const PARAM_OPTIMISTIC_PA;
 
         static void register_params(gu::Config&);
 
@@ -116,6 +117,7 @@ namespace galera
         }
 
         void set_log_conflicts(const std::string& str);
+        void set_optimistic_pa(const std::string& str);
 
         wsrep_seqno_t lowest_trx_seqno() const
         {
@@ -254,6 +256,7 @@ namespace galera
 
         bool               log_conflicts_;
         View               current_view_;
+        bool               optimistic_pa_;
     };
 }
 

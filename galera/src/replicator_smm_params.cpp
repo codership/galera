@@ -223,6 +223,11 @@ galera::ReplicatorSMM::param_set (const std::string& key,
         cert_.set_log_conflicts(value);
         return;
     }
+    else if (key == Certification::PARAM_OPTIMISTIC_PA)
+    {
+        cert_.set_optimistic_pa(value);
+        return;
+    }
     // this key might be for another module
     else if (0 != key.find(common_prefix))
     {
