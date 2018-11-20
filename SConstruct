@@ -288,8 +288,13 @@ def CheckSystemASIOVersion(context):
     system_asio_test_source_file = """
 #include <asio.hpp>
 
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message "Asio version:" XSTR(ASIO_VERSION)
 #if ASIO_VERSION < 101001
-#error "Included asio version is too old"
+#error Included asio version is too old
+#elif ASIO_VERSION >= 101100
+#error Included asio version is too new
 #endif
 
 int main()
@@ -298,7 +303,7 @@ int main()
 }
 
 """
-    context.Message('Checking ASIO version (> 1.10.1) ... ')
+    context.Message('Checking ASIO version (>= 1.10.1 and < 1.11.0) ... ')
     result = context.TryLink(system_asio_test_source_file, '.cpp')
     context.Result(result)
     return result
