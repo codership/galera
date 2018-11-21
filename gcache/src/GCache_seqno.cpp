@@ -19,7 +19,7 @@ namespace gcache
     GCache::seqno_reset (const gu::GTID& gtid)
     {
         gu::Lock lock(mtx);
-        
+
         assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
 
         const int64_t s(gtid.seqno());
@@ -258,30 +258,51 @@ namespace gcache
     {
         const void* ptr(0);
 
+        gu::Lock lock(mtx);
+
+        seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
+
+        if (p != seqno2ptr.end())
         {
-            gu::Lock lock(mtx);
-
-            seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
-
-            if (p != seqno2ptr.end())
+            if (seqno_locked != SEQNO_NONE)
             {
-                if (seqno_locked != SEQNO_NONE)
-                {
-                    cond.signal();
-                }
-                seqno_locked = seqno_g;
+                cond.signal();
+            }
+            seqno_locked = seqno_g;
 
-                ptr = p->second;
-            }
-            else
-            {
-                throw gu::NotFound();
-            }
+            ptr = p->second;
+        }
+        else
+        {
+            throw gu::NotFound();
         }
 
         assert (ptr);
 
-        const BufferHeader* const bh (ptr2BH(ptr)); // this can result in IO
+        BufferHeader* const bh(ptr2BH(ptr));
+        assert(seqno_g == bh->seqno_g);
+
+        if (BH_is_released(bh)) // repossess and revert the effects of free()
+        {
+#ifndef NDEBUG
+            buf_tracker.insert(ptr);
+#endif
+            seqno_released = std::min(seqno_released, bh->seqno_g - 1);
+            mallocs++; // to match the resulting frees count
+
+            // notify store
+            switch (bh->store)
+            {
+            case BUFFER_IN_MEM:  mem.repossess(bh); break;
+            case BUFFER_IN_RB:   rb.repossess (bh); break;
+            case BUFFER_IN_PAGE: assert(0); break; // for the moment buffers
+                                                   // do not linger in pages
+            default: assert(0);
+            }
+
+            bh->flags &= ~BUFFER_RELEASED; // clear released flag
+        }
+
         size = bh->size - sizeof(BufferHeader);
 
         return ptr;

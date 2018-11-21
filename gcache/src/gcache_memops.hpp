@@ -34,11 +34,14 @@ namespace gcache
         virtual void*
         malloc  (size_type size)          = 0;
 
+        virtual void*
+        realloc (void* ptr, size_type size) = 0;
+
         virtual void
         free    (BufferHeader* bh)        = 0;
 
-        virtual void*
-        realloc (void* ptr, size_type size) = 0;
+        virtual void
+        repossess(BufferHeader* bh)       = 0; /* "unfree" */
 
         virtual void
         discard (BufferHeader* bh)        = 0;

@@ -26,17 +26,32 @@ namespace gcache
 
         void* malloc  (size_type size);
 
+        void* realloc (void* ptr, size_type size);
+
         void  free    (BufferHeader* bh)
         {
-            assert (bh >= mmap_.ptr);
-            assert (static_cast<void*>(bh) <=
-                    (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size -
-                     sizeof(BufferHeader)));
+            assert(bh >= mmap_.ptr);
+            assert(static_cast<void*>(bh) <=
+                   (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size -
+                    sizeof(BufferHeader)));
+            assert(bh->size > 0);
+            assert(bh->store == BUFFER_IN_PAGE);
+            assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
             assert (used_ > 0);
             used_--;
         }
 
-        void* realloc (void* ptr, size_type size);
+        void  repossess(BufferHeader* bh)
+        {
+            assert(bh >= mmap_.ptr);
+            assert(reinterpret_cast<uint8_t*>(bh) + bh->size <= next_);
+            assert(bh->size > 0);
+            assert(bh->seqno_g != SEQNO_NONE);
+            assert(bh->store == BUFFER_IN_PAGE);
+            assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
+            assert(BH_is_released(bh)); // will be marked unreleased by caller
+            used_++;
+        }
 
         void discard (BufferHeader* ptr) {}
 

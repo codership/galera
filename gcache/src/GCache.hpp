@@ -61,7 +61,7 @@ namespace gcache
          * Reinitialize seqno sequence (after SST or such)
          * Clears seqno->ptr map // and sets seqno_min to seqno.
          */
-        void  seqno_reset (const gu::GTID& gtid);
+        void seqno_reset (const gu::GTID& gtid);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
@@ -101,9 +101,10 @@ namespace gcache
          */
         void  seqno_lock (int64_t const seqno_g);
 
-        /*!          DEPRECATED
+        /*!
          * Get pointer to buffer identified by seqno.
-         * Moves lock to the given seqno.
+         * Moves lock to the given seqno and clears released flag if any.
+         * The buffer will need to be "freed" again.
          * @throws NotFound
          */
         const void* seqno_get_ptr (int64_t seqno_g, ssize_t& size);

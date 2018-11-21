@@ -2540,11 +2540,11 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (st_required)
     {
-        assert(!from_IST);
-
         log_info << "State transfer required: "
                  << "\n\tGroup state: " << group_uuid << ":" << group_seqno
                  << "\n\tLocal state: " << state_uuid_<< ":" << STATE_SEQNO();
+
+        assert(!from_IST);
 
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
 

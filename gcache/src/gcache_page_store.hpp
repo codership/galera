@@ -34,9 +34,11 @@ namespace gcache
 
         void* malloc  (size_type size);
 
+        void* realloc (void* ptr, size_type size);
+
         void  free    (BufferHeader* bh) { assert(0); }
 
-        void* realloc (void* ptr, size_type size);
+        void  repossess(BufferHeader* bh) { assert(0); }
 
         void  discard (BufferHeader* bh)
         {

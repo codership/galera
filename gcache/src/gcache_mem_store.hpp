@@ -80,6 +80,15 @@ namespace gcache
             if (SEQNO_NONE == bh->seqno_g) discard (bh);
         }
 
+        void  repossess(BufferHeader* bh)
+        {
+            assert(bh->size > 0);
+            assert(bh->seqno_g != SEQNO_NONE);
+            assert(bh->store == BUFFER_IN_MEM);
+            assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
+            assert(BH_is_released(bh)); // will be marked unreleased by caller
+        }
+
         void* realloc (void* ptr, size_type size)
         {
             BufferHeader* bh(0);
