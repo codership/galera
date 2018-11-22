@@ -766,7 +766,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         return WSREP_OK;
     }
 
-    wsrep_status_t retval(WSREP_OK);
+    wsrep_status_t retval;
     bool discard_trx(true);
 
     try
@@ -802,45 +802,67 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         }
 
         if (gu_likely(trx.state() == TrxHandle::S_COMMITTED))
+        {
+            assert(!trx.deferred_abort());
             retval = repl->release_commit(trx);
+
+            assert(trx.state() == TrxHandle::S_COMMITTED ||
+                   trx.state() == TrxHandle::S_EXECUTING);
+
+            if (trx.state() == TrxHandle::S_EXECUTING &&
+                retval == WSREP_OK)
+            {
+                // SR trx ready for new fragment, keep transaction
+                discard_trx = false;
+            }
+        }
         else if (trx.deferred_abort() == false)
+        {
             retval = repl->release_rollback(trx);
+
+            assert(trx.state() == TrxHandle::S_ROLLED_BACK);
+        }
+        else if (trx.state() == TrxHandle::S_ABORTING)
+        {
+            assert(trx.deferred_abort());
+            // SR trx was BF aborted before commit_order_leave()
+            // We return BF abort error code here and do not clean up
+            // the transaction. The transaction is needed for sending
+            // rollback fragment.
+            retval = WSREP_BF_ABORT;
+            discard_trx = false;
+            trx.set_deferred_abort(false);
+        }
         else
-            assert(trx.state() == TrxHandle::S_ABORTING);
+        {
+            assert(0);
+            gu_throw_fatal << "Internal program error: "
+                "unexpected state in deferred abort trx: " << trx;
+        }
 
         switch(trx.state())
         {
         case TrxHandle::S_COMMITTED:
         case TrxHandle::S_ROLLED_BACK:
-            break;
         case TrxHandle::S_EXECUTING:
-            // trx ready for new fragment
-            if (retval == WSREP_OK) discard_trx = false;
-            break;
         case TrxHandle::S_ABORTING:
-            // SR trx was BF aborted before commit_order_leave()
-            // We return BF abort error code here and do not clean up
-            // the transaction. The transaction is needed for sending
-            // rollback fragment.
-            if (trx.deferred_abort())
-            {
-                discard_trx = false;
-                retval = WSREP_BF_ABORT;
-                trx.set_deferred_abort(false);
-            }
             break;
         default:
             assert(0);
+            gu_throw_fatal << "Internal library error: "
+                "unexpected trx release state: " << trx;
         }
     }
     catch (std::exception& e)
     {
         log_error << e.what();
+        assert(0);
         retval = WSREP_NODE_FAIL;
     }
     catch (...)
     {
         log_fatal << "non-standard exception";
+        assert(0);
         retval = WSREP_FATAL;
     }
 
