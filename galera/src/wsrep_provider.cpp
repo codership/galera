@@ -766,7 +766,7 @@ wsrep_status_t galera_release(wsrep_t*            gh,
         return WSREP_OK;
     }
 
-    wsrep_status_t retval;
+    wsrep_status_t retval(WSREP_OK);
     bool discard_trx(true);
 
     try
@@ -805,6 +805,8 @@ wsrep_status_t galera_release(wsrep_t*            gh,
             retval = repl->release_commit(trx);
         else if (trx.deferred_abort() == false)
             retval = repl->release_rollback(trx);
+        else
+            assert(trx.state() == TrxHandle::S_ABORTING);
 
         switch(trx.state())
         {
