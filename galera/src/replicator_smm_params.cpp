@@ -210,18 +210,17 @@ galera::ReplicatorSMM::param_set (const std::string& key,
     {
         found = true;
         set_param (key, value);
-        config_.set (key, value);
     }
 
     if (key == Certification::PARAM_LOG_CONFLICTS)
     {
         cert_.set_log_conflicts(value);
-        return;
+        found = true;
     }
     else if (key == Certification::PARAM_OPTIMISTIC_PA)
     {
         cert_.set_optimistic_pa(value);
-        return;
+        found = true;
     }
     // this key might be for another module
     else if (0 != key.find(common_prefix))
@@ -242,6 +241,8 @@ galera::ReplicatorSMM::param_set (const std::string& key,
     }
 
     if (!found) throw gu::NotFound();
+
+    config_.set(key, value);
 }
 
 std::string
