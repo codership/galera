@@ -68,6 +68,8 @@ namespace galera
             F_NATIVE      = 1 << 5,
             F_BEGIN       = 1 << 6,
             F_PREPARE     = 1 << 7,
+            F_SNAPSHOT    = 1 << 8,
+            F_IMPLICIT_DEPS = 1 << 9,
             /*
              * reserved for API extension
              */
@@ -77,7 +79,7 @@ namespace galera
              */
         };
 
-        static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 8) - 1);
+        static const uint32_t TRXHANDLE_FLAGS_MASK = (1 << 15) | ((1 << 10) - 1);
         static const uint32_t EXPLICIT_ROLLBACK_FLAGS = F_PA_UNSAFE | F_ROLLBACK;
 
         static bool const FLAGS_MATCH_API_FLAGS =
@@ -89,6 +91,8 @@ namespace galera
                                   WSREP_FLAG_NATIVE      == F_NATIVE       &&
                                   WSREP_FLAG_TRX_START   == F_BEGIN        &&
                                   WSREP_FLAG_TRX_PREPARE == F_PREPARE      &&
+                                  WSREP_FLAG_SNAPSHOT    == F_SNAPSHOT     &&
+                                  WSREP_FLAG_IMPLICIT_DEPS == F_IMPLICIT_DEPS &&
                                   int(WriteSetNG::F_PREORDERED) ==F_PREORDERED);
 
         static uint32_t wsrep_flags_to_trx_flags (uint32_t flags);
@@ -431,15 +435,21 @@ namespace galera
                                       (flags() & (TrxHandle::F_ISOLATION |
                                                   TrxHandle::F_PA_UNSAFE))))
                         {
+                            assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+
                             if (gu_likely(version_) >= WriteSetNG::VER5)
                             {
                                 depends_seqno_ = std::max<wsrep_seqno_t>
                                     (last_seen_seqno_ - write_set_.pa_range(),
                                      WSREP_SEQNO_UNDEFINED);
                             }
-                            else
+
+                            /* just in case Galera 3.x uses this don't
+                               condition it on version_ */
+                            if (flags() & F_IMPLICIT_DEPS)
                             {
-                                assert(WSREP_SEQNO_UNDEFINED == depends_seqno_);
+                                assert(last_seen_seqno_ >= depends_seqno_);
+                                depends_seqno_ = last_seen_seqno_;
                             }
                         }
                         else
