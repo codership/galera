@@ -884,6 +884,7 @@ galera::Certification::do_test_preordered(TrxHandle* trx)
 galera::Certification::Certification(gu::Config& conf, ServiceThd& thd)
     :
     version_               (-1),
+    conf_                  (conf),
     trx_map_               (),
     cert_index_            (),
     cert_index_ng_         (),
@@ -1177,7 +1178,7 @@ set_boolean_parameter(bool& param,
         param = gu::Config::from_config<bool>(value);
         if (old != param)
         {
-            log_info << (param ? "Enabled" : "Disabled") << change_msg;
+            log_info << (param ? "Enabled " : "Disabled ") << change_msg;
         }
     }
     catch (gu::NotFound& e)
@@ -1189,16 +1190,23 @@ set_boolean_parameter(bool& param,
 }
 
 void
-galera::Certification::set_log_conflicts(const std::string& str)
+galera::Certification::param_set(const std::string& key,
+                                 const std::string& value)
 {
-    set_boolean_parameter(log_conflicts_, str, CERT_PARAM_LOG_CONFLICTS,
-                          " logging of certification conflicts.");
-}
+    if (key == Certification::PARAM_LOG_CONFLICTS)
+    {
+        set_boolean_parameter(log_conflicts_, value, CERT_PARAM_LOG_CONFLICTS,
+                              "logging of certification conflicts.");
+    }
+    else if (key == Certification::PARAM_OPTIMISTIC_PA)
+    {
+        set_boolean_parameter(optimistic_pa_, value, CERT_PARAM_OPTIMISTIC_PA,
+                              "\"optimistic\" parallel applying.");
+    }
+    else
+    {
+        throw gu::NotFound();
+    }
 
-void
-galera::Certification::set_optimistic_pa(const std::string& str)
-{
-    set_boolean_parameter(optimistic_pa_, str, CERT_PARAM_OPTIMISTIC_PA,
-                          " \"optimistic\" parallel applying.");
+    conf_.set(key, value);
 }
-

@@ -106,8 +106,7 @@ namespace galera
             index_size_ = 0;
         }
 
-        void set_log_conflicts(const std::string& str);
-        void set_optimistic_pa(const std::string& str);
+        void param_set(const std::string& key, const std::string& value);
 
     private:
 
@@ -180,6 +179,7 @@ namespace galera
         };
 
         int           version_;
+        gu::Config&   conf_;
         TrxMap        trx_map_;
         CertIndex     cert_index_;
         CertIndexNG   cert_index_ng_;
