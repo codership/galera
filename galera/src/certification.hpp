@@ -116,8 +116,7 @@ namespace galera
             index_size_ = 0;
         }
 
-        void set_log_conflicts(const std::string& str);
-        void set_optimistic_pa(const std::string& str);
+        void param_set(const std::string& key, const std::string& value);
 
         wsrep_seqno_t lowest_trx_seqno() const
         {
@@ -218,6 +217,7 @@ namespace galera
         };
 
         int           version_;
+        gu::Config&   conf_;
         TrxMap        trx_map_;
         CertIndexNG   cert_index_ng_;
         NBOMap        nbo_map_;
