@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  *
  */
 
@@ -43,6 +43,7 @@ namespace gcache
                       buffer_header_alignment_check);
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
+#define BH_const_cast(ptr) reinterpret_cast<const BufferHeader*>(ptr)
 
     static inline BufferHeader*
     ptr2BH (const void* ptr)
@@ -95,7 +96,8 @@ namespace gcache
     static inline std::ostream&
     operator << (std::ostream& os, const BufferHeader* const bh)
     {
-        os << "seqno_g: "   << bh->seqno_g
+        os << "addr: "      << static_cast<const void*>(bh)
+           << ", seqno_g: " << bh->seqno_g
            << ", seqno_d: " << bh->seqno_d
            << ", size: "    << bh->size
            << ", ctx: "     << bh->ctx

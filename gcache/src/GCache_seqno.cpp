@@ -118,7 +118,7 @@ namespace gcache
 
             if (gu_unlikely(it == seqno2ptr.end()))
             {
-                /* This means that there are no element with
+                /* This means that there are no elements with
                  * seqno following seqno_released - and this should not
                  * generally happen. But it looks like stopcont test does it. */
                 if (SEQNO_NONE != seqno_released)
@@ -140,10 +140,13 @@ namespace gcache
             int64_t const start(it->first - 1);
             int64_t const end  (seqno - start >= 2*batch_size ?
                                 start + batch_size : seqno);
-#if 0
-            log_info << "############ releasing " << (seqno - start)
-                     << " buffers, batch_size: " << batch_size
-                     << ", end: " << end;
+#ifndef NDEBUG
+            if (params.debug())
+            {
+                log_info << "GCache::seqno_release(" << seqno << "): "
+                         << (seqno - start) << " buffers, batch_size: "
+                         << batch_size << ", end: " << end;
+            }
 #endif
             for (;(loop = (it != seqno2ptr.end())) && it->first <= end;)
             {

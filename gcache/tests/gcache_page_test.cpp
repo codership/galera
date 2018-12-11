@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -24,7 +24,7 @@ START_TEST(test1)
     ssize_t const keep_size = 1;
     ssize_t const page_size = 2 + bh_size;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size, false);
+    gcache::PageStore ps (dir_name, keep_size, page_size, 0, false);
 
     fail_if(ps.count()       != 0,"expected count 0, got %zu",ps.count());
     fail_if(ps.total_pages() != 0,"expected 0 pages, got %zu",ps.total_pages());
@@ -65,7 +65,7 @@ START_TEST(test2)
     ssize_t const keep_size = 1;
     ssize_t page_size = (1 << 20) + bh_size;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size, false);
+    gcache::PageStore ps (dir_name, keep_size, page_size, 0, false);
 
     mark_point();
 
@@ -91,7 +91,7 @@ START_TEST(test3) // check that all page size is efficiently used
     ssize_t const keep_size = 1;
     ssize_t const page_size = 1024;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size, false);
+    gcache::PageStore ps (dir_name, keep_size, page_size, 0, false);
 
     mark_point();
 

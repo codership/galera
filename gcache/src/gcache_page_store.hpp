@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 /*! @file page store class */
@@ -23,6 +23,7 @@ namespace gcache
         PageStore (const std::string& dir_name,
                    size_t             keep_size,
                    size_t             page_size,
+                   int                dbg,
                    bool               keep_page);
 
         ~PageStore ();
@@ -51,6 +52,8 @@ namespace gcache
 
         void  set_keep_size (size_t size) { keep_size_ = size; }
 
+        void  set_debug(int dbg);
+
         /* for unit tests */
         size_t count()       const { return count_;        }
         size_t total_pages() const { return pages_.size(); }
@@ -58,15 +61,19 @@ namespace gcache
 
     private:
 
+        static int  const DEBUG = 4; // debug flag
+
         std::string const base_name_; /* /.../.../gcache.page. */
         size_t            keep_size_; /* how much pages to keep after freeing*/
         size_t            page_size_; /* min size of the individual page */
         bool        const keep_page_; /* whether to keep the last page */
         size_t            count_;
-        std::deque<Page*> pages_;
+        typedef std::deque<Page*> PageQueue;
+        PageQueue         pages_;
         Page*             current_;
         size_t            total_size_;
         pthread_attr_t    delete_page_attr_;
+        int               debug_;
 #ifndef GCACHE_DETACH_THREAD
         pthread_t         delete_thr_;
 #endif /* GCACHE_DETACH_THREAD */

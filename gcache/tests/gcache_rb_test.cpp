@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2018 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -34,7 +34,7 @@ START_TEST(test1)
 
     std::map<int64_t, const void*> s2p;
     gu::UUID   gid(GID);
-    RingBuffer rb(RB_NAME, rb_size, s2p, gid, false);
+    RingBuffer rb(RB_NAME, rb_size, s2p, gid, 0, false);
 
     fail_if (rb.size() != rb_size, "Expected %zd, got %zd", rb_size, rb.size());
 
@@ -156,7 +156,7 @@ START_TEST(recovery)
         RingBuffer   rb;
 
         rb_ctx(size_t s, bool recover = true) :
-            size(s), s2p(), gid(GID), rb(RB_NAME, size, s2p, gid, recover) {}
+            size(s), s2p(), gid(GID), rb(RB_NAME, size, s2p, gid, 0, recover) {}
 
         void seqno_assign (seqno2ptr_t& s2p, void* const ptr,
                            seqno_t const g, seqno_t const d)

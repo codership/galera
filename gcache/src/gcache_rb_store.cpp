@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 #include "gcache_rb_store.hpp"
@@ -47,6 +47,7 @@ namespace gcache
                             size_t             size,
                             seqno2ptr_t&       seqno2ptr,
                             gu::UUID&          gid,
+                            int const          dbg,
                             bool const         recover)
     :
         fd_        (name, check_size(size)),
@@ -65,6 +66,7 @@ namespace gcache
         size_trail_(0),
 //        mallocs_   (0),
 //        reallocs_  (0),
+        debug_     (dbg & DEBUG),
         open_      (true)
     {
         assert((uintptr_t(start_) % MemOps::ALIGNMENT) == 0);

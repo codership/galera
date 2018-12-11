@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class implementation */
@@ -46,14 +46,15 @@ gcache::Page::drop_fs_cache() const
 #endif
 }
 
-gcache::Page::Page (void* ps, const std::string& name, size_t size)
+gcache::Page::Page (void* ps, const std::string& name, size_t size, int dbg)
     :
     fd_   (name, size, false, false),
     mmap_ (fd_),
     ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
     space_(mmap_.size),
-    used_ (0)
+    used_ (0),
+    debug_(dbg)
 {
     log_info << "Created page " << name << " of size " << space_
              << " bytes";
@@ -89,7 +90,10 @@ gcache::Page::malloc (size_type size)
         }
 
         assert (next_ <= static_cast<uint8_t*>(mmap_.ptr) + mmap_.size);
+
+        if (debug_) { log_info << name() << " allocd " << bh; }
 #endif
+
         return (bh + 1);
     }
     else
@@ -142,6 +146,39 @@ gcache::Page::realloc (void* ptr, size_type size)
         {
             // do nothing, we can't shrink the buffer, it is locked
             return ptr;
+        }
+    }
+}
+
+void gcache::Page::print(std::ostream& os) const
+{
+    os << "page file: " << name() << ", size: " << size() << ", used: "
+       << used_;
+
+    if (used_ > 0 && debug_ > 0)
+    {
+        bool was_released(true);
+        const uint8_t* const start(static_cast<uint8_t*>(mmap_.ptr));
+        const uint8_t* p(start);
+        assert(p != next_);
+        while (p != next_)
+        {
+            ptrdiff_t const offset(p - start);
+            const BufferHeader* const bh(BH_const_cast(p));
+            p += bh->size;
+            if (!BH_is_released(bh))
+            {
+                os << "\noff: " << offset << ", " << bh;
+                was_released = false;
+            }
+            else
+            {
+                if (!was_released && p != next_)
+                {
+                    os << "\n..."; /* indicate gap */
+                }
+                was_released = true;
+            }
         }
     }
 }

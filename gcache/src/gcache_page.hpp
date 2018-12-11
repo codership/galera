@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -12,8 +12,10 @@
 
 #include "gu_fdesc.hpp"
 #include "gu_mmap.hpp"
+#include "gu_logger.hpp"
 
 #include <string>
+#include <ostream>
 
 namespace gcache
 {
@@ -21,7 +23,7 @@ namespace gcache
     {
     public:
 
-        Page (void* ps, const std::string& name, size_t size);
+        Page (void* ps, const std::string& name, size_t size, int dbg);
         ~Page () {}
 
         void* malloc  (size_type size);
@@ -34,11 +36,19 @@ namespace gcache
                      sizeof(BufferHeader)));
             assert (used_ > 0);
             used_--;
+#ifndef NDEBUG
+            if (debug_) { log_info << name() << " freed " << bh; }
+#endif
         }
 
         void* realloc (void* ptr, size_type size);
 
-        void discard (BufferHeader* ptr) {}
+        void discard (BufferHeader* bh)
+        {
+#ifndef NDEBUG
+            if (debug_) { log_info << name() << " discarded " << bh; }
+#endif
+        }
 
         size_t used () const { return used_; }
 
@@ -53,6 +63,10 @@ namespace gcache
 
         void* parent() const { return ps_; }
 
+        void print(std::ostream& os) const;
+
+        void set_debug(int const dbg) { debug_ = dbg; }
+
     private:
 
         gu::FileDescriptor fd_;
@@ -61,10 +75,18 @@ namespace gcache
         uint8_t*           next_;
         size_t             space_;
         size_t             used_;
+        int                debug_;
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);
     };
+
+    static inline std::ostream&
+    operator <<(std::ostream& os, const gcache::Page& p)
+    {
+        p.print(os);
+        return os;
+    }
 }
 
 #endif /* _gcache_page_hpp_ */

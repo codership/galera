@@ -26,6 +26,17 @@ namespace gcache
     bool
     GCache::discard_seqno (int64_t seqno)
     {
+#ifndef NDEBUG
+        seqno_t begin(0);
+        if (params.debug())
+        {
+            begin = (seqno2ptr.begin() != seqno2ptr.end() ?
+                     seqno2ptr.begin()->first : 0);
+            assert(begin > 0);
+            log_info << "GCache::discard_seqno(" << begin << " - "
+                     << seqno << ")";
+        }
+#endif
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
              i != seqno2ptr.end() && i->first <= seqno;)
         {
@@ -42,6 +53,14 @@ namespace gcache
             }
             else
             {
+#ifndef NDEBUG
+                if (params.debug())
+                {
+                    log_info << "GCache::discard_seqno(" << begin << " - "
+                             << seqno << "): "
+                             << bh->seqno_g << " not released, bailing out.";
+                }
+#endif
                 return false;
             }
         }
@@ -158,6 +177,9 @@ namespace gcache
             BufferHeader* const bh(ptr2BH(ptr));
             gu::Lock      lock(mtx);
 
+#ifndef NDEBUG
+            if (params.debug()) { log_info << "GCache::free() " << bh; }
+#endif
             free_common (bh);
         }
         else {
