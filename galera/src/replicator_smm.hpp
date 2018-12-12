@@ -761,6 +761,16 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
+        /*
+         * Record cc_seqno_ and cc_lowest_trx_seqno_ for future IST
+         * processing.
+         *
+         * @param cc_seqno Seqno of current configuration change.
+         * @param source String describing the source of the configuration
+         *               change.
+         */
+        void record_cc_seqnos(wsrep_seqno_t cc_seqno, const char* source);
+
         bool state_transfer_required(const wsrep_view_info_t& view_info,
                                      bool rejoined);
 
@@ -875,6 +885,7 @@ namespace galera
         wsrep_uuid_t const    state_uuid_;
         const char            state_uuid_str_[37];
         wsrep_seqno_t         cc_seqno_; // seqno of last CC
+        // Lowest trx seqno in cert index during last CC
         wsrep_seqno_t         cc_lowest_trx_seqno_;
         wsrep_seqno_t         pause_seqno_; // local seqno of last pause call
 

@@ -1247,7 +1247,8 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
             establish_protocol_versions(conf.repl_proto_ver);
             cert_.adjust_position(*view_info, gu::GTID(conf.uuid, conf.seqno),
                                   trx_params_.version_);
-
+            // record CC releated state seqnos, needed for IST on DONOR
+            record_cc_seqnos(conf.seqno, "preload");
         }
 
         gcache_.free(const_cast<void*>(act.buf));

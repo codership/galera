@@ -2329,6 +2329,22 @@ void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
              << trx_params_.version_ << ", " << str_proto_ver_ << ")";
 }
 
+void galera::ReplicatorSMM::record_cc_seqnos(wsrep_seqno_t cc_seqno,
+                                             const char* source)
+{
+    cc_seqno_ = cc_seqno;
+    cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
+    log_info << "Lowest cert indnex boundary for CC from " << source
+             << ": " << cc_lowest_trx_seqno_;;
+    log_info << "Min available from gcache for CC from " << source
+             << ": " << gcache_.seqno_min();
+    // GCache must contain some actions, at least this CC
+    assert(gcache_.seqno_min() > 0);
+    // Lowest TRX must not have been released from gcache at this
+    // point.
+    assert(cc_lowest_trx_seqno_ >= gcache_.seqno_min());
+}
+
 void
 galera::ReplicatorSMM::update_incoming_list(const wsrep_view_info_t& view)
 {
@@ -2706,19 +2722,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 }
             }
 
-            // record state seqno, needed for IST on DONOR
-            cc_seqno_ = group_seqno;
-            // Record lowest trx seqno in cert index to set cert index
-            // rebuild flag appropriately in IST. Notice that if cert index
-            // was completely reset above, the value returned is zero and
-            // no rebuild should happen.
-            cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
-            log_info << "####### Lowest cert index boundary: "
-                     << cc_lowest_trx_seqno_;
-            log_info << "####### Min available from gcache: "
-                     << gcache_.seqno_min();
-            assert(gcache_.seqno_min() > 0);
-            assert(cc_lowest_trx_seqno_ >= gcache_.seqno_min());
+            // record CC related state seqnos, needed for IST on DONOR
+            record_cc_seqnos(group_seqno, "group");
 
             st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         }
