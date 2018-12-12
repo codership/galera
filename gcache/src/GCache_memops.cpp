@@ -46,7 +46,6 @@ namespace gcache
             {
                 assert (bh->seqno_g == i->first);
                 assert (bh->seqno_g <= seqno);
-                assert (bh->seqno_g <= seqno_released);
 
                 seqno2ptr.erase (i++); // post ++ is significant!
                 discard_buffer(bh);
@@ -123,6 +122,8 @@ namespace gcache
         assert(bh->seqno_g != SEQNO_ILL);
         BH_release(bh);
 
+        seqno_t new_released(seqno_released);
+
         if (gu_likely(SEQNO_NONE != bh->seqno_g))
         {
 #ifndef NDEBUG
@@ -135,7 +136,7 @@ namespace gcache
             assert(seqno_released + 1 == bh->seqno_g ||
                    SEQNO_NONE == seqno_released);
 #endif
-            seqno_released = bh->seqno_g;
+            new_released = bh->seqno_g;
         }
 #ifndef NDEBUG
         void* const ptr(bh + 1);
@@ -156,7 +157,11 @@ namespace gcache
         case BUFFER_IN_PAGE:
             if (gu_likely(bh->seqno_g > 0))
             {
-                discard_seqno (bh->seqno_g);
+                if (gu_unlikely(!discard_seqno(bh->seqno_g)))
+                {
+                    new_released = (seqno2ptr.begin()->first - 1);
+                    assert(seqno_released <= new_released);
+                }
             }
             else
             {
@@ -167,6 +172,15 @@ namespace gcache
             break;
         }
         rb.assert_size_free();
+
+#ifndef NDEBUG
+        if (params.debug())
+        {
+            log_info << "GCache::free_common(): seqno_released: "
+                     << seqno_released << " -> " << new_released;
+        }
+#endif
+        seqno_released = new_released;
     }
 
     void
