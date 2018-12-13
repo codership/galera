@@ -49,7 +49,7 @@ galera::Wsdb::~Wsdb()
     // With debug builds just print trx and query maps to stderr
     // and don't clean up to let valgrind etc to detect leaks.
 #ifndef NDEBUG
-    std::cerr << *this;
+    log_info << *this;
     assert(trx_map_.size() == 0);
     assert(conn_map_.size() == 0);
 #else

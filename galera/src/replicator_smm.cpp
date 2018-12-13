@@ -341,8 +341,6 @@ wsrep_status_t galera::ReplicatorSMM::close()
 
 wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 {
-    assert(recv_ctx != 0);
-
     if (state_() == S_CLOSED || state_() == S_CLOSING)
     {
         log_error <<"async recv cannot start, provider in closed/closing state";
