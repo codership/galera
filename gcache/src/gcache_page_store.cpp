@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 /*! @file page store implementation */
@@ -131,7 +131,8 @@ gcache::PageStore::reset ()
 inline void
 gcache::PageStore::new_page (size_type size)
 {
-    Page* const page(new Page(this, make_page_name (base_name_, count_), size));
+    Page* const page(new Page
+                     (this, make_page_name (base_name_, count_), size, debug_));
 
     pages_.push_back (page);
     total_size_ += page->size();
@@ -142,6 +143,7 @@ gcache::PageStore::new_page (size_type size)
 gcache::PageStore::PageStore (const std::string& dir_name,
                               size_t             keep_size,
                               size_t             page_size,
+                              int                dbg,
                               bool               keep_page)
     :
     base_name_ (make_base_name(dir_name)),
@@ -152,7 +154,8 @@ gcache::PageStore::PageStore (const std::string& dir_name,
     pages_     (),
     current_   (0),
     total_size_(0),
-    delete_page_attr_()
+    delete_page_attr_(),
+    debug_     (dbg & DEBUG)
 #ifndef GCACHE_DETACH_THREAD
     , delete_thr_(pthread_t(-1))
 #endif /* GCACHE_DETACH_THREAD */
@@ -195,6 +198,11 @@ gcache::PageStore::~PageStore ()
     {
         log_error << "Could not delete " << pages_.size()
                   << " page files: some buffers are still \"mmapped\".";
+        if (debug_)
+            for (PageQueue::iterator i(pages_.begin()); i != pages_.end(); ++i)
+            {
+                log_error << *(*i);;
+            }
     }
 
     pthread_attr_destroy (&delete_page_attr_);
@@ -266,4 +274,15 @@ gcache::PageStore::realloc (void* ptr, size_type const size)
     }
 
     return ret;
+}
+
+void
+gcache::PageStore::set_debug(int const dbg)
+{
+    debug_ = dbg & DEBUG;
+
+    for (PageQueue::iterator i(pages_.begin()); i != pages_.end(); ++i)
+    {
+        (*i)->set_debug(debug_);
+    }
 }

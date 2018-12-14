@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -16,6 +16,10 @@ static const std::string GCACHE_PARAMS_PAGE_SIZE  ("gcache.page_size");
 static const std::string GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
 static const std::string GCACHE_PARAMS_KEEP_PAGES_SIZE("gcache.keep_pages_size");
 static const std::string GCACHE_DEFAULT_KEEP_PAGES_SIZE("0");
+#ifndef NDEBUG
+static const std::string GCACHE_PARAMS_DEBUG      ("gcache.debug");
+static const std::string GCACHE_DEFAULT_DEBUG     ("0");
+#endif
 static const std::string GCACHE_PARAMS_RECOVER    ("gcache.recover");
 static const std::string GCACHE_DEFAULT_RECOVER   ("yes");
 
@@ -31,6 +35,9 @@ gcache::GCache::Params::register_params(gu::Config& cfg)
     cfg.add(GCACHE_PARAMS_RB_SIZE,         GCACHE_DEFAULT_RB_SIZE);
     cfg.add(GCACHE_PARAMS_PAGE_SIZE,       GCACHE_DEFAULT_PAGE_SIZE);
     cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE, GCACHE_DEFAULT_KEEP_PAGES_SIZE);
+#ifndef NDEBUG
+    cfg.add(GCACHE_PARAMS_DEBUG,           GCACHE_DEFAULT_DEBUG);
+#endif
     cfg.add(GCACHE_PARAMS_RECOVER,         GCACHE_DEFAULT_RECOVER);
 }
 
@@ -67,6 +74,11 @@ gcache::GCache::Params::Params (gu::Config& cfg, const std::string& data_dir)
     rb_size_  (cfg.get<size_t>(GCACHE_PARAMS_RB_SIZE)),
     page_size_(cfg.get<size_t>(GCACHE_PARAMS_PAGE_SIZE)),
     keep_pages_size_(cfg.get<size_t>(GCACHE_PARAMS_KEEP_PAGES_SIZE)),
+#ifndef NDEBUG
+    debug_    (cfg.get<int>(GCACHE_PARAMS_DEBUG)),
+#else
+    debug_    (0),
+#endif
     recover_  (cfg.get<bool>(GCACHE_PARAMS_RECOVER))
 {}
 
@@ -126,6 +138,22 @@ gcache::GCache::param_set (const std::string& key, const std::string& val)
         gu_throw_error(EINVAL) << "'" << key
                                << "' has a meaning only on startup.";
     }
+#ifndef NDEBUG
+    else if (key == GCACHE_PARAMS_DEBUG)
+    {
+        int d = gu::Config::from_config<int>(val);
+
+        gu::Lock lock(mtx);
+        /* locking here serves two purposes: ensures atomic setting of config
+         * and params.ram_size and syncs with malloc() method */
+
+        config.set<int>(key, d);
+        params.debug(d);
+        mem.set_debug(params.debug());
+        rb.set_debug(params.debug());
+        ps.set_debug(params.debug());
+    }
+#endif
     else
     {
         throw gu::NotFound();

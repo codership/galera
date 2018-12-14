@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -21,11 +21,12 @@ namespace gcache
     {
     public:
 
-        MemStore (size_t max_size, seqno2ptr_t& seqno2ptr)
+        MemStore (size_t const max_size, seqno2ptr_t& seqno2ptr, int const dbg)
             : max_size_ (max_size),
               size_     (0),
               allocd_   (),
-              seqno2ptr_(seqno2ptr)
+              seqno2ptr_(seqno2ptr),
+              debug_    (dbg & DEBUG)
         {}
 
         void reset ()
@@ -143,7 +144,11 @@ namespace gcache
         // for unit tests only
         size_t _allocd () const { return size_; }
 
+        void set_debug(int const dbg) { debug_ = dbg & DEBUG; }
+
     private:
+
+        static int const DEBUG = 1;
 
         bool have_free_space (size_type size);
 
@@ -151,6 +156,7 @@ namespace gcache
         size_t          size_;
         std::set<void*> allocd_;
         seqno2ptr_t&    seqno2ptr_;
+        int             debug_;
     };
 }
 

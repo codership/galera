@@ -32,14 +32,25 @@ libgaleraxx_srcs = [
     'ist.cpp',
     'gcs_dummy.cpp',
     'saved_state.cpp',
-    'galera_view.cpp' ]
+    'galera_view.cpp'
+]
 
-libgaleraxx_env.StaticLibrary('galera++', libgaleraxx_srcs)
+objs = libgaleraxx_env.Object(libgaleraxx_srcs)
+env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
 
 # Environment for multimaster library build
 mmlib_env = libgaleraxx_env.Clone()
 mmlib_env.Append(CPPFLAGS = ' -DGALERA_MULTIMASTER')
 mmlib_env.Replace(SHOBJPREFIX = 'libmmgalera++-')
+
+mmlib_srcs = [
+    'replicator_smm.cpp',
+    'replicator_str.cpp',
+    'replicator_smm_stats.cpp'
+]
+
+mm_objs = mmlib_env.Object(mmlib_srcs)
+env.Append(LIBMMGALERA_OBJS = mmlib_env.SharedObject(mmlib_srcs))
 
 # Environment to compile provider unit (part of multimaster library)
 # This is needed to hardcode version and revision
@@ -48,14 +59,12 @@ Import ('GALERA_VER', 'GALERA_REV')
 mmprovider_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
 mmprovider_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
 
-#
-env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
-env.Append(LIBMMGALERA_OBJS = mmlib_env.SharedObject([
-            'replicator_smm.cpp',
-            'replicator_str.cpp',
-            'replicator_smm_stats.cpp'
-            ]))
-env.Append(LIBMMGALERA_OBJS = mmprovider_env.SharedObject([
-            'wsrep_provider.cpp'
-            ]))
+mmprovider_srcs = [
+    'wsrep_provider.cpp'
+]
+
+mm_objs += mmprovider_env.Object(mmprovider_srcs)
+env.Append(LIBMMGALERA_OBJS = mmprovider_env.SharedObject(mmprovider_srcs))
+
+libgaleraxx_env.StaticLibrary('galera++', objs + mm_objs)
 

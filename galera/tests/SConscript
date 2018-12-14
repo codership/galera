@@ -31,6 +31,7 @@ galera_check = env.Program(target='galera_check',
                                service_thd_check.cpp
                                ist_check.cpp
                                saved_state_check.cpp
+                               defaults_check.cpp
                            '''))
 #                               write_set_check.cpp
 

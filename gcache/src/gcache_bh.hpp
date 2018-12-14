@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
  *
  */
 
@@ -50,6 +50,7 @@ namespace gcache
                       buffer_header_ctx_check);
 
 #define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
+#define BH_const_cast(ptr) reinterpret_cast<const BufferHeader*>(ptr)
 
     static inline BufferHeader*
     ptr2BH (const void* ptr)
@@ -114,12 +115,13 @@ namespace gcache
     static inline std::ostream&
     operator << (std::ostream& os, const BufferHeader* const bh)
     {
-        os << "seqno_g: "   << bh->seqno_g
+        os << "addr: "      << static_cast<const void*>(bh)
+           << ", seqno: "   << bh->seqno_g
            << ", size: "    << bh->size
            << ", ctx: "     << BH_ctx(bh)
            << ", flags: "   << bh->flags
-           << ". store: "   << bh->store
-           << ", type: "    << bh->type;
+           << ". store: "   << int(bh->store)
+           << ", type: "    << int(bh->type);
         return os;
     }
 

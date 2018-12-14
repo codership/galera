@@ -46,7 +46,7 @@ galera::Wsdb::~Wsdb()
     log_info << trx_pool_;
 
 #ifndef NDEBUG
-    std::cerr << *this;
+    log_info << *this;
     assert(trx_map_.size() == 0);
     assert(conn_map_.size() == 0);
 #endif // !NDEBUG

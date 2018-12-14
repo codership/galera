@@ -99,7 +99,6 @@ void galera::GcsActionSource::dispatch(void* const              recv_ctx,
                                        const struct gcs_action& act,
                                        bool&                    exit_loop)
 {
-    assert(recv_ctx != 0);
     assert(act.buf != 0);
     assert(act.seqno_l > 0 || act.seqno_g == -EAGAIN);
 
