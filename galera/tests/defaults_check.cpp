@@ -6,6 +6,9 @@
 extern "C" int wsrep_loader(wsrep_t*);
 
 #include <gu_config.hpp>
+#include <gu_mutex.hpp>
+#include <gu_cond.hpp>
+#include <gu_lock.hpp>
 
 #include <map>
 #include <string>
@@ -150,8 +153,18 @@ log_cb(wsrep_log_level_t l, const char* c)
     }
 }
 
+struct app_ctx
+{
+    gu::Mutex mtx_;
+    gu::Cond  cond_;
+    wsrep_t   provider_;
+    bool      connected_;
+
+    app_ctx() : mtx_(), cond_(), provider_(), connected_(false) {}
+};
+
 static enum wsrep_cb_status
-view_cb(void*                    app_ctx,
+view_cb(void*                    ctx,
         void*                    recv_ctx,
         const wsrep_view_info_t* view,
         const char*              state,
@@ -160,7 +173,6 @@ view_cb(void*                    app_ctx,
         size_t*                  sst_req_len)
 {
     /* make compilers happy about unused arguments */
-    (void)app_ctx;
     (void)recv_ctx;
     (void)view;
     (void)state;
@@ -168,11 +180,32 @@ view_cb(void*                    app_ctx,
     (void)sst_req;
     (void)sst_req_len;
 
+    app_ctx* c(static_cast<app_ctx*>(ctx));
+    gu::Lock lock(c->mtx_);
+
+    if (!c->connected_)
+    {
+        c->connected_ = true;
+        c->cond_.broadcast();
+    }
+
     return WSREP_CB_SUCCESS;
 }
 
 static void
 synced_cb(void* app_ctx) { (void)app_ctx; }
+
+static void*
+recv_func(void* ctx)
+{
+    app_ctx* c(static_cast<app_ctx*>(ctx));
+    wsrep_t& provider(c->provider_);
+
+    wsrep_status_t const ret(provider.recv(&provider, NULL));
+    fail_if(WSREP_OK != ret, "recv() returned %d", ret);
+
+    return NULL;
+}
 
 START_TEST(defaults)
 {
@@ -180,13 +213,14 @@ START_TEST(defaults)
 
     fill_in_expected(expected_defaults, Defaults);
 
-    wsrep_t provider;
-    wsrep_status_t ret = wsrep_status_t(wsrep_loader(&provider));
+    app_ctx ctx;
+    wsrep_t& provider(ctx.provider_);
+    int ret = wsrep_status_t(wsrep_loader(&provider));
     fail_if(WSREP_OK != ret);
 
     struct wsrep_init_args init_args =
         {
-            NULL, // void* app_ctx
+            &ctx, // void* app_ctx
 
             /* Configuration parameters */
             NULL, // const char* node_name
@@ -224,14 +258,28 @@ START_TEST(defaults)
     fill_in_real(real_defaults, provider);
     mark_point();
 
-    if (WSREP_OK == ret)
+    if (WSREP_OK == ret) /* if connect() was a success, need to disconnect() */
     {
+        /* some configuration change events need to be received */
+        gu_thread_t recv_thd;
+        gu_thread_create(&recv_thd, NULL, recv_func, &ctx);
+
+        mark_point();
+
+        /* @todo:there is a race condition in the library when disconnect() is
+         * called right after connect() */
+        { /* sync with view callback */
+            gu::Lock lock(ctx.mtx_);
+            while(!ctx.connected_) lock.wait(ctx.cond_);
+        }
+
+        mark_point();
+
         ret = provider.disconnect(&provider);
         fail_if(WSREP_OK != ret, "disconnect() returned %d", ret);
 
-        // some configuration change events need to be received
-        ret = provider.recv(&provider, NULL);
-        fail_if(WSREP_OK != ret, "recv() retruned %d", ret);
+        ret = gu_thread_join(recv_thd, NULL);
+        fail_if(0 != ret, "Could not join thread: %d (%s)", ret, strerror(ret));
     }
 
     provider.free(&provider);
