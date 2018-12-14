@@ -215,7 +215,7 @@ recv_func(void* ctx)
     wsrep_t& provider(c->provider_);
 
     wsrep_status_t const ret(provider.recv(&provider, NULL));
-    fail_if(WSREP_OK != ret, "recv() retruned %d", ret);
+    fail_if(WSREP_OK != ret, "recv() returned %d", ret);
 
     return NULL;
 }
@@ -280,6 +280,8 @@ START_TEST(defaults)
 
         mark_point();
 
+        /* @todo:there is a race condition in the library when disconnect() is
+         * called right after connect() */
         { /* sync with connect callback */
             gu::Lock lock(ctx.mtx_);
             while(!ctx.connected_) lock.wait(ctx.cond_);
