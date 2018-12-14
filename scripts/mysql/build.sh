@@ -449,6 +449,8 @@ then
 
         if [ "$MYSQL" = "mysql" ]
         then # MySQL-spcific build options
+            BUILD_OPT+=" -DWITH_WSREP=1"
+
             MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
 
             [ "$MYSQL_MM_VER" -ge "56" ] && \
