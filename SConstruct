@@ -250,7 +250,7 @@ env.Prepend(CFLAGS = '-std=c99 -fno-strict-aliasing -pipe ')
 # CXX-specific flags
 # Note: not all 3rd-party libs like '-Wold-style-cast -Weffc++'
 #       adding those after checks
-env.Prepend(CXXFLAGS = '-Wno-long-long -Wno-deprecated -ansi ')
+env.Prepend(CXXFLAGS = '-Wno-long-long -Wno-deprecated ')
 if sysname != 'sunos':
     env.Prepend(CXXFLAGS = '-pipe ')
 
@@ -272,15 +272,27 @@ if gcov:
 # Custom tests:
 #
 
-def CheckCpp11(context):
+def CheckCpp0x(context):
     test_source = """
-#if __cplusplus < 201103
-#error Not compiling in C++11 mode
-#endif
 int main() { return 0; }
 """
-    context.Message('Checking if compiling in C++11 mode ... ')
+    context.Message('Checking if compiler accepts -std=c++0x ... ')
+    cxxflags_orig = context.env['CXXFLAGS']
+    context.env.Prepend(CXXFLAGS = '-std=c++0x ')
     result = context.TryLink(test_source, '.cpp')
+    context.env.Replace(CXXFLAGS = cxxflags_orig)
+    context.Result(result)
+    return result
+
+def CheckCpp11(context):
+    test_source = """
+int main() { return 0; }
+"""
+    context.Message('Checking if compiler accepts -std=c++11 ... ')
+    cxxflags_orig = context.env['CXXFLAGS']
+    context.env.Prepend(CXXFLAGS = '-std=c++11 ')
+    result = context.TryLink(test_source, '.cpp')
+    context.env.Replace(CXXFLAGS = cxxflags_orig)
     context.Result(result)
     return result
 
@@ -318,12 +330,12 @@ int main() { std::tr1::array<int, 5> a; return 0; }
     context.Result(result)
     return result
 
-def CheckTr1SharedPtr(context):
+def CheckStdSharedPtr(context):
     test_source = """
-#include <tr1/memory>
-int main() { int n; std::tr1::shared_ptr<int> p(&n); return 0; }
+#include <memory>
+int main() { int n; std::shared_ptr<int> p(&n); return 0; }
 """
-    context.Message('Checking for std::tr1::shared_ptr ... ')
+    context.Message('Checking for std::shared_ptr ... ')
     result = context.TryLink(test_source, '.cpp')
     context.Result(result)
     return result
@@ -379,10 +391,11 @@ int main() { SSL_CTX* ctx=NULL; EC_KEY* ecdh=NULL; return !SSL_CTX_set_tmp_ecdh(
 # Construct configuration context
 #
 conf = Configure(env, custom_tests = {
+    'CheckCpp0x': CheckCpp0x,
     'CheckCpp11': CheckCpp11,
     'CheckSystemASIOVersion': CheckSystemASIOVersion,
     'CheckTr1Array': CheckTr1Array,
-    'CheckTr1SharedPtr': CheckTr1SharedPtr,
+    'CheckStdSharedPtr': CheckStdSharedPtr,
     'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
     'CheckWeffcpp': CheckWeffcpp,
     'CheckSetEcdhAuto': CheckSetEcdhAuto,
@@ -444,7 +457,18 @@ if conf.CheckHeader('execinfo.h'):
 
 # Additional C headers and libraries
 
-cpp11 = conf.CheckCpp11()
+# Check if compiler has support for C++11
+if conf.CheckCpp11():
+    conf.env.Prepend(CXXFLAGS = '-std=c++11 ')
+elif conf.CheckCpp0x():
+    conf.env.Prepend(CXXFLAGS = '-std=c++0x ')
+else:
+    print('Compiler does not accept neither -std=c++0x nor -std=c++11')
+    Exit(1)
+
+# This flag should be eventually removed once the code below
+# has been reorganized.
+cpp11 = True
 
 # array
 if cpp11:
@@ -458,14 +482,18 @@ else:
     Exit(1)
 
 # shared_ptr
-if cpp11:
-    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_SHARED_PTR')
-elif False and conf.CheckTr1SharedPtr():
-    # std::tr1::shared_ptr<> is not derived from std::auto_ptr<>
-    # this upsets boost in asio, so don't use tr1 version, use boost instead
-    conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_SHARED_PTR')
-elif conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+#
+# Boost shared_ptr works currently the best across all platforms.
+# Using std::shared_ptr with asio causes compilation errors with
+# older GCC compilers or boost library versions, therefore we prefer
+# boost implementation.
+#
+# Eventually std::shared_ptr should take precedence once all compilation
+# issues have been resolved.
+if conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
+elif conf.CheckStdSharedPtr():
+    conf.env.Append(CPPFLAGS = ' -DHAVE_STD_SHARED_PTR')
 else:
     print('no suitable shared_ptr header found')
     Exit(1)

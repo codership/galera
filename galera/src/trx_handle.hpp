@@ -657,7 +657,7 @@ namespace galera
             mem_pool_          (mp),
             write_set_         (),
             buf_               (buf),
-            action_            (0, 0),
+            action_            (static_cast<const void*>(0), 0),
             certified_         (false),
             committed_         (false),
             exit_loop_         (false),
