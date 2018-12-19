@@ -10,7 +10,6 @@
 
 #include "../src/gu_conf.h"
 #include "gu_mem_test.h"
-#include "gu_vec_test.h"
 #include "gu_bswap_test.h"
 #include "gu_fnv_test.h"
 #include "gu_mmh3_test.h"
@@ -30,7 +29,6 @@ typedef Suite *(*suite_creator_t)(void);
 static suite_creator_t suites[] =
     {
         gu_mem_suite,
-        gu_vec_suite,
         gu_bswap_suite,
         gu_fnv_suite,
         gu_mmh3_suite,
