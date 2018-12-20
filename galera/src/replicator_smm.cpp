@@ -2410,7 +2410,6 @@ galera::ReplicatorSMM::submit_view_info(void*                    recv_ctx,
 
     if (WSREP_CB_SUCCESS != rcode)
     {
-        assert(0);
         gu_throw_fatal << "View callback failed. "
             "This is unrecoverable, restart required.";
     }
