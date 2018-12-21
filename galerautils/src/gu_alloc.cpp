@@ -170,7 +170,7 @@ gu::Allocator::alloc (page_size_type const size, bool& new_page)
 gu::Allocator::BaseNameDefault const gu::Allocator::BASE_NAME_DEFAULT;
 
 gu::Allocator::Allocator (const BaseName&         base_name,
-                          byte_t*                 reserved,
+                          void*                   reserved,
                           page_size_type          reserved_size,
                           heap_size_type          max_ram,
                           page_size_type          disk_page_size)
