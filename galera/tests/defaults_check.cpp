@@ -10,6 +10,8 @@ extern "C" int wsrep_loader(wsrep_t*);
 #include <gu_cond.hpp>
 #include <gu_lock.hpp>
 
+#include <gu_arch.h> // GU_WORDSIZE
+
 #include <map>
 #include <string>
 #include <sstream>
@@ -68,7 +70,11 @@ static const char* Defaults[] =
     "gcs.fc_master_slave",         "no",
     "gcs.max_packet_size",         "64500",
     "gcs.max_throttle",            "0.25",
+#if (GU_WORDSIZE == 32)
+    "gcs.recv_q_hard_limit",       "2147483647",
+#elif (GU_WORDSIZE == 64)
     "gcs.recv_q_hard_limit",       "9223372036854775807",
+#endif
     "gcs.recv_q_soft_limit",       "0.25",
     "gcs.sync_donor",              "no",
     "gmcast.listen_addr",          "tcp://0.0.0.0:4567",
