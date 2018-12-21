@@ -41,7 +41,7 @@ public:
 
     explicit
     Allocator (const BaseName&     base_name      = BASE_NAME_DEFAULT,
-               byte_t*             reserved       = NULL,
+               void*               reserved       = NULL,
                page_size_type      reserved_size  = 0,
                heap_size_type      max_heap       = (1U << 22),   /* 4M  */
                page_size_type      disk_page_size = (1U << 26));  /* 64M */
@@ -74,8 +74,8 @@ private:
     {
     public:
 
-        Page (byte_t* ptr, size_t size)
-            : base_ptr_(ptr),
+        Page (void* ptr, size_t size)
+            : base_ptr_(static_cast<gu::byte_t*>(ptr)),
               ptr_     (base_ptr_),
               left_    (size)
         {}
