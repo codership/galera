@@ -19,9 +19,13 @@ using namespace galera;
 static void ver3_basic(gu::RecordSet::Version const rsv,
                        WriteSetNG::Version    const wsv)
 {
+    union {
+        wsrep_uuid_t source;
+        size_t alignment;
+    } s;
+    wsrep_uuid_t& source(s.source);
     int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
-    wsrep_uuid_t source;
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
@@ -291,9 +295,13 @@ END_TEST
 
 static void ver3_annotation(gu::RecordSet::Version const rsv)
 {
+    union {
+        wsrep_uuid_t source;
+        size_t alignment;
+    } s;
+    wsrep_uuid_t& source(s.source);
     int const alignment(rsv >= gu::RecordSet::VER2 ? GU_MIN_ALIGNMENT : 1);
     uint16_t const flag1(0xabcd);
-    wsrep_uuid_t source;
     gu_uuid_generate (reinterpret_cast<gu_uuid_t*>(&source), NULL, 0);
     wsrep_conn_id_t const conn(652653);
     wsrep_trx_id_t const  trx(99994952);
