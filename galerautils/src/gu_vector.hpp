@@ -1,4 +1,4 @@
-// Copyright (C) 2013-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2019 Codership Oy <info@codership.com>
 
 /*!
  * @file implementation of STL vector functionality "on the stack", that is
@@ -111,6 +111,9 @@ public:
     const T& front() const { return container().front(); }
           T& back ()       { return container().back();  }
     const T& back () const { return container().back();  }
+
+    /* this mehtod must be specialized for each template instantiation */
+    size_type serialize(void* buf, size_type size, size_type offset = 0);
 
     bool in_heap() const // for testing
     {

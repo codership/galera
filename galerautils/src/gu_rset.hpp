@@ -97,6 +97,27 @@ protected:
     ~RecordSet() {}
 };
 
+/*! specialization of Vector::serialize() method */
+template<> inline RecordSet::GatherVector::size_type
+RecordSet::GatherVector::serialize(void*     const buf,
+                                   size_type const buf_size,
+                                   size_type const offset /* = 0 */)
+{
+    byte_t*       to (static_cast<byte_t*>(buf) + offset);
+    byte_t* const end(static_cast<byte_t*>(buf) + buf_size);
+    for (size_type i(0); i < size(); ++i)
+    {
+        const gu::Buf& f((*this)[i]);
+        if (to + f.size > end)
+        {
+            gu_throw_fatal << "attempt to write beyond buffer boundary";
+        }
+        const gu::byte_t* from(static_cast<const gu::byte_t*>(f.ptr));
+        to = std::copy(from, from + f.size, to);
+    }
+    return to - static_cast<byte_t*>(buf);
+}
+
 
 #if defined(__GNUG__)
 # if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
@@ -339,25 +360,9 @@ private:
 
     RecordSetOut (const RecordSetOut&);
     RecordSetOut& operator = (const RecordSetOut&);
-};
 
+}; /* class RecordSetOut */
 
-/*! serialize RecordSet::GatherVector into continuous buffer */
-static inline
-size_t serialize(const RecordSet::GatherVector& gvec, gu::byte_t* buf,
-                 size_t buf_size, size_t offset)
-{
-    for (size_t i(0); i < gvec.size(); ++i)
-    {
-        if (buf_size < gvec[i].size + offset)
-        {
-            gu_throw_fatal << "attempt to write out of range";
-        }
-        const gu::byte_t* ptr(static_cast<const gu::byte_t*>(gvec[i].ptr));
-        offset = std::copy(ptr, ptr + gvec[i].size, buf + offset) - buf;
-    }
-    return offset;
-}
 
 /*! class to recover records from a buffer */
 class RecordSetInBase : public RecordSet
