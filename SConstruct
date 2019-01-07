@@ -147,7 +147,7 @@ psi        = int(ARGUMENTS.get('psi', 0))
 if psi:
     opt_flags = opt_flags + ' -DHAVE_PSI_INTERFACE'
 
-GALERA_VER = ARGUMENTS.get('version', '3.31')
+GALERA_VER = ARGUMENTS.get('version', '3.33')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 # export to any module that might have use of those
 Export('GALERA_VER', 'GALERA_REV')
@@ -287,8 +287,13 @@ def CheckSystemASIOVersion(context):
     system_asio_test_source_file = """
 #include <asio.hpp>
 
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message "Asio version:" XSTR(ASIO_VERSION)
 #if ASIO_VERSION < 101001
-#error "Included asio version is too old"
+#error Included asio version is too old
+#elif ASIO_VERSION >= 101100
+#error Included asio version is too new
 #endif
 
 int main()
@@ -297,7 +302,7 @@ int main()
 }
 
 """
-    context.Message('Checking ASIO version (> 1.10.1) ... ')
+    context.Message('Checking ASIO version (>= 1.10.1 and < 1.11.0) ... ')
     result = context.TryLink(system_asio_test_source_file, '.cpp')
     context.Result(result)
     return result
@@ -359,6 +364,16 @@ int main() { SSL_CTX* ctx=NULL; return !SSL_CTX_set_ecdh_auto(ctx, 1); }
     context.Result(result)
     return result
 
+def CheckSetTmpEcdh(context):
+    test_source = """
+#include <openssl/ssl.h>
+int main() { SSL_CTX* ctx=NULL; EC_KEY* ecdh=NULL; return !SSL_CTX_set_tmp_ecdh(ctx,ecdh); }
+"""
+    context.Message('Checking for SSL_CTX_set_tmp_ecdh_() ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
 #
 # Construct configuration context
 #
@@ -369,7 +384,8 @@ conf = Configure(env, custom_tests = {
     'CheckTr1SharedPtr': CheckTr1SharedPtr,
     'CheckTr1UnorderedMap': CheckTr1UnorderedMap,
     'CheckWeffcpp': CheckWeffcpp,
-    'CheckSetEcdhAuto': CheckSetEcdhAuto
+    'CheckSetEcdhAuto': CheckSetEcdhAuto,
+    'CheckSetTmpEcdh': CheckSetTmpEcdh
 })
 
 conf.env.Append(CPPPATH = [ '#/wsrep/src' ])
@@ -570,6 +586,8 @@ if not conf.CheckLib('crypto'):
 # advanced SSL features
 if conf.CheckSetEcdhAuto():
     conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_ECDH_AUTO')
+elif conf.CheckSetTmpEcdh():
+    conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_TMP_ECDH')
 
 # these will be used only with our software
 if strict_build_flags == 1:

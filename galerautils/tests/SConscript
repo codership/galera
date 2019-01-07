@@ -16,7 +16,6 @@ gu_tests = env.Program(target = 'gu_tests',
                        source = Split('''
                             gu_tests.c
                             gu_mem_test.c
-                            gu_vec_test.c
                             gu_bswap_test.c
                             gu_fnv_test.c
                             gu_mmh3_test.c
@@ -73,7 +72,7 @@ avalanche = env.Program(target = 'avalanche',
                              avalanche.c
                          '''))
 
-copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
-                         source = Split('''
-                             copy_vs_assignment.cpp
-                         '''))
+# copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
+#                         source = Split('''
+#                             copy_vs_assignment.cpp
+#                         '''))
