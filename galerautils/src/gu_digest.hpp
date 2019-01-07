@@ -9,7 +9,6 @@
 #define GU_DIGEST_HPP
 
 #include "gu_hash.h"
-#include "gu_vec16.h"
 #include "gu_byteswap.hpp"
 #include "gu_serializable.hpp"
 #include "gu_macros.hpp"

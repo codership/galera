@@ -475,8 +475,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 /* initialize node ID to the one given by the backend - this way
                  * we'll be recognized as coming from prev. conf. in node array
                  * remap below */
-                strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
-                         sizeof (new_nodes[0].id) - 1);
+                strncpy (group->nodes[0].id, new_nodes[0].id,
+                         sizeof (group->nodes[0].id));
                 group->nodes[0].segment = new_nodes[0].segment;
             }
         }
