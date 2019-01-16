@@ -519,7 +519,8 @@ namespace galera
                 :
                 global_seqno_ (ts.global_seqno()),
                 depends_seqno_(ts.depends_seqno()),
-                is_local_     (ts.local())
+                is_local_     (ts.local()),
+                is_toi_       (ts.is_toi())
 #ifndef NDEBUG
                 ,trx_         (&ts)
 #endif
@@ -535,7 +536,8 @@ namespace galera
                 :
                 global_seqno_ (gs),
                 depends_seqno_(ds),
-                is_local_     (l)
+                is_local_     (l),
+                is_toi_       (false)
 #ifndef NDEBUG
                 ,trx_         (NULL)
 #endif
@@ -546,7 +548,8 @@ namespace galera
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
-                return (is_local_ == true || last_left >= depends_seqno_);
+                return ((is_local_ == true && is_toi_ == false) ||
+                        last_left >= depends_seqno_);
             }
 
 #ifdef GU_DBUG_ON
@@ -573,6 +576,7 @@ namespace galera
                 global_seqno_ (WSREP_SEQNO_UNDEFINED),
                 depends_seqno_(WSREP_SEQNO_UNDEFINED),
                 is_local_     (false),
+                is_toi_       (false),
                 trx_          (NULL)
             {}
 #endif /* NDEBUG */
@@ -591,6 +595,7 @@ namespace galera
             const wsrep_seqno_t global_seqno_;
             const wsrep_seqno_t depends_seqno_;
             const bool is_local_;
+            const bool is_toi_;
 #ifndef NDEBUG
             // this pointer is for debugging purposes only and
             // is not guaranteed to point at a valid location
