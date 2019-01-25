@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com> */
+/* Copyright (C) 2013-2019 Codership Oy <info@codership.com> */
 /*!
  * @file common RecordSet interface
  *

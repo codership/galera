@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2015 Codership Oy <info@codership.com>
+// Copyright (C) 2015-2019 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp" // ReplicatorSMM::InitConfig

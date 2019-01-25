@@ -727,8 +727,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
         assert(ts->depends_seqno() > 0); // must be set at unserialization
         ts->cert_bypass(true);
         ts->mark_certified();
-        gcache_.seqno_assign(ts->action().first, ts->global_seqno(),
-                             GCS_ACT_WRITESET, false);
 
         TX_SET_STATE(trx, TrxHandle::S_MUST_ABORT);
         TX_SET_STATE(trx, TrxHandle::S_ABORTING);
@@ -2977,17 +2975,27 @@ void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t seqno)
     // pending_cert_queue contains any smaller seqno.
     // This avoids the certification index to diverge
     // across nodes.
-    TrxHandleSlavePtr aborted_ts;
-    while ((aborted_ts = pending_cert_queue_.must_cert_next(seqno)) != NULL)
+    TrxHandleSlavePtr queued_ts;
+    while ((queued_ts = pending_cert_queue_.must_cert_next(seqno)) != NULL)
     {
-        log_debug << "must cert next " << seqno << " aborted ts " << *aborted_ts;
+        log_debug << "must cert next " << seqno << " aborted ts " << *queued_ts;
 
-        Certification::TestResult result;
-        result = cert_.append_trx(aborted_ts);
+        Certification::TestResult const result(cert_.append_trx(queued_ts));
 
         log_debug << "trx in pending cert queue certified, result: " << result;
 
-        cert_.set_trx_committed(*aborted_ts);
+        assert(!queued_ts->cert_bypass() ||
+               Certification::TestResult::TEST_OK == result);
+
+        bool const skip(Certification::TestResult::TEST_FAILED == result &&
+                        !(queued_ts->cert_bypass()/* expl. ROLLBACK */));
+
+        /* at this point we are still assigning seqno to buffer in order */
+        gcache_.seqno_assign(queued_ts->action().first,
+                             queued_ts->global_seqno(),
+                             GCS_ACT_WRITESET, skip);
+
+        cert_.set_trx_committed(*queued_ts);
     }
 }
 
@@ -3245,8 +3253,6 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
  //gcf788 - this must be moved to cert(), the caller method
         assert(ts->is_dummy());
         ts->verify_checksum();
-        gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
-                              GCS_ACT_WRITESET, true);
         assert(!ts->nbo_end()); // should never be skipped in seqno_assign()
         return WSREP_TRX_FAIL;
 
