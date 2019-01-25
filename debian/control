@@ -30,7 +30,8 @@ Conflicts: garbd-2,
            percona-xtradb-cluster-galera-4.x,
            percona-xtradb-cluster-garbd-2.x,
            percona-xtradb-cluster-garbd-3.x,
-           percona-xtradb-cluster-garbd-4.x
+           percona-xtradb-cluster-garbd-4.x,
+           galera-3
 Breaks: galera
 Replaces: galera
 Provides: galera-4,
@@ -56,7 +57,10 @@ Description: debugging symbols for galera-4
 
 Package: galera-arbitrator-4
 Architecture: any
-Conflicts: garbd-2, garbd2, percona-xtradb-cluster-garbd-2.x
+Conflicts: garbd-2,
+           garbd2,
+           percona-xtradb-cluster-garbd-2.x,
+           galera-arbitrator-3
 Breaks: percona-xtradb-cluster-galera-2.x
 Replaces: percona-xtradb-cluster-galera-2.x
 Depends: ${misc:Depends}, ${shlibs:Depends}
