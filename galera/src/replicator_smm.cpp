@@ -2797,7 +2797,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     // application. Otherwise last_committed_id() will return incorrect
     // value if called from view callback.
     // IST will release monitors after its view is processed
-    if (!from_IST && !st_required && group_seqno > 0)
+    if (ordered && !from_IST && !st_required && group_seqno > 0)
         cancel_seqno(group_seqno);
 
     if (!from_IST)
