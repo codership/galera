@@ -102,6 +102,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     addr_blacklist_(),
     relaying_     (false),
     isolate_      (0),
+    prim_view_reached_(false),
     proto_map_    (new ProtoMap()),
     relay_set_    (),
     segment_map_  (),
@@ -385,6 +386,7 @@ void gcomm::GMCast::close(bool force)
     proto_map_->clear();
     pending_addrs_.clear();
     remote_addrs_.clear();
+    prim_view_reached_ = false;
 }
 
 // Erase proto entry in safe manner
@@ -574,6 +576,30 @@ void gcomm::GMCast::handle_connected(Proto* rp)
     }
 }
 
+// Throw if the proto has foreign origin. If another proto entry with the
+// same handshake UUID is found from proto_map, the connection is local
+// and the function returns. If such an entry is not found, the function
+// throws.
+static void throw_if_foreign(
+    const gcomm::gmcast::ProtoMap& proto_map,
+    const gcomm::gmcast::Proto* proto,
+    const char* message)
+{
+    for (ProtoMap::const_iterator i(proto_map.begin());
+         i != proto_map.end(); ++i)
+    {
+        // The condition i->first != proto->socket()->id() is needed
+        // if this function is called after the established connection
+        // has been inserted into proto_map.
+        if (i->second->handshake_uuid() == proto->handshake_uuid() &&
+            i->first != proto->socket()->id())
+        {
+            return;
+        }
+    }
+    gu_throw_fatal << message;
+}
+
 void gcomm::GMCast::handle_established(Proto* est)
 {
     log_info << self_string() << " connection established to "
@@ -590,6 +616,13 @@ void gcomm::GMCast::handle_established(Proto* est)
 
     if (est->remote_uuid() == uuid())
     {
+        if (prim_view_reached_ == false)
+        {
+            throw_if_foreign(
+                *proto_map_, est,
+                "A node with the same UUID already exists in the cluster");
+        }
+
         std::set<std::string>::iterator
             ia_i(initial_addrs_.find(est->remote_addr()));
         if (ia_i != initial_addrs_.end())
@@ -761,7 +794,6 @@ void gcomm::GMCast::handle_failed(Proto* failed)
     erase_proto(proto_map_->find_checked(failed->socket()->id()));
     update_addresses();
 }
-
 
 bool gcomm::GMCast::is_connected(const std::string& addr, const UUID& uuid) const
 {
@@ -1607,6 +1639,7 @@ void gcomm::GMCast::handle_stable_view(const View& view)
             }
             i = i_next;
         }
+        prim_view_reached_ = true;
     }
     else if (view.type() == V_REG)
     {
