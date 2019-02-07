@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2019 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_IST_PROTO_HPP
@@ -54,6 +54,9 @@ namespace galera
 {
     namespace ist
     {
+        static int const VER21 = 4;
+        static int const VER40 = 10;
+
         class Message
         {
         public:
@@ -105,7 +108,7 @@ namespace galera
 
             size_t serial_size() const
             {
-                if (gu_likely(version_ >= 8))
+                if (gu_likely(version_ >= VER40))
                 {
                     // header: version 1 byte, type 1 byte, flags 1 byte,
                     //         ctrl field 1 byte, length 4 bytes, seqno 8 bytes
@@ -121,7 +124,7 @@ namespace galera
 
             size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset)const
             {
-                assert(version_ >= 4);
+                assert(version_ >= VER21);
 
                 size_t const orig_offset(offset);
 
@@ -130,7 +133,7 @@ namespace galera
                 offset = gu::serialize1(flags_, buf, buflen, offset);
                 offset = gu::serialize1(ctrl_,  buf, buflen, offset);
 
-                if (gu_likely(version_ >= 8))
+                if (gu_likely(version_ >= VER40))
                 {
                     offset = gu::serialize4(len_,   buf, buflen, offset);
                     offset = gu::serialize8(seqno_, buf, buflen, offset);
@@ -154,7 +157,7 @@ namespace galera
             size_t unserialize(const gu::byte_t* buf, size_t buflen,
                                size_t offset)
             {
-                assert(version_ >= 4);
+                assert(version_ >= VER21);
 
                 size_t orig_offset(offset);
 
@@ -168,7 +171,7 @@ namespace galera
                 offset = gu::unserialize1(buf, buflen, offset, flags_);
                 offset = gu::unserialize1(buf, buflen, offset, ctrl_);
 
-                if (gu_likely(version_ >= 8))
+                if (gu_likely(version_ >= VER40))
                 {
                     offset = gu::unserialize4(buf, buflen, offset, len_);
                     offset = gu::unserialize8(buf, buflen, offset, seqno_);
@@ -462,12 +465,12 @@ namespace galera
                 size_t      payload_size; /* size of the 2nd cbs buffer */
                 size_t      sent;
 
-                // for proto ver < 8 compatibility
+                // for proto ver < VER40 compatibility
                 int64_t seqno_d(WSREP_SEQNO_UNDEFINED);
 
                 if (gu_likely(Message::T_SKIP != type))
                 {
-                    assert(Message::T_TRX == type || version_ >= 8);
+                    assert(Message::T_TRX == type || version_ >= VER40);
 
                     galera::WriteSetIn ws;
                     gu::Buf tmp = { buffer.ptr(), buffer.size() };
@@ -507,17 +510,17 @@ namespace galera
                     payload_size = 0;
                     seqno_d = WSREP_SEQNO_UNDEFINED;
 
-                    /* in proto ver < 8 everything is T_TRX */
-                    if (gu_unlikely(version_ < 8)) type = Message::T_TRX;
+                    /* in proto ver < VER40 everything is T_TRX */
+                    if (gu_unlikely(version_ < VER40)) type = Message::T_TRX;
                 }
 
-                /* in version >= 8 metadata is included in Msg header, leaving
+                /* in version >= 3 metadata is included in Msg header, leaving
                  * it here for backward compatibility */
-                size_t const trx_meta_size (version_ >= 8 ? 0 :
-                                            (8 /* seqno_g */ + 8 /* seqno_d */));
+                size_t const trx_meta_size(version_ >= VER40 ? 0 :
+                                           (8 /* seqno_g */ + 8 /* seqno_d */));
 
-                uint8_t const msg_flags
-                    ((version_ >= 8 && preload_flag) ? Message::F_PRELOAD : 0);
+                uint8_t const msg_flags((version_ >= VER40 && preload_flag) ?
+                                        Message::F_PRELOAD : 0);
 
                 Ordered to_msg(version_, type, msg_flags,
                                trx_meta_size + payload_size, buffer.seqno_g());
@@ -525,7 +528,7 @@ namespace galera
                 gu::Buffer buf(to_msg.serial_size() + trx_meta_size);
                 size_t  offset(to_msg.serialize(&buf[0], buf.size(), 0));
 
-                if (gu_unlikely(version_ < 8))
+                if (gu_unlikely(version_ < VER40))
                 {
                     offset = gu::serialize8(buffer.seqno_g(),
                                             &buf[0], buf.size(), offset);
@@ -597,7 +600,7 @@ namespace galera
                     size_t  offset(0);
                     int64_t seqno_g(msg.seqno());  // compatibility with 3.x
 
-                    if (gu_unlikely(version_ < 8)) // compatibility with 3.x
+                    if (gu_unlikely(version_ < VER40)) //compatibility with 3.x
                     {
                         assert(msg.type() == Message::T_TRX);
 
@@ -695,7 +698,7 @@ namespace galera
                         }
                         else
                         {
-                            wsize = GU_WORDSIZE/8; // 4/8 bytes
+                            wsize = GU_WORDSIZE/8; // bits to bytes
                             wbuf  = gcache_.malloc(wsize);
                         }
 
@@ -768,7 +771,7 @@ namespace galera
                     case GCS_ACT_WRITESET:
                         return Message::T_TRX;
                     case GCS_ACT_CCHANGE:
-                        return (version_ >= 8 ?
+                        return (version_ >= VER40 ?
                                 Message::T_CCHANGE : Message::T_SKIP);
                     default:
                         log_error << "Unsupported message type from cache: "

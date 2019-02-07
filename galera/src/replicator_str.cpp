@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2019 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp"
@@ -26,15 +26,15 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
                                           a valid state here */
             {
-                if (protocol_version_ >= 8)
+                if (str_proto_ver_ >= 3)
                     return (local_seqno + 1 < group_seqno); // this CC will add 1
                 else
                     return (local_seqno < group_seqno);
             }
             else
             {
-                if ((protocol_version_ >= 8 && local_seqno >= group_seqno) ||
-                    (protocol_version_ <  8 && local_seqno >  group_seqno))
+                if ((str_proto_ver_ >= 3 && local_seqno >= group_seqno) ||
+                    (str_proto_ver_ <  3 && local_seqno >  group_seqno))
                 {
                     close();
                     gu_throw_fatal
@@ -417,7 +417,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 if (rcode >= 0)
                 {
                     wsrep_seqno_t const first
-                        ((protocol_version_ < 8 || cc_lowest_trx_seqno_ == 0) ?
+                        ((str_proto_ver_ < 3 || cc_lowest_trx_seqno_ == 0) ?
                          istr.last_applied() + 1 :
                          std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
                     try
@@ -427,6 +427,10 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          first,
                                          cc_seqno_,
                                          cc_lowest_trx_seqno_,
+                                         /* Historically IST messages versioned
+                                          * with the global replicator protocol.
+                                          * Need to keep it that way for backward
+                                          * compatibility */
                                          protocol_version_);
                     }
                     catch (gu::Exception& e)
@@ -457,7 +461,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            if (protocol_version_ >= 8)
+            if (str_proto_ver_ >= 3)
             {
                 if (streq->version() > 0)
                 {
@@ -501,6 +505,10 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                      preload_start,
                                      cc_seqno_,
                                      preload_start,
+                                     /* Historically IST messages are versioned
+                                      * with the global replicator protocol.
+                                      * Need to keep it that way for backward
+                                      * compatibility */
                                      protocol_version_);
                 }
                 else /* streq->version() == 0 */
@@ -540,14 +548,14 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
                                 wsrep_seqno_t const last_needed)
 {
     assert(group_uuid != GU_UUID_NIL);
-    // Up from protocol version 8 joiner is assumed to be able receive
+    // Up from STR protocol version 3 joiner is assumed to be able receive
     // some transactions to rebuild cert index, so IST receiver must be
     // prepared regardless of the group.
     wsrep_seqno_t last_applied(STATE_SEQNO());
     ist_event_queue_.reset();
     if (state_uuid_ != group_uuid)
     {
-        if (protocol_version_ < 8)
+        if (str_proto_ver_ < 3)
         {
             gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
                                    << ") does not match group state UUID ("
@@ -563,7 +571,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         assert(last_applied < last_needed);
     }
 
-    if (last_applied < 0 && protocol_version_ < 8)
+    if (last_applied < 0 && str_proto_ver_ < 3)
     {
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
@@ -571,10 +579,12 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     wsrep_seqno_t const first_needed(last_applied + 1);
 
     log_info << "####### IST uuid:" << state_uuid_ << " f: " << first_needed
-             << ", l: " << last_needed << ", p: " << protocol_version_; //remove
+             << ", l: " << last_needed << ", STRv: " << str_proto_ver_; //remove
 
+    /* Historically IST messages are versioned with the global replicator
+     * protocol. Need to keep it that way for backward compatibility */
     std::string recv_addr(ist_receiver_.prepare(first_needed, last_needed,
-                                                protocol_version_, source_id()));
+                                                protocol_version_,source_id()));
 
     std::ostringstream os;
 
@@ -916,8 +926,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
 
         // IST is prepared only with str proto ver 1 and above
-        // IST is *always* prepared at protocol version 8 or higher
-        if (STATE_SEQNO() < cc_seqno || protocol_version_ >= 8)
+        // IST is *always* prepared at str proto ver 3 or higher
+        if (STATE_SEQNO() < cc_seqno || str_proto_ver_ >= 3)
         {
             wsrep_seqno_t const ist_from(STATE_SEQNO() + 1);
             wsrep_seqno_t const ist_to(cc_seqno);

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2019 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -856,7 +856,8 @@ namespace galera
          * |                 7 |           3 |              2 |               1 |
          * |                 8 |           3 |              2 | alignment     2 |
          * |                 9 | SS keys   4 |              2 |               2 |
-         * | 4.x            10 |           5 | + CC events  3 |               2 |
+         * | 4.x            10 | PA range/ 5 | CC events /  3 |               2 |
+         * |                   | UPD keys    | idx preload    |                 |
          * |--------------------------------------------------------------------|
          */
 

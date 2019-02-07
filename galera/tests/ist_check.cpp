@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2019 Codership Oy <info@codership.com>
 //
 
 
@@ -45,17 +45,33 @@ START_TEST(test_ist_message)
     fail_unless(mu3.len()     == 1001);
 #endif /* 0 */
 
-    Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
-    fail_unless(m4.serial_size() == 12);
+    Message const m2(VER21, Message::T_HANDSHAKE, 0x2, 3, 1001);
+    size_t const s2(12);
+    fail_unless(m2.serial_size() == s2,
+                "Expected m2.serial_size() = %zd, got %zd", s2,m2.serial_size());
 
-    gu::Buffer buf(m4.serial_size());
-//    buf.clear();
-//    buf.resize(m4.serial_size());
-    m4.serialize(&buf[0], buf.size(), 0);
+    gu::Buffer buf2(m2.serial_size());
+    m2.serialize(&buf2[0], buf2.size(), 0);
 
-    Message mu4(4);
-    mu4.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(mu4.version() == 4);
+    Message mu2(VER21);
+    mu2.unserialize(&buf2[0], buf2.size(), 0);
+    fail_unless(mu2.version() == VER21);
+    fail_unless(mu2.type()    == Message::T_HANDSHAKE);
+    fail_unless(mu2.flags()   == 0x2);
+    fail_unless(mu2.ctrl()    == 3);
+    fail_unless(mu2.len()     == 1001);
+
+    Message const m4(VER40, Message::T_HANDSHAKE, 0x2, 3, 1001);
+    size_t const s4(16 + sizeof(uint64_t /* Message::checksum_t */));
+    fail_unless(m4.serial_size() == s4,
+                "Expected m3.serial_size() = %zd, got %zd", s4,m4.serial_size());
+
+    gu::Buffer buf4(m4.serial_size());
+    m4.serialize(&buf4[0], buf4.size(), 0);
+
+    Message mu4(VER40);
+    mu4.unserialize(&buf4[0], buf4.size(), 0);
+    fail_unless(mu4.version() == VER40);
     fail_unless(mu4.type()    == Message::T_HANDSHAKE);
     fail_unless(mu4.flags()   == 0x2);
     fail_unless(mu4.ctrl()    == 3);
@@ -283,9 +299,12 @@ static int select_trx_version(int protocol_version)
     case 5:
     case 6:
     case 7:
-        return 3;
     case 8:
+        return 3;
+    case 9:
         return 4;
+    case 10:
+        return 5;
     default:
         fail("unsupported replicator protocol version: %n", protocol_version);
     }
@@ -451,21 +470,27 @@ static void test_ist_common(int const version)
     unlink(gcache_receiver_file.c_str());
 }
 
-START_TEST(test_ist_v5)
-{
-    test_ist_common(5);
-}
-END_TEST
-
 START_TEST(test_ist_v7)
 {
-    test_ist_common(7);
+    test_ist_common(7);      /* trx ver: 3, STR ver: 2, alignment: none */
 }
 END_TEST
 
 START_TEST(test_ist_v8)
 {
-    test_ist_common(8);
+    test_ist_common(8);      /* trx ver: 3, STR ver: 2, alignment: 8    */
+}
+END_TEST
+
+START_TEST(test_ist_v9)
+{
+    test_ist_common(9);      /* trx ver: 4, STR ver: 2, alignment: 8    */
+}
+END_TEST
+
+START_TEST(test_ist_v10)
+{
+    test_ist_common(10);     /* trx ver: 5, STR ver: 3, alignment: 8    */
 }
 END_TEST
 
@@ -477,16 +502,18 @@ Suite* ist_suite()
     tc = tcase_create("test_ist_message");
     tcase_add_test(tc, test_ist_message);
     suite_add_tcase(s, tc);
-    tc = tcase_create("test_ist_v5");
-    tcase_set_timeout(tc, 60);
-    tcase_add_test(tc, test_ist_v5);
-    suite_add_tcase(s, tc);
     tc = tcase_create("test_ist_v7");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v7);
     tc = tcase_create("test_ist_v8");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v8);
+    tc = tcase_create("test_ist_v9");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v9);
+    tc = tcase_create("test_ist_v10");
+    tcase_set_timeout(tc, 60);
+    tcase_add_test(tc, test_ist_v10);
     suite_add_tcase(s, tc);
 
     return s;
