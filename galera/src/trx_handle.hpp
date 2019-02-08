@@ -378,6 +378,45 @@ namespace galera
             return new(buf) TrxHandleSlave(local, pool, buf);
         }
 
+        /**
+         * Adjust flags for backwards compatibility.
+         *
+         * Galera 4.x assigns some write set flags differently from
+         * 3.x. During rolling upgrade these changes need to be
+         * taken into account as 3.x originated write sets may not
+         * have all flags set which are required for replicator internal
+         * operation. The adjustment is done here in order to avoid spreading
+         * the protocol specific changes up to stack.
+         *
+         * In particular the lack of F_BEGIN flag in 3.x needs to be
+         * take care of.
+         *
+         * F_BEGIN - All of the write sets which originate from 3.x
+         *           (version < VER5) which have F_COMMIT flag set
+         *           must be assigned also F_BEGIN for internal operation.
+         *           This is safe because 3.x does not have SR or NBO
+         *           implemented, all transactions and TOI write sets
+         *           are self contained.
+         *
+         * @param version Write Set wire version
+         * @param flags Flags from write set
+         *
+         * @return Adjusted write set flags compatible with current
+         *         implementation.
+         */
+        static inline uint32_t
+        fixup_write_set_flags(int version, uint32_t flags)
+        {
+            if (version < WriteSetNG::VER5)
+            {
+                if (flags & F_COMMIT)
+                {
+                    flags |= F_BEGIN;
+                }
+            }
+            return flags;
+        }
+
         template <bool from_group>
         size_t unserialize(const gcs_action& act)
         {
@@ -395,7 +434,9 @@ namespace galera
                 case WriteSetNG::VER5:
                     write_set_.read_buf (act.buf, act.size);
                     assert(version_ == write_set_.version());
-                    write_set_flags_ = ws_flags_to_trx_flags(write_set_.flags());
+                    write_set_flags_ = fixup_write_set_flags(
+                        version_,
+                        ws_flags_to_trx_flags(write_set_.flags()));
                     source_id_       = write_set_.source_id();
                     conn_id_         = write_set_.conn_id();
                     trx_id_          = write_set_.trx_id();
