@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2019 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"
@@ -777,7 +777,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
 {
     if (first > last)
     {
-        if (version_ < 8)
+        if (version_ < VER40)
         {
             assert(0);
             gu_throw_error(EINVAL) << "sender send first greater than last: "
