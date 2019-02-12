@@ -850,7 +850,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         }
         else
         {
-            assert(sst_seqno_ > 0);
+            assert(sst_seqno_ != WSREP_SEQNO_UNDEFINED);
 
             /* There are two places where we may need to adjust GCache.
              * This is the second one.
