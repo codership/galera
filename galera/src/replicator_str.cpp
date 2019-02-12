@@ -1261,7 +1261,6 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
             record_cc_seqnos(conf.seqno, "preload");
         }
 
-        gcache_.free(const_cast<void*>(act.buf));
         ::free(view_info);
     }
 }

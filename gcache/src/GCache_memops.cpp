@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -129,14 +129,13 @@ namespace gcache
         if (gu_likely(SEQNO_NONE != bh->seqno_g))
         {
 #ifndef NDEBUG
-            if (!(seqno_released < bh->seqno_g ||
+            if (!(seqno_released + 1 == bh->seqno_g ||
                   SEQNO_NONE == seqno_released))
             {
                 log_fatal << "OOO release: seqno_released " << seqno_released
                           << ", releasing " << bh->seqno_g;
+                assert(0);
             }
-            assert(seqno_released < bh->seqno_g ||
-                   SEQNO_NONE == seqno_released);
 #endif
             new_released = bh->seqno_g;
         }
