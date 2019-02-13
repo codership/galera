@@ -45,16 +45,20 @@ namespace gcache
             assert(bh->store == BUFFER_IN_RB);
             assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
             assert(BH_is_released(bh)); // will be marked unreleased by caller
-            assert(size_used_ + bh->size <= size_cache_);
+
             size_used_ += bh->size;
+            assert(size_used_ <= size_cache_);
         }
 
         void  discard (BufferHeader* const bh)
         {
             assert (BH_is_released(bh));
-            assert (SEQNO_ILL == bh->seqno_g);
+            assert (BUFFER_IN_RB == bh->store);
+
             size_free_ += bh->size;
             assert (size_free_ <= size_cache_);
+
+            bh->seqno_g = SEQNO_ILL;
         }
 
         size_t size      () const { return size_cache_; }

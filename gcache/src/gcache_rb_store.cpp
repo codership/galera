@@ -107,11 +107,12 @@ namespace gcache
             if (gu_likely (BH_is_released(bh)))
             {
                 seqno2ptr_.erase (j);
-                empty_buffer(bh);
 
                 switch (bh->store)
                 {
-                case BUFFER_IN_RB:  discard(bh); break;
+                case BUFFER_IN_RB:
+                    discard(bh);
+                    break;
                 case BUFFER_IN_MEM:
                 {
                     MemStore* const ms(static_cast<MemStore*>(BH_ctx(bh)));
