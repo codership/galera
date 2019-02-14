@@ -211,6 +211,11 @@ if sysname == 'freebsd' or sysname == 'sunos':
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
 
+# Build shared objects with dynamic symbol dispatching disabled.
+# This enables predictable behavior upon dynamic loading with programs
+# that have own versions of commonly used libraries linked in (boost, asio, etc.)
+env.Append(SHLINKFLAGS = ' -Wl,-Bsymbolic -Wl,-Bsymbolic-functions')
+
 # Add paths is extra_sysroot argument was specified
 extra_sysroot = ARGUMENTS.get('extra_sysroot', '')
 if sysname == 'darwin' and extra_sysroot == '':
