@@ -234,7 +234,7 @@ void galera::ReplicatorSMM::shift_to_CLOSED()
 
     if (state_uuid_ != WSREP_UUID_UNDEFINED)
     {
-        st_.set (state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
+        st_.set (state_uuid_, last_committed(), safe_to_bootstrap_);
     }
 
     /* Cleanup for re-opening. */
@@ -310,7 +310,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     ssize_t err = 0;
     wsrep_status_t ret(WSREP_OK);
-    wsrep_seqno_t const seqno(STATE_SEQNO());
+    wsrep_seqno_t const seqno(last_committed());
     wsrep_uuid_t  const gcs_uuid(seqno < 0 ? WSREP_UUID_UNDEFINED :state_uuid_);
     gu::GTID      const inpos(gcs_uuid, seqno);
 
@@ -987,7 +987,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
         return retval;
     }
 
-    assert(ts->global_seqno() > STATE_SEQNO());
+    assert(ts->global_seqno() > last_committed());
     assert(ts->depends_seqno() >= 0);
 
     TX_SET_STATE(trx, TrxHandle::S_APPLYING);
@@ -1074,7 +1074,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
     assert(tsp);
     TrxHandleSlave& ts(*tsp);
 
-    assert(ts.global_seqno() > STATE_SEQNO());
+    assert(ts.global_seqno() > last_committed());
 
     log_debug << "replay trx: " << trx << " ts: " << ts;
 
@@ -1305,7 +1305,7 @@ galera::ReplicatorSMM::commit_order_enter_local(TrxHandleMaster& trx)
             }
             else throw;
         }
-        assert(ts.global_seqno() > STATE_SEQNO());
+        assert(ts.global_seqno() > last_committed());
     }
     assert(trx.locked());
 
@@ -1660,7 +1660,7 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
 
         if (gtid != 0)
         {
-            commit_monitor_.last_left_gtid(*gtid);
+            (void)last_committed_id(gtid);
         }
         ++causal_reads_;
         return WSREP_OK;
@@ -1678,9 +1678,15 @@ wsrep_status_t galera::ReplicatorSMM::sync_wait(wsrep_gtid_t* upto,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::last_committed_id(wsrep_gtid_t* gtid)
+wsrep_status_t galera::ReplicatorSMM::last_committed_id(wsrep_gtid_t* gtid) const
 {
-    commit_monitor_.last_left_gtid(*gtid);
+    // Note that we need to use apply monitor to determine last committed
+    // here. Due to group commit implementation, the commit monitor may
+    // be released before the commit has finished and the changes
+    // made by the transaction have become visible. Therefore we rely
+    // on apply monitor since it remains grabbed until the whole
+    // commit is over.
+    apply_monitor_.last_left_gtid(*gtid);
     return WSREP_OK;
 }
 
@@ -1799,7 +1805,7 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandleMaster&  trx,
     assert(trx.state() == TrxHandle::S_REPLICATING);
     assert(trx.trx_id() == static_cast<wsrep_trx_id_t>(-1));
     assert(ts.local_seqno() > -1 && ts.global_seqno() > -1);
-    assert(ts.global_seqno() > STATE_SEQNO());
+    assert(ts.global_seqno() > last_committed());
 
     CommitOrder co(ts, co_mode_);
     wsrep_status_t const retval(cert_and_catch(&trx, ts_ptr));
@@ -2554,7 +2560,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     {
         log_info << "State transfer required: "
                  << "\n\tGroup state: " << group_uuid << ":" << group_seqno
-                 << "\n\tLocal state: " << state_uuid_<< ":" << STATE_SEQNO();
+                 << "\n\tLocal state: " << state_uuid_<< ":" << last_committed();
 
         assert(!from_IST);
 
@@ -2888,7 +2894,7 @@ wsrep_seqno_t galera::ReplicatorSMM::pause()
         assert (commit_monitor_.last_left() == apply_monitor_.last_left());
     }
 
-    wsrep_seqno_t const ret(STATE_SEQNO());
+    wsrep_seqno_t const ret(last_committed());
     st_.set(state_uuid_, ret, safe_to_bootstrap_);
 
     log_info << "Provider paused at " << state_uuid_ << ':' << ret
@@ -3049,7 +3055,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     }
 
     wsrep_status_t retval(WSREP_OK);
-    bool const applicable(ts->global_seqno() > STATE_SEQNO());
+    bool const applicable(ts->global_seqno() > last_committed());
     assert(!ts->local() || applicable); // applicable can't be false for locals
 
     if (gu_unlikely (interrupted))

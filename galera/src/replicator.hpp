@@ -82,7 +82,7 @@ namespace galera
         virtual wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                          int           tout,
                                          wsrep_gtid_t* gtid) = 0;
-        virtual wsrep_status_t last_committed_id(wsrep_gtid_t* gtid) = 0;
+        virtual wsrep_status_t last_committed_id(wsrep_gtid_t* gtid) const = 0;
         virtual wsrep_status_t to_isolation_begin(TrxHandleMaster&  trx,
                                                   wsrep_trx_meta_t* meta) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandleMaster&   trx,

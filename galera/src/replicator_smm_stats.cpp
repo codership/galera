@@ -183,7 +183,9 @@ galera::ReplicatorSMM::stats_get() const
     std::vector<struct wsrep_stats_var> sv(wsrep_stats_);
 
     sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
-    sv[STATS_LAST_COMMITTED     ].value._int64  = commit_monitor_.last_left();
+    wsrep_gtid last_committed;
+    (void)last_committed_id(&last_committed);
+    sv[STATS_LAST_COMMITTED     ].value._int64  = last_committed.seqno;
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
     sv[STATS_KEYS_COUNT         ].value._int64  = keys_count_();

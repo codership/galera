@@ -21,7 +21,7 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
         if (state_uuid_ == view_info.state_id.uuid) // common history
         {
             wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
-            wsrep_seqno_t const local_seqno(STATE_SEQNO());
+            wsrep_seqno_t const local_seqno(last_committed());
 
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
                                           a valid state here */
@@ -551,7 +551,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     // Up from STR protocol version 3 joiner is assumed to be able receive
     // some transactions to rebuild cert index, so IST receiver must be
     // prepared regardless of the group.
-    wsrep_seqno_t last_applied(STATE_SEQNO());
+    wsrep_seqno_t last_applied(last_committed());
     ist_event_queue_.reset();
     if (state_uuid_ != group_uuid)
     {
@@ -766,7 +766,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
     {
         sst_state_ = SST_REQ_FAILED;
 
-        st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
+        st_.set(state_uuid_, last_committed(), safe_to_bootstrap_);
         st_.mark_safe();
 
         gu::Lock lock(closing_mutex_);
@@ -859,11 +859,11 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
              * This MUST be done before IST starts. */
             // there may be possible optimization to this when cert index
             // transfer is implemented (it may close the gap), but not by much.
-            if (!first_reset && (STATE_SEQNO() /* GCache has */ !=
+            if (!first_reset && (last_committed() /* GCache has */ !=
                                  sst_seqno_    /* current state has */))
             {
                 log_info << "Resetting GCache seqno map due to seqno gap: "
-                         << STATE_SEQNO() << ".." << sst_seqno_;
+                         << last_committed() << ".." << sst_seqno_;
                 gcache_.seqno_reset(gu::GTID(sst_uuid_, sst_seqno_));
             }
 
@@ -892,7 +892,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     else
     {
         assert (state_uuid_ == group_uuid);
-        sst_seqno_ = STATE_SEQNO();
+        sst_seqno_ = last_committed();
     }
 
     if (st_.corrupt())
@@ -920,16 +920,16 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             log_fatal << "Sanity check failed: my state UUID " << state_uuid_
                       << " is different from group state UUID " << group_uuid
                       << ". Can't continue with IST. Aborting.";
-            st_.set(state_uuid_, STATE_SEQNO(), safe_to_bootstrap_);
+            st_.set(state_uuid_, last_committed(), safe_to_bootstrap_);
             st_.mark_safe();
             abort();
         }
 
         // IST is prepared only with str proto ver 1 and above
         // IST is *always* prepared at str proto ver 3 or higher
-        if (STATE_SEQNO() < cc_seqno || str_proto_ver_ >= 3)
+        if (last_committed() < cc_seqno || str_proto_ver_ >= 3)
         {
-            wsrep_seqno_t const ist_from(STATE_SEQNO() + 1);
+            wsrep_seqno_t const ist_from(last_committed() + 1);
             wsrep_seqno_t const ist_to(cc_seqno);
             bool const do_ist(ist_from > 0 && ist_from <= ist_to);
 

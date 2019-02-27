@@ -113,7 +113,7 @@ namespace galera
         wsrep_status_t sync_wait(wsrep_gtid_t* upto,
                                  int           tout,
                                  wsrep_gtid_t* gtid);
-        wsrep_status_t last_committed_id(wsrep_gtid_t* gtid);
+        wsrep_status_t last_committed_id(wsrep_gtid_t* gtid) const;
 
         wsrep_status_t to_isolation_begin(TrxHandleMaster&  trx,
                                           wsrep_trx_meta_t* meta);
@@ -394,6 +394,10 @@ namespace galera
 
         static wsrep_cap_t capabilities(int protocol_version);
 
+        // Return the global seqno of the last transaction which has
+        // released commit order. Note that this does not mean that
+        // the transaction with given gtid has completed the commit
+        // on application side.
         wsrep_seqno_t last_committed()
         {
             return co_mode_ != CommitOrder::BYPASS ?
@@ -810,9 +814,6 @@ namespace galera
 
         wsrep_seqno_t donate_sst(void* recv_ctx, const StateRequest& streq,
                                  const wsrep_gtid_t& state_id, bool bypass);
-
-        /* local state seqno for internal use (macro mock up) */
-        wsrep_seqno_t STATE_SEQNO(void) { return commit_monitor_.last_left(); }
 
         /* Wait until NBO end criteria is met */
         wsrep_status_t wait_nbo_end(TrxHandleMaster*, wsrep_trx_meta_t*);
