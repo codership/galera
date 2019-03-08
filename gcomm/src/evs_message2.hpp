@@ -78,6 +78,8 @@ public:
         im_range_    (mn.im_range_   )
     { }
 
+    MessageNode& operator=(const MessageNode& other) = default;
+
     bool          operational() const { return operational_       ; }
     bool          suspected()   const { return suspected_         ; }
     bool          evicted()     const { return evicted_           ; }

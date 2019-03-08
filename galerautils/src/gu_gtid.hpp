@@ -49,6 +49,8 @@ public:
         offset = unserialize(buf, buflen, offset);
     }
 
+    GTID& operator=(const GTID& other) = default;
+
     const UUID& uuid()  const { return uuid_;  }
     seqno_t     seqno() const { return seqno_; }
 
