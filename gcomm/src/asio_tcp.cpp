@@ -180,7 +180,7 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
             if (!bind_ip.empty()) {
                 socket_.open(i->endpoint().protocol());
                 asio::ip::tcp::endpoint ep(
-                    asio::ip::address::from_string(bind_ip),
+                    asio::ip::address::from_string(gu::unescape_addr(bind_ip)),
                     // connect from any port.
                     0);
                 socket_.bind(ep);
