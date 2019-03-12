@@ -6,8 +6,8 @@ env = check_env.Clone()
 # Include paths
 env.Append(CPPPATH = Split('''
                               #
-                              #common
                               #/galerautils/src
+                              #/common
                            '''))
 
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
@@ -57,6 +57,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_stats_test.cpp
                               gu_thread_test.cpp
                               gu_shared_ptr_test.cpp
+                              gu_asio_test.cpp
                               gu_tests++.cpp
                            '''))
 

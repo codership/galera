@@ -154,6 +154,18 @@ bool gu::net::Sockaddr::is_anyaddr() const
     }
 }
 
+bool gu::net::Sockaddr::is_linklocal() const
+{
+    switch (sa_->sa_family)
+    {
+    case AF_INET6:
+        return IN6_IS_ADDR_LINKLOCAL(
+            &reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
+    default:
+        assert(0);
+        return false;
+    }
+}
 
 gu::net::Sockaddr::Sockaddr(const sockaddr* sa, socklen_t sa_len) :
     sa_    (0     ),
@@ -464,6 +476,11 @@ std::string gu::net::Addrinfo::to_string() const
     case AF_INET6:
         ret += "[";
         ret += dst;
+        if (addr.is_linklocal())
+        {
+            ret += "%";
+            ret += gu::to_string(addr.get_scope_id());
+        }
         ret += "]";
         break;
     default:

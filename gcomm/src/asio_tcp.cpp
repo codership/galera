@@ -176,13 +176,12 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
         }
         else
         {
-            const std::string bind_ip = uri.get_option(gcomm::Socket::OptIfAddr, "");
-            if (!bind_ip.empty()) {
+            const std::string bind_ip(uri.get_option(
+                                          gcomm::Socket::OptIfAddr, ""));
+            if (!bind_ip.empty())
+            {
                 socket_.open(i->endpoint().protocol());
-                asio::ip::tcp::endpoint ep(
-                    asio::ip::address::from_string(bind_ip),
-                    // connect from any port.
-                    0);
+                asio::ip::tcp::endpoint ep(gu::make_address(bind_ip), 0);
                 socket_.bind(ep);
             }
             socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
