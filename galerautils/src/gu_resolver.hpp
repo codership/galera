@@ -16,6 +16,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <cassert>
 
 #include <string>
 
@@ -177,6 +178,7 @@ public:
     bool is_multicast() const;
     bool is_broadcast() const;
     bool is_anyaddr()   const;
+    bool is_linklocal() const;
 
     static Sockaddr get_anyaddr(const Sockaddr& sa)
     {
@@ -194,6 +196,18 @@ public:
             gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family;
         }
         return ret;
+    }
+
+    uint32_t get_scope_id() const
+    {
+        switch(sa_->sa_family)
+        {
+        case AF_INET6:
+            return reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_scope_id;
+        default:
+            assert(0);
+            return 0;
+        }
     }
 
     Sockaddr& operator=(const Sockaddr& sa)

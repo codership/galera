@@ -89,11 +89,10 @@ void gcomm::AsioUdpSocket::connect(const gu::URI& uri)
     asio::ip::udp::socket::non_blocking_io cmd(true);
     socket_.io_control(cmd);
 
-    const std::string if_addr(
-        gu::unescape_addr(
+    const asio::ip::address local_if(
+        gu::make_address(
             uri.get_option("socket.if_addr",
                            gu::any_addr(conn_i->endpoint().address()))));
-    asio::ip::address local_if(asio::ip::address::from_string(if_addr));
 
     if (is_multicast(conn_i->endpoint()) == true)
     {

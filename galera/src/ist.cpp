@@ -271,7 +271,7 @@ IST_determine_recv_bind(gu::Config& conf)
         recv_bind += ":" + gu::to_string(port);
     }
 
-	log_info<< "IST receiver bind using " << recv_bind;
+    log_info<< "IST receiver bind using " << recv_bind;
     return recv_bind;
 }
 

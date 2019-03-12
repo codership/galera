@@ -477,6 +477,7 @@ START_TEST(uri_IPv6)
     std::string const localhost_unescaped("::1");
     std::string const default_unescaped("::");
     std::string const invalid("[2001:db8:85a3::8a2e:370:7334[:789");
+    std::string const link_local_with_scheme("[fe80::fc87:f2ff:fe85:6ba6%lxdbr0]");
 
     try
     {
@@ -548,6 +549,16 @@ START_TEST(uri_IPv6)
     catch (gu::Exception& e)
     {
         fail_if (e.get_errno() != EINVAL);
+    }
+
+    try
+    {
+        URI u(link_local_with_scheme, false);
+        fail_unless(u.get_host() == link_local_with_scheme);
+    }
+    catch (const gu::Exception& e)
+    {
+        fail(e.what());
     }
 }
 END_TEST

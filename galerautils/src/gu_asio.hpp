@@ -10,6 +10,8 @@
 #ifndef GU_ASIO_HPP
 #define GU_ASIO_HPP
 
+#include "gu_config.hpp"
+
 #include "gu_macros.h" // gu_likely()
 #include "common.h"    //
 
@@ -150,6 +152,12 @@ namespace gu
         pos = ret.find(']');
         if (pos != std::string::npos) ret.erase(pos, 1);
         return ret;
+    }
+
+    // Construct asio::ip::address from address string
+    static inline asio::ip::address make_address(const std::string& addr)
+    {
+        return asio::ip::address::from_string(gu::unescape_addr(addr));
     }
 
     //
