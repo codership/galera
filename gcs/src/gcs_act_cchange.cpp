@@ -255,8 +255,9 @@ gcs_act_cchange::write(void** buf) const
     checksum_t check;
     _checksum(cc_ver, *buf, check_offset, check);
 
-    log_info << "Writing down CC checksum: " << gu::Hexdump(check, sizeof(check))
-             << " at offset " << check_offset;
+    log_debug << "Writing down CC checksum: "
+              << gu::Hexdump(check, sizeof(check))
+              << " at offset " << check_offset;
 
     std::copy(check, check + check_len, b); b += check_len;
 
@@ -290,3 +291,14 @@ gcs_act_cchange::operator==(const gcs_act_cchange& other) const
         );
 }
 
+std::ostream&
+operator <<(std::ostream& os, const struct gcs_act_cchange& cc)
+{
+    os << "Version(repl,appl): "
+        << cc.repl_proto_ver << ',' << cc.appl_proto_ver << '\n'
+        << "GTID: " << cc.uuid << ':' << cc.seqno << ", "
+        << "conf ID: " << cc.conf_id << '\n'
+        << "Vote(seqno:res): " << cc.vote_seqno << ':' << cc.vote_res << '\n'
+        << "Members #: " << cc.memb.size();
+    return os;
+}

@@ -509,7 +509,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     }
     else {
         // Self-leave message
-        gu_info ("Received self-leave message.");
+        gu_info ("New SELF-LEAVE.");
         assert (0 == new_nodes_num);
         assert (!prim_comp);
     }

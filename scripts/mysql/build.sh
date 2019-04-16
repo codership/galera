@@ -435,16 +435,15 @@ then
         && BUILD_OPT="-DCMAKE_BUILD_TYPE=Debug -DDEBUG_EXTNAME=OFF" \
         || BUILD_OPT="-DCMAKE_BUILD_TYPE=RelWithDebInfo" # like in RPM spec
 
-        BUILD_OPT+=" -DWITH_WSREP=1"
         BUILD_OPT+=" -DWITH_EXTRA_CHARSETS=all"
         BUILD_OPT+=" -DMYSQL_MAINTAINER_MODE=0"
         BUILD_OPT+=" -DWITH_ZLIB=system"
 
         if [ "$MYSQL" == "mysql" ] # remove this distinction when MySQL
         then                       # fixes its SSL support
-            BUILD_OPT="-DWITH_SSL=bundled"
+            BUILD_OPT+="-DWITH_SSL=bundled"
         else
-            BUILD_OPT="-DWITH_SSL=system"
+            BUILD_OPT+="-DWITH_SSL=system"
         fi
 
         if [ "$MYSQL" = "mysql" ]
@@ -488,6 +487,10 @@ then
         # (at least it distinguishes between gcc/clang)
         ln -sf $(which ccache || which $CC)  $(basename $CC)
         ln -sf $(which ccache || which $CXX) $(basename $CXX)
+
+        # to make sure debug build has nothing optimized out -
+        # only CPPFLAGS seems to let to OVERRIDE optimization flag with cmake
+        [ "$DEBUG" = "yes" ] && CPPFLAGS="${CPPFLAGS:-""} -O0"
 
         cmake \
             -DCMAKE_C_COMPILER=$(basename $CC) \

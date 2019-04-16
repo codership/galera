@@ -449,7 +449,7 @@ gcs_sm_continue (gcs_sm_t* sm)
         sm->stats.paused_ns += gu_time_monotonic() - sm->stats.pause_start;
     }
     else {
-        gu_info ("Trying to continue unpaused monitor");
+        gu_debug("Trying to continue unpaused monitor");
     }
     GCS_SM_HIST_LOG("resumed");
     gu_mutex_unlock (&sm->lock);

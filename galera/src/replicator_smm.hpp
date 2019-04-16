@@ -90,9 +90,9 @@ namespace galera
         }
 
         void apply_trx(void* recv_ctx, TrxHandleSlave& trx);
-        void handle_apply_error(TrxHandleSlave&    trx,
-                                const wsrep_buf_t& error_buf,
-                                const std::string& custom_msg);
+        wsrep_status_t handle_apply_error(TrxHandleSlave&    trx,
+                                          const wsrep_buf_t& error_buf,
+                                          const std::string& custom_msg);
         void process_apply_error(TrxHandleSlave&, const wsrep_buf_t&);
 
         wsrep_status_t send(TrxHandleMaster& trx, wsrep_trx_meta_t*);
@@ -342,6 +342,12 @@ namespace galera
             st_.mark_corrupt();
             gu::Lock lock(closing_mutex_);
             start_closing();
+        }
+
+        void on_inconsistency()
+        {
+            cert_.mark_inconsistent();
+            mark_corrupt_and_close();
         }
 
         bool corrupt() const { return st_.corrupt(); }
