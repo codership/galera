@@ -7,6 +7,7 @@
 #include "gu_utils.hpp"
 #include "gu_string_utils.hpp"
 #include "gu_throw.hpp"
+#include "gu_logger.hpp"
 
 #include <iostream>
 #include <vector>
@@ -78,8 +79,11 @@ gu::ThreadSchedparam gu::thread_get_schedparam(pthread_t thd)
     return ThreadSchedparam(policy, sp.sched_priority);
 }
 
+static bool schedparam_not_supported(false);
+
 void gu::thread_set_schedparam(pthread_t thd, const gu::ThreadSchedparam& sp)
 {
+    if (schedparam_not_supported) return;
 #if defined(__sun__)
     struct sched_param spstr = { sp.prio(), { 0, } /* sched_pad array */};
 #else
@@ -88,6 +92,17 @@ void gu::thread_set_schedparam(pthread_t thd, const gu::ThreadSchedparam& sp)
     int err;
     if ((err = pthread_setschedparam(thd, sp.policy(), &spstr)) != 0)
     {
-        gu_throw_error(err) << "Failed to set thread schedparams " << sp;
+        if (err == ENOSYS)
+        {
+            log_warn << "Function pthread_setschedparam() is not implmented "
+                     << "in this system. Future attempts to change scheduling "
+                     << "priority will be no-op";
+
+            schedparam_not_supported = true;
+        }
+        else
+        {
+            gu_throw_error(err) << "Failed to set thread schedparams " << sp;
+        }
     }
 }
