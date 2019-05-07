@@ -100,7 +100,8 @@ public:
         propagate_remote_ (false),
         tp_               (tp),
         link_map_         (),
-        tstamp_           (gu::datetime::Date::now()),
+        send_tstamp_      (gu::datetime::Date::now()),
+        recv_tstamp_      (gu::datetime::Date::now()),
         gmcast_           (gmcast)
     { }
 
@@ -162,8 +163,10 @@ public:
         return ret;
     }
     int version() const { return version_; }
-    void set_tstamp(gu::datetime::Date ts) { tstamp_ = ts; }
-    gu::datetime::Date tstamp() const { return tstamp_; }
+    void set_recv_tstamp(gu::datetime::Date ts) { recv_tstamp_ = ts; }
+    gu::datetime::Date recv_tstamp() const { return recv_tstamp_; }
+    void set_send_tstamp(gu::datetime::Date ts) { send_tstamp_ = ts; }
+    gu::datetime::Date send_tstamp() const { return send_tstamp_; }
 private:
     friend std::ostream& operator<<(std::ostream&, const Proto&);
     Proto(const Proto&);
@@ -183,7 +186,8 @@ private:
     bool              propagate_remote_;
     SocketPtr         tp_;
     LinkMap           link_map_;
-    gu::datetime::Date tstamp_;
+    gu::datetime::Date send_tstamp_;
+    gu::datetime::Date recv_tstamp_;
     GMCast&     gmcast_;
 };
 

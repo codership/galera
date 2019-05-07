@@ -480,7 +480,8 @@ bool gcomm::GMCast::is_not_own_and_duplicate_exists(
 void gcomm::GMCast::erase_proto(gmcast::ProtoMap::iterator i)
 {
     Proto* p(ProtoMap::value(i));
-    std::set<Socket*>::iterator si(relay_set_.find(p->socket().get()));
+    RelayEntry e(p, p->socket().get());
+    RelaySet::iterator si(relay_set_.find(e));
     if (si != relay_set_.end())
     {
         relay_set_.erase(si);
@@ -991,25 +992,25 @@ void gcomm::GMCast::update_addresses()
     if (mcast_)
     {
         log_debug << mcast_addr_;
-        local_segment.push_back(mcast_.get());
+        local_segment.push_back(RelayEntry(0, mcast_.get()));
     }
 
     self_index_ = 0;
     for (ProtoMap::const_iterator i(proto_map_->begin()); i != proto_map_->end();
          ++i)
     {
-        const Proto& p(*ProtoMap::value(i));
+        Proto* p(ProtoMap::value(i));
 
-        log_debug << "Proto: " << p;
+        log_debug << "Proto: " << *p;
 
-        if (p.remote_segment() == segment_)
+        if (p->remote_segment() == segment_)
         {
-            if (p.state() == Proto::S_OK &&
-                (p.mcast_addr() == "" ||
-                 p.mcast_addr() != mcast_addr_))
+            if (p->state() == Proto::S_OK &&
+                (p->mcast_addr() == "" ||
+                 p->mcast_addr() != mcast_addr_))
             {
-                local_segment.push_back(p.socket().get());
-                if (p.remote_uuid() < uuid())
+                local_segment.push_back(RelayEntry(p, p->socket().get()));
+                if (p->remote_uuid() < uuid())
                 {
                     ++self_index_;
                 }
@@ -1017,10 +1018,10 @@ void gcomm::GMCast::update_addresses()
         }
         else
         {
-            if (p.state() == Proto::S_OK)
+            if (p->state() == Proto::S_OK)
             {
-                Segment& remote_segment(segment_map_[p.remote_segment()]);
-                remote_segment.push_back(p.socket().get());
+                Segment& remote_segment(segment_map_[p->remote_segment()]);
+                remote_segment.push_back(RelayEntry(p, p->socket().get()));
             }
         }
     }
@@ -1166,19 +1167,33 @@ void gcomm::GMCast::check_liveness()
         Proto* p(ProtoMap::value(i));
         if (p->state() > Proto::S_INIT &&
             p->state() < Proto::S_FAILED &&
-            p->tstamp() + peer_timeout_ < now)
+            p->recv_tstamp() + peer_timeout_ < now)
         {
+            gcomm::SocketStats stats(p->socket()->stats());
             log_info << self_string()
                      << " connection to peer "
                      << p->remote_uuid() << " with addr "
                      << p->remote_addr()
-                     << " timed out, no messages seen in " << peer_timeout_;
+                     << " timed out, no messages seen in " << peer_timeout_
+                     << ", socket stats: "
+                     << stats;
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }
         else if (p->state() == Proto::S_OK)
         {
-            if (p->tstamp() + peer_timeout_*2/3 < now)
+            gcomm::SocketStats stats(p->socket()->stats());
+            if (stats.send_queue_length >= 2048)
+            {
+                log_info << self_string()
+                         << " peer "
+                         << p->remote_uuid() << " with addr "
+                         << p->remote_addr()
+                         << ", socket stats: "
+                         << stats;
+            }
+            if ((p->recv_tstamp() + peer_timeout_*2/3 < now) ||
+                (p->send_tstamp() + peer_timeout_*1/3 < now))
             {
                 p->send_keepalive();
             }
@@ -1256,7 +1271,7 @@ void gcomm::GMCast::check_liveness()
             log_debug << "relay set maxel :" << *p << " count: "
                       << CmpUuidCounts(nonlive_uuids, segment_).count(p);
 
-            relay_set_.insert(p->socket().get());
+            relay_set_.insert(RelayEntry(p, p->socket().get()));
             const LinkMap& lm(p->link_map());
             for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end();
                  ++lm_i)
@@ -1290,13 +1305,17 @@ gu::datetime::Date gcomm::GMCast::handle_timers()
 }
 
 
-void send(gcomm::Socket* s, gcomm::Datagram& dg)
+void gcomm::GMCast::send(const RelayEntry& re, gcomm::Datagram& dg)
 {
     int err;
-    if ((err = s->send(dg)) != 0)
+    if ((err = re.socket->send(dg)) != 0)
     {
-        log_debug << "failed to send to " << s->remote_addr()
+        log_debug << "failed to send to " << re.socket->remote_addr()
                   << ": (" << err << ") " << strerror(err);
+    }
+    else
+    {
+        re.proto->set_send_tstamp(gu::datetime::Date::monotonic());
     }
 }
 
@@ -1317,15 +1336,16 @@ void gcomm::GMCast::relay(const Message& msg,
     if (msg.flags() & Message::F_RELAY)
     {
         gu_trace(push_header(relay_msg, relay_dg));
-        for (SegmentMap::iterator i(segment_map_.begin());
-             i != segment_map_.end(); ++i)
+        for (SegmentMap::iterator segment_i(segment_map_.begin());
+             segment_i != segment_map_.end(); ++segment_i)
         {
-            Segment& segment(i->second);
-            for (Segment::iterator j(segment.begin()); j != segment.end(); ++j)
+            Segment& segment(segment_i->second);
+            for (Segment::iterator target_i(segment.begin());
+                 target_i != segment.end(); ++target_i)
             {
-                if ((*j)->id() != exclude_id)
+                if ((*target_i).socket->id() != exclude_id)
                 {
-                    send(*j, relay_dg);
+                    send(*target_i, relay_dg);
                 }
             }
         }
@@ -1338,10 +1358,13 @@ void gcomm::GMCast::relay(const Message& msg,
             // nodes in local segment that are not directly reachable
             relay_msg.set_flags(relay_msg.flags() | Message::F_RELAY);
             gu_trace(push_header(relay_msg, relay_dg));
-            for (std::set<Socket*>::iterator ri(relay_set_.begin());
-                 ri != relay_set_.end(); ++ri)
+            for (RelaySet::iterator relay_i(relay_set_.begin());
+                 relay_i != relay_set_.end(); ++relay_i)
             {
-                send(*ri, relay_dg);
+                if ((*relay_i).socket->id() != exclude_id)
+                {
+                    send(*relay_i, relay_dg);
+                }
             }
             gu_trace(pop_header(relay_msg, relay_dg));
             relay_msg.set_flags(relay_msg.flags() & ~Message::F_RELAY);
@@ -1461,7 +1484,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                           Datagram(dg, dg.offset() + msg.serial_size()),
                           id);
                 }
-                p->set_tstamp(gu::datetime::Date::now());
+                p->set_recv_tstamp(gu::datetime::Date::monotonic());
                 send_up(Datagram(dg, dg.offset() + msg.serial_size()),
                         ProtoUpMeta(msg.source_uuid()));
                 return;
@@ -1470,7 +1493,7 @@ void gcomm::GMCast::handle_up(const void*        id,
             {
                 try
                 {
-                    p->set_tstamp(gu::datetime::Date::now());
+                    p->set_recv_tstamp(gu::datetime::Date::monotonic());
                     gu_trace(p->handle_message(msg));
                 }
                 catch (const gu::Exception& e)
@@ -1540,7 +1563,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
     {
         msg.set_flags(msg.flags() | Message::F_RELAY);
         gu_trace(push_header(msg, dg));
-        for (std::set<Socket*>::iterator ri(relay_set_.begin());
+        for (RelaySet::iterator ri(relay_set_.begin());
              ri != relay_set_.end(); ++ri)
         {
             send(*ri, dg);

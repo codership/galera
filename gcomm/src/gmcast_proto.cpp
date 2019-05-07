@@ -32,7 +32,8 @@ std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
        << "st=" << gcomm::gmcast::Proto::to_string(p.state_) << ","
        << "pr=" << p.propagate_remote_ << ","
        << "tp=" << p.tp_ << ","
-       << "ts=" << p.tstamp_;
+       << "rts=" << p.recv_tstamp_ << ","
+       << "sts=" << p.send_tstamp_;
     return os;
 }
 

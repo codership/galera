@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2019 Codership Oy <info@codership.com>
 //
 
 //!
@@ -23,7 +23,45 @@ namespace gcomm
     class Socket;                 //!< Socket interface
     typedef gu::shared_ptr<Socket>::type SocketPtr;
     class Acceptor;               //!< Acceptor interfacemat
+
+    /**
+     * Statistics for socket connection. Currently relevant only
+     * to TCP stream sockets and available on Linux/FreeBSD only.
+     */
+    typedef struct socket_stats_st
+    {
+        /* Stats from kernel - tcp_info for TCP sockets. */
+        long rtt;     /** RTT in usecs. */
+        long rttvar;  /** RTT variance in usecs. */
+        long rto;     /** Retransmission timeout in usecs. */
+        long lost;    /** Estimate of lost packets (Linux only). */
+        long last_data_recv; /** Time since last received data in msecs. */
+        /* Stats from userspace */
+        long last_queued_since;    /** Last queued since in msecs           */
+        long last_delivered_since; /** Last delivered since in msecs        */
+        long send_queue_length;    /** Number of messaged pending for send. */
+        socket_stats_st() : rtt(), rttvar(), rto(), lost(), last_data_recv(),
+                            last_queued_since(),
+                            last_delivered_since(),
+                            send_queue_length()
+        { }
+    } SocketStats;
+    static inline
+    std::ostream& operator<<(std::ostream& os,
+                             const SocketStats& stats)
+    {
+        return (os
+                << "rtt: " << stats.rtt
+                << " rttvar: " << stats.rttvar
+                << " rto: " << stats.rto
+                << " lost: " << stats.lost
+                << " last_data_recv: " << stats.last_data_recv
+                << " last_queued_since: " << stats.last_queued_since
+                << " last_delivered_since: " << stats.last_delivered_since
+                << " send_queue_length: " << stats.send_queue_length);
+    }
 }
+
 
 
 class gcomm::Socket
@@ -38,7 +76,7 @@ public:
         S_CLOSING
     } State;
 
-    /*!
+    /**
      * Symbolic option names (to specify in URI)
      */
     static const std::string OptNonBlocking; /*! socket.non_blocking */
@@ -65,10 +103,10 @@ public:
     virtual std::string remote_addr() const = 0;
     virtual State state() const = 0;
     virtual SocketId id() const = 0;
+    virtual SocketStats stats() const = 0;
 protected:
     const gu::URI uri_;
 };
-
 
 class gcomm::Acceptor
 {

@@ -16,8 +16,10 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const gu::URI& uri)
     socket_      (net.io_service_),
     ssl_socket_  (0),
     send_q_      (),
+    last_queued_tstamp_(),
     recv_buf_    (net_.mtu() + NetHeader::serial_size_),
     recv_offset_ (0),
+    last_delivered_tstamp_(),
     state_       (S_CLOSED),
     local_addr_  (),
     remote_addr_ ()
@@ -97,6 +99,7 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
              << " compression: "
              << (compression_name != NULL ? compression_name : "none");
     state_ = S_CONNECTED;
+    init_tstamps();
     net_.dispatch(id(), Datagram(), ProtoUpMeta(ec.value()));
     async_receive();
 }
@@ -135,6 +138,7 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
                           << remote_addr() << " local endpoint "
                           << local_addr();
                 state_ = S_CONNECTED;
+                init_tstamps();
                 net_.dispatch(id(), Datagram(), ProtoUpMeta(ec.value()));
                 async_receive();
 
@@ -393,6 +397,7 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         hdr.set_crc32(crc32(net_.checksum_, dg), net_.checksum_);
     }
 
+    last_queued_tstamp_ = gu::datetime::Date::monotonic();
     send_q_.push_back(dg); // makes copy of dg
     Datagram& priv_dg(send_q_.back());
 
@@ -480,6 +485,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                 }
             }
             ProtoUpMeta um;
+            last_delivered_tstamp_ = gu::datetime::Date::monotonic();
             net_.dispatch(id(), dg, um);
             recv_offset_ -= NetHeader::serial_size_ + hdr.len();
 
@@ -722,7 +728,32 @@ void gcomm::AsioTcpSocket::assign_remote_addr()
     }
 }
 
-
+gcomm::SocketStats gcomm::AsioTcpSocket::stats() const
+{
+    SocketStats ret;
+#if defined(__linux__) || defined(__FreeBSD__)
+    struct tcp_info tcpi;
+    memset(&tcpi, 0, sizeof(tcpi));
+    socklen_t tcpi_len(sizeof(tcpi));
+    int native_fd(ssl_socket_ ?
+                  const_cast<basic_socket_t&>(ssl_socket_->lowest_layer()).native() :
+                  const_cast<asio::ip::tcp::socket&>(socket_).native());
+    if (getsockopt(native_fd, SOL_TCP, TCP_INFO, &tcpi, &tcpi_len) == 0)
+    {
+        ret.rtt            = tcpi.tcpi_rtt;
+        ret.rttvar         = tcpi.tcpi_rttvar;
+        ret.rto            = tcpi.tcpi_rto;
+        ret.lost           = tcpi.tcpi_lost;
+        ret.last_data_recv = tcpi.tcpi_last_data_recv;
+        gu::datetime::Date now(gu::datetime::Date::monotonic());
+        Critical<AsioProtonet> crit(net_);
+        ret.last_queued_since = (now - last_queued_tstamp_).get_nsecs();
+        ret.last_delivered_since = (now - last_delivered_tstamp_).get_nsecs();
+        ret.send_queue_length = send_q_.size();
+    }
+#endif /* __linux__ || __FreeBSD__ */
+    return ret;
+}
 
 gcomm::AsioTcpAcceptor::AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri)
     :

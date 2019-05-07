@@ -188,9 +188,22 @@ namespace gcomm
         bool              prim_view_reached_;
 
         gmcast::ProtoMap*  proto_map_;
-        std::set<Socket*>   relay_set_;
+        struct RelayEntry
+        {
+            gmcast::Proto* proto;
+            gcomm::Socket* socket;
+            RelayEntry(gmcast::Proto* p, gcomm::Socket* s)
+                : proto(p), socket(s) { }
+            bool operator<(const RelayEntry& other) const
+            {
+                return (socket < other.socket);
+            }
+        };
+        void send(const RelayEntry&, gcomm::Datagram&);
+        typedef std::set<RelayEntry> RelaySet;
+        RelaySet relay_set_;
 
-        typedef std::vector<Socket*> Segment;
+        typedef std::vector<RelayEntry> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;
         SegmentMap segment_map_;
         // self index in local segment when ordered by UUID

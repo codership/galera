@@ -63,6 +63,7 @@ public:
     std::string remote_addr() const;
     State state() const { return state_; }
     SocketId id() const { return &socket_; }
+    SocketStats stats() const;
 private:
     friend class gcomm::AsioTcpAcceptor;
     friend class gcomm::AsioPostForSendHandler;
@@ -71,6 +72,11 @@ private:
     void operator=(const AsioTcpSocket&);
 
     void set_socket_options();
+    void init_tstamps()
+    {
+        gu::datetime::Date now(gu::datetime::Date::monotonic());
+        last_queued_tstamp_ = last_delivered_tstamp_ = now;
+    }
     void read_one(gu::array<asio::mutable_buffer, 1>::type& mbs);
     void write_one(const gu::array<asio::const_buffer, 2>::type& cbs);
     void close_socket();
@@ -91,8 +97,10 @@ private:
     asio::ip::tcp::socket                     socket_;
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
     std::deque<Datagram>                      send_q_;
+    gu::datetime::Date                        last_queued_tstamp_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;
+    gu::datetime::Date                        last_delivered_tstamp_;
     State                                     state_;
     // Querying addresses from failed socket does not work,
     // so need to maintain copy for diagnostics logging

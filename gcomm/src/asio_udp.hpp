@@ -46,7 +46,7 @@ public:
     std::string remote_addr() const;
     State state() const { return state_; }
     SocketId id() const { return &socket_; }
-
+    SocketStats stats() const { return SocketStats(); }
 private:
     AsioProtonet&            net_;
     State                    state_;
