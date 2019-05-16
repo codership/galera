@@ -93,6 +93,9 @@ link_arch    = ''
 # Build directory
 build_dir    = ''
 
+# Version script file name
+galera_script = 'galera-sym.map'
+
 
 #
 # Read commandline options
@@ -216,11 +219,6 @@ if sysname == 'freebsd' or sysname == 'sunos':
     env.Append(CPPPATH = ['/usr/local/include'])
 if sysname == 'sunos':
    env.Replace(SHLINKFLAGS = '-shared ')
-
-# Build shared objects with dynamic symbol dispatching disabled.
-# This enables predictable behavior upon dynamic loading with programs
-# that have own versions of commonly used libraries linked in (boost, asio, etc.)
-env.Append(SHLINKFLAGS = ' -Wl,-Bsymbolic -Wl,-Bsymbolic-functions')
 
 # Add paths is extra_sysroot argument was specified
 extra_sysroot = ARGUMENTS.get('extra_sysroot', '')
@@ -388,6 +386,15 @@ def CheckSetTmpEcdh(context):
 int main() { SSL_CTX* ctx=NULL; EC_KEY* ecdh=NULL; return !SSL_CTX_set_tmp_ecdh(ctx,ecdh); }
 """
     context.Message('Checking for SSL_CTX_set_tmp_ecdh_() ... ')
+    result = context.TryLink(test_source, '.cpp')
+    context.Result(result)
+    return result
+
+def CheckVersionScript(context):
+    test_source = """
+int main() { return 0; }
+"""
+    context.Message('Checking for --version-script linker option ... ')
     result = context.TryLink(test_source, '.cpp')
     context.Result(result)
     return result
@@ -695,6 +702,21 @@ if sysname != 'darwin':
 conf.Finish()
 
 #
+# Check version script linker option
+#
+
+test_env = env.Clone()
+# Append version script flags to general link options for test
+test_env.Append(LINKFLAGS = ' -Wl,--version-script=' + galera_script)
+
+conf = Configure(test_env, custom_tests = {
+    'CheckVersionScript': CheckVersionScript,
+})
+
+has_version_script = conf.CheckVersionScript()
+conf.Finish()
+
+#
 # this follows recipes from http://www.scons.org/wiki/UnitTests
 #
 
@@ -716,6 +738,7 @@ else:
 check_env.Append(BUILDERS = {'Test' :  bld})
 
 Export('check_env')
+Export('has_version_script galera_script')
 
 #
 # If deterministic_tests is given, export GALERA_TEST_DETERMINISTIC
