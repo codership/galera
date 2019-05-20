@@ -93,8 +93,15 @@ link_arch    = ''
 # Build directory
 build_dir    = ''
 
-# Version script file name
-galera_script = 'galera-sym.map'
+# Version script file
+galera_script = File('#/galera-sym.map').abspath
+with open(galera_script, 'w') as f:
+    f.write('''{
+    global: wsrep_loader;
+            wsrep_interface_version;
+    local:  *;
+};
+''')
 
 
 #
