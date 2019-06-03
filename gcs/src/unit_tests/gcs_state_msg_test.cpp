@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2013 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2019 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -8,7 +8,7 @@
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_state_msg.hpp"
 
-static int const QUORUM_VERSION = 4;
+static int const QUORUM_VERSION = 6;
 
 START_TEST (gcs_state_msg_test_basic)
 {
@@ -36,7 +36,10 @@ START_TEST (gcs_state_msg_test_basic)
                                        "192.168.0.1:2345", // inc_addr
                                        0,                  // gcs_proto_ver
                                        1,                  // repl_proto_ver
-                                       1,                  // appl_proto_ver
+                                       2,                  // appl_proto_ver
+                                       0,                  // prim_gcs_ver
+                                       0,                  // prim_repl_ver
+                                       1,                  // prim_appl_ver
                                        0,                  // desync_count
                                        GCS_STATE_FREP      // flags
         );
@@ -60,9 +63,16 @@ START_TEST (gcs_state_msg_test_basic)
     fail_if (send_state->flags          != recv_state->flags);
     fail_if (send_state->gcs_proto_ver  != recv_state->gcs_proto_ver);
     fail_if (send_state->repl_proto_ver != recv_state->repl_proto_ver);
+    fail_if (recv_state->repl_proto_ver != 1, "repl_proto_ver: %d",
+             recv_state->repl_proto_ver);
     fail_if (send_state->appl_proto_ver != recv_state->appl_proto_ver);
-    fail_if (recv_state->appl_proto_ver != 1, "appl_proto_ver: %d",
+    fail_if (recv_state->appl_proto_ver != 2, "appl_proto_ver: %d",
              recv_state->appl_proto_ver);
+    fail_if (send_state->prim_gcs_ver  != recv_state->prim_gcs_ver);
+    fail_if (send_state->prim_repl_ver != recv_state->prim_repl_ver);
+    fail_if (send_state->prim_appl_ver != recv_state->prim_appl_ver);
+    fail_if (recv_state->prim_appl_ver != 1, "prim_appl_ver: %d",
+             recv_state->prim_appl_ver);
     fail_if (send_state->received       != recv_state->received,
              "Last received seqno: sent %lld, recv %lld",
              send_state->received, recv_state->received);
@@ -123,21 +133,24 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno - 1, act2_seqno - 1, act2_seqno-1,
                                   5, GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 0, 0);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 1, 3,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 2, 5,
                                   GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 0, 1);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Inherited 1");
@@ -160,7 +173,8 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim1_seqno, act1_seqno, act1_seqno - 3, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_DONOR,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Inherited 2");
@@ -183,7 +197,8 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno - 1, act2_seqno - 1, -1, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node0", "",
-                                  0, 1, 1, 0, 0);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[0]);
 
     gu_info ("                  Inherited 3");
@@ -206,7 +221,8 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim1_seqno, act1_seqno, act1_seqno -3, 3,
                                   GCS_NODE_STATE_JOINED, GCS_NODE_STATE_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Inherited 4");
@@ -229,7 +245,8 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   prim2_seqno, act2_seqno, act2_seqno - 2, 5,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
                                   "node2", "",
-                                  0, 1, 1, 0, 0);
+                                  0, 1, 1, 0, 1, 0,
+                                  0, 0);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Inherited 5");
@@ -283,21 +300,24 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 0, 0);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 3, 3,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, -1, 5,
                                   GCS_NODE_STATE_JOINER,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 0, 1);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Remerged 1");
@@ -320,7 +340,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim2_seqno - 1, act2_seqno - 1, -1, 5,
                                   GCS_NODE_STATE_DONOR, GCS_NODE_STATE_NON_PRIM,
                                   "node0", "",
-                                  0, 1, 1, 3, 0);
+                                  0, 1, 1, 0, 0, 0,
+                                  3, 0);
     fail_if(NULL == st[0]);
     fail_if(3 != gcs_state_msg_get_desync_count(st[0]));
 
@@ -344,7 +365,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim2_seqno, act2_seqno, act2_seqno - 3, 5,
                                   GCS_NODE_STATE_JOINED,GCS_NODE_STATE_NON_PRIM,
                                   "node2", "",
-                                  0, 1, 1, 0, 1);
+                                  0, 1, 1, 0, 0, 0,
+                                  0, 1);
     fail_if(NULL == st[2]);
 
     gu_info ("                  Remerged 3");
@@ -367,7 +389,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim1_seqno, act1_seqno, act1_seqno, 3,
                                   GCS_NODE_STATE_SYNCED,GCS_NODE_STATE_NON_PRIM,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Remerged 4");
@@ -390,7 +413,8 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   prim1_seqno, act1_seqno, act1_seqno - 2, 3,
                                   GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_JOINER,
                                   "node1", "",
-                                  0, 1, 0, 0, 0);
+                                  0, 1, 0, 0, 0, 0,
+                                  0, 0);
     fail_if(NULL == st[1]);
 
     gu_info ("                  Remerged 5");
@@ -437,21 +461,24 @@ START_TEST(gcs_state_msg_test_gh24)
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home0", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[0] != 0);
     st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home1", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[1] != 0);
     st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home2", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[2] != 0);
 
     // last four are 37.
@@ -460,28 +487,32 @@ START_TEST(gcs_state_msg_test_gh24)
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home3", "",
-                                 0, 4, 2, 0, 3);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 3);
     fail_unless(st[3] != 0);
     st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home4", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[4] != 0);
     st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home5", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[5] != 0);
     st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_PRIM,
                                  GCS_NODE_STATE_NON_PRIM,
                                  "home6", "",
-                                 0, 4, 2, 0, 2);
+                                 0, 4, 2, 0, 0, 0,
+                                 0, 2);
     fail_unless(st[6] != 0);
     int ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 7,
                                        &quorum);
@@ -501,12 +532,176 @@ START_TEST(gcs_state_msg_test_gh24)
 }
 END_TEST
 
+/* This test is to test that protocol downgrade is disabled with state
+ * excahnge >= v6 */
+START_TEST (gcs_state_msg_test_v6_upgrade)
+{
+    gcs_state_msg_t* st[3] = { NULL, };
+
+    gu_uuid_t state_uuid;
+    gu_uuid_t group_uuid;
+    gu_uuid_t prim_uuid;
+
+    gu_uuid_generate (&state_uuid,  NULL, 0);
+    gu_uuid_generate (&group_uuid, NULL, 0);
+    gu_uuid_generate (&prim_uuid,  NULL, 0);
+
+    gcs_seqno_t prim_seqno = 123;
+    gcs_seqno_t act_seqno  = 345;
+
+    gcs_state_quorum_t quorum;
+
+    mark_point();
+
+    /* Start with "heterogeneous" PC, where node2 is a v4 node */
+    st[0] = gcs_state_msg_create (&state_uuid, &group_uuid, &prim_uuid,
+                                  prim_seqno - 1, act_seqno - 1, act_seqno - 1,
+                                  3,
+                                  GCS_NODE_STATE_PRIM, GCS_NODE_STATE_PRIM,
+                                  "node0", "",
+                                  4, 4, 4, 0, 0, 0,
+                                  0, 0);
+    fail_if(NULL == st[0]);
+
+    st[1] = gcs_state_msg_create (&state_uuid, &group_uuid, &prim_uuid,
+                                  prim_seqno, act_seqno, act_seqno - 3,
+                                  3,
+                                  GCS_NODE_STATE_JOINED, GCS_NODE_STATE_JOINED,
+                                  "node1", "",
+                                  3, 3, 3, 0, 0, 0,
+                                  0, 0);
+    fail_if(NULL == st[1]);
+
+    st[2] = gcs_state_msg_create (&state_uuid, &group_uuid, &prim_uuid,
+                                  prim_seqno, act_seqno, act_seqno - 3,
+                                  3,
+                                  GCS_NODE_STATE_JOINED, GCS_NODE_STATE_JOINED,
+                                  "node2", "",
+                                  1, 1, 1, 0, 0, 0,
+                                  0, 0);
+    fail_if(NULL == st[2]);
+    st[2]->version = 4;
+
+    gu_info ("                  proto_ver I");
+    int
+    ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
+                                    sizeof(st)/sizeof(gcs_state_msg_t*),
+                                    &quorum);
+    fail_if (0 != ret);
+    fail_if (4 != quorum.version);
+    fail_if (true != quorum.primary);
+    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    fail_if (act_seqno  != quorum.act_id);
+    fail_if (prim_seqno != quorum.conf_id);
+    fail_if (1 != quorum.gcs_proto_ver);
+    fail_if (1 != quorum.repl_proto_ver);
+    fail_if (1 != quorum.appl_proto_ver);
+
+#define UPDATE_STATE_MSG(x)                       \
+    st[x]->prim_seqno = prim_seqno;               \
+    st[x]->received   = act_seqno;                \
+    st[x]->prim_gcs_ver  = quorum.gcs_proto_ver;  \
+    st[x]->prim_repl_ver = quorum.repl_proto_ver; \
+    st[x]->prim_appl_ver = quorum.appl_proto_ver;
+
+    /* disconnect node2: protocol versions should go up (also bump seqnos) */
+    prim_seqno++;
+    act_seqno++;
+    UPDATE_STATE_MSG(0);
+    UPDATE_STATE_MSG(1);
+    gu_info ("                  proto_ver II");
+    ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
+                                    2,
+                                    &quorum);
+    fail_if (0 != ret);
+    fail_if (QUORUM_VERSION != quorum.version);
+    fail_if (true != quorum.primary);
+    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    fail_if (act_seqno  != quorum.act_id);
+    fail_if (prim_seqno != quorum.conf_id);
+    fail_if (3 != quorum.gcs_proto_ver);
+    fail_if (3 != quorum.repl_proto_ver);
+    fail_if (3 != quorum.appl_proto_ver);
+
+    /* reconnect node2: protocol versions should go down for backward
+     * compatibility */
+    prim_seqno++;
+    act_seqno++;
+    UPDATE_STATE_MSG(0);
+    UPDATE_STATE_MSG(1);
+    gu_info ("                  proto_ver III");
+    ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
+                                    3,
+                                    &quorum);
+    fail_if (0 != ret);
+    fail_if (4 != quorum.version);
+    fail_if (true != quorum.primary);
+    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    fail_if (act_seqno  != quorum.act_id);
+    fail_if (prim_seqno != quorum.conf_id);
+    fail_if (1 != quorum.gcs_proto_ver);
+    fail_if (1 != quorum.repl_proto_ver);
+    fail_if (1 != quorum.appl_proto_ver);
+
+
+    /* disconnect node2 */
+    prim_seqno++;
+    act_seqno++;
+    UPDATE_STATE_MSG(0);
+    UPDATE_STATE_MSG(1);
+    gu_info ("                  proto_ver IV");
+    ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
+                                    2,
+                                    &quorum);
+    fail_if (0 != ret);
+    fail_if (QUORUM_VERSION != quorum.version);
+    fail_if (true != quorum.primary);
+    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    fail_if (act_seqno  != quorum.act_id);
+    fail_if (prim_seqno != quorum.conf_id);
+    fail_if (3 != quorum.gcs_proto_ver);
+    fail_if (3 != quorum.repl_proto_ver);
+    fail_if (3 != quorum.appl_proto_ver);
+
+    /* upgrade node2 */
+    st[2]->version = QUORUM_VERSION;
+    st[2]->gcs_proto_ver  = 2;
+    st[2]->repl_proto_ver = 2;
+    st[2]->appl_proto_ver = 2;
+
+    /* reconnect node2: this time protocol versions should stay */
+    prim_seqno++;
+    act_seqno++;
+    UPDATE_STATE_MSG(0);
+    UPDATE_STATE_MSG(1);
+    gu_info ("                  proto_ver V");
+    ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
+                                    3,
+                                    &quorum);
+    fail_if (0 != ret);
+    fail_if (QUORUM_VERSION != quorum.version);
+    fail_if (true != quorum.primary);
+    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    fail_if (act_seqno  != quorum.act_id);
+    fail_if (prim_seqno != quorum.conf_id);
+    fail_if (3 != quorum.gcs_proto_ver);
+    fail_if (3 != quorum.repl_proto_ver);
+    fail_if (3 != quorum.appl_proto_ver);
+
+    gcs_state_msg_destroy (st[0]);
+    gcs_state_msg_destroy (st[1]);
+    gcs_state_msg_destroy (st[2]);
+#undef UPDATE_STATE_MSG
+}
+END_TEST
+
 Suite *gcs_state_msg_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
   TCase *tc_basic   = tcase_create("gcs_state_msg_basic");
   TCase *tc_inherit = tcase_create("gcs_state_msg_inherit");
   TCase *tc_remerge = tcase_create("gcs_state_msg_remerge");
+  TCase *tc_proto_ver = tcase_create("gcs_state_msg_proto_ver");
 
   suite_add_tcase (s, tc_basic);
   tcase_add_test  (tc_basic, gcs_state_msg_test_basic);
@@ -517,6 +712,9 @@ Suite *gcs_state_msg_suite(void)
   suite_add_tcase (s, tc_remerge);
   tcase_add_test  (tc_remerge, gcs_state_msg_test_quorum_remerge);
   tcase_add_test  (tc_remerge, gcs_state_msg_test_gh24);
+
+  suite_add_tcase (s, tc_proto_ver);
+  tcase_add_test  (tc_proto_ver, gcs_state_msg_test_v6_upgrade);
 
   return s;
 }

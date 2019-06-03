@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -56,6 +56,9 @@ typedef struct gcs_group
     gu_seqno_t       prim_seqno;
     long             prim_num;
     gcs_node_state_t prim_state;
+    int              prim_gcs_ver;
+    int              prim_repl_ver;
+    int              prim_appl_ver;
 
     /* max supported protocols */
     gcs_proto_t const gcs_proto_ver;

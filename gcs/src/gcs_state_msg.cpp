@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -14,7 +14,8 @@
 #include <galerautils.h>
 #include <gu_serialize.hpp>
 
-#define GCS_STATE_MSG_VER 4
+#define GCS_STATE_MSG_VER 6
+#define GCS_STATE_MSG_NO_PROTO_DOWNGRADE_VER 6
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.hpp"
@@ -32,21 +33,27 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_node_state_t current_state,
                       const char*      name,
                       const char*      inc_addr,
-                      int              gcs_proto_ver,
+                      int              gcs_proto_ver, /* max supported versions*/
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              prim_gcs_ver, /* last prim versions*/
+                      int              prim_repl_ver,
+                      int              prim_appl_ver,
                       int              desync_count,
                       uint8_t          flags)
 {
 #define CHECK_PROTO_RANGE(LEVEL)                                        \
     if (LEVEL < (int)0 || LEVEL > (int)UINT8_MAX) {                     \
-        gu_error ("#LEVEL value %d is out of range [0, %d]", LEVEL,UINT8_MAX); \
+        gu_error(#LEVEL " value %d is out of range [0, %d]", LEVEL,UINT8_MAX); \
         return NULL;                                                    \
     }
 
     CHECK_PROTO_RANGE(gcs_proto_ver);
     CHECK_PROTO_RANGE(repl_proto_ver);
     CHECK_PROTO_RANGE(appl_proto_ver);
+    CHECK_PROTO_RANGE(prim_gcs_ver);
+    CHECK_PROTO_RANGE(prim_repl_ver);
+    CHECK_PROTO_RANGE(prim_appl_ver);
 
     size_t name_len = strlen(name) + 1;
     size_t addr_len = strlen(inc_addr) + 1;
@@ -68,6 +75,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->gcs_proto_ver = gcs_proto_ver;
         ret->repl_proto_ver= repl_proto_ver;
         ret->appl_proto_ver= appl_proto_ver;
+        ret->prim_gcs_ver  = prim_gcs_ver;
+        ret->prim_repl_ver = prim_repl_ver;
+        ret->prim_appl_ver = prim_appl_ver;
         ret->desync_count  = desync_count;
         ret->name          = (char*)(ret + 1);
         ret->inc_addr      = ret->name + name_len;
@@ -89,6 +99,13 @@ gcs_state_msg_destroy (gcs_state_msg_t* state)
 {
     gu_free (state);
 }
+
+static size_t const sizeof_v5_stuff(
+        sizeof (int64_t)     +   // last_applied
+        sizeof (int64_t)     +   // vote_seqno
+        sizeof (int64_t)     +   // vote_res
+        sizeof (uint8_t)         // vote_policy
+    );
 
 /* Returns length needed to serialize gcs_state_msg_t for sending */
 size_t
@@ -114,7 +131,14 @@ gcs_state_msg_len (gcs_state_msg_t* state)
 // V3 stuff
         sizeof (int64_t)     +   // cached
 // V4 stuff
-        sizeof (int32_t)         // desync count
+        sizeof (int32_t)     +   // desync count
+// V5 stuff
+        sizeof_v5_stuff      +
+// V6 stuff
+        sizeof (int8_t)      +   // prim_gcs_ver
+        sizeof (int8_t)      +   // prim_repl_ver
+        sizeof (int8_t)      +   // prim_appl_ver
+        0
         );
 }
 
@@ -149,16 +173,23 @@ gcs_state_msg_len (gcs_state_msg_t* state)
     const char*      name           = (char*)(prim_seqno + 1);
 
 
-
 /* Serialize gcs_state_msg_t into buf */
 ssize_t
 gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
 {
     STATE_MSG_FIELDS_V0(buf);
     char*     inc_addr  = name + strlen (state->name) + 1;
-    uint8_t*  appl_proto_ver = (uint8_t*)(inc_addr + strlen(state->inc_addr) + 1);
+    uint8_t*  appl_proto_ver = (uint8_t*)(inc_addr + strlen(state->inc_addr) +1);
+// V3 stuff
     int64_t*  cached         = (int64_t*)(appl_proto_ver + 1);
+// V4 stuff
     int32_t*  desync_count   = (int32_t*)(cached + 1);
+// V5 stuff
+    uint8_t*  v5_stuff       = (uint8_t*)(desync_count + 1);
+// V6 stuff
+    uint8_t*  prim_gcs_ver   = (uint8_t*)(v5_stuff + sizeof_v5_stuff);
+    uint8_t*  prim_repl_ver  = (uint8_t*)(prim_gcs_ver + 1);
+    uint8_t*  prim_appl_ver  = (uint8_t*)(prim_repl_ver + 1);
 
     *version        = GCS_STATE_MSG_VER;
     *flags          = state->flags;
@@ -181,7 +212,11 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     gu::serialize8(state->cached, cached, 0);
     gu::serialize4(state->desync_count, desync_count, 0);
 
-    return ((uint8_t*)(desync_count + 1) - (uint8_t*)buf);
+    *prim_gcs_ver    = state->prim_gcs_ver;
+    *prim_repl_ver   = state->prim_repl_ver;
+    *prim_appl_ver   = state->prim_appl_ver;
+
+    return ((uint8_t*)(prim_appl_ver + 1) - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
@@ -215,6 +250,21 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         gu::unserialize4(desync_count_ptr, 0, desync_count);
     }
 
+    uint8_t* v5_stuff = (uint8_t*)(desync_count_ptr + 1);
+
+    uint8_t prim_gcs_ver   = 0;
+    uint8_t* prim_gcs_ptr  = (uint8_t*)(v5_stuff + sizeof_v5_stuff);
+    uint8_t prim_repl_ver  = 0;
+    uint8_t* prim_repl_ptr = (uint8_t*)(prim_gcs_ptr + 1);
+    uint8_t prim_appl_ver  = 0;
+    uint8_t* prim_appl_ptr = (uint8_t*)(prim_repl_ptr + 1);
+    if (*version >= 6) {
+        assert(buf_len >= (uint8_t*)(prim_appl_ptr + 1) - (uint8_t*)buf);
+        prim_gcs_ver    = *prim_gcs_ptr;
+        prim_repl_ver   = *prim_repl_ptr;
+        prim_appl_ver   = *prim_appl_ptr;
+    }
+
     gcs_state_msg_t* ret = gcs_state_msg_create (
         state_uuid,
         group_uuid,
@@ -230,6 +280,9 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
         *gcs_proto_ver,
         *repl_proto_ver,
         appl_proto_ver,
+        prim_gcs_ver,
+        prim_repl_ver,
+        prim_appl_ver,
         desync_count,
         *flags
         );
@@ -828,6 +881,7 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     INIT_PROTO_VER(gcs_proto_ver);
     INIT_PROTO_VER(repl_proto_ver);
     INIT_PROTO_VER(appl_proto_ver);
+#undef INIT_PROTO_VER
 
     for (i = 0; i < states_num; i++) {
 
@@ -841,6 +895,20 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
             CHECK_MIN_PROTO_VER(repl_proto_ver);
             CHECK_MIN_PROTO_VER(appl_proto_ver);
 //        }
+#undef CHECK_MIN_PROTO_VER
+    }
+
+    if (quorum->version >= GCS_STATE_MSG_NO_PROTO_DOWNGRADE_VER)
+    {
+        // forbid protocol downgrade
+#define CHECK_MIN_PROTO_VER(LEVEL)                                      \
+        if (quorum->LEVEL##_proto_ver < rep->prim_##LEVEL##_ver) {      \
+            quorum->LEVEL##_proto_ver = rep->prim_##LEVEL##_ver;        \
+        }
+        CHECK_MIN_PROTO_VER(gcs);
+        CHECK_MIN_PROTO_VER(repl);
+        CHECK_MIN_PROTO_VER(appl);
+#undef CHECK_MIN_PROTO_VER
     }
 
     if (quorum->version < 2) {;} // for future generations

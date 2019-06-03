@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -537,7 +537,9 @@ START_TEST(test_gcs_group_find_donor)
             0, 0, seqnos[i], 0,
             GCS_NODE_STATE_SYNCED,
             GCS_NODE_STATE_SYNCED,
-            "", "", 0, 0, 0, 0, 0);
+            "", "",
+            0, 0, 0, 0, 0, 0,
+            0, 0);
     }
     group.quorum.act_id = 0; // in safe range.
     fail_if (group.quorum.gcs_proto_ver != -1);

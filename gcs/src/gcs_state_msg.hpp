@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -39,6 +39,9 @@ typedef struct gcs_state_msg
     int              gcs_proto_ver;
     int              repl_proto_ver;
     int              appl_proto_ver;
+    int              prim_gcs_ver;
+    int              prim_repl_ver;
+    int              prim_appl_ver;
     int              prim_joined;   // number of joined nodes in its last PC
     int              desync_count;
     gcs_node_state_t prim_state;    // state of the node in its last PC
@@ -87,6 +90,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       int              gcs_proto_ver,
                       int              repl_proto_ver,
                       int              appl_proto_ver,
+                      int              prim_gcs_ver,
+                      int              prim_repl_ver,
+                      int              prim_appl_ver,
                       int              desync_count,
                       uint8_t          flags);
 
