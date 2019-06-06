@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -533,9 +533,11 @@ START_TEST(test_gcs_group_find_donor)
         nodes[i].state_msg = gcs_state_msg_create(
             &GU_UUID_NIL, &GU_UUID_NIL, &GU_UUID_NIL,
             0, 0, seqnos[i], 0,
-            GCS_SEQNO_ILL, 0, vp,
-            0, GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
-            "", "", 0, 0, 0, 0, 0);
+            GCS_SEQNO_ILL, 0, vp, 0,
+            GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
+            "", "",
+            0, 0, 0, 0, 0, 0,
+            0, 0);
     }
 
     group.quorum.act_id = 0; // in safe range.

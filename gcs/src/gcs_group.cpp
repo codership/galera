@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -77,6 +77,9 @@ gcs_group_init (gcs_group_t* group, gu::Config* const cnf, gcache_t* const cache
     group->prim_seqno   = GCS_SEQNO_ILL;
     group->prim_num     = 0;
     group->prim_state   = GCS_NODE_STATE_NON_PRIM;
+    group->prim_gcs_ver  = 0;
+    group->prim_repl_ver = 0;
+    group->prim_appl_ver = 0;
 
     *(gcs_proto_t*)&group->gcs_proto_ver = gcs_proto_ver;
     *(int*)&group->repl_proto_ver = repl_proto_ver;
@@ -269,6 +272,32 @@ group_go_non_primary (gcs_group_t* group)
     // what else? Do we want to change anything about the node here?
 }
 
+static void
+group_check_proto_ver(gcs_group_t* group)
+{
+    assert(group->quorum.primary); // must be called only on primary CC
+
+    gcs_node_t& node(group->nodes[group->my_idx]);
+    bool fail(false);
+
+#define GROUP_CHECK_NODE_PROTO_VER(LEVEL)                               \
+    if (node.LEVEL < group->quorum.LEVEL) {                             \
+        gu_fatal("Group requested %s: %d, max supported by this node: %d." \
+                 "Upgrade the node before joining this group."          \
+                 "Need to abort.",                                      \
+                 #LEVEL, group->quorum.LEVEL, node.LEVEL);              \
+        fail = true;                                                    \
+    }
+
+    GROUP_CHECK_NODE_PROTO_VER(gcs_proto_ver);
+    GROUP_CHECK_NODE_PROTO_VER(repl_proto_ver);
+    GROUP_CHECK_NODE_PROTO_VER(appl_proto_ver);
+
+#undef GROUP_CHECK_NODE_PROTO_VER
+
+    if (fail) gu_abort();
+}
+
 static const char group_empty_id[GCS_COMP_MEMB_ID_MAX_LEN + 1] = { 0, };
 
 static void
@@ -383,6 +412,14 @@ group_post_state_exchange (gcs_group_t* group)
 
         assert (group->prim_num > 0);
 
+#define GROUP_UPDATE_PROTO_VER(LEVEL) \
+        if (group->prim_##LEVEL##_ver < quorum->LEVEL##_proto_ver) \
+            group->prim_##LEVEL##_ver = quorum->LEVEL##_proto_ver;
+        GROUP_UPDATE_PROTO_VER(gcs);
+        GROUP_UPDATE_PROTO_VER(repl);
+        GROUP_UPDATE_PROTO_VER(appl);
+#undef GROUP_UPDATE_PROTO_VER
+
         group_redo_last_applied(group);
         // votes will be recounted on CC action creation
     }
@@ -412,6 +449,7 @@ group_post_state_exchange (gcs_group_t* group)
              int(quorum->vote_policy),
              GU_UUID_ARGS(&quorum->group_uuid));
 
+    group_check_proto_ver(group);
     group_check_donor(group);
 }
 
@@ -1903,6 +1941,9 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
         node->gcs_proto_ver,
         node->repl_proto_ver,
         node->appl_proto_ver,
+        group->prim_gcs_ver,
+        group->prim_repl_ver,
+        group->prim_appl_ver,
         node->desync_count,
         flags
         );
