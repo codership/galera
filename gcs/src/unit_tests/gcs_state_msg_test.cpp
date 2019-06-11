@@ -670,7 +670,8 @@ END_TEST
 
 /* This test is to test that protocol downgrade is disabled with state
  * excahnge >= v6 */
-START_TEST (gcs_state_msg_test_v6_upgrade)
+static void
+gcs_state_msg_test_v6_upgrade(int const from_ver)
 {
     gcs_state_msg_t* st[3] = { NULL, };
 
@@ -719,7 +720,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                   0, 1, 1, 0, 0, 0,
                                   0, 0);
     fail_if(NULL == st[2]);
-    st[2]->version = 4;
+    st[2]->version = from_ver;
 
     gu_info ("                  proto_ver I");
     int
@@ -727,7 +728,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (4 != quorum.version);
+    fail_if (from_ver != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
     fail_if (act_seqno  != quorum.act_id);
@@ -775,7 +776,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                     3,
                                     &quorum);
     fail_if (0 != ret);
-    fail_if (4 != quorum.version);
+    fail_if (from_ver != quorum.version);
     fail_if (true != quorum.primary);
     fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
     fail_if (act_seqno  != quorum.act_id);
@@ -837,6 +838,17 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     gcs_state_msg_destroy (st[2]);
 #undef UPDATE_STATE_MSG
 }
+
+START_TEST (gcs_state_msg_test_v4v6_upgrade)
+{
+    gcs_state_msg_test_v6_upgrade(4);
+}
+END_TEST
+
+START_TEST (gcs_state_msg_test_v5v6_upgrade)
+{
+    gcs_state_msg_test_v6_upgrade(5);
+}
 END_TEST
 
 Suite *gcs_state_msg_suite(void)
@@ -859,7 +871,8 @@ Suite *gcs_state_msg_suite(void)
   tcase_add_test  (tc_remerge, gcs_state_msg_test_gh24_1);
 
   suite_add_tcase (s, tc_proto_ver);
-  tcase_add_test  (tc_proto_ver, gcs_state_msg_test_v6_upgrade);
+  tcase_add_test  (tc_proto_ver, gcs_state_msg_test_v4v6_upgrade);
+  tcase_add_test  (tc_proto_ver, gcs_state_msg_test_v5v6_upgrade);
 
   return s;
 }
