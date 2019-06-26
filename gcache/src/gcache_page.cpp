@@ -48,7 +48,7 @@ gcache::Page::drop_fs_cache() const
 
 gcache::Page::Page (void* ps, const std::string& name, size_t size, int dbg)
     :
-    fd_   (name, size, false, false),
+    fd_   (name, size, true, false),
     mmap_ (fd_),
     ps_   (ps),
     next_ (static_cast<uint8_t*>(mmap_.ptr)),
