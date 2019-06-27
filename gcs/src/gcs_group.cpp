@@ -449,7 +449,7 @@ group_post_state_exchange (gcs_group_t* group)
              int(quorum->vote_policy),
              GU_UUID_ARGS(&quorum->group_uuid));
 
-    group_check_proto_ver(group);
+    if (quorum->primary) group_check_proto_ver(group);
     group_check_donor(group);
 }
 
