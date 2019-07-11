@@ -2736,15 +2736,15 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                 }
             }
 
-            // record CC related state seqnos, needed for IST on DONOR
-            record_cc_seqnos(group_seqno, "group");
-
             st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         }
         else
         {
             assert(!from_IST);
         }
+
+        // record CC related state seqnos, needed for IST on DONOR
+        record_cc_seqnos(group_seqno, "group");
 
         if (!from_IST && state_() == S_JOINING && sst_state_ != SST_NONE)
         {
