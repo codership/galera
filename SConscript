@@ -45,5 +45,6 @@ def check_dynamic_symbols(target, source, env):
         return 1
     return 0
 
-env.AddPostAction(galera_lib, Action(check_dynamic_symbols,
-                  'Checking dynamic symbols for \'$TARGET\'...'))
+if has_version_script:
+    env.AddPostAction(galera_lib, Action(check_dynamic_symbols,
+                                         'Checking dynamic symbols for \'$TARGET\'...'))
