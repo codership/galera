@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -190,9 +190,13 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 node->status = GCS_NODE_STATE_PRIM;
             }
 
-            node->last_applied = gcs_state_msg_last_applied(node->state_msg);
-            gcs_state_msg_last_vote(node->state_msg,
-                                    node->vote_seqno, node->vote_res);
+            if (quorum->gcs_proto_ver >= 2)
+            {
+                node->last_applied = gcs_state_msg_last_applied(node->state_msg);
+                gcs_state_msg_last_vote(node->state_msg,
+                                        node->vote_seqno, node->vote_res);
+            }
+            assert(node->last_applied >= 0);
         }
         else {
             // node joins completely different group, clear all status
@@ -281,7 +285,7 @@ gcs_node_print(std::ostream& os, const gcs_node_t& node)
                            << node.repl_proto_ver << '/'
                            << node.appl_proto_ver << '\n'
        << "status:\t " << gcs_node_state_to_str(node.status) << '\n'
-       << "segment:  " << node.segment << '\n'
+       << "segment:  " << int(node.segment) << '\n'
        << "bootstrp: " << (node.bootstrap ? "YES" : "NO") << '\n'
        << "arbitr: "   << (node.arbitrator ? "YES" : "NO");
 }

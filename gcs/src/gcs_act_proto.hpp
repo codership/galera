@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -17,8 +17,13 @@
 #include <stdint.h>
 typedef uint8_t gcs_proto_t;
 
-/*! Supported protocol range (for now only version 0 is supported) */
-#define GCS_PROTO_MAX 1
+/*! Supported protocol range
+ *
+ * 0 - initial version
+ * 1 - support for totally ordered CC events
+ * 2 - support for commit cut in state exchange msg
+ */
+#define GCS_PROTO_MAX 2
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag

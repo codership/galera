@@ -871,7 +871,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
             if (str_proto_ver_ < 3)
             {
-                cert_.assign_initial_position(gu::GTID(sst_uuid_, sst_seqno_),
+                // all IST events will bypass certification
+                gu::GTID const cert_position
+                    (sst_uuid_, std::max(cc_seqno, sst_seqno_));
+                cert_.assign_initial_position(cert_position,
                                               trx_params_.version_);
                 // with higher versions this happens in cert index preload
             }
@@ -968,7 +971,15 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             }
 
             if (ist_seqno == sst_seqno_)
-                log_info << "IST received: " << state_uuid_ << ":" << ist_seqno;
+            {
+                log_info << "IST received: " << state_uuid_ << ":" <<ist_seqno;
+                if (str_proto_ver_ < 3)
+                {
+                    // see cert_.assign_initial_position() above
+                    assert(cc_seqno == ist_seqno);
+                    assert(cert_.lowest_trx_seqno() == ist_seqno);
+                }
+            }
             else
                 log_info << "Cert. index preloaded up to " << ist_seqno;
         }

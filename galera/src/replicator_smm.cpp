@@ -2351,8 +2351,6 @@ void galera::ReplicatorSMM::record_cc_seqnos(wsrep_seqno_t cc_seqno,
              << ": " << cc_lowest_trx_seqno_;;
     log_info << "Min available from gcache for CC from " << source
              << ": " << gcache_.seqno_min();
-    // GCache must contain some actions, at least this CC
-    assert(gcache_.seqno_min() > 0);
     // Lowest TRX must not have been released from gcache at this
     // point.
     assert(cc_lowest_trx_seqno_ >= gcache_.seqno_min());
@@ -2745,6 +2743,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         // record CC related state seqnos, needed for IST on DONOR
         record_cc_seqnos(group_seqno, "group");
+        // GCache must contain some actions, at least this CC
+        assert(gcache_.seqno_min() > 0 || conf.repl_proto_ver < ORDERED_CC);
 
         if (!from_IST && state_() == S_JOINING && sst_state_ != SST_NONE)
         {

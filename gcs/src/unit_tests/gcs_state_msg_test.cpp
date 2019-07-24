@@ -34,7 +34,7 @@ START_TEST (gcs_state_msg_test_basic)
     gcs_node_state_t const current_state(GCS_NODE_STATE_NON_PRIM);
     const char* const name("MyName");
     const char* const inc_addr("192.168.0.1:2345");
-    int         const gcs_proto_ver(0);
+    int         const gcs_proto_ver(2);
     int         const repl_proto_ver(1);
     int         const appl_proto_ver(2);
     int         const prim_gcs_ver(0);
@@ -554,7 +554,7 @@ void gcs_state_msg_test_gh24(int const gcs_proto_ver)
     gcs_seqno_t const prim_seqno2 = 35;
     int const prim_joined2 = 6;
     uint8_t const vp2(2);
-    gcs_seqno_t const received = 0;
+    gcs_seqno_t const received = prim_seqno2;
     gcs_seqno_t const cached = 0;
 
     gcs_state_quorum_t quorum;

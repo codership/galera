@@ -13,6 +13,7 @@
 #include <string.h>
 #include <galerautils.h>
 #include <gu_serialize.hpp>
+#include <gu_hexdump.h>
 
 #define GCS_STATE_MSG_VER 6
 #define GCS_STATE_MSG_NO_PROTO_DOWNGRADE_VER 6
@@ -230,7 +231,13 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
     *prim_repl_ver   = state->prim_repl_ver;
     *prim_appl_ver   = state->prim_appl_ver;
 
-    return ((uint8_t*)(prim_appl_ver + 1) - (uint8_t*)buf);
+    size_t const msg_len((uint8_t*)(prim_appl_ver + 1) - (uint8_t*)buf);
+#ifndef NDEBUG
+    char str[1024];
+    gu_hexdump(buf, msg_len, str, sizeof(str), true);
+    gu_debug("Serialized state message of size %zd\n%s", msg_len, str);
+#endif /* NDEBUG */
+    return msg_len;
 }
 
 /* De-serialize gcs_state_msg_t from buf */
@@ -238,6 +245,12 @@ gcs_state_msg_t*
 gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
 {
     assert (buf_len > 0);
+
+#ifndef NDEBUG
+    char str[1024];
+    gu_hexdump(buf, buf_len, str, sizeof(str), true);
+    gu_debug("Received state message of size %zd\n%s", buf_len, str);
+#endif /* NDEBUG*/
 
     /* beginning of the message is always version 0 */
     CONST_STATE_MSG_FIELDS_V0(buf);
@@ -269,11 +282,11 @@ gcs_state_msg_read (const void* const buf, ssize_t const buf_len)
     int64_t vote_res     = 0;
     uint8_t vote_policy  = GCS_VOTE_ZERO_WINS; // backward compatibility
     int64_t* last_applied_ptr = (int64_t*)(desync_count_ptr + 1);
-    if (*version >= 5) {
+    if (*version >= 5 && *gcs_proto_ver >= 2) {
         assert(buf_len > (uint8_t*)(last_applied_ptr + 3) - (uint8_t*)buf);
         gu::unserialize8(last_applied_ptr, 0, last_applied);
 
-        gu::unserialize8(last_applied_ptr + 1, 0, vote_seqno); // 4.ee
+        gu::unserialize8(last_applied_ptr + 1, 0, vote_seqno);
         gu::unserialize8(last_applied_ptr + 2, 0, vote_res);
         gu::unserialize1(last_applied_ptr + 3, 0, vote_policy);
     }
@@ -594,6 +607,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
 
     quorum->act_id     = rep->received;
     quorum->conf_id    = rep->prim_seqno;
+    quorum->last_applied = rep->last_applied;
     quorum->group_uuid = rep->group_uuid;
     quorum->primary    = true;
 
@@ -789,6 +803,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
 
             quorum->act_id     = rep->received;
             quorum->conf_id    = rep->prim_seqno;
+            quorum->last_applied = rep->last_applied;
             quorum->group_uuid = rep->group_uuid;
             quorum->primary    = true;
         }
@@ -879,6 +894,7 @@ state_quorum_bootstrap (const gcs_state_msg_t* const states[],
 
             quorum->act_id     = rep->received;
             quorum->conf_id    = rep->prim_seqno;
+            quorum->last_applied = rep->last_applied;
             quorum->group_uuid = rep->group_uuid;
             quorum->primary    = true;
         }

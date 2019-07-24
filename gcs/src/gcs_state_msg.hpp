@@ -63,6 +63,7 @@ typedef struct gcs_state_quorum
     gu_uuid_t   group_uuid;   //! group UUID
     gcs_seqno_t act_id;       //! next global seqno
     gcs_seqno_t conf_id;      //! configuration id
+    gcs_seqno_t last_applied; //! group-wide commit cut
     bool        primary;      //! primary configuration or not
     int         version;      //! state excahnge version (max understood by all)
     int         gcs_proto_ver;
@@ -76,6 +77,7 @@ gcs_state_quorum_t;
 
 #define GCS_QUORUM_NON_PRIMARY (gcs_state_quorum_t){    \
         GU_UUID_NIL,                                    \
+        GCS_SEQNO_ILL,                                  \
         GCS_SEQNO_ILL,                                  \
         GCS_SEQNO_ILL,                                  \
         false,                                          \

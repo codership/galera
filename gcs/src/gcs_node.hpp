@@ -109,6 +109,7 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
 static inline void
 gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
+    assert(seqno >= 0);
     if (gu_unlikely(seqno <= node->last_applied)) {
         gu_warn ("Received bogus LAST message: %lld from node %s, "
                  "expected > %lld. Ignoring.",
