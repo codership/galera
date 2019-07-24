@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #include "gmcast.hpp"
@@ -389,6 +389,90 @@ void gcomm::GMCast::close(bool force)
     prim_view_reached_ = false;
 }
 
+//
+// Private
+//
+
+
+// Find other local endpoint matching to proto
+static const Proto*
+find_other_local_endpoint(const gcomm::gmcast::ProtoMap& proto_map,
+                          const gcomm::gmcast::Proto* proto)
+{
+    for (gcomm::gmcast::ProtoMap::const_iterator i(proto_map.begin());
+         i != proto_map.end(); ++i)
+    {
+        if (i->second != proto &&
+            i->second->handshake_uuid() == proto->handshake_uuid())
+        {
+            return i->second;
+        }
+    }
+    return 0;
+}
+
+// Find other endpoint with same remote UUID
+static const Proto*
+find_other_endpoint_same_remote_uuid(const gcomm::gmcast::ProtoMap& proto_map,
+                                     const gcomm::gmcast::Proto* proto)
+{
+    for (gcomm::gmcast::ProtoMap::const_iterator i(proto_map.begin());
+         i != proto_map.end(); ++i)
+    {
+        if (i->second != proto &&
+            i->second->remote_uuid() == proto->remote_uuid())
+        {
+            return i->second;
+        }
+    }
+    return 0;
+}
+
+bool gcomm::GMCast::is_own(const gmcast::Proto* proto) const
+{
+    assert(proto->remote_uuid() != gcomm::UUID::nil());
+    if (proto->remote_uuid() != uuid())
+    {
+        return false;
+    }
+    return find_other_local_endpoint(*proto_map_, proto);
+}
+
+void gcomm::GMCast::blacklist(const gmcast::Proto* proto)
+{
+    initial_addrs_.erase(proto->remote_addr());
+    pending_addrs_.erase(proto->remote_addr());
+    addr_blacklist_.insert(std::make_pair(
+                               proto->remote_addr(),
+                               AddrEntry(gu::datetime::Date::now(),
+                                         gu::datetime::Date::now(),
+                                         proto->remote_uuid())));
+}
+
+bool gcomm::GMCast::is_not_own_and_duplicate_exists(
+    const Proto* proto) const
+{
+    assert(proto->remote_uuid() != gcomm::UUID::nil());
+    const Proto* other(find_other_local_endpoint(*proto_map_, proto));
+    if (!other)
+    {
+        // Not own
+        // Check if remote UUID matches to self
+        if (proto->remote_uuid() == uuid())
+        {
+            return true;
+        }
+        // Check if other proto entry with same remote
+        // UUID but different remote address exists.
+        other = find_other_endpoint_same_remote_uuid(*proto_map_, proto);
+        if (other && other->remote_addr() != proto->remote_addr())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Erase proto entry in safe manner
 // 1) Erase from relay_set_
 // 2) Erase from proto_map_
@@ -576,74 +660,17 @@ void gcomm::GMCast::handle_connected(Proto* rp)
     }
 }
 
-// Throw if the proto has foreign origin. If another proto entry with the
-// same handshake UUID is found from proto_map, the connection is local
-// and the function returns. If such an entry is not found, the function
-// throws.
-static void throw_if_foreign(
-    const gcomm::gmcast::ProtoMap& proto_map,
-    const gcomm::gmcast::Proto* proto,
-    const char* message)
-{
-    for (ProtoMap::const_iterator i(proto_map.begin());
-         i != proto_map.end(); ++i)
-    {
-        // The condition i->first != proto->socket()->id() is needed
-        // if this function is called after the established connection
-        // has been inserted into proto_map.
-        if (i->second->handshake_uuid() == proto->handshake_uuid() &&
-            i->first != proto->socket()->id())
-        {
-            return;
-        }
-    }
-    gu_throw_fatal << message;
-}
-
 void gcomm::GMCast::handle_established(Proto* est)
 {
     log_info << self_string() << " connection established to "
              << est->remote_uuid() << " "
              << est->remote_addr();
+    // UUID checks are handled during protocol handshake
+    assert(est->remote_uuid() != uuid());
 
     if (is_evicted(est->remote_uuid()))
     {
         log_warn << "Closing connection to evicted node " << est->remote_uuid();
-        erase_proto(proto_map_->find_checked(est->socket()->id()));
-        update_addresses();
-        return;
-    }
-
-    if (est->remote_uuid() == uuid())
-    {
-        if (prim_view_reached_ == false)
-        {
-            throw_if_foreign(
-                *proto_map_, est,
-                "A node with the same UUID already exists in the cluster");
-        }
-
-        std::set<std::string>::iterator
-            ia_i(initial_addrs_.find(est->remote_addr()));
-        if (ia_i != initial_addrs_.end())
-        {
-            initial_addrs_.erase(ia_i);
-        }
-        AddrList::iterator i(pending_addrs_.find(est->remote_addr()));
-        if (i != pending_addrs_.end())
-        {
-            if (addr_blacklist_.find(est->remote_addr()) == addr_blacklist_.end())
-            {
-                log_warn << self_string()
-                         << " address '" << est->remote_addr()
-                         << "' points to own listening address, blacklisting";
-            }
-            pending_addrs_.erase(i);
-            addr_blacklist_.insert(make_pair(est->remote_addr(),
-                                             AddrEntry(gu::datetime::Date::now(),
-                                                       gu::datetime::Date::now(),
-                                                       est->remote_uuid())));
-        }
         erase_proto(proto_map_->find_checked(est->socket()->id()));
         update_addresses();
         return;
@@ -1446,15 +1473,16 @@ void gcomm::GMCast::handle_up(const void*        id,
                     p->set_tstamp(gu::datetime::Date::now());
                     gu_trace(p->handle_message(msg));
                 }
-                catch (gu::Exception& e)
+                catch (const gu::Exception& e)
                 {
-                    log_warn << "handling gmcast protocol message failed: "
-                             << e.what();
                     handle_failed(p);
                     if (e.get_errno() == ENOTRECOVERABLE)
                     {
                         throw;
                     }
+                    log_warn
+                        << "handling gmcast protocol message failed: "
+                        << e.what();
                     return;
                 }
 
@@ -1463,7 +1491,7 @@ void gcomm::GMCast::handle_up(const void*        id,
                     handle_failed(p);
                     return;
                 }
-                else if (p->changed() == true)
+                else if (p->check_changed_and_reset() == true)
                 {
                     update_addresses();
                     check_liveness();

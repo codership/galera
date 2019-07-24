@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2012-2019 Codership Oy <info@codership.com>
  */
 
 #include "asio_tcp.hpp"
@@ -27,7 +27,7 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const gu::URI& uri)
 
 gcomm::AsioTcpSocket::~AsioTcpSocket()
 {
-    log_debug << "dtor for " << id();
+    log_debug << "dtor for " << id() << " send q size " << send_q_.size();
     close_socket();
     delete ssl_socket_;
     ssl_socket_ = 0;
@@ -354,7 +354,12 @@ namespace gcomm
         void operator()()
         {
             Critical<AsioProtonet> crit(socket_->net_);
-            if (socket_->state() == gcomm::Socket::S_CONNECTED &&
+            // Send queue is processed also in closing state
+            // in order to deliver as many messages as possible,
+            // even if the socket has been discarded by
+            // upper layers.
+            if ((socket_->state() == gcomm::Socket::S_CONNECTED ||
+                 socket_->state() == gcomm::Socket::S_CLOSING) &&
                 socket_->send_q_.empty() == false)
             {
                 const gcomm::Datagram& dg(socket_->send_q_.front());

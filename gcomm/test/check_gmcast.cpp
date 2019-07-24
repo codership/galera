@@ -376,7 +376,7 @@ END_TEST
 START_TEST(test_trac_380)
 {
     gu_conf_self_tstamp_on();
-    log_info << "START";
+    log_info << "START (test_trac_380)";
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
