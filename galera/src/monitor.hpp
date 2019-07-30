@@ -500,13 +500,17 @@ namespace galera
 
             if (last_left_ > drain_seqno_)
             {
-                log_debug << "last left greater than drain seqno";
+                log_warn << "last left " << last_left_
+                         << " greater than drain seqno " << drain_seqno_;
+#ifndef NDEBUG
                 for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
                 {
                     const Process& a(process_[indexof(i)]);
-                    log_debug << "applier " << i
-                              << " in state " << a.state_;
+                    log_info << "applier " << i
+                             << " in state " << a.state_;
                 }
+                assert(0);
+#endif
             }
 
             while (last_left_ < drain_seqno_) lock.wait(cond_);

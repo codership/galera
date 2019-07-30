@@ -203,11 +203,11 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
         seqno = args->state_id->seqno;
     }
 
-    log_debug << "End state: " << uuid << ':' << seqno << " #################";
-
     cc_seqno_ = seqno; // is it needed here?
 
+    log_debug << "ReplicatorSMM() initial position: " << uuid << ':' << seqno;
     set_initial_position(uuid, seqno);
+    cert_.assign_initial_position(gu::GTID(uuid, seqno), trx_params_.version_);
     gcache_.seqno_reset(gu::GTID(uuid, seqno));
     // update gcache position to one supplied by app.
 
@@ -2226,7 +2226,7 @@ void galera::ReplicatorSMM::process_vote(wsrep_seqno_t const seqno_g,
         assert(GCS_VOTE_REQUEST == code);
         log_info << "Got vote request for seqno " << gtid; //remove
         /* make sure WS was either successfully applied or already voted */
-        drain_monitors(seqno_g);
+        if (last_committed() < seqno_g) drain_monitors(seqno_g);
         if (st_.corrupt()) goto out;
 
         int const ret(gcs_.vote(gtid, 0, NULL, 0));
@@ -2453,8 +2453,10 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gu_trace(process_pending_queue(cc.seqno_g));
     }
 
+    /* it is legally possible to have last_committed() >= upto here due to
+       index preload - the monitors should be initialized to applying position */
     wsrep_seqno_t const upto(cert_.position());
-    log_info << "####### drain monitors upto " << upto;
+    log_debug << "Drain monitors from " << last_committed() << " upto " << upto;
     gu_trace(drain_monitors(upto));
 
     int const prev_protocol_version(protocol_version_);
