@@ -27,8 +27,11 @@
 #include <string>
 #include "gu_dbug.h"
 
-#define GU_DBUG_SYNC_WAIT(_c)                     \
+#define GU_DBUG_SYNC_WAIT(_c)                   \
     GU_DBUG_EXECUTE(_c, gu_debug_sync_wait(_c);)
+
+#define GU_DBUG_SYNC_EXECUTE(_c,_cmd)           \
+    GU_DBUG_EXECUTE(_c, _cmd);
 
 // Wait for sync signal identified by sync string
 void gu_debug_sync_wait(const std::string& sync);
@@ -42,6 +45,7 @@ std::string gu_debug_sync_waiters();
 #else
 
 #define GU_DBUG_SYNC_WAIT(_c)
+#define GU_DBUG_SYNC_EXECUTE(_c,_cmd)
 
 #endif // GU_DBUG_ON
 
