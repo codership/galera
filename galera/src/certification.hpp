@@ -64,6 +64,7 @@ namespace galera
         TestResult append_trx(const TrxHandleSlavePtr&);
         TestResult test(const TrxHandleSlavePtr&, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
+        wsrep_seqno_t increment_position(); /* for dummy IST events */
 
         /* this is for configuration change use */
         void adjust_position(const View&, const gu::GTID& gtid, int version);

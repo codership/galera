@@ -1001,6 +1001,7 @@ galera::Certification::~Certification()
 void galera::Certification::assign_initial_position(const gu::GTID& gtid,
                                                     int const       version)
 {
+    assert(gtid.seqno() >= 0 || gtid == gu::GTID());
     switch (version)
     {
         // value -1 used in initialization when trx protocol version is not
@@ -1080,7 +1081,7 @@ galera::Certification::adjust_position(const View&         view,
     if (version != version_)
     {
         std::for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
-        assert(trx_map_.end()->first + 1 == position_);
+        assert(trx_map_.empty() || trx_map_.rbegin()->first + 1 == position_);
         trx_map_.clear();
         assert(cert_index_ng_.empty());
         if (service_thd_)
@@ -1107,6 +1108,14 @@ galera::Certification::adjust_position(const View&         view,
         e.clear_ended();
         e.nbo_ctx()->set_aborted(true);
     }
+}
+
+wsrep_seqno_t
+galera::Certification::increment_position()
+{
+    gu::Lock lock(mutex_);
+    position_++;
+    return position_;
 }
 
 galera::Certification::TestResult

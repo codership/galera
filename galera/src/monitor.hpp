@@ -509,7 +509,6 @@ namespace galera
                     log_info << "applier " << i
                              << " in state " << a.state_;
                 }
-                assert(0);
 #endif
             }
 

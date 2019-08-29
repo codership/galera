@@ -203,13 +203,19 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
         seqno = args->state_id->seqno;
     }
 
-    cc_seqno_ = seqno; // is it needed here?
+    if (seqno >= 0) // non-trivial starting position
+    {
+        assert(uuid != WSREP_UUID_UNDEFINED);
+        cc_seqno_ = seqno; // is it needed here?
 
-    log_debug << "ReplicatorSMM() initial position: " << uuid << ':' << seqno;
-    set_initial_position(uuid, seqno);
-    cert_.assign_initial_position(gu::GTID(uuid, seqno), trx_params_.version_);
-    gcache_.seqno_reset(gu::GTID(uuid, seqno));
-    // update gcache position to one supplied by app.
+        log_debug << "ReplicatorSMM() initial position: "
+                  << uuid << ':' << seqno;
+        set_initial_position(uuid, seqno);
+        cert_.assign_initial_position(gu::GTID(uuid, seqno),
+                                      trx_params_.version_);
+        gcache_.seqno_reset(gu::GTID(uuid, seqno));
+        // update gcache position to one supplied by app.
+    }
 
     build_stats_vars(wsrep_stats_);
 }
@@ -2451,11 +2457,19 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         gu_trace(process_pending_queue(cc.seqno_g));
     }
 
-    /* it is legally possible to have last_committed() >= upto here due to
-       index preload - the monitors should be initialized to applying position */
     wsrep_seqno_t const upto(cert_.position());
-    log_debug << "Drain monitors from " << last_committed() << " upto " << upto;
-    gu_trace(drain_monitors(upto));
+    if (upto >= last_committed())
+    {
+        log_debug << "Drain monitors from " << last_committed()
+                  << " upto " << upto;
+        gu_trace(drain_monitors(upto));
+    }
+    else
+    {
+        /* this may happen when processing self-leave CC after connection
+         * closure due to inconsistency. */
+        assert(st_.corrupt());
+    }
 
     int const prev_protocol_version(protocol_version_);
 
@@ -2641,7 +2655,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
             }
             else
             {
-                position.set(GU_UUID_NIL, 0);
+                position = gu::GTID();
             }
 
             /* 2 reasons for this here:

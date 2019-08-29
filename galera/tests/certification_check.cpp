@@ -78,8 +78,7 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
     TestEnv env;
     galera::Certification cert(env.conf(), 0);
 
-    gu::UUID uuid;
-    cert.assign_initial_position(gu::GTID(uuid, 0), version);
+    cert.assign_initial_position(gu::GTID(), version);
     galera::TrxHandleMaster::Params const trx_params(
         "", version, galera::KeySet::MAX_VERSION);
 
