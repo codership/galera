@@ -575,7 +575,15 @@ if [ $TAR == "yes" ]; then
     pushd $MYSQL_BINS;
     [ -x wsrep_sst_rsync_wan ] || ln -s wsrep_sst_rsync wsrep_sst_rsync_wan
     popd
-    tar -xzf ${MYSQL}_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
+    if [ -f ${MYSQL}_var_$MYSQL_MAJOR.tgz ]
+    then
+        tar -xzf ${MYSQL}_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
+        chmod 700 $MYSQL_DIST_DIR/var
+    else
+        install -m 700 -d $MYSQL_DIST_DIR/var
+    fi
+    install -m 755 init_db.sh $MYSQL_BINS/init_db.sh
+
     install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 
     # Copy required Galera libraries
