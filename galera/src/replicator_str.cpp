@@ -1138,9 +1138,9 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             gu::GTID(gu::UUID(), ts.global_seqno() - 1), ts.version());
     }
 
-    if (ts.nbo_start() == true || ts.nbo_end() == true)
+    if (ts.nbo_start() || ts.nbo_end())
     {
-        if (must_apply == true)
+        if (must_apply)
         {
             ts.verify_checksum();
             ts.set_state(TrxHandle::S_CERTIFYING);
@@ -1181,8 +1181,11 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
             // Skipping NBO events in preload is fine since joiner either
             // have all events applied in case of pure IST and donor refuses to
             // donate SST from the position there are NBOs going on.
-            assert(preload == true);
+            assert(preload);
             log_debug << "Skipping NBO event: " << ts;
+            wsrep_seqno_t const pos(cert_.increment_position());
+            assert(ts.global_seqno() == pos);
+            (void)pos;
         }
 #if 0
         log_info << "\n     IST processing NBO_"
