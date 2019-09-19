@@ -1209,6 +1209,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
     {
         // galera_to_execute_end() won't be called
         repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
+        meta->gtid = WSREP_GTID_UNDEFINED;
     }
 
     return retval;
