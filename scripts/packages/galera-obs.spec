@@ -16,7 +16,8 @@
 # MA  02110-1301  USA.
 
 %{!?name: %define name galera-3}
-%{!?version: %define version 25_3.x}
+%{!?wsrep_api: %define wsrep_api 25}
+%{!?version: %define version %{wsrep_api}_3.x}
 %{!?release: %define release 2}
 %define revision XXXX
 %define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
