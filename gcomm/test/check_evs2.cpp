@@ -30,33 +30,30 @@
 #include "check.h"
 
 //
-// run_all_evs_tests is set to true by default. To disable pc tests
-// which use real TCP transport or depend on wall clock,
 // set GALERA_TEST_DETERMINISTIC env
 // variable before running pc test suite.
 //
-static class run_all_evs_tests
+static class deterministic_tests
 {
 public:
-    run_all_evs_tests()
-        : run_all_tests_()
+    deterministic_tests()
+        : deterministic_tests_()
     {
         if (::getenv("GALERA_TEST_DETERMINISTIC"))
         {
-            run_all_tests_ = false;
+            deterministic_tests_ = true;
         }
         else
         {
-            run_all_tests_ = true;
+            deterministic_tests_ = false;
         }
     }
 
-    bool operator()() const { return run_all_tests_; }
+    bool operator()() const { return deterministic_tests_; }
 
 private:
-    bool run_all_tests_;
-} run_all_evs_tests;
-
+    bool deterministic_tests_;
+} deterministic_tests;
 
 using namespace std;
 using namespace std::rel_ops;
@@ -985,6 +982,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n_lossy)
 {
+    if (deterministic_tests()) return;
+
     gu_conf_self_tstamp_on();
     log_info << "START (leave_n_lossy)";
     init_rand();
@@ -1038,6 +1037,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n_lossy_w_user_msg)
 {
+    if (deterministic_tests()) return;
+
     gu_conf_self_tstamp_on();
     log_info << "START (leave_n_lossy_w_user_msg)";
     init_rand();
@@ -1218,6 +1219,8 @@ END_TEST
 
 START_TEST(test_proto_split_merge_lossy)
 {
+    if (deterministic_tests()) return;
+
     gu_conf_self_tstamp_on();
     log_info << "START (split_merge_lossy)";
     init_rand();
@@ -1242,6 +1245,8 @@ END_TEST
 
 START_TEST(test_proto_split_merge_lossy_w_user_msg)
 {
+    if (deterministic_tests()) return;
+
     gu_conf_self_tstamp_on();
     log_info << "START (split_merge_lossy_w_user_msg)";
     init_rand();
@@ -2199,189 +2204,171 @@ Suite* evs2_suite()
     Suite* s = suite_create("gcomm::evs");
     TCase* tc;
 
-    bool skip(false);
+    tc = tcase_create("test_range");
+    tcase_add_test(tc, test_range);
+    suite_add_tcase(s, tc);
 
-    if (skip == false)
-    {
-        tc = tcase_create("test_range");
-        tcase_add_test(tc, test_range);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_message");
+    tcase_add_test(tc, test_message);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_message");
-        tcase_add_test(tc, test_message);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_insert");
+    tcase_add_test(tc, test_input_map_insert);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_insert");
-        tcase_add_test(tc, test_input_map_insert);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_find");
+    tcase_add_test(tc, test_input_map_find);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_find");
-        tcase_add_test(tc, test_input_map_find);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_safety");
+    tcase_add_test(tc, test_input_map_safety);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_safety");
-        tcase_add_test(tc, test_input_map_safety);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_erase");
+    tcase_add_test(tc, test_input_map_erase);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_erase");
-        tcase_add_test(tc, test_input_map_erase);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_overwrap");
+    tcase_add_test(tc, test_input_map_overwrap);
+    tcase_set_timeout(tc, 60);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_overwrap");
-        tcase_add_test(tc, test_input_map_overwrap);
-        tcase_set_timeout(tc, 60);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_random_insert");
+    tcase_add_test(tc, test_input_map_random_insert);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_random_insert");
-        tcase_add_test(tc, test_input_map_random_insert);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_single_join");
+    tcase_add_test(tc, test_proto_single_join);
+    suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_proto_double_join");
+    tcase_add_test(tc, test_proto_double_join);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_single_join");
-        tcase_add_test(tc, test_proto_single_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n");
+    tcase_add_test(tc, test_proto_join_n);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_double_join");
-        tcase_add_test(tc, test_proto_double_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_w_user_msg);
+    suite_add_tcase(s, tc);
 
-        if (run_all_evs_tests() == true)
-        {
-            tc = tcase_create("test_proto_join_n");
-            tcase_add_test(tc, test_proto_join_n);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_lossy");
+    tcase_add_test(tc, test_proto_join_n_lossy);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_join_n_w_user_msg");
-            tcase_add_test(tc, test_proto_join_n_w_user_msg);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_join_n_lossy");
-            tcase_add_test(tc, test_proto_join_n_lossy);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_leave_n");
+    tcase_add_test(tc, test_proto_leave_n);
+    tcase_set_timeout(tc, 20);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
-            tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_leave_n_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_w_user_msg);
+    tcase_set_timeout(tc, 20);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_leave_n");
-            tcase_add_test(tc, test_proto_leave_n);
-            tcase_set_timeout(tc, 20);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_leave_n_lossy");
+    tcase_add_test(tc, test_proto_leave_n_lossy);
+    tcase_set_timeout(tc, 25);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_leave_n_w_user_msg");
-            tcase_add_test(tc, test_proto_leave_n_w_user_msg);
-            tcase_set_timeout(tc, 20);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
+    tcase_set_timeout(tc, 25);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_leave_n_lossy");
-            tcase_add_test(tc, test_proto_leave_n_lossy);
-            tcase_set_timeout(tc, 25);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_split_merge");
+    tcase_add_test(tc, test_proto_split_merge);
+    tcase_set_timeout(tc, 20);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
-            tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
-            tcase_set_timeout(tc, 25);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_split_merge_lossy");
+    tcase_add_test(tc, test_proto_split_merge_lossy);
+    tcase_set_timeout(tc, 20);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_split_merge");
-            tcase_add_test(tc, test_proto_split_merge);
-            tcase_set_timeout(tc, 20);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_split_merge_w_user_msg");
+    tcase_add_test(tc, test_proto_split_merge_w_user_msg);
+    tcase_set_timeout(tc, 60);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_split_merge_lossy");
-            tcase_add_test(tc, test_proto_split_merge_lossy);
-            tcase_set_timeout(tc, 20);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
+    tcase_set_timeout(tc, 60);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_split_merge_w_user_msg");
-            tcase_add_test(tc, test_proto_split_merge_w_user_msg);
-            tcase_set_timeout(tc, 60);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_stop_cont");
+    tcase_add_test(tc, test_proto_stop_cont);
+    tcase_set_timeout(tc, 10);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
-            tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
-            tcase_set_timeout(tc, 60);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_split_two");
+    tcase_add_test(tc, test_proto_split_two);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_proto_stop_cont");
-            tcase_add_test(tc, test_proto_stop_cont);
-            tcase_set_timeout(tc, 10);
-            suite_add_tcase(s, tc);
-        }
+    tc = tcase_create("test_aggreg");
+    tcase_add_test(tc, test_aggreg);
+    suite_add_tcase(s, tc);
 
-        if (run_all_evs_tests() == true)
-        {
-            tc = tcase_create("test_proto_split_two");
-            tcase_add_test(tc, test_proto_split_two);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_arbitrate");
+    tcase_add_test(tc, test_proto_arbitrate);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_aggreg");
-            tcase_add_test(tc, test_aggreg);
-            suite_add_tcase(s, tc);
-        }
+    tc = tcase_create("test_trac_538");
+    tcase_add_test(tc, test_trac_538);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-        if (run_all_evs_tests() == true)
-        {
-            tc = tcase_create("test_proto_arbitrate");
-            tcase_add_test(tc, test_proto_arbitrate);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_trac_552");
+    tcase_add_test(tc, test_trac_552);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_trac_538");
-            tcase_add_test(tc, test_trac_538);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_trac_607");
+    tcase_add_test(tc, test_trac_607);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_trac_552");
-            tcase_add_test(tc, test_trac_552);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_trac_724");
+    tcase_add_test(tc, test_trac_724);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_trac_607");
-            tcase_add_test(tc, test_trac_607);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_trac_760");
+    tcase_add_test(tc, test_trac_760);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_trac_724");
-            tcase_add_test(tc, test_trac_724);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_gh_41");
+    tcase_add_test(tc, test_gh_41);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_trac_760");
-            tcase_add_test(tc, test_trac_760);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_gh_37");
+    tcase_add_test(tc, test_gh_37);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_gh_41");
-            tcase_add_test(tc, test_gh_41);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_gh_40");
+    tcase_add_test(tc, test_gh_40);
+    tcase_set_timeout(tc, 5);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_gh_37");
-            tcase_add_test(tc, test_gh_37);
-            tcase_set_timeout(tc, 15);
-            suite_add_tcase(s, tc);
+    tc = tcase_create("test_gh_100");
+    tcase_add_test(tc, test_gh_100);
+    suite_add_tcase(s, tc);
 
-            tc = tcase_create("test_gh_40");
-            tcase_add_test(tc, test_gh_40);
-            tcase_set_timeout(tc, 5);
-            suite_add_tcase(s, tc);
-        }
+    tc = tcase_create("test_evs_protocol_upgrade");
+    tcase_add_test(tc, test_evs_protocol_upgrade);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_gh_100");
-        tcase_add_test(tc, test_gh_100);
-        suite_add_tcase(s, tc);
-
-        if (run_all_evs_tests() == true)
-        {
-            tc = tcase_create("test_evs_protocol_upgrade");
-            tcase_add_test(tc, test_evs_protocol_upgrade);
-            suite_add_tcase(s, tc);
-        }
-
-        tc = tcase_create("test_gal_521");
-        tcase_add_test(tc, test_gal_521);
-        suite_add_tcase(s, tc);
-    }
+    tc = tcase_create("test_gal_521");
+    tcase_add_test(tc, test_gal_521);
+    suite_add_tcase(s, tc);
 
     return s;
 }

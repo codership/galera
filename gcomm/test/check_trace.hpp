@@ -546,7 +546,14 @@ namespace gcomm
     class PropagationMatrix
     {
     public:
-        PropagationMatrix() : tp_(), prop_() { }
+        PropagationMatrix() : tp_(), prop_()
+        {
+            // Some tests which deal with timer expiration require that
+            // the current time is far enough from zero. Start from
+            // 100 secs after zero, this should give enough headroom
+            // for all tests.
+            gu::datetime::SimClock::init(100*gu::datetime::Sec);
+        }
         ~PropagationMatrix();
 
         void insert_tp(DummyNode* t);

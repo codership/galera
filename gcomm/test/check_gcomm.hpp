@@ -11,6 +11,8 @@ struct Suite;
 Suite* types_suite();
 /* Tests for utilities */
 Suite* util_suite();
+/* Util nondeterministic tests */
+Suite* util_nondet_suite();
 /* Tests for logger */
 Suite* logger_suite();
 /* Tests for message buffer implementations */
@@ -31,5 +33,7 @@ Suite* evs2_suite();
 Suite* vs_suite();
 /* Tests for PC transport */
 Suite* pc_suite();
+/* PC nondeterministic tests */
+Suite* pc_nondet_suite();
 
 #endif // CHECK_GCOMM_HPP

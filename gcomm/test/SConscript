@@ -20,7 +20,6 @@ gcomm_check = env.Program(target = 'check_gcomm',
                               check_trace.cpp
                               check_types.cpp
                               check_util.cpp
-                              check_gmcast.cpp
                               check_evs2.cpp
                               check_pc.cpp
                            '''))
@@ -29,6 +28,19 @@ env.Test("gcomm_check.passed", gcomm_check)
 
 Clean(gcomm_check, '#/check_gcomm.log')
 
+# Non deterministic tests must be run manually.
+Import('deterministic_tests all_tests')
+
+check_gcomm_nondet = env.Program(target = "check_gcomm_nondet",
+                                 source = [
+                                     "check_gcomm_nondet.cpp",
+                                     "check_gmcast.cpp",
+                                     "check_pc_nondet.cpp",
+                                     "check_util_nondet.cpp"
+                                 ])
+if not deterministic_tests and all_tests:
+    env.Test("gcomm_check_nondet.passed", check_gcomm_nondet)
+    Clean(check_gcomm_nondet, "#/check_gcomm_nondet.log")
 
 ssl_test = env.Program(target = 'ssl_test',
                        source = ['ssl_test.cpp'])
