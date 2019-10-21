@@ -13,6 +13,9 @@ extern "C"
 #include "gu_time.h"
 }
 
+long long gu::datetime::SimClock::counter_(0);
+bool gu::datetime::SimClock::initialized_(false);
+
 std::ostream& gu::datetime::operator<<(std::ostream& os, const Date& d)
 {
     os << d.get_utc();

@@ -70,13 +70,16 @@ gu_to_test = env.Program(target = 'gu_to_test',
                          source = Split('''
                              gu_to_test.c
                          '''))
-
 avalanche = env.Program(target = 'avalanche',
                          source = Split('''
                              avalanche.c
                          '''))
+Import('all_tests')
+if all_tests:
+    env.Test("go_to_test.passed", gu_to_test)
+    env.Test("avalance.passed", avalanche)
 
-# copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
+    # copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
 #                         source = Split('''
 #                             copy_vs_assignment.cpp
 #                         '''))

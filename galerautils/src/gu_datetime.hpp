@@ -110,6 +110,26 @@ namespace gu
             long long nsecs;
         };
 
+        // Clock simulation for unit tests which need determinism.
+        class SimClock
+        {
+        public:
+            /* Init with start time */
+            static void init(long long start_time)
+            {
+                counter_ = start_time;
+                initialized_ = true;
+            }
+            /* Return true if has been initialized. */
+            static bool initialized() { return initialized_; }
+            /* Get current time */
+            static long long get_time() { return counter_; }
+            /* Increment time with step nanoseconds. */
+            static void inc_time(long long step) { counter_ += step; }
+        private:
+            static long long counter_;
+            static bool initialized_;
+        };
 
         /*!
          * @brief Date/time representation.
@@ -127,17 +147,29 @@ namespace gu
              * @note This call should be deprecated in favor of calendar()
              *       and monotonic().
              */
-            static inline Date now() { return gu_time_monotonic(); }
+            static inline Date now()
+            {
+                if (SimClock::initialized()) return SimClock::get_time();
+                else return gu_time_monotonic();
+            }
 
             /*!
              * @brief Get time from system-wide realtime clock.
              */
-            static inline Date calendar() { return gu_time_calendar(); }
+            static inline Date calendar()
+            {
+                if (SimClock::initialized()) return SimClock::get_time();
+                else return gu_time_calendar();
+            }
 
             /*!
              * @brief Get time from monotonic clock.
              */
-            static inline Date monotonic() { return gu_time_monotonic(); }
+            static inline Date monotonic()
+            {
+                if (SimClock::initialized()) return SimClock::get_time();
+                else return gu_time_monotonic();
+            }
 
             /*!
              * @brief Get maximum representable timestamp.
@@ -227,6 +259,7 @@ namespace gu
         }
 
     } // namespace datetime
+
 } // namespace gu
 
 #endif // __GU_DATETIME__

@@ -153,7 +153,10 @@ boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
 tests      = int(ARGUMENTS.get('tests', 1))
+# Run only tests which are known to be deterministic
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
+# Run all tests
+all_tests = int(ARGUMENTS.get('all_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 
 
@@ -753,7 +756,7 @@ Export('has_version_script galera_script')
 #
 if deterministic_tests:
    os.environ['GALERA_TEST_DETERMINISTIC'] = '1'
-
+Export('deterministic_tests all_tests')
 #
 # Run root SConscript with variant_dir
 #
