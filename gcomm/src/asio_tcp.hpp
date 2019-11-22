@@ -72,6 +72,7 @@ private:
     void operator=(const AsioTcpSocket&);
 
     void set_socket_options();
+    void set_recv_buf_size();
     void init_tstamps()
     {
         gu::datetime::Date now(gu::datetime::Date::monotonic());
@@ -127,6 +128,7 @@ public:
 
     AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpAcceptor();
+    void set_recv_buf_size();
     void listen(const gu::URI& uri);
     std::string listen_addr() const;
     void close();

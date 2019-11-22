@@ -5,7 +5,7 @@
 #include "asio_tcp.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/common.hpp"
-
+#include "defaults.hpp"
 
 #define FAILED_HANDLER(_e) failed_handler(_e, __FUNCTION__, __LINE__)
 
@@ -172,6 +172,8 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
                 net_.io_service_, net_.ssl_context_
             );
 
+            ssl_socket_->lowest_layer().open(i->endpoint().protocol());
+            set_recv_buf_size(); // Must be done before connect
             ssl_socket_->lowest_layer().async_connect(
                 *i, boost::bind(&AsioTcpSocket::connect_handler,
                                 shared_from_this(),
@@ -182,12 +184,13 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
         {
             const std::string bind_ip(uri.get_option(
                                           gcomm::Socket::OptIfAddr, ""));
+            socket_.open(i->endpoint().protocol());
             if (!bind_ip.empty())
             {
-                socket_.open(i->endpoint().protocol());
                 asio::ip::tcp::endpoint ep(gu::make_address(bind_ip), 0);
                 socket_.bind(ep);
             }
+            set_recv_buf_size(); // Must be done before connect
             socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
                                                   shared_from_this(),
                                                   asio::placeholders::error));
@@ -196,10 +199,12 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
     }
     catch (asio::system_error& e)
     {
-        gu_throw_error(e.code().value())
-            << "error while connecting to remote host "
+        std::ostringstream msg;
+        msg << "error while connecting to remote host "
             << uri.to_string()
             << "', asio error '" << e.what() << "'";
+        log_warn << msg.str();
+        gu_throw_error(e.code().value()) << msg.str();
     }
 }
 
@@ -333,12 +338,18 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
 void gcomm::AsioTcpSocket::set_option(const std::string& key,
                                       const std::string& val)
 {
-    if (key == Conf::SocketRecvBufSize)
+    // Defaults::SocketRecvBufSize has value "auto", which means that the
+    // kernel should stay in control of tuning receive buffer. If the value
+    // is changed for something else, the kernel disables receive autotuning
+    // and there is no way back, so first changing the receive buffer size
+    // to some defined value and trying to change it back to "auto" will
+    // have no effect.
+    if (key == Conf::SocketRecvBufSize && val != Defaults::SocketRecvBufSize)
     {
         size_t llval;
         gu_trace(llval = Conf::check_recv_buf_size(val));
         socket().set_option(asio::socket_base::receive_buffer_size(llval));
-#if GCOMM_CHECK_RECV_BUF_SIZE
+#ifdef GCOMM_CHECK_RECV_BUF_SIZE
         check_socket_option<asio::socket_base::receive_buffer_size>
             (key, llval);
 #endif
@@ -585,32 +596,36 @@ std::string gcomm::AsioTcpSocket::remote_addr() const
     return remote_addr_;
 }
 
+static bool asio_recv_buf_warned(false);
 
 void gcomm::AsioTcpSocket::set_socket_options()
 {
     basic_socket_t& sock(socket());
-
     gu::set_fd_options(sock);
     sock.set_option(asio::ip::tcp::no_delay(true));
+}
 
-    size_t const recv_buf_size
-        (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
-    assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
-    sock.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
-
-#if GCOMM_CHECK_RECV_BUF_SIZE
-    size_t new_val(check_socket_option<asio::socket_base::receive_buffer_size>
-                   (gcomm::Conf::SocketRecvBufSize, recv_buf_size));
-    if (new_val < recv_buf_size)
+void gcomm::AsioTcpSocket::set_recv_buf_size()
+{
+    basic_socket_t& sock(socket());
+    if (net_.conf().get(Conf::SocketRecvBufSize) != Defaults::SocketRecvBufSize)
     {
-        // apparently there's a limit
-        net_.conf().set(gcomm::Conf::SocketRecvBufSize, new_val);
+        size_t const recv_buf_size
+            (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
+        assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
+        sock.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
+        asio::socket_base::receive_buffer_size option;
+        sock.get_option(option);
+        log_debug << "socket recv buf size " << option.value();
+        if (option.value() < ssize_t(recv_buf_size) && not asio_recv_buf_warned)
+        {
+            log_warn << "Receive buffer size " << option.value()
+                     << " less than requested " << recv_buf_size
+                     << ", this may affect performance in high latency/high "
+                     << "throughput networks.";
+            asio_recv_buf_warned = true;
+        }
     }
-#else
-    asio::socket_base::receive_buffer_size option;
-    sock.get_option(option);
-    log_debug << "socket recv buf size " << option.value();
-#endif
 }
 
 void gcomm::AsioTcpSocket::read_one(
@@ -829,6 +844,29 @@ void gcomm::AsioTcpAcceptor::accept_handler(
     }
 }
 
+void gcomm::AsioTcpAcceptor::set_recv_buf_size()
+{
+    if (net_.conf().get(Conf::SocketRecvBufSize) != Defaults::SocketRecvBufSize)
+    {
+        size_t const recv_buf_size
+            (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
+        assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
+        acceptor_.set_option(
+            asio::socket_base::receive_buffer_size(recv_buf_size));
+        asio::socket_base::receive_buffer_size option;
+        acceptor_.get_option(option);
+        log_debug << "socket recv buf size " << option.value();
+        if (option.value() < ssize_t(recv_buf_size) && not asio_recv_buf_warned)
+        {
+            log_warn << "Receive buffer size " << option.value()
+                     << " less than requested " << recv_buf_size
+                     << ", this may affect performance in high latency/high "
+                     << "throughput networks.";
+            asio_recv_buf_warned = true;
+        }
+    }
+}
+
 
 void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
 {
@@ -844,6 +882,7 @@ void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
         gu::set_fd_options(acceptor_);
+        set_recv_buf_size(); // Must be done before listen
         acceptor_.bind(*i);
         acceptor_.listen();
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));
@@ -861,10 +900,11 @@ void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
     }
     catch (asio::system_error& e)
     {
-        log_error << e.what();
-        gu_throw_error(e.code().value())
-            << "error while trying to listen '" << uri.to_string()
+        std::ostringstream msg;
+        msg << "error while trying to listen '" << uri.to_string()
             << "', asio error '" << e.what() << "'";
+        log_warn << msg.str();
+        gu_throw_error(e.code().value()) << msg.str();
     }
 }
 
