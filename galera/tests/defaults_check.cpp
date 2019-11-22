@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2018 Codership Oy <info@codership.com>
+// Copyright (C) 2018-2019 Codership Oy <info@codership.com>
 //
 
 #include <wsrep_api.h>
@@ -108,6 +108,7 @@ static const char* Defaults[] =
 #endif
     "socket.checksum",             "2",
     "socket.recv_buf_size",        "auto",
+    "socket.send_buf_size",        "auto",
 //  "socket.ssl",                  no default,
 //  "socket.ssl_cert",             no default,
 //  "socket.ssl_cipher",           no default,

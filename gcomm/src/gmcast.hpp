@@ -64,6 +64,13 @@ namespace gcomm
             gu_throw_fatal << "gmcast transport listen not implemented";
         }
 
+        // Configured listen address
+        std::string configured_listen_addr() const
+        {
+            return listen_addr_;
+        }
+
+        // Listen adddress obtained from listening socket.
         std::string listen_addr() const
         {
             if (listener_ == 0)

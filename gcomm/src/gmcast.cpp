@@ -1183,14 +1183,15 @@ void gcomm::GMCast::check_liveness()
         else if (p->state() == Proto::S_OK)
         {
             gcomm::SocketStats stats(p->socket()->stats());
-            if (stats.send_queue_length >= 2048)
+            if (stats.send_queue_length >= 1024)
             {
-                log_info << self_string()
-                         << " peer "
-                         << p->remote_uuid() << " with addr "
-                         << p->remote_addr()
-                         << ", socket stats: "
-                         << stats;
+                log_debug << self_string()
+                          << " socket send queue to "
+                          << " peer "
+                          << p->remote_uuid() << " with addr "
+                          << p->remote_addr()
+                          << ", socket stats: "
+                          << stats;
             }
             if ((p->recv_tstamp() + peer_timeout_*2/3 < now) ||
                 (p->send_tstamp() + peer_timeout_*1/3 < now))
@@ -1553,10 +1554,57 @@ void gcomm::GMCast::handle_up(const void*        id,
     }
 }
 
+static gcomm::gmcast::Proto* find_by_remote_uuid(
+    const gcomm::gmcast::ProtoMap& proto_map,
+    const gcomm::UUID& uuid)
+{
+    for (gcomm::gmcast::ProtoMap::const_iterator i(proto_map.begin());
+         i != proto_map.end(); ++i)
+    {
+        if (i->second->remote_uuid() == uuid)
+        {
+            return i->second;
+        }
+    }
+    return 0;
+}
 
 int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
     Message msg(version_, Message::GMCAST_T_USER_BASE, uuid(), 1, segment_);
+
+    // If target is set and proto entry for target is found,
+    // send a direct message. Otherwise fall back for broadcast
+    // to ensure message delivery via relay
+    if (dm.target() != UUID::nil())
+    {
+        Proto* target_proto(find_by_remote_uuid(*proto_map_, dm.target()));
+        if (target_proto && target_proto->state() == Proto::S_OK)
+        {
+            gu_trace(push_header(msg, dg));
+            int err;
+            if ((err = target_proto->socket()->send(dg)) != 0)
+            {
+                log_debug << "failed to send to "
+                          << target_proto->socket()->remote_addr()
+                          << ": (" << err << ") " << strerror(err);
+            }
+            else
+            {
+                target_proto->set_send_tstamp(gu::datetime::Date::monotonic());
+            }
+            gu_trace(pop_header(msg, dg));
+            if (err == 0)
+            {
+                return 0;
+            }
+            // In case of error fall back to broadcast
+        }
+        else
+        {
+            log_debug << "Target proto not found";
+        }
+    }
 
     // handle relay set first, skip these peers below
     if (relay_set_.empty() == false)
@@ -1571,8 +1619,6 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         gu_trace(pop_header(msg, dg));
         msg.set_flags(msg.flags() & ~Message::F_RELAY);
     }
-
-
 
     for (SegmentMap::iterator si(segment_map_.begin());
          si != segment_map_.end(); ++si)

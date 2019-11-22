@@ -9,6 +9,63 @@
 
 #define FAILED_HANDLER(_e) failed_handler(_e, __FUNCTION__, __LINE__)
 
+// Helpers to set socket buffer sizes for both connecting
+// and listening sockets.
+
+static const std::string auto_buf_size("auto");
+
+static bool asio_recv_buf_warned(false);
+template <class Socket>
+void set_recv_buf_size_helper(const gu::Config& conf, Socket& socket)
+{
+    if (conf.get(gcomm::Conf::SocketRecvBufSize) != auto_buf_size)
+    {
+        size_t const recv_buf_size
+            (conf.get<size_t>(gcomm::Conf::SocketRecvBufSize));
+        // this should have been checked already
+        assert(ssize_t(recv_buf_size) >= 0);
+
+        socket.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
+        asio::socket_base::receive_buffer_size option;
+        socket.get_option(option);
+        log_debug << "socket recv buf size " << option.value();
+        if (option.value() < ssize_t(recv_buf_size) && not asio_recv_buf_warned)
+        {
+            log_warn << "Receive buffer size " << option.value()
+                     << " less than requested " << recv_buf_size
+                     << ", this may affect performance in high latency/high "
+                     << "throughput networks.";
+            asio_recv_buf_warned = true;
+        }
+    }
+}
+
+static bool asio_send_buf_warned(false);
+template <class Socket>
+void set_send_buf_size_helper(const gu::Config& conf, Socket& socket)
+{
+    if (conf.get(gcomm::Conf::SocketSendBufSize) != auto_buf_size)
+    {
+        size_t const send_buf_size
+            (conf.get<size_t>(gcomm::Conf::SocketSendBufSize));
+        // this should have been checked already
+        assert(ssize_t(send_buf_size) >= 0);
+
+        socket.set_option(asio::socket_base::send_buffer_size(send_buf_size));
+        asio::socket_base::send_buffer_size option;
+        socket.get_option(option);
+        log_debug << "socket send buf size " << option.value();
+        if (option.value() < ssize_t(send_buf_size) && not asio_send_buf_warned)
+        {
+            log_warn << "Send buffer size " << option.value()
+                     << " less than requested " << send_buf_size
+                     << ", this may affect performance in high latency/high "
+                     << "throughput networks.";
+            asio_send_buf_warned = true;
+        }
+    }
+}
+
 gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const gu::URI& uri)
     :
     Socket       (uri),
@@ -173,7 +230,7 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
             );
 
             ssl_socket_->lowest_layer().open(i->endpoint().protocol());
-            set_recv_buf_size(); // Must be done before connect
+            set_buf_sizes(); // Must be done before connect
             ssl_socket_->lowest_layer().async_connect(
                 *i, boost::bind(&AsioTcpSocket::connect_handler,
                                 shared_from_this(),
@@ -190,7 +247,7 @@ void gcomm::AsioTcpSocket::connect(const gu::URI& uri)
                 asio::ip::tcp::endpoint ep(gu::make_address(bind_ip), 0);
                 socket_.bind(ep);
             }
-            set_recv_buf_size(); // Must be done before connect
+            set_buf_sizes(); // Must be done before connect
             socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
                                                   shared_from_this(),
                                                   asio::placeholders::error));
@@ -338,21 +395,19 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
 void gcomm::AsioTcpSocket::set_option(const std::string& key,
                                       const std::string& val)
 {
-    // Defaults::SocketRecvBufSize has value "auto", which means that the
-    // kernel should stay in control of tuning receive buffer. If the value
-    // is changed for something else, the kernel disables receive autotuning
-    // and there is no way back, so first changing the receive buffer size
-    // to some defined value and trying to change it back to "auto" will
-    // have no effect.
-    if (key == Conf::SocketRecvBufSize && val != Defaults::SocketRecvBufSize)
+    // Currently adjustable socket.recv_buf_size and socket.send_buf_size
+    // bust be set before the connection is established, so the runtime
+    // setting will not be effective.
+    log_warn << "Setting " << key << " in run time does not have effect, "
+             << "please set the configuration in provider options "
+             << "and restart";
+    if (key == Conf::SocketRecvBufSize)
     {
-        size_t llval;
-        gu_trace(llval = Conf::check_recv_buf_size(val));
-        socket().set_option(asio::socket_base::receive_buffer_size(llval));
-#ifdef GCOMM_CHECK_RECV_BUF_SIZE
-        check_socket_option<asio::socket_base::receive_buffer_size>
-            (key, llval);
-#endif
+        (void)Conf::check_recv_buf_size(val);
+    }
+    else if (key == Conf::SocketSendBufSize)
+    {
+        (void)Conf::check_send_buf_size(val);
     }
 }
 
@@ -399,6 +454,11 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
     if (state() != S_CONNECTED)
     {
         return ENOTCONN;
+    }
+
+    if (send_q_.size() > max_send_q_length)
+    {
+        return ENOBUFS;
     }
 
     NetHeader hdr(static_cast<uint32_t>(dg.len()), net_.version_);
@@ -596,8 +656,6 @@ std::string gcomm::AsioTcpSocket::remote_addr() const
     return remote_addr_;
 }
 
-static bool asio_recv_buf_warned(false);
-
 void gcomm::AsioTcpSocket::set_socket_options()
 {
     basic_socket_t& sock(socket());
@@ -605,27 +663,10 @@ void gcomm::AsioTcpSocket::set_socket_options()
     sock.set_option(asio::ip::tcp::no_delay(true));
 }
 
-void gcomm::AsioTcpSocket::set_recv_buf_size()
+void gcomm::AsioTcpSocket::set_buf_sizes()
 {
-    basic_socket_t& sock(socket());
-    if (net_.conf().get(Conf::SocketRecvBufSize) != Defaults::SocketRecvBufSize)
-    {
-        size_t const recv_buf_size
-            (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
-        assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
-        sock.set_option(asio::socket_base::receive_buffer_size(recv_buf_size));
-        asio::socket_base::receive_buffer_size option;
-        sock.get_option(option);
-        log_debug << "socket recv buf size " << option.value();
-        if (option.value() < ssize_t(recv_buf_size) && not asio_recv_buf_warned)
-        {
-            log_warn << "Receive buffer size " << option.value()
-                     << " less than requested " << recv_buf_size
-                     << ", this may affect performance in high latency/high "
-                     << "throughput networks.";
-            asio_recv_buf_warned = true;
-        }
-    }
+    set_recv_buf_size_helper(net_.conf(), socket());
+    set_send_buf_size_helper(net_.conf(), socket());
 }
 
 void gcomm::AsioTcpSocket::read_one(
@@ -760,6 +801,7 @@ gcomm::SocketStats gcomm::AsioTcpSocket::stats() const
         ret.rto            = tcpi.tcpi_rto;
         ret.lost           = tcpi.tcpi_lost;
         ret.last_data_recv = tcpi.tcpi_last_data_recv;
+        ret.cwnd           = tcpi.tcpi_snd_cwnd;
         gu::datetime::Date now(gu::datetime::Date::monotonic());
         Critical<AsioProtonet> crit(net_);
         ret.last_queued_since = (now - last_queued_tstamp_).get_nsecs();
@@ -844,27 +886,10 @@ void gcomm::AsioTcpAcceptor::accept_handler(
     }
 }
 
-void gcomm::AsioTcpAcceptor::set_recv_buf_size()
+void gcomm::AsioTcpAcceptor::set_buf_sizes()
 {
-    if (net_.conf().get(Conf::SocketRecvBufSize) != Defaults::SocketRecvBufSize)
-    {
-        size_t const recv_buf_size
-            (net_.conf().get<size_t>(gcomm::Conf::SocketRecvBufSize));
-        assert(ssize_t(recv_buf_size) >= 0); // this should have been checked already
-        acceptor_.set_option(
-            asio::socket_base::receive_buffer_size(recv_buf_size));
-        asio::socket_base::receive_buffer_size option;
-        acceptor_.get_option(option);
-        log_debug << "socket recv buf size " << option.value();
-        if (option.value() < ssize_t(recv_buf_size) && not asio_recv_buf_warned)
-        {
-            log_warn << "Receive buffer size " << option.value()
-                     << " less than requested " << recv_buf_size
-                     << ", this may affect performance in high latency/high "
-                     << "throughput networks.";
-            asio_recv_buf_warned = true;
-        }
-    }
+    set_recv_buf_size_helper(net_.conf(), acceptor_);
+    set_send_buf_size_helper(net_.conf(), acceptor_);
 }
 
 
@@ -882,7 +907,7 @@ void gcomm::AsioTcpAcceptor::listen(const gu::URI& uri)
         acceptor_.open(i->endpoint().protocol());
         acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
         gu::set_fd_options(acceptor_);
-        set_recv_buf_size(); // Must be done before listen
+        set_buf_sizes(); // Must be done before listen
         acceptor_.bind(*i);
         acceptor_.listen();
         AsioTcpSocket* new_socket(new AsioTcpSocket(net_, uri));

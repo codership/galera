@@ -64,6 +64,11 @@ public:
     }
 
     virtual void        listen();
+    // Get configured listen addr. For test purposes only.
+    virtual std::string configured_listen_addr() const
+    {
+        gu_throw_fatal << "not supported";
+    }
     virtual std::string listen_addr() const
     {
         gu_throw_fatal << "not supported";

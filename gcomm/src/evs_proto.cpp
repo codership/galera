@@ -158,6 +158,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     input_map_(new InputMap()),
     causal_queue_(),
     consensus_(*this, known_, *input_map_, current_view_),
+    last_sent_join_tstamp_(),
     install_message_(0),
     max_view_id_seq_(0),
     attempt_seq_(1),
@@ -182,6 +183,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                                    Defaults::EvsUserSendWindow),
                     gu::from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
                     send_window_ + 1)),
+    bytes_since_request_user_msg_feedback_(),
     output_(),
     send_buf_(),
     max_output_size_(128),
@@ -662,7 +664,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
     else if (state() == S_OPERATIONAL)
     {
         const seqno_t prev_last_sent(last_sent_);
-        evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent_;
+        evs_log_debug(D_TIMERS) << "sending keepalive, last_sent=" << last_sent_;
         Datagram dg;
         gu_trace((void)send_user(dg, 0xff, O_DROP, -1, -1));
         if (prev_last_sent == last_sent_)
@@ -782,6 +784,10 @@ void gcomm::evs::Proto::handle_install_timer()
 
 void gcomm::evs::Proto::handle_stats_timer()
 {
+    if (info_mask_ & I_STATISTICS)
+    {
+        log_info << stats();
+    }
     reset_stats();
 #ifdef GCOMM_PROFILE
     evs_log_info(I_PROFILING) << "\nprofiles:\n";
@@ -971,24 +977,21 @@ void gcomm::evs::Proto::check_inactive()
         }
 
         DelayedList::iterator dli(delayed_list_.find(node_uuid));
-        if (node.seen_tstamp() + retrans_period_ + delay_margin_ <= now)
+        if (auto_evict_ &&
+            node.seen_tstamp() + retrans_period_ + delay_margin_ <= now)
         {
             if (node.index() != std::numeric_limits<size_t>::max())
             {
                 // Delayed node in group, check input map state and request
                 // message recovery if necessary
                 Range range(input_map_->range(node.index()));
-                evs_log_info(I_STATE) << "delayed "
-                                      << node_uuid << " requesting range "
-                                      << Range(range.lu(), last_sent_);
+                log_info << "delayed node: "
+                         << node_uuid << ", requesting range "
+                         << Range(range.lu(), last_sent_);
                 if (last_sent_ >= range.lu())
                 {
-                    // Request recovering message from all nodes (indicated
-                    // by last arg) to increase probablity of receiving the
-                    // message.
-                    gu_trace(send_gap(EVS_CALLER, node_uuid, current_view_.id(),
-                                      Range(range.lu(), last_sent_),
-                                      false, true));
+                    // Request missing message range from delayed node.
+                    request_retrans(node_uuid, Range(range.lu(), last_sent_));
                 }
             }
 
@@ -1466,6 +1469,21 @@ bool gcomm::evs::Proto::is_flow_control(const seqno_t seq, const seqno_t win) co
     return false;
 }
 
+bool gcomm::evs::Proto::request_user_msg_feedback(const gcomm::Datagram& dg)
+    const
+{
+    // Request feedback from peers at least once per 128kB chunk. This will
+    // force the nodes to complete their seqnos.
+    if (bytes_since_request_user_msg_feedback_ + dg.len() >= (size_t(1) << 17))
+    {
+        evs_log_debug(D_USER_MSGS) << "bytes since request user msg feedback: "
+                                   << bytes_since_request_user_msg_feedback_
+                                   << " dg len: " << dg.len();
+        return true;
+    }
+    return false;
+}
+
 int gcomm::evs::Proto::send_user(Datagram& dg,
                                  uint8_t const user_type,
                                  Order  const order,
@@ -1500,16 +1518,21 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
 
     // If output queue wont contain messages after this patch,
     // up_to_seqno is given (msg completion) or flow contol would kick in
-    // at next batch, don't set F_MSG_MORE.
+    // at next batch, don't set F_MSG_MORE. Also if the number of bytes
+    // in send pipeline exceeds predefined value as reported by
+    // request_user_msg_feedback(), the F_MSG_MORE will not get set.
     if (output_.size() <= n_aggregated ||
         up_to_seqno != -1 ||
-        (win != -1 && is_flow_control(last_msg_seq + 1, win) == true))
+        (win != -1 && (is_flow_control(last_msg_seq + 1, win) ||
+                       request_user_msg_feedback(dg))))
     {
         flags = 0;
+        bytes_since_request_user_msg_feedback_ = 0;
     }
     else
     {
         flags = Message::F_MSG_MORE;
+        bytes_since_request_user_msg_feedback_ += dg.len();
     }
     if (n_aggregated > 1)
     {
@@ -1685,36 +1708,55 @@ void gcomm::evs::Proto::complete_user(const seqno_t high_seq)
 
 }
 
-
-int gcomm::evs::Proto::send_delegate(Datagram& wb)
+int gcomm::evs::Proto::send_delegate(Datagram& wb, const UUID& target)
 {
     DelegateMessage dm(version_, uuid(), current_view_.id(),
                        ++fifo_seq_);
     push_header(dm, wb);
-    int ret = send_down(wb, ProtoDownMeta());
+    int ret = send_down(wb, ProtoDownMeta(target));
     pop_header(dm, wb);
     sent_msgs_[Message::EVS_T_DELEGATE]++;
     return ret;
 }
 
+bool gcomm::evs::Proto::gap_rate_limit(const UUID& target, const Range& range)
+    const
+{
+    NodeMap::const_iterator target_i(known_.find(target));
+    // Sanity check: The target should always be in the set
+    // of known nodes. If it is not, skip sending the gap message
+    // in production.
+    assert(target_i != known_.end());
+    if (target_i == known_.end())
+    {
+        return true;
+    }
+    const Node& target_node(target_i->second);
+    // Limit requesting ranges with the same highest seen within
+    // 50msec period.
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
+    if (now < target_node.last_requested_range_tstamp() + gu::datetime::MSec*100)
+    {
+        evs_log_debug(D_GAP_MSGS) << "Rate limiting gap: now " << now
+                                  << " requested range tstamp: "
+                                  << target_node.last_requested_range_tstamp()
+                                  << " requested range: "
+                                  << target_node.last_requested_range();
+        return true;
+    }
+    return false;
+}
 
 void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
                                  const UUID&   range_uuid,
                                  const ViewId& source_view_id,
                                  const Range   range,
-                                 const bool    commit,
-                                 const bool    req_all)
+                                 const bool    commit)
 {
     gcomm_assert((commit == false && source_view_id == current_view_.id())
                  || install_message_ != 0);
-    // TODO: Investigate if gap sending can be somehow limited,
-    // message loss happen most probably during congestion and
-    // flooding network with gap messages won't probably make
-    // conditions better
-
     uint8_t flags(0);
     if (commit == true) flags |= Message::F_COMMIT;
-    if (req_all) flags |= Message::F_RETRANS;
 
     GapMessage gm(version_,
                   uuid(),
@@ -1732,13 +1774,21 @@ void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
     gu::Buffer buf;
     serialize(gm, buf);
     Datagram dg(buf);
-    int err = send_down(dg, ProtoDownMeta());
+    int err = send_down(dg, ProtoDownMeta(range_uuid));
     if (err != 0)
     {
         log_debug << "send failed: " << strerror(err);
     }
     sent_msgs_[Message::EVS_T_GAP]++;
     gu_trace(handle_gap(gm, self_i_));
+    if (not range.is_empty() && range_uuid != UUID::nil())
+    {
+        NodeMap::iterator target_i(known_.find(range_uuid));
+        if (target_i != known_.end())
+        {
+            target_i->second.last_requested_range(range);
+        }
+    }
 }
 
 
@@ -1893,6 +1943,10 @@ void gcomm::evs::Proto::send_join(bool handle)
     if (err != 0)
     {
         log_debug << "send failed: " << strerror(err);
+    }
+    else
+    {
+        last_sent_join_tstamp_ = gu::datetime::Date::monotonic();
     }
     sent_msgs_[Message::EVS_T_JOIN]++;
     if (handle == true)
@@ -2074,7 +2128,10 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
                              << range.lu() << " -> "
                              << range.hs();
 
-    seqno_t seq(range.lu());
+    // All of the nodes have received all messages up to input_map_->safe_seq(),
+    // therefore it does not make sense to retransmit anything below that.
+    seqno_t seq(std::max(range.lu(), input_map_->safe_seq() + 1));
+    evs_log_debug(D_RETRANS) << "retransmitting from " << seq;
     while (seq <= range.hs())
     {
         InputMap::iterator msg_i = input_map_->find(
@@ -2115,7 +2172,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
 
         push_header(um, rb);
 
-        int err = send_down(rb, ProtoDownMeta());
+        int err = send_down(rb, ProtoDownMeta(gap_source));
         if (err != 0)
         {
             log_debug << "send failed: " << strerror(err);
@@ -2159,8 +2216,11 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
                              << " requested range " << range
                              << " available " << im_range;
 
-
-    seqno_t seq(range.lu());
+    // All of the nodes have received all messages up to input_map_->safe_seq(),
+    // therefore it does not make sense to retransmit anything below that.
+    seqno_t seq(std::max(range.lu(), input_map_->safe_seq() + 1));
+    evs_log_debug(D_RETRANS) << "recovering from " << seq;
+    size_t n_recovered(0);
     while (seq <= range.hs() && seq <= im_range.hs())
     {
         InputMap::iterator msg_i = input_map_->find(range_node.index(), seq);
@@ -2198,7 +2258,8 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 
         push_header(um, rb);
 
-        int err = send_delegate(rb);
+        ++n_recovered;
+        int err = send_delegate(rb, gap_source);
         if (err != 0)
         {
             log_debug << "send failed: " << strerror(err);
@@ -2211,6 +2272,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         seq = seq + msg.seq_range() + 1;
         recovered_msgs_++;
     }
+    evs_log_debug(D_RETRANS) << "recovered: " << n_recovered;
 }
 
 
@@ -3230,6 +3292,22 @@ gcomm::evs::seqno_t gcomm::evs::Proto::update_im_safe_seq(const size_t uuid,
     return im_safe_seq;
 }
 
+void gcomm::evs::Proto::request_retrans(const UUID& target, const Range& range)
+{
+    if (not gap_rate_limit(target, range))
+    {
+        // @todo Currently the whole range is requested. This should be optimized
+        //       to request only missing messages.
+        evs_log_debug(D_RETRANS) << " requesting retrans from "
+                                 << target << " "
+                                 << range
+                                 << " due to input map gap, aru "
+                                 << input_map_->aru_seq();
+        profile_enter(send_gap_prof_);
+        gu_trace(send_gap(EVS_CALLER, target, current_view_.id(), range));
+        profile_leave(send_gap_prof_);
+    }
+}
 
 void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                                     NodeMap::iterator ii,
@@ -3378,9 +3456,22 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         {
             inst.set_tstamp(gu::datetime::Date::now());
         }
+        else
+        {
+            evs_log_debug(D_USER_MSGS)
+                << "Not timestamping due to user msg: range.lu: "
+                << range.lu()
+                << " prev_range.lu(): "
+                << prev_range.lu();
+        }
     }
     else
     {
+        evs_log_debug(D_USER_MSGS)
+            << "Not timestamping due to user msg: msg.seq: "
+            << msg.seq()
+            << " prev_range.lu(): "
+            << prev_range.lu();
         range = prev_range;
     }
 
@@ -3394,17 +3485,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     profile_leave(input_map_prof_);
 
     // Check for missing messages
-    if (range.hs()                         >  range.lu() &&
-        (msg.flags() & Message::F_RETRANS) == 0                 )
+    if (range.hs() >  range.lu() &&
+        (msg.flags() & Message::F_RETRANS) == 0)
     {
-        evs_log_debug(D_RETRANS) << " requesting retrans from "
-                                 << msg.source() << " "
-                                 << range
-                                 << " due to input map gap, aru "
-                                 << input_map_->aru_seq();
-        profile_enter(send_gap_prof_);
-        gu_trace(send_gap(EVS_CALLER, msg.source(), current_view_.id(), range));
-        profile_leave(send_gap_prof_);
+        request_retrans(msg.source(), range);
     }
 
     // Seqno range completion and acknowledgement
@@ -3758,7 +3842,7 @@ void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
                 gu::Buffer buf;
                 serialize(send_lm, buf);
                 Datagram dg(buf);
-                gu_trace(send_delegate(dg));
+                gu_trace(send_delegate(dg, UUID::nil()));
             }
         }
     }
@@ -4111,6 +4195,22 @@ void gcomm::evs::Proto::check_nil_view_id()
     }
 }
 
+bool gcomm::evs::Proto::join_rate_limit() const
+{
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
+    // Limit join message send rate with wan settings. It is likely that
+    // the transfer of user messages which were flushed into network
+    // in shift to GATHER state takes some time. Too frequent join message
+    // send will cause unwanted retransmits which will pile up in the
+    // socket send queue.
+    if (send_window_ > 16 &&
+        now < last_sent_join_tstamp_ + 100*gu::datetime::MSec)
+    {
+        evs_log_debug(D_JOIN_MSGS) << "join rate limit";
+        return true;
+    }
+    return false;
+}
 
 void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii)
 {
@@ -4147,8 +4247,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                     const Range r(input_map_->range(node.index()));
                     if (r.lu() <= last_sent_)
                     {
-                        send_gap(EVS_CALLER, uuid, current_view_.id(),
-                                 Range(r.lu(), last_sent_));
+                        request_retrans(uuid, Range(r.lu(), last_sent_));
                     }
                 }
             }
@@ -4370,7 +4469,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
          curr_join->node_list() != new_nl))
     {
         gu_trace(create_join());
-        if (consensus_.is_consensus() == false)
+        if (consensus_.is_consensus() == false && not join_rate_limit())
         {
             send_join(false);
         }

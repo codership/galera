@@ -1823,6 +1823,7 @@ START_TEST(test_weighted_quorum)
     fail_unless(pc_from_dummy(dn[0])->cluster_weight() == 0);
     fail_unless(pc_from_dummy(dn[1])->cluster_weight() == 0);
     fail_unless(pc_from_dummy(dn[2])->cluster_weight() == 2);
+    std::for_each(dn.begin(), dn.end(), gu::DeleteObject());
 }
 END_TEST
 

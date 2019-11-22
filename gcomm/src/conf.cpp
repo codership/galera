@@ -22,6 +22,8 @@ std::string const gcomm::Conf::SocketChecksum =
     SocketPrefix + "checksum";
 std::string const gcomm::Conf::SocketRecvBufSize =
     SocketPrefix + "recv_buf_size";
+std::string const gcomm::Conf::SocketSendBufSize =
+    SocketPrefix + "send_buf_size";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
@@ -129,6 +131,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD        (TcpNonBlocking);
     GCOMM_CONF_ADD_DEFAULT(SocketChecksum);
     GCOMM_CONF_ADD_DEFAULT(SocketRecvBufSize);
+    GCOMM_CONF_ADD_DEFAULT(SocketSendBufSize);
 
     GCOMM_CONF_ADD_DEFAULT(GMCastVersion);
     GCOMM_CONF_ADD        (GMCastGroup);
@@ -192,5 +195,13 @@ size_t gcomm::Conf::check_recv_buf_size(const std::string& str)
     // signed type to check for negative values
     return (str == Defaults::SocketRecvBufSize ||
             check_range<long long>(SocketRecvBufSize, str,
+                                   0, std::numeric_limits<long long>::max()));
+}
+
+size_t gcomm::Conf::check_send_buf_size(const std::string& str)
+{
+    // signed type to check for negative values
+    return (str == Defaults::SocketSendBufSize ||
+            check_range<long long>(SocketSendBufSize, str,
                                    0, std::numeric_limits<long long>::max()));
 }

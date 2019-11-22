@@ -150,7 +150,15 @@ public:
     std::string stats() const;
     void reset_stats();
 
-    bool is_flow_control(const seqno_t, const seqno_t win) const;
+    // Return true if the message with seqno and given send window will
+    // cause flow control.
+    bool is_flow_control(const seqno_t seqno, const seqno_t win) const;
+    // Return true if sending the user message contained in dg
+    // should make all nodes to respond to the message. This happens
+    // if sending the datagram would cause some predefined (@todo name
+    // variable here) number of bytes to be exceeded without sending
+    // and user message without F_MSG_MORE flag.
+    bool request_user_msg_feedback(const gcomm::Datagram& dg) const;
     int send_user(Datagram&,
                   uint8_t,
                   Order,
@@ -161,11 +169,21 @@ public:
     size_t aggregate_len() const;
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
-    int send_delegate(Datagram&);
+    int send_delegate(Datagram&, const UUID& target);
+    bool gap_rate_limit(const UUID&, const Range&) const;
+    // Send GAP message.
+    // @param range_uuid If non-nil, the gap message will contain request for
+    //                   retransmission of messages in given range.
+    // @param view_id View ID the gap message belongs to.
+    // @param range If non-empty denotes the range of messages to be resent
+    //              by the node with range_uuid
+    // @param commit If set, the gap informs that the node will commit to the
+    //               proposed view in previously received install message.
     void send_gap(EVS_CALLER_ARG,
-                  const UUID&, const ViewId&, const Range,
-                  bool commit = false, bool req_all = false);
+                  const UUID& range_uuid, const ViewId& view_id, const Range range,
+                  bool commit = false);
     const JoinMessage& create_join();
+    bool join_rate_limit() const;
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
     void set_leave(const LeaveMessage&, const UUID&);
@@ -237,6 +255,10 @@ private:
     void check_nil_view_id();
     void asymmetry_elimination();
     void handle_foreign(const Message&);
+    // Request retransmission of messages.
+    // @param target Target node to request messages from.
+    // @param range Seqno range to request
+    void request_retrans(const UUID& target, const Range& range);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,
                      const Datagram&);
@@ -463,6 +485,8 @@ private:
     std::deque<CausalMessage> causal_queue_;
     // Consensus module
     Consensus consensus_;
+    // Last sent join tstamp
+    gu::datetime::Date last_sent_join_tstamp_;
     // Last received install message
     InstallMessage* install_message_;
     // Highest seen view id seqno
@@ -483,6 +507,9 @@ private:
     seqno_t send_window_;
     // User send window size
     seqno_t user_send_window_;
+    // Bytes since the last user msg which will require feedback from
+    // other nodes (i.e. sent without F_MSG_MORE)
+    size_t bytes_since_request_user_msg_feedback_;
     // Output message queue
     std::deque<std::pair<Datagram, ProtoDownMeta> > output_;
     std::vector<gu::byte_t> send_buf_;

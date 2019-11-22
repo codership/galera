@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_DEFAULTS_HPP
@@ -15,6 +15,7 @@ namespace gcomm
         static std::string const ProtonetVersion          ;
         static std::string const SocketChecksum           ;
         static std::string const SocketRecvBufSize        ;
+        static std::string const SocketSendBufSize        ;
         static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
         static std::string const GMCastSegment            ;

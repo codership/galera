@@ -50,6 +50,8 @@ public:
         delayed_list_message_(0),
         tstamp_            (gu::datetime::Date::now()),
         seen_tstamp_       (tstamp_),
+        last_requested_range_tstamp_(),
+        last_requested_range_(),
         fifo_seq_          (-1),
         segment_           (0)
     {}
@@ -99,6 +101,16 @@ public:
     void set_seen_tstamp(const gu::datetime::Date& t) { seen_tstamp_ = t; }
     const gu::datetime::Date& seen_tstamp() const { return seen_tstamp_; }
 
+    void last_requested_range(const Range& range)
+    {
+        assert(range.is_empty() == false);
+        last_requested_range_tstamp_ = gu::datetime::Date::monotonic();
+        last_requested_range_ = range;
+    }
+    gu::datetime::Date last_requested_range_tstamp() const
+    { return last_requested_range_tstamp_; }
+    const Range& last_requested_range() const { return last_requested_range_; }
+
     void set_fifo_seq(const int64_t seq) { fifo_seq_ = seq; }
     int64_t fifo_seq() const { return fifo_seq_; }
     SegmentId segment() const { return segment_; }
@@ -136,6 +148,11 @@ private:
     // Timestamp denoting the time when the node was seen last time.
     // This is used to decide if the node should be considered delayed.
     gu::datetime::Date seen_tstamp_;
+    // Last time the gap message requesting a message resend/recovery
+    // was sent to this node.
+    gu::datetime::Date last_requested_range_tstamp_;
+    // Last requested (non-empty) range.
+    Range last_requested_range_;
     int64_t fifo_seq_;
     SegmentId segment_;
 };

@@ -47,6 +47,8 @@ gcomm::evs::Node::Node(const Node& n)
                          new DelayedListMessage(*n.delayed_list_message_) : 0),
     tstamp_          (n.tstamp_),
     seen_tstamp_     (n.seen_tstamp_),
+    last_requested_range_tstamp_(),
+    last_requested_range_(),
     fifo_seq_        (n.fifo_seq_),
     segment_         (n.segment_)
 { }

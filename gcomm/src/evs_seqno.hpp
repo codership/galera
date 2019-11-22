@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef EVS_SEQNO_HPP
@@ -9,7 +9,6 @@
 
 #include "gu_serialize.hpp"
 
-//#include <stdint.h> // for uint16_t
 #include <ostream>
 #include <cassert>
 
@@ -65,6 +64,15 @@ public:
         return (lu_ == cmp.lu_ && hs_ == cmp.hs_);
     }
 
+    /**
+     * Return true if the range is empty. This is the case when
+     * - The range is default constructed
+     * - Lowest unseen is greater than highest seen.
+     */
+    bool is_empty() const
+    {
+        return ((lu_ == -1 && hs_ == -1) || lu_ > hs_);
+    }
 private:
     seqno_t lu_; /*!< Lowest unseen seqno */
     seqno_t hs_; /*!< Highest seen seqno  */

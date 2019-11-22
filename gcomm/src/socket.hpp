@@ -36,11 +36,13 @@ namespace gcomm
         long rto;     /** Retransmission timeout in usecs. */
         long lost;    /** Estimate of lost packets (Linux only). */
         long last_data_recv; /** Time since last received data in msecs. */
+        long cwnd; /** Congestion window */
         /* Stats from userspace */
         long last_queued_since;    /** Last queued since in msecs           */
         long last_delivered_since; /** Last delivered since in msecs        */
         long send_queue_length;    /** Number of messaged pending for send. */
         socket_stats_st() : rtt(), rttvar(), rto(), lost(), last_data_recv(),
+                            cwnd(),
                             last_queued_since(),
                             last_delivered_since(),
                             send_queue_length()
@@ -56,6 +58,7 @@ namespace gcomm
                 << " rto: " << stats.rto
                 << " lost: " << stats.lost
                 << " last_data_recv: " << stats.last_data_recv
+                << " cwnd: " << stats.cwnd
                 << " last_queued_since: " << stats.last_queued_since
                 << " last_delivered_since: " << stats.last_delivered_since
                 << " send_queue_length: " << stats.send_queue_length);
