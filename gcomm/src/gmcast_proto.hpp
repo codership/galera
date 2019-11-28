@@ -107,7 +107,7 @@ public:
 
     ~Proto() { tp_->close(); }
 
-    void send_msg(const Message& msg);
+    void send_msg(const Message& msg, bool ignore_no_buffer_space);
     void send_handshake();
     void wait_handshake();
     /*

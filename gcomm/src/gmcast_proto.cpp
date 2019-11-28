@@ -70,15 +70,19 @@ void gcomm::gmcast::Proto:: set_state(State new_state)
     state_ = new_state;
 }
 
-void gcomm::gmcast::Proto::send_msg(const Message& msg)
+void gcomm::gmcast::Proto::send_msg(const Message& msg,
+                                    bool ignore_no_buffer_space)
 {
     gu::Buffer buf;
     gu_trace(serialize(msg, buf));
     Datagram dg(buf);
     int ret = tp_->send(dg);
 
-    // @todo: This can happen during congestion, figure out how to
-    // avoid terminating connection with topology change messages.
+    if (ret == ENOBUFS && ignore_no_buffer_space)
+    {
+        return;
+    }
+
     if (ret != 0)
     {
         log_debug << "Send failed: " << strerror(ret);
@@ -92,7 +96,7 @@ void gcomm::gmcast::Proto::send_handshake()
     Message hs (version_, Message::GMCAST_T_HANDSHAKE, handshake_uuid_,
                 gmcast_.uuid(), local_segment_);
 
-    send_msg(hs);
+    send_msg(hs, false);
 
     set_state(S_HANDSHAKE_SENT);
 }
@@ -191,7 +195,7 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
                  local_addr_,
                  group_name_,
                  local_segment_);
-    send_msg(hsr);
+    send_msg(hsr, false);
 
     set_state(S_HANDSHAKE_RESPONSE_SENT);
 }
@@ -212,7 +216,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             Message failed(version_, Message::GMCAST_T_FAIL,
                            gmcast_.uuid(), local_segment_,
                            gmcast_proto_err_invalid_group);
-            send_msg(failed);
+            send_msg(failed, false);
             set_state(S_FAILED);
             return;
         }
@@ -242,7 +246,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         propagate_remote_ = true;
         Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(),
                    local_segment_, "");
-        send_msg(ok);
+        send_msg(ok, false);
         set_state(S_OK);
     }
     catch (std::exception& e)
@@ -252,7 +256,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         Message nok (version_, Message::GMCAST_T_FAIL,
                      gmcast_.uuid(), local_segment_,
                      "invalid node address");
-        send_msg (nok);
+        send_msg (nok, false);
         set_state(S_FAILED);
     }
 }
@@ -334,7 +338,7 @@ void gcomm::gmcast::Proto::handle_keepalive(const Message& msg)
 {
     log_debug << "keepalive: " << *this;
     Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(), local_segment_, "");
-    send_msg(ok);
+    send_msg(ok, true);
 }
 
 void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
@@ -354,7 +358,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
     Message msg(version_, Message::GMCAST_T_TOPOLOGY_CHANGE, gmcast_.uuid(),
                 group_name_, nl);
 
-    send_msg(msg);
+    send_msg(msg, false);
 }
 
 
@@ -363,14 +367,14 @@ void gcomm::gmcast::Proto::send_keepalive()
     log_debug << "sending keepalive: " << *this;
     Message msg(version_, Message::GMCAST_T_KEEPALIVE,
                 gmcast_.uuid(), local_segment_, "");
-    send_msg(msg);
+    send_msg(msg, true);
 }
 
 void gcomm::gmcast::Proto::evict()
 {
     Message failed(version_, Message::GMCAST_T_FAIL,
                    gmcast_.uuid(), local_segment_, gmcast_proto_err_evicted);
-    send_msg(failed);
+    send_msg(failed, false);
     set_state(S_FAILED);
 }
 
@@ -379,7 +383,7 @@ void gcomm::gmcast::Proto::evict_duplicate_uuid()
     Message failed(version_, Message::GMCAST_T_FAIL,
                    gmcast_.uuid(), local_segment_,
                    gmcast_proto_err_duplicate_uuid);
-    send_msg(failed);
+    send_msg(failed, false);
     set_state(S_FAILED);
 }
 
