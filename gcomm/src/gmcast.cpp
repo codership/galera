@@ -1306,10 +1306,10 @@ gu::datetime::Date gcomm::GMCast::handle_timers()
 }
 
 
-void gcomm::GMCast::send(const RelayEntry& re, gcomm::Datagram& dg)
+void gcomm::GMCast::send(const RelayEntry& re, int segment, gcomm::Datagram& dg)
 {
     int err;
-    if ((err = re.socket->send(dg)) != 0)
+    if ((err = re.socket->send(segment, dg)) != 0)
     {
         log_debug << "failed to send to " << re.socket->remote_addr()
                   << ": (" << err << ") " << strerror(err);
@@ -1346,7 +1346,7 @@ void gcomm::GMCast::relay(const Message& msg,
             {
                 if ((*target_i).socket->id() != exclude_id)
                 {
-                    send(*target_i, relay_dg);
+                    send(*target_i, msg.segment_id(), relay_dg);
                 }
             }
         }
@@ -1364,7 +1364,7 @@ void gcomm::GMCast::relay(const Message& msg,
             {
                 if ((*relay_i).socket->id() != exclude_id)
                 {
-                    send(*relay_i, relay_dg);
+                    send(*relay_i, msg.segment_id(), relay_dg);
                 }
             }
             gu_trace(pop_header(relay_msg, relay_dg));
@@ -1382,7 +1382,7 @@ void gcomm::GMCast::relay(const Message& msg,
         Segment& segment(segment_map_[segment_]);
         for (Segment::iterator i(segment.begin()); i != segment.end(); ++i)
         {
-            send(*i, relay_dg);
+            send(*i, msg.segment_id(), relay_dg);
         }
     }
     else
@@ -1583,7 +1583,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         {
             gu_trace(push_header(msg, dg));
             int err;
-            if ((err = target_proto->socket()->send(dg)) != 0)
+            if ((err = target_proto->socket()->send(msg.segment_id(), dg)) != 0)
             {
                 log_debug << "failed to send to "
                           << target_proto->socket()->remote_addr()
@@ -1614,7 +1614,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         for (RelaySet::iterator ri(relay_set_.begin());
              ri != relay_set_.end(); ++ri)
         {
-            send(*ri, dg);
+            send(*ri, msg.segment_id(), dg);
         }
         gu_trace(pop_header(msg, dg));
         msg.set_flags(msg.flags() & ~Message::F_RELAY);
@@ -1635,7 +1635,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
                 relay_set_.find(segment[target_idx]) == relay_set_.end())
             {
                 gu_trace(push_header(msg, dg));
-                send(segment[target_idx], dg);
+                send(segment[target_idx], msg.segment_id(), dg);
                 gu_trace(pop_header(msg, dg));
             }
         }
@@ -1650,7 +1650,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
                 if (relay_set_.empty() == true ||
                     relay_set_.find(*i) == relay_set_.end())
                 {
-                    send(*i, dg);
+                    send(*i, msg.segment_id(), dg);
                 }
             }
             gu_trace(pop_header(msg, dg));

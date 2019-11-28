@@ -206,7 +206,7 @@ namespace gcomm
                 return (socket < other.socket);
             }
         };
-        void send(const RelayEntry&, gcomm::Datagram&);
+        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
         typedef std::set<RelayEntry> RelaySet;
         RelaySet relay_set_;
 

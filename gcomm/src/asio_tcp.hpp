@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_ASIO_TCP_HPP
@@ -7,6 +7,7 @@
 
 #include "socket.hpp"
 #include "asio_protonet.hpp"
+#include "fair_send_queue.hpp"
 
 #include "gu_array.hpp"
 #include "gu_shared_ptr.hpp"
@@ -51,7 +52,7 @@ public:
     void write_handler(const asio::error_code& ec,
                        size_t bytes_transferred);
     void set_option(const std::string& key, const std::string& val);
-    int send(const Datagram& dg);
+    int send(int segment, const Datagram& dg);
     size_t read_completion_condition(
         const asio::error_code& ec,
         const size_t bytes_transferred);
@@ -97,18 +98,13 @@ private:
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
-    // Limit the number of queued messages. This workaround to avoid queue
+    // Limit the number of queued bytes. This workaround to avoid queue
     // pile up due to frequent retransmissions by the upper layers (evs).
     // It is a responsibility of upper layers (evs) to request resending
-    // of dropped messaes.
-    //
-    // With 32kB MTU this means that there may be around 64MB queued for
-    // transfer. This is still on the high side with slow connections.
-    // The number of bytes in send queue should be tracked and the limit
-    // should be estimated from socket stats to keep the transfer time
-    // below certain time limit.
-    static const size_t                       max_send_q_length = 2048;
-    std::deque<Datagram>                      send_q_;
+    // of dropped messaes. Upper limit (32MB) is enough to hold 1024
+    // datagrams with default gcomm MTU 32kB.
+    static const size_t                       max_send_q_bytes = (1 << 25);
+    gcomm::FairSendQueue                      send_q_;
     gu::datetime::Date                        last_queued_tstamp_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;

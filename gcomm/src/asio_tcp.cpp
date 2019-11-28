@@ -350,9 +350,9 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
             }
             if (bytes_transferred != 0
 #ifdef GCOMM_ASIO_TCP_SIMULATE_WRITE_HANDLER_ERROR
-                 || ::rand() % bytes_transferred_not_zero_rate == 0
+                || ::rand() % bytes_transferred_not_zero_rate == 0
 #endif // GCOMM_ASIO_TCP_SIMULATE_WRITE_HANDLER_ERROR
-            )
+                )
             {
                 log_warn << "write_handler() bytes_transferred "
                          << bytes_transferred
@@ -447,7 +447,7 @@ namespace gcomm
     };
 }
 
-int gcomm::AsioTcpSocket::send(const Datagram& dg)
+int gcomm::AsioTcpSocket::send(int segment, const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
 
@@ -456,7 +456,7 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         return ENOTCONN;
     }
 
-    if (send_q_.size() > max_send_q_length)
+    if (send_q_.size() >= max_send_q_bytes)
     {
         return ENOBUFS;
     }
@@ -469,16 +469,15 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
     }
 
     last_queued_tstamp_ = gu::datetime::Date::monotonic();
-    send_q_.push_back(dg); // makes copy of dg
-    Datagram& priv_dg(send_q_.back());
-
+    // Make copy of datagram to be able to adjust the header
+    Datagram priv_dg(dg);
     priv_dg.set_header_offset(priv_dg.header_offset() -
                               NetHeader::serial_size_);
     serialize(hdr,
               priv_dg.header(),
               priv_dg.header_size(),
               priv_dg.header_offset());
-
+    send_q_.push_back(segment, priv_dg);
     if (send_q_.size() == 1)
     {
         net_.io_service_.post(AsioPostForSendHandler(shared_from_this()));
@@ -807,6 +806,8 @@ gcomm::SocketStats gcomm::AsioTcpSocket::stats() const
         ret.last_queued_since = (now - last_queued_tstamp_).get_nsecs();
         ret.last_delivered_since = (now - last_delivered_tstamp_).get_nsecs();
         ret.send_queue_length = send_q_.size();
+        ret.send_queue_bytes = send_q_.queued_bytes();
+        ret.send_queue_segments = send_q_.segments();
     }
 #endif /* __linux__ || __FreeBSD__ */
     return ret;

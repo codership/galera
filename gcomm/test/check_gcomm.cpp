@@ -30,6 +30,7 @@ struct GCommSuite
 };
 
 static GCommSuite suites[] = {
+    {"fair_send_queue", fair_send_queue_suite},
     {"util", util_suite},
     {"types", types_suite},
     {"evs2", evs2_suite},

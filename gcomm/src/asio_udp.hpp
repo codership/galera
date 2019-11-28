@@ -38,7 +38,7 @@ public:
     void connect(const gu::URI& uri);
     void close();
     void set_option(const std::string&, const std::string&) { /* not implemented */ }
-    int send(const Datagram& dg);
+    int send(int segment, const Datagram& dg);
     void read_handler(const asio::error_code&, size_t);
     void async_receive();
     size_t mtu() const;

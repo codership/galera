@@ -76,7 +76,7 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg,
     gu::Buffer buf;
     gu_trace(serialize(msg, buf));
     Datagram dg(buf);
-    int ret = tp_->send(dg);
+    int ret = tp_->send(msg.segment_id(), dg);
 
     if (ret == ENOBUFS && ignore_no_buffer_space)
     {

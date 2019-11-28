@@ -131,7 +131,7 @@ void gcomm::AsioUdpSocket::close()
     state_ = S_CLOSED;
 }
 
-int gcomm::AsioUdpSocket::send(const Datagram& dg)
+int gcomm::AsioUdpSocket::send(int /* segment */, const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
     gu::array<asio::const_buffer, 3>::type cbs;
