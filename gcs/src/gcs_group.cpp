@@ -1189,20 +1189,20 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             }
         }
         else {
-            if (sender_idx == peer_idx) {
-                if (GCS_NODE_STATE_JOINED == sender->status) {
-                    gu_info ("Member %d.%d (%s) resyncs itself to group",
-                             sender_idx, sender->segment, sender->name);
+            if (GCS_NODE_STATE_JOINED == sender->status) {
+                if (sender_idx == peer_idx) {
+                    gu_info("Member %d.%d (%s) resyncs itself to group.",
+                            sender_idx, sender->segment, sender->name);
                 }
                 else {
-                    assert(sender->desync_count > 0);
-                    return 0; // don't deliver up
+                    gu_info("%d.%d (%s): State transfer %s %d.%d (%s) complete.",
+                            sender_idx, sender->segment, sender->name, st_dir,
+                            peer_idx, peer ? peer->segment : -1, peer_name);
                 }
             }
             else {
-                gu_info ("%d.%d (%s): State transfer %s %d.%d (%s) complete.",
-                         sender_idx, sender->segment, sender->name, st_dir,
-                         peer_idx, peer ? peer->segment : -1, peer_name);
+                assert(sender->desync_count > 0);
+                return 0; // don't deliver up
             }
         }
     }
