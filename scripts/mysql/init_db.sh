@@ -20,7 +20,9 @@ echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_pswd';" >> "$init_sql"
 echo "UPDATE mysql.user SET Host = '%' WHERE User = 'root';" >> "$init_sql"
 echo "CREATE USER IF NOT EXISTS 'test'@'%' IDENTIFIED BY '$test_pswd';" >> "$init_sql"
 echo "GRANT ALL ON test.* TO 'test'@'%';" >> "$init_sql"
+echo "CREATE SCHEMA test;" >> "$init_sql"
 
+LD_LIBRARY_PATH=$base_dir/lib/mysql/private:${LD_LIBRARY_PATH:-} \
 "$base_dir/sbin/mysqld" \
     --no-defaults --initialize-insecure --core-file --wsrep_provider=none \
     --innodb_log_file_size=4M --innodb_buffer_pool_size=64M \
