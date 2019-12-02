@@ -5,7 +5,6 @@
 #include "asio_tcp.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/common.hpp"
-#include "defaults.hpp"
 
 #define FAILED_HANDLER(_e) failed_handler(_e, __FUNCTION__, __LINE__)
 
