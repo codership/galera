@@ -48,19 +48,19 @@ namespace gcomm
         }
 
         /* Return reference to front datagram. */
-        gcomm::Datagram& front()
+        const gcomm::Datagram& front() const
         {
             assert(current_segment_ != -1);
-            queue_type::iterator i(queue_.find(current_segment_));
+            queue_type::const_iterator i(queue_.find(current_segment_));
             assert(i != queue_.end());
             return i->second.front();
         }
 
         /* Return reference to back datagram. */
-        gcomm::Datagram& back()
+        const gcomm::Datagram& back() const
         {
             assert(last_pushed_segment_ != -1);
-            queue_type::iterator i(queue_.find(last_pushed_segment_));
+            queue_type::const_iterator i(queue_.find(last_pushed_segment_));
             assert(i != queue_.end());
             return i->second.back();
         }
