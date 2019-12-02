@@ -114,7 +114,6 @@ std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMap& im)
 
 
 gcomm::evs::InputMap::InputMap() :
-    window_         (-1),
     safe_seq_       (-1),
     aru_seq_        (-1),
     node_index_     (new InputMapNodeIndex()),
@@ -140,13 +139,12 @@ gcomm::evs::InputMap::~InputMap()
 //////////////////////////////////////////////////////////////////////////
 
 
-void gcomm::evs::InputMap::reset(const size_t nodes, const seqno_t window)
+void gcomm::evs::InputMap::reset(const size_t nodes)
 {
     gcomm_assert(msg_index_->empty()                           == true &&
                  recovery_index_->empty()                      == true);
     node_index_->clear();
 
-    window_ = window;
     log_debug << " size " << node_index_->size();
     gu_trace(node_index_->resize(nodes, InputMapNode()));
     for (size_t i = 0; i < nodes; ++i)
@@ -358,6 +356,49 @@ gcomm::evs::InputMap::recover(const size_t uuid, const seqno_t seq) const
     const InputMapNode& node(node_index_->at(uuid));
     const InputMapMsgKey key(node.index(), seq);
     gu_trace(ret = recovery_index_->find_checked(key));
+    return ret;
+}
+
+static void append_gap_range_list(std::vector<gcomm::evs::Range>& range_list,
+                                  gcomm::evs::seqno_t lowest_unseen,
+                                  gcomm::evs::seqno_t seq)
+{
+    if (range_list.empty())
+    {
+        range_list.push_back(gcomm::evs::Range(lowest_unseen, seq));
+    }
+    else if (range_list.rbegin()->hs() + 1 != seq)
+    {
+        range_list.push_back(gcomm::evs::Range(seq, seq));
+    }
+    else
+    {
+        const gcomm::evs::Range prev_range(*range_list.rbegin());
+        *range_list.rbegin() = gcomm::evs::Range(prev_range.lu(), seq);
+    }
+}
+
+std::vector<gcomm::evs::Range>
+gcomm::evs::InputMap::gap_range_list(size_t index, const Range& range) const
+{
+    const InputMapNode& node(node_index_->at(index));
+    seqno_t max_lu(std::max(range.lu(), node.range().lu()));
+    std::vector<Range> ret;
+    for (seqno_t seq(range.lu()); seq <= range.hs(); ++seq)
+    {
+        const InputMapMsgKey key(index, seq);
+        gcomm::evs::InputMap::const_iterator msg_i(msg_index_->find(key));
+        if (msg_i != msg_index_->end())
+        {
+            continue;
+        }
+        msg_i = recovery_index_->find(key);
+        if (msg_i != recovery_index_->end())
+        {
+            continue;
+        }
+        append_gap_range_list(ret, max_lu, seq);
+    }
     return ret;
 }
 

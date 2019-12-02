@@ -2302,6 +2302,12 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     const UUID& source(msg.source());
 
+    if (source == UUID::nil())
+    {
+        log_warn << "Received message with nil source UUDI, dropping";
+        return;
+    }
+
     evs_log_info(I_STATE) << " detected new message source "
                           << source;
 
@@ -3294,17 +3300,37 @@ gcomm::evs::seqno_t gcomm::evs::Proto::update_im_safe_seq(const size_t uuid,
 
 void gcomm::evs::Proto::request_retrans(const UUID& target, const Range& range)
 {
+    NodeMap::const_iterator node_i(known_.find(target));
+    assert(node_i != known_.end());
+    if (node_i == known_.end())
+    {
+        log_warn << "Target " << target << " not found from known nodes";
+        return;
+    }
+    const Node& node(NodeMap::value(node_i));
+    if (node.index() == std::numeric_limits<size_t>::max())
+    {
+        log_warn << "Target " << target << " has no index";
+        return;
+    }
     if (not gap_rate_limit(target, range))
     {
-        // @todo Currently the whole range is requested. This should be optimized
-        //       to request only missing messages.
         evs_log_debug(D_RETRANS) << " requesting retrans from "
                                  << target << " "
                                  << range
                                  << " due to input map gap, aru "
                                  << input_map_->aru_seq();
         profile_enter(send_gap_prof_);
-        gu_trace(send_gap(EVS_CALLER, target, current_view_.id(), range));
+        std::vector<Range> gap_ranges(input_map_->gap_range_list(node.index(),
+                                                                 range));
+        for (std::vector<Range>::const_iterator ri(gap_ranges.begin());
+             ri != gap_ranges.end(); ++ri)
+        {
+            evs_log_debug(D_RETRANS)
+                << "Requesting retransmssion from " << target
+                << " range: " << *ri;
+            gu_trace(send_gap(EVS_CALLER, target, current_view_.id(), *ri));
+        }
         profile_leave(send_gap_prof_);
     }
 }

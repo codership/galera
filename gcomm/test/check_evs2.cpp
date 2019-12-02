@@ -348,7 +348,6 @@ START_TEST(test_input_map_random_insert)
 {
     log_info << "START";
     init_rand();
-    seqno_t window(1024);
     seqno_t n_seqnos(1024);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
@@ -361,7 +360,7 @@ START_TEST(test_input_map_random_insert)
         uuids[i] = (static_cast<int32_t>(i + 1));
     }
 
-    im.reset(n_uuids, window);
+    im.reset(n_uuids);
 
     for (seqno_t j = 0; j < n_seqnos; ++j)
     {
@@ -401,8 +400,60 @@ START_TEST(test_input_map_random_insert)
 }
 END_TEST
 
+START_TEST(test_input_map_gap_range_list)
+{
+    gcomm::evs::InputMap im;
+    im.reset(1);
+    gcomm::UUID uuid(1);
+    gcomm::ViewId view_id(gcomm::V_REG, uuid, 1);
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 0, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 2, 0));
 
+    std::vector<gcomm::evs::Range> gap_range(
+        im.gap_range_list(0, gcomm::evs::Range(0, 2)));
+    fail_unless(gap_range.size() == 1);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
 
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 4, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 4));
+    fail_unless(gap_range.size() == 2);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 3);
+    fail_unless(gap_range.rbegin()->hs() == 3);
+
+    // Although there are two messages missing, limiting the range to 0,2
+    // should return only the first one.
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 2));
+    fail_unless(gap_range.size() == 1);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 8, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.size() == 3);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 5);
+    fail_unless(gap_range.rbegin()->hs() == 7);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 3, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.size() == 2);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 5);
+    fail_unless(gap_range.rbegin()->hs() == 7);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 1, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 5, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 6, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 7, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.empty());
+}
+END_TEST
 
 static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 {
@@ -2290,7 +2341,7 @@ START_TEST(test_gap_rate_limit)
     fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
     fail_unless(gm1.range_uuid() == f.uuid1);
     fail_unless(gm1.range().lu() == 0);
-    fail_unless(gm1.range().hs() == 1);
+    fail_unless(gm1.range().hs() == 0);
     // The node2 will also send an user message to complete the sequence
     // number. Consume it.
     gcomm::evs::Message comp_um1;
@@ -2324,7 +2375,7 @@ START_TEST(test_gap_rate_limit)
     fail_unless(read_dg != 0);
     fail_unless(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
     fail_unless(gm2.range().lu() == 0);
-    fail_unless(gm2.range().hs() == 3);
+    fail_unless(gm2.range().hs() == 0);
 
     gcomm::evs::Message comp_u4;
     read_dg = get_msg(&f.tr2, &comp_u4);
@@ -2385,7 +2436,7 @@ START_TEST(test_gap_rate_limit_delayed)
     fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
     fail_unless(gm1.range_uuid() == f.uuid1);
     fail_unless(gm1.range().lu() == 0);
-    fail_unless(gm1.range().hs() == 1);
+    fail_unless(gm1.range().hs() == 0);
     // The node2 will also send an user message to complete the sequence
     // number. Consume it.
     gcomm::evs::Message comp_um1;
@@ -2464,6 +2515,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_input_map_random_insert");
     tcase_add_test(tc, test_input_map_random_insert);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_input_map_gap_range_list");
+    tcase_add_test(tc, test_input_map_gap_range_list);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_single_join");
