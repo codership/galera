@@ -2466,7 +2466,13 @@ START_TEST(test_gap_rate_limit_delayed)
     fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
     // Now call handle_inactivity_timer() again, gap message should not
     // be emitted due to rate limit.
+    // Galera 4 will run with evs protocol version 1 and will emit
+    // delayed list at this point.
     f.evs2.handle_inactivity_timer();
+    gcomm::evs::Message dm;
+    read_dg = get_msg(&f.tr2, &dm);
+    fail_unless(read_dg != 0);
+    fail_unless(dm.type() == gcomm::evs::Message::EVS_T_DELAYED_LIST);
     read_dg = get_msg(&f.tr2, &gm_discard);
     fail_if(read_dg != 0);
     // Move clock forward 100msec, new gap should be now emitted.
