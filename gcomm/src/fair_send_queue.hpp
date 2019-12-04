@@ -80,12 +80,7 @@ namespace gcomm
         /* Return true if queue is empty. */
         bool empty() const
         {
-            for (queue_type::const_iterator i(queue_.begin());
-                 i != queue_.end(); ++i)
-            {
-                if (not i->second.empty()) return false;
-            }
-            return true;
+            return (queued_bytes() == 0);
         }
 
         /* Return queue size. */
@@ -121,18 +116,17 @@ namespace gcomm
         {
             queue_type::const_iterator i(queue_.find(current_segment_));
             assert(i != queue_.end());
-            // Increment and wrap around
-            ++i;
-            if (i == queue_.end()) i = queue_.begin();
-
-            while (i->first != current_segment_)
+            do
             {
-                if (not i->second.empty()) return i->first;
-                // Increment and wrap around.
+                // Increment and wrap around
                 ++i;
                 if (i == queue_.end()) i = queue_.begin();
+
+                if (not i->second.empty()) return i->first;
             }
-            return i->second.empty() ? -1 : i->first;
+            while (i->first != current_segment_);
+
+            return -1;
         }
 
         int current_segment_;

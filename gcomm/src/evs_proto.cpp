@@ -4224,13 +4224,12 @@ void gcomm::evs::Proto::check_nil_view_id()
 bool gcomm::evs::Proto::join_rate_limit() const
 {
     gu::datetime::Date now(gu::datetime::Date::monotonic());
-    // Limit join message send rate with wan settings. It is likely that
+    // Limit join message sending. It is likely that
     // the transfer of user messages which were flushed into network
     // in shift to GATHER state takes some time. Too frequent join message
     // send will cause unwanted retransmits which will pile up in the
     // socket send queue.
-    if (send_window_ > 16 &&
-        now < last_sent_join_tstamp_ + 100*gu::datetime::MSec)
+    if (now < last_sent_join_tstamp_ + 100*gu::datetime::MSec)
     {
         evs_log_debug(D_JOIN_MSGS) << "join rate limit";
         return true;

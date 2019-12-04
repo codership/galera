@@ -1162,6 +1162,8 @@ void gcomm::GMCast::check_liveness()
     gu::datetime::Date now(gu::datetime::Date::now());
     for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end(); )
     {
+        // Store next iterator into temporary, handle_failed() may remove
+        // the entry proto_map_.
         ProtoMap::iterator i_next(i);
         ++i_next;
         Proto* p(ProtoMap::value(i));
@@ -1602,7 +1604,7 @@ int gcomm::GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         }
         else
         {
-            log_debug << "Target proto not found";
+            log_debug << "Target " << dm.target() << " proto not found";
         }
     }
 

@@ -78,15 +78,13 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg,
     Datagram dg(buf);
     int ret = tp_->send(msg.segment_id(), dg);
 
-    if (ret == ENOBUFS && ignore_no_buffer_space)
-    {
-        return;
-    }
-
     if (ret != 0)
     {
-        log_debug << "Send failed: " << strerror(ret);
-        set_state(S_FAILED);
+        if (not (ret == ENOBUFS && ignore_no_buffer_space))
+        {
+            log_debug << "Send failed: " << strerror(ret);
+            set_state(S_FAILED);
+        }
     }
 }
 

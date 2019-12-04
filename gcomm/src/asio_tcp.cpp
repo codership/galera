@@ -11,13 +11,11 @@
 // Helpers to set socket buffer sizes for both connecting
 // and listening sockets.
 
-static const std::string auto_buf_size("auto");
-
 static bool asio_recv_buf_warned(false);
 template <class Socket>
 void set_recv_buf_size_helper(const gu::Config& conf, Socket& socket)
 {
-    if (conf.get(gcomm::Conf::SocketRecvBufSize) != auto_buf_size)
+    if (conf.get(gcomm::Conf::SocketRecvBufSize) != GCOMM_ASIO_AUTO_BUF_SIZE)
     {
         size_t const recv_buf_size
             (conf.get<size_t>(gcomm::Conf::SocketRecvBufSize));
@@ -43,7 +41,7 @@ static bool asio_send_buf_warned(false);
 template <class Socket>
 void set_send_buf_size_helper(const gu::Config& conf, Socket& socket)
 {
-    if (conf.get(gcomm::Conf::SocketSendBufSize) != auto_buf_size)
+    if (conf.get(gcomm::Conf::SocketSendBufSize) != GCOMM_ASIO_AUTO_BUF_SIZE)
     {
         size_t const send_buf_size
             (conf.get<size_t>(gcomm::Conf::SocketSendBufSize));
@@ -400,14 +398,6 @@ void gcomm::AsioTcpSocket::set_option(const std::string& key,
     log_warn << "Setting " << key << " in run time does not have effect, "
              << "please set the configuration in provider options "
              << "and restart";
-    if (key == Conf::SocketRecvBufSize)
-    {
-        (void)Conf::check_recv_buf_size(val);
-    }
-    else if (key == Conf::SocketSendBufSize)
-    {
-        (void)Conf::check_send_buf_size(val);
-    }
 }
 
 namespace gcomm

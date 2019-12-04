@@ -28,6 +28,12 @@
 # pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #endif
 
+/**
+ * Configuration value denoting automatic buffer size adjustment for
+ * socket.recv_buf_size and socket.send_buf_size.
+ */
+#define GCOMM_ASIO_AUTO_BUF_SIZE "auto"
+
 namespace gcomm
 {
     class AsioTcpSocket;

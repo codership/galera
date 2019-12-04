@@ -3,6 +3,7 @@
  */
 
 #include "defaults.hpp"
+#include "asio_tcp.hpp"
 
 #include "gcomm/common.hpp"
 
@@ -16,8 +17,10 @@ namespace gcomm
 
     std::string const Defaults::ProtonetVersion         = "0";
     std::string const Defaults::SocketChecksum          = "2";
-    std::string const Defaults::SocketRecvBufSize       = "auto";
-    std::string const Defaults::SocketSendBufSize       = "auto";
+    std::string const Defaults::SocketRecvBufSize       =
+        GCOMM_ASIO_AUTO_BUF_SIZE;
+    std::string const Defaults::SocketSendBufSize       =
+        GCOMM_ASIO_AUTO_BUF_SIZE;
     std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
     std::string const Defaults::GMCastSegment           = "0";

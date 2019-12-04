@@ -1925,7 +1925,6 @@ START_TEST(test_gh_40)
     // dn[1] send msg(seq=1)
     dn[1]->send();
 
-
     Proto* evs1 = evs_from_dummy(dn[1]);
     Proto* evs2 = evs_from_dummy(dn[2]);
     fail_if(evs1->state() != Proto::S_OPERATIONAL);
@@ -1937,6 +1936,8 @@ START_TEST(test_gh_40)
     fail_if(evs1->state() != Proto::S_GATHER);
     fail_if(evs2->state() != Proto::S_GATHER);
 
+    // Advance clock to get over join message rate limiting.
+    gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
     while(!(evs1->state() == Proto::S_GATHER &&
             evs1->is_install_message()))
     {

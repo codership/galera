@@ -367,14 +367,13 @@ static void append_gap_range_list(std::vector<gcomm::evs::Range>& range_list,
     {
         range_list.push_back(gcomm::evs::Range(lowest_unseen, seq));
     }
-    else if (range_list.rbegin()->hs() + 1 != seq)
+    else if (range_list.rbegin()->hs() + 1 == seq)
     {
-        range_list.push_back(gcomm::evs::Range(seq, seq));
+        range_list.rbegin()->set_hs(seq);
     }
     else
     {
-        const gcomm::evs::Range prev_range(*range_list.rbegin());
-        *range_list.rbegin() = gcomm::evs::Range(prev_range.lu(), seq);
+        range_list.push_back(gcomm::evs::Range(seq, seq));
     }
 }
 
