@@ -322,9 +322,19 @@ public:
     iterator recover(const size_t uuid, const seqno_t seq) const;
 
     /*!
+     * Return list of ranges for missing messages.
      *
+     * @param index Index of the node.
+     * @param range Range to be scanned for missing messages.
      */
-    void reset(const size_t, const seqno_t = 256);
+    std::vector<Range> gap_range_list(size_t index, const Range& range) const;
+
+    /*!
+     * Reset the input map.
+     *
+     * @param nodes Number of nodes in the new configuration.
+     */
+    void reset(const size_t nodes);
 
     /*!
      * Clear input map state.
@@ -348,7 +358,6 @@ private:
      */
     void cleanup_recovery_index();
 
-    seqno_t            window_;
     seqno_t            safe_seq_;       /*!< Safe seqno              */
     seqno_t            aru_seq_;        /*!< All received upto seqno */
     InputMapNodeIndex* node_index_;     /*!< Index of nodes          */

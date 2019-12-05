@@ -123,7 +123,7 @@ public:
             gcomm::Datagram msg;
             msg.payload().resize(msg_.size());
             std::copy(msg_.begin(), msg_.end(), msg.payload().begin());
-            socket->send(msg);
+            socket->send(0, msg);
         }
         else if (socket->state() == gcomm::Socket::S_CLOSED ||
                  socket->state() == gcomm::Socket::S_FAILED)

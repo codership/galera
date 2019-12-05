@@ -16,6 +16,7 @@ env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
 
 gcomm_check = env.Program(target = 'check_gcomm',
                           source = Split('''
+                              check_fair_send_queue.cpp
                               check_gcomm.cpp
                               check_trace.cpp
                               check_types.cpp

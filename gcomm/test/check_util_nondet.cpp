@@ -64,7 +64,7 @@ START_TEST(test_asio)
     for (size_t i = 0; i < 13; ++i)
     {
         Datagram dg(Buffer(&buf[0], &buf[0] + buf.size()));
-        cl->send(dg);
+        cl->send(0, dg);
     }
     pn.event_loop(gu::datetime::Sec);
 

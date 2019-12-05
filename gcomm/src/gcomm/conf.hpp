@@ -69,6 +69,11 @@ namespace gcomm
         static std::string const SocketRecvBufSize;
 
         /*!
+         * @brief Socket send buffer size in bytes.
+         */
+        static std::string const SocketSendBufSize;
+
+        /*!
          * @brief GMCast scheme for transport URI ("gmcast")
          */
         static std::string const GMCastScheme;
@@ -426,6 +431,7 @@ namespace gcomm
         };
 
         static size_t check_recv_buf_size(const std::string& val);
+        static size_t check_send_buf_size(const std::string& val);
     };
 
 

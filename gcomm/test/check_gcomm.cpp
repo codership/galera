@@ -30,6 +30,7 @@ struct GCommSuite
 };
 
 static GCommSuite suites[] = {
+    {"fair_send_queue", fair_send_queue_suite},
     {"util", util_suite},
     {"types", types_suite},
     {"evs2", evs2_suite},
@@ -91,7 +92,7 @@ int main(int argc, char* argv[])
     log_info << "check_gcomm, run all tests";
     int n_fail = srunner_ntests_failed(sr);
     srunner_free(sr);
-
+    if (log_file) fclose(log_file);
     if (0 == n_fail && 0 != log_file) ::unlink(LOG_FILE);
 
     return n_fail == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

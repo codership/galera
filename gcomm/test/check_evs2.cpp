@@ -348,7 +348,6 @@ START_TEST(test_input_map_random_insert)
 {
     log_info << "START";
     init_rand();
-    seqno_t window(1024);
     seqno_t n_seqnos(1024);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
@@ -361,7 +360,7 @@ START_TEST(test_input_map_random_insert)
         uuids[i] = (static_cast<int32_t>(i + 1));
     }
 
-    im.reset(n_uuids, window);
+    im.reset(n_uuids);
 
     for (seqno_t j = 0; j < n_seqnos; ++j)
     {
@@ -401,8 +400,60 @@ START_TEST(test_input_map_random_insert)
 }
 END_TEST
 
+START_TEST(test_input_map_gap_range_list)
+{
+    gcomm::evs::InputMap im;
+    im.reset(1);
+    gcomm::UUID uuid(1);
+    gcomm::ViewId view_id(gcomm::V_REG, uuid, 1);
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 0, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 2, 0));
 
+    std::vector<gcomm::evs::Range> gap_range(
+        im.gap_range_list(0, gcomm::evs::Range(0, 2)));
+    fail_unless(gap_range.size() == 1);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
 
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 4, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 4));
+    fail_unless(gap_range.size() == 2);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 3);
+    fail_unless(gap_range.rbegin()->hs() == 3);
+
+    // Although there are two messages missing, limiting the range to 0,2
+    // should return only the first one.
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 2));
+    fail_unless(gap_range.size() == 1);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 8, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.size() == 3);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 5);
+    fail_unless(gap_range.rbegin()->hs() == 7);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 3, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.size() == 2);
+    fail_unless(gap_range.begin()->lu() == 1);
+    fail_unless(gap_range.begin()->hs() == 1);
+    fail_unless(gap_range.rbegin()->lu() == 5);
+    fail_unless(gap_range.rbegin()->hs() == 7);
+
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 1, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 5, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 6, 0));
+    im.insert(0, gcomm::evs::UserMessage(0, uuid, view_id, 7, 0));
+    gap_range = im.gap_range_list(0, gcomm::evs::Range(0, 8));
+    fail_unless(gap_range.empty());
+}
+END_TEST
 
 static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 {
@@ -1874,7 +1925,6 @@ START_TEST(test_gh_40)
     // dn[1] send msg(seq=1)
     dn[1]->send();
 
-
     Proto* evs1 = evs_from_dummy(dn[1]);
     Proto* evs2 = evs_from_dummy(dn[2]);
     fail_if(evs1->state() != Proto::S_OPERATIONAL);
@@ -1886,6 +1936,8 @@ START_TEST(test_gh_40)
     fail_if(evs1->state() != Proto::S_GATHER);
     fail_if(evs2->state() != Proto::S_GATHER);
 
+    // Advance clock to get over join message rate limiting.
+    gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
     while(!(evs1->state() == Proto::S_GATHER &&
             evs1->is_install_message()))
     {
@@ -2198,6 +2250,235 @@ START_TEST(test_gal_521)
 }
 END_TEST
 
+struct TwoNodeFixture
+{
+    struct Configs
+    {
+        Configs()
+            : conf1()
+            , conf2()
+        {
+            gu::ssl_register_params(conf1);
+            gcomm::Conf::register_params(conf1);
+            gcomm::Conf::register_params(conf2);
+        }
+        gu::Config conf1;  // Config for node1
+        gu::Config conf2;  // Config for node2
+    };
+    TwoNodeFixture()
+        : conf()
+        , uuid1(1)
+        , uuid2(2)
+        , tr1(uuid1)
+        , tr2(uuid2)
+        , evs1(conf.conf1, uuid1, 0)
+        , evs2(conf.conf2, uuid2, 0)
+        , top1(conf.conf1)
+        , top2(conf.conf2)
+    {
+        gcomm::connect(&tr1, &evs1);
+        gcomm::connect(&evs1, &top1);
+        gcomm::connect(&tr2, &evs2);
+        gcomm::connect(&evs2, &top2);
+        single_join(&tr1, &evs1);
+        double_join(&tr1, &evs1, &tr2, &evs2);
+    }
+    Configs conf;
+    const gcomm::UUID uuid1; // UUID of node1
+    const gcomm::UUID uuid2; // UUID if node2
+    DummyTransport tr1; // Transport for node1
+    DummyTransport tr2; // Transport for node2
+    gcomm::evs::Proto evs1; // Proto for node1
+    gcomm::evs::Proto evs2; // Proto for node2
+    DummyUser top1;      // Top level layer for node1
+    DummyUser top2;      // Top level layer for node2
+};
+
+// Verify that gap messages are rate limited when a node receives
+// several out of order messages.
+START_TEST(test_gap_rate_limit)
+{
+    log_info << "START test_gap_rate_limit";
+    // Start time from 1 sec to avoid hitting gap rate limit for the first
+    // gap message.
+    gu::datetime::SimClock::init(gu::datetime::Sec);
+    gu_log_max_level = GU_LOG_DEBUG;
+    TwoNodeFixture f;
+    gcomm::Protolay::sync_param_cb_t spcb;
+
+    // Increase evs1 send windows to allow generating out of order messages.
+    f.evs1.set_param("evs.send_window", "4", spcb);
+    f.evs1.set_param("evs.user_send_window", "4", spcb);
+    // Print all debug logging on node2 for test troubleshooting.
+    f.evs2.set_param("evs.debug_log_mask", "0xffff", spcb);
+    f.evs2.set_param("evs.info_log_mask", "0xff", spcb);
+    char data[1] = { 0 };
+    gcomm::Datagram dg(gu::SharedBuffer(new gu::Buffer(data, data + 1)));
+    // Generate four messages from node1. The first one is ignored,
+    // the rest are handled by node2 for generating gap messages.
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::Datagram* read_dg;
+    gcomm::evs::Message um1;
+    read_dg = get_msg(&f.tr1, &um1);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um2;
+    read_dg = get_msg(&f.tr1, &um2);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um3;
+    read_dg = get_msg(&f.tr1, &um3);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um4;
+    read_dg = get_msg(&f.tr1, &um4);
+    fail_unless(read_dg != 0);
+
+    // Make node2 handle an out of order message and verify that gap is emitted
+    f.evs2.handle_msg(um2);
+    gcomm::evs::Message gm1;
+    read_dg = get_msg(&f.tr2, &gm1);
+    fail_unless(read_dg != 0);
+    fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
+    fail_unless(gm1.range_uuid() == f.uuid1);
+    fail_unless(gm1.range().lu() == 0);
+    fail_unless(gm1.range().hs() == 0);
+    // The node2 will also send an user message to complete the sequence
+    // number. Consume it.
+    gcomm::evs::Message comp_um1;
+    read_dg = get_msg(&f.tr2, &comp_um1);
+    fail_unless(read_dg != 0);
+    fail_unless(comp_um1.type() == gcomm::evs::Message::EVS_T_USER);
+    fail_unless(comp_um1.seq() + comp_um1.seq_range() == 1);
+    // No further messages should be emitted
+    read_dg = get_msg(&f.tr2, &comp_um1);
+    fail_if(read_dg != 0);
+
+    // Handle the second out of order message, gap should not be emitted.
+    // There will be a next user message which completes the um3.
+    f.evs2.handle_msg(um3);
+    gcomm::evs::Message comp_um2;
+    read_dg = get_msg(&f.tr2, &comp_um2);
+    fail_unless(read_dg != 0);
+    fail_unless(comp_um2.type() == gcomm::evs::Message::EVS_T_USER);
+    fail_unless(comp_um2.seq() + comp_um2.seq_range() == 2);
+
+    // There should not be any more gap messages.
+    read_dg = get_msg(&f.tr2, &gm1);
+    fail_if(read_dg != 0);
+
+    // Move the clock forwards and handle the fourth message, gap should
+    // now emitted.
+    gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
+    gcomm::evs::Message gm2;
+    f.evs2.handle_msg(um4);
+    read_dg = get_msg(&f.tr2, &gm2);
+    fail_unless(read_dg != 0);
+    fail_unless(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
+    fail_unless(gm2.range().lu() == 0);
+    fail_unless(gm2.range().hs() == 0);
+
+    gcomm::evs::Message comp_u4;
+    read_dg = get_msg(&f.tr2, &comp_u4);
+    fail_unless(read_dg != 0);
+    fail_unless(comp_u4.type() == gcomm::evs::Message::EVS_T_USER);
+    log_info << "END test_gap_rate_limit";
+}
+END_TEST
+
+// Verify that gap messages are rate limited when the liveness check finds
+// delayed node.
+START_TEST(test_gap_rate_limit_delayed)
+{
+    log_info << "START test_gap_rate_limit_delayed";
+    // Start time from 1 sec to avoid hitting gap rate limit for the first
+    // gap message.
+    gu::datetime::SimClock::init(gu::datetime::Sec);
+    gu_log_max_level = GU_LOG_DEBUG;
+    TwoNodeFixture f;
+    gcomm::Protolay::sync_param_cb_t spcb;
+
+    // Increase evs1 send windows to allow generating out of order messages.
+    f.evs1.set_param("evs.send_window", "4", spcb);
+    f.evs1.set_param("evs.user_send_window", "4", spcb);
+    // Print all debug logging on node2 for test troubleshooting.
+    f.evs2.set_param("evs.debug_log_mask", "0xffff", spcb);
+    f.evs2.set_param("evs.info_log_mask", "0xff", spcb);
+    // The retransmission request is done for delayed only if
+    // auto evict is on.
+    f.evs2.set_param("evs.auto_evict", "1", spcb);
+    char data[1] = { 0 };
+    gcomm::Datagram dg(gu::SharedBuffer(new gu::Buffer(data, data + 1)));
+    // Generate four messages from node1. The first one is ignored,
+    // the rest are handled by node2 for generating gap messages.
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::Datagram* read_dg;
+    gcomm::evs::Message um1;
+    read_dg = get_msg(&f.tr1, &um1);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um2;
+    read_dg = get_msg(&f.tr1, &um2);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um3;
+    read_dg = get_msg(&f.tr1, &um3);
+    fail_unless(read_dg != 0);
+    f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
+    gcomm::evs::Message um4;
+    read_dg = get_msg(&f.tr1, &um4);
+    fail_unless(read_dg != 0);
+
+    // Make node2 handle an out of order message and verify that gap is emitted
+    f.evs2.handle_msg(um2);
+    gcomm::evs::Message gm1;
+    read_dg = get_msg(&f.tr2, &gm1);
+    fail_unless(read_dg != 0);
+    fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
+    fail_unless(gm1.range_uuid() == f.uuid1);
+    fail_unless(gm1.range().lu() == 0);
+    fail_unless(gm1.range().hs() == 0);
+    // The node2 will also send an user message to complete the sequence
+    // number. Consume it.
+    gcomm::evs::Message comp_um1;
+    read_dg = get_msg(&f.tr2, &comp_um1);
+    fail_unless(read_dg != 0);
+    fail_unless(comp_um1.type() == gcomm::evs::Message::EVS_T_USER);
+    fail_unless(comp_um1.seq() + comp_um1.seq_range() == 1);
+    // No further messages should be emitted
+    read_dg = get_msg(&f.tr2, &comp_um1);
+    fail_if(read_dg != 0);
+
+    // Move time forwards in 1 sec interval and make inactivity check
+    // in between. No gap messages should be emitted.
+    gu::datetime::SimClock::inc_time(gu::datetime::Sec);
+    f.evs2.handle_inactivity_timer();
+    gcomm::evs::Message gm_discard;
+    read_dg = get_msg(&f.tr2, &gm_discard);
+    fail_if(read_dg != 0);
+    // The clock is now advanced over retrans_period + delay margin. Next
+    // call to handle_inactivity_timer() should fire the check. Gap message
+    // is emitted.
+    gu::datetime::SimClock::inc_time(gu::datetime::Sec);
+    f.evs2.handle_inactivity_timer();
+    read_dg = get_msg(&f.tr2, &gm1);
+    fail_unless(read_dg != 0);
+    fail_unless(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
+    // Now call handle_inactivity_timer() again, gap message should not
+    // be emitted due to rate limit.
+    f.evs2.handle_inactivity_timer();
+    read_dg = get_msg(&f.tr2, &gm_discard);
+    fail_if(read_dg != 0);
+    // Move clock forward 100msec, new gap should be now emitted.
+    gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
+    f.evs2.handle_inactivity_timer();
+    gcomm::evs::Message gm2;
+    read_dg = get_msg(&f.tr2, &gm2);
+    fail_unless(read_dg != 0);
+    fail_unless(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
+    log_info << "END test_gap_rate_limit_delayed";
+}
+END_TEST
 
 Suite* evs2_suite()
 {
@@ -2235,6 +2516,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_input_map_random_insert");
     tcase_add_test(tc, test_input_map_random_insert);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_input_map_gap_range_list");
+    tcase_add_test(tc, test_input_map_gap_range_list);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_single_join");
@@ -2368,6 +2653,14 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_gal_521");
     tcase_add_test(tc, test_gal_521);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gap_rate_limit");
+    tcase_add_test(tc, test_gap_rate_limit);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gap_rate_limit_delayed");
+    tcase_add_test(tc, test_gap_rate_limit_delayed);
     suite_add_tcase(s, tc);
 
     return s;

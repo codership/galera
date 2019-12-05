@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_ASIO_TCP_HPP
@@ -7,6 +7,7 @@
 
 #include "socket.hpp"
 #include "asio_protonet.hpp"
+#include "fair_send_queue.hpp"
 
 #include "gu_array.hpp"
 #include "gu_shared_ptr.hpp"
@@ -26,6 +27,12 @@
 # pragma GCC diagnostic ignored "-Weffc++"
 # pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #endif
+
+/**
+ * Configuration value denoting automatic buffer size adjustment for
+ * socket.recv_buf_size and socket.send_buf_size.
+ */
+#define GCOMM_ASIO_AUTO_BUF_SIZE "auto"
 
 namespace gcomm
 {
@@ -51,7 +58,7 @@ public:
     void write_handler(const asio::error_code& ec,
                        size_t bytes_transferred);
     void set_option(const std::string& key, const std::string& val);
-    int send(const Datagram& dg);
+    int send(int segment, const Datagram& dg);
     size_t read_completion_condition(
         const asio::error_code& ec,
         const size_t bytes_transferred);
@@ -63,6 +70,7 @@ public:
     std::string remote_addr() const;
     State state() const { return state_; }
     SocketId id() const { return &socket_; }
+    SocketStats stats() const;
 private:
     friend class gcomm::AsioTcpAcceptor;
     friend class gcomm::AsioPostForSendHandler;
@@ -71,6 +79,12 @@ private:
     void operator=(const AsioTcpSocket&);
 
     void set_socket_options();
+    void set_buf_sizes();
+    void init_tstamps()
+    {
+        gu::datetime::Date now(gu::datetime::Date::monotonic());
+        last_queued_tstamp_ = last_delivered_tstamp_ = now;
+    }
     void read_one(gu::array<asio::mutable_buffer, 1>::type& mbs);
     void write_one(const gu::array<asio::const_buffer, 2>::type& cbs);
     void close_socket();
@@ -90,9 +104,17 @@ private:
     AsioProtonet&                             net_;
     asio::ip::tcp::socket                     socket_;
     asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
-    std::deque<Datagram>                      send_q_;
+    // Limit the number of queued bytes. This workaround to avoid queue
+    // pile up due to frequent retransmissions by the upper layers (evs).
+    // It is a responsibility of upper layers (evs) to request resending
+    // of dropped messaes. Upper limit (32MB) is enough to hold 1024
+    // datagrams with default gcomm MTU 32kB.
+    static const size_t                       max_send_q_bytes = (1 << 25);
+    gcomm::FairSendQueue                      send_q_;
+    gu::datetime::Date                        last_queued_tstamp_;
     std::vector<gu::byte_t>                   recv_buf_;
     size_t                                    recv_offset_;
+    gu::datetime::Date                        last_delivered_tstamp_;
     State                                     state_;
     // Querying addresses from failed socket does not work,
     // so need to maintain copy for diagnostics logging
@@ -119,6 +141,7 @@ public:
 
     AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpAcceptor();
+    void set_buf_sizes();
     void listen(const gu::URI& uri);
     std::string listen_addr() const;
     void close();

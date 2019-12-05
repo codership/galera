@@ -35,5 +35,7 @@ Suite* vs_suite();
 Suite* pc_suite();
 /* PC nondeterministic tests */
 Suite* pc_nondet_suite();
+/* Fair send queue suite */
+Suite* fair_send_queue_suite();
 
 #endif // CHECK_GCOMM_HPP

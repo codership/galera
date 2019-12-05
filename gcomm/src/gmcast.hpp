@@ -64,6 +64,13 @@ namespace gcomm
             gu_throw_fatal << "gmcast transport listen not implemented";
         }
 
+        // Configured listen address
+        std::string configured_listen_addr() const
+        {
+            return listen_addr_;
+        }
+
+        // Listen adddress obtained from listening socket.
         std::string listen_addr() const
         {
             if (listener_ == 0)
@@ -188,9 +195,22 @@ namespace gcomm
         bool              prim_view_reached_;
 
         gmcast::ProtoMap*  proto_map_;
-        std::set<Socket*>   relay_set_;
+        struct RelayEntry
+        {
+            gmcast::Proto* proto;
+            gcomm::Socket* socket;
+            RelayEntry(gmcast::Proto* p, gcomm::Socket* s)
+                : proto(p), socket(s) { }
+            bool operator<(const RelayEntry& other) const
+            {
+                return (socket < other.socket);
+            }
+        };
+        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
+        typedef std::set<RelayEntry> RelaySet;
+        RelaySet relay_set_;
 
-        typedef std::vector<Socket*> Segment;
+        typedef std::vector<RelayEntry> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;
         SegmentMap segment_map_;
         // self index in local segment when ordered by UUID

@@ -38,7 +38,7 @@ public:
     void connect(const gu::URI& uri);
     void close();
     void set_option(const std::string&, const std::string&) { /* not implemented */ }
-    int send(const Datagram& dg);
+    int send(int segment, const Datagram& dg);
     void read_handler(const asio::error_code&, size_t);
     void async_receive();
     size_t mtu() const;
@@ -46,7 +46,7 @@ public:
     std::string remote_addr() const;
     State state() const { return state_; }
     SocketId id() const { return &socket_; }
-
+    SocketStats stats() const { return SocketStats(); }
 private:
     AsioProtonet&            net_;
     State                    state_;

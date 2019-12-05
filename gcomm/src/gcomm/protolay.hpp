@@ -172,22 +172,33 @@ class gcomm::ProtoDownMeta
 public:
     ProtoDownMeta(const uint8_t user_type = 0xff,
                   const Order   order     = O_SAFE,
-                  const UUID&   uuid      = UUID::nil(),
+                  const UUID&   source      = UUID::nil(),
                   const int     segment   = 0) :
         user_type_ (user_type),
         order_     (order),
-        source_    (uuid),
+        source_    (source),
+        target_    (UUID::nil()),
         segment_   (segment)
+    { }
+
+    ProtoDownMeta(const UUID& target)
+        : user_type_(0xff)
+        , order_ (O_SAFE)
+        , source_(UUID::nil())
+        , target_(target)
+        , segment_(0)
     { }
 
     uint8_t     user_type() const { return user_type_; }
     Order       order()     const { return order_;     }
     const UUID& source()    const { return source_;    }
+    const UUID& target()    const { return target_;    }
     int         segment()   const { return segment_;   }
 private:
     const uint8_t user_type_;
     const Order   order_;
     const UUID    source_;
+    const UUID    target_;
     const int     segment_;
 };
 
