@@ -70,7 +70,7 @@ public:
             if (view.type() == V_PRIM && send_ == true)
             {
                 sending_ = true;
-                next_send_ = Date::now() + send_period_;
+                next_send_ = Date::monotonic() + send_period_;
             }
         }
         else
@@ -88,7 +88,7 @@ public:
 
     Date handle_timers()
     {
-        Date now(Date::now());
+        Date now(Date::monotonic());
         if (now >= next_send_)
         {
             byte_t buf[16];

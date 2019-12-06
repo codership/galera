@@ -1,12 +1,6 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
-
-#ifdef PROFILE_EVS_PROTO
-#define GCOMM_PROFILE 1
-#else
-#undef GCOMM_PROFILE
-#endif // PROFILE_EVS_PROTO
 
 #include "evs_proto.hpp"
 #include "evs_message2.hpp"
@@ -52,7 +46,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                          0, GCOMM_PROTOCOL_MAX_VERSION + 1)),
     debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
     info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
-    last_stats_report_(gu::datetime::Date::now()),
+    last_stats_report_(gu::datetime::Date::monotonic()),
     collect_stats_(true),
     hs_agreed_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
     hs_safe_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
@@ -65,16 +59,6 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     recovered_msgs_(0),
     recvd_msgs_(7, 0),
     delivered_msgs_(O_LOCAL_CAUSAL + 1),
-    send_user_prof_    ("send_user"),
-    send_gap_prof_     ("send_gap"),
-    send_join_prof_    ("send_join"),
-    send_install_prof_ ("send_install"),
-    send_leave_prof_   ("send_leave"),
-    consistent_prof_   ("consistent"),
-    consensus_prof_    ("consensus"),
-    shift_to_prof_     ("shift_to"),
-    input_map_prof_    ("input_map"),
-    delivery_prof_     ("delivery"),
     delivering_(false),
     my_uuid_(my_uuid),
     segment_(segment),
@@ -148,8 +132,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     delayed_keep_period_(param<gu::datetime::Period>(
                              conf, uri, Conf::EvsDelayedKeepPeriod,
                              Defaults::EvsDelayedKeepPeriod)),
-    last_inactive_check_   (gu::datetime::Date::now()),
-    last_causal_keepalive_ (gu::datetime::Date::now()),
+    last_inactive_check_   (gu::datetime::Date::monotonic()),
+    last_causal_keepalive_ (gu::datetime::Date::monotonic()),
     current_view_(0, ViewId(V_TRANS, my_uuid,
                          rst_view ? rst_view -> id().seq() + 1 : 0)),
     previous_view_(),
@@ -235,7 +219,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     if (rst_view) {
         previous_view_ = *rst_view;
         previous_views_.insert(
-            std::make_pair(rst_view -> id(), gu::datetime::Date::now()));
+            std::make_pair(rst_view -> id(), gu::datetime::Date::monotonic()));
     }
     if (mtu_ != std::numeric_limits<size_t>::max())
     {
@@ -540,7 +524,7 @@ std::string gcomm::evs::Proto::stats() const
     std::copy(sent_msgs_.begin(), sent_msgs_.end(),
          std::ostream_iterator<long long int>(os, ","));
     os << "}\n\tsent per sec {";
-    const double norm(double(gu::datetime::Date::now().get_utc()
+    const double norm(double(gu::datetime::Date::monotonic().get_utc()
                              - last_stats_report_.get_utc())/gu::datetime::Sec);
     std::vector<double> result(7, norm);
     std::transform(sent_msgs_.begin(), sent_msgs_.end(),
@@ -576,7 +560,7 @@ void gcomm::evs::Proto::reset_stats()
     safe_deliv_latency_.clear();
     send_queue_s_ = 0;
     n_send_queue_s_ = 0;
-    last_stats_report_ = gu::datetime::Date::now();
+    last_stats_report_ = gu::datetime::Date::monotonic();
 }
 
 
@@ -675,15 +659,13 @@ void gcomm::evs::Proto::handle_retrans_timer()
     else if (state() == S_LEAVING)
     {
         evs_log_debug(D_TIMERS) << "send leave timer";
-        profile_enter(send_leave_prof_);
         send_leave(false);
-        profile_leave(send_leave_prof_);
     }
 }
 
 void gcomm::evs::Proto::isolate(gu::datetime::Period period)
 {
-    isolation_end_ = gu::datetime::Date::now() + period;
+    isolation_end_ = gu::datetime::Date::monotonic() + period;
 }
 
 
@@ -789,19 +771,6 @@ void gcomm::evs::Proto::handle_stats_timer()
         log_info << stats();
     }
     reset_stats();
-#ifdef GCOMM_PROFILE
-    evs_log_info(I_PROFILING) << "\nprofiles:\n";
-    evs_log_info(I_PROFILING) << send_user_prof_    << "\n";
-    evs_log_info(I_PROFILING) << send_gap_prof_     << "\n";
-    evs_log_info(I_PROFILING) << send_join_prof_    << "\n";
-    evs_log_info(I_PROFILING) << send_install_prof_ << "\n";
-    evs_log_info(I_PROFILING) << send_leave_prof_   << "\n";
-    evs_log_info(I_PROFILING) << consistent_prof_   << "\n";
-    evs_log_info(I_PROFILING) << consensus_prof_    << "\n";
-    evs_log_info(I_PROFILING) << shift_to_prof_     << "\n";
-    evs_log_info(I_PROFILING) << input_map_prof_    << "\n";
-    evs_log_info(I_PROFILING) << delivery_prof_     << "\n";
-#endif // GCOMM_PROFILE
 }
 
 
@@ -822,7 +791,7 @@ private:
 gu::datetime::Date gcomm::evs::Proto::next_expiration(const Timer t) const
 {
     gcomm_assert(state() != S_CLOSED);
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
     switch (t)
     {
     case T_INACTIVITY:
@@ -883,7 +852,7 @@ void gcomm::evs::Proto::cancel_timer(Timer t)
 
 gu::datetime::Date gcomm::evs::Proto::handle_timers()
 {
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
 
     while (timers_.empty() == false &&
            TimerList::key(timers_.begin()) <= now)
@@ -923,7 +892,7 @@ gu::datetime::Date gcomm::evs::Proto::handle_timers()
 
 void gcomm::evs::Proto::check_inactive()
 {
-    const gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Date now(gu::datetime::Date::monotonic());
     if (last_inactive_check_ + inactive_check_period_*3 < now)
     {
         log_warn << "last inactive check more than " << inactive_check_period_*3
@@ -933,7 +902,7 @@ void gcomm::evs::Proto::check_inactive()
         return;
     }
 
-    NodeMap::value(self_i_).set_tstamp(gu::datetime::Date::now());
+    NodeMap::value(self_i_).set_tstamp(gu::datetime::Date::monotonic());
     std::for_each(known_.begin(), known_.end(), InspectNode());
 
     bool has_inactive(false);
@@ -1091,17 +1060,13 @@ void gcomm::evs::Proto::check_inactive()
 
     if (has_inactive == true && state() == S_OPERATIONAL)
     {
-        profile_enter(shift_to_prof_);
         gu_trace(shift_to(S_GATHER, true));
-        profile_leave(shift_to_prof_);
     }
     else if (has_inactive    == true &&
              state()     == S_LEAVING &&
              n_operational() == 1)
     {
-        profile_enter(shift_to_prof_);
         gu_trace(shift_to(S_CLOSED));
-        profile_leave(shift_to_prof_);
     }
 
     last_inactive_check_ = now;
@@ -1157,7 +1122,7 @@ void gcomm::evs::Proto::cleanup_foreign(const InstallMessage& im)
 
 void gcomm::evs::Proto::cleanup_views()
 {
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
 
     ViewList::iterator i, i_next;
     for (i = previous_views_.begin(); i != previous_views_.end(); i = i_next)
@@ -1173,7 +1138,7 @@ void gcomm::evs::Proto::cleanup_views()
 
 void gcomm::evs::Proto::cleanup_evicted()
 {
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
     Protolay::EvictList::const_iterator i, i_next;
     for (i = evict_list().begin(); i != evict_list().end(); i = i_next)
     {
@@ -1696,9 +1661,7 @@ void gcomm::evs::Proto::complete_user(const seqno_t high_seq)
 
     Datagram wb;
     int err;
-    profile_enter(send_user_prof_);
     err = send_user(wb, 0xff, O_DROP, -1, high_seq);
-    profile_leave(send_user_prof_);
     if (err != 0)
     {
         log_debug << "failed to send completing msg " << strerror(err)
@@ -2386,7 +2349,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     Node& node(NodeMap::value(ii));
     if (direct == true)
     {
-        node.set_seen_tstamp(gu::datetime::Date::now());
+        node.set_seen_tstamp(gu::datetime::Date::monotonic());
     }
 
     if (node.operational()                 == false &&
@@ -2618,7 +2581,7 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 
     if (dm.order() == O_LOCAL_CAUSAL)
     {
-        gu::datetime::Date now(gu::datetime::Date::now());
+        gu::datetime::Date now(gu::datetime::Date::monotonic());
         if (causal_queue_.empty() == true &&
             last_sent_ == input_map_->safe_seq() &&
             causal_keepalive_period_ > gu::datetime::Period(0) &&
@@ -2833,7 +2796,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 
         if (state() == S_OPERATIONAL)
         {
-            profile_enter(send_user_prof_);
             while (output_.empty() == false)
             {
                 int err;
@@ -2846,7 +2808,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                                    << strerror(err);
                 }
             }
-            profile_leave(send_user_prof_);
         }
         else
         {
@@ -2857,9 +2818,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         state_ = S_GATHER;
         if (send_j == true)
         {
-            profile_enter(send_join_prof_);
             gu_trace(send_join(false));
-            profile_leave(send_join_prof_);
         }
         gcomm_assert(state() == S_GATHER);
         reset_timer(T_INACTIVITY);
@@ -2973,9 +2932,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         install_message_ = 0;
         attempt_seq_ = 1;
         install_timeout_count_ = 0;
-        profile_enter(send_gap_prof_);
         gu_trace(send_gap(EVS_CALLER, UUID::nil(), current_view_.id(), Range()));;
-        profile_leave(send_gap_prof_);
         gcomm_assert(state() == S_OPERATIONAL);
         reset_timer(T_INACTIVITY);
         reset_timer(T_RETRANS);
@@ -3011,7 +2968,7 @@ void gcomm::evs::Proto::deliver_local(bool trans)
 {
     // local causal
     const seqno_t causal_seq(trans == false ? input_map_->safe_seq() : last_sent_);
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
 
     assert(input_map_->begin() == input_map_->end() ||
            input_map_->is_safe(input_map_->begin()) == false);
@@ -3040,7 +2997,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
     {
         if (msg.order() == O_SAFE)
         {
-            gu::datetime::Date now(gu::datetime::Date::now());
+            gu::datetime::Date now(gu::datetime::Date::monotonic());
             double lat(double(now.get_utc() - msg.tstamp().get_utc())/
                        gu::datetime::Sec);
             if (info_mask_ & I_STATISTICS) hs_safe_.insert(lat);
@@ -3050,7 +3007,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
         {
             if (info_mask_ & I_STATISTICS)
             {
-                gu::datetime::Date now(gu::datetime::Date::now());
+                gu::datetime::Date now(gu::datetime::Date::monotonic());
                 hs_agreed_.insert(double(now.get_utc() - msg.tstamp().get_utc())/gu::datetime::Sec);
             }
         }
@@ -3066,7 +3023,6 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
         if (msg.msg().order() != O_DROP)
         {
             gu_trace(validate_reg_msg(msg.msg()));
-            profile_enter(delivery_prof_);
             ProtoUpMeta um(msg.msg().source(),
                            msg.msg().source_view_id(),
                            0,
@@ -3082,7 +3038,6 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
                 log_info << msg.msg() << " " << msg.rb().len();
                 throw;
             }
-            profile_leave(delivery_prof_);
         }
     }
     else
@@ -3320,7 +3275,6 @@ void gcomm::evs::Proto::request_retrans(const UUID& target, const Range& range)
                                  << range
                                  << " due to input map gap, aru "
                                  << input_map_->aru_seq();
-        profile_enter(send_gap_prof_);
         std::vector<Range> gap_ranges(input_map_->gap_range_list(node.index(),
                                                                  range));
         for (std::vector<Range>::const_iterator ri(gap_ranges.begin());
@@ -3331,7 +3285,6 @@ void gcomm::evs::Proto::request_retrans(const UUID& target, const Range& range)
                 << " range: " << *ri;
             gu_trace(send_gap(EVS_CALLER, target, current_view_.id(), *ri));
         }
-        profile_leave(send_gap_prof_);
     }
 }
 
@@ -3421,11 +3374,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                         NodeMap::value(jj).set_installed(true);
                     }
                 }
-                inst.set_tstamp(gu::datetime::Date::now());
+                inst.set_tstamp(gu::datetime::Date::monotonic());
 
-                profile_enter(shift_to_prof_);
                 gu_trace(shift_to(S_OPERATIONAL));
-                profile_leave(shift_to_prof_);
                 if (pending_leave_ == true)
                 {
                     close();
@@ -3467,8 +3418,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     seqno_t prev_aru;
     seqno_t prev_safe;
 
-    profile_enter(input_map_prof_);
-
     prev_aru = input_map_->aru_seq();
     prev_range = input_map_->range(inst.index());
 
@@ -3480,7 +3429,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         gu_trace(range = input_map_->insert(inst.index(), msg, im_dgram));
         if (range.lu() > prev_range.lu())
         {
-            inst.set_tstamp(gu::datetime::Date::now());
+            inst.set_tstamp(gu::datetime::Date::monotonic());
         }
         else
         {
@@ -3508,8 +3457,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     // Update safe seq for message source
     prev_safe = update_im_safe_seq(inst.index(), msg.aru_seq());
 
-    profile_leave(input_map_prof_);
-
     // Check for missing messages
     if (range.hs() >  range.lu() &&
         (msg.flags() & Message::F_RETRANS) == 0)
@@ -3533,16 +3480,13 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     {
         // Output queue empty and aru changed, send gap to inform others
         evs_log_debug(D_GAP_MSGS) << "sending empty gap";
-        profile_enter(send_gap_prof_);
         gu_trace(send_gap(EVS_CALLER, UUID::nil(), current_view_.id(), Range()));
-        profile_leave(send_gap_prof_);
     }
 
     // Send messages
     if (state() == S_OPERATIONAL)
     {
         size_t n_sent(0);
-        profile_enter(send_user_prof_);
         while (output_.empty() == false)
         {
             int err;
@@ -3563,14 +3507,11 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 ++n_sent;
             }
         }
-        profile_leave(send_user_prof_);
     }
 
     // Deliver messages
-    profile_enter(delivery_prof_);
     gu_trace(deliver());
     gu_trace(deliver_local());
-    profile_leave(delivery_prof_);
 
     // If in recovery state, send join each time input map aru seq reaches
     // last sent and either input map aru or safe seq has changed.
@@ -3583,9 +3524,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         gcomm_assert(output_.empty() == true);
         if (consensus_.is_consensus() == false)
         {
-            profile_enter(send_join_prof_);
             gu_trace(send_join());
-            profile_leave(send_join_prof_);
         }
     }
     if (shift_to_gather) {
@@ -3625,7 +3564,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             install_message_->fifo_seq()        == msg.seq())
         {
             inst.set_committed(true);
-            inst.set_tstamp(gu::datetime::Date::now());
+            inst.set_tstamp(gu::datetime::Date::monotonic());
             if (is_all_committed() == true)
             {
                 shift_to(S_INSTALL);
@@ -3654,12 +3593,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         evs_log_debug(D_STATE) << "install gap " << msg;
         inst.set_installed(true);
-        inst.set_tstamp(gu::datetime::Date::now());
+        inst.set_tstamp(gu::datetime::Date::monotonic());
         if (is_all_installed() == true)
         {
-            profile_enter(shift_to_prof_);
             gu_trace(shift_to(S_OPERATIONAL));
-            profile_leave(shift_to_prof_);
             if (pending_leave_ == true)
             {
                 close();
@@ -3705,16 +3642,14 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     //
     seqno_t prev_safe;
 
-    profile_enter(input_map_prof_);
     prev_safe = update_im_safe_seq(inst.index(), msg.aru_seq());
 
     // Deliver messages and update tstamp only if safe_seq changed
     // for the source.
     if (prev_safe != input_map_->safe_seq(inst.index()))
     {
-        inst.set_tstamp(gu::datetime::Date::now());
+        inst.set_tstamp(gu::datetime::Date::monotonic());
     }
-    profile_leave(input_map_prof_);
 
     //
     if (msg.range_uuid() == uuid())
@@ -3745,7 +3680,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         if (output_.empty() == false)
         {
-            profile_enter(send_user_prof_);
             while (output_.empty() == false)
             {
                 int err;
@@ -3753,7 +3687,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
                 if (err != 0)
                     break;
             }
-            profile_leave(send_user_prof_);
         }
         else
         {
@@ -3765,10 +3698,8 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         }
     }
 
-    profile_enter(delivery_prof_);
     gu_trace(deliver());
     gu_trace(deliver_local());
-    profile_leave(delivery_prof_);
 
     //
     if (state()                            == S_GATHER                  &&
@@ -3778,9 +3709,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         gcomm_assert(output_.empty() == true);
         if (consensus_.is_consensus() == false)
         {
-            profile_enter(send_join_prof_);
             gu_trace(send_join());
-            profile_leave(send_join_prof_);
         }
     }
 }
@@ -3983,7 +3912,7 @@ void gcomm::evs::Proto::asymmetry_elimination()
 {
     // Allow some time to pass from setting install timers to get
     // join messages accumulated.
-    const gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Date now(gu::datetime::Date::monotonic());
     TimerList::const_iterator ti(
         find_if(timers_.begin(), timers_.end(), TimerSelectOp(T_INSTALL)));
 
@@ -4250,17 +4179,14 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if (msg.source_view_id() == current_view_.id())
         {
-            inst.set_tstamp(gu::datetime::Date::now());
+            inst.set_tstamp(gu::datetime::Date::monotonic());
             MessageNodeList same_view;
             for_each(msg.node_list().begin(), msg.node_list().end(),
                      SelectNodesOp(same_view, current_view_.id(),
                                    true, true));
-            profile_enter(input_map_prof_);
             if (update_im_safe_seqs(same_view) == true)
             {
-                profile_enter(send_leave_prof_);
                 gu_trace(send_leave(false));
-                profile_leave(send_leave_prof_);
             }
             for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
                  ++i)
@@ -4276,7 +4202,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                     }
                 }
             }
-            profile_leave(input_map_prof_);
             gu_trace(retrans_user(msg.source(), same_view));
         }
         return;
@@ -4313,12 +4238,10 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                         NodeMap::value(jj).set_installed(true);
                     }
                 }
-                inst.set_tstamp(gu::datetime::Date::now());
+                inst.set_tstamp(gu::datetime::Date::monotonic());
                 if (state() == S_INSTALL)
                 {
-                    profile_enter(shift_to_prof_);
                     gu_trace(shift_to(S_OPERATIONAL));
-                    profile_leave(shift_to_prof_);
                     if (pending_leave_ == true)
                     {
                         close();
@@ -4400,7 +4323,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         const UUID mn_uuid(MessageNodeList::key(i));
         const MessageNode& mn(MessageNodeList::value(i));
         gather_views_.insert(std::make_pair(mn.view_id(),
-                                            gu::datetime::Date::now()));
+                                            gu::datetime::Date::monotonic()));
         if (ni == known_.end())
         {
             known_.insert_unique(
@@ -4425,7 +4348,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if(MessageNodeList::value(self).operational() == true)
         {
-            inst.set_tstamp(gu::datetime::Date::now());
+            inst.set_tstamp(gu::datetime::Date::monotonic());
         }
         else
         {
@@ -4532,9 +4455,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         // leave message.
         if (current_view_.members().size() == 1)
         {
-            profile_enter(shift_to_prof_);
             gu_trace(shift_to(S_CLOSED));
-            profile_leave(shift_to_prof_);
         }
     }
     else
@@ -4551,23 +4472,19 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         const seqno_t prev_safe_seq(update_im_safe_seq(node.index(), msg.aru_seq()));
         if (prev_safe_seq != input_map_->safe_seq(node.index()))
         {
-            node.set_tstamp(gu::datetime::Date::now());
+            node.set_tstamp(gu::datetime::Date::monotonic());
         }
         if (state() == S_OPERATIONAL)
         {
-            profile_enter(shift_to_prof_);
             evs_log_info(I_STATE)
                 << " shift to GATHER when handling leave from "
                 << msg.source() << " " << msg.source_view_id();
             gu_trace(shift_to(S_GATHER, true));
-            profile_leave(shift_to_prof_);
         }
         else if (state() == S_GATHER &&
                  prev_safe_seq != input_map_->safe_seq(node.index()))
         {
-            profile_enter(send_join_prof_);
             gu_trace(send_join());
-            profile_leave(send_join_prof_);
         }
     }
 }
@@ -4594,9 +4511,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
             const MessageNode& mn(MessageNodeList::value(mn_i));
             if (mn.operational() == false || mn.leaving() == true)
             {
-                profile_enter(shift_to_prof_);
                 gu_trace(shift_to(S_CLOSED));
-                profile_leave(shift_to_prof_);
             }
         }
         return;
@@ -4671,9 +4586,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     {
         log_warn << self_string()
                  << " shift to GATHER due to inconsistent state";
-        profile_enter(shift_to_prof_);
         gu_trace(shift_to(S_GATHER));
-        profile_leave(shift_to_prof_);
         return;
     }
 
@@ -4745,24 +4658,20 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     // nodes that will not be in the next view.
     if (consensus_.is_consistent(msg) == true)
     {
-        inst.set_tstamp(gu::datetime::Date::now());
+        inst.set_tstamp(gu::datetime::Date::monotonic());
         install_message_ = new InstallMessage(msg);
         assert(install_message_->source() != UUID::nil());
         assert(install_message_->flags() != 0);
-        profile_enter(send_gap_prof_);
         // Send commit gap
         gu_trace(send_gap(EVS_CALLER, UUID::nil(), install_message_->install_view_id(),
                           Range(), true));
-        profile_leave(send_gap_prof_);
     }
     else
     {
         evs_log_debug(D_INSTALL_MSGS)
             << "install message " << msg
             << " not consistent with state " << *this;
-        profile_enter(shift_to_prof_);
         gu_trace(shift_to(S_GATHER, true));
-        profile_leave(shift_to_prof_);
     }
 }
 
@@ -4778,7 +4687,7 @@ void gcomm::evs::Proto::handle_delayed_list(const DelayedListMessage& msg,
 
     Node& node(NodeMap::value(ii));
     node.set_delayed_list_message(&msg);
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
 
     // Construct a list of evict candidates that appear in evict list messages
     // with cnt greater than local auto_evict_. If evict candidate is reported

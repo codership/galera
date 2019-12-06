@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #include "evs_node.hpp"
@@ -117,7 +117,7 @@ bool gcomm::evs::Node::is_inactive() const
 void gcomm::evs::InspectNode::operator()(std::pair<const gcomm::UUID, Node>& p) const
 {
     Node& node(p.second);
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
     if (node.tstamp() + node.proto_.suspect_timeout_ < now)
     {
         if (node.suspected_ == false)

@@ -118,7 +118,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
         param<int>(conf_, uri,
                    Conf::GMCastMaxInitialReconnectAttempts,
                    gu::to_string(max_retry_cnt_))),
-    next_check_   (gu::datetime::Date::now())
+    next_check_   (gu::datetime::Date::monotonic())
 {
     log_info << "GMCast version " << version_;
 
@@ -444,8 +444,8 @@ void gcomm::GMCast::blacklist(const gmcast::Proto* proto)
     pending_addrs_.erase(proto->remote_addr());
     addr_blacklist_.insert(std::make_pair(
                                proto->remote_addr(),
-                               AddrEntry(gu::datetime::Date::now(),
-                                         gu::datetime::Date::now(),
+                               AddrEntry(gu::datetime::Date::monotonic(),
+                                         gu::datetime::Date::monotonic(),
                                          proto->remote_uuid())));
 }
 
@@ -628,13 +628,13 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid,
             }
             ae.set_max_retries(0);
             ae.set_retry_cnt(1);
-            gu::datetime::Date now(gu::datetime::Date::now());
+            gu::datetime::Date now(gu::datetime::Date::monotonic());
             // Don't reduce next reconnect time if it is set greater than
             // requested
             if ((now + wait_period > ae.next_reconnect()) ||
                 (ae.next_reconnect() == gu::datetime::Date::max()))
             {
-                ae.set_next_reconnect(gu::datetime::Date::now() + wait_period);
+                ae.set_next_reconnect(gu::datetime::Date::monotonic() + wait_period);
             }
             else
             {
@@ -703,8 +703,8 @@ void gcomm::GMCast::handle_established(Proto* est)
         remote_addrs_.erase(i);
         i = remote_addrs_.insert_unique(
             make_pair(est->remote_addr(),
-                      AddrEntry(gu::datetime::Date::now(),
-                                gu::datetime::Date::now(),
+                      AddrEntry(gu::datetime::Date::monotonic(),
+                                gu::datetime::Date::monotonic(),
                                 est->remote_uuid())));
     }
 
@@ -811,7 +811,7 @@ void gcomm::GMCast::handle_failed(Proto* failed)
             AddrEntry& ae(AddrList::value(i));
             ae.set_retry_cnt(ae.retry_cnt() + 1);
 
-            gu::datetime::Date rtime = gu::datetime::Date::now() + gu::datetime::Period("PT1S");
+            gu::datetime::Date rtime = gu::datetime::Date::monotonic() + gu::datetime::Period("PT1S");
             log_debug << self_string()
                       << " setting next reconnect time to "
                       << rtime << " for " << remote_addr;
@@ -851,8 +851,8 @@ void gcomm::GMCast::insert_address (const std::string& addr,
     }
 
     if (alist.insert(make_pair(addr,
-                               AddrEntry(gu::datetime::Date::now(),
-                                         gu::datetime::Date::now(), uuid))).second == false)
+                               AddrEntry(gu::datetime::Date::monotonic(),
+                                         gu::datetime::Date::monotonic(), uuid))).second == false)
     {
         log_warn << "Duplicate entry: " << addr;
     }
@@ -973,7 +973,7 @@ void gcomm::GMCast::update_addresses()
 
                     // Add some randomness for first reconnect to avoid
                     // simultaneous connects
-                    gu::datetime::Date rtime(gu::datetime::Date::now());
+                    gu::datetime::Date rtime(gu::datetime::Date::monotonic());
 
                     rtime = rtime + ::rand() % (100*gu::datetime::MSec);
                     ae.set_next_reconnect(rtime);
@@ -1040,7 +1040,7 @@ void gcomm::GMCast::reconnect()
 
     /* Loop over known remote addresses and connect if proto entry
      * does not exist */
-    gu::datetime::Date now = gu::datetime::Date::now();
+    gu::datetime::Date now = gu::datetime::Date::monotonic();
     AddrList::iterator i, i_next;
 
     for (i = pending_addrs_.begin(); i != pending_addrs_.end(); i = i_next)
@@ -1159,7 +1159,7 @@ void gcomm::GMCast::check_liveness()
     std::set<UUID> live_uuids;
 
     // iterate over proto map and mark all timed out entries as failed
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
     for (ProtoMap::iterator i(proto_map_->begin()); i != proto_map_->end(); )
     {
         // Store next iterator into temporary, handle_failed() may remove
@@ -1295,7 +1295,7 @@ void gcomm::GMCast::check_liveness()
 
 gu::datetime::Date gcomm::GMCast::handle_timers()
 {
-    const gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Date now(gu::datetime::Date::monotonic());
 
     if (now >= next_check_)
     {
@@ -1829,7 +1829,7 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
             AddrEntry& ae(AddrList::value(ai));
             ae.set_max_retries(0);
             ae.set_retry_cnt(1);
-            ae.set_next_reconnect(gu::datetime::Date::now() + time_wait_);
+            ae.set_next_reconnect(gu::datetime::Date::monotonic() + time_wait_);
             update_addresses();
         }
         else

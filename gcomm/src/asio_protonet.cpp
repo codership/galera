@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2019 Codership Oy <info@codership.com>
  */
 
 
@@ -95,7 +95,7 @@ gcomm::Acceptor* gcomm::AsioProtonet::acceptor(const gu::URI& uri)
 gu::datetime::Period handle_timers_helper(gcomm::Protonet&            pnet,
                                           const gu::datetime::Period& period)
 {
-    const gu::datetime::Date now(gu::datetime::Date::now());
+    const gu::datetime::Date now(gu::datetime::Date::monotonic());
     const gu::datetime::Date stop(now + period);
 
     const gu::datetime::Date next_time(pnet.handle_timers());
@@ -107,7 +107,7 @@ gu::datetime::Period handle_timers_helper(gcomm::Protonet&            pnet,
 void gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
 {
     io_service_.reset();
-    poll_until_ = gu::datetime::Date::now() + period;
+    poll_until_ = gu::datetime::Date::monotonic() + period;
 
     const gu::datetime::Period p(handle_timers_helper(*this, period));
     timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
@@ -137,7 +137,7 @@ void gcomm::AsioProtonet::interrupt()
 
 void gcomm::AsioProtonet::handle_wait(const asio::error_code& ec)
 {
-    gu::datetime::Date now(gu::datetime::Date::now());
+    gu::datetime::Date now(gu::datetime::Date::monotonic());
     const gu::datetime::Period p(handle_timers_helper(*this, poll_until_ - now));
     using std::rel_ops::operator>=;
     if (ec == asio::error_code() && poll_until_ >= now)

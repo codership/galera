@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -21,17 +21,9 @@
 #include <gcomm/util.hpp>
 #include <gcomm/conf.hpp>
 
-#ifdef PROFILE_GCS_GCOMM
-#define GCOMM_PROFILE 1
-#else
-#undef GCOMM_PROFILE
-#endif // PROFILE_GCS_GCOMM
-#include <profile.hpp>
-
 #include <gu_backtrace.hpp>
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
-#include <gu_prodcons.hpp>
 #include <gu_barrier.hpp>
 #include <gu_thread.hpp>
 
@@ -39,10 +31,8 @@
 
 using namespace std;
 using namespace gu;
-using namespace gu::prodcons;
 using namespace gu::datetime;
 using namespace gcomm;
-using namespace prof;
 
 static const std::string gcomm_thread_schedparam_opt("gcomm.thread_prio");
 
@@ -148,31 +138,7 @@ private:
     bool waiting_;
 };
 
-
-class MsgData : public MessageData
-{
-public:
-    MsgData(const byte_t* data,
-            const size_t data_size,
-            const gcs_msg_type_t msg_type) :
-        data_     (data),
-        data_size_(data_size),
-        msg_type_ (msg_type)
-    { }
-    const byte_t* get_data() const { return data_; }
-    size_t get_data_size() const { return data_size_; }
-    gcs_msg_type_t get_msg_type() const { return msg_type_; }
-
-public:
-    MsgData(const MsgData&);
-    void operator=(const MsgData&);
-    const byte_t*  data_;
-    size_t         data_size_;
-    gcs_msg_type_t msg_type_;
-};
-
-
-class GCommConn : public Consumer, public Toplay
+class GCommConn : public Toplay
 {
 public:
 
@@ -191,8 +157,7 @@ public:
         terminated_(false),
         error_(0),
         recv_buf_(),
-        current_view_(),
-        prof_("gcs_gcomm")
+        current_view_()
     {
         log_info << "backend: " << net_->type();
     }
@@ -307,14 +272,7 @@ public:
             delete tp_;
             tp_ = 0;
         }
-        const Message* msg;
-
-        while ((msg = get_next_msg()) != 0)
-        {
-            return_ack(Message(&msg->get_producer(), 0, -ECONNABORTED));
-        }
         log_info << "gcomm: closed";
-        log_debug << prof_;
     }
 
     void run();
@@ -331,8 +289,6 @@ public:
     void handle_up     (const void*        id,
                         const Datagram&    dg,
                         const ProtoUpMeta& um);
-
-    void queue_and_wait(const Message& msg, Message* ack);
 
     RecvBuf&    get_recv_buf()            { return recv_buf_; }
     size_t      get_mtu()           const
@@ -417,7 +373,6 @@ private:
     int               error_;
     RecvBuf           recv_buf_;
     View              current_view_;
-    Profile           prof_;
 };
 
 
@@ -448,9 +403,7 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
         {
             if (NodeList::key(i) == um.source())
             {
-                profile_enter(prof_);
                 recv_buf_.push_back(RecvBufData(idx, dg, um));
-                profile_leave(prof_);
                 break;
             }
             ++idx;
@@ -458,24 +411,6 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
         assert(idx < current_view_.members().size());
     }
 }
-
-
-void GCommConn::queue_and_wait(const Message& msg, Message* ack)
-{
-    {
-        Lock lock(mutex_);
-        if (terminated_ == true)
-        {
-            *ack = Message(&msg.get_producer(), 0, -ECONNABORTED);
-            return;
-        }
-    }
-    profile_enter(prof_);
-    Consumer::queue_and_wait(msg, ack);
-    profile_leave(prof_);
-}
-
-
 
 void GCommConn::run()
 {

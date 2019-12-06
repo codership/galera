@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #include "pc.hpp"
@@ -84,7 +84,8 @@ void gcomm::PC::connect(bool start_prim)
         start_prim = true;
     }
 
-    bool wait_prim(param<bool>(conf_, uri_, Conf::PcWaitPrim, Defaults::PcWaitPrim));
+    bool wait_prim(param<bool>(conf_, uri_, Conf::PcWaitPrim,
+                               Defaults::PcWaitPrim));
     const gu::datetime::Period wait_prim_timeout(
         param<gu::datetime::Period>(conf_, uri_, Conf::PcWaitPrimTimeout,
                                     Defaults::PcWaitPrimTimeout));
@@ -115,14 +116,15 @@ void gcomm::PC::connect(bool start_prim)
     // Due to #658 there is limited announce period after which
     // node is allowed to proceed to non-prim if other nodes
     // are not detected.
-    gu::datetime::Date try_until(gu::datetime::Date::now() + announce_timeout_);
+    gu::datetime::Date try_until(
+        gu::datetime::Date::monotonic() + announce_timeout_);
     while (start_prim == false && evs_->known_size() <= 1)
     {
         // Send join messages without handling them
         evs_->send_join(false);
         pnet().event_loop(gu::datetime::Sec/2);
 
-        if (try_until < gu::datetime::Date::now())
+        if (try_until < gu::datetime::Date::monotonic())
         {
             break;
         }
@@ -140,12 +142,12 @@ void gcomm::PC::connect(bool start_prim)
 
     // - Due to #658 we loop here only if node is told to start in prim.
     // - Fix for #680, bypass waiting prim only if explicitly required
-    try_until = gu::datetime::Date::now() + wait_prim_timeout;
+    try_until = gu::datetime::Date::monotonic() + wait_prim_timeout;
     while ((wait_prim == true || start_prim == true) &&
            pc_->state() != pc::Proto::S_PRIM)
     {
         pnet().event_loop(gu::datetime::Sec/2);
-        if (try_until < gu::datetime::Date::now())
+        if (try_until < gu::datetime::Date::monotonic())
         {
             pc_->close();
             evs_->close();
@@ -187,14 +189,15 @@ void gcomm::PC::close(bool force)
         pc_->close();
         evs_->close();
 
-        gu::datetime::Date wait_until(gu::datetime::Date::now() + linger_);
+        gu::datetime::Date wait_until(
+            gu::datetime::Date::monotonic() + linger_);
 
         do
         {
             pnet().event_loop(gu::datetime::Sec/2);
         }
         while (evs_->state()         != evs::Proto::S_CLOSED &&
-               gu::datetime::Date::now() <  wait_until);
+               gu::datetime::Date::monotonic() <  wait_until);
 
         if (evs_->state() != evs::Proto::S_CLOSED)
         {

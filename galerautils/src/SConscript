@@ -79,7 +79,6 @@ libgalerautilsxx_sources = [
     'gu_exception.cpp',
     'gu_serialize.cpp',
     'gu_logger.cpp',
-    'gu_prodcons.cpp',
     'gu_regex.cpp',
     'gu_string_utils.cpp',
     'gu_uri.cpp',
