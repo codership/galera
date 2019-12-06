@@ -42,7 +42,7 @@ START_TEST(shared_ptr_test)
 
     long acc(0);
     long iters(1000000);
-    gu::datetime::Date start(gu::datetime::Date::now());
+    gu::datetime::Date start(gu::datetime::Date::monotonic());
 
     LongPtr longptr(new long(0));
     for (long i(0); i < iters; ++i)
@@ -51,11 +51,11 @@ START_TEST(shared_ptr_test)
         pass_by_value(longptr, acc);
     }
 
-    gu::datetime::Date end(gu::datetime::Date::now());
+    gu::datetime::Date end(gu::datetime::Date::monotonic());
 
     log_info << "add_by_val: " << acc << " " << iters/to_sec(end - start);
 
-    start = gu::datetime::Date::now();
+    start = gu::datetime::Date::monotonic();
 
     for (long i(0); i < iters; ++i)
     {
@@ -63,12 +63,12 @@ START_TEST(shared_ptr_test)
         pass_by_const_ref(longptr, acc);
     }
 
-    end = gu::datetime::Date::now();
+    end = gu::datetime::Date::monotonic();
 
     log_info << "add_by_const_ref: " << acc << " " << iters/to_sec(end - start);
 
 
-    start = gu::datetime::Date::now();
+    start = gu::datetime::Date::monotonic();
 
     for (long i(0); i < iters; ++i)
     {
@@ -76,7 +76,7 @@ START_TEST(shared_ptr_test)
         acc += *longptr;
     }
 
-    end = gu::datetime::Date::now();
+    end = gu::datetime::Date::monotonic();
 
     log_info << "construct_and_ret: " << acc << " "
              << iters/to_sec(end - start);
