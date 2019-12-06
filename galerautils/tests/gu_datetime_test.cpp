@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #include "gu_datetime.hpp"
@@ -76,7 +74,7 @@ END_TEST
 
 START_TEST(test_date)
 {
-    Date d1(Date::now());
+    Date d1(Date::monotonic());
     Date d2 = d1 + Period("PT6S");
     fail_unless(d2.get_utc() == d1.get_utc() + 6*Sec);
     fail_unless(d2 - Period("PT6S") == d1);

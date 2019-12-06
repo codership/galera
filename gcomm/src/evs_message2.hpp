@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef EVS_MESSAGE2_HPP
@@ -373,7 +371,7 @@ public:
         install_view_id_ (install_view_id),
         range_uuid_      (range_uuid),
         range_           (range),
-        tstamp_          (gu::datetime::Date::now()),
+        tstamp_          (gu::datetime::Date::monotonic()),
         node_list_       (node_list),
         delayed_list_    ()
     { }

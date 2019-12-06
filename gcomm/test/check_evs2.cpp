@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
- *
- * $Id$
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -298,7 +296,7 @@ START_TEST(test_input_map_overwrap)
     im.reset(n_nodes);
 
 
-    Date start(Date::now());
+    Date start(Date::monotonic());
     size_t cnt(0);
     seqno_t last_safe(-1);
     for (seqno_t seq = 0; seq < 100000; ++seq)
@@ -323,7 +321,7 @@ START_TEST(test_input_map_overwrap)
         gcomm_assert(im.aru_seq() == seq);
         gcomm_assert(im.safe_seq() == last_safe);
     }
-    Date stop(Date::now());
+    Date stop(Date::monotonic());
 
     double div(double(stop.get_utc() - start.get_utc())/gu::datetime::Sec);
     log_info << "input map msg rate " << double(cnt)/div;

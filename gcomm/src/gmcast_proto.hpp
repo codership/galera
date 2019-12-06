@@ -100,8 +100,8 @@ public:
         propagate_remote_ (false),
         tp_               (tp),
         link_map_         (),
-        send_tstamp_      (gu::datetime::Date::now()),
-        recv_tstamp_      (gu::datetime::Date::now()),
+        send_tstamp_      (gu::datetime::Date::monotonic()),
+        recv_tstamp_      (gu::datetime::Date::monotonic()),
         gmcast_           (gmcast)
     { }
 

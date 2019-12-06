@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -141,17 +139,6 @@ namespace gu
         class Date
         {
         public:
-
-            /*!
-             * @brief Get system time.
-             * @note This call should be deprecated in favor of calendar()
-             *       and monotonic().
-             */
-            static inline Date now()
-            {
-                if (SimClock::initialized()) return SimClock::get_time();
-                else return gu_time_monotonic();
-            }
 
             /*!
              * @brief Get time from system-wide realtime clock.

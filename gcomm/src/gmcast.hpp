@@ -133,7 +133,7 @@ namespace gcomm
 
             void set_last_connect()
             {
-                last_connect_ = gu::datetime::Date::now();
+                last_connect_ = gu::datetime::Date::monotonic();
             }
 
             const gu::datetime::Date& last_connect() const

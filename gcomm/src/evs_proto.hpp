@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -17,7 +17,6 @@
 #include "gcomm/map.hpp"
 #include "gu_histogram.hpp"
 #include "gu_stats.hpp"
-#include "profile.hpp"
 
 #include "evs_seqno.hpp"
 #include "evs_node.hpp"
@@ -408,16 +407,6 @@ private:
     long long int recovered_msgs_;
     std::vector<long long int> recvd_msgs_;
     std::vector<long long int> delivered_msgs_;
-    prof::Profile send_user_prof_;
-    prof::Profile send_gap_prof_;
-    prof::Profile send_join_prof_;
-    prof::Profile send_install_prof_;
-    prof::Profile send_leave_prof_;
-    prof::Profile consistent_prof_;
-    prof::Profile consensus_prof_;
-    prof::Profile shift_to_prof_;
-    prof::Profile input_map_prof_;
-    prof::Profile delivery_prof_;
     bool delivering_;
     UUID my_uuid_;
     SegmentId segment_;
@@ -469,7 +458,7 @@ private:
             user_type_(user_type),
             seqno_    (seqno    ),
             datagram_ (datagram ),
-            tstamp_   (gu::datetime::Date::now())
+            tstamp_   (gu::datetime::Date::monotonic())
         { }
         uint8_t             user_type() const { return user_type_; }
         seqno_t             seqno()     const { return seqno_    ; }
@@ -533,7 +522,7 @@ private:
         DelayedEntry(const std::string& addr)
             :
             addr_      (addr),
-            tstamp_(gu::datetime::Date::now()),
+            tstamp_(gu::datetime::Date::monotonic()),
             state_(S_DELAYED),
             state_change_cnt_(1)
         { }

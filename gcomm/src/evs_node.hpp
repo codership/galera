@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 #ifndef EVS_NODE_HPP
@@ -48,7 +48,7 @@ public:
         join_message_      (0),
         leave_message_     (0),
         delayed_list_message_(0),
-        tstamp_            (gu::datetime::Date::now()),
+        tstamp_            (gu::datetime::Date::monotonic()),
         seen_tstamp_       (tstamp_),
         last_requested_range_tstamp_(),
         last_requested_range_(),

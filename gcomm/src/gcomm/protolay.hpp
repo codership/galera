@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -327,7 +327,8 @@ public:
 
     void evict(const UUID& uuid)
     {
-        evict_list_.insert(std::make_pair(uuid, gu::datetime::Date::now()));
+        evict_list_.insert(
+            std::make_pair(uuid, gu::datetime::Date::monotonic()));
         handle_evict(uuid);
         for (CtxList::iterator i(down_context_.begin());
              i != down_context_.end(); ++i)

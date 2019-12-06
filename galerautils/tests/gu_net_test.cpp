@@ -14,7 +14,6 @@
 #include "gu_uri.hpp"
 #include "gu_resolver.hpp"
 #include "gu_lock.hpp"
-#include "gu_prodcons.hpp"
 
 #include "gu_net_test.hpp"
 
@@ -25,7 +24,6 @@ using std::mem_fun;
 using std::for_each;
 using namespace gu;
 using namespace gu::net;
-using namespace gu::prodcons;
 
 START_TEST(test_resolver)
 {
