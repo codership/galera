@@ -660,6 +660,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
     {
         evs_log_debug(D_TIMERS) << "send leave timer";
         send_leave(false);
+        retrans_missing();
     }
 }
 
@@ -766,10 +767,6 @@ void gcomm::evs::Proto::handle_install_timer()
 
 void gcomm::evs::Proto::handle_stats_timer()
 {
-    if (info_mask_ & I_STATISTICS)
-    {
-        log_info << stats();
-    }
     reset_stats();
 }
 
@@ -949,7 +946,7 @@ void gcomm::evs::Proto::check_inactive()
         if (auto_evict_ &&
             node.seen_tstamp() + retrans_period_ + delay_margin_ <= now)
         {
-            if (node.index() != std::numeric_limits<size_t>::max())
+            if (node.index() != Node::invalid_index)
             {
                 // Delayed node in group, check input map state and request
                 // message recovery if necessary
@@ -960,7 +957,8 @@ void gcomm::evs::Proto::check_inactive()
                 if (last_sent_ >= range.lu())
                 {
                     // Request missing message range from delayed node.
-                    request_retrans(node_uuid, Range(range.lu(), last_sent_));
+                    request_retrans(node_uuid, node_uuid,
+                                    Range(range.lu(), last_sent_));
                 }
             }
 
@@ -1570,8 +1568,7 @@ size_t gcomm::evs::Proto::aggregate_len() const
     bool is_aggregate(false);
     size_t ret(0);
     AggregateMessage am;
-    std::deque<std::pair<Datagram, ProtoDownMeta> >::const_iterator
-        i(output_.begin());
+    out_queue::const_iterator i(output_.begin());
     const Order ord(i->second.order());
     ret += i->first.len() + am.serial_size();
     for (++i; i != output_.end() && i->second.order() == ord; ++i)
@@ -1604,8 +1601,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
         size_t offset(0);
         size_t n(0);
 
-        std::deque<std::pair<Datagram, ProtoDownMeta> >::iterator
-            i(output_.begin());
+        out_queue::const_iterator i(output_.begin());
         Order ord(i->second.order());
         while ((alen > 0 && i != output_.end()))
         {
@@ -1716,6 +1712,8 @@ void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
                                  const Range   range,
                                  const bool    commit)
 {
+    assert(range_uuid == UUID::nil());
+    assert(range.is_empty());
     gcomm_assert((commit == false && source_view_id == current_view_.id())
                  || install_message_ != 0);
     uint8_t flags(0);
@@ -1744,14 +1742,6 @@ void gcomm::evs::Proto::send_gap(EVS_CALLER_ARG,
     }
     sent_msgs_[Message::EVS_T_GAP]++;
     gu_trace(handle_gap(gm, self_i_));
-    if (not range.is_empty() && range_uuid != UUID::nil())
-    {
-        NodeMap::iterator target_i(known_.find(range_uuid));
-        if (target_i != known_.end())
-        {
-            target_i->second.last_requested_range(range);
-        }
-    }
 }
 
 
@@ -2352,9 +2342,17 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         node.set_seen_tstamp(gu::datetime::Date::monotonic());
     }
 
-    if (node.operational()                 == false &&
-        node.leave_message()               == 0     &&
-        (msg.flags() & Message::F_RETRANS) == 0)
+    if (state() == S_LEAVING && msg.source_view_id() == current_view_.id())
+    {
+        // Allow messages in leaving state. This is needed for both
+        // updating the join messages for retransmission and for handling
+        // retransmitted messages.
+        evs_log_debug(D_FOREIGN_MSGS) << "Allow message from current view "
+                                      << "in leaving state" << msg;
+    }
+    else if (node.operational()                 == false &&
+             node.leave_message()               == 0     &&
+             (msg.flags() & Message::F_RETRANS) == 0)
     {
         // We have set this node unoperational and there was
         // probably good reason to do so. Don't accept messages
@@ -2426,7 +2424,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             << "dropping non-membership message from foreign view";
         return;
     }
-    else if (NodeMap::value(ii).index() == std::numeric_limits<size_t>::max() &&
+    else if (NodeMap::value(ii).index() == Node::invalid_index &&
              msg.source_view_id()       == current_view_.id())
     {
         log_warn << "Message from node that claims to come from same view but is not in current view " << msg;
@@ -2641,6 +2639,13 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
         return 0;
     }
 
+    // Limit outbound bytes to out_queue::max_outbound_bytes (1MB)
+    // to limit the time it takes to transmit all outbound messages
+    // during configuration change.
+    if (output_.outbound_bytes() >= out_queue::max_outbound_bytes)
+    {
+        return EAGAIN;
+    }
 
     send_queue_s_ += output_.size();
     ++n_send_queue_s_;
@@ -2669,14 +2674,11 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
             ret = err;
         }
     }
-    else if (output_.size() < max_output_size_)
+    else
     {
         output_.push_back(std::make_pair(wb, dm));
     }
-    else
-    {
-        ret = EAGAIN;
-    }
+
     return ret;
 }
 
@@ -2906,7 +2908,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             else
             {
                 NodeMap::value(nmi).set_index(
-                    std::numeric_limits<size_t>::max());
+                    Node::invalid_index);
             }
 
         }
@@ -3253,38 +3255,368 @@ gcomm::evs::seqno_t gcomm::evs::Proto::update_im_safe_seq(const size_t uuid,
     return im_safe_seq;
 }
 
-void gcomm::evs::Proto::request_retrans(const UUID& target, const Range& range)
+void gcomm::evs::Proto::send_request_retrans_gap(const UUID& target,
+                                                 const UUID& origin,
+                                                 const Range& range)
 {
-    NodeMap::const_iterator node_i(known_.find(target));
-    assert(node_i != known_.end());
-    if (node_i == known_.end())
+    GapMessage gm(version_,
+                  uuid(),
+                  current_view_.id(),
+                  last_sent_,
+                  input_map_->aru_seq(),
+                  ++fifo_seq_,
+                  origin,
+                  range,
+                  Message::F_RETRANS);
+    gu::Buffer buf;
+    serialize(gm, buf);
+    Datagram dg(buf);
+    int err = send_down(dg, ProtoDownMeta(target));
+    if (err != 0)
     {
-        log_warn << "Target " << target << " not found from known nodes";
+        log_debug << "send failed: " << strerror(err);
+    }
+    sent_msgs_[Message::EVS_T_GAP]++;
+}
+
+void gcomm::evs::Proto::request_retrans(const UUID& target, const UUID& origin,
+                                        const Range& range)
+{
+    NodeMap::const_iterator origin_node_i(known_.find(origin));
+    assert(origin_node_i != known_.end());
+    if (origin_node_i == known_.end())
+    {
+        log_warn << "Origin " << origin << " not found from known nodes";
         return;
     }
-    const Node& node(NodeMap::value(node_i));
-    if (node.index() == std::numeric_limits<size_t>::max())
+    const Node& origin_node(NodeMap::value(origin_node_i));
+    if (origin_node.index() == Node::invalid_index)
     {
-        log_warn << "Target " << target << " has no index";
+        log_warn << "Origin " << origin << " has no index";
         return;
     }
     if (not gap_rate_limit(target, range))
     {
-        evs_log_debug(D_RETRANS) << " requesting retrans from "
-                                 << target << " "
-                                 << range
+        evs_log_debug(D_RETRANS) << self_string()
+                                 << " requesting retrans from " << target
+                                 << " origin " << origin
+                                 << " range " << range
                                  << " due to input map gap, aru "
                                  << input_map_->aru_seq();
-        std::vector<Range> gap_ranges(input_map_->gap_range_list(node.index(),
-                                                                 range));
+        std::vector<Range> gap_ranges(input_map_->gap_range_list(
+                                          origin_node.index(), range));
         for (std::vector<Range>::const_iterator ri(gap_ranges.begin());
              ri != gap_ranges.end(); ++ri)
         {
             evs_log_debug(D_RETRANS)
                 << "Requesting retransmssion from " << target
+                << " origin: " << origin
                 << " range: " << *ri;
-            gu_trace(send_gap(EVS_CALLER, target, current_view_.id(), *ri));
+            send_request_retrans_gap(target, origin, *ri);
         }
+        NodeMap::iterator target_i(known_.find(target));
+        if (target_i != known_.end())
+        {
+            target_i->second.last_requested_range(range);
+        }
+    }
+}
+
+// Select suitable node for recovering missing messages. The node
+// is chosen to be one with join message originating from the same
+// view and highest lowest unseen for origin.
+
+struct SelectRecoveryNodeForMissingResult
+{
+    gcomm::evs::seqno_t lowest_unseen;
+    gcomm::UUID target;
+    SelectRecoveryNodeForMissingResult()
+        : lowest_unseen(-1)
+        , target()
+    { }
+};
+
+class SelectRecoveryNodeForMissing
+{
+public:
+    SelectRecoveryNodeForMissing(const gcomm::evs::Proto& evs,
+                                 const gcomm::UUID& origin,
+                                 const gcomm::ViewId& view_id,
+                                 SelectRecoveryNodeForMissingResult&
+                                 result /* Out parameter */)
+        : evs_(evs)
+        , origin_(origin)
+        , view_id_(view_id)
+        , result_(result)
+    { }
+
+    void operator()(const gcomm::evs::NodeMap::value_type& node_v)
+    {
+        // Do not try to recover from self.
+        if (evs_.uuid() == node_v.first) return;
+
+        if (node_v.second.operational())
+        {
+            gcomm::evs::seqno_t lu(get_lu_for(origin_, node_v.second));
+            if (lu > result_.lowest_unseen)
+            {
+                result_.lowest_unseen = lu;
+                result_.target = node_v.first;
+            }
+        }
+    }
+
+private:
+    gcomm::evs::seqno_t get_lu_from_join_for(const gcomm::UUID& origin,
+                                             const gcomm::evs::JoinMessage& jm)
+    {
+        gcomm::evs::MessageNodeList::const_iterator origin_i(
+            jm.node_list().find(origin));
+        if (origin_i != jm.node_list().end())
+        {
+            return origin_i->second.im_range().lu();
+        }
+        return -1;
+    }
+
+    gcomm::evs::seqno_t get_lu_for(const gcomm::UUID& origin,
+                                   const gcomm::evs::Node& node)
+    {
+        const gcomm::evs::JoinMessage* jm(node.join_message());
+        // No join message received
+        if (not jm) return -1;
+        // Not in the same view
+        if (jm->source_view_id() != view_id_) return -1;
+        return get_lu_from_join_for(origin, *jm);
+    }
+
+    const gcomm::evs::Proto& evs_;
+    const gcomm::UUID& origin_;
+    const gcomm::ViewId& view_id_;
+    SelectRecoveryNodeForMissingResult& result_; // Reference to out parameter
+};
+
+void gcomm::evs::Proto::request_missing()
+{
+    // This method should be called only during configuration changes.
+    // In operational state requests should be done based on
+    // detected gaps and on delayed node checks.
+    assert(state() != S_OPERATIONAL);
+    for (NodeMap::const_iterator node_i(known_.begin()); node_i != known_.end();
+         ++node_i)
+    {
+        const UUID& origin(node_i->first);
+        if (origin == my_uuid_) continue; // No need to request from self.
+        const Node& node(node_i->second);
+        // Node has no index assigned, so it was not in the current group.
+        if (node.index() == Node::invalid_index) continue;
+
+        Range range(input_map_->range(node.index()));
+        if ((not range.is_empty() || range.hs() < last_sent_) &&
+            (node.leave_message() == 0 ||
+             node.leave_message()->seq() > range.hs()))
+        {
+            // Missing messages from node. If it is still considerd operational,
+            // send a retransimission request to it. Otherwise locate some
+            // other node to recover the missing messages.
+            if (node.operational())
+            {
+                const Range request_range(range.lu(), last_sent_);
+                if (not request_range.is_empty())
+                {
+                    request_retrans(origin, origin, request_range);
+                }
+            }
+            else
+            {
+                // Try to find suitable node to recover the missing messages
+                // from origin.
+                SelectRecoveryNodeForMissingResult result;
+                std::for_each(known_.begin(), known_.end(),
+                              SelectRecoveryNodeForMissing(
+                                  *this, origin, current_view_.id(), result));
+                // If the target node was found, it has messages up to
+                // result.lowest_unseen - 1 from origin.
+                const Range request_range(range.lu(), result.lowest_unseen - 1);
+                if (result.target != UUID::nil() && not request_range.is_empty())
+                {
+                    request_retrans(result.target, origin, request_range);
+                }
+                else
+                {
+                    evs_log_debug(D_RETRANS)
+                        << "Could not find a node to recover messages "
+                        << "from, missing from " << origin
+                        << " range: " << range
+                        << " last_sent: " << last_sent_;
+                }
+            }
+        }
+    }
+}
+
+class ResendMissingRanges
+{
+public:
+    ResendMissingRanges(gcomm::evs::Proto& evs,
+                        gcomm::evs::seqno_t last_sent,
+                        const gcomm::ViewId& view_id)
+        : evs_(evs)
+        , last_sent_(last_sent)
+        , view_id_(view_id)
+    { }
+
+    void operator()(const gcomm::evs::NodeMap::value_type& node_v)
+    {
+        if (node_v.first == evs_.uuid()) return; // No need to inspect self
+
+        const gcomm::evs::JoinMessage* jm(node_v.second.join_message());
+        if (jm && jm->source_view_id() == view_id_)
+        {
+            resend_missing_from_join_message(*jm);
+        }
+
+        const gcomm::evs::LeaveMessage* lm(node_v.second.leave_message());
+        if (lm && lm->source_view_id() == view_id_)
+        {
+            resend_missing_from_leave_message(*lm);
+        }
+    }
+
+private:
+    void resend_missing_from_join_message(const gcomm::evs::JoinMessage& jm)
+    {
+        gcomm::evs::MessageNodeList::const_iterator self_i(
+            jm.node_list().find(evs_.uuid()));
+        if (self_i == jm.node_list().end())
+        {
+            log_warn << "Node join message claims to be from the same "
+                     << "view but does not list this node, "
+                     << "own uuid: " << evs_.uuid()
+                     << " join message: " << jm;
+            return;
+        }
+        if (self_i->second.im_range().lu() <= last_sent_)
+        {
+            evs_.resend(jm.source(),
+                        gcomm::evs::Range(self_i->second.im_range().lu(),
+                                          last_sent_));
+        }
+    }
+
+    void resend_missing_from_leave_message(const gcomm::evs::LeaveMessage& lm)
+    {
+        if (lm.aru_seq() < last_sent_)
+        {
+            evs_.resend(lm.source(),
+                        gcomm::evs::Range(lm.aru_seq() + 1, last_sent_));
+        }
+    }
+
+    gcomm::evs::Proto& evs_;
+    const gcomm::evs::seqno_t last_sent_;
+    const gcomm::ViewId& view_id_;
+};
+
+void gcomm::evs::Proto::retrans_missing()
+{
+    // This method should be called only during configuration changes.
+    // In operational state retransmits should happen only by
+    // responding to retrans request Gap messages.
+    assert(state() != S_OPERATIONAL);
+
+    // Iterate over join messages and retransmit is some nodes
+    // have not received all messages.
+    ResendMissingRanges resend_missing(*this, last_sent_, current_view_.id());
+    std::for_each(known_.begin(), known_.end(), resend_missing);
+}
+
+void gcomm::evs::Proto::handle_user_from_different_view(
+    const Node& source_node, const UserMessage& msg)
+{
+    if (state() == S_LEAVING)
+    {
+        // Silent drop
+        return;
+    }
+
+    if (is_msg_from_previous_view(msg) == true)
+    {
+        evs_log_debug(D_FOREIGN_MSGS) << "user message "
+                                      << msg
+                                      << " from previous view";
+        return;
+    }
+
+    if (source_node.operational() == false)
+    {
+        evs_log_debug(D_STATE)
+            << "dropping message from unoperational source "
+            << msg.source();
+    }
+    else if (source_node.installed() == false)
+    {
+        if (install_message_ != 0 &&
+            msg.source_view_id() == install_message_->install_view_id())
+        {
+            assert(state() == S_GATHER || state() == S_INSTALL);
+            evs_log_debug(D_STATE) << " recovery user message "
+                                   << msg;
+
+            // This is possible if install timer expires just before
+            // new view is established on this source_node and retransmitted
+            // install message is received just before user this message.
+            if (state() == S_GATHER)
+            {
+                // Sanity check
+                MessageNodeList::const_iterator self(
+                    install_message_->node_list().find(uuid()));
+                gcomm_assert(self != install_message_->node_list().end()
+                             && MessageNodeList::value(self).operational() == true);
+                // Mark all operational nodes in install message as
+                // committed
+                for (MessageNodeList::const_iterator
+                         mi = install_message_->node_list().begin();
+                     mi != install_message_->node_list().end(); ++mi)
+                {
+                    if (MessageNodeList::value(mi).operational() == true)
+                    {
+                        NodeMap::iterator jj;
+                        gu_trace(jj = known_.find_checked(
+                                     MessageNodeList::key(mi)));
+                        NodeMap::value(jj).set_committed(true);
+                    }
+                }
+                shift_to(S_INSTALL);
+            }
+
+            // Other instances installed view before this one, so it is
+            // safe to shift to S_OPERATIONAL
+
+            // Mark all operational nodes in install message as installed
+            for (MessageNodeList::const_iterator
+                     mi = install_message_->node_list().begin();
+                 mi != install_message_->node_list().end(); ++mi)
+            {
+                if (MessageNodeList::value(mi).operational() == true)
+                {
+                    NodeMap::iterator jj;
+                    gu_trace(jj = known_.find_checked(
+                                 MessageNodeList::key(mi)));
+                    NodeMap::value(jj).set_installed(true);
+                }
+            }
+
+            gu_trace(shift_to(S_OPERATIONAL));
+            if (pending_leave_ == true)
+            {
+                close();
+            }
+        }
+    }
+    else
+    {
+        log_debug << self_string() << " unhandled user message " << msg;
     }
 }
 
@@ -3301,116 +3633,23 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     if (msg.source_view_id() != current_view_.id())
     {
-        if (state() == S_LEAVING)
+        handle_user_from_different_view(inst, msg);
+        // Handling user message from different view may cause shift
+        // to operational or leaving state. Check the view ID again and if it
+        // matches to current view proceed to handling the message.
+        if (msg.source_view_id() != current_view_.id())
         {
-            // Silent drop
             return;
         }
-
-        if (is_msg_from_previous_view(msg) == true)
-        {
-            evs_log_debug(D_FOREIGN_MSGS) << "user message "
-                                          << msg
-                                          << " from previous view";
-            return;
-        }
-
-        if (inst.operational() == false)
-        {
-            evs_log_debug(D_STATE)
-                << "dropping message from unoperational source "
-                << msg.source();
-            return;
-        }
-        else if (inst.installed() == false)
-        {
-            if (install_message_ != 0 &&
-                msg.source_view_id() == install_message_->install_view_id())
-            {
-                assert(state() == S_GATHER || state() == S_INSTALL);
-                evs_log_debug(D_STATE) << " recovery user message "
-                                       << msg;
-
-                // This is possible if install timer expires just before
-                // new view is established on this node and retransmitted
-                // install message is received just before user this message.
-                if (state() == S_GATHER)
-                {
-                    // Sanity check
-                    MessageNodeList::const_iterator self(
-                        install_message_->node_list().find(uuid()));
-                    gcomm_assert(self != install_message_->node_list().end()
-                                 && MessageNodeList::value(self).operational() == true);
-                    // Mark all operational nodes in install message as
-                    // committed
-                    for (MessageNodeList::const_iterator
-                             mi = install_message_->node_list().begin();
-                         mi != install_message_->node_list().end(); ++mi)
-                    {
-                        if (MessageNodeList::value(mi).operational() == true)
-                        {
-                            NodeMap::iterator jj;
-                            gu_trace(jj = known_.find_checked(
-                                         MessageNodeList::key(mi)));
-                            NodeMap::value(jj).set_committed(true);
-                        }
-                    }
-                    shift_to(S_INSTALL);
-                }
-
-                // Other instances installed view before this one, so it is
-                // safe to shift to S_OPERATIONAL
-
-                // Mark all operational nodes in install message as installed
-                for (MessageNodeList::const_iterator
-                         mi = install_message_->node_list().begin();
-                     mi != install_message_->node_list().end(); ++mi)
-                {
-                    if (MessageNodeList::value(mi).operational() == true)
-                    {
-                        NodeMap::iterator jj;
-                        gu_trace(jj = known_.find_checked(
-                                     MessageNodeList::key(mi)));
-                        NodeMap::value(jj).set_installed(true);
-                    }
-                }
-                inst.set_tstamp(gu::datetime::Date::monotonic());
-
-                gu_trace(shift_to(S_OPERATIONAL));
-                if (pending_leave_ == true)
-                {
-                    close();
-                }
-                // proceed to process actual user message
-            }
-            else
-            {
-                return;
-            }
-        }
-        else
-        {
-            log_debug << self_string() << " unhandled user message " << msg;
-            return;
-        }
+        assert(state() == S_OPERATIONAL || state() == S_LEAVING);
     }
 
-    gcomm_assert(msg.source_view_id() == current_view_.id());
-
-
-    // note: #gh40
-    bool shift_to_gather = false;
-    if (install_message_) {
-        const MessageNode& mn(
-            MessageNodeList::value(
-                install_message_->node_list().find_checked(
-                    msg.source())));
-        if (!mn.operational())
-            return ;
-        if (mn.operational() &&
-            msg.seq() > mn.im_range().hs()) {
-            shift_to_gather = true;
-        }
+    if (install_message_)
+    {
+        // Install message has been received, which means that the
+        // members of the group already got into agreement about the
+        // set of delivered messages.
+        return;
     }
 
     Range range;
@@ -3461,7 +3700,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     if (range.hs() >  range.lu() &&
         (msg.flags() & Message::F_RETRANS) == 0)
     {
-        request_retrans(msg.source(), range);
+        request_retrans(msg.source(), msg.source(), range);
     }
 
     // Seqno range completion and acknowledgement
@@ -3526,9 +3765,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         {
             gu_trace(send_join());
         }
-    }
-    if (shift_to_gather) {
-        shift_to(S_GATHER, true);
     }
 }
 
@@ -3736,39 +3972,6 @@ bool gcomm::evs::Proto::update_im_safe_seqs(const MessageNodeList& node_list)
         }
     }
     return updated;
-}
-
-
-void gcomm::evs::Proto::retrans_user(const UUID& nl_uuid,
-                                     const MessageNodeList& node_list)
-{
-    for (MessageNodeList::const_iterator i = node_list.begin();
-         i != node_list.end(); ++i)
-    {
-        const UUID& node_uuid(MessageNodeList::key(i));
-        const MessageNode& mn(MessageNodeList::value(i));
-        const Node& n(NodeMap::value(known_.find_checked(node_uuid)));
-        const Range r(input_map_->range(n.index()));
-
-        if (node_uuid == uuid() &&
-            mn.im_range().lu() != r.lu())
-        {
-            // Source member is missing messages from us
-            gcomm_assert(mn.im_range().hs() <= last_sent_);
-            gu_trace(resend(nl_uuid,
-                            Range(mn.im_range().lu(), last_sent_)));
-        }
-        else if ((mn.operational() == false ||
-                  mn.leaving() == true) &&
-                 node_uuid != uuid() &&
-                 (mn.im_range().lu() < r.lu() ||
-                  mn.im_range().hs() < r.hs()))
-        {
-            gu_trace(recover(nl_uuid, node_uuid,
-                             Range(mn.im_range().lu(),
-                                   r.hs())));
-        }
-    }
 }
 
 void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
@@ -4180,6 +4383,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (msg.source_view_id() == current_view_.id())
         {
             inst.set_tstamp(gu::datetime::Date::monotonic());
+            // Join messages are needed for detecting gaps in message
+            // sequences on other nodes.
+            inst.set_join_message(&msg);
             MessageNodeList same_view;
             for_each(msg.node_list().begin(), msg.node_list().end(),
                      SelectNodesOp(same_view, current_view_.id(),
@@ -4188,21 +4394,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             {
                 gu_trace(send_leave(false));
             }
-            for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
-                 ++i)
-            {
-                const UUID& uuid(NodeMap::key(i));
-                const Node& node(NodeMap::value(i));
-                if (current_view_.is_member(uuid) == true)
-                {
-                    const Range r(input_map_->range(node.index()));
-                    if (r.lu() <= last_sent_)
-                    {
-                        request_retrans(uuid, Range(r.lu(), last_sent_));
-                    }
-                }
-            }
-            gu_trace(retrans_user(msg.source(), same_view));
+            request_missing();
         }
         return;
     }
@@ -4386,8 +4578,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         }
     }
 
-    //
-    gu_trace(retrans_user(msg.source(), same_view));
+    // Request missing messages from other nodes.
+    request_missing();
     // Retrans leave messages that others are missing
     gu_trace(retrans_leaves(same_view));
 
@@ -4442,11 +4634,9 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     Node& node(NodeMap::value(ii));
     evs_log_debug(D_LEAVE_MSGS) << "leave message " << msg;
 
-    if (msg.source() != uuid() && node.is_inactive() == true)
-    {
-        evs_log_debug(D_LEAVE_MSGS) << "dropping leave from already inactive";
-        return;
-    }
+    // Leave messages must be always handled. They carry aru_seq information
+    // which is used to retrasmit missing messages.
+
     node.set_leave_message(&msg);
     if (msg.source() == uuid())
     {
