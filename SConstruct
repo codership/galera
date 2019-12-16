@@ -65,6 +65,7 @@ Default target: all
 
 Commandline Options:
     debug=n             debug build with optimization level n
+    asan=[0|1]          disable or enable ASAN instrumentation
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
     system_asio=[0|1]   use system asio library, if available
@@ -113,6 +114,7 @@ build_dir = ARGUMENTS.get('build_dir', '')
 # Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
+asan = ARGUMENTS.get('asan', 0)
 
 gcov = ARGUMENTS.get('gcov', False)
 
@@ -273,9 +275,12 @@ if sysname != 'sunos':
 # static linking have beed addressed
 #
 #env.Prepend(LINKFLAGS = '-Wl,--warn-common -Wl,--fatal-warnings ')
+if int(asan):
+    env.Append(CCFLAGS = ' -fsanitize=address')
+    env.Append(LINKFLAGS = ' -fsanitize=address')
 
 if gcov:
-   env.Append(LINKFLAGS = '--coverage -g')
+    env.Append(LINKFLAGS = '--coverage -g')
 
 #
 # Check required headers and libraries (autoconf functionality)

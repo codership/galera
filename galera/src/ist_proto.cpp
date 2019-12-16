@@ -21,7 +21,7 @@ void
 galera::ist::Message::throw_invalid_version(uint8_t const v)
 {
     gu_throw_error(EPROTO) << "invalid protocol version " << int(v)
-                           << ", expected " << version_;
+                           << ", expected " << int(version_);
 }
 
 void

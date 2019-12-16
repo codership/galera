@@ -8,12 +8,47 @@
 #include <gu_abort.h>
 #include <gu_throw.hpp>
 
+/*
+ * Decide STR protocol version based on group protocol version.
+ * For more infromation about versions, see table in replicator_smm.hpp.
+ */
+static int get_str_proto_ver(int const group_proto_ver)
+{
+    switch (group_proto_ver)
+    {
+    case 1:
+        return 0;
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        return 1;
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+        // gcs intelligent donor selection.
+        // include handling dangling comma in donor string.
+        return 2;
+    case 10:
+        // 4.x
+        // CC events in IST, certification index preload
+        return 3;
+    default:
+        gu_throw_error(EPROTO)
+            << "Can't find suitable STR protocol version based on "
+            << "group protocol version: " << group_proto_ver;
+    }
+}
+
 namespace galera {
 
 bool
 ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
+                                       int const group_proto_ver,
                                        bool const rejoined)
 {
+    const int str_proto_ver(get_str_proto_ver(group_proto_ver));
     if (rejoined)
     {
         assert(view_info.view >= 0);
@@ -26,15 +61,15 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
             if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
                                           a valid state here */
             {
-                if (str_proto_ver_ >= 3)
+                if (str_proto_ver >= 3)
                     return (local_seqno + 1 < group_seqno); // this CC will add 1
                 else
                     return (local_seqno < group_seqno);
             }
             else
             {
-                if ((str_proto_ver_ >= 3 && local_seqno >= group_seqno) ||
-                    (str_proto_ver_ <  3 && local_seqno >  group_seqno))
+                if ((str_proto_ver >= 3 && local_seqno >= group_seqno) ||
+                    (str_proto_ver <  3 && local_seqno >  group_seqno))
                 {
                     close();
                     gu_throw_fatal
@@ -349,6 +384,11 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     assert(req != 0);
 
     StateRequest* const streq(read_state_request(req, req_size));
+    // Guess correct STR protocol version. Here we assume that the
+    // replicator protocol version didn't change between sending
+    // and receiving STR message. Unfortunately the protocol version
+    // is not yet available in STR message.
+    int const str_proto_ver(get_str_proto_ver(protocol_version_));
 
     LocalOrder lo(seqno_l);
 
@@ -417,7 +457,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 if (rcode >= 0)
                 {
                     wsrep_seqno_t const first
-                        ((str_proto_ver_ < 3 || cc_lowest_trx_seqno_ == 0) ?
+                        ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
                          istr.last_applied() + 1 :
                          std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
                     try
@@ -461,7 +501,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             wsrep_gtid_t const state_id = { state_uuid_, donor_seq };
 
-            if (str_proto_ver_ >= 3)
+            if (str_proto_ver >= 3)
             {
                 if (streq->version() > 0)
                 {
@@ -544,6 +584,8 @@ out:
 
 void
 ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
+                                int const group_proto_ver,
+                                int const str_proto_ver,
                                 const wsrep_uuid_t& group_uuid,
                                 wsrep_seqno_t const last_needed)
 {
@@ -555,7 +597,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     ist_event_queue_.reset();
     if (state_uuid_ != group_uuid)
     {
-        if (str_proto_ver_ < 3)
+        if (str_proto_ver < 3)
         {
             gu_throw_error (EPERM) << "Local state UUID (" << state_uuid_
                                    << ") does not match group state UUID ("
@@ -571,7 +613,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
         assert(last_applied < last_needed);
     }
 
-    if (last_applied < 0 && str_proto_ver_ < 3)
+    if (last_applied < 0 && str_proto_ver < 3)
     {
         gu_throw_error (EPERM) << "Local state seqno is undefined";
     }
@@ -579,12 +621,12 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     wsrep_seqno_t const first_needed(last_applied + 1);
 
     log_info << "####### IST uuid:" << state_uuid_ << " f: " << first_needed
-             << ", l: " << last_needed << ", STRv: " << str_proto_ver_; //remove
+             << ", l: " << last_needed << ", STRv: " << str_proto_ver; //remove
 
     /* Historically IST messages are versioned with the global replicator
      * protocol. Need to keep it that way for backward compatibility */
     std::string recv_addr(ist_receiver_.prepare(first_needed, last_needed,
-                                                protocol_version_,source_id()));
+                                                group_proto_ver, source_id()));
 
     std::ostringstream os;
 
@@ -608,6 +650,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 ReplicatorSMM::StateRequest*
 ReplicatorSMM::prepare_state_request (const void*         sst_req,
                                       ssize_t             sst_req_len,
+                                      int const           group_proto_ver,
+                                      int const           str_proto_ver,
                                       const wsrep_uuid_t& group_uuid,
                                       wsrep_seqno_t const last_needed_seqno)
 {
@@ -628,7 +672,7 @@ ReplicatorSMM::prepare_state_request (const void*         sst_req,
             sst_req_len = 0;
         }
 
-        switch (str_proto_ver_)
+        switch (str_proto_ver)
         {
         case 0:
             if (0 == sst_req_len)
@@ -643,7 +687,10 @@ ReplicatorSMM::prepare_state_request (const void*         sst_req,
 
             try
             {
+                // Note: IST uses group protocol version.
                 gu_trace(prepare_for_IST (ist_req, ist_req_len,
+                                          group_proto_ver,
+                                          str_proto_ver,
                                           group_uuid, last_needed_seqno));
                 assert(ist_req_len > 0);
                 assert(NULL != ist_req);
@@ -664,7 +711,7 @@ ReplicatorSMM::prepare_state_request (const void*         sst_req,
             return ret;
         }
         default:
-            gu_throw_fatal << "Unsupported STR protocol: " << str_proto_ver_;
+            gu_throw_fatal << "Unsupported STR protocol: " << str_proto_ver;
         }
     }
     catch (std::exception& e)
@@ -687,7 +734,8 @@ retry_str(int ret)
 }
 
 void
-ReplicatorSMM::send_state_request (const StateRequest* const req)
+ReplicatorSMM::send_state_request (const StateRequest* const req,
+                                   int const str_proto_ver)
 {
     long ret;
     long tries = 0;
@@ -709,7 +757,7 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
         gcs_seqno_t seqno_l;
 
-        ret = gcs_.request_state_transfer(str_proto_ver_,
+        ret = gcs_.request_state_transfer(str_proto_ver,
                                           req->req(), req->len(), sst_donor_,
                                           gu::GTID(ist_uuid, ist_seqno),seqno_l);
         if (ret < 0)
@@ -789,21 +837,25 @@ ReplicatorSMM::send_state_request (const StateRequest* const req)
 
 void
 ReplicatorSMM::request_state_transfer (void* recv_ctx,
+                                       int           const group_proto_ver,
                                        const wsrep_uuid_t& group_uuid,
                                        wsrep_seqno_t const cc_seqno,
                                        const void*   const sst_req,
                                        ssize_t       const sst_req_len)
 {
     assert(sst_req_len >= 0);
+    int const str_proto_ver(get_str_proto_ver(group_proto_ver));
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
+                                                  group_proto_ver,
+                                                  str_proto_ver,
                                                   group_uuid, cc_seqno));
     gu::Lock sst_lock(sst_mutex_);
     sst_received_ = false;
 
     st_.mark_unsafe();
 
-    send_state_request(req);
+    send_state_request(req, str_proto_ver);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
@@ -869,7 +921,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
             update_state_uuid (sst_uuid_);
 
-            if (str_proto_ver_ < 3)
+            if (str_proto_ver < 3)
             {
                 // all IST events will bypass certification
                 gu::GTID const cert_position
@@ -930,7 +982,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
         // IST is prepared only with str proto ver 1 and above
         // IST is *always* prepared at str proto ver 3 or higher
-        if (last_committed() < cc_seqno || str_proto_ver_ >= 3)
+        if (last_committed() < cc_seqno || str_proto_ver >= 3)
         {
             wsrep_seqno_t const ist_from(last_committed() + 1);
             wsrep_seqno_t const ist_to(cc_seqno);
@@ -973,7 +1025,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             if (ist_seqno == sst_seqno_)
             {
                 log_info << "IST received: " << state_uuid_ << ":" <<ist_seqno;
-                if (str_proto_ver_ < 3)
+                if (str_proto_ver < 3)
                 {
                     // see cert_.assign_initial_position() above
                     assert(cc_seqno == ist_seqno);
@@ -1221,9 +1273,17 @@ void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
                 (void)pos;
             }
         }
-        else if (ts.state() == TrxHandle::S_REPLICATING)
+        else
         {
-            ts.set_state(TrxHandle::S_CERTIFYING);
+            assert(ts.state() == TrxHandle::S_REPLICATING ||
+                   ts.state() == TrxHandle::S_ABORTING);
+            if (ts.state() == TrxHandle::S_REPLICATING)
+            {
+                ts.set_state(TrxHandle::S_CERTIFYING);
+            }
+            wsrep_seqno_t const pos __attribute__((unused))(
+                cert_.increment_position());
+            assert(ts.global_seqno() == pos);
         }
     }
 
@@ -1238,6 +1298,43 @@ void ReplicatorSMM::ist_end(int error)
     ist_event_queue_.eof(error);
 }
 
+void galera::ReplicatorSMM::process_ist_conf_change(const gcs_act_cchange& conf)
+{
+    // IST should contain only ordered CCs
+    assert(conf.repl_proto_ver >= PROTO_VER_ORDERED_CC);
+
+    gu_trace(process_pending_queue(conf.seqno));
+    // Drain monitors to make sure that all preceding IST events have
+    // been applied.
+    drain_monitors(conf.seqno - 1);
+    // Create view info. This will be consumed by ist_event_queue_.push_back().
+    wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
+    wsrep_view_info_t* const view_info
+        (galera_view_info_create(conf,
+                                 capabilities(conf.repl_proto_ver),
+                                 -1, uuid_undefined));
+    // IST view status should always be Primary
+    assert(view_info->status == WSREP_VIEW_PRIMARY);
+    // Establish protocol version before adjusting cert position as
+    // trx_params_.version is decided there.
+    establish_protocol_versions (conf.repl_proto_ver);
+    cert_.adjust_position(*view_info, gu::GTID(conf.uuid, conf.seqno),
+                          trx_params_.version_);
+    update_incoming_list(*view_info);
+    record_cc_seqnos(conf.seqno, "ist");
+
+    // TO monitors need to be entered here to maintain critical
+    // section over passing the view through the event queue to
+    // an applier and ensure that the view is submitted in isolation.
+    // Applier is to leave monitors and free the view after it is
+    // submitted.
+    ApplyOrder ao(conf.seqno, conf.seqno - 1, false);
+    apply_monitor_.enter(ao);
+    CommitOrder co(conf.seqno, CommitOrder::NO_OOOC);
+    commit_monitor_.enter(co);
+    ist_event_queue_.push_back(view_info);
+}
+
 void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
                            bool preload)
 {
@@ -1248,11 +1345,6 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
 
     assert(conf.conf_id >= 0); // Primary configuration
     assert(conf.seqno == act.seqno_g);
-
-    wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
-    wsrep_view_info_t* const view_info(
-        galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
-                                -1, uuid_undefined));
 
     if (gu_unlikely(cert_.position() == WSREP_SEQNO_UNDEFINED) &&
         (must_apply || preload))
@@ -1266,22 +1358,18 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
 
     if (must_apply == true)
     {
-        process_conf_change(0, act);
-        /* TO monitors need to be entered here to maintain critical
-         * section over passing the view through the event queue to
-         * an applier and ensure that the view is submitted in isolation.
-         * Applier is to leave monitors and free the view after it is
-         * submitted */
-        ApplyOrder ao(conf.seqno, conf.seqno - 1, false);
-        apply_monitor_.enter(ao);
-        CommitOrder co(conf.seqno, CommitOrder::NO_OOOC);
-        commit_monitor_.enter(co);
-        ist_event_queue_.push_back(view_info);
+        // Will generate and queue view info. Monitors are handled by
+        // slave appliers when the view_info is consumed.
+        process_ist_conf_change(conf);
     }
     else
     {
         if (preload == true)
         {
+            wsrep_uuid_t uuid_undefined(WSREP_UUID_UNDEFINED);
+            wsrep_view_info_t* const view_info(
+                galera_view_info_create(conf, capabilities(conf.repl_proto_ver),
+                                        -1, uuid_undefined));
             /* CC is part of index preload but won't be processed
              * by process_conf_change()
              * Order of these calls is essential: trx_params_.version_ may
@@ -1291,9 +1379,8 @@ void ReplicatorSMM::ist_cc(const gcs_action& act, bool must_apply,
                                   trx_params_.version_);
             // record CC releated state seqnos, needed for IST on DONOR
             record_cc_seqnos(conf.seqno, "preload");
+            ::free(view_info);
         }
-
-        ::free(view_info);
     }
 }
 

@@ -615,7 +615,10 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
             {
                 assert(meta->gtid.seqno > 0);
                 assert(meta->gtid.seqno == trx.ts()->global_seqno());
-                assert(meta->depends_on == trx.ts()->depends_seqno());
+                // If TrxHandleSlave was queued its depends_seqno may be
+                // modified concurrently.
+                assert(trx.ts()->queued() ||
+                       meta->depends_on == trx.ts()->depends_seqno());
             }
             else
             {

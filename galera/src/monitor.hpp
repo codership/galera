@@ -50,7 +50,6 @@ namespace galera
 
         static const ssize_t process_size_ = (1ULL << 16);
         static const size_t  process_mask_ = process_size_ - 1;
-
     public:
 
         Monitor()
@@ -95,8 +94,11 @@ namespace galera
             gu::Lock lock(mutex_);
 
             state_debug_print("set_initial_position", seqno);
-
             uuid_ = uuid;
+            // When the monitor poisition is reset, either all the
+            // waiters must have been drained or the thread which is
+            // resetting the position must hold the monitor (CC from IST).
+            assert(last_entered_ == last_left_ || last_entered_ == seqno);
             if (last_entered_ == -1 || seqno == -1)
             {
                 // first call or reset

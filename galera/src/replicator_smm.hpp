@@ -142,6 +142,26 @@ namespace galera
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
         void submit_view_info(void* recv_ctx, const wsrep_view_info_t* cc);
         void process_conf_change(void* recv_ctx, const struct gcs_action& cc);
+        void drain_monitors_for_local_conf_change();
+        void process_non_prim_conf_change(void* recv_ctx,
+                                          const gcs_act_cchange&,
+                                          int my_index);
+        void process_first_view(const wsrep_view_info_t*, const wsrep_uuid_t&);
+        void process_group_change(const wsrep_view_info_t*);
+        void process_st_required(void* recv_ctx, int group_proto_ver,
+                                 const wsrep_view_info_t*);
+        void reset_index_if_needed(const wsrep_view_info_t* view_info,
+                                   int prev_protocol_version,
+                                   int next_protocol_version,
+                                   bool st_required);
+        void shift_to_next_state(Replicator::State next_state);
+        void become_joined_if_needed();
+        void submit_ordered_view_info(void* recv_ctx, const wsrep_view_info_t*);
+        void process_prim_conf_change(void* recv_ctx,
+                                      const gcs_act_cchange&,
+                                      int my_index,
+                                      void* cc_buf);
+        void process_ist_conf_change(const gcs_act_cchange&);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
                                wsrep_seqno_t donor_seq);
@@ -792,9 +812,12 @@ namespace galera
         void record_cc_seqnos(wsrep_seqno_t cc_seqno, const char* source);
 
         bool state_transfer_required(const wsrep_view_info_t& view_info,
+                                     int group_proto_ver,
                                      bool rejoined);
 
         void prepare_for_IST (void*& req, ssize_t& req_len,
+                              int group_proto_ver,
+                              int str_proto_ver,
                               const wsrep_uuid_t& group_uuid,
                               wsrep_seqno_t       group_seqno);
 
@@ -803,12 +826,15 @@ namespace galera
 
         StateRequest* prepare_state_request (const void* sst_req,
                                              ssize_t     sst_req_len,
+                                             int         group_proto_ver,
+                                             int         str_proto_ver,
                                              const wsrep_uuid_t& group_uuid,
                                              wsrep_seqno_t       group_seqno);
 
-        void send_state_request (const StateRequest* req);
+        void send_state_request (const StateRequest* req, int str_proto_ver);
 
         void request_state_transfer (void* recv_ctx,
+                                     int                 group_proto_ver,
                                      const wsrep_uuid_t& group_uuid,
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
@@ -857,7 +883,7 @@ namespace galera
 
         /*
          * |--------------------------------------------------------------------|
-         * | protocol_version_ | trx version | str_proto_ver_ | record_set_ver_ |
+         * | protocol_version_ | trx version | str_proto_ver  | record_set_ver_ |
          * |--------------------------------------------------------------------|
          * |                 1 |           1 |              0 |               1 |
          * |                 2 |           1 |              1 |               1 |
@@ -871,9 +897,14 @@ namespace galera
          * | 4.x            10 | PA range/ 5 | CC events /  3 |               2 |
          * |                   | UPD keys    | idx preload    |                 |
          * |--------------------------------------------------------------------|
+         *
+         * Note: str_proto_ver is decided in replicator_str.cpp based on
+         *       given protocol version.
          */
 
-        int                    str_proto_ver_;// state transfer request protocol
+        /* repl protocol version which orders CC */
+        static int const PROTO_VER_ORDERED_CC = 10;
+
         int                    protocol_version_;// general repl layer proto
         int                    proto_max_;    // maximum allowed proto version
 
