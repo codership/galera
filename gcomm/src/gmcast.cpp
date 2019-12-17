@@ -1419,7 +1419,7 @@ void gcomm::GMCast::handle_up(const void*        id,
             }
             else
             {
-                gu_trace(msg.unserialize(&dg.payload()[0],
+                gu_trace(msg.unserialize(dg.payload().data(),
                                          dg.len(),
                                          dg.offset()));
             }
@@ -1461,7 +1461,7 @@ void gcomm::GMCast::handle_up(const void*        id,
 
             try
             {
-                msg.unserialize(&dg.payload()[0], dg.len(),
+                msg.unserialize(dg.payload().data(), dg.len(),
                                 dg.offset());
             }
             catch (gu::Exception& e)

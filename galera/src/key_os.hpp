@@ -209,9 +209,7 @@ namespace galera
 
         size_t hash() const
         {
-            static const unsigned char empty_data[1] = {0};
-            const gu::byte_t* data(keys_.empty() ? empty_data : &keys_[0]);
-            return gu_table_hash(data, keys_.size());
+            return gu_table_hash(keys_.data(), keys_.size());
         }
 
         size_t hash_with_flags() const
