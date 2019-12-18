@@ -3048,16 +3048,16 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
         {
             ++delivered_msgs_[msg.msg().order()];
             AggregateMessage am;
-            gu_trace(am.unserialize(&msg.rb().payload()[0],
+            gu_trace(am.unserialize(msg.rb().payload().data(),
                                     msg.rb().payload().size(),
                                     offset));
             Datagram dg(
                 gu::SharedBuffer(
                     new gu::Buffer(
-                        &msg.rb().payload()[0]
+                        msg.rb().payload().data()
                         + offset
                         + am.serial_size(),
-                        &msg.rb().payload()[0]
+                        msg.rb().payload().data()
                         + offset
                         + am.serial_size()
                         + am.len())));

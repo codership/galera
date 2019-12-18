@@ -80,7 +80,7 @@ namespace gcomm
     {
         return (dg.offset() < dg.header_len() ?
                 dg.header() + dg.header_offset() + dg.offset() :
-                &dg.payload()[0] + (dg.offset() - dg.header_len()));
+                dg.payload().data() + (dg.offset() - dg.header_len()));
     }
     inline size_t available(const Datagram& dg)
     {

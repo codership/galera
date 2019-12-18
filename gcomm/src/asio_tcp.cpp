@@ -365,7 +365,7 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
                 cbs[0] = asio::const_buffer(dg.header()
                                             + dg.header_offset(),
                                             dg.header_len());
-                cbs[1] = asio::const_buffer(&dg.payload()[0],
+                cbs[1] = asio::const_buffer(dg.payload().data(),
                                             dg.payload().size());
                 write_one(cbs);
             }
@@ -426,7 +426,7 @@ namespace gcomm
                 cbs[0] = asio::const_buffer(dg.header()
                                             + dg.header_offset(),
                                             dg.header_len());
-                cbs[1] = asio::const_buffer(&dg.payload()[0],
+                cbs[1] = asio::const_buffer(dg.payload().data(),
                                             dg.payload().size());
                 socket_->write_one(cbs);
             }
