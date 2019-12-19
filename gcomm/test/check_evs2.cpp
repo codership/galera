@@ -712,6 +712,7 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsInfoLogMask + "=0x7" + "&"
+        + Conf::EvsDebugLogMask + "=0xfff" + "&"
         + Conf::EvsVersion + "=" + gu::to_string<int>(version);
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
@@ -1039,9 +1040,9 @@ START_TEST(test_proto_leave_n_lossy)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string suspect_timeout("PT0.5S");
-    const string inactive_timeout("PT1S");
-    const string retrans_period("PT0.1S");
+    const string suspect_timeout("PT15S");
+    const string inactive_timeout("PT30S");
+    const string retrans_period("PT1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -1096,9 +1097,9 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     PropagationMatrix prop;
     vector<DummyNode*> dn;
 
-    const string suspect_timeout("PT0.5S");
-    const string inactive_timeout("PT1S");
-    const string retrans_period("PT0.1S");
+    const string suspect_timeout("PT15S");
+    const string inactive_timeout("PT30S");
+    const string retrans_period("PT1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -1152,9 +1153,9 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
 {
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string suspect_timeout("PT1.2S");
-    const string inactive_timeout("PT1.2S");
-    const string retrans_period("PT0.1S");
+    const string suspect_timeout("PT15S");
+    const string inactive_timeout("PT30S");
+    const string retrans_period("PT1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -1523,7 +1524,6 @@ END_TEST
 
 START_TEST(test_trac_552)
 {
-    gu_conf_self_tstamp_on();
     log_info << "START (trac_552)";
     init_rand();
 
@@ -1531,9 +1531,9 @@ START_TEST(test_trac_552)
     PropagationMatrix prop;
     vector<DummyNode*> dn;
 
-    const string suspect_timeout("PT0.5S");
-    const string inactive_timeout("PT1S");
-    const string retrans_period("PT0.1S");
+    const string suspect_timeout("PT15S");
+    const string inactive_timeout("PT30S");
+    const string retrans_period("PT1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -2405,7 +2405,7 @@ START_TEST(test_gap_rate_limit_delayed)
     // The retransmission request is done for delayed only if
     // auto evict is on.
     f.evs2.set_param("evs.auto_evict", "1", spcb);
-    char data[1] = { 0 };
+    const char data[1] = { 0 };
     gcomm::Datagram dg(gu::SharedBuffer(new gu::Buffer(data, data + 1)));
     // Generate four messages from node1. The first one is ignored,
     // the rest are handled by node2 for generating gap messages.
@@ -2481,6 +2481,26 @@ START_TEST(test_gap_rate_limit_delayed)
     fail_unless(read_dg != 0);
     fail_unless(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
     log_info << "END test_gap_rate_limit_delayed";
+}
+END_TEST
+
+START_TEST(test_out_queue_limit)
+{
+    TwoNodeFixture f;
+
+    std::vector<char> data(1 << 15);
+    gcomm::Datagram dg(gu::SharedBuffer(
+                           new gu::Buffer(data.begin(), data.end())));
+    // Default user send window is 2 and out queue limit is 1M,
+    // so we can write 2 + 32 messages without blocking.
+    for (size_t i(0); i < 34; ++i)
+    {
+        fail_unless(f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE)) == 0);
+    }
+    // The next write should fill the out_queue and return EAGAIN
+    const char small_data[1] = { 0 };
+    dg = gu::SharedBuffer(new gu::Buffer(small_data, small_data + 1));
+    fail_unless(f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE)) == EAGAIN);
 }
 END_TEST
 
@@ -2665,6 +2685,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_gap_rate_limit_delayed");
     tcase_add_test(tc, test_gap_rate_limit_delayed);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_out_queue_limit");
+    tcase_add_test(tc, test_out_queue_limit);
     suite_add_tcase(s, tc);
 
     return s;

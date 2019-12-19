@@ -193,7 +193,6 @@ public:
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
 
-    void retrans_user(const UUID&, const MessageNodeList&);
     void retrans_leaves(const MessageNodeList&);
 
     void set_inactive(const UUID&);
@@ -254,10 +253,27 @@ private:
     void check_nil_view_id();
     void asymmetry_elimination();
     void handle_foreign(const Message&);
+    void send_request_retrans_gap(const UUID& target, const UUID& origin,
+                                  const Range& range);
     // Request retransmission of messages.
     // @param target Target node to request messages from.
+    // @param origin Origin of the range of messages to request.
     // @param range Seqno range to request
-    void request_retrans(const UUID& target, const Range& range);
+    void request_retrans(const UUID& target, const UUID& origin,
+                         const Range& range);
+    // Request missing messages from nodes in the same view.
+    // This method should be used only during configuration changes,
+    // not in operational state.
+    void request_missing();
+    // Retrans messages which may be missing from some nodes. This method
+    // should used only during configuration changes, not in
+    // operational state.
+    void retrans_missing();
+    // Handle user message which has view id different from
+    // current view ID.
+    // @return True if the message must be processed
+    void handle_user_from_different_view(const Node& node,
+                                         const UserMessage& msg);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,
                      const Datagram&);
@@ -499,8 +515,65 @@ private:
     // Bytes since the last user msg which will require feedback from
     // other nodes (i.e. sent without F_MSG_MORE)
     size_t bytes_since_request_user_msg_feedback_;
-    // Output message queue
-    std::deque<std::pair<Datagram, ProtoDownMeta> > output_;
+    // Output message queue. Class implemented as a thin wrapper
+    // around std::deque<> with book keeping of outbound bytes.
+    class out_queue
+    {
+    public:
+        typedef std::deque<std::pair<Datagram, ProtoDownMeta> > queue_type;
+        typedef queue_type::const_iterator const_iterator;
+
+        out_queue()
+            : outbound_bytes_(),
+              queue_()
+        { }
+
+        bool empty() const
+        {
+            assert(outbound_bytes_ || queue_.empty());
+            return (outbound_bytes_ == 0);
+        }
+
+        void push_back(const queue_type::value_type& msg)
+        {
+            outbound_bytes_ += msg.first.len();
+            queue_.push_back(msg);
+        }
+
+        void pop_front()
+        {
+            assert(not queue_.empty());
+            assert(outbound_bytes_ >= queue_.front().first.len());
+            outbound_bytes_ -= queue_.front().first.len();
+            queue_.pop_front();
+        }
+
+        const queue_type::value_type& front() const
+        {
+            assert(not queue_.empty());
+            return queue_.front();
+        }
+
+        const_iterator begin() const { return queue_.begin(); }
+
+        const_iterator end() const { return queue_.end(); }
+
+        size_t size() const { return queue_.size(); }
+
+        void clear()
+        {
+            outbound_bytes_ = 0;
+            queue_.clear();
+        }
+
+        size_t outbound_bytes() const { return outbound_bytes_; }
+
+        static const size_t max_outbound_bytes = (size_t(1) << 20);
+    private:
+        size_t outbound_bytes_;
+        queue_type queue_;
+    } output_;
+
     std::vector<gu::byte_t> send_buf_;
     uint32_t max_output_size_;
     size_t mtu_;

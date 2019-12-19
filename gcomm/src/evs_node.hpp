@@ -36,10 +36,11 @@ namespace gcomm
 class gcomm::evs::Node
 {
 public:
+    static const size_t invalid_index;
     Node(const Proto& proto)
         :
         proto_             (proto),
-        index_             (std::numeric_limits<size_t>::max()),
+        index_             (invalid_index),
         operational_       (true),
         suspected_         (false),
         inactive_          (false),

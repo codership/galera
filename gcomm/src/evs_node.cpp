@@ -8,6 +8,7 @@
 
 #include <ostream>
 
+const size_t gcomm::evs::Node::invalid_index(std::numeric_limits<size_t>::max());
 
 std::ostream&
 gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Node& n)

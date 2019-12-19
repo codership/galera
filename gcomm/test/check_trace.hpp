@@ -25,6 +25,8 @@
 
 gu::Config& check_trace_conf();
 
+extern "C" void check_trace_log_cb(int, const char*);
+
 namespace gcomm
 {
     class TraceMsg
@@ -553,6 +555,9 @@ namespace gcomm
             // 100 secs after zero, this should give enough headroom
             // for all tests.
             gu::datetime::SimClock::init(100*gu::datetime::Sec);
+            // Uncomment this to get logs with simulated timestamps.
+            // The low will be written into stderr.
+            // gu_log_cb = check_trace_log_cb;
         }
         ~PropagationMatrix();
 
