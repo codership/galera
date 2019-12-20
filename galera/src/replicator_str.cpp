@@ -1013,7 +1013,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 // Note: apply_monitor_ must be drained to avoid race between
                 // IST appliers and GCS appliers, GCS action source may
                 // provide actions that have already been applied via IST.
-                apply_monitor_.drain(ist_seqno);
+                log_info << "Draining apply monitors after IST upto "
+                         << sst_seqno_;
+                apply_monitor_.drain(sst_seqno_);
+                set_initial_position(group_uuid, sst_seqno_);
             }
             else
             {
@@ -1170,126 +1173,162 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     }
 }
 
-
-void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& tsp, bool must_apply,
-                            bool preload)
+void ReplicatorSMM::handle_ist_nbo(const TrxHandleSlavePtr& ts,
+                                   bool must_apply, bool preload)
 {
-    assert(tsp != 0);
-    TrxHandleSlave& ts(*tsp);
-
-    assert(ts.depends_seqno() >= 0 || ts.state() == TrxHandle::S_ABORTING ||
-           ts.nbo_end());
-    assert(ts.local_seqno() == WSREP_SEQNO_UNDEFINED);
-
-    ts.verify_checksum();
-    if (gu_unlikely(cert_.position() == WSREP_SEQNO_UNDEFINED))
+    if (must_apply)
     {
-        // This is the first pre IST event for rebuilding cert index
-        cert_.assign_initial_position(
-            /* proper UUID will be installed by CC */
-            gu::GTID(gu::UUID(), ts.global_seqno() - 1), ts.version());
-    }
-
-    if (ts.nbo_start() || ts.nbo_end())
-    {
-        if (must_apply)
+        ts->verify_checksum();
+        Certification::TestResult result(cert_.append_trx(ts));
+        switch (result)
         {
-            ts.verify_checksum();
-            ts.set_state(TrxHandle::S_CERTIFYING);
-            Certification::TestResult result(cert_.append_trx(tsp));
-            switch (result)
+        case Certification::TEST_OK:
+            if (ts->nbo_end())
             {
-            case Certification::TEST_OK:
-                if (ts.nbo_end())
+                // This is the same as in  process_trx()
+                if (ts->ends_nbo() == WSREP_SEQNO_UNDEFINED)
                 {
-                    // This is the same as in  process_trx()
-                    if (ts.ends_nbo() == WSREP_SEQNO_UNDEFINED)
-                    {
-                        assert(ts.is_dummy());
-                    }
-                    else
-                    {
-                        // Signal NBO waiter
-                        gu::shared_ptr<NBOCtx>::type nbo_ctx(
-                            cert_.nbo_ctx(ts.ends_nbo()));
-                        assert(nbo_ctx != 0);
-                        nbo_ctx->set_ts(tsp);
-                        return; // not pushing to queue below
-                    }
+                    assert(ts->is_dummy());
                 }
-                break;
-            case Certification::TEST_FAILED:
-            {
-                assert(ts.nbo_end()); // non-effective nbo_end
-                assert(ts.is_dummy());
-                break;
+                else
+                {
+                    // Signal NBO waiter
+                    gu::shared_ptr<NBOCtx>::type nbo_ctx(
+                        cert_.nbo_ctx(ts->ends_nbo()));
+                    assert(nbo_ctx != 0);
+                    nbo_ctx->set_ts(ts);
+                    return; // not pushing to queue below
+                }
             }
-            }
-            /* regardless of certification outcome, event must be passed to
-             * apply_trx() as it carries global seqno */
-        }
-        else
+            break;
+        case Certification::TEST_FAILED:
         {
-            // Skipping NBO events in preload is fine since joiner either
-            // have all events applied in case of pure IST and donor refuses to
-            // donate SST from the position there are NBOs going on.
-            assert(preload);
-            log_debug << "Skipping NBO event: " << ts;
-            wsrep_seqno_t const pos(cert_.increment_position());
-            assert(ts.global_seqno() == pos);
-            (void)pos;
+            assert(ts->nbo_end()); // non-effective nbo_end
+            assert(ts->is_dummy());
+            break;
         }
-#if 0
-        log_info << "\n     IST processing NBO_"
-                 << (ts.nbo_start() ? "START(" : "END(")
-                 << ts.global_seqno() << ")"
-                 << (must_apply ? ", must apply" : ", skip")
-                 << ", ends NBO: " << ts.ends_nbo();
-#endif
+        }
+        /* regardless of certification outcome, event must be passed to
+         * apply_trx() as it carries global seqno */
     }
     else
     {
-        if (gu_unlikely(preload == true))
+        // Skipping NBO events in preload is fine since the joiner either
+        // has all the events applied in case of pure IST or the
+        // donor refuses to donate SST from the position with active NBO.
+        assert(preload);
+        log_debug << "Skipping NBO event: " << ts;
+        wsrep_seqno_t const pos(cert_.increment_position());
+        assert(ts->global_seqno() == pos);
+        (void)pos;
+    }
+    if (gu_likely(must_apply == true))
+    {
+        ist_event_queue_.push_back(ts);
+    }
+}
+
+// Append IST trx to certification index. As trx has passed certification
+// on donor, certification is expected to pass. If it fails, exception
+// is thrown as the state is unrecoverable.
+static void append_ist_trx(galera::Certification& cert,
+                           const TrxHandleSlavePtr& ts)
+{
+    Certification::TestResult result(cert.append_trx(ts));
+    if (result != Certification::TEST_OK)
+    {
+        gu_throw_fatal << "Pre IST trx append returned unexpected "
+                       << "certification result " << result
+                       << ", expected " << Certification::TEST_OK
+                       << "must abort to maintain consistency, "
+                       << " cert position: " << cert.position()
+                       << " ts: " << *ts;
+    }
+}
+
+void ReplicatorSMM::handle_ist_trx_preload(const TrxHandleSlavePtr& ts,
+                                           bool const must_apply)
+{
+    if (not ts->is_dummy())
+    {
+        append_ist_trx(cert_, ts);
+        if (not must_apply)
         {
-            if (gu_likely(!ts.is_dummy()))
-            {
-                ts.set_state(TrxHandle::S_CERTIFYING);
-                Certification::TestResult result(cert_.append_trx(tsp));
-                if (result != Certification::TEST_OK)
-                {
-                    gu_throw_fatal << "Pre IST trx append returned unexpected "
-                                   << "certification result " << result
-                                   << ", expected " << Certification::TEST_OK
-                                   << "must abort to maintain consistency";
-                }
-                // Mark trx committed for certification bookkeeping here
-                // if it won't pass to applying stage
-                if (!must_apply) cert_.set_trx_committed(ts);
-            }
-            else
-            {
-                wsrep_seqno_t const pos(cert_.increment_position());
-                assert(ts.global_seqno() == pos);
-                (void)pos;
-            }
+            // Pure preload event will not get applied, so mark it committed
+            // here for certification bookkeeping.
+            cert_.set_trx_committed(*ts);
         }
-        else
+    }
+    else if (cert_.position() != WSREP_SEQNO_UNDEFINED)
+    {
+        // Increment position to keep track only if the initial
+        // seqno has already been assigned.
+        wsrep_seqno_t const pos __attribute__((unused))(
+            cert_.increment_position());
+        assert(ts->global_seqno() == pos);
+    }
+}
+
+void ReplicatorSMM::handle_ist_trx(const TrxHandleSlavePtr& ts,
+                                   bool must_apply, bool preload)
+{
+    if (preload)
+    {
+        handle_ist_trx_preload(ts, must_apply);
+    }
+    if (must_apply)
+    {
+        ist_event_queue_.push_back(ts);
+    }
+}
+
+void ReplicatorSMM::ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
+                            bool preload)
+{
+    assert(ts != 0);
+
+    assert(ts->depends_seqno() >= 0 || ts->is_dummy() || ts->nbo_end());
+    assert(ts->local_seqno() == WSREP_SEQNO_UNDEFINED);
+    assert(sst_seqno_ > 0);
+
+    ts->verify_checksum();
+
+    // Note: Write sets which do not have preload or must_apply flag set
+    // are used to populate joiner gcache to have enough history
+    // to be able to donate IST for following joiners. Therefore
+    // they don't need to be applied or used to populate certification
+    // index and are just skipped here.
+    if (not (preload || must_apply))
+    {
+        return;
+    }
+
+    if (gu_unlikely(cert_.position() == WSREP_SEQNO_UNDEFINED))
+    {
+        if (not ts->is_dummy())
         {
-            assert(ts.state() == TrxHandle::S_REPLICATING ||
-                   ts.state() == TrxHandle::S_ABORTING);
-            if (ts.state() == TrxHandle::S_REPLICATING)
-            {
-                ts.set_state(TrxHandle::S_CERTIFYING);
-            }
-            wsrep_seqno_t const pos __attribute__((unused))(
-                cert_.increment_position());
-            assert(ts.global_seqno() == pos);
+            // This is the first pre IST event for rebuilding cert index.
+            // Note that we skip dummy write sets here as they don't carry
+            // version information. If the IST will contain only dummy
+            // write sets, the last CC belonging into IST which corresponds
+            // to CC which triggered STR, will initialize cert index.
+            assert(ts->version() > 0);
+            cert_.assign_initial_position(
+                /* proper UUID will be installed by CC */
+                gu::GTID(gu::UUID(), ts->global_seqno() - 1), ts->version());
         }
     }
 
-    if (gu_likely(must_apply == true))
+    assert(ts->state() == TrxHandleSlave::S_REPLICATING);
+    ts->set_state(TrxHandleSlave::S_CERTIFYING);
+
+    if (ts->nbo_start() || ts->nbo_end())
     {
-        ist_event_queue_.push_back(tsp);
+        handle_ist_nbo(ts, must_apply, preload);
+    }
+    else
+    {
+        handle_ist_trx(ts, must_apply, preload);
     }
 }
 

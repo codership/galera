@@ -226,14 +226,10 @@ namespace galera {
 // CERTIFYING  - local monitor has been entered succesfully
 // APPLYING    - apply monitor has been entered succesfully
 // COMMITTING  - commit monitor has been entered succesfully
-// ABORTING    - certification has failed
-// ROLLING_BACK - certification has failed and commit monitor has been
-//                entered
-// COMMITTED   - commit has been finished, commit order critical section
-//               has been released
-// ROLLED_BACK - transaction has rolled back, commit order critical section
-//               has been released
 //
+// TrxHandleSlave state machine is restricted in order to use it
+// for tracking which monitors have been entered. Certification result
+// can be queried via is_dummy().
 //
 // State machine diagrams can be found below.
 
@@ -324,40 +320,17 @@ TransMapBuilder<TrxHandleSlave>::TransMapBuilder()
     trans_map_(TrxHandleSlave::trans_map_)
 {
     //                                 Cert OK
-    // 0 --> REPLICATING -> CERTIFYING ------> APPLYING --> COMMITTING
-    //            |             |                               |
-    //            |             |Cert failed                    |
-    //            |             |                               |
-    //            |             v                               v
-    //            +-------> ABORTING                  COMMITTED / ROLLED_BACK
-    //                          |
-    //                          v
-    //                    ROLLING_BACK
-    //                          |
-    //                          v
-    //                     ROLLED_BACK
+    // 0 --> REPLICATING -> CERTIFYING -> APPLYING -> COMMITTING -> COMMITTED
+    //
 
     // Enter in-order cert after replication
     add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
-    // BF'ed and IST-skipped
-    add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
     // Applying after certification
     add(TrxHandle::S_CERTIFYING,  TrxHandle::S_APPLYING);
-    // Roll back due to cert failure
-    add(TrxHandle::S_CERTIFYING,  TrxHandle::S_ABORTING);
-    // Entering commit monitor after rollback
-    add(TrxHandle::S_ABORTING,    TrxHandle::S_ROLLING_BACK);
     // Entering commit monitor after applying
     add(TrxHandle::S_APPLYING,    TrxHandle::S_COMMITTING);
-    // Replay after BF
-    add(TrxHandle::S_APPLYING,    TrxHandle::S_REPLAYING);
-    add(TrxHandle::S_COMMITTING,  TrxHandle::S_REPLAYING);
     // Commit finished
     add(TrxHandle::S_COMMITTING,  TrxHandle::S_COMMITTED);
-    // Error reported in leave_commit_order() call
-    add(TrxHandle::S_COMMITTING,  TrxHandle::S_ROLLED_BACK);
-    // Rollback finished
-    add(TrxHandle::S_ROLLING_BACK,  TrxHandle::S_ROLLED_BACK);
 }
 
 

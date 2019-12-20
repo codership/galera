@@ -13,11 +13,18 @@ namespace galera
     {
     public:
         KeyEntryNG(const KeySet::KeyPart& key)
-            : refs_(), key_(key)
+            : refs_(),
+#ifndef NDEBUG
+              seqnos_(),
+#endif // NDEBUG
+              key_(key)
         {
             std::fill(&refs_[0],
                       &refs_[KeySet::Key::TYPE_MAX],
                       static_cast<TrxHandleSlave*>(NULL));
+#ifndef NDEBUG
+            std::fill(&seqnos_[0], &seqnos_[KeySet::Key::TYPE_MAX], 0);
+#endif // NDEBUG
         }
 
         KeyEntryNG(const KeyEntryNG& other)
@@ -37,6 +44,9 @@ namespace galera
                    refs_[p]->global_seqno() <= trx->global_seqno());
 
             refs_[p] = trx;
+#ifndef NDEBUG
+            seqnos_[p] = trx->global_seqno();
+#endif // NDEBUG
             key_ = k;
         }
 
@@ -98,6 +108,9 @@ namespace galera
     private:
 
         TrxHandleSlave* refs_[KeySet::Key::TYPE_MAX + 1];
+#ifndef NDEBUG
+        wsrep_seqno_t seqnos_[KeySet::Key::TYPE_MAX + 1];
+#endif // NDEBUG
         KeySet::KeyPart key_;
 
 #ifndef NDEBUG

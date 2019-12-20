@@ -72,6 +72,7 @@ galera::GcsActionSource::resend_writeset(const struct gcs_action& act)
     ssize_t ret;
     struct gu_buf const sb = { act.buf, act.size };
     GcsI::WriteSetVector v;
+    v.resize(1);
     v[0] = sb;
 
     /* grab send monitor to resend asap */

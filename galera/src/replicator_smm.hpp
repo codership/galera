@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -142,26 +142,6 @@ namespace galera
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l);
         void submit_view_info(void* recv_ctx, const wsrep_view_info_t* cc);
         void process_conf_change(void* recv_ctx, const struct gcs_action& cc);
-        void drain_monitors_for_local_conf_change();
-        void process_non_prim_conf_change(void* recv_ctx,
-                                          const gcs_act_cchange&,
-                                          int my_index);
-        void process_first_view(const wsrep_view_info_t*, const wsrep_uuid_t&);
-        void process_group_change(const wsrep_view_info_t*);
-        void process_st_required(void* recv_ctx, int group_proto_ver,
-                                 const wsrep_view_info_t*);
-        void reset_index_if_needed(const wsrep_view_info_t* view_info,
-                                   int prev_protocol_version,
-                                   int next_protocol_version,
-                                   bool st_required);
-        void shift_to_next_state(Replicator::State next_state);
-        void become_joined_if_needed();
-        void submit_ordered_view_info(void* recv_ctx, const wsrep_view_info_t*);
-        void process_prim_conf_change(void* recv_ctx,
-                                      const gcs_act_cchange&,
-                                      int my_index,
-                                      void* cc_buf);
-        void process_ist_conf_change(const gcs_act_cchange&);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
                                wsrep_seqno_t donor_seq);
@@ -202,15 +182,6 @@ namespace galera
         void ist_cc(const gcs_action&, bool must_apply, bool preload);
         void ist_end(int error);
 
-        // Enter apply monitor without waiting
-        void apply_monitor_enter_immediately(const TrxHandleSlave& ts)
-        {
-            assert(!ts.explicit_rollback());
-            assert(ts.state() == TrxHandle::S_ABORTING);
-            ApplyOrder ao(ts.global_seqno(), 0, ts.local());
-            gu_trace(apply_monitor_.enter(ao));
-        }
-
         // Cancel local and enter apply monitors for TrxHandle
         void cancel_monitors_for_local(const TrxHandleSlave& ts)
         {
@@ -220,8 +191,6 @@ namespace galera
 
             LocalOrder lo(ts);
             local_monitor_.self_cancel(lo);
-
-            gu_trace(apply_monitor_enter_immediately(ts));
         }
 
         // Cancel all monitors for given seqnos
@@ -442,16 +411,66 @@ namespace galera
                 service_thd_.report_last_committed(purge_seqno);
             }
         }
+        // Helpers for configuration change processing
+        void drain_monitors_for_local_conf_change();
+        void process_non_prim_conf_change(void* recv_ctx,
+                                          const gcs_act_cchange&,
+                                          int my_index);
+        void process_first_view(const wsrep_view_info_t*, const wsrep_uuid_t&);
+        void process_group_change(const wsrep_view_info_t*);
+        void process_st_required(void* recv_ctx, int group_proto_ver,
+                                 const wsrep_view_info_t*);
+        void reset_index_if_needed(const wsrep_view_info_t* view_info,
+                                   int prev_protocol_version,
+                                   int next_protocol_version,
+                                   bool st_required);
+        void shift_to_next_state(Replicator::State next_state);
+        void become_joined_if_needed();
+        void submit_ordered_view_info(void* recv_ctx, const wsrep_view_info_t*);
+        void finish_local_prim_conf_change(int group_proto_ver,
+                                           wsrep_seqno_t seqno,
+                                           const char* context);
+        void process_prim_conf_change(void* recv_ctx,
+                                      const gcs_act_cchange&,
+                                      int my_index,
+                                      void* cc_buf);
+        void process_ist_conf_change(const gcs_act_cchange&);
+        TrxHandleSlavePtr get_real_ts_with_gcache_buffer(const TrxHandleSlavePtr&);
+        void handle_trx_overlapping_ist(const TrxHandleSlavePtr& ts);
+
+        // Helpers for IST processing.
+        void handle_ist_nbo(const TrxHandleSlavePtr& ts, bool must_apply,
+                            bool preload);
+        void handle_ist_trx_preload(const TrxHandleSlavePtr& ts,
+                                    bool must_apply);
+        void handle_ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
+                            bool preload);
 
         /* process pending queue events scheduled before seqno */
         void process_pending_queue(wsrep_seqno_t seqno);
 
+        // Enter local monitor. Return true if entered.
+        bool enter_local_monitor_for_cert(TrxHandleMaster*,
+                                          const TrxHandleSlavePtr&);
+        wsrep_status_t handle_local_monitor_interrupted(TrxHandleMaster*,
+                                                        const TrxHandleSlavePtr&);
+        wsrep_status_t finish_cert(TrxHandleMaster*,
+                                   const TrxHandleSlavePtr&);
         wsrep_status_t cert             (TrxHandleMaster*,
                                          const TrxHandleSlavePtr&);
         wsrep_status_t cert_and_catch   (TrxHandleMaster*,
                                          const TrxHandleSlavePtr&);
         wsrep_status_t cert_for_aborted (const TrxHandleSlavePtr&);
 
+        // Enter apply monitor for local transaction. Return true
+        // if apply monitor was grabbed.
+        bool enter_apply_monitor_for_local(TrxHandleMaster&,
+                                           const TrxHandleSlavePtr&);
+        wsrep_status_t handle_apply_monitor_interrupted(TrxHandleMaster&,
+                                                        const TrxHandleSlavePtr&);
+        void enter_apply_monitor_for_local_not_committing(
+            const TrxHandleMaster&,
+            TrxHandleSlave&);
         wsrep_status_t handle_commit_interrupt(TrxHandleMaster&,
                                                const TrxHandleSlave&);
 

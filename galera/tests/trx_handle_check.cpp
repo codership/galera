@@ -124,14 +124,14 @@ START_TEST(test_states_slave)
         // 0  1  2  3  4  5  6  7  8  9  10 11  To / From
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 0  EXECUTING
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 1  MUST_ABORT
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }, // 2  ABORTING
-        {  0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 3  REPLICATING
-        {  0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 4  CERTIFYING
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 2  ABORTING
+        {  0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, // 3  REPLICATING
+        {  0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }, // 4  CERTIFYING
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 5  MUST_REPLAY
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 6  REPLAYING
         {  0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 }, // 7  APPLYING
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 }, // 8  COMMITTNG
-        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }, // 9  ROLLING_BACK
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 }, // 8  COMMITTNG
+        {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 9  ROLLING_BACK
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, // 10 COMMITTED
         {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }  // 11 ROLLED_BACK
     };
@@ -140,18 +140,13 @@ START_TEST(test_states_slave)
                          TrxHandleSlaveDeleter());
     fail_unless(ts->state() == TrxHandle::S_REPLICATING);
 
-    // Visits only REPLICATING, CERTIFYING, APPLYING, COMMITTING, COMMITTED,
-    // ROLLED_BACK
     std::vector<int> visits(TrxHandle::num_states_);
     std::fill(visits.begin(), visits.end(), 0);
-    visits[TrxHandle::S_ABORTING] = 1;
     visits[TrxHandle::S_REPLICATING] = 1;
     visits[TrxHandle::S_CERTIFYING] = 1;
     visits[TrxHandle::S_APPLYING] = 1;
     visits[TrxHandle::S_COMMITTING] = 1;
     visits[TrxHandle::S_COMMITTED] = 1;
-    visits[TrxHandle::S_ROLLING_BACK] = 1;
-    visits[TrxHandle::S_ROLLED_BACK] = 1;
 
     check_states_graph(state_trans_slave, ts.get(), visits);
 }

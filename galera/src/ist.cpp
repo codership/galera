@@ -525,7 +525,7 @@ void galera::ist::Receiver::run()
                 else
                 {
                     ts->set_global_seqno(act.seqno_g);
-                    ts->mark_dummy(__LINE__);
+                    ts->mark_dummy_with_action(act.buf);
                 }
 
                 //log_info << "####### Passing WS " << act.seqno_g;
@@ -900,7 +900,8 @@ void* run_async_sender(void* arg)
         (reinterpret_cast<galera::ist::AsyncSender*>(arg));
 
     log_info << "async IST sender starting to serve " << as->peer().c_str()
-             << " sending " << as->first() << "-" << as->last();
+             << " sending " << as->first() << "-" << as->last()
+             << ", preload starts from " << as->preload_start();
 
     wsrep_seqno_t join_seqno;
 
