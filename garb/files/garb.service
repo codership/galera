@@ -2,6 +2,8 @@
 
 [Unit]
 Description=Galera Arbitrator Daemon
+Documentation=man:garbd(8)
+Documentation=https://galeracluster.com/library/documentation/arbitrator.html
 After=network.target
 
 [Install]
@@ -19,5 +21,3 @@ KillSignal=SIGINT
 
 TimeoutSec=2m
 PrivateTmp=false
-
-
