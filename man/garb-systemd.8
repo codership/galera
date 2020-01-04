@@ -1,0 +1,16 @@
+.TH GARB-SYSTEMD "8" "January 2020" "garb-systemd" "System Administration Utilities"
+.SH NAME
+garb-systemd \- systemd start helper for arbitrator daemon 
+.SH SYNOPSIS
+.B garb-systemd
+{\fI\,start\/\fR}
+.SH "DESCRIPTION"
+This is a simple wrapper for garbd written in shell script, which facilitates starting garbd via systemd. While starting garbd, settings are applied from /etc/sysconfig/garb or from environment variables GALERA_NODES, GALERA_GROUP, GALERA_PORT, GALERA_OPTIONS and LOG_FILE.
+
+For more information, view the source code and read more at https://galeracluster.com/library/documentation/arbitrator.html
+
+.SH BUGS
+See Galera bug tracker at https://github.com/codership/galera
+
+.SH AUTHOR
+Codership Oy <info at codership dot com>
