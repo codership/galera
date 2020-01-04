@@ -2,7 +2,7 @@
 
 [Unit]
 Description=Galera Arbitrator Daemon
-After=network.target syslog.target
+After=network.target
 
 [Install]
 WantedBy=multi-user.target
