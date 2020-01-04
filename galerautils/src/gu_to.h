@@ -52,7 +52,7 @@ extern long gu_to_destroy (gu_to_t** to);
  * Must be released gu_to_release(). @see gu_to_release
  *
  * @param to    TO resource to be acquired.
- * @param seqno The order at which TO resouce should be aquired. For any N
+ * @param seqno The order at which TO resource should be acquired. For any N
  *              gu_to_grab (to, N) will return exactly after
  *              gu_to_release (to, N-1).
  * @return 0 in case of success, negative code in case of error.
@@ -64,7 +64,7 @@ extern long gu_to_destroy (gu_to_t** to);
 extern long gu_to_grab (gu_to_t* to, gu_seqno_t seqno);
 
 /*! @brief Releases TO specified resource.
- * On succesful return unlocks the mutex associated with TO.
+ * On successful return unlocks the mutex associated with TO.
  * TO must be previously acquired with gu_to_grab(). @see gu_to_grab
  *
  * @param to TO resource that was previously acquired with gu_to_grab().
@@ -100,7 +100,7 @@ extern long gu_to_cancel (gu_to_t *to, gu_seqno_t seqno);
 
 
 /*!
- * Self cancel to without attempting to enter critical secion
+ * Self cancel to without attempting to enter critical section
  */
 extern long gu_to_self_cancel(gu_to_t *to, gu_seqno_t seqno);
 

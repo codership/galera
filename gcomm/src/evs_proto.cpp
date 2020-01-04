@@ -2222,7 +2222,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         return;
     }
 
-    // Don't handle foreing messages in install phase.
+    // Don't handle foreign messages in install phase.
     // This includes not only INSTALL state, but also
     // GATHER state after receiving install message.
     if (install_message_ != 0)
@@ -2575,7 +2575,7 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
                     input_map_->is_safe(input_map_->begin()) == true)
                 {
                     // If the input map state is still not good for fast path,
-                    // the situation is not likely to clear immediately. Retur
+                    // the situation is not likely to clear immediately. Return
                     // error to retry later.
                     return EAGAIN;
                 }

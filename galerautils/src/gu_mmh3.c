@@ -2,7 +2,7 @@
 
 /**
  * @file MurmurHash3 implementation
- *       (slightly rewritten from the refrence C++ impl.)
+ *       (slightly rewritten from the reference C++ impl.)
  *
  * $Id$
  */

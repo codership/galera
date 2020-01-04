@@ -48,7 +48,7 @@ gu_clock_diff (clock_t left, clock_t right)
 /**
  * New time interface
  *
- * All funcitons return nanoseconds.
+ * All functions return nanoseconds.
  */
 
 /* Maximum date representable by long long and compatible with timespec */

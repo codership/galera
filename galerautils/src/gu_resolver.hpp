@@ -105,7 +105,7 @@ public:
      * Get port in network byte order. This is applicable only
      * for AF_INET, AF_INET6.
      *
-     * @return Port in nework byte order
+     * @return Port in network byte order
      */
     unsigned short get_port() const
     {

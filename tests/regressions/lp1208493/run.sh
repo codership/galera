@@ -13,7 +13,7 @@
 # may be accessing global variables, and refuse to die if cannot grab the 
 # variable protecting lock. 
 # The fix for this issue, will release global variable lock for the duration
-# of conneciton closing, and all client connections should be able to close
+# of connection closing, and all client connections should be able to close
 # gracefully
 #
 # If bug is present, mysqld will hang after wsrep_provider or 

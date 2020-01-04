@@ -498,7 +498,7 @@ void gu_fifo_destroy   (gu_fifo_t *queue)
 
     while (gu_mutex_destroy (&queue->lock)) continue;
 
-    /* only one row migth be left */
+    /* only one row might be left */
     {
         ulong row = FIFO_ROW(queue, queue->tail);
         if (queue->rows[row]) {

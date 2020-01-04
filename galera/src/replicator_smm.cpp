@@ -2461,7 +2461,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
     if (upto >= last_committed())
     {
         log_debug << "Drain monitors from " << last_committed()
-                  << " upto " << upto;
+                  << " up to " << upto;
         gu_trace(drain_monitors(upto));
     }
     else

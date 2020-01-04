@@ -349,11 +349,11 @@ private:
     void cleanup_recovery_index();
 
     seqno_t            window_;
-    seqno_t            safe_seq_;       /*!< Safe seqno              */
-    seqno_t            aru_seq_;        /*!< All received upto seqno */
-    InputMapNodeIndex* node_index_;     /*!< Index of nodes          */
-    InputMapMsgIndex*  msg_index_;      /*!< Index of messages       */
-    InputMapMsgIndex*  recovery_index_; /*!< Recovery index          */
+    seqno_t            safe_seq_;       /*!< Safe seqno               */
+    seqno_t            aru_seq_;        /*!< All received up to seqno */
+    InputMapNodeIndex* node_index_;     /*!< Index of nodes           */
+    InputMapMsgIndex*  msg_index_;      /*!< Index of messages        */
+    InputMapMsgIndex*  recovery_index_; /*!< Recovery index           */
 };
 
 #endif // EVS_INPUT_MAP2_HPP
