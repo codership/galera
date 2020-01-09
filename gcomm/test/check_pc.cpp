@@ -1106,7 +1106,7 @@ static DummyNode* create_dummy_node(size_t idx,
     protos.push_back(new DummyTransport(uuid, false));
     protos.push_back(new evs::Proto(gu_conf, uuid, 0, conf));
     protos.push_back(new Proto(gu_conf, uuid, 0, conf));
-    return new DummyNode(gu_conf, idx, protos);
+    return new DummyNode(gu_conf, idx, gcomm::UUID(idx), protos);
 }
 
 namespace

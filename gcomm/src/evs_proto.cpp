@@ -2229,6 +2229,18 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 }
 
 
+class UUIDFixedPartCmp
+{
+public:
+    UUIDFixedPartCmp(const gcomm::UUID& uuid) : uuid_(uuid) { }
+    bool operator()(const gcomm::evs::NodeMap::value_type& vt) const
+    {
+        return uuid_.fixed_part_matches(vt.first);
+    }
+private:
+    const gcomm::UUID& uuid_;
+};
+
 void gcomm::evs::Proto::handle_foreign(const Message& msg)
 {
     // no need to handle foreign LEAVE message
@@ -2261,10 +2273,20 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         return;
     }
 
+    NodeMap::iterator i;
+    if ((i = std::find_if(known_.begin(), known_.end(), UUIDFixedPartCmp(source)))
+        != known_.end())
+    {
+        // Keep the new incarnation out of the group until a new view has been
+        // established.
+        evs_log_debug(D_FOREIGN_MSGS)
+            << "Dropping message from new incarnation of already known "
+            "node in current view, old: " << i->first << " new: " << source;
+        return;
+    }
     evs_log_info(I_STATE) << " detected new message source "
                           << source;
 
-    NodeMap::iterator i;
     gu_trace(i = known_.insert_unique(
                  std::make_pair(source, Node(*this))));
     assert(NodeMap::value(i).operational() == true);

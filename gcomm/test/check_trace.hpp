@@ -253,10 +253,11 @@ namespace gcomm
     public:
         DummyNode(gu::Config& conf,
                   const size_t index,
+                  const gcomm::UUID& uuid,
                   const std::list<Protolay*>& protos) :
             Toplay (conf),
             index_  (index),
-            uuid_   (UUID(static_cast<int32_t>(index))),
+            uuid_   (uuid),
             protos_ (protos),
             cvi_    (),
             tr_     (),

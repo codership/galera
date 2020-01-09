@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -694,11 +694,13 @@ END_TEST
 
 static gu::Config gu_conf;
 
-static DummyNode* create_dummy_node(size_t idx,
-                                    int version,
-                                    const string& suspect_timeout = "PT1H",
-                                    const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT10M")
+static DummyNode* create_dummy_node_with_uuid(
+    size_t idx,
+    const gcomm::UUID& uuid,
+    int version,
+    const string& suspect_timeout,
+    const string& inactive_timeout,
+    const string& retrans_period)
 {
     // reset conf to avoid stale config in case of nofork
     gu_conf = gu::Config();
@@ -720,10 +722,21 @@ static DummyNode* create_dummy_node(size_t idx,
             + ::getenv("EVS_DEBUG_MASK");
     }
     list<Protolay*> protos;
-    UUID uuid(static_cast<int32_t>(idx));
     protos.push_back(new DummyTransport(uuid, false));
     protos.push_back(new Proto(gu_conf, uuid, 0, conf));
-    return new DummyNode(gu_conf, idx, protos);
+    return new DummyNode(gu_conf, idx, uuid, protos);
+}
+
+static DummyNode* create_dummy_node(
+    size_t idx,
+    int version,
+    const string& suspect_timeout = "PT1H",
+    const string& inactive_timeout = "PT1H",
+    const string& retrans_period = "PT10M")
+{
+    UUID uuid(static_cast<int32_t>(idx));
+    return create_dummy_node_with_uuid(idx, uuid, version, suspect_timeout,
+                                       inactive_timeout, retrans_period);
 }
 
 namespace
@@ -2504,6 +2517,81 @@ START_TEST(test_out_queue_limit)
 }
 END_TEST
 
+// Test outline: The representative of the group is isolated out and a
+// new instance is joined with uuid with incremented incarnation.
+// The following install message should have also the old incarnation
+// present. This is checked by sending an user message from old
+// representative incarnation before isolation. If the old incarnation
+// is not present in the install message, the delivery of the user message
+// in transitional configuration will throw an exception.
+START_TEST(test_representative_incarnation_change)
+{
+    log_info << "START test_representative_incarnation_change";
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const int protocol_version(1);
+
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node_with_uuid(
+                         i, gcomm::UUID(i), protocol_version, suspect_timeout,
+                         inactive_timeout, retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    prop.propagate_until_empty();
+    // Send a message from the representative and propagate enough messages
+    // to make sure that other nodes received the message but didn't deliver
+    // yet.
+    dn[0]->send();
+    prop.propagate_n(3);
+
+    // Isolate the representative.
+    for (size_t i = 2; i <= n_nodes; ++i)
+    {
+        prop.set_loss(1, i, 0.);
+        prop.set_loss(i, 1, 0.);
+    }
+
+    // Shift clock and handle timers to bring other nodes into gather
+    // state.
+    gu::datetime::SimClock::inc_time(300 * gu::datetime::MSec);
+    evs_from_dummy(dn[1])->handle_timers();
+    evs_from_dummy(dn[2])->handle_timers();
+    prop.propagate_until_empty();
+    gu::datetime::SimClock::inc_time(300 * gu::datetime::MSec);
+    evs_from_dummy(dn[1])->handle_timers();
+    evs_from_dummy(dn[2])->handle_timers();
+    fail_unless(evs_from_dummy(dn[1])->state() == gcomm::evs::Proto::S_GATHER);
+    fail_unless(evs_from_dummy(dn[2])->state() == gcomm::evs::Proto::S_GATHER);
+
+    // Create a new instance with old representative uuid with incarnation
+    // incremented. Keep it isolated from old representative.
+    gcomm::UUID uuid_new_incarnation(evs_from_dummy(dn[0])->uuid());
+    uuid_new_incarnation.increment_incarnation();
+    dn.push_back(create_dummy_node_with_uuid(4, uuid_new_incarnation,
+                                             protocol_version,
+                                             suspect_timeout, inactive_timeout,
+                                             retrans_period));
+    join_node(&prop, dn[3], false);
+    prop.set_loss(1, 4, 0.);
+    prop.set_loss(4, 1, 0.);
+    prop.propagate_until_empty();
+    std::for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -2689,6 +2777,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_out_queue_limit");
     tcase_add_test(tc, test_out_queue_limit);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_representative_incarnation_change");
+    tcase_add_test(tc, test_representative_incarnation_change);
     suite_add_tcase(s, tc);
 
     return s;

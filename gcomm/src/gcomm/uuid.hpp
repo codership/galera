@@ -44,6 +44,11 @@ public:
         return uuid_nil_;
     }
 
+    // Print UUID to stream. If the full equals to true,
+    // whole UUID string is printed. If it is false, the
+    // first 4 bytes and 2 bytes matching to incarnation
+    // number are printed in form of
+    //   <first-4-bytes>-<incarnation number>
     std::ostream& to_stream(std::ostream& os, bool full) const
     {
         std::ios_base::fmtflags saved = os.flags();
@@ -61,7 +66,10 @@ public:
                << std::setfill('0') << std::setw(2)
                << static_cast<int>(uuid_.data[2])
                << std::setfill('0') << std::setw(2)
-               << static_cast<int>(uuid_.data[3]);
+               << static_cast<int>(uuid_.data[3])
+               << "-"
+               << std::setfill('0') << std::setw(4)
+               << get_incarnation();
         }
         os.flags(saved);
         return os;
@@ -73,6 +81,13 @@ public:
         std::ostringstream os;
         to_stream(os, true);
         return os.str();
+    }
+
+    // Return incarnation number.
+    uint16_t get_incarnation() const
+    {
+        const uint16_t* data = reinterpret_cast<const uint16_t*>(uuid_.data);
+        return gu_be16(data[4]);
     }
 
     void increment_incarnation()
