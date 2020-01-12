@@ -130,7 +130,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     ist_senders_        (gcache_),
     wsdb_               (),
     cert_               (config_, &service_thd_),
-    pending_cert_queue_ (),
+    pending_cert_queue_ (gcache_),
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
@@ -2434,6 +2434,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     LocalOrder lo(cc.seqno_l);
     local_monitor_.enter(lo);
+
+    process_pending_queue(cc.seqno_l);
+
     if (conf.conf_id < 0)
     {
         process_non_prim_conf_change(recv_ctx, conf, cc.seqno_g);
@@ -2683,7 +2686,10 @@ void galera::ReplicatorSMM::reset_index_if_needed(
             // See process_ist_conf_change().
             trx_proto_ver = -1;
         }
-
+        // Index will be reset, so all write sets preceding this CC in
+        // local order must be discarded. Therefore the pending cert queue
+        // must also be cleared.
+        pending_cert_queue_.clear();
         /* 2 reasons for this here:
          * 1 - compatibility with protocols < PROTO_VER_ORDERED_CC
          * 2 - preparing cert index for preloading by setting seqno to 0 */
@@ -2858,8 +2864,6 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
     log_info << "####### processing CC " << group_seqno
              << ", local"
              << (ordered ? ", ordered" : ", unordered");
-
-    gu_trace(process_pending_queue(group_seqno));
 
     drain_monitors_for_local_conf_change();
 
@@ -3097,8 +3101,11 @@ void galera::ReplicatorSMM::resync()
 //////////////////////////////////////////////////////////////////////
 
 /* process pending queue events scheduled before seqno */
-void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t seqno)
+void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t local_seqno)
 {
+    // This method should be called only from code paths of local
+    // processing, i.e. events from group.
+    assert(local_seqno > 0);
     // pending_cert_queue_ contains all writesets that:
     //   a) were BF aborted before being certified
     //   b) are not going to be replayed even though
@@ -3109,9 +3116,10 @@ void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t seqno)
     // This avoids the certification index to diverge
     // across nodes.
     TrxHandleSlavePtr queued_ts;
-    while ((queued_ts = pending_cert_queue_.must_cert_next(seqno)) != NULL)
+    while ((queued_ts = pending_cert_queue_.must_cert_next(local_seqno)) != 0)
     {
-        log_debug << "must cert next " << seqno << " aborted ts " << *queued_ts;
+        log_debug << "must cert next " << local_seqno
+                  << " aborted ts " << *queued_ts;
 
         Certification::TestResult const result(cert_.append_trx(queued_ts));
 
@@ -3230,7 +3238,7 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
 {
     assert(ts->state() == TrxHandle::S_CERTIFYING);
 
-    gu_trace(process_pending_queue(ts->global_seqno()));
+    gu_trace(process_pending_queue(ts->local_seqno()));
 
     // Write sets which would overlap with IST must have already been
     // filtered out before getting here.

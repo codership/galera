@@ -1342,7 +1342,6 @@ void galera::ReplicatorSMM::process_ist_conf_change(const gcs_act_cchange& conf)
     // IST should contain only ordered CCs
     assert(conf.repl_proto_ver >= PROTO_VER_ORDERED_CC);
 
-    gu_trace(process_pending_queue(conf.seqno));
     // Drain monitors to make sure that all preceding IST events have
     // been applied.
     drain_monitors(conf.seqno - 1);

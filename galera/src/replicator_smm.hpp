@@ -446,8 +446,8 @@ namespace galera
         void handle_ist_trx(const TrxHandleSlavePtr& ts, bool must_apply,
                             bool preload);
 
-        /* process pending queue events scheduled before seqno */
-        void process_pending_queue(wsrep_seqno_t seqno);
+        /* process pending queue events scheduled before local_seqno */
+        void process_pending_queue(wsrep_seqno_t local_seqno);
 
         // Enter local monitor. Return true if entered.
         bool enter_local_monitor_for_cert(TrxHandleMaster*,
@@ -994,14 +994,16 @@ namespace galera
         class PendingCertQueue
         {
         public:
-            PendingCertQueue() :
+            PendingCertQueue(gcache::GCache& gcache) :
                 mutex_(),
-                ts_queue_()
+                ts_queue_(),
+                gcache_(gcache)
             { }
 
             void push(const TrxHandleSlavePtr& ts)
             {
                 assert(ts->local());
+                assert(ts->local_seqno() > 0);
                 gu::Lock lock(mutex_);
                 ts_queue_.push(ts);
                 ts->mark_queued();
@@ -1014,8 +1016,8 @@ namespace galera
                 if (!ts_queue_.empty())
                 {
                     const TrxHandleSlavePtr& top(ts_queue_.top());
-                    assert(top->global_seqno() != seqno);
-                    if (top->global_seqno() < seqno)
+                    assert(top->local_seqno() != seqno);
+                    if (top->local_seqno() < seqno)
                     {
                         ret = top;
                         ts_queue_.pop();
@@ -1024,19 +1026,31 @@ namespace galera
                 return ret;
             }
 
+            void clear()
+            {
+                gu::Lock lock(mutex_);
+                while (not ts_queue_.empty())
+                {
+                    TrxHandleSlavePtr ts(ts_queue_.top());
+                    ts_queue_.pop();
+                    gcache_.free(const_cast<void*>(ts->action().first));
+                }
+            }
+
         private:
-            struct TrxHandleSlavePtrCmpGlobalSeqno
+            struct TrxHandleSlavePtrCmpLocalSeqno
             {
                 bool operator()(const TrxHandleSlavePtr& lhs,
                                 const TrxHandleSlavePtr& rhs) const
                 {
-                    return lhs->global_seqno() > rhs->global_seqno();
+                    return lhs->local_seqno() > rhs->local_seqno();
                 }
             };
             gu::Mutex mutex_;
             std::priority_queue<TrxHandleSlavePtr,
                                 std::vector<TrxHandleSlavePtr>,
-                                TrxHandleSlavePtrCmpGlobalSeqno> ts_queue_;
+                                TrxHandleSlavePtrCmpLocalSeqno> ts_queue_;
+            gcache::GCache& gcache_;
         };
 
         PendingCertQueue pending_cert_queue_;
