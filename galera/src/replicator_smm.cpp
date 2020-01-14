@@ -2051,6 +2051,7 @@ void galera::ReplicatorSMM::handle_trx_overlapping_ist(
     {
         // We don't care about the result, just populate the index
         // and mark trx committed in certification.
+        // see skip_prim_conf_change() for analogous logic
         (void)cert_.append_trx(real_ts);
         report_last_committed(cert_.set_trx_committed(*real_ts));
     }
@@ -2547,6 +2548,37 @@ static void validate_local_prim_view_info(const wsrep_view_info_t* view_info,
     }
 }
 
+bool galera::ReplicatorSMM::skip_prim_conf_change(
+    const wsrep_view_info_t& view_info, int const proto_ver)
+{
+    auto cc_seqno(WSREP_SEQNO_UNDEFINED);
+    bool keep(false); // keep in cache
+
+    if (proto_ver >= PROTO_VER_ORDERED_CC)
+    {
+        cc_seqno = view_info.state_id.seqno;
+
+        if (cc_seqno > cert_.position())
+        {
+            // was not part of IST preload, adjust cert. index
+            // see handle_trx_overlapping_ist() for analogous logic
+            assert(cc_seqno == cert_.position() + 1);
+            const auto trx_ver
+                (std::get<0>(get_trx_protocol_versions(proto_ver)));
+            cert_.adjust_position(view_info,
+                                  gu::GTID(view_info.state_id.uuid, cc_seqno),
+                                  trx_ver);
+            keep = true;
+        }
+    }
+
+    log_info << "####### skipping local CC " << cc_seqno << ", keep in cache: "
+             << (keep ? "true" : "false");
+    resume_recv();
+
+    return keep;
+}
+
 void galera::ReplicatorSMM::process_first_view(
     const wsrep_view_info_t* view_info, const wsrep_uuid_t& new_uuid)
 {
@@ -2825,19 +2857,16 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
         {
             if (cc_buf_) gcache_.free(cc_buf_);
         }
-        void keep() { cc_buf_ = 0; }
+        void keep(wsrep_seqno_t const cc_seqno) // keep cc_buf_ in gcache_
+        {
+            gu_trace(gcache_.seqno_assign(cc_buf_, cc_seqno,
+                                          GCS_ACT_CCHANGE, false));
+            cc_buf_ = 0;
+        }
     private:
         gcache::GCache& gcache_;
         void* cc_buf_;
     } cc_buf_discard(gcache_, cc_buf);
-
-    if (conf.seqno <= sst_seqno_)
-    {
-        log_info << "####### skipping CC " << conf.seqno << ", local";
-        // applied already in SST, skip
-        resume_recv();
-        return;
-    }
 
     // Processing local primary conf change, so this node must always
     // be in conf change as indicated by my_index.
@@ -2854,7 +2883,18 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
     // Will abort if validation fails
     validate_local_prim_view_info(view_info.get(), uuid_);
 
-    bool const ordered(conf.repl_proto_ver >= PROTO_VER_ORDERED_CC);
+    if (conf.seqno <= sst_seqno_)
+    {
+        // contained already in SST, skip
+        if (skip_prim_conf_change(*view_info, group_proto_version))
+        {
+            // was not part of IST, don't discard
+            cc_buf_discard.keep(conf.seqno);
+        }
+        return;
+    }
+
+    bool const ordered(group_proto_version >= PROTO_VER_ORDERED_CC);
     const wsrep_uuid_t& group_uuid (view_info->state_id.uuid);
     wsrep_seqno_t const group_seqno(view_info->state_id.seqno);
 
@@ -2939,9 +2979,7 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
      * adjusted */
     if (ordered)
     {
-        gu_trace(gcache_.seqno_assign(cc_buf, group_seqno,
-                                      GCS_ACT_CCHANGE, false));
-        cc_buf_discard.keep();
+        cc_buf_discard.keep(group_seqno);
     }
     shift_to_next_state(next_state);
 

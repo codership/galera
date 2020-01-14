@@ -416,6 +416,8 @@ namespace galera
         void process_non_prim_conf_change(void* recv_ctx,
                                           const gcs_act_cchange&,
                                           int my_index);
+        bool skip_prim_conf_change(const wsrep_view_info_t& view,
+                                   int group_proto_ver);
         void process_first_view(const wsrep_view_info_t*, const wsrep_uuid_t&);
         void process_group_change(const wsrep_view_info_t*);
         void process_st_required(void* recv_ctx, int group_proto_ver,

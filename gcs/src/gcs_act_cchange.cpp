@@ -39,6 +39,7 @@ _version(int ver)
     {
     case VER0: return VER0;
     default:
+        assert(0);
         gu_throw_error(EPROTO) << "Unsupported CC action version";
         throw;
     }
