@@ -471,20 +471,40 @@ static bool have_weights(const gcomm::NodeList& node_list,
     return true;
 }
 
+static bool node_list_intersection_comp(const gcomm::NodeList::value_type& vt1,
+                                        const gcomm::NodeList::value_type& vt2)
+{
+    return (vt1.first < vt2.first);
+}
+
+static gcomm::NodeList node_list_intersection(const gcomm::NodeList& nl1,
+                                              const gcomm::NodeList& nl2)
+{
+    gcomm::NodeList ret;
+    std::set_intersection(nl1.begin(), nl1.end(), nl2.begin(), nl2.end(),
+                          std::inserter(ret, ret.begin()),
+                          node_list_intersection_comp);
+    return ret;
+}
 
 bool gcomm::pc::Proto::have_quorum(const View& view, const View& pc_view) const
 {
+    // Compare only against members and left which were part of the pc_view.
+    gcomm::NodeList memb_intersection(
+        node_list_intersection(view.members(), pc_view.members()));
+    gcomm::NodeList left_intersection(
+        node_list_intersection(view.left(), pc_view.members()));
     if (have_weights(view.members(), instances_) &&
         have_weights(view.left(), instances_)    &&
         have_weights(pc_view.members(), instances_))
     {
-        return (weighted_sum(view.members(), instances_) * 2
-                + weighted_sum(view.left(), instances_) >
+        return (weighted_sum(memb_intersection, instances_) * 2
+                + weighted_sum(left_intersection, instances_) >
                 weighted_sum(pc_view.members(), instances_));
     }
     else
     {
-        return (view.members().size()*2 + view.left().size() >
+        return (memb_intersection.size()*2 + left_intersection.size() >
                 pc_view.members().size());
     }
 }
@@ -492,17 +512,22 @@ bool gcomm::pc::Proto::have_quorum(const View& view, const View& pc_view) const
 
 bool gcomm::pc::Proto::have_split_brain(const View& view) const
 {
+    // Compare only against members and left which were part of the pc_view.
+    gcomm::NodeList memb_intersection(
+        node_list_intersection(view.members(), pc_view_.members()));
+    gcomm::NodeList left_intersection(
+        node_list_intersection(view.left(), pc_view_.members()));
     if (have_weights(view.members(), instances_)  &&
         have_weights(view.left(), instances_)     &&
         have_weights(pc_view_.members(), instances_))
     {
-        return (weighted_sum(view.members(), instances_) * 2
-                + weighted_sum(view.left(), instances_) ==
+        return (weighted_sum(memb_intersection, instances_) * 2
+                + weighted_sum(left_intersection, instances_) ==
                 weighted_sum(pc_view_.members(), instances_));
     }
     else
     {
-        return (view.members().size()*2 + view.left().size() ==
+        return (memb_intersection.size()*2 + left_intersection.size() ==
                 pc_view_.members().size());
     }
 }
