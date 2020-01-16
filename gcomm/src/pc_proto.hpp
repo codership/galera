@@ -27,6 +27,7 @@ namespace gcomm
     namespace pc
     {
         class Proto;
+        class ProtoBuilder;
         std::ostream& operator<<(std::ostream& os, const Proto& p);
     }
 }
@@ -203,6 +204,34 @@ public:
     int cluster_weight() const;
 private:
     friend std::ostream& operator<<(std::ostream& os, const Proto& p);
+    // Helper class to construct Proto states for unit tests
+    friend class ProtoBuilder;
+    Proto(gu::Config& conf, const UUID& uuid)
+        :
+        Protolay(conf),
+        my_uuid_          (uuid),
+        start_prim_       (),
+        npvo_             (),
+        ignore_quorum_    (),
+        ignore_sb_        (),
+        closing_          (),
+        state_            (),
+        last_sent_seq_    (),
+        checksum_         (),
+        instances_        (),
+        self_i_           (),
+        state_msgs_       (),
+        current_view_     (0, V_NONE),
+        pc_view_          (0, V_NON_PRIM),
+        views_            (),
+        mtu_              (std::numeric_limits<int32_t>::max()),
+        weight_           (),
+        rst_view_         (),
+        sync_param_mutex_ (),
+        sync_param_cond_  (),
+        param_sync_set_   (0)
+    { }
+
     Proto (const Proto&);
     Proto& operator=(const Proto&);
 
@@ -244,5 +273,53 @@ private:
     bool              param_sync_set_;
 };
 
+class gcomm::pc::ProtoBuilder
+{
+public:
+    ProtoBuilder()
+        : conf_()
+        , uuid_()
+        , state_msgs_()
+        , current_view_()
+        , pc_view_()
+        , instances_()
+        , state_(Proto::S_CLOSED)
+    { }
+    Proto* make_proto()
+    {
+        gcomm_assert(uuid_ != UUID::nil());
+        Proto* ret(new Proto(conf_, uuid_));
+        ret->state_msgs_ = state_msgs_;
+        ret->current_view_ = current_view_;
+        ret->pc_view_ = pc_view_;
+        ret->instances_ = instances_;
+        ret->self_i_ = ret->instances_.find_checked(uuid_);
+        ret->state_ = state_;
+
+        return ret;
+    }
+    ProtoBuilder& conf(const gu::Config& conf)
+    { conf_ = conf; return *this; }
+    ProtoBuilder& uuid(const gcomm::UUID& uuid)
+    { uuid_ = uuid; return *this; }
+    ProtoBuilder& state_msgs(const Proto::SMMap& state_msgs)
+    { state_msgs_ = state_msgs; return *this; }
+    ProtoBuilder& current_view(const gcomm::View& current_view)
+    { current_view_ = current_view; return *this; }
+    ProtoBuilder& pc_view(const gcomm::View& pc_view)
+    { pc_view_ = pc_view; return *this; }
+    ProtoBuilder& instances(const NodeMap& instances)
+    { instances_ = instances; return *this; }
+    ProtoBuilder& state(enum Proto::State state)
+    { state_ = state; return *this; }
+private:
+    gu::Config conf_;
+    gcomm::UUID uuid_;
+    Proto::SMMap state_msgs_;
+    gcomm::View current_view_;
+    gcomm::View pc_view_;
+    NodeMap instances_;
+    enum Proto::State state_;
+};
 
 #endif // PC_PROTO_HPP

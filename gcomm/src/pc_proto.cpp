@@ -321,18 +321,13 @@ void gcomm::pc::Proto::shift_to(const State s)
     // State graph
     static const bool allowed[S_MAX][S_MAX] = {
 
-        // Closed
-        { false, false,  false, false, false, true },
-        // States exch
-        { true,  false, true,  false, true,  true  },
-        // Install
-        { true,  false, false, true,  true,  true  },
-        // Prim
-        { true,  false, false, false, true,  true  },
-        // Trans
-        { true,  true,  false, false, false, true  },
-        // Non-prim
-        { true,  false,  false, true, true,  true  }
+        // Cl     S-E    IN     P      Trans  N-P
+        {  false, false, false, false, false, true  }, // Closed
+        {  true,  false, true,  false, true,  true  }, // States exch
+        {  true,  false, false, true,  true,  true  }, // Install
+        {  true,  false, false, false, true,  true  }, // Prim
+        {  true,  true,  false, false, false, true  }, // Trans
+        {  true,  false, false,  true, true,  true  }  // Non-prim
     };
 
 
@@ -523,7 +518,7 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     log_debug << self_id() << " \n\n current view " << current_view_
               << "\n\n next view " << view
               << "\n\n pc view " << pc_view_;
-
+    log_debug << *this;
     if (have_quorum(view, pc_view_) == false)
     {
         if (closing_ == false && ignore_sb_ == true && have_split_brain(view))

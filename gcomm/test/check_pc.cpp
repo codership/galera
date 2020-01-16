@@ -3572,6 +3572,133 @@ START_TEST(test_prim_after_evict)
 }
 END_TEST
 
+class DummyEvs : public gcomm::Bottomlay
+{
+public:
+    DummyEvs(gu::Config& conf) : gcomm::Bottomlay(conf) { }
+    int handle_down(Datagram&, const ProtoDownMeta&) { return 0; }
+};
+
+class DummyTop : public gcomm::Toplay
+{
+public:
+    DummyTop(gu::Config& conf) : gcomm::Toplay(conf) { }
+    void handle_up(const void*, const gcomm::Datagram&,
+                   const gcomm::ProtoUpMeta&) { }
+};
+
+// Test outline:
+// * Three node cluster, nodes n1, n2, n3
+// * Current primary view is (n1, n2), view number 2
+// * Group is merging, current EVS view is (n1, n2, n3),
+//   view number 3
+// * State messages have been delivered, but group partitioned again when
+//   install message was being sent.
+// * Underlying EVS membership changes so that the transitional view
+//   ends up in (n1, n3), paritioned (n2)
+// * It is expected that the n1 ends up in non-primary component.
+START_TEST(test_quorum_2_to_2_in_3_node_cluster)
+{
+    gu_log_max_level = GU_LOG_DEBUG;
+    gcomm::pc::ProtoBuilder builder;
+    gu::Config conf;
+    gu::ssl_register_params(conf);
+    gcomm::Conf::register_params(conf);
+
+    // Current view is EVS view (n1, n2, n3), view number 3
+    gcomm::View current_view(0, gcomm::ViewId(V_REG, gcomm::UUID(1), 3));
+    current_view.add_member(gcomm::UUID(1), 0);
+    current_view.add_member(gcomm::UUID(2), 0);
+    current_view.add_member(gcomm::UUID(3), 0);
+
+    // Primary component view (n1, n2), view number 2
+    gcomm::View pc_view(0, gcomm::ViewId(V_PRIM, gcomm::UUID(1), 2));
+    pc_view.add_member(gcomm::UUID(1), 0);
+    pc_view.add_member(gcomm::UUID(2), 0);
+
+    // Known instances according to state messages.
+    gcomm::pc::Node node1(true, false, false, 0,
+                          gcomm::ViewId(V_PRIM, gcomm::UUID(1), 2),
+                          0, 1, 0);
+    gcomm::pc::Node node2(true, false, false, 0,
+                          gcomm::ViewId(V_PRIM, gcomm::UUID(1), 2),
+                          0, 1, 0);
+    gcomm::pc::Node node3(false, false, false, 0,
+                          gcomm::ViewId(V_PRIM, gcomm::UUID(1), 1),
+                          0, 1, 0);
+    gcomm::pc::NodeMap instances;
+    instances.insert(std::make_pair(gcomm::UUID(1), node1));
+    instances.insert(std::make_pair(gcomm::UUID(2), node2));
+    instances.insert(std::make_pair(gcomm::UUID(3), node3));
+
+    // State messages for all nodes.
+    // * Nodes n1, n2 report previous prim view (n1, n2), view number 2.
+    // * Node 3 reports previous prim view (n1, n2, n3), view number 1.
+    gcomm::pc::Proto::SMMap state_msgs;
+    {
+        // Node n1
+        gcomm::pc::NodeMap nm;
+        nm.insert(std::make_pair(gcomm::UUID(1), node1));
+        nm.insert(std::make_pair(gcomm::UUID(2), node2));
+        gcomm::pc::Message msg(1, gcomm::pc::Message::PC_T_STATE, 0, nm);
+        state_msgs.insert(std::make_pair(gcomm::UUID(1), msg));
+    }
+    {
+        // Node n2
+        gcomm::pc::NodeMap nm;
+        nm.insert(std::make_pair(gcomm::UUID(1), node1));
+        nm.insert(std::make_pair(gcomm::UUID(2), node2));
+        gcomm::pc::Message msg(1, gcomm::pc::Message::PC_T_STATE, 0, nm);
+        state_msgs.insert(std::make_pair(gcomm::UUID(2), msg));
+    }
+    {
+        // Node3
+        gcomm::pc::NodeMap nm;
+        // Nodes n1 and n2 have previously been seen in prim view number 1
+        nm.insert(std::make_pair(gcomm::UUID(1),
+                                 gcomm::pc::Node(
+                                     false, false, false, 0,
+                                     gcomm::ViewId(V_PRIM, gcomm::UUID(1), 1),
+                                     0, 1, 0)));
+        nm.insert(std::make_pair(gcomm::UUID(2),
+                                 gcomm::pc::Node(
+                                     false, false, false, 0,
+                                     gcomm::ViewId(V_PRIM, gcomm::UUID(1), 1),
+                                     0, 1, 0)));
+        nm.insert(std::make_pair(gcomm::UUID(3), node3));
+        gcomm::pc::Message msg(1, gcomm::pc::Message::PC_T_STATE, 0, nm);
+        state_msgs.insert(std::make_pair(gcomm::UUID(3), msg));
+    }
+
+    // Build n1 state in S_INSTALL.
+    builder
+        .conf(conf)
+        .uuid(gcomm::UUID(1))
+        .state_msgs(state_msgs)
+        .current_view(current_view)
+        .pc_view(pc_view)
+        .instances(instances)
+        .state(gcomm::pc::Proto::S_INSTALL);
+    std::auto_ptr<gcomm::pc::Proto> p(builder.make_proto());
+    DummyEvs devs(conf);
+    DummyTop dtop(conf);
+    gcomm::connect(&devs, p.get());
+    gcomm::connect(p.get(), &dtop);
+
+    // Deliver transitional EVS view where members are n1, n3 and
+    // partitioned n2. After handling transitional view n1 is
+    // expected to end up in non-primary.
+    gcomm::View trans_view(0, gcomm::ViewId(V_TRANS, gcomm::UUID(1), 3));
+    trans_view.add_member(gcomm::UUID(1), 0);
+    trans_view.add_partitioned(gcomm::UUID(2), 0);
+    trans_view.add_member(gcomm::UUID(3), 0);
+
+    p->handle_view(trans_view);
+
+    fail_unless(p->state() == gcomm::pc::Proto::S_TRANS);
+    fail_unless(not p->prim());
+}
+END_TEST
 
 Suite* pc_suite()
 {
@@ -3701,6 +3828,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_prim_after_evict");
     tcase_add_test(tc, test_prim_after_evict);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_quorum_2_to_2_in_3_node_cluster");
+    tcase_add_test(tc, test_quorum_2_to_2_in_3_node_cluster);
     suite_add_tcase(s, tc);
 
     return s;
