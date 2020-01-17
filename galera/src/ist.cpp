@@ -157,7 +157,7 @@ IST_determine_recv_addr (gu::Config& conf)
     {
         recv_addr = conf.get(galera::ist::Receiver::RECV_ADDR);
     }
-    catch (gu::NotFound&)
+    catch (gu::NotSet&)
     {
         try
         {
