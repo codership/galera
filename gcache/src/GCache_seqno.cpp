@@ -22,7 +22,7 @@ namespace gcache
 
         assert(seqno2ptr.empty() || seqno_max == seqno2ptr.rbegin()->first);
 
-        const int64_t s(gtid.seqno());
+        const seqno_t s(gtid.seqno());
         if (gtid.uuid() == gid && s != SEQNO_ILL && seqno_max >= s)
         {
             if (seqno_max > s)
@@ -34,7 +34,7 @@ namespace gcache
             return;
         }
 
-        log_info << "GCache history reset: old(" << gu::GTID(gid, seqno_max)
+        log_info << "GCache history reset: " << gu::GTID(gid, seqno_max)
                  << " -> " << gtid;
 
         seqno_released = SEQNO_NONE;

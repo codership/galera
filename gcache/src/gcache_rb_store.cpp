@@ -395,28 +395,25 @@ namespace gcache
 
         if (size_cache_ == size_free_) return;
 
-        /* Find the last seqno'd RB buffer. It is likely to be close to the
-         * end of released buffers chain. */
+        /* Invalidate seqnos for all ordered buffers (so that they can't be
+         * recovered on restart. Also find the last seqno'd RB buffer. */
         BufferHeader* bh(0);
 
-        for (seqno2ptr_t::reverse_iterator r(seqno2ptr_.rbegin());
-             r != seqno2ptr_.rend(); ++r)
+        for (seqno2ptr_t::iterator i(seqno2ptr_.begin());
+             i != seqno2ptr_.end(); ++i)
         {
-            BufferHeader* const b(ptr2BH(r->second));
+            BufferHeader* const b(ptr2BH(i->second));
             if (BUFFER_IN_RB == b->store)
             {
 #ifndef NDEBUG
                 if (!BH_is_released(b))
                 {
-                    log_fatal << "Buffer "
-                              << reinterpret_cast<const void*>(r->second)
-                              << ", seqno_g " << b->seqno_g
-                              << " is not released.";
+                    log_fatal << "Buffer " << b << " is not released.";
                     assert(0);
                 }
 #endif
+                b->seqno_g = SEQNO_NONE;
                 bh = b;
-                break;
             }
         }
 
