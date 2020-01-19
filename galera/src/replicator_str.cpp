@@ -346,9 +346,18 @@ static bool
 sst_is_trivial (const void* const req, size_t const len)
 {
     /* Check that the first string in request == ReplicatorSMM::TRIVIAL_SST */
-    size_t const trivial_len = strlen(ReplicatorSMM::TRIVIAL_SST) + 1;
+    static size_t const trivial_len(strlen(ReplicatorSMM::TRIVIAL_SST) + 1);
     return (len >= trivial_len &&
-            !memcmp (req, ReplicatorSMM::TRIVIAL_SST, trivial_len));
+            !::memcmp(req, ReplicatorSMM::TRIVIAL_SST, trivial_len));
+}
+
+static bool
+no_sst (const void* const req, size_t const len)
+{
+    /* Check that the first string in request == ReplicatorSMM::NO_SST */
+    static size_t const no_len(strlen(ReplicatorSMM::NO_SST) + 1);
+    return (len >= no_len &&
+            !::memcmp(req, ReplicatorSMM::NO_SST, no_len));
 }
 
 wsrep_seqno_t
@@ -410,82 +419,76 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     std::string const req_str(tmp);
     free (tmp);
 
-    bool const skip_state_transfer (sst_is_trivial(streq->sst_req(),
-                                                   streq->sst_len())
-                          /* compatibility with older garbd, to be removed in
-                           * the next release (2.1)*/
-                          || req_str == std::string(WSREP_STATE_TRANSFER_NONE)
-                                   );
+    bool const trivial_sst(sst_is_trivial(streq->sst_req(), streq->sst_len()));
+    bool const skip_sst(trivial_sst
+                        || no_sst(streq->sst_req(), streq->sst_len()));
 
     wsrep_seqno_t rcode (0);
     bool join_now = true;
 
-    if (!skip_state_transfer)
+    if (streq->ist_len())
     {
-        if (streq->ist_len())
+        IST_request istr;
+        get_ist_request(streq, &istr);
+
+        if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
         {
-            IST_request istr;
-            get_ist_request(streq, &istr);
+            log_info << "IST request: " << istr;
 
-            if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
+            try
             {
-                log_info << "IST request: " << istr;
+                gcache_.seqno_lock(istr.last_applied() + 1);
+            }
+            catch(gu::NotFound& nf)
+            {
+                log_info << "IST first seqno " << istr.last_applied() + 1
+                         << " not found from cache, falling back to SST";
+                // @todo: close IST channel explicitly
+                goto full_sst;
+            }
 
+            if (streq->sst_len()) // if joiner is waiting for SST, notify it
+            {
+                wsrep_gtid_t const state_id =
+                    { istr.uuid(), istr.last_applied() };
+
+                rcode = donate_sst(recv_ctx, *streq, state_id, true);
+
+                // we will join in sst_sent.
+                join_now = false;
+            }
+
+            if (rcode >= 0)
+            {
+                wsrep_seqno_t const first
+                    ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
+                     istr.last_applied() + 1 :
+                     std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
                 try
                 {
-                    gcache_.seqno_lock(istr.last_applied() + 1);
+                    ist_senders_.run(config_,
+                                     istr.peer(),
+                                     first,
+                                     cc_seqno_,
+                                     cc_lowest_trx_seqno_,
+                                     /* Historically IST messages versioned
+                                      * with the global replicator protocol.
+                                      * Need to keep it that way for backward
+                                      * compatibility */
+                                     protocol_version_);
                 }
-                catch(gu::NotFound& nf)
+                catch (gu::Exception& e)
                 {
-                    log_info << "IST first seqno " << istr.last_applied() + 1
-                             << " not found from cache, falling back to SST";
-                    // @todo: close IST channel explicitly
-                    goto full_sst;
+                    log_error << "IST failed: " << e.what();
+                    rcode = -e.get_errno();
                 }
-
-                if (streq->sst_len()) // if joiner is waiting for SST, notify it
-                {
-                    wsrep_gtid_t const state_id =
-                        { istr.uuid(), istr.last_applied() };
-
-                    rcode = donate_sst(recv_ctx, *streq, state_id, true);
-
-                    // we will join in sst_sent.
-                    join_now = false;
-                }
-
-                if (rcode >= 0)
-                {
-                    wsrep_seqno_t const first
-                        ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
-                         istr.last_applied() + 1 :
-                         std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
-                    try
-                    {
-                        ist_senders_.run(config_,
-                                         istr.peer(),
-                                         first,
-                                         cc_seqno_,
-                                         cc_lowest_trx_seqno_,
-                                         /* Historically IST messages versioned
-                                          * with the global replicator protocol.
-                                          * Need to keep it that way for backward
-                                          * compatibility */
-                                         protocol_version_);
-                    }
-                    catch (gu::Exception& e)
-                    {
-                        log_error << "IST failed: " << e.what();
-                        rcode = -e.get_errno();
-                    }
-                }
-                else
-                {
-                    log_error << "Failed to bypass SST";
-                }
-
-                goto out;
             }
+            else
+            {
+                log_error << "Failed to bypass SST";
+            }
+
+            goto out;
         }
 
     full_sst:
@@ -507,9 +510,19 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     if (streq->ist_len() <= 0)
                     {
-                        log_warn << "Joiner didn't provide IST connection info -"
-                            " cert. index preload impossible, bailing out.";
-                        rcode = -ENOMSG;
+                        if (not trivial_sst)
+                        {
+                            log_warn << "Joiner didn't provide IST connection "
+                                "info - cert. index preload impossible, bailing "
+                                "out.";
+                            rcode = -ENOMSG;
+                        }
+                        else
+                        {
+                            /* don't warn about trivial SST requests: such nodes
+                             * are not supposed to fully join the cluster, e,g,
+                             * garbd */
+                        }
                         goto out;
                     }
 
@@ -558,10 +571,12 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 }
             }
 
-            rcode = donate_sst(recv_ctx, *streq, state_id, false);
-
-            // we will join in sst_sent.
-            join_now = false;
+            if (not skip_sst)
+            {
+                rcode = donate_sst(recv_ctx, *streq, state_id, false);
+                // we will join in sst_sent.
+                join_now = false;
+            }
         }
         else
         {
@@ -875,7 +890,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     if (sst_req_len != 0)
     {
-        if (sst_is_trivial(sst_req, sst_req_len))
+        if (sst_is_trivial(sst_req, sst_req_len) ||
+            no_sst        (sst_req, sst_req_len))
         {
             sst_uuid_  = group_uuid;
             sst_seqno_ = cc_seqno;

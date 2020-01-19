@@ -25,5 +25,8 @@ void Replicator::register_params(gu::Config& conf)
 const char* const
 Replicator::TRIVIAL_SST(WSREP_STATE_TRANSFER_TRIVIAL);
 
+const char* const
+Replicator::NO_SST(WSREP_STATE_TRANSFER_NONE);
+
 } /* namespace galera */
 

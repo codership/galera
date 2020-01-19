@@ -37,6 +37,7 @@ namespace galera
         };
 
         static const char* const TRIVIAL_SST;
+        static const char* const NO_SST;
 
         typedef enum
         {

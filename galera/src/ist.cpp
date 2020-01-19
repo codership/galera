@@ -175,7 +175,7 @@ IST_determine_recv_addr (gu::Config& conf)
         catch (gu::NotSet&)
         {
             gu_throw_error(EINVAL)
-                << "Could not determine IST receinve address: '"
+                << "Could not determine IST receive address: '"
                 << galera::ist::Receiver::RECV_ADDR << "' not set.";
         }
     }
