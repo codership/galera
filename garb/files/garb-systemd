@@ -1,62 +1,61 @@
 #!/bin/bash -ue
 #
 
-
-config=/etc/sysconfig/garb
+if [[ -f /etc/redhat-release ]]; then
+  config=/etc/sysconfig/garb
+else
+  config=/etc/default/garb
+fi
 
 log_failure() {
-    echo " ERROR! $@"
+  echo " ERROR! $@"
 }
-
-
 
 program_start() {
-	echo "Starting garbd"
-        /usr/bin/garbd "$@"
+  echo "Starting garbd"
+  /usr/bin/garbd "$@"
 }
-
 
 start() {
 
-	if grep -q -E '^# REMOVE' $config;then 
-	    log_failure "Garbd config $config is not configured yet"
-	    return 0
-	fi
+  if grep -q -E '^# REMOVE' $config; then
+    log_failure "Garbd config $config is not configured yet"
+    return 0
+  fi
 
-        [ -f $config ] && . $config
+  [ -f $config ] && . $config
 
-	# Check that node addresses are configured
-	if [[ -z "${GALERA_NODES:-}" ]]; then
-		log_failure "List of GALERA_NODES is not configured"
-		return 6
-	fi
-	if [[ -z "${GALERA_GROUP:-}" ]]; then
-		log_failure "GALERA_GROUP name is not configured"
-		return 6
-	fi
+  # Check that node addresses are configured
+  if [[ -z "${GALERA_NODES:-}" ]]; then
+    log_failure "List of GALERA_NODES is not configured"
+    return 6
+  fi
+  if [[ -z "${GALERA_GROUP:-}" ]]; then
+    log_failure "GALERA_GROUP name is not configured"
+    return 6
+  fi
 
-	GALERA_PORT=${GALERA_PORT:-4567}
+  GALERA_PORT=${GALERA_PORT:-4567}
 
-	OPTIONS="-a gcomm://${GALERA_NODES// /,}"
-	# substitute space with comma for backward compatibility
+  OPTIONS="-a gcomm://${GALERA_NODES// /,}"
+  # substitute space with comma for backward compatibility
 
-	[ -n "${GALERA_GROUP:-}" ]   && OPTIONS="$OPTIONS -g '$GALERA_GROUP'"
-	[ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o '$GALERA_OPTIONS'"
-	[ -n "${LOG_FILE:-}" ]       && OPTIONS="$OPTIONS -l '$LOG_FILE'"
+  [ -n "${GALERA_GROUP:-}" ] && OPTIONS="$OPTIONS -g '$GALERA_GROUP'"
+  [ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o '$GALERA_OPTIONS'"
+  [ -n "${LOG_FILE:-}" ] && OPTIONS="$OPTIONS -l '$LOG_FILE'"
 
-	eval program_start $OPTIONS
+  eval program_start $OPTIONS
 }
-
-
 
 # See how we were called.
 case "$1" in
-  start)
-	start
-	;;
-  *)
-	echo $"Usage: $0 {start}"
-	exit 2
+start)
+  start
+  ;;
+*)
+  echo $"Usage: $0 {start}"
+  exit 2
+  ;;
 esac
 
 exit $?

@@ -10,7 +10,6 @@ Alias=garbd.service
 
 [Service]
 User=nobody
-EnvironmentFile=/etc/sysconfig/garb
 ExecStart=/usr/bin/garb-systemd start
 
 # Use SIGINT because with the default SIGTERM
@@ -19,5 +18,3 @@ KillSignal=SIGINT
 
 TimeoutSec=2m
 PrivateTmp=false
-
-
