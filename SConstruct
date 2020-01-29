@@ -162,7 +162,7 @@ all_tests = int(ARGUMENTS.get('all_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 
 
-GALERA_VER = ARGUMENTS.get('version', '4.3')
+GALERA_VER = ARGUMENTS.get('version', '4.4')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 
 # Attempt to read from file if not given
