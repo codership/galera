@@ -139,6 +139,8 @@ public:
         EVS_T_DELAYED_LIST = 7 /*!< Evict list message */
     };
 
+    static const size_t num_message_types = EVS_T_DELAYED_LIST + 1;
+
     typedef std::map<UUID, uint8_t> DelayedList;
 
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
