@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
  */
 
 #include "gcache_rb_store.hpp"
@@ -1025,10 +1025,21 @@ namespace gcache
                 if (gu_likely(bh->size > 0))
                 {
                     total++;
-                    if (gu_unlikely(SEQNO_ILL == bh->seqno_g))
+
+                    if (gu_likely(bh->seqno_g > 0))
                     {
+                        free(bh); // on recovery no buffer is used
+                    }
+                    else
+                    {
+                        /* anything that is not ordered must be discarded */
+                        assert(SEQNO_NONE == bh->seqno_g ||
+                               SEQNO_ILL  == bh->seqno_g);
                         locked++;
+                        empty_buffer(bh);
                         discard(bh);
+                        size_used_ -= bh->size;
+                        // size_free_ is taken care of in discard()
                     }
 
                     bh = BH_next(bh);
@@ -1043,10 +1054,13 @@ namespace gcache
 
             progress.finish();
 
+            /* No buffers on recovery should be in used state */
+            assert(0 == size_used_);
+
             log_info << "GCache DEBUG: RingBuffer::recover(): found "
                      << locked << '/' << total << " locked buffers";
-            log_info << "GCache DEBUG: RingBuffer::recover(): used space: "
-                     << size_used_ << '/' << size_cache_;
+            log_info << "GCache DEBUG: RingBuffer::recover(): free space: "
+                     << size_free_ << '/' << size_cache_;
 
             assert_sizes();
         }
