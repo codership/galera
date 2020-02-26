@@ -5,7 +5,7 @@ SConscript(['galerautils/SConscript',
             'galera/SConscript',
             'garb/SConscript'])
 
-Import('env', 'sysname', 'has_version_script', 'galera_script')
+Import('env', 'sysname', 'has_version_script', 'galera_script', 'install')
 
 # Clone the environment as it will be extended for this specific library
 env = env.Clone()
@@ -48,3 +48,26 @@ def check_dynamic_symbols(target, source, env):
 if has_version_script:
     env.AddPostAction(galera_lib, Action(check_dynamic_symbols,
                                          'Checking dynamic symbols for \'$TARGET\'...'))
+
+if install:
+    env.Install(install + '/lib', '#libgalera_smm.so')
+    env.Install(install + '/bin', '#garb/garbd')
+    env.Install(install + '/share',
+                '#garb/files/garb.service')
+    env.Install(install + '/share',
+                '#garb/files/garb-systemd')
+    env.Install(install + '/share',
+                '#garb/files/garb-systemd')
+    env.Install(install + '/share',
+                '#garb/files/garb.cnf')
+    env.Install(install + '/doc/', '#COPYING')
+    env.Install(install + '/doc/', '#AUTHORS')
+    env.InstallAs(install + '/doc/LICENSE.asio',
+                '#asio/LICENSE_1_0.txt')
+    env.InstallAs(install + '/doc/LICENSE.crc32c',
+                '#www.evanjones.ca/LICENSE')
+    env.InstallAs(install + '/doc/LICENSE.chromium',
+                '#chromium/LICENSE')
+    env.InstallAs(install + '/doc/README',
+                '#scripts/packages/README')
+    env.Install(install + '/man/man8', '#man/garbd.8')

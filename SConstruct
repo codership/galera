@@ -71,8 +71,10 @@ Commandline Options:
     boost_pool=[0|1]    use or not use boost pool allocator
     revno=XXXX          source code revision number
     bpostatic=path      a path to static libboost_program_options.a
+    static_ssl=path     a path to static SSL libraries
     extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
     bits=[32bit|64bit]
+    install=path        install files under path
 ''')
 # bpostatic option added on Percona request
 
@@ -152,7 +154,8 @@ deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 # Run all tests
 all_tests = int(ARGUMENTS.get('all_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
-
+static_ssl = ARGUMENTS.get('static_ssl', None)
+install = ARGUMENTS.get('install', None)
 
 GALERA_VER = ARGUMENTS.get('version', '3.29')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
@@ -590,12 +593,33 @@ if not conf.CheckCXXHeader('asio/ssl.hpp'):
     print('SSL support required but asio/ssl.hpp was not found or not usable')
     print('check that SSL devel headers are installed and usable')
     Exit(1)
-if not conf.CheckLib('ssl'):
-    print('SSL support required but libssl was not found')
-    Exit(1)
-if not conf.CheckLib('crypto'):
-    print('SSL support required libcrypto was not found')
-    Exit(1)
+
+def check_static_lib(path, libname):
+    fqfilename = path + "/lib" + libname + '.a'
+    if os.path.isfile(fqfilename):
+        conf.env.Append(LIBS = File(fqfilename))
+        return True
+    return False
+
+if static_ssl:
+    if not check_static_lib(static_ssl, "ssl"):
+        print("Static SSL linkage requested but ssl libary not found from {}"
+              .format(static_ssl))
+        Exit(1)
+    if not check_static_lib(static_ssl, "crypto"):
+        print("Static SSL requested but crypto libary not found from {}"
+              .format(static_ssl))
+        Exit(1)
+    conf.CheckLib('pthread')
+    conf.CheckLib('dl')
+    conf.env.Append(LDFLAGS = ' -static-libgcc')
+else:
+    if not conf.CheckLib('ssl'):
+        print('SSL support required but libssl was not found')
+        Exit(1)
+    if not conf.CheckLib('crypto'):
+        print('SSL support required libcrypto was not found')
+        Exit(1)
 
 # advanced SSL features
 if conf.CheckSetEcdhAuto():
@@ -629,7 +653,7 @@ print('Global flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
     print(f + ': ' + env[f].strip())
 
-Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options')
+Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'install')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
