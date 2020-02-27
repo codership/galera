@@ -38,35 +38,18 @@ https://github.com/codership/mysql-wsrep into some directory (hereafter
 
 After successful build, demo package can be found under scripts/mysql.
 
-BUILDING on Ubuntu 16.04
+BUILDING on Ubuntu 16.04 or later
 
  1) apt-get install libasio-dev check scons libboost-program-options-dev \
        libboost-dev  libssl-dev
 
 Then proceed as described above.
 
-BUILDING on CentOS/RHEL 5
+BUILDING on CentOS/RHEL 6 or later
 
-CentOS/RHEL by default uses a very old version of GCC and a likewise ancient
-version of BOOST that lacks important features. In order to build Galera on
-CentOS/RHEL one needs to:
-
- 1) Install gcc44 and gcc44-c++ packages and set CC and CXX variables
-    accordingly:
-    # yum install gcc44 gcc44-c++
-    # export CC=gcc44
-    # export CXX=g++44
- 2) Remove standard boost and boost-devel packages (if present)
- 3) Install boost141-devel package:
-    # yum install boost141-devel
- 4) Make link from /usr/include/boost to /usr/include/boost141:
-    # cd /usr/include
-    # ln -sf boost141/boost boost
- 5) Install scons check-devel openssl-devel
-    # yum install scons check-devel openssl-devel
+ 1) yum install gcc gcc-c++ scons boost-devel check-devel
 
 Then proceed as described above.
-
 
 For more information, see:
 * Codership mailing list: http://groups.google.com/group/codership-team
