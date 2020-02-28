@@ -1,3 +1,9 @@
+galera-4 (26.4.5-1) UNRELEASED; URGENCY=low
+
+  * Galera 4 version 26.4.5
+
+ -- Codership Oy <info@codership.com>  Wed, 28 Feb 2020 16:38:32 +0200
+
 galera-4 (26.4.4-1) UNRELEASED; URGENCY=low
 
   * Galera 4 version 26.4.4
