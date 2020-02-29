@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp"
@@ -20,13 +20,14 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
             wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
             wsrep_seqno_t const local_seqno(STATE_SEQNO());
 
-            if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
-                                          a valid state here */
+            if (state_() != S_CONNECTED)
             {
                 return (local_seqno < group_seqno);
             }
             else
             {
+                /* The node that has just CONNECTED can't be more advanced than
+                 * the group. */
                 if (local_seqno > group_seqno)
                 {
                     close();
