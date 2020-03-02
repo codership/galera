@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -355,9 +355,9 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     while (WSREP_OK == retval && state_() != S_CLOSING)
     {
-        ssize_t rc;
-
         GU_DBUG_SYNC_EXECUTE("before_async_recv_process_sync", sleep(5););
+
+        ssize_t rc;
 
         while (gu_unlikely((rc = as_->process(recv_ctx, exit_loop))
                            == -ECANCELED))
@@ -370,7 +370,15 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
         if (gu_unlikely(rc <= 0))
         {
-            retval = WSREP_CONN_FAIL;
+            if (GcsActionSource::INCONSISTENCY_CODE == rc)
+            {
+                st_.mark_corrupt();
+                retval = WSREP_FATAL;
+            }
+            else
+            {
+                retval = WSREP_CONN_FAIL;
+            }
         }
         else if (gu_unlikely(exit_loop == true))
         {

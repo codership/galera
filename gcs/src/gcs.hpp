@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -155,6 +155,7 @@ typedef enum gcs_act_type
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
+    GCS_ACT_INCONSISTENCY,//! inconsistency event
     GCS_ACT_UNKNOWN     //! undefined/unknown action type
 }
 gcs_act_type_t;

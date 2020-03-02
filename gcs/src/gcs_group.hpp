@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -28,6 +28,7 @@ typedef enum gcs_group_state
     GCS_GROUP_WAIT_STATE_UUID,
     GCS_GROUP_WAIT_STATE_MSG,
     GCS_GROUP_PRIMARY,
+    GCS_GROUP_INCONSISTENT,
     GCS_GROUP_STATE_MAX
 }
 gcs_group_state_t;

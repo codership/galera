@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -700,6 +700,17 @@ core_handle_last_msg (gcs_core_t*          core,
     return 0;
 }
 
+/*! Common things to do on detected inconsistency */
+static int
+core_handle_inconsistency(gcs_core_t* core, struct gcs_act* act)
+{
+    core->state  = CORE_NON_PRIMARY;
+    act->buf     = NULL;
+    act->buf_len = 0;
+    act->type    = GCS_ACT_INCONSISTENCY;
+    return -ENOTRECOVERABLE;
+}
+
 /*!
  * Helper for gcs_core_recv(). Handles GCS_MSG_COMPONENT.
  *
@@ -808,6 +819,9 @@ core_handle_comp_msg (gcs_core_t*          core,
             assert(0);
         }
         assert (ret == act->buf_len || ret < 0);
+        break;
+    case GCS_GROUP_INCONSISTENT:
+        ret = core_handle_inconsistency(core, act);
         break;
     case GCS_GROUP_WAIT_STATE_MSG:
         gu_fatal ("Internal error: gcs_group_handle_comp() returned "
@@ -943,6 +957,9 @@ core_handle_state_msg (gcs_core_t*          core,
             // waiting for more state messages
             ret = 0;
             break;
+        case GCS_GROUP_INCONSISTENT:
+            ret = core_handle_inconsistency(core, act);
+            break;
         default:
             assert (ret < 0);
             gu_error ("Failed to handle state message: %d (%s)",
@@ -1059,7 +1076,6 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
                        long long            timeout)
 {
-//    struct gcs_act_rcvd  recv_act;
     struct gcs_recv_msg* recv_msg = &conn->recv_msg;
     ssize_t              ret      = 0;
 
@@ -1101,17 +1117,17 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         case GCS_MSG_COMPONENT:
             ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
             // assert (ret >= 0); // hang on error in debug mode
-            assert (ret == recv_act->act.buf_len || ret <= 0);
+            assert (ret == recv_act->act.buf_len || ret < 0);
             break;
         case GCS_MSG_STATE_UUID:
             ret = core_handle_uuid_msg (conn, recv_msg);
             // assert (ret >= 0); // hang on error in debug mode
-            ret = 0;           // continue waiting for state messages
+            ret = 0;              // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:
             ret = core_handle_state_msg (conn, recv_msg, &recv_act->act);
-            assert (ret >= 0); // hang on error in debug mode
-            assert (ret == recv_act->act.buf_len);
+            //assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len || ret < 0);
             break;
         case GCS_MSG_JOIN:
         case GCS_MSG_SYNC:
@@ -1157,7 +1173,10 @@ out:
 
         if (-ENOTRECOVERABLE == ret) {
             conn->backend.close(&conn->backend);
-            gu_abort();
+            if (GCS_ACT_INCONSISTENCY != recv_act->act.type) {
+                /* inconsistency event must be passed up */
+                gu_abort();
+            }
         }
     }
 
