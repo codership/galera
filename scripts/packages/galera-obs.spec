@@ -69,7 +69,13 @@ BuildRequires: boost-devel >= 1.41
 BuildRequires: check-devel
 BuildRequires: glibc-devel
 BuildRequires: %{ssl_package_devel}
+%if 0%{?rhel} >= 8 || 0%{?centos} >= 8
+BuildRequires: python3-scons
+%define scons_cmd scons-3
+%else
 BuildRequires: scons
+%define scons_cmd scons
+%endif
 %if 0%{?suse_version} == 1110
 # On SLES11 SPx use the linked gcc47 to build instead of default gcc43
 BuildRequires: gcc47 gcc47-c++
@@ -161,7 +167,7 @@ export CXX=g++-4.7
 
 NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
-scons -j$(echo $NUM_JOBS) revno=%{revision} deterministic_tests=1
+%{scons_cmd} -j$(echo $NUM_JOBS) revno=%{revision} deterministic_tests=1
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
