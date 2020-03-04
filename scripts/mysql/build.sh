@@ -456,8 +456,10 @@ then
                 BOOST_OPT="-DWITH_BOOST=boost_$MYSQL_MM_VER"
                 [ "yes" = "$BOOTSTRAP" ] && \
                     BOOST_OPT="$BOOST_OPT -DDOWNLOAD_BOOST=1"
+                SSL_OPT="-DWITH_SSL=yes"
             else
                 BOOST_OPT=""
+                SSL_OPT="-DWITH_SSL=bundled"
             fi
 
             if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
@@ -484,7 +486,7 @@ then
                   $BUILD_OPT \
                   -DWITH_WSREP=1 \
                   -DWITH_EXTRA_CHARSETS=all \
-                  -DWITH_SSL=yes \
+                  $SSL_OPT \
                   -DWITH_ZLIB=system \
                   -DMYSQL_MAINTAINER_MODE=0 \
                   $MEMCACHED_OPT \

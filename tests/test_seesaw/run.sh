@@ -44,13 +44,14 @@ trap "kill $sqlgen_pid || :" EXIT
 pause 5 5
 consistency_check $sqlgen_pid
 
+global_pause=10
 # kills a node and restarts it after a while
 cycle()
 {
     local -r node=$1
     local -r node_id=${NODE_ID[$node]}
 
-    local pause_var=10
+    local pause_var=$global_pause
     local var_kill=$(( $RANDOM % $KILL_RATE ))
 
     if [ $var_kill -eq 0 ]
@@ -104,7 +105,7 @@ do
 
     cycle $node
 
-    pause
+    pause 0 $global_pause
     consistency_check $sqlgen_pid
 
     node=$(( ( node + 1 ) % node_num ))

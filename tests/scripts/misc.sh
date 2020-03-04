@@ -19,10 +19,10 @@ consistency_check() #pids
     local ret=0
     local pids="$@"
 
-    kill -STOP $pids
+    [ -n "$pids" ] && kill -STOP $pids
     sleep 1
     check || (sleep 2; check) || (sleep 3; check) || ret=$?
-    kill -CONT $pids # processes will receive SIGHUP in case of script exit
+    [ -n "$pids" ] && kill -CONT $pids # processes will receive SIGHUP in case of script exit
     return $ret
 }
 

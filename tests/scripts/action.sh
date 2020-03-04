@@ -318,7 +318,11 @@ start()
 
 _get_status_var()
 {
-    mysql_query "$1" "SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = '$2'" 2>/dev/null || echo -1
+# INFORMATION_SCHEMA.GLOBAL_STATUS is deprecated in MySQL >= 5.7
+# SHOW GLOBAL STATUS seems to be more compatible between the versions.
+#    mysql_query "$1" "SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = '$2'" 2>/dev/null || echo -1
+    mysql_query "$1" "SHOW GLOBAL STATUS LIKE '$2'" 2>/dev/null | cut -f 2-
+    [ 0 = ${PIPESTATUS[0]} ] || echo -1
 }
 
 stop()
