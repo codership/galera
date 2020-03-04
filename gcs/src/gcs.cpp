@@ -909,6 +909,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     {
         /* reset flow control as membership is most likely changed */
         if (!gu_mutex_lock (&conn->fc_lock)) {
+            /* wake up send monitor if it was paused */
+            if (conn->stop_count > 0) gcs_sm_continue(conn->sm);
+
             conn->stop_sent_  = 0;
             conn->stop_count  = 0;
             conn->conf_id     = conf->conf_id;
@@ -924,9 +927,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         }
 
         conn->sync_sent(false);
-
-        // need to wake up send monitor if it was paused during CC
-        gcs_sm_continue(conn->sm);
     }
     gu_fifo_release (conn->recv_q);
 
