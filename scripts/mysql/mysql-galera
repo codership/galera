@@ -245,6 +245,18 @@ galera_start()
         exit -1;
     fi
 
+    GENERAL_OPTS=$DEFAULTS_OPTION
+    GENERAL_OPTS+=" --user=$MYSQLD_USER"
+    GENERAL_OPTS+=" --basedir=$MYSQL_BASE_DIR"
+    GENERAL_OPTS+=" --secure-file-priv=$MYSQL_DATA_DIR"
+    GENERAL_OPTS+=" --datadir=$MYSQL_DATA_DIR"
+    GENERAL_OPTS+=" --plugin-dir=lib/mysql/plugin"
+    GENERAL_OPTS+=" --pid-file=$MYSQL_PID"
+    GENERAL_OPTS+=" --port=$MYSQL_PORT"
+    GENERAL_OPTS+=" --socket=$MYSQL_SOCKET"
+    GENERAL_OPTS+=" --skip-external-locking"
+    GENERAL_OPTS+=" --log_error=$err_log"
+
 #    if [ -n "$MYSQL_LOG" ]
 #    then
 #        LOGGING_OPTS=" --general_log=1 --log_output=FILE "
@@ -294,17 +306,7 @@ galera_start()
     if test $SKIP_RECOVERY = 0
     then
         wsrep_recovery $MYSQLD \
-            $DEFAULTS_OPTION \
-            --user="$MYSQLD_USER" \
-            --basedir="$MYSQL_BASE_DIR" \
-            --secure-file-priv="$MYSQL_DATA_DIR" \
-            --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
-            --pid-file="$MYSQL_PID" \
-            --port=$MYSQL_PORT \
-            --socket=$MYSQL_SOCKET \
-            --skip-external-locking \
-            --log_error=$err_log \
+            $GENERAL_OPTS \
             $MYSQLD_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
@@ -324,17 +326,7 @@ galera_start()
     if test -z $GDB
     then
         nohup $VALGRIND $MYSQLD \
-            $DEFAULTS_OPTION \
-            --user="$MYSQLD_USER" \
-            --basedir="$MYSQL_BASE_DIR" \
-            --secure-file-priv="$MYSQL_DATA_DIR" \
-            --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
-            --pid-file="$MYSQL_PID" \
-            --port=$MYSQL_PORT \
-            --socket=$MYSQL_SOCKET \
-            --skip-external-locking \
-            --log_error=$err_log \
+            $GENERAL_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \
@@ -346,17 +338,7 @@ galera_start()
             1>/dev/null 2>>$err_log &
     else
         $GDB --args $MYSQLD \
-            $DEFAULTS_OPTION \
-            --user="$MYSQLD_USER" \
-            --basedir="$MYSQL_BASE_DIR" \
-            --secure-file-priv="$MYSQL_DATA_DIR" \
-            --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
-            --pid-file="$MYSQL_PID" \
-            --port=$MYSQL_PORT \
-            --socket=$MYSQL_SOCKET \
-            --skip-external-locking \
-            --log_error=$err_log \
+            $GENERAL_OPTS \
             $INNODB_OPTS \
             $WSREP_OPTS \
             $DEBUG_OPTS \

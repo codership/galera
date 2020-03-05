@@ -439,9 +439,16 @@ then
         BUILD_OPT+=" -DMYSQL_MAINTAINER_MODE=0"
         BUILD_OPT+=" -DWITH_ZLIB=system"
 
+        MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
+
         if [ "$MYSQL" == "mysql" ] # remove this distinction when MySQL
         then                       # fixes its SSL support
-            BUILD_OPT+="-DWITH_SSL=bundled"
+            if [ "$MYSQL_MM_VER" -ge "57" ]
+            then
+                BUILD_OPT+="-DWITH_SSL=yes"
+            else
+                BUILD_OPT+="-DWITH_SSL=bundled"
+            fi
         else
             BUILD_OPT+="-DWITH_SSL=system"
         fi
@@ -450,11 +457,10 @@ then
         then # MySQL-spcific build options
             BUILD_OPT+=" -DWITH_WSREP=1"
 
-            MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
-
-            [ "$MYSQL_MM_VER" -ge "56" ] && \
+            if [ "$MYSQL_MM_VER" -ge "56" ]
+            then
                 BUILD_OPT+=" -DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON"
-
+            fi
             if [ "$MYSQL_MM_VER" -ge "57" ]
             then
                 BUILD_OPT+=" -DWITH_BOOST=boost_$MYSQL_MM_VER"

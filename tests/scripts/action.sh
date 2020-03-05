@@ -24,7 +24,7 @@ mysql_query()
     local query=$2
     mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
           -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
-          --skip-column-names -ss -e "$query" 2>/dev/null
+          --skip-column-names -ss -e "$query"
 }
 
 wait_node_state()
@@ -318,7 +318,11 @@ start()
 
 _get_status_var()
 {
-    mysql_query "$1" "SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = '$2'" 2>/dev/null || echo -1
+# INFORMATION_SCHEMA.GLOBAL_STATUS is deprecated in MySQL >= 5.7
+# SHOW GLOBAL STATUS seems to be more compatible between the versions.
+#    mysql_query "$1" "SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = '$2'" 2>/dev/null || echo -1
+    mysql_query "$1" "SHOW GLOBAL STATUS LIKE '$2'" | tail -n1 | cut -f 2-
+    [ 0 = ${PIPESTATUS[0]} ] || echo -1
 }
 
 stop()

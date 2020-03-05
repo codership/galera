@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * Queue (FIFO) class definition
  *
@@ -56,6 +56,8 @@ extern void  gu_fifo_stats_get (gu_fifo_t* q, int* q_len, int* q_len_max,
                                 int* q_len_min, double* q_len_avg);
 /*! Flush stats counters */
 extern void  gu_fifo_stats_flush(gu_fifo_t* q);
+/*! Clear contents of the queue */
+extern void  gu_fifo_clear(gu_fifo_t* q);
 
 /*! Cancel getters (must be called while holding a FIFO lock) */
 extern int gu_fifo_cancel_gets (gu_fifo_t* q);

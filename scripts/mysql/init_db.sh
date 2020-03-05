@@ -16,9 +16,9 @@ chmod go-rx "$data_dir"
 
 init_sql=$(mktemp -p "$base_dir")
 chmod go-r "$init_sql"
-echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_pswd';" >> "$init_sql"
+echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$root_pswd';" >> "$init_sql"
 echo "UPDATE mysql.user SET Host = '%' WHERE User = 'root';" >> "$init_sql"
-echo "CREATE USER IF NOT EXISTS 'test'@'%' IDENTIFIED BY '$test_pswd';" >> "$init_sql"
+echo "CREATE USER IF NOT EXISTS 'test'@'%' IDENTIFIED WITH mysql_native_password BY '$test_pswd';" >> "$init_sql"
 echo "GRANT ALL ON test.* TO 'test'@'%';" >> "$init_sql"
 echo "CREATE SCHEMA test;" >> "$init_sql"
 

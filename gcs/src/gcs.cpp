@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -970,6 +970,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
     {
         /* reset flow control as membership is most likely changed */
         if (!gu_mutex_lock (&conn->fc_lock)) {
+            /* wake up send monitor if it was paused */
+            if (conn->stop_count > 0) gcs_sm_continue(conn->sm);
+
             conn->stop_sent_  = 0;
             conn->stop_count  = 0;
             conn->conf_id     = conf.conf_id;
@@ -985,9 +988,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
         }
 
         conn->sync_sent(false);
-
-        // need to wake up send monitor if it was paused during CC
-        gcs_sm_continue(conn->sm);
     }
     gu_fifo_release (conn->recv_q);
 
@@ -1399,22 +1399,31 @@ static void *gcs_recv_thread (void *arg)
 
         if (gu_unlikely(ret <= 0)) {
 
-            if (-ETIMEDOUT == ret && _handle_timeout(conn)) continue;
+            gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
 
-            struct gcs_recv_act* err_act =
-                (struct gcs_recv_act*) gu_fifo_get_tail(conn->recv_q);
+            if (-ETIMEDOUT == ret && _handle_timeout(conn)) continue;
 
             assert (NULL          == rcvd.act.buf);
             assert (0             == rcvd.act.buf_len);
-            assert (GCS_ACT_ERROR == rcvd.act.type);
+            assert (GCS_ACT_ERROR == rcvd.act.type ||
+                    GCS_ACT_INCONSISTENCY == rcvd.act.type);
             assert (GCS_SEQNO_ILL == rcvd.id);
+
+            if (GCS_ACT_INCONSISTENCY == rcvd.act.type) {
+                /* In the case of inconsistency our concern is to report it to
+                 * replicator ASAP. Current contents of the slave queue are
+                 * meaningless. */
+                gu_fifo_clear(conn->recv_q);
+            }
+
+            struct gcs_recv_act* err_act =
+                (struct gcs_recv_act*) gu_fifo_get_tail(conn->recv_q);
 
             err_act->rcvd     = rcvd;
             err_act->local_id = GCS_SEQNO_ILL;
 
             GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
 
-            gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
             break;
         }
 

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 #include "replicator.hpp"
@@ -196,6 +196,12 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx, bool& exit_loop)
     {
         assert(act.seqno_l < 0);
         assert(act.seqno_g < 0);
+
+        if (GCS_ACT_INCONSISTENCY == act.type)
+        {
+            assert(0 == rc);
+            rc = INCONSISTENCY_CODE;
+        }
     }
 
     return rc;
