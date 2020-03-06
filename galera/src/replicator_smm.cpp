@@ -2974,12 +2974,15 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
 
     if (first_view)
     {
-        set_initial_position(group_uuid, group_seqno - 1);
+        /* if CC is ordered need to use preceding seqno */
+        set_initial_position(group_uuid, group_seqno - ordered);
+        gcache_.seqno_reset(gu::GTID(group_uuid, group_seqno - ordered));
     }
     else
     {
         // Note: Monitor initial position setting is not needed as this CC
-        // is processing in order.
+        // is processed in order.
+        assert(state_uuid_ == group_uuid);
         update_state_uuid(group_uuid);
     }
 
