@@ -901,19 +901,26 @@ _reset_pkt_size(gcs_conn_t* conn)
     }
 }
 
-static long
+static int
 _join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 {
-    long err;
+    int err;
 
     while (-EAGAIN == (err = gcs_core_send_join (conn->core, gtid, code)))
         usleep (10000);
 
-    if (gu_unlikely(err < 0))
+    if (err < 0)
     {
-        gu_warn ("Sending JOIN failed: %d (%s). "
-                 "Will retry in new primary component.", err, strerror(-err));
-        return err;
+        switch (err)
+        {
+        case -ENOTCONN:
+            gu_warn ("Sending JOIN failed: %d (%s). "
+                     "Will retry in new primary component.", err,strerror(-err));
+            return 0;
+        default:
+            gu_error ("Sending JOIN failed: %d (%s).", err, strerror(-err));
+            return err;
+        }
     }
 
     return 0;
