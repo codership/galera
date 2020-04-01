@@ -2272,8 +2272,8 @@ void galera::ReplicatorSMM::set_initial_position(const wsrep_uuid_t&  uuid,
         commit_monitor_.set_initial_position(uuid, seqno);
 }
 
-static std::tuple<int, enum gu::RecordSet::Version>
-get_trx_protocol_versions(int proto_ver)
+std::tuple<int, enum gu::RecordSet::Version>
+galera::get_trx_protocol_versions(int proto_ver)
 {
     enum gu::RecordSet::Version record_set_ver(gu::RecordSet::EMPTY);
     int trx_ver(-1);
@@ -2353,7 +2353,7 @@ void galera::ReplicatorSMM::record_cc_seqnos(wsrep_seqno_t cc_seqno,
 {
     cc_seqno_ = cc_seqno;
     cc_lowest_trx_seqno_ = cert_.lowest_trx_seqno();
-    log_info << "Lowest cert indnex boundary for CC from " << source
+    log_info << "Lowest cert index boundary for CC from " << source
              << ": " << cc_lowest_trx_seqno_;;
     log_info << "Min available from gcache for CC from " << source
              << ": " << gcache_.seqno_min();
@@ -2956,6 +2956,14 @@ void galera::ReplicatorSMM::process_prim_conf_change(void* recv_ctx,
     if (st_required)
     {
         process_st_required(recv_ctx, group_proto_version, view_info.get());
+        // Rolling upgrade from earlier version. Group protocol version
+        // PROTO_VER_GALERA_3_MAX and below do not get CCs from the IST,
+        // so protocol versions are not established at this point yet.
+        // Do it now before continuing.
+        if (group_proto_version <= PROTO_VER_GALERA_3_MAX)
+        {
+            establish_protocol_versions(group_proto_version);
+        }
         return;
     }
 

@@ -938,13 +938,25 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
             update_state_uuid (sst_uuid_);
 
-            if (str_proto_ver < 3)
+            if (group_proto_ver < PROTO_VER_GALERA_3_MAX)
             {
-                // all IST events will bypass certification
+                log_error << "Rolling upgrade from group protocol version "
+                          << "earlier than "
+                          << PROTO_VER_GALERA_3_MAX
+                          << " is not supported. Please upgrade "
+                          << "Galera library to latest in Galera 3 series on "
+                          << "all of the nodes in the cluster before "
+                          << "continuing.";
+                abort();
+            }
+            else if (group_proto_ver == PROTO_VER_GALERA_3_MAX)
+            {
+                // Rolling upgrade from Galera 3 PROTO_VER_GALERA_3_MAX.
                 gu::GTID const cert_position
                     (sst_uuid_, std::max(cc_seqno, sst_seqno_));
-                cert_.assign_initial_position(cert_position,
-                                              trx_params_.version_);
+                cert_.assign_initial_position(
+                    cert_position,
+                    std::get<0>(get_trx_protocol_versions(group_proto_ver)));
                 // with higher versions this happens in cert index preload
             }
 
