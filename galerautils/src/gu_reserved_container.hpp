@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2020 Codership Oy <info@codership.com>
 
 /*!
  * ReservedContainer template. It is a wrapper for a container and a reserved
@@ -16,8 +16,6 @@
 #ifndef _GU_RESERVED_CONTAINER_
 #define _GU_RESERVED_CONTAINER_
 
-#include "chromium/aligned_memory.h"
-
 #include "gu_logger.hpp"
 
 #include <cstddef>  // size_t, ptrdiff_t and NULL
@@ -25,8 +23,34 @@
 #include <cassert>
 #include <new>      // placement new and std::bad_alloc
 
+// GU_ALIGNOF macro to support GCC 4.4. Should be removed after
+// support for GCC 4.4 is not needed anymore.
+#if defined(__GNUG__)
+#    if (__GNUC__ == 4 && __GNUC_MINOR__ == 4)
+#        define GU_ALIGNOF __alignof__
+#    else
+#        define GU_ALIGNOF alignof
+#    endif // (__GNUC__ == 4 && __GNUC_MINOR__ == 4)
+#endif // __GNUG__
+
 namespace gu
 {
+
+template <typename T, size_t capacity>
+class AlignedBuffer
+{
+public:
+          T* base_ptr()       { return reinterpret_cast<T*>      (buf_); }
+    const T* base_ptr() const { return reinterpret_cast<const T*>(buf_); }
+    size_t   size()     const { return capacity; }
+
+private:
+    // The buffer itself. It is not of type T because we don't want the
+    // constructors and destructors to be automatically called. Define a POD
+    // buffer of the right size instead.
+    typename std::aligned_storage<sizeof(T), GU_ALIGNOF(T)>::type
+        buf_[capacity];
+};
 
 /*!
  * ReservedAllocator is an allocator for STL containers that can use a
@@ -34,8 +58,7 @@ namespace gu
  * storage allocation. If the number of elements exceeds buffer capacity, it
  * overflows to heap.
  *
- * Unlike the Chromium code, this does not derive from std::allocator, but
- * implements the whole thing.
+ * This does not derive from std::allocator, but implements the whole thing.
  *
  * NOTE1: container must support reserve() method.
  *
@@ -47,7 +70,7 @@ class ReservedAllocator
 {
 public:
 
-    typedef chromium::AlignedBuffer<T, reserved> Buffer;
+    typedef AlignedBuffer<T, reserved> Buffer;
 
     typedef T*        pointer;
     typedef const T*  const_pointer;

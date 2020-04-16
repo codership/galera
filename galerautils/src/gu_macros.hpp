@@ -17,10 +17,6 @@
 extern "C" { static void (* const GU_SIG_IGN)(int) = SIG_IGN; }
 #endif
 
-#if defined(MAP_FAILED)
-extern "C" { static const void* const GU_MAP_FAILED = MAP_FAILED; }
-#endif
-
 namespace gu
 {
     template<bool> struct CompileAssert {};
