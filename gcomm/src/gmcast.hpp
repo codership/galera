@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 /*
@@ -116,6 +116,16 @@ namespace gcomm
                 last_connect_   (0),
                 retry_cnt_      (0),
                 max_retries_    (0)
+            { }
+
+            AddrEntry(const AddrEntry& other)
+                :
+                uuid_(other.uuid_),
+                last_seen_(other.last_seen_),
+                next_reconnect_(other.next_reconnect_),
+                last_connect_(other.last_connect_),
+                retry_cnt_(other.retry_cnt_),
+                max_retries_(other.max_retries_)
             { }
 
             const UUID& uuid() const { return uuid_; }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -20,12 +20,6 @@ struct gcs_act
         buf(b),
         buf_len(bl),
         type(t)
-    { }
-    gcs_act(const gcs_act& a)
-        :
-        buf(a.buf),
-        buf_len(a.buf_len),
-        type(a.type)
     { }
 };
 
