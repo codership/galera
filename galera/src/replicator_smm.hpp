@@ -41,6 +41,7 @@ namespace galera
         {
             SST_NONE,
             SST_WAIT,
+            SST_JOIN_SENT,
             SST_REQ_FAILED,
             SST_FAILED
         } SstState;

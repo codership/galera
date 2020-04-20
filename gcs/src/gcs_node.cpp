@@ -133,7 +133,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             // node was a part of this group
             gcs_seqno_t node_act_id = gcs_state_msg_received (node->state_msg);
 
-             if (node_act_id == quorum->act_id) {
+            if (node_act_id == quorum->act_id) {
                 const gcs_node_state_t last_prim_state =
                     gcs_state_msg_prim_state (node->state_msg);
 

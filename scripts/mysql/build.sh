@@ -89,6 +89,9 @@ fi
 if ! which "$CC" ; then echo "Can't execute $CC" ; exit 1; fi
 if ! which "$CXX"; then echo "Can't execute $CXX"; exit 1; fi
 
+CFLAGS=${CFLAGS:-""}
+CXXFLAGS=${CXXFLAGS:-""}
+
 export CC CXX LD_LIBRARY_PATH
 
 EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
@@ -459,7 +462,7 @@ then
                 SSL_OPT="-DWITH_SSL=yes"
             else
                 BOOST_OPT=""
-                SSL_OPT="-DWITH_SSL=bundled"
+                SSL_OPT="-DWITH_SSL=yes"
             fi
 
             if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
@@ -479,8 +482,8 @@ then
             cmake \
                   -DCMAKE_C_COMPILER=$(basename $CC) \
                   -DCMAKE_CXX_COMPILER=$(basename $CXX) \
-                  -DCMAKE_C_FLAGS=$(CFLAGS) \
-                  -DCMAKE_CXX_FLAGS=$(CXXFLAGS) \
+                  -DCMAKE_C_FLAGS="$CFLAGS" \
+                  -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
                   -DBUILD_CONFIG=mysql_release \
                   "${CMAKE_LAYOUT_OPTIONS[@]}" \
                   $BUILD_OPT \

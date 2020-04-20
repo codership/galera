@@ -173,8 +173,8 @@ struct gcs_conn
     gcs_fc_t     stfc; // state transfer FC object
 
     /* #603, #606 join control */
-    bool        volatile need_to_join;
     gcs_seqno_t volatile join_seqno;
+    bool        volatile need_to_join;
 
     /* sync control */
     bool         sync_sent_;
@@ -685,11 +685,18 @@ _release_flow_control (gcs_conn_t* conn)
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
+    assert(conn->join_seqno == GCS_SEQNO_ILL ||
+           conn->state == GCS_CONN_JOINER    ||
+           conn->state == GCS_CONN_OPEN /* joiner that has received NON_PRIM */);
+
     if (!gcs_shift_state (conn, GCS_CONN_PRIMARY)) {
         gu_fatal ("Protocol violation, can't continue");
         gcs_close (conn);
         abort();
     }
+
+    conn->join_seqno   = GCS_SEQNO_NIL;
+    conn->need_to_join = false;
 
     int ret;
 
@@ -794,6 +801,7 @@ gcs_become_joined (gcs_conn_t* conn)
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
         conn->fc_offset    = conn->queue_len;
+        conn->join_seqno   = GCS_SEQNO_NIL;
         conn->need_to_join = false;
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
@@ -872,12 +880,12 @@ _reset_pkt_size(gcs_conn_t* conn)
     }
 }
 
-static long
-_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+static int
+s_join (gcs_conn_t* conn)
 {
-    long err;
+    int err;
 
-    while (-EAGAIN == (err = gcs_core_send_join (conn->core, seqno)))
+    while (-EAGAIN == (err = gcs_core_send_join (conn->core, conn->join_seqno)))
         usleep (10000);
 
     switch (err)
@@ -1006,7 +1014,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         /* #603, #606 - duplicate JOIN msg in case we lost it */
         assert (conf->conf_id >= 0);
 
-        if (conn->need_to_join) _join (conn, conn->join_seqno);
+        if (conn->need_to_join) s_join (conn);
 
         break;
     default:
@@ -2006,12 +2014,18 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 }
 
 long
-gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+gcs_join (gcs_conn_t* conn, gcs_seqno_t const seqno)
 {
-    conn->join_seqno   = seqno;
-    conn->need_to_join = true;
+    assert(conn->join_seqno <= seqno || seqno < 0);
 
-    return _join (conn, seqno);
+    if (seqno < 0 || seqno >= conn->join_seqno)
+    {
+        conn->join_seqno   = seqno;
+        conn->need_to_join = true;
+        return s_join (conn);
+    }
+
+    return 0;
 }
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)

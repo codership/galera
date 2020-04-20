@@ -1402,6 +1402,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
                                            State                    next_state,
                                            wsrep_seqno_t            seqno_l)
 {
+    assert(repl_proto >= 0 || view_info.status != WSREP_VIEW_PRIMARY);
     assert(seqno_l > -1);
 
     update_incoming_list(view_info);
@@ -1438,6 +1439,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
     }
 
+    // must establish protocols before calling view_cb()
+    if (view_info.view >= 0) establish_protocol_versions (repl_proto);
+
     void*  app_req(0);
     size_t app_req_len(0);
 
@@ -1464,7 +1468,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
     if (view_info.view >= 0) // Primary configuration
     {
-        establish_protocol_versions (repl_proto);
+        GU_DBUG_SYNC_WAIT("process_primary_configuration");
 
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
@@ -1538,7 +1542,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
              */
             try {
                 gcs_.join(sst_seqno_);
-                sst_state_ = SST_NONE;
+                sst_state_ = SST_JOIN_SENT;
             }
             catch (gu::Exception& e)
             {
@@ -1594,6 +1598,7 @@ void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_j,
     else
     {
         state_.shift_to(S_JOINED);
+        sst_state_ = SST_NONE;
     }
 
     local_monitor_.leave(lo);
@@ -1748,37 +1753,40 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     }
 
     wsrep_status_t retval(WSREP_OK);
+    // IST should have drained the monitors, so STATE_SEQNO() should be current
     bool const applicable(trx->global_seqno() > STATE_SEQNO());
+
+    if (!applicable)
+    {
+        // this can happen after state transfer position has been submitted
+        // but not all actions preceding it have been processed
+        trx->set_state(TrxHandle::S_MUST_ABORT);
+        gcache_.free(const_cast<void*>(trx->action()));
+        if (interrupted)
+            local_monitor_.self_cancel(lo);
+        else
+            local_monitor_.leave(lo);
+        return WSREP_TRX_FAIL;
+    }
 
     if (gu_likely (!interrupted))
     {
         switch (cert_.append_trx(trx))
         {
         case Certification::TEST_OK:
-            if (gu_likely(applicable))
+            if (trx->state() == TrxHandle::S_CERTIFYING)
             {
-                if (trx->state() == TrxHandle::S_CERTIFYING)
-                {
-                    retval = WSREP_OK;
-                }
-                else
-                {
-                    assert(trx->state() == TrxHandle::S_MUST_ABORT);
-                    trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
-                    retval = WSREP_BF_ABORT;
-                }
+                retval = WSREP_OK;
             }
             else
             {
-                // this can happen after SST position has been submitted
-                // but not all actions preceding SST initial position
-                // have been processed
-                trx->set_state(TrxHandle::S_MUST_ABORT);
-                retval = WSREP_TRX_FAIL;
+                assert(trx->state() == TrxHandle::S_MUST_ABORT);
+                trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
+                retval = WSREP_BF_ABORT;
             }
             break;
         case Certification::TEST_FAILED:
-            if (gu_unlikely(trx->is_toi() && applicable)) // small sanity check
+            if (gu_unlikely(trx->is_toi())) // small sanity check
             {
                 // may happen on configuration change
                 log_warn << "Certification failed for TO isolated action: "
@@ -1822,12 +1830,14 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         }
     }
 
-    if (gu_unlikely(WSREP_TRX_FAIL == retval && applicable))
+    if (gu_unlikely(WSREP_TRX_FAIL == retval))
     {
         // applicable but failed certification: self-cancel monitors
         apply_monitor_.self_cancel(ao);
         if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
     }
+
+    assert(applicable);
 
     return retval;
 }

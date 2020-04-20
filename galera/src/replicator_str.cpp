@@ -20,27 +20,7 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info)
             wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
             wsrep_seqno_t const local_seqno(STATE_SEQNO());
 
-            if (state_() != S_CONNECTED)
-            {
-                return (local_seqno < group_seqno);
-            }
-            else
-            {
-                /* The node that has just CONNECTED can't be more advanced than
-                 * the group. */
-                if (local_seqno > group_seqno)
-                {
-                    close();
-                    gu_throw_fatal
-                        << "Local state seqno (" << local_seqno
-                        << ") is greater than group seqno (" <<group_seqno
-                        << "): states diverged. Aborting to avoid potential "
-                        << "data loss. Remove '" << state_file_
-                        << "' file and restart if you wish to continue.";
-                }
-
-                return (local_seqno != group_seqno);
-            }
+            return (local_seqno < group_seqno);
         }
 
         return true;
@@ -682,10 +662,13 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     st_.mark_unsafe();
 
+    GU_DBUG_SYNC_WAIT("before_send_state_request");
     send_state_request (req);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
+    GU_DBUG_SYNC_WAIT("after_shift_to_joining");
+
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may involve some IO too */
     gcache_.seqno_reset(to_gu_uuid(group_uuid), group_seqno);
@@ -729,7 +712,8 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
 
-            log_debug << "Installed new state: " << state_uuid_ << ":" << sst_seqno_;
+            log_debug << "Installed new state: " << state_uuid_ << ":"
+                      << sst_seqno_;
         }
     }
     else
