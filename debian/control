@@ -1,6 +1,6 @@
 Source: galera-4
 Maintainer: Codership Oy <info@codership.com>
-Uploaders: Otto Kekäläinen <otto@seravo.fi>
+Uploaders: Otto Kekäläinen <otto@kekalainen.net>
 Section: database
 Priority: optional
 Standards-Version: 3.9.6
@@ -12,37 +12,37 @@ Build-Depends: check,
                libssl-dev,
                scons (>= 2)
 Homepage: http://www.galeracluster.com/
-Vcs-Git: git://github.com/codership/galera.git
-Vcs-Browser: http://github.com/codership/galera.git
+Vcs-Git: https://github.com/codership/galera.git
+Vcs-Browser: https://github.com/codership/galera
 
 Package: galera-4
 Architecture: any
 Section: libs
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Conflicts: garbd-2,
-           garbd2,
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
+Conflicts: galera-3,
+           garbd-2,
            garbd-3,
+           garbd2,
            garbd3,
            percona-galera-3,
+           percona-galera-4,
            percona-xtradb-cluster-galera,
            percona-xtradb-cluster-galera-2.x,
            percona-xtradb-cluster-galera-3.x,
            percona-xtradb-cluster-galera-4.x,
            percona-xtradb-cluster-garbd-2.x,
-           percona-xtradb-cluster-garbd-3.x,
-           percona-xtradb-cluster-garbd-4.x,
-           galera-3
+           percona-xtradb-cluster-garbd-3.x
 Breaks: galera
 Replaces: galera
-Provides: galera-4,
-          wsrep,
-          galera,
+Provides: galera,
           galera4,
-          percona-xtradb-cluster-galera-26
+          percona-xtradb-cluster-galera-26,
+          wsrep
 Description: Replication framework for transactional applications
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
- about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+ about wsrep API see https://launchpad.net/wsrep. For a description of Galera
  replication engine see http://galeracluster.com.
  .
  This package contains the Galera library/plugin.
@@ -51,19 +51,24 @@ Package: galera-4-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Depends: galera-4 (= ${binary:Version}), ${misc:Depends}
+Depends: galera-4 (= ${binary:Version}),
+         ${misc:Depends}
 Description: debugging symbols for galera-4
  This package contains the debugging symbols for galera-4.
 
 Package: galera-arbitrator-4
 Architecture: any
-Conflicts: garbd-2,
+Conflicts: galera-arbitrator-3,
+           garbd-2,
            garbd2,
-           percona-xtradb-cluster-garbd-2.x,
-           galera-arbitrator-3
+           percona-galera-arbitrator-3,
+           percona-galera-arbitrator-4,
+           percona-xtradb-cluster-garbd-2.x
 Breaks: percona-xtradb-cluster-galera-2.x
 Replaces: percona-xtradb-cluster-galera-2.x
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: lsb-base (>= 3.0-6),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: Galera arbitrator daemon
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
@@ -77,6 +82,7 @@ Architecture: any
 Section: debug
 Priority: extra
 Conflicts: percona-xtradb-cluster-galera-2.x-dbg
-Depends: galera-arbitrator-4 (= ${binary:Version}), ${misc:Depends}
+Depends: galera-arbitrator-4 (= ${binary:Version}),
+         ${misc:Depends}
 Description: debugging symbols for galera-arbitrator-4
  This package contains the debugging symbols for galera-arbitrator-4.

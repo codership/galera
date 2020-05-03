@@ -1,48 +1,5 @@
-galera-4 (26.4.5-1) UNRELEASED; URGENCY=low
+galera-4 (26.4.5) unstable; urgency=medium
 
-  * Galera 4 version 26.4.5
+  * Galera 4 release
 
- -- Codership Oy <info@codership.com>  Wed, 28 Feb 2020 16:38:32 +0200
-
-galera-4 (26.4.4-1) UNRELEASED; URGENCY=low
-
-  * Galera 4 version 26.4.4
-
- -- Codership Oy <info@codership.com>  Wed, 29 Jan 2020 14:56:32 +0200
-
-galera-4 (26.4.3-1) UNRELEASED; URGENCY=low
-
-  * Galera 4 version 26.4.3
-
- -- Codership Oy <info@codership.com>  Fri, 12 Sep 2019 17:46:47 +0200
-
-galera-4 (26.4.2-1) UNRELEASED; URGENCY=low
-
-  * Galera 4 version 26.4.2
-
- -- Codership Oy <info@codership.com>  Fri, 12 Feb 2019 11:01:10 +0200
-
-galera-4 (26.4.1-1) UNRELEASED; URGENCY=low
-
-  * Galera 4 release candidate
-
- -- Codership Oy <info@codership.com>  Fri, 22 Feb 2019 08:29:49 +0200
-
-galera-4 (26.4.0-1) UNRELEASED; URGENCY=low
-
-  * First Galera 4 release
-
- -- Codership Oy <info@codership.com>  Tue, 13 Nov 2018 15:10:04 +0200
-
-galera-3 (25.3.14-1) UNRELEASED; urgency=low
-
-  * Sync Debian packaging from downstream to include improvements developed at
-    http://anonscm.debian.org/cgit/pkg-mysql/galera-3.git
-
- -- Codership Oy <info@codership.com>  Fri, 01 Jan 2016 16:02:54 +0200
-
-galera-3 (25.3.6-1) UNRELEASED; urgency=low
-
-  * First deb release.
-
- -- Codership Oy <info@codership.com>  Fri, 01 Aug 2014 14:36:49 +0300
+ -- Codership Oy <info@codership.com>  Fri, 28 Feb 2020 16:38:32 +0200
