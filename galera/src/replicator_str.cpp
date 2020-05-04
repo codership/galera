@@ -1023,7 +1023,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                 // Note: apply_monitor_ must be drained to avoid race between
                 // IST appliers and GCS appliers, GCS action source may
                 // provide actions that have already been applied via IST.
-                log_info << "Draining apply monitors after IST upto "
+                log_info << "Draining apply monitors after IST up to "
                          << sst_seqno_;
                 apply_monitor_.drain(sst_seqno_);
                 set_initial_position(group_uuid, sst_seqno_);
