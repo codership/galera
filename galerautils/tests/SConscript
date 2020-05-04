@@ -56,6 +56,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_stats_test.cpp
                               gu_thread_test.cpp
                               gu_asio_test.cpp
+                              gu_deqmap_test.cpp
                               gu_tests++.cpp
                            '''))
 
@@ -81,3 +82,9 @@ if all_tests:
 #                         source = Split('''
 #                             copy_vs_assignment.cpp
 #                         '''))
+
+deqmap_bench = env.Program(target = 'deqmap_bench',
+                           source = Split('''
+                               deqmap_bench.cpp
+                           '''))
+
