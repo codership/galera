@@ -3,9 +3,10 @@ Maintainer: Codership Oy <info@codership.com>
 Uploaders: Otto Kekäläinen <otto@kekalainen.net>
 Section: database
 Priority: optional
-Standards-Version: 3.9.6
+Standards-Version: 4.5.0
+Rules-Requires-Root: no
 Build-Depends: check,
-               debhelper (>= 9),
+               debhelper (>= 10),
                libasio-dev,
                libboost-dev (>= 1.41),
                libboost-program-options-dev (>= 1.41),
@@ -50,7 +51,6 @@ Description: Replication framework for transactional applications
 Package: galera-4-dbg
 Architecture: any
 Section: debug
-Priority: extra
 Depends: galera-4 (= ${binary:Version}),
          ${misc:Depends}
 Description: debugging symbols for galera-4
@@ -80,7 +80,6 @@ Description: Galera arbitrator daemon
 Package: galera-arbitrator-4-dbg
 Architecture: any
 Section: debug
-Priority: extra
 Conflicts: percona-xtradb-cluster-galera-2.x-dbg
 Depends: galera-arbitrator-4 (= ${binary:Version}),
          ${misc:Depends}

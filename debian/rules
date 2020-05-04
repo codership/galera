@@ -15,9 +15,11 @@ ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	# Don't use MAKEFLAGS as it has strange 'w' and '--jobserver-fds=3,4' by default
 endif
 
-# Add support for verbose builds
-ifneq (,$(filter verbose,$(DEB_BUILD_OPTIONS)))
+# According to Debian Policy version 4.2.0 builds should be as verbose as
+# possible unless 'terse' is specifically passed.
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
 	SCONS_ARGS += VERBOSE=1
+	export DH_VERBOSE=1
 endif
 
 # Run tests by default
