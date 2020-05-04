@@ -6,7 +6,7 @@ The main idea is facilitation of parallel operations and minimizaiton
 of code duplicaiton.
 
 Executable file is command.sh. It sources the configuration and the rest of
-the scripts which implement different funcitons:
+the scripts which implement different functions:
 
 jobs.sh - the main file which defines generic command execution framework.
           It implements parallel and per-node command execution routines and

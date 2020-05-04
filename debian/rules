@@ -5,7 +5,7 @@ export DEB_BUILD_HARDENING=1
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 
-# Parallel build support as adviced
+# Parallel build support as advised
 # at https://www.debian.org/doc/debian-policy/ch-source.html#s-debianrules-options
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))

@@ -125,7 +125,7 @@ namespace gcomm
          *
          * This parameter controls multicast packet TTL. By default it
          * is set to 1 and usually it should not be changed unless
-         * adviced so. This means that multicast is limited to single LAN
+         * advised so. This means that multicast is limited to single LAN
          * segment.
          */
         static std::string const GMCastMCastTTL;
@@ -152,7 +152,7 @@ namespace gcomm
         /*!
          * @brief Isolate node from peers
          *
-         * Setting this value to 'true' closes all conections
+         * Setting this value to 'true' closes all connections
          * and will prevent forming of new connections until
          * value is set again to 'false'. This parameter should be
          * used for testing purposes only and it will not be visible
@@ -297,7 +297,7 @@ namespace gcomm
          * This parameter controls whether EVS is allowed to aggregate
          * several user messages into one message. By default this option
          * is enabled and there should be no need to disable it unless
-         * adviced so.
+         * advised so.
          */
         static std::string const EvsUseAggregate;
 

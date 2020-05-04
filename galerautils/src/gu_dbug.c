@@ -351,7 +351,7 @@ static char *static_strtok(char *s1, char chr);
 
 #undef EXISTS
 #if !defined(HAVE_ACCESS) || defined(MSDOS)
-#define EXISTS(pathname) (FALSE)			   /* Assume no existance */
+#define EXISTS(pathname) (FALSE)			   /* Assume no existence */
 #define Writable(name) (TRUE)
 #else
 #define EXISTS(pathname)	 (access (pathname, F_OK) == 0)

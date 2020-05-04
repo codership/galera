@@ -103,7 +103,7 @@ gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid);
 
 /*!
  * Copy UUID from to as ::memcpy() seems to be considerably faster than the
- * default assignement operator for structs
+ * default assignment operator for structs
  */
 GU_FORCE_INLINE void
 gu_uuid_copy(gu_uuid_t* const to, const gu_uuid_t* const from)

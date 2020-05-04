@@ -175,7 +175,7 @@ namespace gu
              */
             long long get_utc() const { return utc; }
 
-            /* Standard comparision operators */
+            /* Standard comparison operators */
             bool operator==(const Date cmp) const
             { return (utc == cmp.utc); }
 

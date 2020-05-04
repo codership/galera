@@ -74,7 +74,7 @@ gcs_create  (gu_config_t* conf, gcache_t* cache,
  *                 application state.
  *                 Should be undefined for undefined state.
  *
- * @return 0 in case of success, -EBUSY if conneciton is already opened,
+ * @return 0 in case of success, -EBUSY if connection is already opened,
  *         -EBADFD if connection object is being destroyed.
  */
 extern long gcs_init (gcs_conn_t*     conn,

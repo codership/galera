@@ -142,7 +142,7 @@ namespace galera {
 // which critical sections have been accessed during write set
 // applying. As a convention, TrxHandleMaster states are changed
 // before entering the critical section, TrxHandleSlave states
-// after critical section has been succesfully entered.
+// after critical section has been successfully entered.
 //
 // TrxHandleMaster states during normal execution:
 //
@@ -169,7 +169,7 @@ namespace galera {
 //
 // TrxHandleMaster states after effective BF abort:
 //
-// MUST_ABORT   - Transaction enter this state after succesful BF abort.
+// MUST_ABORT   - Transaction enter this state after successful BF abort.
 //                BF abort is allowed if:
 //                * Transaction does not have associated TrxHandleSlave
 //                * Transaction has associated TrxHandleSlave but it does
@@ -184,9 +184,9 @@ namespace galera {
 // ROLLING_BACK - Commit order critical section has been grabbed for
 //                rollback
 // ROLLED_BACK  - Commit order critical section has been released after
-//                succesful rollback
+//                successful rollback
 //
-// 2) The case where BF abort happens after succesful certification or
+// 2) The case where BF abort happens after successful certification or
 //    if out-of-order certification results a success:
 // MUST_REPLAY  - The transaction must roll back and replay in applier
 //                context.
@@ -216,16 +216,16 @@ namespace galera {
 // ROLLING_BACK - Commit order critical section has been grabbed for
 //                rollback
 // ROLLED_BACK  - Commit order critical section has been released
-//                after succesful rollback
+//                after successful rollback
 //
 //
 //
 // TrxHandleSlave:
 // REPLICATING - this is the first state for TrxHandleSlave after it
 //               has been received from group
-// CERTIFYING  - local monitor has been entered succesfully
-// APPLYING    - apply monitor has been entered succesfully
-// COMMITTING  - commit monitor has been entered succesfully
+// CERTIFYING  - local monitor has been entered successfully
+// APPLYING    - apply monitor has been entered successfully
+// COMMITTING  - commit monitor has been entered successfully
 //
 // TrxHandleSlave state machine is restricted in order to use it
 // for tracking which monitors have been entered. Certification result
