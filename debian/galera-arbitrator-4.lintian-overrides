@@ -1,0 +1,4 @@
+# garbd is intentionally not started automatically upon installation,
+# see https://github.com/codership/galera/issues/266
+galera-arbitrator-4: script-in-etc-init.d-not-registered-via-update-rc.d etc/init.d/garb
+
