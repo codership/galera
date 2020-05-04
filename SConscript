@@ -69,3 +69,4 @@ if install:
     env.InstallAs(install + '/doc/README',
                 '#scripts/packages/README')
     env.Install(install + '/man/man8', '#man/garbd.8')
+    env.Install(install + '/man/man8', '#man/garb-systemd.8')
