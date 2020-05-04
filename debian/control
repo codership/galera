@@ -48,14 +48,6 @@ Description: Replication framework for transactional applications
  .
  This package contains the Galera library/plugin.
 
-Package: galera-4-dbg
-Architecture: any
-Section: debug
-Depends: galera-4 (= ${binary:Version}),
-         ${misc:Depends}
-Description: debugging symbols for galera-4
- This package contains the debugging symbols for galera-4.
-
 Package: galera-arbitrator-4
 Architecture: any
 Conflicts: galera-arbitrator-3,
@@ -76,12 +68,3 @@ Description: Galera arbitrator daemon
  replication engine see http://galeracluster.com.
  .
  This package contains the Galera arbitrator daemon (garbd).
-
-Package: galera-arbitrator-4-dbg
-Architecture: any
-Section: debug
-Conflicts: percona-xtradb-cluster-galera-2.x-dbg
-Depends: galera-arbitrator-4 (= ${binary:Version}),
-         ${misc:Depends}
-Description: debugging symbols for galera-arbitrator-4
- This package contains the debugging symbols for galera-arbitrator-4.
