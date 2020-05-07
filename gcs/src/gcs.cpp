@@ -713,11 +713,18 @@ _release_flow_control (gcs_conn_t* conn)
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
+    assert(conn->join_gtid.seqno() == GCS_SEQNO_ILL ||
+           conn->state == GCS_CONN_JOINER    ||
+           conn->state == GCS_CONN_OPEN /* joiner that has received NON_PRIM */);
+
     if (!gcs_shift_state (conn, GCS_CONN_PRIMARY)) {
         gu_fatal ("Protocol violation, can't continue");
         gcs_close (conn);
         abort();
     }
+
+    conn->join_gtid    = gu::GTID();
+    conn->need_to_join = false;
 
     int ret;
 
@@ -823,6 +830,7 @@ gcs_become_joined (gcs_conn_t* conn)
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
         conn->fc_offset    = conn->queue_len;
+        conn->join_gtid    = gu::GTID();
         conn->need_to_join = false;
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
@@ -902,11 +910,11 @@ _reset_pkt_size(gcs_conn_t* conn)
 }
 
 static int
-_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
+s_join (gcs_conn_t* conn)
 {
     int err;
 
-    while (-EAGAIN == (err = gcs_core_send_join (conn->core, gtid, code)))
+    while (-EAGAIN == (err = gcs_core_send_join (conn->core, conn->join_gtid, conn->join_code)))
         usleep (10000);
 
     if (err < 0)
@@ -1078,7 +1086,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
         /* #603, #606 - duplicate JOIN msg in case we lost it */
         assert (conf.conf_id >= 0);
 
-        if (conn->need_to_join) _join (conn, conn->join_gtid, conn->join_code);
+        if (conn->need_to_join) s_join (conn);
 
         break;
     default:
@@ -2277,11 +2285,18 @@ cleanup:
 long
 gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 {
-    conn->join_gtid    = gtid;
-    conn->join_code    = code;
-    conn->need_to_join = true;
+    if (code < 0 || gtid.seqno() >= conn->join_gtid.seqno())
+    {
+        conn->join_gtid    = gtid;
+        conn->join_code    = code;
+        conn->need_to_join = true;
 
-    return _join (conn, gtid, code);
+        return s_join (conn);
+    }
+
+    assert(0);
+
+    return 0;
 }
 
 gcs_seqno_t gcs_local_sequence(gcs_conn_t* conn)

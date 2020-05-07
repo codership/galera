@@ -58,31 +58,10 @@ ReplicatorSMM::state_transfer_required(const wsrep_view_info_t& view_info,
             wsrep_seqno_t const group_seqno(view_info.state_id.seqno);
             wsrep_seqno_t const local_seqno(last_committed());
 
-            if (state_() != S_CONNECTED)
-            {
-                if (str_proto_ver >= 3)
-                    return (local_seqno + 1 < group_seqno); // this CC will add 1
-                else
-                    return (local_seqno < group_seqno);
-            }
+            if (str_proto_ver >= 3)
+                return (local_seqno + 1 < group_seqno); // this CC will add 1
             else
-            {
-                /* The node that has just CONNECTED can't be more advanced than
-                 * the group. */
-                if ((str_proto_ver >= 3 && local_seqno >= group_seqno) ||
-                    (str_proto_ver <  3 && local_seqno >  group_seqno))
-                {
-                    close();
-                    gu_throw_fatal
-                        << "Local state seqno (" << local_seqno
-                        << ") is greater than group seqno (" <<group_seqno
-                        << "): states diverged. Aborting to avoid potential "
-                        << "data loss. Remove '" << state_file_
-                        << "' file and restart if you wish to continue.";
-                }
-
-                return (local_seqno != group_seqno);
-            }
+                return (local_seqno < group_seqno);
         }
 
         return true;
@@ -871,11 +850,13 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
     st_.mark_unsafe();
 
+    GU_DBUG_SYNC_WAIT("before_send_state_request");
     send_state_request(req, str_proto_ver);
 
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
     sst_seqno_ = WSREP_SEQNO_UNDEFINED;
+    GU_DBUG_SYNC_WAIT("after_shift_to_joining");
 
     /* There are two places where we may need to adjust GCache.
      * This is the first one, which we can do while waiting for SST to complete.
@@ -970,7 +951,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
             }
 
             log_info << "Installed new state from SST: " << state_uuid_ << ":"
-                      << sst_seqno_;
+                     << sst_seqno_;
         }
     }
     else

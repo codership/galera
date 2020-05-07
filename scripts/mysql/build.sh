@@ -85,6 +85,9 @@ fi
 if ! which "$CC" ; then echo "Can't execute $CC" ; exit 1; fi
 if ! which "$CXX"; then echo "Can't execute $CXX"; exit 1; fi
 
+CFLAGS=${CFLAGS:-""}
+CXXFLAGS=${CXXFLAGS:-""}
+
 export CC CXX LD_LIBRARY_PATH
 
 EXTRA_SYSROOT=${EXTRA_SYSROOT:-""}
@@ -443,12 +446,7 @@ then
 
         if [ "$MYSQL" == "mysql" ] # remove this distinction when MySQL
         then                       # fixes its SSL support
-            if [ "$MYSQL_MM_VER" -ge "57" ]
-            then
-                BUILD_OPT+="-DWITH_SSL=yes"
-            else
-                BUILD_OPT+="-DWITH_SSL=bundled"
-            fi
+            BUILD_OPT+="-DWITH_SSL=yes"
         else
             BUILD_OPT+="-DWITH_SSL=system"
         fi
@@ -502,7 +500,8 @@ then
         cmake \
             -DCMAKE_C_COMPILER=$(basename $CC) \
             -DCMAKE_CXX_COMPILER=$(basename $CXX) \
-            -DCMAKE_CXX_FLAGS='-fpermissive' \
+            -DCMAKE_C_FLAGS="$CFLAGS" \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
             -DBUILD_CONFIG=mysql_release \
             "${CMAKE_LAYOUT_OPTIONS[@]}" \
             $BUILD_OPT \
