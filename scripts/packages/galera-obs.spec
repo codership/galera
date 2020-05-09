@@ -50,6 +50,23 @@
 %define dist .lp151
 %define ssl_package_devel libopenssl-devel
 %endif
+%if 0%{?sle_version} == 120500 && !0%{?is_opensuse}
+%define dist .sl12
+%endif
+%if 0%{?sle_version} == 150000 && !0%{?is_opensuse}
+%define dist .sl15
+%define ssl_package_devel libopenssl-devel
+%endif
+%if 0%{?sle_version} == 150100 && !0%{?is_opensuse}
+%define dist .sl15_1
+%define ssl_package_devel libopenssl-devel
+%endif
+%if 0%{?sle_version} == 150200 && !0%{?is_opensuse}
+%define dist .sl15_2
+%define ssl_package_devel libopenssl-devel
+%endif
+
+
 
 
 Name:          %{name}
