@@ -277,7 +277,7 @@ START_TEST (gcs_sm_test_pause)
     long long tmp;
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
-    fail_if (tmp <= paused_ns); paused_ns = tmp;
+    fail_if (tmp < paused_ns); paused_ns = tmp;
     fail_if (paused_avg <= 0.0);
     fail_if (fabs(q_len_avg) > EPS,
              "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
