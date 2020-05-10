@@ -205,7 +205,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     {
         try
         {
-            port = uri_.get_option(Conf::GMCastMCastPort);
+            port = param<std::string>(conf_, uri_, Conf::GMCastMCastPort, port);
         }
         catch (gu::NotFound&) {}
 
@@ -1316,7 +1316,7 @@ void gcomm::GMCast::send(const RelayEntry& re, int segment, gcomm::Datagram& dg)
         log_debug << "failed to send to " << re.socket->remote_addr()
                   << ": (" << err << ") " << strerror(err);
     }
-    else
+    else if (re.proto)
     {
         re.proto->set_send_tstamp(gu::datetime::Date::monotonic());
     }
