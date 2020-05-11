@@ -782,12 +782,21 @@ gcomm::SocketStats gcomm::AsioTcpSocket::stats() const
     int native_fd(ssl_socket_ ?
                   const_cast<basic_socket_t&>(ssl_socket_->lowest_layer()).native() :
                   const_cast<asio::ip::tcp::socket&>(socket_).native());
-    if (getsockopt(native_fd, SOL_TCP, TCP_INFO, &tcpi, &tcpi_len) == 0)
+#if defined(__linux__)
+    int level(SOL_TCP);
+#else
+    int level(IPPROTO_TCP);
+#endif /* __linux__ */
+    if (getsockopt(native_fd, level, TCP_INFO, &tcpi, &tcpi_len) == 0)
     {
         ret.rtt            = tcpi.tcpi_rtt;
         ret.rttvar         = tcpi.tcpi_rttvar;
         ret.rto            = tcpi.tcpi_rto;
+#if defined(__linux__)
         ret.lost           = tcpi.tcpi_lost;
+#else
+        ret.lost           = 0;
+#endif /* __linux__ */
         ret.last_data_recv = tcpi.tcpi_last_data_recv;
         ret.cwnd           = tcpi.tcpi_snd_cwnd;
         gu::datetime::Date now(gu::datetime::Date::monotonic());
