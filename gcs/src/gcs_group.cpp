@@ -1907,12 +1907,12 @@ gcs_group_act_conf (gcs_group_t*         group,
                 conf.vote_res   = group->vote_result.res;
             }
         }
-        conf.seqno      = group->act_id_;
-    } else {
+    }
+    else {
         assert(GCS_GROUP_NON_PRIMARY == group->state);
-        conf.seqno      = GCS_SEQNO_ILL;
     }
 
+    conf.seqno          = group->act_id_;
     conf.conf_id        = group->conf_id;
     conf.repl_proto_ver = group->quorum.repl_proto_ver;
     conf.appl_proto_ver = group->quorum.appl_proto_ver;

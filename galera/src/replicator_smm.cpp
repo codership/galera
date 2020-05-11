@@ -2456,6 +2456,9 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         process_prim_conf_change(recv_ctx, conf, cc.seqno_g,
                                  const_cast<void*>(cc.buf));
     }
+
+    resume_recv();
+
     local_monitor_.leave(lo);
 
     if (conf.memb.size() == 0)
@@ -2489,7 +2492,10 @@ void galera::ReplicatorSMM::process_non_prim_conf_change(
     const gcs_act_cchange& conf,
     int const my_index)
 {
-    assert(conf.seqno == WSREP_SEQNO_UNDEFINED);
+    assert(conf.conf_id == WSREP_SEQNO_UNDEFINED);
+
+    /* ignore outdated non-prim configuration change */
+    if (conf.uuid == state_uuid_ && conf.seqno < sst_seqno_) return;
 
     wsrep_uuid_t new_uuid(uuid_);
     wsrep_view_info_t* const view_info
@@ -2528,8 +2534,6 @@ void galera::ReplicatorSMM::process_non_prim_conf_change(
             state_.shift_to(S_CONNECTED);
         }
     }
-
-    resume_recv();
 }
 
 static void validate_local_prim_view_info(const wsrep_view_info_t* view_info,
@@ -2579,7 +2583,6 @@ bool galera::ReplicatorSMM::skip_prim_conf_change(
 
     log_info << "####### skipping local CC " << cc_seqno << ", keep in cache: "
              << (keep ? "true" : "false");
-    resume_recv();
 
     return keep;
 }
@@ -2831,7 +2834,6 @@ void galera::ReplicatorSMM::finish_local_prim_conf_change(
     bool const ordered __attribute__((unused))
         (group_proto_ver >= PROTO_VER_ORDERED_CC);
     assert(gcache_.seqno_min() > 0 || not ordered);
-    resume_recv();
 }
 
 namespace {
