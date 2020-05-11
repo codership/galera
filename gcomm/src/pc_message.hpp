@@ -236,15 +236,8 @@ public:
         assert(version < 15);
     }
 
-    Message(const Message& msg)
-        :
-        version_ (msg.version_ ),
-        flags_   (msg.flags_   ),
-        type_    (msg.type_    ),
-        seq_     (msg.seq_     ),
-        crc16_   (msg.crc16_   ),
-        node_map_(msg.node_map_)
-    { }
+    Message(const Message& msg) = default;
+    Message& operator=(const Message&) = default;
 
     virtual ~Message() { }
 
@@ -358,7 +351,6 @@ public:
     }
 
 private:
-    Message& operator=(const Message&);
 
     int      version_;  // Message version
     int      flags_;    // Flags

@@ -146,7 +146,7 @@ public:
     { NodeMap::value(self_i_).set_weight(weight); }
 
 
-    class SMMap : public Map<const UUID, Message> { };
+    class SMMap : public Map<UUID, Message> { };
 
     const View& current_view() const { return current_view_; }
 
