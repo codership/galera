@@ -29,6 +29,7 @@
 #include "gu_thread_test.hpp"
 #include "gu_shared_ptr_test.hpp"
 #include "gu_asio_test.hpp"
+#include "gu_deqmap_test.hpp"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -53,6 +54,7 @@ static suite_creator_t suites[] =
     gu_thread_suite,
     gu_shared_ptr_suite,
     gu_asio_suite,
+    gu_deqmap_suite,
     0
 };
 

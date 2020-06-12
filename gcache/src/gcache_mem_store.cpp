@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
  */
 
 #include "gcache_mem_store.hpp"
@@ -16,12 +16,11 @@ MemStore::have_free_space (size_type size)
     while ((size_ + size > max_size_) && !seqno2ptr_.empty())
     {
         /* try to free some released bufs */
-        seqno2ptr_iter_t const i  (seqno2ptr_.begin());
-        BufferHeader*    const bh (ptr2BH (i->second));
+        BufferHeader* const bh(ptr2BH(seqno2ptr_.front()));
 
         if (BH_is_released(bh)) /* discard buffer */
         {
-            seqno2ptr_.erase(i);
+            seqno2ptr_.pop_front();
             bh->seqno_g = SEQNO_ILL;
 
             switch (bh->store)

@@ -24,12 +24,14 @@ galerautils/tests/gu_tests.passed
 galerautils/tests/gu_to_test
 galerautils/tests/avalanche*
 galerautils/tests/copy_vs_assignment*
+galerautils/tests/deqmap_bench
 garb/garbd
 gcache.page.*
 gcache/src/test
 gcache/tests/gcache_tests
 gcache/tests/gcache_tests.passed
 gcomm/test/check_gcomm
+gcomm/test/check_gcomm_nondet
 gcomm/test/gcomm_check.passed
 gcomm/test/ssl_test
 gcs/src/gcs_test

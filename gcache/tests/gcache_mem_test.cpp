@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -15,7 +15,7 @@ START_TEST(test1)
     ssize_t const bh_size (sizeof(gcache::BufferHeader));
     ssize_t const mem_size (3 + 2*bh_size);
 
-    std::map<int64_t, const void*> s2p;
+    seqno2ptr_t s2p(SEQNO_NONE);
     MemStore ms(mem_size, s2p, 0);
 
     void* buf1 = ms.malloc (1 + bh_size);

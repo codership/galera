@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -24,7 +24,7 @@ namespace gcache
     }
 
     bool
-    GCache::discard_seqno (int64_t seqno)
+    GCache::discard_seqno (seqno_t seqno)
     {
         assert(mtx.locked() && mtx.owned());
 
@@ -32,24 +32,20 @@ namespace gcache
         seqno_t begin(0);
         if (params.debug())
         {
-            begin = (seqno2ptr.begin() != seqno2ptr.end() ?
-                     seqno2ptr.begin()->first : 0);
+            begin = (seqno2ptr.empty() ? seqno2ptr.index_begin() : SEQNO_NONE);
             assert(begin > 0);
             log_info << "GCache::discard_seqno(" << begin << " - "
                      << seqno << ")";
         }
 #endif
-        for (seqno2ptr_t::iterator i = seqno2ptr.begin();
-             i != seqno2ptr.end() && i->first <= seqno;)
+        while (seqno2ptr.index_begin() <= seqno && !seqno2ptr.empty())
         {
-            BufferHeader* bh(ptr2BH (i->second));
+            BufferHeader* const bh(ptr2BH(seqno2ptr.front()));
 
             if (gu_likely(BH_is_released(bh)))
             {
-                assert (bh->seqno_g == i->first);
+                assert (bh->seqno_g == seqno2ptr.index_begin());
                 assert (bh->seqno_g <= seqno);
-
-                seqno2ptr.erase (i++); // post ++ is significant!
                 discard_buffer(bh);
             }
             else
@@ -64,26 +60,25 @@ namespace gcache
 #endif
                 return false;
             }
+
+            seqno2ptr.pop_front();
         }
 
         return true;
     }
 
     void
-    GCache::discard_tail (int64_t seqno)
+    GCache::discard_tail (seqno_t const seqno)
     {
-        seqno2ptr_t::reverse_iterator r;
-        while ((r = seqno2ptr.rbegin()) != seqno2ptr.rend() &&
-               r->first > seqno)
+        while (seqno2ptr.index_back() > seqno && !seqno2ptr.empty())
         {
-            BufferHeader* bh(ptr2BH(r->second));
+            BufferHeader* bh(ptr2BH(seqno2ptr.back()));
 
             assert(BH_is_released(bh));
-            assert(bh->seqno_g == r->first);
-            assert(bh->seqno_g > seqno);
+            assert(bh->seqno_g == seqno2ptr.index_back());
 
-            seqno2ptr.erase(--(seqno2ptr.end()));
             discard_buffer(bh);
+            seqno2ptr.pop_back();
         }
     }
 
@@ -160,7 +155,7 @@ namespace gcache
             {
                 if (gu_unlikely(!discard_seqno(bh->seqno_g)))
                 {
-                    new_released = (seqno2ptr.begin()->first - 1);
+                    new_released = (seqno2ptr.index_begin() - 1);
                     assert(seqno_released <= new_released);
                 }
             }

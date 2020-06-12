@@ -186,7 +186,7 @@ namespace gcache
         void          close_preamble();
 
         // returns lower bound (not inclusive) of valid seqno range
-        int64_t       scan(off_t offset, int scan_step);
+        seqno_t       scan(off_t offset, int scan_step);
         void          recover(off_t offset, int version);
 
         void          estimate_space();
