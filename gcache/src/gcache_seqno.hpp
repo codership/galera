@@ -1,11 +1,12 @@
 /*
- * Copyright (C) 2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2016-2020 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_SEQNO__
 #define __GCACHE_SEQNO__
 
 #include <stdint.h>
+#include <limits>
 
 namespace gcache
 {
@@ -13,6 +14,7 @@ namespace gcache
 
     static seqno_t const SEQNO_NONE =  0;
     static seqno_t const SEQNO_ILL  = -1;
+    static seqno_t const SEQNO_MAX  = std::numeric_limits<seqno_t>::max();
 
 } /* namespace gcache */
 

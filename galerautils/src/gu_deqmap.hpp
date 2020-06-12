@@ -18,7 +18,7 @@
 #ifndef GU_DEQMAP_HPP
 #define GU_DEQMAP_HPP
 
-#include "gu_macros.hpp"
+#include "gu_exception.hpp" // NotFound
 
 #include <deque>
 #include <utility>   // std::pair<>
@@ -70,7 +70,7 @@ public:
     static value_type null_value() { return value_type(); }
 
     /** A test for an unset element (hole) */
-    static bool not_set(const value_type& val) { return val == null_value(); }
+    static bool not_set(const_reference val) { return val == null_value(); }
 
     /**
      * @param begin initial index value for the map. It is required for
@@ -128,13 +128,23 @@ public:
     const_reverse_iterator rbegin() const { return base_.rbegin(); }
     const_reverse_iterator rend()   const { return base_.rend();   }
 
-    const_reference operator[] (index_type i) const { return base_[i - begin_]; }
-
-    const_reference at(index_type i) const { return base_.at(i - begin_); }
-
     const_reference front() const { return base_.front(); }
 
     const_reference back() const { return base_.back(); }
+
+    const_reference operator[] (index_type i) const { return base_[i - begin_]; }
+
+    const_reference
+    at(index_type i) const
+    {
+        if (begin_ <= i && i < end_)
+        {
+            const_reference v(operator[](i));
+            if (!not_set(v)) return v;
+        }
+
+        throw NotFound();
+    }
 
     iterator
     find(index_type i) { return find_tmpl<iterator>(*this, i); }

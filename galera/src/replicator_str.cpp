@@ -367,9 +367,20 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             {
                 log_info << "IST request: " << istr;
 
+                struct sgl
+                {
+                    gcache::GCache& gcache_;
+                    bool            unlock_;
+
+                    sgl(gcache::GCache& cache) : gcache_(cache), unlock_(false){}
+                    ~sgl() { if (unlock_) gcache_.seqno_unlock(); }
+                }
+                seqno_lock_guard(gcache_);
+
                 try
                 {
                     gcache_.seqno_lock(istr.last_applied() + 1);
+                    seqno_lock_guard.unlock_ = true;
                 }
                 catch(gu::NotFound& nf)
                 {
@@ -405,6 +416,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                          istr.last_applied() + 1,
                                          cc_seqno_,
                                          protocol_version_);
+
+                        // seqno will be unlocked when sender exists
+                        seqno_lock_guard.unlock_ = false;
                     }
                     catch (gu::Exception& e)
                     {

@@ -157,6 +157,45 @@ START_TEST(pop_holes) /* autoshrinking when popping on container with holes */
 }
 END_TEST
 
+START_TEST(at)
+{
+    typedef gu::DeqMap<char, char> Map;
+    Map m(-1);
+
+    try
+    {
+        m.at(-1);
+        fail("expected exception");
+    }
+    catch (gu::NotFound&) {}
+
+    m.push_back(3);
+
+    try
+    {
+        fail_if(3 != m.at(-1));
+    }
+    catch (...)
+    {
+        fail("unexpected exception");
+    }
+
+    try
+    {
+        m.at(-2);
+        fail("expected exception");
+    }
+    catch (gu::NotFound&) {}
+
+    try
+    {
+        m.at(0);
+        fail("expected exception");
+    }
+    catch (gu::NotFound&) {}
+}
+END_TEST
+
 START_TEST(iterators_insert)
 {
     typedef gu::DeqMap<char, char> Map;
@@ -587,7 +626,6 @@ START_TEST(random_access)
     for (Map::index_type i(Min + 1); i < Max; ++i)
     {
         fail_unless(Map::not_set(m[i]));
-        fail_unless(Map::not_set(m.at(i)));
     }
 
     for (Map::index_type i(Min + 1); i < Max; ++i)
@@ -602,7 +640,7 @@ START_TEST(random_access)
         Map::value_type const val((Test(i)));
 
         fail_unless(m[i] == val);
-        fail_unless(m.at(i) == val);
+        if (!Map::not_set(val)) fail_unless(m.at(i) == val);
     }
 }
 END_TEST
@@ -827,6 +865,10 @@ Suite* gu_deqmap_suite ()
     t = tcase_create("push_pop");
     tcase_add_test(t, push_pop);
     tcase_add_test(t, pop_holes);
+    suite_add_tcase(s, t);
+
+    t = tcase_create("at");
+    tcase_add_test(t, at);
     suite_add_tcase(s, t);
 
     t = tcase_create("iterators");

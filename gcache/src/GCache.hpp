@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -216,7 +216,6 @@ namespace gcache
             params;
 
         gu::Mutex       mtx;
-        gu::Cond        cond;
 
         seqno2ptr_t     seqno2ptr;
         gu::UUID        gid;
@@ -229,9 +228,11 @@ namespace gcache
         long long       reallocs;
         long long       frees;
 
-        seqno_t         seqno_locked;
         seqno_t         seqno_max;
         seqno_t         seqno_released;
+
+        seqno_t         seqno_locked;
+        int             seqno_locked_count;
 
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;
