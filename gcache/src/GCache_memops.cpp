@@ -28,6 +28,9 @@ namespace gcache
     {
         assert(mtx.locked() && mtx.owned());
 
+        /* if we can't complete the operation, let's not even start */
+        if (seqno >= seqno_locked) return false;
+
 #ifndef NDEBUG
         seqno_t begin(0);
         if (params.debug())
@@ -155,7 +158,7 @@ namespace gcache
             {
                 if (gu_unlikely(!discard_seqno(bh->seqno_g)))
                 {
-                    new_released = (seqno2ptr.index_begin() - 1);
+                    new_released = (bh->seqno_g - 1);
                     assert(seqno_released <= new_released);
                 }
             }

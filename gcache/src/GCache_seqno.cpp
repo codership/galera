@@ -253,44 +253,30 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
-        if (seqno2ptr.find(seqno_g) == seqno2ptr.end()) throw gu::NotFound();
+        assert(seqno_g > 0);
 
-        if (seqno_locked != SEQNO_NONE)
-        {
-            cond.signal();
-        }
-        seqno_locked = seqno_g;
+        assert(SEQNO_MAX == seqno_locked || seqno_locked_count > 0);
+        assert(0   == seqno_locked_count || seqno_locked < SEQNO_MAX);
+
+        seqno2ptr.at(seqno_g); /* check that the element exists */
+
+        seqno_locked_count++;
+
+        if (seqno_g < seqno_locked) seqno_locked = seqno_g;
     }
 
     /*!
      * Get pointer to buffer identified by seqno.
-     * Moves lock to the given seqno.
+     * Repossesses the buffer if it was already released, preventing its
+     * (and following buffers) discarding.
      * @throws NotFound
      */
     const void* GCache::seqno_get_ptr (seqno_t const seqno_g,
                                        ssize_t&      size)
     {
-        const void* ptr(0);
-
         gu::Lock lock(mtx);
 
-        seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
-
-        if (p != seqno2ptr.end() && *p)
-        {
-            if (seqno_locked != SEQNO_NONE)
-            {
-                cond.signal();
-            }
-            seqno_locked = seqno_g;
-
-            ptr = *p;
-        }
-        else
-        {
-            throw gu::NotFound();
-        }
-
+        const void* const ptr(seqno2ptr.at(seqno_g));
         assert (ptr);
 
         BufferHeader* const bh(ptr2BH(ptr));
@@ -335,17 +321,13 @@ namespace gcache
         {
             gu::Lock lock(mtx);
 
+            assert(seqno_locked <= start);
+            // the caller should have locked the range first
+
             seqno2ptr_iter_t p = seqno2ptr.find(start);
 
             if (p != seqno2ptr.end() && *p)
             {
-                if (seqno_locked != SEQNO_NONE)
-                {
-                    cond.signal();
-                }
-
-                seqno_locked = start;
-
                 do {
                     assert(seqno2ptr.index(p) == seqno_t(start + found));
                     assert(*p);
@@ -379,7 +361,18 @@ namespace gcache
     void GCache::seqno_unlock ()
     {
         gu::Lock lock(mtx);
-        seqno_locked = SEQNO_NONE;
-        cond.signal();
+
+        if (seqno_locked_count > 0)
+        {
+            assert(seqno_locked < SEQNO_MAX);
+            seqno_locked_count--;
+            if (0 == seqno_locked_count) seqno_locked = SEQNO_MAX;
+        }
+        else
+        {
+            assert(SEQNO_MAX == seqno_locked);
+            assert(0); // something wrong with the caller's logic
+            seqno_locked = SEQNO_MAX;
+        }
     }
 }

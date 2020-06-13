@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
 //
 
 
@@ -156,6 +156,7 @@ extern "C" void* sender_thd(void* arg)
     gu::Config conf;
     galera::ReplicatorSMM::InitConfig(conf, NULL, NULL);
     gu_barrier_wait(&start_barrier);
+    sargs->gcache_.seqno_lock(sargs->first_); // unlocked in sender dtor
     galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_,
                                sargs->version_);
     mark_point();

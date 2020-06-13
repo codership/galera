@@ -411,13 +411,29 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         IST_request istr;
         get_ist_request(streq, &istr);
 
+        struct sgl
+        {
+            gcache::GCache& gcache_;
+            bool            unlock_;
+
+            sgl(gcache::GCache& cache) : gcache_(cache), unlock_(false){}
+            ~sgl() { if (unlock_) gcache_.seqno_unlock(); }
+        }
+        seqno_lock_guard(gcache_);
+
         if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
         {
             log_info << "IST request: " << istr;
 
+            wsrep_seqno_t const first
+                ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
+                 istr.last_applied() + 1 :
+                 std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
+
             try
             {
-                gcache_.seqno_lock(istr.last_applied() + 1);
+                gcache_.seqno_lock(first);
+                seqno_lock_guard.unlock_ = true;
             }
             catch(gu::NotFound& nf)
             {
@@ -440,10 +456,6 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
             if (rcode >= 0)
             {
-                wsrep_seqno_t const first
-                    ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
-                     istr.last_applied() + 1 :
-                     std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
                 try
                 {
                     ist_senders_.run(config_,
@@ -456,6 +468,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       * Need to keep it that way for backward
                                       * compatibility */
                                      protocol_version_);
+                    // seqno will be unlocked when sender exists
+                    seqno_lock_guard.unlock_ = false;
                 }
                 catch (gu::Exception& e)
                 {
@@ -472,6 +486,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         }
 
     full_sst:
+
+        assert(!seqno_lock_guard.unlock_);
 
         if (cert_.nbo_size() > 0)
         {
@@ -516,6 +532,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                         }
 
                         gcache_.seqno_lock(preload_start);
+                        seqno_lock_guard.unlock_ = true;
                     }
                     catch (gu::NotFound& nf)
                     {
@@ -543,6 +560,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       * Need to keep it that way for backward
                                       * compatibility */
                                      protocol_version_);
+                    // seqno will be unlocked when sender exists
+                    seqno_lock_guard.unlock_ = false;
                 }
                 else /* streq->version() == 0 */
                 {

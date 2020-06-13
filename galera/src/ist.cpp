@@ -561,7 +561,6 @@ void galera::ist::Receiver::run()
     }
 
 err:
-    gcache_.seqno_unlock();
     delete progress;
     gu::Lock lock(mutex_);
     if (use_ssl_ == true)
