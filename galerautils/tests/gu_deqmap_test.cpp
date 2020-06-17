@@ -671,7 +671,7 @@ START_TEST(find)
 }
 END_TEST
 
-START_TEST(random)
+START_TEST(random_test)
 {
     /* access methods */
     typedef enum
@@ -890,7 +890,7 @@ Suite* gu_deqmap_suite ()
     suite_add_tcase(s, t);
 
     t = tcase_create("random");
-    tcase_add_test(t, random);
+    tcase_add_test(t, random_test);
     suite_add_tcase(s, t);
 
     return s;
