@@ -35,16 +35,16 @@ START_TEST(ctor_clear)
     Map m(-1);
 
     fail_if(m.size() > 0);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end() != -1);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end() != Map::index_type(-1));
 
     fail_if(m.upper_bound(0) != m.index_end());
 
     m.clear(5);
 
     fail_if(m.size() > 0);
-    fail_if(m.index_begin() != 5);
-    fail_if(m.index_end() != 5);
+    fail_if(m.index_begin() != Map::index_type(5));
+    fail_if(m.index_end() != Map::index_type(5));
 
     fail_if(m.upper_bound(0) != m.index_begin());
 }
@@ -65,8 +65,8 @@ START_TEST(push_pop)
     fail_if(m.size()  != 4);
     fail_if(m.front() != 4);
     fail_if(m.back()  != 3);
-    fail_if(m.index_begin() != -2);
-    fail_if(m.index_end()   != 2);
+    fail_if(m.index_begin() != Map::index_type(-2));
+    fail_if(m.index_end()   != Map::index_type(2));
 
     m.pop_front();
     /* Here we have: 1, 2, 3 */
@@ -74,8 +74,8 @@ START_TEST(push_pop)
     fail_if(m.size()  != 3);
     fail_if(m.front() != 1);
     fail_if(m.back()  != 3);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 2);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(2));
 
     m.pop_back();
     /* Here we have: 1, 2 */
@@ -83,30 +83,30 @@ START_TEST(push_pop)
     fail_if(m.size()  != 2);
     fail_if(m.front() != 1);
     fail_if(m.back()  != 2);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 1);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(1));
 
     m.pop_front();
     m.pop_front();
     /* Here we have: empty */
 
     fail_if(m.size()  != 0);
-    fail_if(m.index_begin() != 1);
-    fail_if(m.index_end()   != 1);
+    fail_if(m.index_begin() != Map::index_type(1));
+    fail_if(m.index_end()   != Map::index_type(1));
 
     m.push_front(7); // 0
 
     fail_if(m.size()  != 1);
     fail_if(m.front() != 7);
     fail_if(m.back()  != 7);
-    fail_if(m.index_begin() != 0);
-    fail_if(m.index_end()   != 1);
+    fail_if(m.index_begin() != Map::index_type(0));
+    fail_if(m.index_end()   != Map::index_type(1));
 
     m.pop_back();
 
     fail_if(m.size()  != 0);
-    fail_if(m.index_begin() != 0);
-    fail_if(m.index_end()   != 0);
+    fail_if(m.index_begin() != Map::index_type(0));
+    fail_if(m.index_end()   != Map::index_type(0));
 }
 END_TEST
 
@@ -116,43 +116,43 @@ START_TEST(pop_holes) /* autoshrinking when popping on container with holes */
     Map m(-1);
 
     fail_if(m.size() != 0);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != -1);
-    fail_if(m.index_back()  != -2);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(-1));
+    fail_if(m.index_back()  != Map::index_type(-2));
 
     m.insert(1, 1);
     m.insert(4, 4);
 
     fail_if(m.size() != 4, "expected 4 got %u", m.size());
-    fail_if(m.index_begin() != 1);
-    fail_if(m.index_end()   != 5);
-    fail_if(m.index_back()  != 4);
+    fail_if(m.index_begin() != Map::index_type(1));
+    fail_if(m.index_end()   != Map::index_type(5));
+    fail_if(m.index_back()  != Map::index_type(4));
     fail_if(!Map::not_set(m[2]));
     fail_if(!Map::not_set(m[3]));
 
     m.pop_front();
 
     fail_if(m.size() != 1);
-    fail_if(m.index_begin() != 4);
-    fail_if(m.index_end()   != 5);
-    fail_if(m.index_back()  != 4);
+    fail_if(m.index_begin() != Map::index_type(4));
+    fail_if(m.index_end()   != Map::index_type(5));
+    fail_if(m.index_back()  != Map::index_type(4));
     fail_if(*m.begin() != 4);
 
     m.insert(1, 1);
 
     fail_if(m.size() != 4);
-    fail_if(m.index_begin() != 1);
-    fail_if(m.index_end()   != 5);
-    fail_if(m.index_back()  != 4);
+    fail_if(m.index_begin() != Map::index_type(1));
+    fail_if(m.index_end()   != Map::index_type(5));
+    fail_if(m.index_back()  != Map::index_type(4));
     fail_if(!Map::not_set(m[2]));
     fail_if(!Map::not_set(m[3]));
 
     m.pop_back();
 
     fail_if(m.size() != 1);
-    fail_if(m.index_begin() != 1);
-    fail_if(m.index_end()   != 2);
-    fail_if(m.index_back()  != 1);
+    fail_if(m.index_begin() != Map::index_type(1));
+    fail_if(m.index_end()   != Map::index_type(2));
+    fail_if(m.index_back()  != Map::index_type(1));
     fail_if(*m.begin() != 1);
 }
 END_TEST
@@ -207,8 +207,8 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 4);
     fail_if(*m.begin()  != 4);
     fail_if(*m.rbegin() != 4);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 3);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(3));
 
     m.insert(m.begin() + 1, 2, 2); // bulk insert (overwrite) in the middle
     /* here we have 4, 2, 2, 4 */
@@ -216,8 +216,8 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 4);
     fail_if(*m.begin()  != 4);
     fail_if(*m.rbegin() != 4);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 3);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(3));
 
     m.insert(m.begin(), 2, 1); // bulk insert (overwrite) in the beginning
     /* here we have 1, 1, 2, 4 */
@@ -225,8 +225,8 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 4);
     fail_if(*m.begin()  != 1);
     fail_if(*m.rbegin() != 4);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 3);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(3));
 
     m.insert(m.end(), 2, 5); // bulk insert in the end
     /* here we have 1, 1, 2, 4, 5, 5 */
@@ -234,8 +234,8 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 6);
     fail_if(*m.begin()  != 1);
     fail_if(*m.rbegin() != 5);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 5);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(5));
 
     m.insert(m.begin(), -1); // single insert (overwrite) in the beginning
     /* here we have -1, 1, 2, 4, 5, 5 */
@@ -243,8 +243,8 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 6);
     fail_if(*m.begin()  != -1);
     fail_if(*m.rbegin() != 5);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 5);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(5));
 
     Map::iterator b(m.begin());
     ++b;
@@ -267,9 +267,9 @@ START_TEST(iterators_insert)
     fail_if(m.size() != 7);
     fail_if(*m.begin()  != -1);
     fail_if(*m.rbegin() != 6);
-    fail_if(m.index_begin() != -1);
-    fail_if(m.index_end()   != 6);
-    fail_if(m.index_back()  != 5);
+    fail_if(m.index_begin() != Map::index_type(-1));
+    fail_if(m.index_end()   != Map::index_type(6));
+    fail_if(m.index_back()  != Map::index_type(5));
     fail_if(m[m.index_back()] != 6);
 
     ++b;
@@ -309,7 +309,7 @@ START_TEST(iterators_erase)
     /* here we have 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 */
 
     fail_if(m.size() != init_size);
-    fail_if(m.index_begin() != -1);
+    fail_if(m.index_begin() != Map::index_type(-1));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -327,7 +327,7 @@ START_TEST(iterators_erase)
     fail_unless(Map::not_set(*e));
 
     fail_if(m.size() != init_size);
-    fail_if(m.index_begin() != -1);
+    fail_if(m.index_begin() != Map::index_type(-1));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -337,7 +337,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 1);
-    fail_if(m.index_begin() != 0);
+    fail_if(m.index_begin() != Map::index_type(0));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -347,7 +347,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 3);
-    fail_if(m.index_begin() != 2);
+    fail_if(m.index_begin() != Map::index_type(2));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -357,7 +357,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 4);
-    fail_if(m.index_begin() != 2);
+    fail_if(m.index_begin() != Map::index_type(2));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -367,7 +367,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 7);
-    fail_if(m.index_begin() != 2);
+    fail_if(m.index_begin() != Map::index_type(2));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -377,7 +377,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 9);
-    fail_if(m.index_begin() != 4);
+    fail_if(m.index_begin() != Map::index_type(4));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -387,7 +387,7 @@ START_TEST(iterators_erase)
     /*                    b                 e          */
 
     fail_if(m.size() != init_size - 11);
-    fail_if(m.index_begin() != 4);
+    fail_if(m.index_begin() != Map::index_type(4));
     fail_if(m.index_end() != m.index_begin() + int(m.size()));
     fail_if(m.front() != 1);
     fail_if(m.back()  != 1);
@@ -408,7 +408,7 @@ START_TEST(iterators_erase)
     m.erase(m.begin(), m.begin() + 2);
     /* here we have             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 */
     fail_if(m.size() != init_size - 4);
-    fail_if(m.index_begin() != 8);
+    fail_if(m.index_begin() != Map::index_type(8));
 
     m.erase(m.end() - 3, m.end() - 1);
     /* here we have             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, N, N, 1 */
@@ -429,7 +429,7 @@ START_TEST(iterators_erase)
     m.erase(m.begin() + 5, m.begin() + 7);
     /* here we have             1, 1, N, N, 1, N, N, 1, 1             */
     fail_if(m.size() != init_size - 8);
-    fail_if(m.index_begin() != 8);
+    fail_if(m.index_begin() != Map::index_type(8));
 
     fail_unless(Map::not_set(m[m.index_begin() + 2]));
     fail_unless(Map::not_set(m[m.index_begin() + 3]));
@@ -444,7 +444,7 @@ START_TEST(iterators_erase)
     m.erase(m.begin());
     /* here we have                                     1             */
     fail_if(m.size() != 1);
-    fail_if(m.index_begin() != 16);
+    fail_if(m.index_begin() != Map::index_type(16));
 }
 END_TEST
 
@@ -611,13 +611,13 @@ START_TEST(random_access)
 {
     typedef gu::DeqMap<char, Test> Map;
     Map::index_type const Min(-5);
-    Map::index_type  const Max(5);
+    Map::index_type const Max(5);
 
     Map m(100);
     m.insert(Min, Test(Min));
     m.insert(Max, Test(Max));
 
-    fail_if(m.size() != (Max - Min + 1));
+    fail_if(m.size() != size_t(Max - Min + 1));
     fail_if(m.index_begin() != Min);
     fail_if(m.index_back()  != Max);
     fail_unless(m.front() == Test(Min));
@@ -891,6 +891,7 @@ Suite* gu_deqmap_suite ()
 
     t = tcase_create("random");
     tcase_add_test(t, random_test);
+    tcase_set_timeout(t, 120);
     suite_add_tcase(s, t);
 
     return s;
