@@ -675,7 +675,7 @@ Suite* write_set_suite()
 
     tc = tcase_create("test_cert_hierarchical_v2");
     tcase_add_test(tc, test_cert_hierarchical_v2);
-    tcase_set_timeout(tc, 20);
+    tcase_set_timeout(tc, 120);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_trac_726");

@@ -14,7 +14,11 @@ namespace gcache
 
     static seqno_t const SEQNO_NONE =  0;
     static seqno_t const SEQNO_ILL  = -1;
-    static seqno_t const SEQNO_MAX  = std::numeric_limits<seqno_t>::max();
+    static seqno_t const SEQNO_MAX
+#if __GNUC__ == 5 && __GNUC_MINOR__ == 4 /* workaround for Xenial GCC bug */
+                                    __attribute__((unused))
+#endif
+                                    = std::numeric_limits<seqno_t>::max();
 
 } /* namespace gcache */
 

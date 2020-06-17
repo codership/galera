@@ -139,6 +139,7 @@ Suite* service_thd_suite()
     tcase_add_test  (tc, service_thd1);
     tcase_add_test  (tc, service_thd2);
     tcase_add_test  (tc, service_thd3);
+    tcase_set_timeout(tc, 60);
     suite_add_tcase (s, tc);
 
     return s;
