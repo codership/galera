@@ -272,10 +272,10 @@ void gcomm::PropagationMatrix::propagate_until_cvi(bool handle_timers)
         }
         if (handle_timers)
         {
-            // Assume that time progresses in millisecond intervals
+            // Assume that time progresses in 50 millisecond intervals
             // and that is fine enough granularity for all tests
             // which deal with timers.
-            gu::datetime::SimClock::inc_time(gu::datetime::MSec);
+            gu::datetime::SimClock::inc_time(50*gu::datetime::MSec);
         }
     }
     while (all_in == false);
