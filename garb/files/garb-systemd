@@ -1,10 +1,10 @@
 #!/bin/bash -ue
 #
 
-if [[ -f /etc/redhat-release ]]; then
-  config=/etc/sysconfig/garb
-else
+if [[ -f /etc/debian_version ]]; then
   config=/etc/default/garb
+else
+  config=/etc/sysconfig/garb
 fi
 
 log_failure() {
