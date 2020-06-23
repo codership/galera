@@ -31,7 +31,7 @@ operator <<(std::ostream& os, const Test& t) { os << +t; return os; }
 
 START_TEST(ctor_clear)
 {
-    typedef gu::DeqMap<char, Test> Map;
+    typedef gu::DeqMap<signed char, Test> Map;
     Map m(-1);
 
     fail_if(m.size() > 0);
@@ -52,7 +52,7 @@ END_TEST
 
 START_TEST(push_pop)
 {
-    typedef gu::DeqMap<char, char> Map;
+    typedef gu::DeqMap<signed char, char> Map;
     Map m(-1);
 
     /* some push acton */
@@ -112,7 +112,7 @@ END_TEST
 
 START_TEST(pop_holes) /* autoshrinking when popping on container with holes */
 {
-    typedef gu::DeqMap<char, char> Map;
+    typedef gu::DeqMap<signed char, char> Map;
     Map m(-1);
 
     fail_if(m.size() != 0);
@@ -159,7 +159,7 @@ END_TEST
 
 START_TEST(at)
 {
-    typedef gu::DeqMap<char, char> Map;
+    typedef gu::DeqMap<signed char, char> Map;
     Map m(-1);
 
     try
@@ -198,7 +198,7 @@ END_TEST
 
 START_TEST(iterators_insert)
 {
-    typedef gu::DeqMap<char, char> Map;
+    typedef gu::DeqMap<signed char, char> Map;
     Map m(-1);
 
     m.insert(m.begin(), 4, 4);
@@ -301,7 +301,7 @@ END_TEST
 
 START_TEST(iterators_erase)
 {
-    typedef gu::DeqMap<char, char> Map;
+    typedef gu::DeqMap<signed char, char> Map;
     Map m(-1);
 
     Map::size_type init_size(12);
@@ -453,7 +453,7 @@ END_TEST
 static void
 null_insertions(size_t const SIZE)
 {
-    typedef gu::DeqMap<char, Test> Map;
+    typedef gu::DeqMap<signed char, Test> Map;
     Map::value_type const Null(Map::null_value());
     fail_unless(Map::null_value() == Null);
     fail_unless(Map::not_set(Null));
@@ -609,7 +609,7 @@ END_TEST
 
 START_TEST(random_access)
 {
-    typedef gu::DeqMap<char, Test> Map;
+    typedef gu::DeqMap<signed char, Test> Map;
     Map::index_type const Min(-5);
     Map::index_type const Max(5);
 
