@@ -52,7 +52,7 @@ END_TEST
 
 START_TEST(push_pop)
 {
-    typedef gu::DeqMap<signed char, char> Map;
+    typedef gu::DeqMap<signed char, signed char> Map;
     Map m(-1);
 
     /* some push acton */
@@ -112,7 +112,7 @@ END_TEST
 
 START_TEST(pop_holes) /* autoshrinking when popping on container with holes */
 {
-    typedef gu::DeqMap<signed char, char> Map;
+    typedef gu::DeqMap<signed char, signed char> Map;
     Map m(-1);
 
     fail_if(m.size() != 0);
@@ -159,7 +159,7 @@ END_TEST
 
 START_TEST(at)
 {
-    typedef gu::DeqMap<signed char, char> Map;
+    typedef gu::DeqMap<signed char, signed char> Map;
     Map m(-1);
 
     try
@@ -198,7 +198,7 @@ END_TEST
 
 START_TEST(iterators_insert)
 {
-    typedef gu::DeqMap<signed char, char> Map;
+    typedef gu::DeqMap<signed char, signed char> Map;
     Map m(-1);
 
     m.insert(m.begin(), 4, 4);
@@ -301,7 +301,7 @@ END_TEST
 
 START_TEST(iterators_erase)
 {
-    typedef gu::DeqMap<signed char, char> Map;
+    typedef gu::DeqMap<signed char, signed char> Map;
     Map m(-1);
 
     Map::size_type init_size(12);
