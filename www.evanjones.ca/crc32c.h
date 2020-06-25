@@ -10,6 +10,10 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint stuff
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /** Returns the initial value for a CRC32-C computation. */
 static inline uint32_t crc32cInit() {
     return 0xFFFFFFFF;
@@ -52,5 +56,9 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cHardware32(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length);
 #endif /* !CRC32C_NO_HARDWARE */
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif /* __CRC32C_H__ */

@@ -78,7 +78,7 @@ if all_tests:
     env.Test("go_to_test.passed", gu_to_test)
     env.Test("avalance.passed", avalanche)
 
-    # copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
+# copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
 #                         source = Split('''
 #                             copy_vs_assignment.cpp
 #                         '''))
@@ -88,3 +88,7 @@ deqmap_bench = env.Program(target = 'deqmap_bench',
                                deqmap_bench.cpp
                            '''))
 
+crc32c_bench = env.Program(target = 'crc32c_bench',
+                           source = Split('''
+                               crc32c_bench.cpp
+                           '''))

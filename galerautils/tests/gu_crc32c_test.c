@@ -1,10 +1,11 @@
 /*
- * Copyright (C) 2013-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2013-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
 #include "../src/gu_crc32c.h"
+#include <www.evanjones.ca/crc32c.h>
 
 #include "gu_crc32c_test.h"
 
@@ -34,21 +35,21 @@ struct test_pair
 static struct test_pair
 test_vector[] =
 {
-    { "",                  0x00000000 },
-    { "1",                 0x90f599e3 },
-    { "22",                0x47b26cf9 },
-    { "333",               0x4cb6e5c8 },
-    { "4444",              0xfb8150f7 },
-    { "55555",             0x23874b2f },
-    { "666666",            0xfad65244 },
-    { "7777777",           0xe4cbaa36 },
-    { "88888888",          0xda8901c2 },
-    { "123456789",         0xe3069283 }, // taken from SCTP mailing list
-    { "My",                0xc7600404 }, // taken from
-    { "test",              0x86a072c0 }, // http://www.zorc.breitbandkatze.de/crc.html
-    { "vector",            0xa0b8f38a },
-    { long_input,          long_output},
-    { NULL,                0x0 }
+    { "",             0x00000000 },
+    { "1",            0x90f599e3 },
+    { "22",           0x47b26cf9 },
+    { "333",          0x4cb6e5c8 },
+    { "4444",         0xfb8150f7 },
+    { "55555",        0x23874b2f },
+    { "666666",       0xfad65244 },
+    { "7777777",      0xe4cbaa36 },
+    { "88888888",     0xda8901c2 },
+    { "123456789",    0xe3069283 }, // taken from SCTP mailing list
+    { "My",           0xc7600404 }, // taken from
+    { "test",         0x86a072c0 }, // http://www.zorc.breitbandkatze.de/crc.html
+    { "vector",       0xa0b8f38a },
+    { long_input,     long_output},
+    { NULL,           0x0        }
 };
 
 static void
@@ -121,28 +122,84 @@ START_TEST(test_SlicingBy8)
 }
 END_TEST
 
-// will run a hardware test, if available
+// will run x86 hardware test, if available
 START_TEST(test_hardware)
 {
-    gu_crc32c_configure();
+    gu_crc32c_func = detectBestCRC32C();
     test_function();
 }
 END_TEST
 
+START_TEST(test_gu_crc32c_sarwate)
+{
+    gu_crc32c_func = gu_crc32c_sarwate;
+    test_function();
+}
+END_TEST
+
+START_TEST(test_gu_crc32c_slicing_by_4)
+{
+    gu_crc32c_func = gu_crc32c_slicing_by_4;
+    test_function();
+}
+END_TEST
+
+START_TEST(test_gu_crc32c_slicing_by_8)
+{
+    gu_crc32c_func = gu_crc32c_slicing_by_8;
+    test_function();
+}
+END_TEST
+
+#if defined(GU_CRC32C_X86)
+START_TEST(test_gu_crc32c_x86)
+{
+    gu_crc32c_func = gu_crc32c_x86;
+    test_function();
+}
+END_TEST
+
+#if defined(GU_CRC32C_X86_64)
+START_TEST(test_gu_crc32c_x86_64)
+{
+    gu_crc32c_func = gu_crc32c_x86_64;
+    test_function();
+}
+END_TEST
+#endif /* GU_CRC32C_X86_64 */
+#endif /* GU_CRC32C_X86 */
+
 Suite *gu_crc32c_suite(void)
 {
-    Suite *suite = suite_create("CRC32C implementation");
+    gu_crc32c_configure(); /* compute lookup tables for SW implementations */
 
-    TCase *sw = tcase_create("test_sw");
+    Suite *suite = suite_create("CRC32C implementations");
+    TCase *t;
 
-    suite_add_tcase (suite, sw);
-    tcase_add_test  (sw, test_Sarwate);
-    tcase_add_test  (sw, test_SlicingBy4);
-    tcase_add_test  (sw, test_SlicingBy8);
+    t = tcase_create("evanjones_sw");
+    suite_add_tcase (suite, t);
+    tcase_add_test  (t, test_Sarwate);
+    tcase_add_test  (t, test_SlicingBy4);
+    tcase_add_test  (t, test_SlicingBy8);
 
-    TCase *hw = tcase_create("test_hw");
-    suite_add_tcase (suite, hw);
-    tcase_add_test  (hw, test_hardware);
+    t = tcase_create("evanjones_hw");
+    suite_add_tcase (suite, t);
+    tcase_add_test  (t, test_hardware);
+
+    t = tcase_create("gu_crc32c_sw");
+    suite_add_tcase (suite, t);
+    tcase_add_test  (t, test_gu_crc32c_sarwate);
+    tcase_add_test  (t, test_gu_crc32c_slicing_by_4);
+    tcase_add_test  (t, test_gu_crc32c_slicing_by_8);
+
+#if defined(GU_CRC32C_X86)
+    t = tcase_create("gu_crc32c_hw_x86");
+    suite_add_tcase (suite, t);
+    tcase_add_test  (t, test_gu_crc32c_x86);
+#if defined(GU_CRC32C_X86_64)
+    tcase_add_test  (t, test_gu_crc32c_x86_64);
+#endif /* GU_CRC32C_X86_64 */
+#endif /* GU_CRC32C_X86 */
 
     return suite;
 }
