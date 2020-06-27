@@ -77,6 +77,7 @@ Commandline Options:
     bits=[32bit|64bit]
     install=path        install files under path
     version_script=[0|1] Use version script (default 1)
+    crc32c_no_hardware=[0|1] disable building hardware support for CRC32C
 ''')
 # bpostatic option added on Percona request
 
@@ -662,7 +663,13 @@ print('Global flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
     print(f + ': ' + env[f].strip())
 
-Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'install')
+Export('machine',
+       'x86',
+       'bits',
+       'env',
+       'sysname',
+       'libboost_program_options',
+       'install')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

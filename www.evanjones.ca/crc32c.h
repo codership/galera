@@ -48,7 +48,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
 #define CRC32C_x86
 #endif
 
-#if !defined(CRC32C_x86)
+#if !defined(CRC32C_x86) || defined(GU_CRC32C_NO_HARDWARE)
 #define CRC32C_NO_HARDWARE
 #endif
 

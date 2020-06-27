@@ -56,7 +56,7 @@ gu_crc32c (const void* data, size_t size)
     return (~(gu_crc32c_func (GU_CRC32C_INIT, data, size)));
 }
 
-/* Software CRC32-C implementations for gu_crc32c_func */
+/* Portable software-only CRC32-C implementations for gu_crc32c_func */
 extern gu_crc32c_t
 gu_crc32c_sarwate     (gu_crc32c_t state, const void* data, size_t length);
 extern gu_crc32c_t
@@ -64,7 +64,7 @@ gu_crc32c_slicing_by_4(gu_crc32c_t state, const void* data, size_t length);
 extern gu_crc32c_t
 gu_crc32c_slicing_by_8(gu_crc32c_t state, const void* data, size_t length);
 
-#if !defined(CRC32C_NO_HARDWARE)
+#if !defined(GU_CRC32C_NO_HARDWARE)
 
 #if defined(__x86_64) || defined(_M_AMD64) || defined(_M_X64)
 #define GU_CRC32C_X86_64
@@ -75,7 +75,7 @@ gu_crc32c_slicing_by_8(gu_crc32c_t state, const void* data, size_t length);
 #endif
 
 #if defined(GU_CRC32C_X86)
-/* Hardware-based CRC32-C implementations for gu_crc32c_func */
+/* x86-based CRC32-C implementations for gu_crc32c_func */
 extern gu_crc32c_t
 gu_crc32c_x86(gu_crc32c_t state, const void* data, size_t length);
 #if defined(GU_CRC32C_X86_64)
@@ -83,6 +83,13 @@ extern gu_crc32c_t
 gu_crc32c_x86_64(gu_crc32c_t state, const void* data, size_t length);
 #endif /* GU_CRC32C_X86_64 */
 #endif /* GU_CRC32C_X86 */
+
+#if defined(GU_CRC32C_X86)
+/** Returns hardware-accelerated CRC32C implementation */
+extern gu_crc32c_func_t gu_crc32c_hardware();
+#else
+#define GU_CRC32C_NO_HARDWARE 1
+#endif
 
 #endif /* !GU_CRC32C_NO_HARDWARE */
 

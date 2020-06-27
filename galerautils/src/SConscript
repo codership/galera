@@ -1,4 +1,4 @@
-Import('env', 'x86', 'sysname')
+Import('env', 'x86', 'crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
 
 libgalerautils_env = env.Clone()
 
@@ -31,34 +31,25 @@ libgalerautils_sources = [
 
 libgalerautils_objs = libgalerautils_env.SharedObject(libgalerautils_sources)
 
-crc32c_env = env.Clone()
-crc32c_env.Append(CPPPATH = [ '#' ])
-crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA')
+crc32c_env = libgalerautils_env.Clone()
+crc32c_env.Append(CPPFLAGS = crc32c_cppflags)
+crc32c_env.Append(CPPFLAGS = ' -DWITH_GALERA') # for www.evanjones.ca code
 crc32c_sources = [ '#/www.evanjones.ca/crc32c.c', 'gu_crc32c.c' ]
-crc32c_objs = crc32c_env.SharedObject(crc32c_sources)
 
-if x86:
-    crc32c_env.Append(CFLAGS = ' -msse4.2')
-    if sysname == 'sunos':
-        # Ideally we want to simply strip SSE4.2 flag from the resulting
-        # crc32.pic.o
-        # (see http://ffmpeg.org/pipermail/ffmpeg-user/2013-March/013977.html)
-        # but that requires some serious scons-fu, so we just don't
-        # compile hardware support in if host CPU does not have it.
-        from subprocess import check_call
-        try:
-            check_call("isainfo -v | grep sse4.2 >/dev/null 2>&1", shell=True);
-        except:
-            libgalerautils_env.Append(CPPFLAGS = ' -DCRC32C_NO_HARDWARE')
-            crc32c_env.Append(CPPFLAGS = ' -DCRC32C_NO_HARDWARE')
+if not crc32c_no_hardware:
+    # environment with hardware-specific flags
+    crc32c_hw_env = crc32c_env.Clone()
+    crc32c_hw_env.Append(CFLAGS = crc32c_cflags)
+    if x86:
+        crc32c_env.Append(CFLAGS = crc32c_cflags) # for www.evanjones.ca code
+        libgalerautils_objs += crc32c_hw_env.SharedObject([ 'gu_crc32c_x86.c' ])
+
+libgalerautils_objs += crc32c_env.SharedObject(crc32c_sources)
 
 libgalerautils_env.StaticLibrary('galerautils',
-                                 libgalerautils_objs + crc32c_objs)
+                                 libgalerautils_objs)
 
-env.Append(LIBGALERA_OBJS = libgalerautils_objs + crc32c_objs)
-#env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
-#           libgalerautils_sources))
-#env.Append(LIBGALERA_OBJS = crc32c_objs)
+env.Append(LIBGALERA_OBJS = libgalerautils_objs)
 
 libgalerautilsxx_env = env.Clone()
 
