@@ -1560,6 +1560,9 @@ START_TEST(test_trac_413)
         n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
         n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
         delete dg;
+        // Clean up n2 out queue
+        dg = n2.tp().out();
+        delete dg;
     }
 
     mark_point();
@@ -1580,6 +1583,7 @@ START_TEST(test_trac_413)
         Datagram* dg(n3.tp().out());
         fail_unless(dg != 0);
         n3.p().handle_up(0, *dg, ProtoUpMeta(n3.uuid()));
+        delete dg;
         dg = n3.tp().out();
         fail_unless(dg == 0 &&
                     n3.p().state() == gcomm::pc::Proto::S_NON_PRIM,
@@ -2812,6 +2816,7 @@ static void _test_join_split_cluster(
         fail_unless(dg2 != 0);
         pc2.handle_up(0, *dg2, ProtoUpMeta(pu2.uuid()));
         fail_unless(pc2.state() == Proto::S_NON_PRIM);
+        delete dg2;
     }
     {
         View tr1(0, ViewId(V_TRANS, pc1.current_view().id()));
@@ -2888,6 +2893,7 @@ static void _test_join_split_cluster(
         fail_unless(pc1.state() == Proto::S_PRIM);
         fail_unless(pc2.state() == Proto::S_PRIM);
         fail_unless(pc3.state() == Proto::S_PRIM);
+        delete dg;
     }
 }
 START_TEST(test_join_split_cluster)
@@ -3128,8 +3134,9 @@ START_TEST(test_trac_762)
         fail_unless(tp1->out() == 0);
         fail_unless(tp2->out() == 0);
         fail_unless(tp3->out() == 0);
+        delete dg;
     }
-
+    std::for_each(dn.begin(), dn.end(), gu::DeleteObject());
 }
 END_TEST
 
@@ -3195,6 +3202,7 @@ START_TEST(test_gh_92)
         reg2.add_member(pu2.uuid(), 0);
         pc2.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg2));
         fail_unless(pc2.state() == Proto::S_STATES_EXCH);
+        delete dg;
         dg = pu2.tp()->out();
         pc2.handle_up(0, *dg, ProtoUpMeta(pu2.uuid()));
         fail_unless(pc2.state() == Proto::S_NON_PRIM);
@@ -3210,9 +3218,12 @@ START_TEST(test_gh_92)
         reg3.add_member(pu3.uuid(), 0);
         pc3.handle_up(0, Datagram(), ProtoUpMeta(UUID::nil(), ViewId(), &reg3));
         fail_unless(pc3.state() == Proto::S_STATES_EXCH);
+        delete dg;
         dg = pu3.tp()->out();
         pc3.handle_up(0, *dg, ProtoUpMeta(pu3.uuid()));
         fail_unless(pc3.state() == Proto::S_NON_PRIM);
+        delete dg;
+        dg = 0;
     }
     seq += 1;
 
@@ -3341,6 +3352,8 @@ START_TEST(test_gh_92)
         fail_unless(dg3 != 0);
         pc3.handle_up(0, *dg3, ProtoUpMeta(pu3.uuid()));
         fail_unless(pc3.state() == Proto::S_NON_PRIM);
+
+        delete dg1; delete dg2; delete dg3;
     }
     seq += 1;
 
@@ -3398,6 +3411,7 @@ START_TEST(test_gh_92)
         fail_unless(pc2.state() == Proto::S_INSTALL);
         fail_unless(pc3.state() == Proto::S_INSTALL);
 
+        delete im;
         im = pu1.tp()->out();
         fail_unless(im != 0);
         fail_unless(pu2.tp()->out() == 0);
@@ -3408,6 +3422,7 @@ START_TEST(test_gh_92)
         fail_unless(pc1.state() == Proto::S_PRIM);
         fail_unless(pc2.state() == Proto::S_PRIM);
         fail_unless(pc3.state() == Proto::S_PRIM);
+        delete im;
     }
 }
 END_TEST

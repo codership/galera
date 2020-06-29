@@ -357,7 +357,7 @@ gcs_core_send (gcs_core_t*          const conn,
         size_t to_copy = chunk_size;
 
         while (to_copy > 0) {        // gather action bufs into one
-            if (to_copy < left) {
+            if (to_copy <= left) {
                 memcpy (dst, ptr, to_copy);
                 ptr     += to_copy;
                 left    -= to_copy;

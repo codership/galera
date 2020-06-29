@@ -464,6 +464,11 @@ START_TEST(gcs_memb_test_465)
 
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
     fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
+
+    free(const_cast<void*>(act.buf));
+    for (i = 0; i < MAX_NODES; i++) {
+        gcs_group_free(&nodes[i].group);
+    }
 }
 END_TEST
 

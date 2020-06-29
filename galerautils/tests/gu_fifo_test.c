@@ -227,6 +227,8 @@ START_TEST(gu_fifo_cancel_test)
     mark_point();
 
     gu_thread_join(thread, NULL);
+
+    gu_fifo_destroy(q);
 }
 END_TEST
 

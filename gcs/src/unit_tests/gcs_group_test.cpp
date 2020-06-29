@@ -519,6 +519,7 @@ START_TEST(test_gcs_group_find_donor)
     // 6th home6 1        105
 
     const int number = 7;
+    group_nodes_free(&group);
     group.nodes = (gcs_node_t*)malloc(sizeof(gcs_node_t) * number);
     group.num = number;
     const gcs_seqno_t seqnos[] = {90, 95, 105, 100, 90, 95, 105};
@@ -597,12 +598,7 @@ START_TEST(test_gcs_group_find_donor)
     nodes[2].status = GCS_NODE_STATE_SYNCED;
 #undef SARGS
 
-    // todo: free
-    for(int i = 0; i < number; i++)
-    {
-        gcs_state_msg_destroy((gcs_state_msg_t*)nodes[i].state_msg);
-    }
-    free(nodes);
+    gcs_group_free(&group);
 }
 END_TEST
 
@@ -610,11 +606,13 @@ Suite *gcs_group_suite(void)
 {
     Suite *suite = suite_create("GCS group context");
     TCase *tcase = tcase_create("gcs_group");
-    TCase *tcase_ignore = tcase_create("gcs_group");
 
     suite_add_tcase (suite, tcase);
-    tcase_add_test  (tcase_ignore, gcs_group_configuration);
-    tcase_add_test  (tcase_ignore, gcs_group_last_applied);
+    tcase_add_test  (tcase, gcs_group_configuration);
+    // Last applied test is failing. Disabling for now until
+    // it gets fixed.
+    // tcase_add_test  (tcase, gcs_group_last_applied);
+    (void)gcs_group_last_applied;
     tcase_add_test  (tcase, test_gcs_group_find_donor);
 
     return suite;

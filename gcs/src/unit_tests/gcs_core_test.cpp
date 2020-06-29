@@ -43,6 +43,7 @@
 #include "../gcs_state_msg.hpp"
 
 #include <galerautils.h>
+#include "gu_config.hpp"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -324,7 +325,7 @@ core_test_set_payload_size (ssize_t s)
 
 // Initialises core and backend objects + some common tests
 static inline void
-core_test_init (bool bootstrap = true,
+core_test_init (gu::Config* config, bool bootstrap = true,
                 const char* name = "core_test")
 {
     long     ret;
@@ -332,10 +333,9 @@ core_test_init (bool bootstrap = true,
 
     mark_point();
 
-    gu_config_t* config = gu_config_create ();
     fail_if (config == NULL);
 
-    Core = gcs_core_create (config, NULL, name,
+    Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config), NULL, name,
                             "aaa.bbb.ccc.ddd:xxxx", 0, 0);
 
     fail_if (NULL == Core);
@@ -435,7 +435,8 @@ core_test_cleanup ()
 // just a smoke test for core API
 START_TEST (gcs_core_test_api)
 {
-    core_test_init ();
+    gu::Config config;
+    core_test_init (&config);
     fail_if (NULL == Core);
     fail_if (NULL == Backend);
 
@@ -551,7 +552,8 @@ START_TEST (gcs_core_test_own)
     gcs_comp_msg_add (prim,     "node1", 0);
     gcs_comp_msg_add (non_prim, "node1", 1);
 
-    core_test_init ();
+    gu::Config config;
+    core_test_init (&config);
 
     /////////////////////////////////////////////
     /// check behaviour in transitional state ///
@@ -944,8 +946,13 @@ Suite *gcs_core_suite(void)
 
   suite_add_tcase (suite, tcase);
   tcase_set_timeout(tcase, 60);
-
+  // Tests in this suite leak memory, disable them for now if ASAN
+  // is enabled.
+#ifdef GALERA_WITH_ASAN
+  bool skip = true;
+#else
   bool skip = false;
+#endif // GALERA_WITH_ASAN
   if (skip == false) {
       tcase_add_test  (tcase, gcs_core_test_api);
       tcase_add_test  (tcase, gcs_core_test_own);

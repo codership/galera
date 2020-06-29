@@ -94,6 +94,15 @@ gcs_group_init_history (gcs_group_t*     group,
                         gcs_seqno_t      seqno,
                         const gu_uuid_t* uuid);
 
+#ifdef GCS_CORE_TESTING
+/*!
+ * Free group nodes. Should not be used directly, exposed only for
+ * unit tests.
+ */
+extern void
+group_nodes_free (gcs_group_t* group);
+#endif // GCS_CORE_TESTING
+
 /*!
  * Free group resources
  */

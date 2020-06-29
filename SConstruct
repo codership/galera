@@ -65,6 +65,7 @@ Default target: all
 
 Commandline Options:
     debug=n             debug build with optimization level n
+    asan=[0|1]          disable or enable ASAN instrumentation
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
     system_asio=[0|1]   use system asio library, if available
@@ -75,6 +76,7 @@ Commandline Options:
     extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
     bits=[32bit|64bit]
     install=path        install files under path
+    version_script=[0|1] Use version script (default 1)
 ''')
 # bpostatic option added on Percona request
 
@@ -114,6 +116,7 @@ build_dir = ARGUMENTS.get('build_dir', '')
 # Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
+asan = ARGUMENTS.get('asan', 0)
 
 debug_lvl = int(debug)
 if debug_lvl >= 0 and debug_lvl < 3:
@@ -156,6 +159,7 @@ all_tests = int(ARGUMENTS.get('all_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
 static_ssl = ARGUMENTS.get('static_ssl', None)
 install = ARGUMENTS.get('install', None)
+version_script = int(ARGUMENTS.get('version_script', 1))
 
 GALERA_VER = ARGUMENTS.get('version', '3.30')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
@@ -270,6 +274,11 @@ if sysname != 'sunos':
 # static linking have beed addressed
 #
 #env.Prepend(LINKFLAGS = '-Wl,--warn-common -Wl,--fatal-warnings ')
+
+if int(asan):
+    env.Append(CCFLAGS = ' -fsanitize=address')
+    env.Append(CPPFLAGS = ' -DGALERA_WITH_ASAN')
+    env.Append(LINKFLAGS = ' -fsanitize=address')
 
 #
 # Check required headers and libraries (autoconf functionality)
@@ -708,7 +717,10 @@ conf = Configure(test_env, custom_tests = {
     'CheckVersionScript': CheckVersionScript,
 })
 
-has_version_script = conf.CheckVersionScript()
+if version_script:
+    has_version_script = conf.CheckVersionScript()
+else:
+    has_version_script = False
 conf.Finish()
 
 #

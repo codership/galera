@@ -123,7 +123,10 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
 }
 
 /* Free nodes array */
-static void
+#ifndef GCS_CORE_TESTING
+static
+#endif // GCS_CORE_TESTING
+void
 group_nodes_free (gcs_group_t* group)
 {
     int i;
