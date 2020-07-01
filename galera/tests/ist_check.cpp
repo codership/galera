@@ -391,7 +391,7 @@ static void store_cc(gcache::GCache* const gcache,
 
     fail_if(NULL == cc_ptr);
     memcpy(cc_ptr, tmp, cc_size);
-
+    free(tmp);
     gcache->seqno_assign(cc_ptr, i, GCS_ACT_CCHANGE, i > 0);
 }
 
@@ -505,13 +505,16 @@ Suite* ist_suite()
     suite_add_tcase(s, tc);
     tc = tcase_create("test_ist_v7");
     tcase_set_timeout(tc, 60);
+    suite_add_tcase(s, tc);
     tcase_add_test(tc, test_ist_v7);
     tc = tcase_create("test_ist_v8");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v8);
+    suite_add_tcase(s, tc);
     tc = tcase_create("test_ist_v9");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v9);
+    suite_add_tcase(s, tc);
     tc = tcase_create("test_ist_v10");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ist_v10);

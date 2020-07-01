@@ -281,15 +281,11 @@ if sysname != 'sunos':
 #env.Prepend(LINKFLAGS = '-Wl,--warn-common -Wl,--fatal-warnings ')
 if int(asan):
     env.Append(CCFLAGS = ' -fsanitize=address')
+    env.Append(CPPFLAGS = ' -DGALERA_WITH_ASAN')
     env.Append(LINKFLAGS = ' -fsanitize=address')
 
 if gcov:
     env.Append(LINKFLAGS = '--coverage -g')
-
-if int(asan):
-    env.Append(CCFLAGS = ' -fsanitize=address')
-    env.Append(CPPFLAGS = ' -DGALERA_WITH_ASAN')
-    env.Append(LINKFLAGS = ' -fsanitize=address')
 
 #
 # Check required headers and libraries (autoconf functionality)
