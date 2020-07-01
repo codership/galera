@@ -72,6 +72,7 @@ START_TEST (gcs_backend_test)
 
     ret = gcs_backend_init (&backend, "dummy://", config);
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
+    backend.destroy(&backend);
 //    fail_if (backend.name != gcs_test_name); this test is broken since we can
 //    no longer use global gcs_dummy_create() symbol because linking with real
 //    gcs_dummy.o
@@ -80,6 +81,7 @@ START_TEST (gcs_backend_test)
 #ifdef GCS_USE_GCOMM
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_gcomm_name);
+    backend.destroy(&backend);
 #else
     fail_if (ret != -ESOCKTNOSUPPORT);
 #endif
@@ -92,6 +94,7 @@ START_TEST (gcs_backend_test)
 //    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
 //    fail_if (backend.name != gcs_spread_name);
 
+    gu_config_destroy(config);
 }
 END_TEST
 

@@ -109,6 +109,15 @@ extern int
 gcs_group_init_history (gcs_group_t*    group,
                         const gu::GTID& position);
 
+#ifdef GCS_CORE_TESTING
+/*!
+ * Free group nodes. Should not be used directly, exposed only for
+ * unit tests.
+ */
+extern void
+group_nodes_free (gcs_group_t* group);
+#endif // GCS_CORE_TESTING
+
 /*!
  * Free group resources
  */

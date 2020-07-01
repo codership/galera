@@ -59,6 +59,7 @@ gcomm::evs::Node::~Node()
 {
     delete join_message_;
     delete leave_message_;
+    delete delayed_list_message_;
 }
 
 

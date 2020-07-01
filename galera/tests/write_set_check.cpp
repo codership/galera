@@ -573,7 +573,11 @@ START_TEST(test_cert_hierarchical_v2)
 }
 END_TEST
 
-
+// This test leaks memory and it is for trx protocol version 2
+// which is pre 25.3.5. Disabling this test for now with ASAN
+// build. The test should be either removed or fixed to work
+// with more recent protocol versions.
+#ifndef GALERA_WITH_ASAN
 START_TEST(test_trac_726)
 {
     log_info << "test_trac_726";
@@ -641,7 +645,7 @@ START_TEST(test_trac_726)
     }
 }
 END_TEST
-
+#endif // GALERA_WITH_ASAN
 
 Suite* write_set_suite()
 {
@@ -678,10 +682,12 @@ Suite* write_set_suite()
     tcase_set_timeout(tc, 120);
     suite_add_tcase(s, tc);
 
+#ifndef GALERA_WITH_ASAN
     tc = tcase_create("test_trac_726");
     tcase_add_test(tc, test_trac_726);
     tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
+#endif
 
     return s;
 }

@@ -2087,8 +2087,6 @@ START_TEST(test_gh_100)
     rb = get_msg(&t1, &msg);
     fail_unless(rb == 0);
 
-    // usleep(1100000);
-
     // Handle timers to  to generate shift to GATHER
     p1.handle_inactivity_timer();
     p1.handle_install_timer();
@@ -2100,6 +2098,9 @@ START_TEST(test_gh_100)
     fail_unless(im2.type() == Message::EVS_T_INSTALL);
     fail_unless(im2.install_view_id().seq() > im.install_view_id().seq());
 
+    gcomm::Datagram* tmp;
+    while ((tmp = t1.out())) delete tmp;
+    while ((tmp = t2.out())) delete tmp;
 }
 END_TEST
 
@@ -2494,6 +2495,10 @@ START_TEST(test_gap_rate_limit_delayed)
     fail_unless(read_dg != 0);
     fail_unless(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
     log_info << "END test_gap_rate_limit_delayed";
+
+    gcomm::Datagram* tmp;
+    while ((tmp = f.tr1.out())) delete tmp;
+    while ((tmp = f.tr2.out())) delete tmp;
 }
 END_TEST
 
@@ -2514,6 +2519,9 @@ START_TEST(test_out_queue_limit)
     const char small_data[1] = { 0 };
     dg = gu::SharedBuffer(new gu::Buffer(small_data, small_data + 1));
     fail_unless(f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE)) == EAGAIN);
+
+    gcomm::Datagram* tmp;
+    while ((tmp = f.tr1.out())) delete tmp;
 }
 END_TEST
 
