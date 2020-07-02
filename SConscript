@@ -5,7 +5,8 @@ SConscript(['galerautils/SConscript',
             'galera/SConscript',
             'garb/SConscript'])
 
-Import('env', 'sysname', 'has_version_script', 'galera_script', 'install')
+Import('env', 'sysname', 'has_version_script', 'galera_script', 'install',
+       'have_ssl')
 
 # Clone the environment as it will be extended for this specific library
 env = env.Clone()
@@ -30,13 +31,16 @@ else:
 if has_version_script:
     env.Depends(galera_lib, galera_script)
 
-def check_dynamic_symbols(target, source, env):
-    import subprocess
 
-    # Check if objdump exists
-    p = subprocess.Popen(['objdump', '--version'], stdout=subprocess.PIPE)
+def check_executable_exists(command):
+    import subprocess
+    p = subprocess.Popen(command, stdout=subprocess.PIPE)
     p.wait()
-    if p.returncode != 0:
+    return p.returncode
+
+def check_dynamic_symbols(target, source, env):
+    # Check if objdump exists
+    if check_executable_exists(['objdump', '--version']):
         print('objdump utility is not found. Skipping checks...')
         return 0
 
@@ -48,6 +52,30 @@ def check_dynamic_symbols(target, source, env):
 if has_version_script:
     env.AddPostAction(galera_lib, Action(check_dynamic_symbols,
                                          'Checking dynamic symbols for \'$TARGET\'...'))
+
+def check_no_ssl_linkage(target, source, env):
+    # Check if ldd exists
+    if check_executable_exists(['ldd', '--version']):
+        print('ldd utility is not found. Skipping linkage checks...')
+        return 0
+
+    if env.Execute(Action(['! ldd ' + target[0].abspath + ' | grep ssl'], None)):
+        return 1
+    if env.Execute(Action(['! ldd ' + target[0].abspath + ' | grep crypto'], None)):
+        return 1
+
+    if check_executable_exists(['nm', '--version']):
+        print('nm utility not found, Skipping symbol checks...')
+        return 0
+    if env.Execute(Action([' ! nm ' + target[0].abspath + ' | grep OPENSSL'],
+                          None)):
+        return 1
+
+# Verify that no SSL libraries were linked and no SSL symbols can be found
+# if SSL was not enabled.
+if not have_ssl:
+    env.AddPostAction(galera_lib, Action(check_no_ssl_linkage,
+                                         'Checking no-SSL linkage for \'$TARGET\'...'))
 
 if install:
     env.Install(install + '/lib', '#libgalera_smm.so')

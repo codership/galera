@@ -15,6 +15,8 @@
 #include <deque>
 #include <list>
 
+#include "gu_disable_non_virtual_dtor.hpp"
+
 namespace gcomm
 {
     class AsioProtonet;
@@ -32,7 +34,7 @@ public:
                   const ProtoUpMeta&);
     void interrupt();
     SocketPtr socket(const gu::URI&);
-    gcomm::Acceptor* acceptor(const gu::URI&);
+    std::shared_ptr<gcomm::Acceptor> acceptor(const gu::URI&);
     void enter();
     void leave();
     size_t mtu() const { return mtu_; }
@@ -41,21 +43,38 @@ public:
 
 private:
 
+    class TimerHandler : public gu::AsioSteadyTimerHandler
+                       , public std::enable_shared_from_this<TimerHandler>
+    {
+    public:
+        TimerHandler(AsioProtonet& pnet)
+            : pnet_(pnet)
+        { }
+        void handle_wait(const gu::AsioErrorCode& ec)
+        {
+            return pnet_.handle_wait(ec);
+        }
+    private:
+        AsioProtonet& pnet_;
+    };
+
     friend class AsioTcpSocket;
     friend class AsioTcpAcceptor;
     friend class AsioUdpSocket;
     AsioProtonet(const AsioProtonet&);
 
-    void handle_wait(const asio::error_code& ec);
+    void handle_wait(const gu::AsioErrorCode& ec);
 
     gu::RecursiveMutex          mutex_;
     gu::datetime::Date          poll_until_;
-    asio::io_service            io_service_;
-    asio::deadline_timer        timer_;
-    asio::ssl::context          ssl_context_;
+    gu::AsioIoService           io_service_;
+    std::shared_ptr<TimerHandler> timer_handler_;
+    gu::AsioSteadyTimer         timer_;
     size_t                      mtu_;
 
     NetHeader::checksum_t       checksum_;
 };
+
+#include "gu_enable_non_virtual_dtor.hpp"
 
 #endif // GCOMM_ASIO_PROTONET_HPP

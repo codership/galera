@@ -12,21 +12,11 @@
 #include "gu_array.hpp"
 #include "gu_shared_ptr.hpp"
 
-#include <boost/bind.hpp>
 #include <vector>
 #include <deque>
 
-//
-// Boost and std:: enable_shared_from_this<> does not have virtual destructor,
-// therefore need to ignore -Weffc++ and -Wnon-virtual-dtor
-//
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic push
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-# pragma GCC diagnostic ignored "-Weffc++"
-# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-#endif
+#include "gu_disable_non_virtual_dtor.hpp"
+#include "gu_compiler.hpp"
 
 /**
  * Configuration value denoting automatic buffer size adjustment for
@@ -45,65 +35,54 @@ namespace gcomm
 
 class gcomm::AsioTcpSocket :
     public gcomm::Socket,
-    public gu::enable_shared_from_this<AsioTcpSocket>::type
+    public gu::AsioSocketHandler,
+    public std::enable_shared_from_this<AsioTcpSocket>
 {
 public:
     AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
+    AsioTcpSocket(AsioProtonet& net, const gu::URI& uri,
+                  const std::shared_ptr<gu::AsioSocket>&);
     ~AsioTcpSocket();
-    void failed_handler(const asio::error_code& ec, const std::string& func, int line);
-    void handshake_handler(const asio::error_code& ec);
-    void connect_handler(const asio::error_code& ec);
-    void connect(const gu::URI& uri);
-    void close();
-    void write_handler(const asio::error_code& ec,
-                       size_t bytes_transferred);
-    void set_option(const std::string& key, const std::string& val);
-    int send(int segment, const Datagram& dg);
-    size_t read_completion_condition(
-        const asio::error_code& ec,
-        const size_t bytes_transferred);
-    void read_handler(const asio::error_code& ec,
-                      const size_t bytes_transferred);
-    void async_receive();
-    size_t mtu() const;
-    std::string local_addr() const;
-    std::string remote_addr() const;
-    State state() const { return state_; }
-    SocketId id() const { return &socket_; }
-    SocketStats stats() const;
+    void failed_handler(const gu::AsioErrorCode& ec,
+                        const std::string& func, int line);
+    // Socket interface
+    virtual void connect(const gu::URI& uri) GALERA_OVERRIDE;
+    virtual void close() GALERA_OVERRIDE;
+    virtual void set_option(const std::string& key, const std::string& val) GALERA_OVERRIDE;
+    virtual int send(int segment, const Datagram& dg) GALERA_OVERRIDE;
+    virtual void async_receive() GALERA_OVERRIDE;
+    virtual size_t mtu() const GALERA_OVERRIDE;
+    virtual std::string local_addr() const GALERA_OVERRIDE;
+    virtual std::string remote_addr() const GALERA_OVERRIDE;
+    virtual State state() const GALERA_OVERRIDE { return state_; }
+    virtual SocketId id() const GALERA_OVERRIDE { return &socket_; }
+    virtual SocketStats stats() const GALERA_OVERRIDE;
 private:
+    // AsioSocketHandler interface
+    virtual void connect_handler(gu::AsioSocket&, const gu::AsioErrorCode&) GALERA_OVERRIDE;
+    virtual void write_handler(gu::AsioSocket&, const gu::AsioErrorCode&, size_t) GALERA_OVERRIDE;
+    virtual size_t read_completion_condition(gu::AsioSocket&, const gu::AsioErrorCode&,
+                                             size_t) GALERA_OVERRIDE;
+    virtual void read_handler(gu::AsioSocket&, const gu::AsioErrorCode&, size_t) GALERA_OVERRIDE;
+
+    // 
     friend class gcomm::AsioTcpAcceptor;
     friend class gcomm::AsioPostForSendHandler;
 
+    
     AsioTcpSocket(const AsioTcpSocket&);
     void operator=(const AsioTcpSocket&);
 
-    void set_socket_options();
     void set_buf_sizes();
     void init_tstamps()
     {
         gu::datetime::Date now(gu::datetime::Date::monotonic());
         last_queued_tstamp_ = last_delivered_tstamp_ = now;
     }
-    void read_one(gu::array<asio::mutable_buffer, 1>::type& mbs);
-    void write_one(const gu::array<asio::const_buffer, 2>::type& cbs);
-    void close_socket();
-
-    // call to assign local/remote addresses at the point where it
-    // is known that underlying socket is live
-    void assign_local_addr();
-    void assign_remote_addr();
-
-    // returns real socket to use
-    typedef asio::basic_socket<asio::ip::tcp,
-                               asio::stream_socket_service<asio::ip::tcp> >
-    basic_socket_t;
-    basic_socket_t&
-    socket() { return (ssl_socket_ ? ssl_socket_->lowest_layer() : socket_); }
+    void cancel_deferred_close_timer();
 
     AsioProtonet&                             net_;
-    asio::ip::tcp::socket                     socket_;
-    asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
+    std::shared_ptr<gu::AsioSocket>           socket_;
     // Limit the number of queued bytes. This workaround to avoid queue
     // pile up due to frequent retransmissions by the upper layers (evs).
     // It is a responsibility of upper layers (evs) to request resending
@@ -116,26 +95,15 @@ private:
     size_t                                    recv_offset_;
     gu::datetime::Date                        last_delivered_tstamp_;
     State                                     state_;
-    // Querying addresses from failed socket does not work,
-    // so need to maintain copy for diagnostics logging
-    std::string                               local_addr_;
-    std::string                               remote_addr_;
 
-    template <typename T> unsigned long long
-    check_socket_option(const std::string& key, unsigned long long val)
-    {
-        T option;
-        socket().get_option(option);
-        if (val != static_cast<unsigned long long>(option.value()))
-        {
-            log_info << "Setting '" << key << "' to " << val
-                     << " failed. Resulting value is " << option.value();
-        }
-        return option.value();
-    }
+    class DeferredCloseTimer;
+    std::weak_ptr<DeferredCloseTimer>       deferred_close_timer_;
 };
 
-class gcomm::AsioTcpAcceptor : public gcomm::Acceptor
+class gcomm::AsioTcpAcceptor
+    : public gcomm::Acceptor
+    , public gu::AsioAcceptorHandler
+    , public std::enable_shared_from_this<AsioTcpAcceptor>
 {
 public:
 
@@ -155,19 +123,17 @@ public:
     SocketId id() const { return &acceptor_; }
 
 private:
+
     void accept_handler(
-        SocketPtr socket,
-        const asio::error_code& error);
+        gu::AsioAcceptor&,
+        const std::shared_ptr<gu::AsioSocket>&,
+        const gu::AsioErrorCode& error);
 
     AsioProtonet& net_;
-    asio::ip::tcp::acceptor acceptor_;
+    std::shared_ptr<gu::AsioAcceptor> acceptor_;
     SocketPtr accepted_socket_;
 };
 
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic pop
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#endif
+#include "gu_enable_non_virtual_dtor.hpp"
 
 #endif // GCOMM_ASIO_TCP_HPP

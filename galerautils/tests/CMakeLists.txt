@@ -69,6 +69,10 @@ add_executable(gu_tests++
   gu_tests++.cpp
   )
 
+target_compile_definitions(gu_tests++
+  PRIVATE
+  -DGU_ASIO_TEST_CERT_DIR="${CMAKE_SOURCE_DIR}/tests/conf")
+
 # TODO: These should be eventually fixed.
 target_compile_options(gu_tests++
   PRIVATE

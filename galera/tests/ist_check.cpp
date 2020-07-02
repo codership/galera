@@ -8,12 +8,142 @@
 #include "trx_handle.hpp"
 #include "monitor.hpp"
 #include "replicator_smm.hpp"
+#include "common.h"
 
 #include <GCache.hpp>
 #include <gu_arch.h>
 #include <check.h>
 
 using namespace galera;
+
+static void register_params(gu::Config& conf)
+{
+    galera::ist::register_params(conf);
+    galera::ReplicatorSMM::register_params(conf);
+    conf.add(COMMON_BASE_HOST_KEY);
+    conf.add(COMMON_BASE_PORT_KEY);
+#ifdef GALERA_HAVE_SSL
+    gu::ssl_register_params(conf);
+#endif // GALERA_HAVE_SSL
+}
+
+static void test_ist_recv_addr_expect(const std::string& expect,
+                                      const std::string& addr)
+{
+    fail_unless(expect == addr, "Expected %s got %s",
+                expect.c_str(), addr.c_str());
+}
+
+START_TEST(test_ist_recv_addr_not_set)
+{
+    gu::Config conf;
+    register_params(conf);
+    try
+    {
+        galera::IST_determine_recv_addr(conf);
+        fail("Exception not thrown");
+    }
+    catch (const gu::Exception& e)
+    {
+        fail_unless(e.get_errno() == EINVAL);
+    }
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_base_host)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(COMMON_BASE_HOST_KEY, "127.0.0.1");
+    test_ist_recv_addr_expect("tcp://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_ip)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(galera::ist::Receiver::RECV_ADDR, "127.0.0.1");
+    test_ist_recv_addr_expect("tcp://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_ip_port)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(galera::ist::Receiver::RECV_ADDR, "127.0.0.1:10001");
+
+    test_ist_recv_addr_expect("tcp://127.0.0.1:10001",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_tcp_ip)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(galera::ist::Receiver::RECV_ADDR, "tcp://127.0.0.1");
+    test_ist_recv_addr_expect("tcp://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_tcp_ip_port)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(galera::ist::Receiver::RECV_ADDR, "tcp://127.0.0.1");
+    test_ist_recv_addr_expect("tcp://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_bind_not_set)
+{
+    gu::Config conf;
+    register_params(conf);
+    conf.set(galera::ist::Receiver::RECV_ADDR, "127.0.0.1");
+    try
+    {
+        (void)galera::IST_determine_recv_bind(conf);
+        fail("Expcetion not thrown");
+    }
+    catch (const gu::NotSet&) { }
+}
+END_TEST
+
+#ifdef GALERA_HAVE_SSL
+
+START_TEST(test_ist_recv_addr_auto_ssl_scheme)
+{
+    gu::Config conf;
+    register_params(conf);
+    // Existing ssl_key parameter should result in ssl scheme if
+    // scheme is not explicitly given.
+    conf.set(gu::conf::ssl_key, "key");
+    conf.set(galera::ist::Receiver::RECV_ADDR, "127.0.0.1");
+    test_ist_recv_addr_expect("ssl://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+START_TEST(test_ist_recv_addr_ssl_scheme)
+{
+    gu::Config conf;
+    register_params(conf);
+    // Existing ssl_key parameter should result in ssl scheme if
+    // scheme is not explicitly given.
+    conf.set(gu::conf::ssl_key, "key");
+    conf.set(galera::ist::Receiver::RECV_ADDR, "ssl://127.0.0.1");
+    test_ist_recv_addr_expect("ssl://127.0.0.1:4568",
+                              galera::IST_determine_recv_addr(conf));
+}
+END_TEST
+
+#endif // GALERA_HAVE_SSL
 
 // Message tests
 
@@ -503,6 +633,45 @@ Suite* ist_suite()
 {
     Suite* s  = suite_create("ist");
     TCase* tc;
+
+    tc = tcase_create("test_ist_recv_addr_not_set");
+    tcase_add_test(tc, test_ist_recv_addr_not_set);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_ip");
+    tcase_add_test(tc, test_ist_recv_addr_ip);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_base_host");
+    tcase_add_test(tc, test_ist_recv_addr_base_host);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_ip_port");
+    tcase_add_test(tc, test_ist_recv_addr_ip_port);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_tcp_ip");
+    tcase_add_test(tc, test_ist_recv_addr_tcp_ip);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_tcp_ip_port");
+    tcase_add_test(tc, test_ist_recv_addr_tcp_ip_port);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_bind_not_set");
+    tcase_add_test(tc, test_ist_recv_bind_not_set);
+    suite_add_tcase(s, tc);
+
+#ifdef GALERA_HAVE_SSL
+    tc = tcase_create("test_ist_recv_addr_auto_ssl_scheme");
+    tcase_add_test(tc, test_ist_recv_addr_auto_ssl_scheme);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ist_recv_addr_ssl_scheme");
+    tcase_add_test(tc, test_ist_recv_addr_ssl_scheme);
+    suite_add_tcase(s, tc);
+
+#endif // GALERA_HAVE_SSL
 
     tc = tcase_create("test_ist_message");
     tcase_add_test(tc, test_ist_message);

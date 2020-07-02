@@ -79,7 +79,7 @@ public:
     //
     // @return Acceptor
     //
-    virtual Acceptor* acceptor(const gu::URI& uri) = 0;
+    virtual std::shared_ptr<Acceptor> acceptor(const gu::URI& uri) = 0;
 
     //!
     // Dispatch events until period p has passed or event

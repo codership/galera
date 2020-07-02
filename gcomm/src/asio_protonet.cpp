@@ -25,31 +25,16 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     gcomm::Protonet(conf, "asio", version),
     mutex_(),
     poll_until_(gu::datetime::Date::max()),
-    io_service_(),
+    io_service_(conf),
+    timer_handler_(std::make_shared<TimerHandler>(*this)),
     timer_(io_service_),
-    ssl_context_(io_service_, asio::ssl::context::sslv23),
+    // ssl_context_(io_service_, asio::ssl::context::sslv23),
     mtu_(1 << 15),
     checksum_(NetHeader::checksum_type(
                   conf.get<int>(gcomm::Conf::SocketChecksum,
                                 NetHeader::CS_CRC32C)))
 {
     conf.set(gcomm::Conf::SocketChecksum, checksum_);
-    // use ssl if either private key or cert file is specified
-    bool use_ssl(conf_.is_set(gu::conf::ssl_key)  == true ||
-                 conf_.is_set(gu::conf::ssl_cert) == true);
-    try
-    {
-        // overrides use_ssl if set explicitly
-        use_ssl = conf_.get<bool>(gu::conf::use_ssl);
-    }
-    catch (gu::NotSet& nf) {}
-
-    if (use_ssl == true)
-    {
-        conf_.set(gu::conf::use_ssl, true);
-        log_info << "initializing ssl context";
-        gu::ssl_prepare_context(conf_, ssl_context_);
-    }
 }
 
 gcomm::AsioProtonet::~AsioProtonet()
@@ -73,11 +58,11 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
 {
     if (uri.get_scheme() == "tcp" || uri.get_scheme() == "ssl")
     {
-        return gu::shared_ptr<AsioTcpSocket>::type(new AsioTcpSocket(*this, uri));
+        return std::make_shared<AsioTcpSocket>(*this, uri);
     }
     else if (uri.get_scheme() == "udp")
     {
-        return gu::shared_ptr<AsioUdpSocket>::type(new AsioUdpSocket(*this, uri));
+        return std::make_shared<AsioUdpSocket>(*this, uri);
     }
     else
     {
@@ -85,9 +70,10 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const gu::URI& uri)
     }
 }
 
-gcomm::Acceptor* gcomm::AsioProtonet::acceptor(const gu::URI& uri)
+std::shared_ptr<gcomm::Acceptor> gcomm::AsioProtonet::acceptor(
+    const gu::URI& uri)
 {
-    return new AsioTcpAcceptor(*this, uri);
+    return std::make_shared<AsioTcpAcceptor>(*this, uri);
 }
 
 
@@ -110,9 +96,11 @@ void gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
     poll_until_ = gu::datetime::Date::monotonic() + period;
 
     const gu::datetime::Period p(handle_timers_helper(*this, period));
-    timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
-    timer_.async_wait(boost::bind(&AsioProtonet::handle_wait, this,
-                                  asio::placeholders::error));
+    // Use microsecond precision to avoid
+    // "the resulting duration is not exactly representable"
+    // static assertion with GCC 4.4.
+    timer_.expires_from_now(std::chrono::microseconds(p.get_nsecs()/1000));
+    timer_.async_wait(timer_handler_);
     io_service_.run();
 }
 
@@ -135,16 +123,18 @@ void gcomm::AsioProtonet::interrupt()
 }
 
 
-void gcomm::AsioProtonet::handle_wait(const asio::error_code& ec)
+void gcomm::AsioProtonet::handle_wait(const gu::AsioErrorCode& ec)
 {
     gu::datetime::Date now(gu::datetime::Date::monotonic());
     const gu::datetime::Period p(handle_timers_helper(*this, poll_until_ - now));
     using std::rel_ops::operator>=;
-    if (ec == asio::error_code() && poll_until_ >= now)
+    if (not ec && poll_until_ >= now)
     {
-        timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
-        timer_.async_wait(boost::bind(&AsioProtonet::handle_wait, this,
-                                      asio::placeholders::error));
+        // Use microsecond precision to avoid
+        // "the resulting duration is not exactly representable"
+        // static assertion with GCC 4.4.
+        timer_.expires_from_now(std::chrono::microseconds(p.get_nsecs()/1000));
+        timer_.async_wait(timer_handler_);
     }
     else
     {

@@ -15,6 +15,10 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
+# If without_crypto == 1, the library will be built without
+# SSL/TLS support.
+%{!?without_crypto: %global without_crypto 0}
+
 %{!?name: %define name galera-4}
 %{!?wsrep_api: %define wsrep_api 26}
 %{!?version: %define version %{wsrep_api}_4.x}
@@ -184,7 +188,10 @@ export CXX=g++-4.7
 
 NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
-%{scons_cmd} -j$(echo $NUM_JOBS) revno=%{revision} deterministic_tests=1
+%if 0%{?without_crypto}
+%define crypto_opt ssl=0
+%endif
+%{scons_cmd} -j$(echo $NUM_JOBS) revno=%{revision} deterministic_tests=1 %{?crypto_opt}
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-4-4.x-44.1.x86_64

@@ -195,7 +195,7 @@ namespace gcomm
         std::string       mcast_addr_;
         std::string       bind_ip_;
         int               mcast_ttl_;
-        Acceptor*         listener_;
+        std::shared_ptr<Acceptor> listener_;
         SocketPtr         mcast_;
         AddrList          pending_addrs_;
         AddrList          remote_addrs_;

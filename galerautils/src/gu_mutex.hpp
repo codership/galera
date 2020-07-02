@@ -72,6 +72,7 @@ namespace gu
 #if defined(GU_MUTEX_DEBUG)
             locked_ = false;
 #endif /* GU_MUTEX_DEBUG */
+            disown();
 #endif /* GU_DEBUG_MUTEX */
             int const err(gu_mutex_unlock(&value_));
             if (gu_unlikely(0 != err))
@@ -87,9 +88,14 @@ namespace gu
 #if defined(GU_DEBUG_MUTEX)
         bool locked() const { return gu_mutex_locked(&value_); }
         bool owned()  const { return locked() && gu_mutex_owned(&value_);  }
+        void disown() const { gu_mutex_disown(&value); }
 #elif defined(GU_MUTEX_DEBUG)
         bool locked() const { return locked_; }
         bool owned()  const { return locked() && gu_thread_equal(owned_,gu_thread_self()); }
+        void disown() const
+        {
+            memset(&owned_, 0, sizeof(owned_));
+        }
 #endif /* GU_DEBUG_MUTEX */
     protected:
 

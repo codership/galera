@@ -40,7 +40,7 @@ START_TEST(test_asio)
     AsioProtonet pn(conf);
     string uri_str("tcp://127.0.0.1:0");
 
-    Acceptor* acc = pn.acceptor(uri_str);
+    auto acc(pn.acceptor(uri_str));
     acc->listen(uri_str);
     uri_str = acc->listen_addr();
 
@@ -63,9 +63,6 @@ START_TEST(test_asio)
         cl->send(0, dg);
     }
     pn.event_loop(gu::datetime::Sec);
-
-    delete acc;
-
 }
 END_TEST
 #endif // HAVE_ASIO_HPP

@@ -136,6 +136,7 @@ void
 gcs_sm_destroy (gcs_sm_t* sm)
 {
     gu_mutex_destroy(&sm->lock);
+    gu_cond_destroy(&sm->cond);
     gu_free (sm);
 }
 

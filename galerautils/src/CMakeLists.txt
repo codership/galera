@@ -78,6 +78,9 @@ add_library(galerautilsxx
   gu_histogram.cpp
   gu_stats.cpp
   gu_asio.cpp
+  gu_asio_datagram.cpp
+  gu_asio_stream_engine.cpp
+  gu_asio_stream_react.cpp
   gu_debug_sync.cpp
   gu_thread.cpp
   gu_uuid.cpp

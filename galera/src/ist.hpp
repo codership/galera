@@ -76,9 +76,8 @@ namespace galera
 
             std::string                                   recv_addr_;
             std::string                                   recv_bind_;
-            asio::io_service                              io_service_;
-            asio::ip::tcp::acceptor                       acceptor_;
-            asio::ssl::context                            ssl_ctx_;
+            gu::AsioIoService                             io_service_;
+            std::shared_ptr<gu::AsioAcceptor>             acceptor_;
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
 
@@ -121,22 +120,13 @@ namespace galera
 
             void cancel()
             {
-                if (use_ssl_ == true)
-                {
-                    ssl_stream_->lowest_layer().close();
-                }
-                else
-                {
-                    socket_.close();
-                }
+                socket_->close();
             }
 
         private:
 
-            asio::io_service                          io_service_;
-            asio::ip::tcp::socket                     socket_;
-            asio::ssl::context                        ssl_ctx_;
-            asio::ssl::stream<asio::ip::tcp::socket>* ssl_stream_;
+            gu::AsioIoService                         io_service_;
+            std::shared_ptr<gu::AsioSocket>           socket_;
             const gu::Config&                         conf_;
             gcache::GCache&                           gcache_;
             int                                       version_;
@@ -177,6 +167,12 @@ namespace galera
 
 
     } // namespace ist
+
+    // Helpers to determine receive addr and receive bind. Public for
+    // testing.
+    std::string IST_determine_recv_addr(gu::Config& conf);
+    std::string IST_determine_recv_bind(gu::Config& conf);
+
 } // namespace galera
 
 #endif // GALERA_IST_HPP

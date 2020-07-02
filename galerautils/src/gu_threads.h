@@ -171,6 +171,13 @@ bool gu_mutex_owned   (const gu_mutex_t_DBG* m)
 {
     return m->locked && gu_thread_equal_SYS(gu_thread_self_SYS(), m->thread);
 }
+
+static inline
+void gu_mutex_disown (gu_mutex_t_DBG* m)
+{
+    memset(&m->thread, 0, sizeof(m->thread));
+}
+
 /*@}*/
 
 typedef gu_mutex_t_DBG gu_mutex_t;

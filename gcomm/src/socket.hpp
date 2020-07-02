@@ -21,7 +21,7 @@ namespace gcomm
 {
     typedef const void* SocketId; //!< Socket Identifier
     class Socket;                 //!< Socket interface
-    typedef gu::shared_ptr<Socket>::type SocketPtr;
+    typedef std::shared_ptr<Socket> SocketPtr;
     class Acceptor;               //!< Acceptor interfacemat
 
     /**

@@ -10,17 +10,8 @@
 #include "gu_shared_ptr.hpp"
 #include <vector>
 
-//
-// Boost enable_shared_from_this<> does not have virtual destructor,
-// therefore need to ignore -Weffc++ and -Wnon-virtual-dtor
-//
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic push
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-# pragma GCC diagnostic ignored "-Weffc++"
-# pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-#endif
+#include "gu_disable_non_virtual_dtor.hpp"
+#include "gu_compiler.hpp"
 
 namespace gcomm
 {
@@ -30,36 +21,36 @@ namespace gcomm
 
 class gcomm::AsioUdpSocket :
     public gcomm::Socket,
-    public gu::enable_shared_from_this<AsioUdpSocket>::type
+    public gu::AsioDatagramSocketHandler,
+    public std::enable_shared_from_this<AsioUdpSocket>
 {
 public:
     AsioUdpSocket(AsioProtonet& net, const gu::URI& uri);
     ~AsioUdpSocket();
-    void connect(const gu::URI& uri);
-    void close();
-    void set_option(const std::string&, const std::string&) { /* not implemented */ }
-    int send(int segment, const Datagram& dg);
-    void read_handler(const asio::error_code&, size_t);
-    void async_receive();
-    size_t mtu() const;
-    std::string local_addr() const;
-    std::string remote_addr() const;
-    State state() const { return state_; }
-    SocketId id() const { return &socket_; }
-    SocketStats stats() const { return SocketStats(); }
+    // Socket interface
+    virtual void connect(const gu::URI& uri) GALERA_OVERRIDE;
+    virtual void close() GALERA_OVERRIDE;
+    virtual void set_option(const std::string&, const std::string&) GALERA_OVERRIDE
+    { /* not implemented */ }
+    virtual int send(int segment, const Datagram& dg) GALERA_OVERRIDE;
+    virtual void async_receive() GALERA_OVERRIDE;
+    virtual size_t mtu() const GALERA_OVERRIDE;
+    virtual std::string local_addr() const GALERA_OVERRIDE;
+    virtual std::string remote_addr() const GALERA_OVERRIDE;
+    virtual State state() const GALERA_OVERRIDE { return state_; }
+    virtual SocketId id() const GALERA_OVERRIDE { return &socket_; }
+    virtual SocketStats stats() const GALERA_OVERRIDE { return SocketStats(); }
 private:
+    // AsioDatagramSocketHandler
+    virtual void read_handler(gu::AsioDatagramSocket&, const gu::AsioErrorCode&,
+                              size_t) GALERA_OVERRIDE;
+
     AsioProtonet&            net_;
     State                    state_;
-    asio::ip::udp::socket    socket_;
-    asio::ip::udp::endpoint  target_ep_;
-    asio::ip::udp::endpoint  source_ep_;
+    std::shared_ptr<gu::AsioDatagramSocket> socket_;
     std::vector<gu::byte_t>  recv_buf_;
 };
 
-#if defined(__GNUG__)
-# if (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#  pragma GCC diagnostic pop
-# endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || (__GNUC__ > 4)
-#endif
+#include "gu_enable_non_virtual_dtor.hpp"
 
 #endif // GCOMM_ASIO_UDP_HPP

@@ -6,6 +6,8 @@ if (NOT GALERA_WITH_SSL)
   return()
 endif()
 
+add_definitions(-DGALERA_HAVE_SSL)
+
 #
 # Helper macros to check Ecdh features.
 #

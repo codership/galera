@@ -41,7 +41,7 @@ START_TEST(shared_ptr_test)
 {
 
     long acc(0);
-    long iters(1000000);
+    long iters(10000);
     gu::datetime::Date start(gu::datetime::Date::monotonic());
 
     LongPtr longptr(new long(0));

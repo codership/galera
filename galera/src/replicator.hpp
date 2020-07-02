@@ -147,8 +147,6 @@ namespace galera
                                    wsrep_seqno_t seqno_g) = 0;
         virtual bool corrupt() const = 0;
 
-    protected:
-
         static void register_params(gu::Config&);
 
     };

@@ -69,9 +69,11 @@ Commandline Options:
     build_dir=dir       build directory, default: '.'
     boost=[0|1]         disable or enable boost libraries
     system_asio=[0|1]   use system asio library, if available
+    asio_path=path      path to asio headers
     boost_pool=[0|1]    use or not use boost pool allocator
     revno=XXXX          source code revision number
     bpostatic=path      a path to static libboost_program_options.a
+    ssl=[0|1]           build without/with SSL enabled
     static_ssl=path     a path to static SSL libraries
     extra_sysroot=path  a path to extra development environment (Fink, Homebrew, MacPorts, MinGW)
     bits=[32bit|64bit]
@@ -149,12 +151,14 @@ elif machine == 's390x':
 boost      = int(ARGUMENTS.get('boost', 1))
 boost_pool = int(ARGUMENTS.get('boost_pool', 0))
 system_asio= int(ARGUMENTS.get('system_asio', 1))
+asio_path  = ARGUMENTS.get('asio_path')
 tests      = int(ARGUMENTS.get('tests', 1))
 # Run only tests which are known to be deterministic
 deterministic_tests = int(ARGUMENTS.get('deterministic_tests', 0))
 # Run all tests
 all_tests = int(ARGUMENTS.get('all_tests', 0))
 strict_build_flags = int(ARGUMENTS.get('strict_build_flags', 0))
+have_ssl = int(ARGUMENTS.get('ssl', 1))
 static_ssl = ARGUMENTS.get('static_ssl', None)
 install = ARGUMENTS.get('install', None)
 version_script = int(ARGUMENTS.get('version_script', 1))
@@ -278,7 +282,7 @@ if int(asan):
     env.Append(LINKFLAGS = ' -fsanitize=address')
 
 if gcov:
-    env.Append(LINKFLAGS = '--coverage -g')
+    env.Append(LINKFLAGS = ' --coverage -g')
 
 #
 # Check required headers and libraries (autoconf functionality)
@@ -618,7 +622,10 @@ if not system_asio:
     # Make sure that -Iasio goes before other paths (e.g. -I/usr/local/include)
     # that may contain a system wide installed asio. We should use the bundled
     # asio if "scons system_asio=0" is specified. Thus use Prepend().
-    conf.env.Prepend(CPPPATH = [ '#/asio' ])
+    # Also append as system header path.
+    asio_root = asio_path if asio_path else Dir('#').abspath + '/asio'
+    conf.env.Prepend(CCFLAGS = '-isystem ' + asio_root )
+
     if conf.CheckCXXHeader('asio.hpp'):
         conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
     else:
@@ -626,7 +633,7 @@ if not system_asio:
         Exit(1)
 
 # asio/ssl
-if not conf.CheckCXXHeader('asio/ssl.hpp'):
+if have_ssl and not conf.CheckCXXHeader('asio/ssl.hpp'):
     print('SSL support required but asio/ssl.hpp was not found or not usable')
     print('check that SSL devel headers are installed and usable')
     Exit(1)
@@ -638,7 +645,7 @@ def check_static_lib(path, libname):
         return True
     return False
 
-if static_ssl:
+if have_ssl and static_ssl:
     if not check_static_lib(static_ssl, "ssl"):
         print("Static SSL linkage requested but ssl libary not found from {}"
               .format(static_ssl))
@@ -650,7 +657,7 @@ if static_ssl:
     conf.CheckLib('pthread')
     conf.CheckLib('dl')
     conf.env.Append(LDFLAGS = ' -static-libgcc')
-else:
+elif have_ssl:
     if not conf.CheckLib('ssl'):
         print('SSL support required but libssl was not found')
         Exit(1)
@@ -658,11 +665,14 @@ else:
         print('SSL support required libcrypto was not found')
         Exit(1)
 
-# advanced SSL features
-if conf.CheckSetEcdhAuto():
-    conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_ECDH_AUTO')
-elif conf.CheckSetTmpEcdh():
-    conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_TMP_ECDH')
+if have_ssl:
+    # advanced SSL features
+    if conf.CheckSetEcdhAuto():
+        conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_ECDH_AUTO')
+    elif conf.CheckSetTmpEcdh():
+        conf.env.Append(CPPFLAGS = ' -DOPENSSL_HAS_SET_TMP_ECDH')
+    # Enable SSL compilation
+    conf.env.Append(CPPFLAGS = ' -DGALERA_HAVE_SSL=1')
 
 # these will be used only with our software
 if strict_build_flags == 1:
@@ -701,7 +711,8 @@ Export('machine',
        'env',
        'sysname',
        'libboost_program_options',
-       'install')
+       'install',
+       'have_ssl')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin

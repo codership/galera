@@ -96,9 +96,8 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     :
     recv_addr_    (),
     recv_bind_    (),
-    io_service_   (),
-    acceptor_     (io_service_),
-    ssl_ctx_      (io_service_, asio::ssl::context::sslv23),
+    io_service_   (conf),
+    acceptor_     (),
     mutex_        (),
     cond_         (),
     first_seqno_  (WSREP_SEQNO_UNDEFINED),
@@ -157,56 +156,34 @@ extern "C" void* run_receiver_thread(void* arg)
     return 0;
 }
 
-static std::string
-IST_determine_recv_addr (gu::Config& conf)
+static void IST_fix_addr_scheme(const gu::Config& conf, std::string& addr)
 {
-    std::string recv_addr;
-
-    try
-    {
-        recv_addr = conf.get(galera::ist::Receiver::RECV_ADDR);
-    }
-    catch (gu::NotSet&)
-    {
-        try
-        {
-            recv_addr = conf.get(galera::BASE_HOST_KEY);
-        }
-        catch (gu::NotSet&)
-        {
-            gu_throw_error(EINVAL)
-                << "Could not determine IST receive address: '"
-                << galera::ist::Receiver::RECV_ADDR << "' not set.";
-        }
-    }
-
     /* check if explicit scheme is present */
-    if (recv_addr.find("://") == std::string::npos)
+    if (addr.find("://") == std::string::npos)
     {
-        bool ssl(false);
-
+#ifdef GALERA_HAVE_SSL
         try
         {
             std::string ssl_key = conf.get(gu::conf::ssl_key);
-            if (ssl_key.length() != 0) ssl = true;
+            if (ssl_key.length() != 0)
+            {
+                addr.insert(0, "ssl://");
+                return;
+            }
         }
         catch (gu::NotSet&) {}
-
-        if (ssl)
-            recv_addr.insert(0, "ssl://");
-        else
-            recv_addr.insert(0, "tcp://");
+#endif // GALERA_HAVE_SSL
+        addr.insert(0, "tcp://");
     }
+}
 
-    gu::URI ra_uri(recv_addr);
-
-    if (!conf.has(galera::BASE_HOST_KEY))
-        conf.set(galera::BASE_HOST_KEY, ra_uri.get_host());
-
+static void IST_fix_addr_port(const gu::Config& conf, const gu::URI& uri,
+                              std::string& addr)
+{
     try /* check for explicit port,
            TODO: make it possible to use any free port (explicit 0?) */
     {
-        ra_uri.get_port();
+        uri.get_port();
     }
     catch (gu::NotSet&) /* use gmcast listen port + 1 */
     {
@@ -223,58 +200,56 @@ IST_determine_recv_addr (gu::Config& conf)
 
         port += 1;
 
-        recv_addr += ":" + gu::to_string(port);
+        addr += ":" + gu::to_string(port);
     }
+}
+
+std::string galera::IST_determine_recv_addr (gu::Config& conf)
+{
+    std::string recv_addr;
+
+    try
+    {
+        recv_addr = conf.get(galera::ist::Receiver::RECV_ADDR);
+    }
+    catch (const gu::NotSet&)
+    {
+        try
+        {
+            recv_addr = conf.get(galera::BASE_HOST_KEY);
+        }
+        catch (const gu::NotSet&)
+        {
+            gu_throw_error(EINVAL)
+                << "Could not determine IST receive address: '"
+                << galera::ist::Receiver::RECV_ADDR << "' or '"
+                << galera::BASE_HOST_KEY << "' not set.";
+        }
+    }
+
+    IST_fix_addr_scheme(conf, recv_addr);
+    gu::URI ra_uri(recv_addr);
+
+    if (!conf.has(galera::BASE_HOST_KEY))
+        conf.set(galera::BASE_HOST_KEY, ra_uri.get_host());
+
+    IST_fix_addr_port(conf, ra_uri, recv_addr);
 
     log_info << "IST receiver addr using " << recv_addr;
     return recv_addr;
 }
 
-static std::string
-IST_determine_recv_bind(gu::Config& conf)
+std::string galera::IST_determine_recv_bind(gu::Config& conf)
 {
     std::string recv_bind;
 
     recv_bind = conf.get(galera::ist::Receiver::RECV_BIND);
 
-    /* check if explicit scheme is present */
-    if (recv_bind.find("://") == std::string::npos) {
-        bool ssl(false);
-
-        try {
-            std::string ssl_key = conf.get(gu::conf::ssl_key);
-            if (ssl_key.length() != 0)
-                ssl = true;
-        } catch (gu::NotSet&) {
-        }
-
-        if (ssl)
-            recv_bind.insert(0, "ssl://");
-        else
-            recv_bind.insert(0, "tcp://");
-    }
+    IST_fix_addr_scheme(conf, recv_bind);
 
     gu::URI rb_uri(recv_bind);
 
-    try /* check for explicit port,
-     TODO: make it possible to use any free port (explicit 0?) */
-    {
-        rb_uri.get_port();
-    } catch (gu::NotSet&) /* use gmcast listen port + 1 */
-    {
-        int port(0);
-
-        try {
-            port = gu::from_string<uint16_t>(conf.get(galera::BASE_PORT_KEY));
-
-        } catch (...) {
-            port = gu::from_string<uint16_t>(galera::BASE_PORT_DEFAULT);
-        }
-
-        port += 1;
-
-        recv_bind += ":" + gu::to_string(port);
-    }
+    IST_fix_addr_port(conf, rb_uri, recv_bind);
 
     log_info << "IST receiver bind using " << recv_bind;
     return recv_bind;
@@ -298,11 +273,14 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
     {
         recv_bind_ = recv_addr_;
     }
-    gu::URI     const uri_addr(recv_addr_);
+
+    // uri_bind will be the real bind address which the acceptor will
+    // listen. The recv_addr_ returned from this call may point to
+    // other address, for example if the node is behind NATting firewall.
     gu::URI     const uri_bind(recv_bind_);
     try
     {
-        if (uri_addr.get_scheme() == "ssl")
+        if (uri_bind.get_scheme() == "ssl")
         {
             log_info << "IST receiver using ssl";
             use_ssl_ = true;
@@ -310,31 +288,19 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
             // which made sender to return null cert in handshake.
             // Therefore peer cert verfification must be enabled
             // only at protocol version 7 or higher.
-            gu::ssl_prepare_context(conf_, ssl_ctx_, version >= 7);
+            // Removed in 4.x asio refactoring.
+            // gu::ssl_prepare_context(conf_, ssl_ctx_, version >= 7);
         }
 
-        asio::ip::tcp::resolver resolver(io_service_);
-        asio::ip::tcp::resolver::query
-            query(gu::unescape_addr(uri_bind.get_host()),
-                  uri_bind.get_port(),
-                  asio::ip::tcp::resolver::query::flags(0));
-        asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
-        acceptor_.open(i->endpoint().protocol());
-        acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
-        gu::set_fd_options(acceptor_);
-        acceptor_.bind(*i);
-        acceptor_.listen();
+        acceptor_ = io_service_.make_acceptor(uri_bind);
+        acceptor_->listen(uri_bind);
         // read recv_addr_ from acceptor_ in case zero port was specified
-        recv_addr_ = uri_addr.get_scheme()
-            + "://"
-            + uri_addr.get_host()
-            + ":"
-            + gu::to_string(acceptor_.local_endpoint().port());
+        recv_addr_ = acceptor_->listen_addr();
     }
-    catch (asio::system_error& e)
+    catch (const gu::Exception& e)
     {
         recv_addr_ = "";
-        gu_throw_error(e.code().value())
+        gu_throw_error(e.get_errno())
             << "Failed to open IST listener at "
             << uri_bind.to_string()
             << "', asio error '" << e.what() << "'";
@@ -354,11 +320,7 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
 
     log_info << "Prepared IST receiver for " << first_seqno << '-'
              << last_seqno << ", listening at: "
-             << (uri_bind.get_scheme()
-                 + "://"
-                 + gu::escape_addr(acceptor_.local_endpoint().address())
-                 + ":"
-                 + gu::to_string(acceptor_.local_endpoint().port()));
+             << acceptor_->listen_addr();
 
     return recv_addr_;
 }
@@ -366,32 +328,8 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
 
 void galera::ist::Receiver::run()
 {
-    asio::ip::tcp::socket socket(io_service_);
-    asio::ssl::stream<asio::ip::tcp::socket> ssl_stream(io_service_, ssl_ctx_);
-
-    try
-    {
-        if (use_ssl_ == true)
-        {
-            acceptor_.accept(ssl_stream.lowest_layer());
-            gu::set_fd_options(ssl_stream.lowest_layer());
-            ssl_stream.handshake(
-                asio::ssl::stream<asio::ip::tcp::socket>::server);
-        }
-        else
-        {
-            acceptor_.accept(socket);
-            gu::set_fd_options(socket);
-        }
-    }
-    catch (asio::system_error& e)
-    {
-        gu_throw_error(e.code().value()) << "accept() failed"
-                                         << "', asio error '"
-                                         << e.what() << "': "
-                                         << gu::extra_error_info(e.code());
-    }
-    acceptor_.close();
+    auto socket(acceptor_->accept());
+    acceptor_->close();
 
     /* shall be initialized below, when we know at what seqno preload starts */
     gu::Progress<wsrep_seqno_t>* progress(NULL);
@@ -403,18 +341,9 @@ void galera::ist::Receiver::run()
         bool const keep_keys(conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         Proto p(gcache_, version_, keep_keys);
 
-        if (use_ssl_ == true)
-        {
-            p.send_handshake(ssl_stream);
-            p.recv_handshake_response(ssl_stream);
-            p.send_ctrl(ssl_stream, Ctrl::C_OK);
-        }
-        else
-        {
-            p.send_handshake(socket);
-            p.recv_handshake_response(socket);
-            p.send_ctrl(socket, Ctrl::C_OK);
-        }
+        p.send_handshake(*socket);
+        p.recv_handshake_response(*socket);
+        p.send_ctrl(*socket, Ctrl::C_OK);
 
         // wait for SST to complete so that we know what is the first_seqno_
         {
@@ -430,15 +359,7 @@ void galera::ist::Receiver::run()
         while (true)
         {
             std::pair<gcs_action, bool> ret;
-
-            if (use_ssl_ == true)
-            {
-                p.recv_ordered(ssl_stream, ret);
-            }
-            else
-            {
-                p.recv_ordered(socket, ret);
-            }
+            p.recv_ordered(*socket, ret);
 
             gcs_action& act(ret.first);
 
@@ -545,12 +466,6 @@ void galera::ist::Receiver::run()
 
         if (progress /* IST actually started */) progress->finish();
     }
-    catch (asio::system_error& e)
-    {
-        log_error << "got asio system error while reading IST stream: "
-                  << e.code();
-        ec = e.code().value();
-    }
     catch (gu::Exception& e)
     {
         ec = e.get_errno();
@@ -563,15 +478,7 @@ void galera::ist::Receiver::run()
 err:
     delete progress;
     gu::Lock lock(mutex_);
-    if (use_ssl_ == true)
-    {
-        ssl_stream.lowest_layer().close();
-        // ssl_stream.shutdown();
-    }
-    else
-    {
-        socket.close();
-    }
+    socket->close();
 
     running_ = false;
     if (last_seqno_ > 0 && ec != EINTR && current_seqno_ < last_seqno_)
@@ -618,7 +525,7 @@ wsrep_seqno_t galera::ist::Receiver::finished()
             log_warn << "Failed to join IST receiver thread: " << err;
         }
 
-        acceptor_.close();
+        acceptor_->close();
 
         gu::Lock lock(mutex_);
 
@@ -636,49 +543,15 @@ void galera::ist::Receiver::interrupt()
     gu::URI uri(recv_addr_);
     try
     {
-        asio::ip::tcp::resolver::iterator i;
-        try
-        {
-            asio::ip::tcp::resolver resolver(io_service_);
-            asio::ip::tcp::resolver::query
-                query(gu::unescape_addr(uri.get_host()),
-                      uri.get_port(),
-                      asio::ip::tcp::resolver::query::flags(0));
-            i = resolver.resolve(query);
-        }
-        catch (asio::system_error& e)
-        {
-            gu_throw_error(e.code().value())
-                << "failed to resolve host '"
-                << uri.to_string()
-                << "', asio error '" << e.what() << "'";
-        }
-        if (use_ssl_ == true)
-        {
-            asio::ssl::stream<asio::ip::tcp::socket>
-                ssl_stream(io_service_, ssl_ctx_);
-            ssl_stream.lowest_layer().connect(*i);
-            gu::set_fd_options(ssl_stream.lowest_layer());
-            ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p(gcache_,
-                    version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
-            p.recv_handshake(ssl_stream);
-            p.send_ctrl(ssl_stream, Ctrl::C_EOF);
-            p.recv_ctrl(ssl_stream);
-        }
-        else
-        {
-            asio::ip::tcp::socket socket(io_service_);
-            socket.connect(*i);
-            gu::set_fd_options(socket);
-            Proto p(gcache_, version_,
-                    conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
-            p.recv_handshake(socket);
-            p.send_ctrl(socket, Ctrl::C_EOF);
-            p.recv_ctrl(socket);
-        }
+        auto socket(io_service_.make_socket(uri));
+        socket->connect(uri);
+        Proto p(gcache_, version_,
+                conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
+        p.recv_handshake(*socket);
+        p.send_ctrl(*socket, Ctrl::C_EOF);
+        p.recv_ctrl(*socket);
     }
-    catch (asio::system_error& e)
+    catch (const gu::Exception&)
     {
         // ignore
     }
@@ -690,10 +563,8 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
                             const std::string& peer,
                             int                version)
     :
-    io_service_(),
-    socket_    (io_service_),
-    ssl_ctx_   (io_service_, asio::ssl::context::sslv23),
-    ssl_stream_(0),
+    io_service_(conf),
+    socket_    (),
     conf_      (conf),
     gcache_    (gcache),
     version_   (version),
@@ -702,74 +573,41 @@ galera::ist::Sender::Sender(const gu::Config&  conf,
     gu::URI uri(peer);
     try
     {
-        asio::ip::tcp::resolver resolver(io_service_);
-        asio::ip::tcp::resolver::query
-            query(gu::unescape_addr(uri.get_host()),
-                  uri.get_port(),
-                  asio::ip::tcp::resolver::query::flags(0));
-        asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
-        if (uri.get_scheme() == "ssl")
-        {
-            use_ssl_ = true;
-        }
-        if (use_ssl_ == true)
-        {
-            log_info << "IST sender using ssl";
-            ssl_prepare_context(conf, ssl_ctx_);
-            // ssl_stream must be created after ssl_ctx_ is prepared...
-            ssl_stream_ = new asio::ssl::stream<asio::ip::tcp::socket>(
-                io_service_, ssl_ctx_);
-            ssl_stream_->lowest_layer().connect(*i);
-            gu::set_fd_options(ssl_stream_->lowest_layer());
-            ssl_stream_->handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-        }
-        else
-        {
-            socket_.connect(*i);
-            gu::set_fd_options(socket_);
-        }
+        socket_ = io_service_.make_socket(uri);
+        socket_->connect(uri);
     }
-    catch (asio::system_error& e)
+    catch (const gu::Exception& e)
     {
-        gu_throw_error(e.code().value()) << "IST sender, failed to connect '"
-                                         << peer.c_str() << "': " << e.what();
+        gu_throw_error(e.get_errno()) << "IST sender, failed to connect '"
+                                      << peer.c_str() << "': " << e.what();
     }
 }
 
 
 galera::ist::Sender::~Sender()
 {
-    if (use_ssl_ == true)
-    {
-        ssl_stream_->lowest_layer().close();
-        delete ssl_stream_;
-    }
-    else
-    {
-        socket_.close();
-    }
+    socket_->close();
     gcache_.seqno_unlock();
 }
 
-template <class S>
-void send_eof(galera::ist::Proto& p, S& stream)
+void send_eof(galera::ist::Proto& p, gu::AsioSocket& socket)
 {
 
-    p.send_ctrl(stream, galera::ist::Ctrl::C_EOF);
+    p.send_ctrl(socket, galera::ist::Ctrl::C_EOF);
 
     // wait until receiver closes the connection
     try
     {
         gu::byte_t b;
         size_t n;
-        n = asio::read(stream, asio::buffer(&b, 1));
+        n = socket.read(gu::AsioMutableBuffer(&b, 1));
         if (n > 0)
         {
             log_warn << "received " << n
                      << " bytes, expected none";
         }
     }
-    catch (asio::system_error& e)
+    catch (const gu::Exception& e)
     { }
 }
 
@@ -792,18 +630,9 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
                 version_, conf_.get(CONF_KEEP_KEYS, CONF_KEEP_KEYS_DEFAULT));
         int32_t ctrl;
 
-        if (use_ssl_ == true)
-        {
-            p.recv_handshake(*ssl_stream_);
-            p.send_handshake_response(*ssl_stream_);
-            ctrl = p.recv_ctrl(*ssl_stream_);
-        }
-        else
-        {
-            p.recv_handshake(socket_);
-            p.send_handshake_response(socket_);
-            ctrl = p.recv_ctrl(socket_);
-        }
+        p.recv_handshake(*socket_);
+        p.send_handshake_response(*socket_);
+        ctrl = p.recv_ctrl(*socket_);
 
         if (ctrl < 0)
         {
@@ -815,14 +644,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
         if (first > last || (first == 0 && last == 0))
         {
             log_info << "IST sender notifying joiner, not sending anything";
-            if (use_ssl_ == true)
-            {
-                send_eof(p, *ssl_stream_);
-            }
-            else
-            {
-                send_eof(p, socket_);
-            }
+            send_eof(p, *socket_);
             return;
         }
         else
@@ -849,25 +671,11 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
                 //log_info << "Sender::send(): seqno " << buf_vec[i].seqno_g()
                 //         << ", size " << buf_vec[i].size() << ", preload: "
                 //         << preload_flag;
-                if (use_ssl_ == true)
-                {
-                    p.send_ordered(*ssl_stream_, buf_vec[i], preload_flag);
-                }
-                else
-                {
-                    p.send_ordered(socket_, buf_vec[i], preload_flag);
-                }
+                p.send_ordered(*socket_, buf_vec[i], preload_flag);
 
                 if (buf_vec[i].seqno_g() == last)
                 {
-                    if (use_ssl_ == true)
-                    {
-                        send_eof(p, *ssl_stream_);
-                    }
-                    else
-                    {
-                        send_eof(p, socket_);
-                    }
+                    send_eof(p, *socket_);
                     return;
                 }
             }
@@ -881,11 +689,11 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last,
             }
         }
     }
-    catch (asio::system_error& e)
+    catch (const gu::Exception& e)
     {
-        gu_throw_error(e.code().value()) << "ist send failed: " << e.code()
-                                         << "', asio error '" << e.what()
-                                         << "'";
+        gu_throw_error(e.get_errno()) << "ist send failed: "
+                                      << "', asio error '" << e.what()
+                                      << "'";
     }
 }
 
