@@ -112,6 +112,10 @@ one_length(size_t const len, size_t const reps)
     run_bench_with_impl(gu_crc32c_x86_64,       len, reps, "GU x86_64  ");
 #endif /* GU_CRC32C_X86_64 */
 #endif /* GU_CRC32C_X86 */
+
+#if defined(GU_CRC32C_ARM64)
+    run_bench_with_impl(gu_crc32c_arm64,        len, reps, "GU arm64   ");
+#endif /* GU_CRC32C_X86 */
 }
 
 int main()

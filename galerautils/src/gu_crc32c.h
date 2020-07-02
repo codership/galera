@@ -84,7 +84,13 @@ gu_crc32c_x86_64(gu_crc32c_t state, const void* data, size_t length);
 #endif /* GU_CRC32C_X86_64 */
 #endif /* GU_CRC32C_X86 */
 
-#if defined(GU_CRC32C_X86)
+#if defined(__aarch64__) || defined(__AARCH64__)
+#define GU_CRC32C_ARM64
+extern gu_crc32c_t
+gu_crc32c_arm64(gu_crc32c_t state, const void* data, size_t length);
+#endif /* __aarch64__ || __AARCH64__ */
+
+#if defined(GU_CRC32C_X86) || defined(GU_CRC32C_ARM64)
 /** Returns hardware-accelerated CRC32C implementation */
 extern gu_crc32c_func_t gu_crc32c_hardware();
 #else

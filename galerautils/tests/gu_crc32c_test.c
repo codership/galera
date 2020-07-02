@@ -169,6 +169,15 @@ END_TEST
 #endif /* GU_CRC32C_X86_64 */
 #endif /* GU_CRC32C_X86 */
 
+#if defined(GU_CRC32C_ARM64)
+START_TEST(test_gu_crc32c_arm64)
+{
+    gu_crc32c_func = gu_crc32c_arm64;
+    test_function();
+}
+END_TEST
+#endif /* GU_CRC32C_ARM64 */
+
 Suite *gu_crc32c_suite(void)
 {
     gu_crc32c_configure(); /* compute lookup tables for SW implementations */
@@ -200,6 +209,12 @@ Suite *gu_crc32c_suite(void)
     tcase_add_test  (t, test_gu_crc32c_x86_64);
 #endif /* GU_CRC32C_X86_64 */
 #endif /* GU_CRC32C_X86 */
+
+#if defined(GU_CRC32C_ARM64)
+    t = tcase_create("gu_crc32c_hw_arm64");
+    suite_add_tcase (suite, t);
+    tcase_add_test  (t, test_gu_crc32c_arm64);
+#endif /* GU_CRC32C_ARM64 */
 
     return suite;
 }

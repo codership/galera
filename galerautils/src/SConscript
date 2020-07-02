@@ -1,4 +1,4 @@
-Import('env', 'x86', 'crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
+Import('env', 'x86', 'arm64', 'crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
 
 libgalerautils_env = env.Clone()
 
@@ -43,6 +43,8 @@ if not crc32c_no_hardware:
     if x86:
         crc32c_env.Append(CFLAGS = crc32c_cflags) # for www.evanjones.ca code
         libgalerautils_objs += crc32c_hw_env.SharedObject([ 'gu_crc32c_x86.c' ])
+    elif arm64:
+        libgalerautils_objs += crc32c_hw_env.SharedObject([ 'gu_crc32c_arm64.c' ])
 
 libgalerautils_objs += crc32c_env.SharedObject(crc32c_sources)
 

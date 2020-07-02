@@ -12,6 +12,8 @@ crc32c_no_hardware = bool(int(ARGUMENTS.get('crc32c_no_hardware', 0)))
 crc32c_cppflags = ''
 crc32c_cflags   = ''
 
+arm64 = False
+
 if not crc32c_no_hardware:
     try:
         crc32c_check_env = env.Clone()
@@ -37,6 +39,25 @@ if not crc32c_no_hardware:
                                 return 0;
                              }
                           """
+        elif any(arch in machine for arch in [ 'aarch64', 'arm64' ]):
+            arm64 = True
+            test_cflags = ' -march=armv8-a+crc'
+            test_source = """
+                            #include <sys/auxv.h>
+                            #include <arm_acle.h>
+
+                            int main()
+                            {
+                                (void)getauxval(AT_HWCAP);
+
+                                (void)__crc32b(0, 0);
+                                (void)__crc32h(0, 0);
+                                (void)__crc32w(0, 0);
+                                (void)__crc32d(0, 0);
+
+                                return 0;
+                            }
+                          """
         else:
             raise Exception('Unsupported architecture: ' + machine)
 
@@ -45,7 +66,7 @@ if not crc32c_no_hardware:
             result = context.TryLink(test_source, '.c')
             context.Result(result)
             if not result:
-                raise Exception('Compiler does not support hardware CRC32C instructions')
+                raise Exception('Compiler does not support hardware CRC32C intrinsics')
 
         crc32c_check_env.Append(CFLAGS = test_cflags)
         conf = Configure(crc32c_check_env,
@@ -72,6 +93,6 @@ print("CRC32C config" +
       "', crc32c_cflags='"     + crc32c_cflags + "'"
 )
 
-Export('crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
+Export('arm64', 'crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
 
 SConscript(Split('''src/SConscript tests/SConscript'''))
