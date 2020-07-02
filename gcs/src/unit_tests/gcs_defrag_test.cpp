@@ -129,12 +129,13 @@ START_TEST (gcs_defrag_test)
     fail_if (ret != (long)act_len);
 
     // 8. Check the action
+    fail_if (recv_act.buf == NULL);
     fail_if (recv_act.buf_len != (long)act_len);
     fail_if (strncmp((const char*)recv_act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'",recv_act.buf,act_buf);
     defrag_check_init (&defrag); // should be empty
 
-// memleak in recv_act.buf !
+    gcs_gcache_free(defrag.cache, recv_act.buf);
 
     // 9. Try the same with local action
     ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, TRUE);
@@ -151,12 +152,13 @@ START_TEST (gcs_defrag_test)
 
 
     // 10. Check the action
+    fail_if (recv_act.buf == NULL);
     fail_if (recv_act.buf_len != (long)act_len);
 //    fail_if (recv_act.buf != NULL); (and now we may allocate it for cache)
 
     defrag_check_init (&defrag); // should be empty
 
-// memleack in recv_act.buf !
+    gcs_gcache_free(defrag.cache, recv_act.buf);
 }
 END_TEST
 
