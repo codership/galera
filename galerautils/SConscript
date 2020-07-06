@@ -1,3 +1,98 @@
 # SConscript for building galerautils
 
+Import('env', 'machine', 'x86', 'sysname')
+
+#
+# We need to decide on building hardware support for CRC32C at this level
+# because resulting preprocessor flags are needed in both src/ and tests/
+#
+
+crc32c_no_hardware = bool(int(ARGUMENTS.get('crc32c_no_hardware', 0)))
+
+crc32c_cppflags = ''
+crc32c_cflags   = ''
+
+arm64 = False
+
+if not crc32c_no_hardware:
+    try:
+        crc32c_check_env = env.Clone()
+
+        if x86:
+            if sysname == 'sunos':
+                # Ideally we want to simply strip SSE4.2 flag from the resulting
+                # crc32.pic.o
+                # (see http://ffmpeg.org/pipermail/ffmpeg-user/2013-March/013977.html)
+                # but that requires some serious scons-fu, so we just don't
+                # compile hardware support in if host CPU does not have it.
+                from subprocess import check_call
+                check_call("isainfo -v | grep sse4.2 >/dev/null 2>&1", shell=True);
+                # raises exception
+            test_cflags = ' -msse4.2'
+            test_source = """
+                             int main()
+                             {
+                                /* at least 32-bit functions should be present */
+                                (void)__builtin_ia32_crc32qi(0, 0);
+                                (void)__builtin_ia32_crc32hi(0, 0);
+                                (void)__builtin_ia32_crc32si(0, 0);
+                                return 0;
+                             }
+                          """
+        elif any(arch in machine for arch in [ 'aarch64', 'arm64' ]):
+            arm64 = True
+            test_cflags = ' -march=armv8-a+crc'
+            test_source = """
+                            #include <sys/auxv.h>
+                            #include <arm_acle.h>
+
+                            int main()
+                            {
+                                (void)getauxval(AT_HWCAP);
+
+                                (void)__crc32b(0, 0);
+                                (void)__crc32h(0, 0);
+                                (void)__crc32w(0, 0);
+                                (void)__crc32d(0, 0);
+
+                                return 0;
+                            }
+                          """
+        else:
+            raise Exception('Unsupported architecture: ' + machine)
+
+        def CheckCompilerSupport(context, test_source):
+            context.Message('Checking for hardware CRC32C support by compiler... ')
+            result = context.TryLink(test_source, '.c')
+            context.Result(result)
+            if not result:
+                raise Exception('Compiler does not support hardware CRC32C intrinsics')
+
+        crc32c_check_env.Append(CFLAGS = test_cflags)
+        conf = Configure(crc32c_check_env,
+                         custom_tests = {'CheckCompilerSupport': CheckCompilerSupport })
+        conf.CheckCompilerSupport(test_source) # raises exception
+
+        crc32c_cflags = test_cflags
+
+    except Exception as e:
+        # from traceback import print_exc
+        # print_exc()
+        crc32c_no_hardware = True
+        nohw_reason = str(e)
+else:
+    nohw_reason = 'command line options'
+
+if crc32c_no_hardware:
+    print('Hardware CRC32C support disabled: ' + nohw_reason)
+    crc32c_cppflags = ' -DGU_CRC32C_NO_HARDWARE'
+
+print("CRC32C config" +
+      ": crc32c_no_hardware='" + str(crc32c_no_hardware) +
+      "', crc32c_cppflags='"   + crc32c_cppflags +
+      "', crc32c_cflags='"     + crc32c_cflags + "'"
+)
+
+Export('arm64', 'crc32c_no_hardware', 'crc32c_cppflags', 'crc32c_cflags')
+
 SConscript(Split('''src/SConscript tests/SConscript'''))

@@ -25,6 +25,7 @@ galerautils/tests/gu_to_test
 galerautils/tests/avalanche*
 galerautils/tests/copy_vs_assignment*
 galerautils/tests/deqmap_bench
+galerautils/tests/crc32c_bench
 garb/garbd
 gcache.page.*
 gcache/src/test

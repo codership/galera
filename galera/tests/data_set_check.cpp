@@ -240,11 +240,13 @@ static void test_ver(gu::RecordSet::Version const rsv)
     }
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver1)
 {
     test_ver(gu::RecordSet::VER1);
 }
 END_TEST
+#endif /* GALERA_ONLY_ALIGNED */
 
 START_TEST (ver2)
 {
@@ -255,7 +257,9 @@ END_TEST
 Suite* data_set_suite ()
 {
     TCase* t = tcase_create ("DataSet");
+#ifndef GALERA_ONLY_ALIGNED
     tcase_add_test (t, ver1);
+#endif
     tcase_add_test (t, ver2);
     tcase_set_timeout(t, 60);
 

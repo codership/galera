@@ -1,5 +1,5 @@
 
-Import('check_env')
+Import('check_env', 'crc32c_cppflags')
 
 env = check_env.Clone()
 
@@ -13,24 +13,32 @@ env.Append(CPPPATH = Split('''
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 
+gu_tests_srcs = Split('''
+                        gu_tests.c
+                        gu_mem_test.c
+                        gu_bswap_test.c
+                        gu_fnv_test.c
+                        gu_mmh3_test.c
+                        gu_spooky_test.c
+                        gu_hash_test.c
+                        gu_time_test.c
+                        gu_fifo_test.c
+                        gu_uuid_test.c
+                        gu_dbug_test.c
+                        gu_lock_step_test.c
+                        gu_str_test.c
+                        gu_utils_test.c
+                      ''')
+
+gu_tests_objs = env.SharedObject(gu_tests_srcs)
+
+# Need to specify dedicated preprocessor macro for CRC32C unit test only
+crc32c_env = env.Clone()
+crc32c_env.Append(CPPFLAGS = crc32c_cppflags)
+crc32c_objs = crc32c_env.SharedObject(['gu_crc32c_test.c'])
+
 gu_tests = env.Program(target = 'gu_tests',
-                       source = Split('''
-                            gu_tests.c
-                            gu_mem_test.c
-                            gu_bswap_test.c
-                            gu_fnv_test.c
-                            gu_mmh3_test.c
-                            gu_spooky_test.c
-                            gu_crc32c_test.c
-                            gu_hash_test.c
-                            gu_time_test.c
-                            gu_fifo_test.c
-                            gu_uuid_test.c
-                            gu_dbug_test.c
-                            gu_lock_step_test.c
-                            gu_str_test.c
-                            gu_utils_test.c
-                         '''))
+                       source = gu_tests_objs + crc32c_objs)
 
 env.Test("gu_tests.passed", gu_tests)
 env.Alias("test", "gu_tests.passed")
@@ -80,7 +88,7 @@ if all_tests:
     env.Test("go_to_test.passed", gu_to_test)
     env.Test("avalance.passed", avalanche)
 
-    # copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
+# copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
 #                         source = Split('''
 #                             copy_vs_assignment.cpp
 #                         '''))
@@ -90,3 +98,7 @@ deqmap_bench = env.Program(target = 'deqmap_bench',
                                deqmap_bench.cpp
                            '''))
 
+crc32c_bench = crc32c_env.Program(target = 'crc32c_bench',
+                                  source = Split('''
+                                      crc32c_bench.cpp
+                                  '''))

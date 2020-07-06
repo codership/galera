@@ -78,6 +78,7 @@ Commandline Options:
     gcov=[True|False]   compile Galera for code coverage reporting
     install=path        install files under path
     version_script=[0|1] Use version script (default 1)
+    crc32c_no_hardware=[0|1] disable building hardware support for CRC32C
 ''')
 # bpostatic option added on Percona request
 
@@ -702,7 +703,13 @@ print('Global flags:')
 for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
     print(f + ': ' + env[f].strip())
 
-Export('x86', 'bits', 'env', 'sysname', 'libboost_program_options', 'install')
+Export('machine',
+       'x86',
+       'bits',
+       'env',
+       'sysname',
+       'libboost_program_options',
+       'install')
 
 #
 # Actions to build .dSYM directories, containing debugging information for Darwin
@@ -718,6 +725,11 @@ if sysname == 'darwin' and int(debug) >= 0 and int(debug) < 3:
 
 # Clone base from default environment
 check_env = env.Clone()
+
+if not x86:
+    # don't attempt to run the legacy protocol tests that use unaligned memory
+    # access on platforms that are not known to handle it well.
+    check_env.Append(CPPFLAGS = ' -DGALERA_ONLY_ALIGNED')
 
 conf = Configure(check_env)
 
