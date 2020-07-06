@@ -686,6 +686,11 @@ if sysname == 'darwin' and int(debug) >= 0 and int(debug) < 3:
 # Clone base from default environment
 check_env = env.Clone()
 
+if not x86:
+    # don't attempt to run the legacy protocol tests that use unaligned memory
+    # access on platforms that are not known to handle it well.
+    check_env.Append(CPPFLAGS = ' -DGALERA_ONLY_ALIGNED')
+
 conf = Configure(check_env)
 
 # Check header and library

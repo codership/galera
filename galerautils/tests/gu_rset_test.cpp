@@ -595,7 +595,9 @@ Suite* gu_rset_suite ()
     tcase_add_test (t, empty);
     tcase_add_test (t, ver1);
     tcase_add_test (t, ver1_padding);
+#ifndef GALERA_ONLY_ALIGNED
     suite_add_tcase (s, t);
+#endif
 
     t = tcase_create("RecordSet v2");
     tcase_add_test (t, ver2);

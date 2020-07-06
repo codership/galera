@@ -300,11 +300,13 @@ static void test_ver(gu::RecordSet::Version const rsv, int ws_ver)
     fail_if(0 == shared);
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver1_3)
 {
     test_ver(gu::RecordSet::VER1, 3);
 }
 END_TEST
+#endif /* GALERA_ONLY_ALIGNED */
 
 START_TEST (ver2_3)
 {
@@ -321,7 +323,9 @@ END_TEST
 Suite* key_set_suite ()
 {
     TCase* t = tcase_create ("KeySet");
+#ifndef GALERA_ONLY_ALIGNED
     tcase_add_test (t, ver1_3);
+#endif
     tcase_add_test (t, ver2_3);
     tcase_add_test (t, ver2_4);
     tcase_set_timeout(t, 60);

@@ -275,11 +275,13 @@ static void ver3_basic(gu::RecordSet::Version const rsv,
     }
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver3_basic_rsv1)
 {
     ver3_basic(gu::RecordSet::VER1, WriteSetNG::VER3);
 }
 END_TEST
+#endif /* GALERA_ONLY_ALIGNED */
 
 START_TEST (ver3_basic_rsv2_wsv3)
 {
@@ -377,11 +379,13 @@ static void ver3_annotation(gu::RecordSet::Version const rsv)
             annotation.c_str(), res.c_str());
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver3_annotation_rsv1)
 {
     ver3_annotation(gu::RecordSet::VER1);
 }
 END_TEST
+#endif /* GALERA_ONLY_ALIGNED */
 
 START_TEST (ver3_annotation_rsv2)
 {
@@ -394,14 +398,18 @@ Suite* write_set_ng_suite ()
     Suite* s = suite_create ("WriteSet");
 
     TCase* t = tcase_create ("WriteSet basic");
+#ifndef GALERA_ONLY_ALIGNED
     tcase_add_test (t, ver3_basic_rsv1);
+#endif
     tcase_add_test (t, ver3_basic_rsv2_wsv3);
     tcase_add_test (t, ver3_basic_rsv2_wsv4);
     tcase_set_timeout(t, 60);
     suite_add_tcase (s, t);
 
     t = tcase_create ("WriteSet annotation");
+#ifndef GALERA_ONLY_ALIGNED
     tcase_add_test (t, ver3_annotation_rsv1);
+#endif
     tcase_add_test (t, ver3_annotation_rsv2);
     tcase_set_timeout(t, 60);
     suite_add_tcase (s, t);

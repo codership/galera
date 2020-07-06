@@ -240,6 +240,7 @@ Suite *gu_fifo_suite(void)
     suite_add_tcase (s, tc);
     tcase_add_test  (tc, gu_fifo_test);
     tcase_add_test  (tc, gu_fifo_cancel_test);
+    tcase_set_timeout(tc, 60);
 
     return s;
 }

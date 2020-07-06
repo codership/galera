@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -7,6 +7,7 @@
 #include "../src/gu_mmh3.h"
 #include "../src/gu_log.h"
 #include "../src/gu_hexdump.h"
+#include "../src/gu_byteswap.h"
 
 /* This is to verify all tails plus block + all tails. Max block is 16 bytes */
 static const char test_input[] = "0123456789ABCDEF0123456789abcde";
@@ -28,7 +29,7 @@ test_output32[NUM_32_TESTS] =
     {{ 0xe1, 0xbe, 0x2d, 0xce }}  /* '0123456' */
 };
 
-typedef struct hash128 { uint8_t h[16]; } hash128_t;
+typedef union hash128 { uint8_t h[16]; uint64_t x[2]; } hash128_t;
 
 #define NUM_128_TESTS 32 /* 0 to 31 bytes */
 
