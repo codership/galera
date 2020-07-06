@@ -3,7 +3,6 @@
  */
 
 #include "../src/gu_crc32c.h"
-#include <www.evanjones.ca/crc32c.h>
 
 #include <iostream>
 #include <sstream>
@@ -99,13 +98,9 @@ one_length(size_t const len, size_t const reps)
 {
     std::cout << "\nImpl:   \tBytes:\tDuration:\tResult:\n";
 
-    run_bench_with_impl(crc32cSarwate,          len, reps, "EJ Sarwate ");
     run_bench_with_impl(gu_crc32c_sarwate,      len, reps, "GU Sarwate ");
-    run_bench_with_impl(crc32cSlicingBy4,       len, reps, "EJ Slicing4");
     run_bench_with_impl(gu_crc32c_slicing_by_4, len, reps, "GU Slicing4");
-    run_bench_with_impl(crc32cSlicingBy8,       len, reps, "EJ Slicing8");
     run_bench_with_impl(gu_crc32c_slicing_by_8, len, reps, "GU Slicing8");
-    run_bench_with_impl(detectBestCRC32C(),     len, reps, "EJ Hardware");
 #if defined(GU_CRC32C_X86)
     run_bench_with_impl(gu_crc32c_x86,          len, reps, "GU x86_32  ");
 #if defined(GU_CRC32C_X86_64)

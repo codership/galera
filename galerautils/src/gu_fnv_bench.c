@@ -6,8 +6,8 @@
  *
  * To compile on Ubuntu:
   g++ -DHAVE_ENDIAN_H -DHAVE_BYTESWAP_H -DGALERA_LOG_H_ENABLE_CXX \
-  -O3 -march=native -msse4 -Wall -Werror -I../.. gu_fnv_bench.c gu_crc32c.c \
-  gu_mmh3.c gu_spooky.c gu_log.c ../../www.evanjones.ca/crc32c.c \
+  -O3 -march=native -msse4 -Wall -Werror -I../.. gu_fnv_bench.c \
+  gu_mmh3.c gu_spooky.c gu_log.c gu_crc32c.c gu_crc32c_x86.c \
   -lssl -lcrypto -lcrypto++ -o gu_fnv_bench
  *
  * on CentOS some play with -lcrypto++ may be needed (also see includes below)
@@ -31,7 +31,6 @@
 
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <crypto++/md5.h>
-//#include <cryptopp/md5.h>
 
 enum algs
 {
@@ -82,9 +81,7 @@ static int timer (const void* const buf, ssize_t const len,
     {
         if (CRC32sw == type) alg = "crc32sw"; else alg = "crc32hw";
         INTERNAL_LOOP_BEGIN
-//            gu_crc32c_t crc = GU_CRC32C_INIT;
             h = gu_crc32c (buf, len);
-//            h = hash;
         INTERNAL_LOOP_END
         break;
     }
@@ -225,11 +222,12 @@ int main (int argc, char* argv[])
     if (!buf) return ENOMEM;
     while (buf_size_int) buf[--buf_size_int] = rand();
 
-    timer (buf, buf_size, loops, CRC32sw);
+    gu_crc32c_configure(); // compute lookup tables
+    gu_crc32c_func = gu_crc32c_hardware(); // try hardware CRC32C
+    if (gu_crc32c_func) timer(buf, buf_size, loops, CRC32hw);
 
-    CRC32CFunctionPtr const old = gu_crc32c_func;
-    gu_crc32c_configure();
-    if (old != gu_crc32c_func) timer(buf, buf_size, loops, CRC32hw);
+    gu_crc32c_func = gu_crc32c_slicing_by_8; // force software CRC32C
+    timer (buf, buf_size, loops, CRC32sw);
 
     timer (buf, buf_size, loops, FNV32);
     timer (buf, buf_size, loops, FNV64);
@@ -239,7 +237,7 @@ int main (int argc, char* argv[])
 //    timer (buf, buf_size, loops, SPOOKYS);
     timer (buf, buf_size, loops, SPOOKY);
 //    timer (buf, buf_size, loops, MD5SSL);
-//    timer (buf, buf_size, loops, MD5CPP);
+    timer (buf, buf_size, loops, MD5CPP);
     timer (buf, buf_size, loops, FAST128);
     timer (buf, buf_size, loops, TABLE);
 

@@ -5,7 +5,6 @@
  */
 
 #include "../src/gu_crc32c.h"
-#include <www.evanjones.ca/crc32c.h>
 
 #include "gu_crc32c_test.h"
 
@@ -101,35 +100,6 @@ test_function(void)
     fail_if (ret != output, "Generated %#08x, expected %#08x\n", ret, output);
 }
 
-START_TEST(test_Sarwate)
-{
-    gu_crc32c_func = crc32cSarwate;
-    test_function();
-}
-END_TEST
-
-START_TEST(test_SlicingBy4)
-{
-    gu_crc32c_func = crc32cSlicingBy4;
-    test_function();
-}
-END_TEST
-
-START_TEST(test_SlicingBy8)
-{
-    gu_crc32c_func = crc32cSlicingBy8;
-    test_function();
-}
-END_TEST
-
-// will run x86 hardware test, if available
-START_TEST(test_hardware)
-{
-    gu_crc32c_func = detectBestCRC32C();
-    test_function();
-}
-END_TEST
-
 START_TEST(test_gu_crc32c_sarwate)
 {
     gu_crc32c_func = gu_crc32c_sarwate;
@@ -184,16 +154,6 @@ Suite *gu_crc32c_suite(void)
 
     Suite *suite = suite_create("CRC32C implementations");
     TCase *t;
-
-    t = tcase_create("evanjones_sw");
-    suite_add_tcase (suite, t);
-    tcase_add_test  (t, test_Sarwate);
-    tcase_add_test  (t, test_SlicingBy4);
-    tcase_add_test  (t, test_SlicingBy8);
-
-    t = tcase_create("evanjones_hw");
-    suite_add_tcase (suite, t);
-    tcase_add_test  (t, test_hardware);
 
     t = tcase_create("gu_crc32c_sw");
     suite_add_tcase (suite, t);

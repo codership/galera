@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Codership Oy <info@codership.com>
  *
- * @file Interface to CRC-32C implementation from www.evanjones.ca
+ * @file Interface to CRC-32C implementations
  *
  * $Id$
  */
