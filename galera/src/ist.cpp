@@ -543,7 +543,7 @@ void galera::ist::Receiver::run()
             }
         }
 
-        progress->finish();
+        if (progress /* IST actually started */) progress->finish();
     }
     catch (asio::system_error& e)
     {
