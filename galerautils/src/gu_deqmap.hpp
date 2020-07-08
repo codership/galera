@@ -394,7 +394,7 @@ public:
     {
         GU_DEQMAP_ASSERT_CONSISTENCY;
 
-        return it - base_.begin() + begin_;
+        return (it - base_.begin()) + begin_;
     }
 
     index_type
@@ -502,7 +502,7 @@ private:
         t.GU_DEQMAP_ASSERT_CONSISTENCY;
 #endif
         if (i >= t.begin_ && i < t.end_)
-            return t.begin() += i - t.begin_;
+            return t.begin() += (i - t.begin_);
         else
             return t.end();
     }

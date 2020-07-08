@@ -709,8 +709,8 @@ START_TEST(random_test)
         bool operator!=(const map_state& o) const { return !operator==(o); }
     };
 
-    static int const SIZE(1<<14); // 16K
-    static int const SEED(1);
+    static int const SIZE(1<<13); // 8K
+    static int const SEED(2);
 
     Map map(0);
     srand(SEED);
@@ -762,7 +762,10 @@ START_TEST(random_test)
             Map::iterator it(map.begin() + (idx - begin));
             it = map.insert(it, val);
             fail_if(it == map.end());
-            fail_if(init_state != map_state(map));
+            if (size_change)
+                fail_if(init_state == map_state(map));
+            else
+                fail_if(init_state != map_state(map));
         }
         break;
         case INDEX:
@@ -794,9 +797,11 @@ START_TEST(random_test)
         int const begin(map.index_begin());
         int const end(map.index_end());
         fail_if(begin >= end);
+        fail_if(map.index_back() >= end);
 
         int const size(end - begin);
         int const idx((rand() % size) + begin);
+        fail_if(idx >= map.index_end());
 
         bool size_change;
         how_t how;
@@ -826,7 +831,7 @@ START_TEST(random_test)
         switch (how)
         {
         case ITERATOR:
-            map.erase(map.begin() + idx - begin);
+            map.erase(map.begin() + (idx - begin));
             if (size_change)
                 fail_if(init_state == map_state(map));
             else
