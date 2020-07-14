@@ -21,7 +21,6 @@ f 755 root root $LIBS_DEST/libgalera_smm.so $BUILD_BASE/libgalera_smm.so
 d 755 root root $DOCS_DEST -
 f 644 root root $DOCS_DEST/COPYING          $BUILD_BASE/LICENSE
 f 644 root root $DOCS_DEST/LICENSE.asio     $BUILD_BASE/asio/LICENSE_1_0.txt
-f 644 root root $DOCS_DEST/LICENSE.crc32c   $BUILD_BASE/www.evanjones.ca/LICENSE
 f 644 root root $DOCS_DEST/LICENSE.chromium $BUILD_BASE/chromium/LICENSE
 f 644 root root $DOCS_DEST/README       README
 f 644 root root $DOCS_DEST/README-MySQL README-MySQL

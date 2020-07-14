@@ -22,7 +22,6 @@ share/licenses/galera-%{RELEASE}/catalog.mk
 share/licenses/galera-%{RELEASE}/LICENSE
 share/licenses/galera-%{RELEASE}/GPLv2
 share/licenses/galera-%{RELEASE}/LICENSE.asio
-share/licenses/galera-%{RELEASE}/LICENSE.crc32c
 share/licenses/galera-%{RELEASE}/LICENSE.chromium
 @mode 0555
 etc/rc.d/garb

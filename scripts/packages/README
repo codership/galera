@@ -23,9 +23,6 @@ This product uses asio C++ library which is
 Copyright (c) 2003-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 licensed under Boost Software License.
 
-This product uses CRC-32C implementation from http://www.evanjones.ca which is
-licensed under MIT License.
-
 This product uses aligned buffer implementation from Chromium Project which is
 copyright Chromium Authors and licensed under Chromium License
 
