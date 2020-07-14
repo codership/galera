@@ -64,8 +64,6 @@ if install:
     env.Install(install + '/doc/', '#AUTHORS')
     env.InstallAs(install + '/doc/LICENSE.asio',
                 '#asio/LICENSE_1_0.txt')
-    env.InstallAs(install + '/doc/LICENSE.crc32c',
-                '#www.evanjones.ca/LICENSE')
     env.InstallAs(install + '/doc/LICENSE.chromium',
                 '#chromium/LICENSE')
     env.InstallAs(install + '/doc/README',

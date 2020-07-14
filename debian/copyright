@@ -63,11 +63,6 @@ Files: chromium/*
 Copyright: 2012 The Chromium Authors as listed in AUTHORS file
 License: BSD-3-clause
 
-Files: www.evanjones.ca/*
-Copyright: 2008,2009,2010 Massachusetts Institute of Technology
-           2004-2006 Intel Corporation
-License: BSD-3-clause
-
 License: BSD-3-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
